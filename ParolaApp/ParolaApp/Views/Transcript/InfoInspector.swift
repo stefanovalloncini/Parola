@@ -26,6 +26,17 @@ struct InfoInspector: View {
                 if let updated = entry?.updatedAt {
                     InfoRow(icon: "calendar.badge.clock", label: "Updated", value: dateLabel(updated))
                 }
+                if let aiTitle = entry?.aiTitle {
+                    InfoRow(icon: "sparkles", label: "AI title", value: aiTitle, wraps: true)
+                }
+                if let summary = entry?.shortSummary {
+                    InfoRow(icon: "text.quote", label: "AI summary", value: summary, wraps: true)
+                }
+                if model.features.isEnabled(.ai), model.transcript != nil {
+                    Button("Regenerate title and summary") { model.regenerateCardMetadata() }
+                        .buttonStyle(DSPillButtonStyle(kind: .secondary))
+                        .axLeaf("Info.Button.RegenerateCardMetadata")
+                }
             }
 
             InspectorSection(title: "Transcription Details") {

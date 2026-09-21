@@ -761,6 +761,28 @@
         }
       }
     },
+    "AI summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riassunto AI"
+          }
+        }
+      }
+    },
+    "AI title": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titolo AI"
+          }
+        }
+      }
+    },
     "APP": {
       "extractionState": "manual",
       "localizations": {
@@ -2031,6 +2053,17 @@
         }
       }
     },
+    "Card and row titles use the generated title when one exists.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I titoli delle schede e delle righe usano il titolo generato, quando esiste."
+          }
+        }
+      }
+    },
     "Case sensitive": {
       "extractionState": "manual",
       "localizations": {
@@ -2834,6 +2867,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Personalizzato"
+          }
+        }
+      }
+    },
+    "Custom summary instructions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Istruzioni personalizzate per il riassunto"
+          }
+        }
+      }
+    },
+    "Custom title instructions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Istruzioni personalizzate per il titolo"
           }
         }
       }
@@ -4338,6 +4393,28 @@
         }
       }
     },
+    "For example, keep numbers and dates.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ad esempio, mantieni numeri e date."
+          }
+        }
+      }
+    },
+    "For example, mention the client's name.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ad esempio, cita il nome del cliente."
+          }
+        }
+      }
+    },
     "Format": {
       "extractionState": "manual",
       "localizations": {
@@ -4395,6 +4472,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Genera una panoramica breve con dei capitoli a cui puoi saltare."
+          }
+        }
+      }
+    },
+    "Generate an AI title and summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genera un titolo e un riassunto con l'AI"
           }
         }
       }
@@ -5229,6 +5317,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Libreria"
+          }
+        }
+      }
+    },
+    "Library cards": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schede della libreria"
           }
         }
       }
@@ -7902,6 +8001,17 @@
         }
       }
     },
+    "Regenerate title and summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rigenera titolo e riassunto"
+          }
+        }
+      }
+    },
     "Regex": {
       "extractionState": "manual",
       "localizations": {
@@ -8249,6 +8359,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Preset di riscrittura"
+          }
+        }
+      }
+    },
+    "Row previews use the generated summary when one exists.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le anteprime delle righe usano il riassunto generato, quando esiste."
           }
         }
       }
@@ -8904,6 +9025,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra sostituisci"
+          }
+        }
+      }
+    },
+    "Show the AI summary instead of the first lines": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra il riassunto AI al posto delle prime righe"
+          }
+        }
+      }
+    },
+    "Show the AI title instead of the file name": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra il titolo AI al posto del nome del file"
           }
         }
       }
@@ -11110,6 +11253,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parole che attivano questo prompt per una sola dettatura. Separale con la virgola."
+          }
+        }
+      }
+    },
+    "Writes a short title and a one-line summary from the transcript, on device, when a transcription finishes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrive un titolo breve e un riassunto in una riga dalla trascrizione, sul dispositivo, al termine della trascrizione."
           }
         }
       }

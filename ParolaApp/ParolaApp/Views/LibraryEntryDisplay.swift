@@ -81,7 +81,10 @@ struct LibraryRowDisplay: Identifiable {
     let languageLabel: String?
     let tooltip: String
     /// The opening of the transcript, read from the search index. nil until the index has the entry.
+    /// Replaced by the entry's AI summary when `showsAISummary` is set.
     let excerpt: String?
+    /// The excerpt argument as passed in, before any AI-summary substitution — what the cache compares against.
+    let rawExcerpt: String?
     let sourceKind: EntrySourceKind
 
     var id: LibraryEntry.ID { entry.id }
@@ -90,12 +93,22 @@ struct LibraryRowDisplay: Identifiable {
     var labels: [String] { entry.labels }
 
     /// `date` is what the row states; `dateLabel` names it where the bare day would read as the creation.
-    init(entry: LibraryEntry, excerpt: String? = nil, date: Date? = nil, dateLabel: String? = nil) {
-        let title = LibraryEntryDisplay.title(for: entry)
+    /// `showsAITitle`/`showsAISummary` swap in the entry's generated title and summary when it has one.
+    init(
+        entry: LibraryEntry,
+        excerpt: String? = nil,
+        date: Date? = nil,
+        dateLabel: String? = nil,
+        showsAITitle: Bool = false,
+        showsAISummary: Bool = false
+    ) {
+        let baseTitle = LibraryEntryDisplay.title(for: entry)
+        let title = showsAITitle ? (entry.aiTitle ?? baseTitle) : baseTitle
         let stated = date ?? entry.createdAt
         self.entry = entry
         self.title = title
-        self.excerpt = excerpt
+        self.excerpt = showsAISummary ? (entry.shortSummary ?? excerpt) : excerpt
+        self.rawExcerpt = excerpt
         sourceKind = EntrySourceKind(entry: entry)
         timeOfDay = dateLabel ?? AppFormat.timeOfDay(stated)
         shortDate = dateLabel ?? AppFormat.dayAndMonth(stated)
@@ -131,10 +144,15 @@ struct LibraryRowDisplayCache {
         for entry: LibraryEntry,
         excerpt: String? = nil,
         date: Date? = nil,
-        dateLabel: String? = nil
+        dateLabel: String? = nil,
+        showsAITitle: Bool = false,
+        showsAISummary: Bool = false
     ) -> LibraryRowDisplay {
-        if let cached = displays[entry.id], cached.excerpt == excerpt { return cached }
-        let display = LibraryRowDisplay(entry: entry, excerpt: excerpt, date: date, dateLabel: dateLabel)
+        if let cached = displays[entry.id], cached.rawExcerpt == excerpt { return cached }
+        let display = LibraryRowDisplay(
+            entry: entry, excerpt: excerpt, date: date, dateLabel: dateLabel,
+            showsAITitle: showsAITitle, showsAISummary: showsAISummary
+        )
         displays[entry.id] = display
         return display
     }

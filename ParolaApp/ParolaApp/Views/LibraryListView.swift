@@ -249,7 +249,10 @@ struct LibraryListView: View {
             let size = sizes[entry.id]
             totalBytes += size ?? 0
             totalSeconds += entry.durationSeconds ?? 0
-            return cache.display(for: entry, excerpt: model.libraryExcerpts[entry.id])
+            return cache.display(
+                for: entry, excerpt: model.libraryExcerpts[entry.id],
+                showsAITitle: model.showAITitles, showsAISummary: model.showAISummaries
+            )
         }
         displayCache = cache
         entries = displays

@@ -161,7 +161,10 @@ struct EmptyDropZone: View {
         let displays = RecentEntries
             .most(of: model.libraryEntries, limit: RecentEntries.homeMaximum)
             .map {
-                cache.display(for: $0, excerpt: model.libraryExcerpts[$0.id])
+                cache.display(
+                    for: $0, excerpt: model.libraryExcerpts[$0.id],
+                    showsAITitle: model.showAITitles, showsAISummary: model.showAISummaries
+                )
             }
         recentCache = cache
         recentGroups = LibraryDateGroups.trimmed(
