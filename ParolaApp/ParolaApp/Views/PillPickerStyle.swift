@@ -1,5 +1,27 @@
 import SwiftUI
 
+/// One segment of the toolbar's intake capsule: no shell of its own, just a hover fill inside the shared one.
+struct IntakeSegment<Label: View>: View {
+    let action: () -> Void
+    @ViewBuilder var label: Label
+
+    @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        Button(action: action) {
+            label
+                .padding(.horizontal, DS.Spacing.regular)
+                .frame(height: ToolbarCapsule.height)
+                .background(hovering ? DS.Palette.subtleFill : Color.clear)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .opacity(isEnabled ? 1 : DS.Opacity.disabled)
+        .onHover { hovering = isEnabled && $0 }
+    }
+}
+
 struct PillPickerButton<MenuContent: View>: View {
     let icon: String
     let caption: String
@@ -7,11 +29,9 @@ struct PillPickerButton<MenuContent: View>: View {
     @ViewBuilder var menuContent: () -> MenuContent
 
     @State private var isPresented = false
-    @State private var hovering = false
-    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
-        Button {
+        IntakeSegment {
             isPresented = true
         } label: {
             HStack(spacing: 7) {
@@ -27,22 +47,7 @@ struct PillPickerButton<MenuContent: View>: View {
                     .font(DS.Font.caption)
                     .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, DS.Spacing.regular)
-            .padding(.vertical, DS.Spacing.tight)
-            .frame(height: 28)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.primary.opacity(hovering ? 0.10 : 0.06))
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-            )
-            .contentShape(Capsule(style: .continuous))
         }
-        .buttonStyle(.plain)
-        .opacity(isEnabled ? 1 : DS.Opacity.disabled)
-        .onHover { hovering = isEnabled && $0 }
         .accessibilityLabel("\(caption): \(value)")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             menuContent()

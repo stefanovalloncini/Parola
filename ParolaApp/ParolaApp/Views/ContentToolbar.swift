@@ -22,17 +22,7 @@ struct ContentToolbar: ToolbarContent {
     var body: some ToolbarContent {
         if showsIntakeSettings {
             ToolbarItem(placement: .navigation) {
-                HStack(spacing: DS.Spacing.small) {
-                    ModelPickerView()
-                    LanguagePickerView()
-                        .disabled(selectedModelIsEnglishOnly)
-                        .modifier(LanguageNoticeHelpModifier(notice: languageControlNotice))
-                }
-                // Without this the pills' own capsules run flush into the toolbar's rounded ends.
-                .padding(.horizontal, DS.Spacing.tight)
-            }
-            ToolbarItem(placement: .navigation) {
-                optionsButton
+                intakeCapsule
             }
         }
         ToolbarSpacer(.flexible, placement: .navigation)
@@ -56,11 +46,31 @@ struct ContentToolbar: ToolbarContent {
         }
     }
 
-    private var optionsButton: some View {
-        Button {
+    private var intakeCapsule: some View {
+        HStack(spacing: 0) {
+            ModelPickerView()
+            segmentDivider
+            LanguagePickerView()
+                .disabled(selectedModelIsEnglishOnly)
+                .modifier(LanguageNoticeHelpModifier(notice: languageControlNotice))
+            segmentDivider
+            optionsSegment
+        }
+        .toolbarCapsule()
+    }
+
+    private var segmentDivider: some View {
+        DS.Color.separator
+            .frame(width: 0.5, height: ToolbarCapsule.height)
+    }
+
+    private var optionsSegment: some View {
+        IntakeSegment {
             optionsOpen.toggle()
         } label: {
             Image(systemName: "slider.horizontal.3")
+                .font(DS.Font.bodyStrong)
+                .foregroundStyle(DS.Color.accent)
                 .overlay(alignment: .topTrailing) {
                     if optionsActive {
                         Circle()

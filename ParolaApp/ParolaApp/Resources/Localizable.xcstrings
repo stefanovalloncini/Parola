@@ -1476,6 +1476,17 @@
         }
       }
     },
+    "Auto-detect": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatica"
+          }
+        }
+      }
+    },
     "Auto-detect meeting apps": {
       "extractionState": "manual",
       "localizations": {

@@ -35,7 +35,7 @@ struct LanguagePickerView: View {
         return displayName(for: code)
     }
 
-    private var autoLabel: String { String(localized: "Auto") }
+    private var autoLabel: String { String(localized: "Auto-detect") }
 
     private func displayName(for code: String) -> String {
         SupportedLanguages.displayName(for: code)
