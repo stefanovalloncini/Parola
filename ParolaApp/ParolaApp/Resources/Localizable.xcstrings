@@ -431,10 +431,40 @@
     "%lld words": {
       "extractionState": "manual",
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld word"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld words"
+                }
+              }
+            }
+          }
+        },
         "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld parole"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld parola"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld parole"
+                }
+              }
+            }
           }
         }
       }
@@ -4003,6 +4033,17 @@
         }
       }
     },
+    "Export as": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta come"
+          }
+        }
+      }
+    },
     "Export as TXT": {
       "extractionState": "manual",
       "localizations": {
@@ -5584,6 +5625,17 @@
         }
       }
     },
+    "Markdown": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Markdown"
+          }
+        }
+      }
+    },
     "Markdown (.md)": {
       "extractionState": "manual",
       "localizations": {
@@ -7009,6 +7061,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Overlay"
+          }
+        }
+      }
+    },
+    "PDF": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PDF"
           }
         }
       }
@@ -8469,6 +8532,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "SORGENTI"
+          }
+        }
+      }
+    },
+    "SRT": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SRT"
           }
         }
       }
@@ -9945,6 +10019,17 @@
         }
       }
     },
+    "Text": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testo"
+          }
+        }
+      }
+    },
     "Text and density": {
       "extractionState": "manual",
       "localizations": {
@@ -11221,6 +11306,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "WhisperKit · FluidAudio · Sparkle"
+          }
+        }
+      }
+    },
+    "Word": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Word"
           }
         }
       }
