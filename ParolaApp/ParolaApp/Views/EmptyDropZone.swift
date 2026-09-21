@@ -343,6 +343,7 @@ private struct ModeButton: View {
     let systemImage: String
     let action: () -> Void
 
+    @Environment(\.isEnabled) private var isEnabled
     @State private var isHovering = false
 
     var body: some View {
@@ -355,7 +356,7 @@ private struct ModeButton: View {
                     .foregroundStyle(DS.Color.primaryText)
             }
             .pillStyle()
-            .opacity(isHovering ? 1 : 0.88)
+            .opacity(isEnabled ? (isHovering ? 1 : 0.88) : DS.Opacity.disabled)
         }
         .buttonStyle(.plain)
         .onHover { hovering in
@@ -369,7 +370,6 @@ struct ActionCard: View {
     let title: LocalizedStringKey
     var subtitle: LocalizedStringKey?
     let systemImage: String
-    var isEnabled: Bool = true
     let action: () -> Void
 
     @State private var isHovering = false
@@ -408,10 +408,7 @@ struct ActionCard: View {
             .contentShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         }
         .buttonStyle(.plain)
-        .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.45)
         .onHover { hovering in
-            guard isEnabled else { return }
             withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
         }
         .help(title)
