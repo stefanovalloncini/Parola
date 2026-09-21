@@ -34,8 +34,7 @@ struct QueueView: View {
             title: "Queue",
             subtitle: QueueCount.label(for: model.batchJobs),
             trailing: {
-                SearchPill(text: $searchText, placeholder: "Search queue")
-                    .frame(maxWidth: 240)
+                CollapsingSearchPill(text: $searchText, placeholder: "Search queue", width: 240)
                 sortMenu
                 Button {
                     model.clearFinishedBatchJobs()
