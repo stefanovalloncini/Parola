@@ -5,7 +5,7 @@ import ParolaCore
 import ParolaTestSupport
 
 @MainActor
-@Suite("Bridge library commands")
+@Suite("Bridge library commands", .serialized)
 struct LibraryCommandsTests {
 
     private func makeIsolatedDefaults() -> UserDefaults {
@@ -127,21 +127,24 @@ struct LibraryCommandsTests {
         #expect(second["shortSummary"] == .null)
     }
 
-    @Test("generateCardMetadata writes the AI title and summary using the mock model")
-    func generateCardMetadataWritesFields() async throws {
-        let (model, server, context, commands) = try makeRig()
-        let entry = try await model.library.add(
+    private func makeCardMetadataEntry(_ model: AppModel) async throws -> LibraryEntry {
+        try await model.library.add(
             transcript: Transcript(
                 segments: [TranscriptSegment(id: 0, start: 0, end: 9, text: String(repeating: "vendite per canale ", count: 6))],
                 language: "it", modelName: "m"
             ),
             audioSource: nil, category: .transcription
         )
+    }
+
+    @Test("generateCardMetadata writes the AI title and summary using the mock model")
+    func generateCardMetadataWritesFields() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let entry = try await makeCardMetadataEntry(model)
         await MockLanguageModelStore.shared.install(
             provider: .foundation,
             response: MockLanguageModelResponse(text: "Piano vendite\nRiepilogo delle quote per canale.")
         )
-        defer { Task { await MockLanguageModelStore.shared.clear() } }
         let command = try #require(commands["generateCardMetadata"])
 
         let result = try await command.handler(try command.validate(AutomationArgs(["id": .string(entry.id)])), context)
@@ -151,8 +154,53 @@ struct LibraryCommandsTests {
             Issue.record("generateCardMetadata should return an object")
             return
         }
+        #expect(fields["generated"] == .bool(true))
         #expect(fields["aiTitle"] == .string("Piano vendite"))
         #expect(fields["shortSummary"] == .string("Riepilogo delle quote per canale."))
+        await MockLanguageModelStore.shared.clear()
+    }
+
+    @Test("generateCardMetadata reports why it skipped when the AI feature is off")
+    func generateCardMetadataReportsFeatureOff() async throws {
+        let model = AppModel(
+            skipBootstrap: true, defaults: makeIsolatedDefaults(),
+            libraryURL: makeTempLibraryURL("librarycommands-nofeature"), features: []
+        )
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let commands = Dictionary(uniqueKeysWithValues: server.libraryCommands().map { ($0.name, $0) })
+        let entry = try await makeCardMetadataEntry(model)
+        let command = try #require(commands["generateCardMetadata"])
+
+        let result = try await command.handler(try command.validate(AutomationArgs(["id": .string(entry.id)])), context)
+        withExtendedLifetime(server) {}
+
+        guard case .object(let fields) = result else {
+            Issue.record("generateCardMetadata should return an object")
+            return
+        }
+        #expect(fields["generated"] == .bool(false))
+        #expect(fields["reason"] != nil)
+        #expect(fields["aiTitle"] == nil)
+    }
+
+    @Test("generateCardMetadata reports why it skipped when the toggle is off")
+    func generateCardMetadataReportsToggleOff() async throws {
+        let (model, server, context, commands) = try makeRig()
+        model.generatesCardMetadata = false
+        let entry = try await makeCardMetadataEntry(model)
+        let command = try #require(commands["generateCardMetadata"])
+
+        let result = try await command.handler(try command.validate(AutomationArgs(["id": .string(entry.id)])), context)
+        withExtendedLifetime(server) {}
+
+        guard case .object(let fields) = result else {
+            Issue.record("generateCardMetadata should return an object")
+            return
+        }
+        #expect(fields["generated"] == .bool(false))
+        #expect(fields["reason"] != nil)
+        #expect(fields["aiTitle"] == nil)
     }
 
     @Test("listDeletedEntries clamps a negative limit to empty instead of trapping")

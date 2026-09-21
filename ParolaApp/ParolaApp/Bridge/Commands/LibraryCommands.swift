@@ -40,19 +40,27 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "generateCardMetadata",
                 area: .library,
-                summary: "Writes the on-device title and one-line summary for an entry. Needs the AI feature; use installMockLanguageModel in tests.",
+                summary: "Writes the on-device title and one-line summary for an entry. Needs the AI feature and the generation toggle; use installMockLanguageModel in tests.",
                 kind: .mutating,
                 args: [
                     .init(name: "id", kind: .string(), required: true, summary: "Library entry ID"),
                 ],
                 handler: { args, ctx in
                     let id = try args.string("id")
+                    guard ctx.model.features.isEnabled(.ai) else {
+                        return .object(["generated": .bool(false), "reason": .string("the AI feature is off")])
+                    }
+                    guard ctx.model.generatesCardMetadata else {
+                        return .object(["generated": .bool(false), "reason": .string("card metadata generation is off")])
+                    }
                     let loaded = try await ctx.model.library.load(id)
-                    await ctx.model.generateCardMetadata(for: id, transcript: loaded.document.transcript)
-                    let reloaded = try await ctx.model.library.load(id)
+                    guard let meta = await ctx.model.generateCardMetadata(for: id, transcript: loaded.document.transcript) else {
+                        return .object(["generated": .bool(false), "reason": .string("generation failed or the transcript was too short")])
+                    }
                     return .object([
-                        "aiTitle": reloaded.entry.aiTitle.map { .string($0) } ?? .null,
-                        "shortSummary": reloaded.entry.shortSummary.map { .string($0) } ?? .null,
+                        "generated": .bool(true),
+                        "aiTitle": .string(meta.title),
+                        "shortSummary": .string(meta.summary),
                     ])
                 }
             ),
