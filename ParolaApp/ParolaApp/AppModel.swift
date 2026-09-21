@@ -2882,9 +2882,7 @@ final class AppModel {
 
     // MARK: - Editing
 
-    /// The single seam for user edits to the transcript: installs the new value, schedules the
-    /// debounced persist, remaps favorites when the edit moved them, and registers an inverse
-    /// edit (transcript and favorites both) with the window's undo manager.
+    /// The single seam for user edits: installs the new value, persists, remaps favorites, and registers an inverse edit with the undo manager.
     func applyTranscriptEdit(
         _ new: Transcript,
         actionName: String,
@@ -2909,8 +2907,7 @@ final class AppModel {
     ) {
         guard let undoManager else { return }
         let entryID = selectedEntryID
-        // The undo closure runs after this edit lands, so from its perspective the edit's `new`
-        // favorites are the current ones and its `old` favorites are the target to restore.
+        // From the undo closure's perspective this edit's `new` favorites are current; `old` is the restore target.
         let inverseFavorites = (old: favorites.new, new: favorites.old)
         // Only group explicitly when event grouping is off (tests): nesting inside the window's per-event group would leave that group unnamed, and the Edit menu title reads the top-level group's name.
         let opensGroup = !undoManager.groupsByEvent && !undoManager.isUndoing && !undoManager.isRedoing
