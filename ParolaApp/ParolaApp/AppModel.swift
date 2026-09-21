@@ -2883,17 +2883,35 @@ final class AppModel {
     // MARK: - Editing
 
     /// The single seam for user edits to the transcript: installs the new value, schedules the
-    /// debounced persist, and registers an inverse edit with the window's undo manager.
-    func applyTranscriptEdit(_ new: Transcript, actionName: String, textChanged: Bool = true) {
+    /// debounced persist, remaps favorites when the edit moved them, and registers an inverse
+    /// edit (transcript and favorites both) with the window's undo manager.
+    func applyTranscriptEdit(
+        _ new: Transcript,
+        actionName: String,
+        textChanged: Bool = true,
+        favorites: (old: Set<Int>, new: Set<Int>)? = nil
+    ) {
         guard let old = transcript, old != new else { return }
+        let resolvedFavorites = favorites ?? (favoriteSegmentIDs, favoriteSegmentIDs)
         transcript = new
         persistCurrentTranscriptIfLoaded(textChanged: textChanged)
-        registerTranscriptUndo(restoring: old, actionName: actionName, textChanged: textChanged)
+        if resolvedFavorites.new != resolvedFavorites.old { replaceFavorites(resolvedFavorites.new) }
+        registerTranscriptUndo(
+            restoring: old, favorites: resolvedFavorites, actionName: actionName, textChanged: textChanged
+        )
     }
 
-    private func registerTranscriptUndo(restoring old: Transcript, actionName: String, textChanged: Bool) {
+    private func registerTranscriptUndo(
+        restoring old: Transcript,
+        favorites: (old: Set<Int>, new: Set<Int>),
+        actionName: String,
+        textChanged: Bool
+    ) {
         guard let undoManager else { return }
         let entryID = selectedEntryID
+        // The undo closure runs after this edit lands, so from its perspective the edit's `new`
+        // favorites are the current ones and its `old` favorites are the target to restore.
+        let inverseFavorites = (old: favorites.new, new: favorites.old)
         // Only group explicitly when event grouping is off (tests): nesting inside the window's per-event group would leave that group unnamed, and the Edit menu title reads the top-level group's name.
         let opensGroup = !undoManager.groupsByEvent && !undoManager.isUndoing && !undoManager.isRedoing
             && undoManager.groupingLevel == 0
@@ -2902,7 +2920,9 @@ final class AppModel {
             // Undo always fires on the thread that calls undo()/redo(), which is the main thread here.
             MainActor.assumeIsolated {
                 guard model.selectedEntryID == entryID else { return }
-                model.applyTranscriptEdit(old, actionName: actionName, textChanged: textChanged)
+                model.applyTranscriptEdit(
+                    old, actionName: actionName, textChanged: textChanged, favorites: inverseFavorites
+                )
             }
         }
         undoManager.setActionName(actionName)
@@ -2924,8 +2944,7 @@ final class AppModel {
         t.segments.removeAll { $0.id == id }
         let favorites = favoriteSegmentIDs
         let newFavorites = FavoriteRemap.afterDelete(favorites, of: id)
-        applyTranscriptEdit(t, actionName: String(localized: "Delete Segment"))
-        if newFavorites != favorites { replaceFavorites(newFavorites) }
+        applyTranscriptEdit(t, actionName: String(localized: "Delete Segment"), favorites: (favorites, newFavorites))
     }
 
     func assignSpeaker(_ name: String?, toSegmentID id: TranscriptSegment.ID) {
@@ -2951,8 +2970,7 @@ final class AppModel {
         t.segments = segments
         let favorites = favoriteSegmentIDs
         let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: firstID)
-        applyTranscriptEdit(t, actionName: String(localized: "Split Segment"))
-        if newFavorites != favorites { replaceFavorites(newFavorites) }
+        applyTranscriptEdit(t, actionName: String(localized: "Split Segment"), favorites: (favorites, newFavorites))
     }
 
     func splitSegment(id: TranscriptSegment.ID, atFraction fraction: Double) {
@@ -2962,8 +2980,7 @@ final class AppModel {
         t.segments = segments
         let favorites = favoriteSegmentIDs
         let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: firstID)
-        applyTranscriptEdit(t, actionName: String(localized: "Split Segment"))
-        if newFavorites != favorites { replaceFavorites(newFavorites) }
+        applyTranscriptEdit(t, actionName: String(localized: "Split Segment"), favorites: (favorites, newFavorites))
     }
 
     func mergeSegmentWithNext(id: TranscriptSegment.ID) {
@@ -2974,8 +2991,7 @@ final class AppModel {
         t.segments = segments
         let favorites = favoriteSegmentIDs
         let newFavorites = FavoriteRemap.afterMerge(favorites, of: id, with: nextID)
-        applyTranscriptEdit(t, actionName: String(localized: "Merge Segments"))
-        if newFavorites != favorites { replaceFavorites(newFavorites) }
+        applyTranscriptEdit(t, actionName: String(localized: "Merge Segments"), favorites: (favorites, newFavorites))
     }
 
     func nudgeSegmentStart(id: TranscriptSegment.ID, frames: Int) {
