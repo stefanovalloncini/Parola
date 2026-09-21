@@ -59,8 +59,14 @@ enum ToolbarSearchMetrics {
 /// `FocusState` never takes on a field hosted in the window toolbar, so the caret and the field's keyboard state go through AppKit.
 @MainActor
 enum ToolbarSearchFocus {
+    /// Walking the titlebar is not free, so it happens only when the field is about to be needed.
+    static func allowLookup() {
+        lookupAllowed = true
+    }
+
     @discardableResult
     static func placeCaret() -> Bool {
+        allowLookup()
         guard let (window, field) = locate() else { return false }
         if window.firstResponder !== field { previousResponder = window.firstResponder as? NSView }
         return window.makeFirstResponder(field)
@@ -74,26 +80,34 @@ enum ToolbarSearchFocus {
         window.makeFirstResponder(restored ?? window.contentView)
     }
 
-    private static weak var previousResponder: NSView?
-
     /// The field posts its begin-editing notification only once text changes, so the caret is read off the field editor instead.
     static func holdsCaret() -> Bool {
         locate()?.field.currentEditor() != nil
     }
 
+    private static weak var cachedWindow: NSWindow?
+    private static weak var cachedField: NSTextField?
+    private static weak var previousResponder: NSView?
+    private static var lookupAllowed = true
+
     private static func locate() -> (window: NSWindow, field: NSTextField)? {
-        if let cached, cached.field.window != nil { return cached }
-        for window in NSApp.windows where window.isVisible {
-            if let field = toolbarField(in: window) {
-                cached = (window, field)
-                return cached
-            }
+        if let cachedWindow, let cachedField, cachedField.window === cachedWindow { return (cachedWindow, cachedField) }
+        guard lookupAllowed else { return nil }
+        lookupAllowed = false
+        for window in searchOrder() {
+            guard let field = toolbarField(in: window) else { continue }
+            cachedWindow = window
+            cachedField = field
+            return (window, field)
         }
-        cached = nil
         return nil
     }
 
-    private static var cached: (window: NSWindow, field: NSTextField)?
+    /// The field belongs to the window being used, so start there instead of at the head of `NSApp.windows`.
+    private static func searchOrder() -> [NSWindow] {
+        let preferred = [NSApp.keyWindow, NSApp.mainWindow].compactMap { $0 }
+        return preferred + NSApp.windows.filter { $0.isVisible && !preferred.contains($0) }
+    }
 
     private static func toolbarField(in window: NSWindow) -> NSTextField? {
         guard let titlebar = window.contentView?.superview?.subviews.first(where: isTitlebar) else { return nil }
@@ -133,17 +147,18 @@ struct ToolbarSearchField: View {
         }
         .animation(reduceMotion ? nil : DS.Motion.resize, value: editing)
         .animation(reduceMotion ? nil : DS.Motion.resize, value: collapsed)
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didUpdateNotification)) { _ in
-            guard !collapsed else { return }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didUpdateNotification)) { note in
+            guard !collapsed, (note.object as? NSWindow)?.isKeyWindow == true else { return }
             let holdsCaret = ToolbarSearchFocus.holdsCaret()
             guard holdsCaret != editing else { return }
             editing = holdsCaret
             if !holdsCaret, model.searchQuery.isEmpty { expanded = false }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            ToolbarSearchFocus.allowLookup()
+        }
         .onChange(of: model.librarySearchFocusRequests) { _, _ in
-            expanded = true
-            // The field is not on screen yet on the frame the chip gives way to it, so the caret ask waits a runloop turn.
-            DispatchQueue.main.async { ToolbarSearchFocus.placeCaret() }
+            requestCaret()
         }
     }
 
@@ -182,6 +197,9 @@ struct ToolbarSearchField: View {
             )
         )
         .toolbarCapsule(focused: editing)
+        // A click lands after a hover, so warming the lookup here keeps it off the event loop's back.
+        .onHover { inside in if inside { ToolbarSearchFocus.allowLookup() } }
+        .onAppear { ToolbarSearchFocus.allowLookup() }
     }
 
     private var clearButton: some View {
@@ -201,8 +219,7 @@ struct ToolbarSearchField: View {
 
     private var expandChip: some View {
         Button {
-            expanded = true
-            DispatchQueue.main.async { ToolbarSearchFocus.placeCaret() }
+            requestCaret()
         } label: {
             Image(systemName: "magnifyingglass")
                 .overlay(alignment: .topTrailing) {
@@ -224,6 +241,18 @@ struct ToolbarSearchField: View {
     private var chipLabel: String {
         let query = model.searchQuery.trimmingCharacters(in: .whitespaces)
         return query.isEmpty ? String(localized: "Search history") : String(localized: "Searching for “\(query)”")
+    }
+
+    /// The field is not on screen yet on the frame the chip gives way to it, so the ask waits a runloop turn — and one more before giving up.
+    private func requestCaret() {
+        expanded = true
+        DispatchQueue.main.async {
+            guard !ToolbarSearchFocus.placeCaret() else { return }
+            DispatchQueue.main.async {
+                guard !ToolbarSearchFocus.placeCaret(), model.searchQuery.isEmpty else { return }
+                expanded = false
+            }
+        }
     }
 
     private func escape() -> KeyPress.Result {
