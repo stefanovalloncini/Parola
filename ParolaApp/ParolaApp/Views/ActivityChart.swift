@@ -10,39 +10,43 @@ struct ActivityChart: View {
     let caption: String
 
     static let height: CGFloat = 160
+    static let axisStripHeight: CGFloat = 18
 
     @State private var hovered: Date?
     private let calendar = Calendar.current
 
     var body: some View {
-        Chart {
+        let hovered = hoveredBucket
+        return Chart {
             ForEach(buckets) { bucket in
                 if bucket.entries > 0 {
                     BarMark(
                         x: .value("Date", bucket.start, unit: unit),
                         y: .value("Minutes", bucket.audioSeconds / 60)
                     )
-                    .foregroundStyle(DS.Color.accent.opacity(opacity(of: bucket)))
+                    .foregroundStyle(DS.Color.accent.opacity(opacity(of: bucket, hovered: hovered)))
                     .cornerRadius(2)
                 }
             }
-            if let bucket = hoveredBucket {
-                RuleMark(x: .value("Hovered", bucket.start, unit: unit))
+            if let hovered {
+                RuleMark(x: .value("Hovered", hovered.start, unit: unit))
                     .foregroundStyle(DS.Palette.divider)
                     .annotation(
                         position: .top,
                         spacing: DS.Spacing.tight,
                         overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))
                     ) {
-                        card(for: bucket)
+                        card(for: hovered)
                     }
             }
         }
         .chartXSelection(value: $hovered)
-        // Room for half of the last label: Charts drops a label that would cross the plot's trailing edge.
+        // Room for half of the last label, which is centred on the last bucket.
         .chartXScale(domain: domain, range: .plotDimension(endPadding: DS.Spacing.medium))
         .chartYScale(domain: 0...axis.top)
-        .chartXAxis { xAxis }
+        .chartXAxis(.hidden)
+        .chartPlotStyle { $0.padding(.bottom, Self.axisStripHeight) }
+        .chartOverlay { proxy in xLabels(proxy) }
         .chartYAxis { yAxis }
         .frame(height: Self.height)
         .accessibilityLabel(Text("Activity"))
@@ -71,9 +75,9 @@ struct ActivityChart: View {
         return buckets.last { $0.start <= hovered }
     }
 
-    private func opacity(of bucket: Bucket) -> Double {
-        guard let hoveredBucket else { return 1 }
-        return hoveredBucket.id == bucket.id ? 1 : 0.75
+    private func opacity(of bucket: Bucket, hovered: Bucket?) -> Double {
+        guard let hovered else { return 1 }
+        return hovered.id == bucket.id ? 1 : 0.75
     }
 
     /// Counted back from the last bucket, so today is always on the axis.
@@ -97,15 +101,19 @@ struct ActivityChart: View {
         range == .days30 ? AppFormat.dayAndMonth(date) : AppFormat.monthAndYear(date)
     }
 
-    private var xAxis: some AxisContent {
-        AxisMarks(values: labelledDates) { value in
-            if let date = value.as(Date.self) {
-                // Charts sizes a label to the slot it computes, and one month's slot came out too narrow for "Jul".
-                AxisValueLabel(collisionResolution: .disabled) {
-                    Text(axisLabel(for: date))
-                        .font(DS.Font.caption)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .fixedSize()
+    /// Drawn by hand under the plot: an `AxisValueLabel` starts at its mark instead of centring on it, whatever its anchor.
+    private func xLabels(_ proxy: ChartProxy) -> some View {
+        GeometryReader { geometry in
+            if let frame = proxy.plotFrame {
+                let plot = geometry[frame]
+                ForEach(labelledDates, id: \.self) { date in
+                    if let x = proxy.position(forX: date) {
+                        Text(axisLabel(for: date))
+                            .font(DS.Font.caption)
+                            .foregroundStyle(DS.Color.secondaryText)
+                            .fixedSize()
+                            .position(x: plot.minX + x, y: plot.maxY + Self.axisStripHeight / 2)
+                    }
                 }
             }
         }
