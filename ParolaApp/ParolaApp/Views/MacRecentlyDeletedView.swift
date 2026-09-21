@@ -265,7 +265,7 @@ struct MacRecentlyDeletedView: View {
 
     private func recomputeRows() {
         var cache = displayCache
-        cache.invalidate(libraryVersion: model.libraryVersion, excerptsVersion: model.libraryExcerptsVersion)
+        cache.prune(keeping: model.deletedEntries.lazy.map(\.id))
         rows = model.deletedEntries.map { entry in
             cache.display(
                 for: entry,

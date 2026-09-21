@@ -144,24 +144,26 @@ struct LibraryEntryDisplayTests {
         return LibraryRowDisplay(entry: entry)
     }
 
-    @Test("row displays are reused until the library or the excerpts move")
-    func displayCacheHoldsUntilItsVersionsChange() {
+    /// A pin or a rename ticks the library version for every row, so the version cannot be what a row is kept on.
+    @Test("row displays outlive the library version and go only when their entry leaves")
+    func displayCacheKeepsRowsUntilTheirEntryLeaves() {
         let entry = display().entry
+        let other = LibraryEntry(
+            id: "other",
+            bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/other.parola"),
+            manifest: entry.manifest
+        )
         var cache = LibraryRowDisplayCache()
 
-        cache.invalidate(libraryVersion: 1, excerptsVersion: 7)
         _ = cache.display(for: entry)
-        #expect(cache.displays.count == 1)
+        _ = cache.display(for: other)
+        #expect(cache.displays.count == 2)
 
-        cache.invalidate(libraryVersion: 1, excerptsVersion: 7)
-        #expect(cache.displays.count == 1)
+        cache.prune(keeping: [entry.id, other.id])
+        #expect(cache.displays.count == 2)
 
-        cache.invalidate(libraryVersion: 2, excerptsVersion: 7)
-        #expect(cache.displays.isEmpty)
-
-        _ = cache.display(for: entry)
-        cache.invalidate(libraryVersion: 2, excerptsVersion: 8)
-        #expect(cache.displays.isEmpty)
+        cache.prune(keeping: [entry.id])
+        #expect(cache.displays.keys.sorted() == ["e"])
     }
 
     /// The index fills in after the rows are already on screen, and a cached row would keep the blank.
@@ -170,19 +172,15 @@ struct LibraryEntryDisplayTests {
         let entry = display().entry
         var cache = LibraryRowDisplayCache()
 
-        cache.invalidate(libraryVersion: 1, excerptsVersion: 1)
         #expect(cache.display(for: entry, excerpt: nil).excerpt == nil)
-
-        cache.invalidate(libraryVersion: 1, excerptsVersion: 2)
-        #expect(cache.displays.isEmpty)
         #expect(cache.display(for: entry, excerpt: "Prime parole.").excerpt == "Prime parole.")
+        #expect(cache.displays.count == 1)
     }
 
     @Test("a cached display is handed back rather than formatted again")
     func displayCacheReturnsTheSameRow() {
         let entry = display().entry
         var cache = LibraryRowDisplayCache()
-        cache.invalidate(libraryVersion: 1, excerptsVersion: 1)
 
         let first = cache.display(for: entry, excerpt: "Prime parole.")
         let second = cache.display(for: entry, excerpt: "Prime parole.")

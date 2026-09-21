@@ -157,7 +157,7 @@ struct EmptyDropZone: View {
     /// Recomputed on the changes that move it, never inside `body`: a row's strings cost formatters to build.
     private func recomputeRecents() {
         var cache = recentCache
-        cache.invalidate(libraryVersion: model.libraryVersion, excerptsVersion: model.libraryExcerptsVersion)
+        cache.prune(keeping: model.libraryEntries.lazy.map(\.id))
         let displays = RecentEntries
             .most(of: model.libraryEntries, limit: RecentEntries.homeMaximum)
             .map {

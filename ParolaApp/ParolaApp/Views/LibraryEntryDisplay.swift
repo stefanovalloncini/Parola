@@ -85,6 +85,8 @@ struct LibraryRowDisplay: Identifiable {
     let excerpt: String?
     /// The excerpt argument as passed in, before any AI-summary substitution — what the cache compares against.
     let rawExcerpt: String?
+    let showsAITitle: Bool
+    let showsAISummary: Bool
     let sourceKind: EntrySourceKind
 
     var id: LibraryEntry.ID { entry.id }
@@ -109,6 +111,8 @@ struct LibraryRowDisplay: Identifiable {
         self.title = title
         self.excerpt = showsAISummary ? (entry.shortSummary ?? excerpt) : excerpt
         self.rawExcerpt = excerpt
+        self.showsAITitle = showsAITitle
+        self.showsAISummary = showsAISummary
         sourceKind = EntrySourceKind(entry: entry)
         timeOfDay = dateLabel ?? AppFormat.timeOfDay(stated)
         shortDate = dateLabel ?? AppFormat.dayAndMonth(stated)
@@ -129,17 +133,16 @@ struct LibraryRowDisplay: Identifiable {
 
 /// Caches the strings a row needs, since the list rebuilds rows on every filter and sort change.
 struct LibraryRowDisplayCache {
-    private(set) var libraryVersion = -1
-    private(set) var excerptsVersion = -1
     private(set) var displays: [LibraryEntry.ID: LibraryRowDisplay] = [:]
 
-    mutating func invalidate(libraryVersion: Int, excerptsVersion: Int) {
-        guard self.libraryVersion != libraryVersion || self.excerptsVersion != excerptsVersion else { return }
-        displays.removeAll(keepingCapacity: true)
-        self.libraryVersion = libraryVersion
-        self.excerptsVersion = excerptsVersion
+    /// Only entries that left the library: the rest are kept, since `display(for:)` checks each row itself.
+    mutating func prune(keeping ids: some Collection<LibraryEntry.ID>) {
+        guard displays.count > ids.count else { return }
+        let live = Set(ids)
+        displays = displays.filter { live.contains($0.key) }
     }
 
+    /// `date` and `dateLabel` are left out of the hit test because every caller derives them from the manifest.
     mutating func display(
         for entry: LibraryEntry,
         excerpt: String? = nil,
@@ -148,7 +151,13 @@ struct LibraryRowDisplayCache {
         showsAITitle: Bool = false,
         showsAISummary: Bool = false
     ) -> LibraryRowDisplay {
-        if let cached = displays[entry.id], cached.rawExcerpt == excerpt { return cached }
+        if let cached = displays[entry.id],
+           cached.rawExcerpt == excerpt,
+           cached.showsAITitle == showsAITitle,
+           cached.showsAISummary == showsAISummary,
+           cached.entry.manifest == entry.manifest {
+            return cached
+        }
         let display = LibraryRowDisplay(
             entry: entry, excerpt: excerpt, date: date, dateLabel: dateLabel,
             showsAITitle: showsAITitle, showsAISummary: showsAISummary

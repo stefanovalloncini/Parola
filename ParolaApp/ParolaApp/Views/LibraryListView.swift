@@ -244,7 +244,7 @@ struct LibraryListView: View {
         var totalBytes: Int64 = 0
         var totalSeconds: Double = 0
         var cache = displayCache
-        cache.invalidate(libraryVersion: model.libraryVersion, excerptsVersion: model.libraryExcerptsVersion)
+        cache.prune(keeping: model.libraryEntries.lazy.map(\.id))
         let displays = computed.map { entry -> LibraryRowDisplay in
             let size = sizes[entry.id]
             totalBytes += size ?? 0
