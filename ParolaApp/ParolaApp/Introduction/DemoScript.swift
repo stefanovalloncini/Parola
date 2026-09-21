@@ -25,6 +25,15 @@ struct DemoScript: Codable, Equatable {
         return levels[index]
     }
 
+    /// One level per brand bar: the centre bar is the level now and the pairs either side of it lag
+    /// further behind, so the mark ripples outward from the middle.
+    func barLevels(at time: Double, lagPerBar: Double = 0.05) -> [Float] {
+        let centre = AppIconArtwork.barFractions.count / 2
+        return AppIconArtwork.barFractions.indices.map { index in
+            level(at: time - Double(abs(index - centre)) * lagPerBar)
+        }
+    }
+
     /// The last `window` levels up to `time`, padded with silence where the clip has nothing to give.
     func levels(window: Int, endingAt time: Double) -> [Float] {
         let last = Int(time * levelRate)

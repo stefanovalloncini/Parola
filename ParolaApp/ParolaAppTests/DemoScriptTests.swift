@@ -96,6 +96,51 @@ struct DemoScriptTests {
         #expect(!demo.isSettled)
     }
 
+    @Test("silence leaves every brand bar at nothing")
+    func barLevelsInSilence() throws {
+        for script in try bothScripts() {
+            #expect(script.barLevels(at: -5) == Array(repeating: 0, count: 9))
+            #expect(script.barLevels(at: script.duration + 5) == Array(repeating: 0, count: 9))
+        }
+        #expect(DemoScript.placeholder.barLevels(at: 1) == Array(repeating: 0, count: 9))
+    }
+
+    @Test("the centre bar is the level now and the others lag outward")
+    func barLevelsRippleOutward() {
+        let rising = DemoScript(
+            text: "x",
+            speaker: "Speaker 1",
+            duration: 1,
+            levelRate: 20,
+            levels: (0..<20).map { Float($0) / 20 },
+            words: []
+        )
+        let bars = rising.barLevels(at: 0.5)
+        #expect(bars.count == 9)
+        #expect(bars[4] == rising.level(at: 0.5))
+        #expect(bars[3] == bars[5])
+        #expect(bars[2] == bars[6])
+        #expect(bars[1] == bars[7])
+        #expect(bars[0] == bars[8])
+        #expect(bars[0] == rising.level(at: 0.3))
+        #expect(bars[4] > bars[3])
+        #expect(bars[3] > bars[2])
+    }
+
+    @Test("a longer lag reaches further back in the clip")
+    func barLevelsLag() {
+        let rising = DemoScript(
+            text: "x",
+            speaker: "Speaker 1",
+            duration: 2,
+            levelRate: 20,
+            levels: (0..<40).map { Float($0) / 40 },
+            words: []
+        )
+        #expect(rising.barLevels(at: 1, lagPerBar: 0.1)[0] == rising.level(at: 0.6))
+        #expect(rising.barLevels(at: 1, lagPerBar: 0)[0] == rising.level(at: 1))
+    }
+
     @Test("a time outside the clip has no level")
     func levelOutsideTheClip() throws {
         for script in try bothScripts() {
