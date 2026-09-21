@@ -25,29 +25,33 @@ struct EmptyStateView<Actions: View>: View {
 
     var body: some View {
         VStack(spacing: DS.Spacing.small) {
-            Image(systemName: systemImage)
-                .font(.system(size: iconSize, weight: .light))
-                .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
-                .padding(.bottom, DS.Spacing.tight)
-            Text(title)
-                .font(DS.Font.title)
-                .foregroundStyle(DS.Color.primaryText)
-            if let message {
-                Text(message)
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: DS.Spacing.small) {
+                Image(systemName: systemImage)
+                    .font(.system(size: iconSize, weight: .light))
+                    .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
+                    .padding(.bottom, DS.Spacing.tight)
+                Text(title)
+                    .font(DS.Font.title)
+                    .foregroundStyle(DS.Color.primaryText)
+                if let message {
+                    Text(message)
+                        .font(DS.Font.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
+            // A floor too: proposed no width the message wraps per character, and the route's minimum height explodes.
+            .frame(minWidth: MainWindowLayout.narrowestPaneWidth - 2 * DS.Spacing.large, maxWidth: 420)
             if hasActions {
+                // Outside the reading width: a third pill wraps its own label at 420.
                 HStack(spacing: DS.Spacing.small) {
                     actions
                 }
+                .fixedSize()
                 .padding(.top, DS.Spacing.small)
             }
         }
-        // A floor too: proposed no width the message wraps per character, and the route's minimum height explodes.
-        .frame(minWidth: MainWindowLayout.narrowestPaneWidth - 2 * DS.Spacing.large, maxWidth: 420)
         .padding(DS.Spacing.large)
     }
 }
