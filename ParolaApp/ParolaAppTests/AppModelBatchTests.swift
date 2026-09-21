@@ -286,26 +286,17 @@ struct AppModelBatchTests {
         #expect(read == options)
     }
 
-    @Test("batch exporters honor caption length, HTML theme, and per-batch timestamps")
-    func batchExporterHonorsSharedOptions() {
-        let srt = AppModel.batchExporter(for: .srt, includeTimestamps: false, captionLength: .short, htmlTheme: .dark)
-        #expect((srt as? SrtExporter)?.options.captionLength == .short)
+    @Test("batch export specs honor caption length, HTML theme, and per-batch timestamps")
+    func batchExportSpecHonorsSharedOptions() {
+        let model = makeModel()
+        model.subtitleCaptionLengthRaw = CaptionLength.short.rawValue
+        model.htmlExportThemeRaw = HtmlExportTheme.sepia.rawValue
 
-        let vtt = AppModel.batchExporter(for: .vtt, includeTimestamps: false, captionLength: .medium, htmlTheme: .dark)
-        #expect((vtt as? VttExporter)?.options.captionLength == .medium)
-
-        let html = AppModel.batchExporter(for: .html, includeTimestamps: true, captionLength: .none, htmlTheme: .sepia)
-        #expect((html as? HtmlExporter)?.options.theme == .sepia)
-        #expect((html as? HtmlExporter)?.options.showTimestamps == true)
-
-        let md = AppModel.batchExporter(for: .md, includeTimestamps: true, captionLength: .none, htmlTheme: .light)
-        #expect((md as? MarkdownExporter)?.options.showTimestamps == true)
-
-        let txt = AppModel.batchExporter(for: .txt, includeTimestamps: true, captionLength: .none, htmlTheme: .light)
-        #expect((txt as? TxtExporter)?.options.showTimestamps == true)
-
-        let plainTxt = AppModel.batchExporter(for: .txt, includeTimestamps: false, captionLength: .none, htmlTheme: .light)
-        #expect((plainTxt as? TxtExporter)?.options.showTimestamps == false)
+        #expect(model.exportSpec(for: .srt, includeTimestamps: false).options.captionLength == .short)
+        #expect(model.exportSpec(for: .html, includeTimestamps: true).options.htmlTheme == .sepia)
+        #expect(model.exportSpec(for: .html, includeTimestamps: true).options.timestamps)
+        #expect(model.exportSpec(for: .md, includeTimestamps: true).options.timestamps)
+        #expect(model.exportSpec(for: .txt, includeTimestamps: true).options.timestamps)
     }
 
     @Test("a completed batch job is post-processed before it is stored and shown")

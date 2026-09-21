@@ -171,52 +171,26 @@ extension AppModel {
         }
     }
 
-    nonisolated static func batchExporter(
-        for format: ExportFormat,
-        includeTimestamps: Bool,
-        captionLength: CaptionLength,
-        htmlTheme: HtmlExportTheme
-    ) -> any TranscriptExporter {
-        switch format {
-        case .txt:  TxtExporter(options: TxtOptions(showTimestamps: includeTimestamps))
-        case .srt:  SrtExporter(options: SubtitleOptions(captionLength: captionLength))
-        case .vtt:  VttExporter(options: SubtitleOptions(captionLength: captionLength))
-        case .md:   MarkdownExporter(options: MarkdownOptions(showTimestamps: includeTimestamps))
-        case .html: HtmlExporter(options: HtmlOptions(theme: htmlTheme, showTimestamps: includeTimestamps))
-        default:    Exporters.exporter(for: format)
-        }
-    }
-
     @discardableResult
     private func writeBatchExports(transcript: Transcript, sourceURL: URL) -> Set<URL> {
-        let formats = batchExportFormats
-        guard !formats.isEmpty else { return [] }
-        let plans: [(ExportFormat, URL, Bool)] = formats.compactMap { format in
+        let plans: [(spec: ExportSpec, target: URL)] = batchExportFormats.compactMap { format in
             let opts = options(for: format)
             guard opts.writeToSourceFolder else { return nil }
-            let url = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
-            return (format, url, opts.includeTimestamps)
+            let target = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
+            return (exportSpec(for: format, includeTimestamps: opts.includeTimestamps), target)
         }
         guard !plans.isEmpty else { return [] }
-        let captionLength = subtitleCaptionLength
-        let htmlTheme = HtmlExportTheme(rawValue: htmlExportThemeRaw) ?? .light
         Task.detached {
-            for (format, target, includeTimestamps) in plans {
+            for plan in plans {
                 do {
-                    let exporter = AppModel.batchExporter(
-                        for: format,
-                        includeTimestamps: includeTimestamps,
-                        captionLength: captionLength,
-                        htmlTheme: htmlTheme
-                    )
-                    let data = try exporter.render(transcript)
-                    try data.write(to: target, options: .atomic)
+                    let data = try Exporters.exporter(for: plan.spec).render(transcript)
+                    try data.write(to: plan.target, options: .atomic)
                 } catch {
                     // Sidecar write is best-effort; the transcript is already saved.
                 }
             }
         }
-        return Set(plans.map { $0.1 })
+        return Set(plans.map(\.target))
     }
 
     func addBatchFiles(_ urls: [URL]) {

@@ -3,10 +3,13 @@ import Foundation
 /// Renders the transcript as plain LRC lyrics: one `[mm:ss.xx]` line per segment.
 public struct LrcExporter: TranscriptExporter {
     public let format: ExportFormat = .lrc
+    public let spec: ExportSpec
 
-    public init() {}
+    public init(spec: ExportSpec = .standard(for: .lrc)) {
+        self.spec = spec
+    }
 
-    public func render(_ transcript: Transcript) throws -> Data {
+    public func encode(_ transcript: Transcript) throws -> Data {
         var out = ""
         for seg in transcript.segments {
             let body = seg.text

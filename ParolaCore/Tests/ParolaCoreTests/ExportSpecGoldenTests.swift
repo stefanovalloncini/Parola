@@ -42,7 +42,7 @@ struct ExportSpecGoldenTests {
     /// Set PAROLA_REGENERATE_EXPORT_GOLDEN=1 to rewrite Tests/Resources/export-golden/.
     /// Inspect the diff before committing: these files pin the bytes every export produces.
     private func compare(_ format: ExportFormat) throws {
-        let exporter = Exporters.exporter(for: format)
+        let exporter = Exporters.exporter(for: ExportSpec.standard(for: format))
         let actual = try exporter.render(Self.fixture())
         let filename = "\(format.rawValue).\(format.fileExtension)"
 

@@ -18,28 +18,17 @@ extension AppModel {
             sourceExtension: sourceURL.pathExtension
         )
         guard !formats.isEmpty else { return }
-        let markdownTimestamps = self.markdownTimestamps
-        let txtTimestamps = self.txtExportTimestamps
-        let htmlTheme = HtmlExportTheme(rawValue: htmlExportThemeRaw) ?? .light
-        let captionLength = subtitleCaptionLength
+        let specs = formats.map { exportSpec(for: $0) }
         Task.detached(priority: .utility) {
-            for format in formats {
+            for spec in specs {
                 do {
-                    let target = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
+                    let target = sourceURL.deletingPathExtension().appendingPathExtension(spec.format.fileExtension)
                     guard !skippingTargets.contains(target) else { continue }
-                    let exporter: any TranscriptExporter = switch format {
-                    case .txt:  TxtExporter(options: TxtOptions(showTimestamps: txtTimestamps))
-                    case .srt:  SrtExporter(options: SubtitleOptions(captionLength: captionLength))
-                    case .vtt:  VttExporter(options: SubtitleOptions(captionLength: captionLength))
-                    case .md:   MarkdownExporter(options: MarkdownOptions(showTimestamps: markdownTimestamps))
-                    case .html: HtmlExporter(options: HtmlOptions(theme: htmlTheme))
-                    default:    Exporters.exporter(for: format)
-                    }
-                    let data = try exporter.render(transcript)
+                    let data = try Exporters.exporter(for: spec).render(transcript)
                     try data.write(to: target, options: .atomic)
                 } catch {
                     // Auto-export is best-effort; primary transcription already in the library.
-                    ParolaLog.error(.export, "auto-export failed as \(format)", [.error: .error(error)])
+                    ParolaLog.error(.export, "auto-export failed as \(spec.format)", [.error: .error(error)])
                 }
             }
         }

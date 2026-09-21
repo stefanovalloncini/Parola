@@ -15,7 +15,7 @@ struct HtmlThemeTests {
 
     @Test("light theme uses a white background")
     func light() throws {
-        let exporter = HtmlExporter(options: HtmlOptions(theme: .light))
+        let exporter = HtmlExporter(spec: .html(theme: .light))
         let html = try String(data: exporter.render(transcript()), encoding: .utf8) ?? ""
         #expect(html.contains("background:#ffffff"))
         #expect(html.contains("color:#111111"))
@@ -23,7 +23,7 @@ struct HtmlThemeTests {
 
     @Test("dark theme uses a dark background")
     func dark() throws {
-        let exporter = HtmlExporter(options: HtmlOptions(theme: .dark))
+        let exporter = HtmlExporter(spec: .html(theme: .dark))
         let html = try String(data: exporter.render(transcript()), encoding: .utf8) ?? ""
         #expect(html.contains("background:#111111"))
         #expect(html.contains("color:#eeeeee"))
@@ -31,7 +31,7 @@ struct HtmlThemeTests {
 
     @Test("sepia theme uses a warm background")
     func sepia() throws {
-        let exporter = HtmlExporter(options: HtmlOptions(theme: .sepia))
+        let exporter = HtmlExporter(spec: .html(theme: .sepia))
         let html = try String(data: exporter.render(transcript()), encoding: .utf8) ?? ""
         #expect(html.contains("background:#f4ecd8"))
     }

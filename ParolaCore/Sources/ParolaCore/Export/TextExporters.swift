@@ -1,70 +1,54 @@
 import Foundation
 
-public struct TxtOptions: Sendable, Codable, Hashable {
-    public var showTimestamps: Bool
-
-    public init(showTimestamps: Bool = false) {
-        self.showTimestamps = showTimestamps
-    }
-}
-
 public struct TxtExporter: TranscriptExporter {
     public let format: ExportFormat = .txt
-    public let options: TxtOptions
+    public let spec: ExportSpec
 
-    public init(options: TxtOptions = TxtOptions()) {
-        self.options = options
+    public init(spec: ExportSpec = .standard(for: .txt)) {
+        self.spec = spec
     }
 
-    public func render(_ transcript: Transcript) throws -> Data {
+    public func encode(_ transcript: Transcript) throws -> Data {
         let lines = transcript.segments
             .compactMap { seg -> String? in
                 let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !body.isEmpty else { return nil }
                 let line: String
-                if let speaker = Format.presentationSpeakerLabel(seg.speaker) {
+                if options.speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                     line = "\(speaker): \(body)"
                 } else {
                     line = body
                 }
-                guard options.showTimestamps else { return line }
-                return "[\(Format.timestampHHMMSS(seg.start))] \(line)"
+                guard let stamp = options.timestampLabel(start: seg.start, end: seg.end) else { return line }
+                return "[\(stamp)] \(line)"
             }
         guard !lines.isEmpty else { return Data() }
         return utf8(lines.joined(separator: "\n") + "\n")
     }
 }
 
-public struct MarkdownOptions: Sendable, Codable, Hashable {
-    public var showTimestamps: Bool
-
-    public init(showTimestamps: Bool = false) {
-        self.showTimestamps = showTimestamps
-    }
-}
-
 public struct MarkdownExporter: TranscriptExporter {
     public let format: ExportFormat = .md
-    public let options: MarkdownOptions
+    public let spec: ExportSpec
 
-    public init(options: MarkdownOptions = MarkdownOptions()) {
-        self.options = options
+    public init(spec: ExportSpec = .standard(for: .md)) {
+        self.spec = spec
     }
 
-    public func render(_ transcript: Transcript) throws -> Data {
+    public func encode(_ transcript: Transcript) throws -> Data {
         var out = "# \(Format.documentTitle(for: transcript))\n\n"
         for seg in transcript.segments {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }
-            let label = Format.presentationSpeakerLabel(seg.speaker)
-            switch (label, options.showTimestamps) {
-            case (let speaker?, true):
-                out += "**\(speaker)** *[\(Format.timestampHHMMSS(seg.start))]*: \(body)\n\n"
-            case (let speaker?, false):
+            let label = options.speakers ? Format.presentationSpeakerLabel(seg.speaker) : nil
+            switch (label, options.timestampLabel(start: seg.start, end: seg.end)) {
+            case (let speaker?, let stamp?):
+                out += "**\(speaker)** *[\(stamp)]*: \(body)\n\n"
+            case (let speaker?, nil):
                 out += "**\(speaker):** \(body)\n\n"
-            case (nil, true):
-                out += "*[\(Format.timestampHHMMSS(seg.start))]* \(body)\n\n"
-            case (nil, false):
+            case (nil, let stamp?):
+                out += "*[\(stamp)]* \(body)\n\n"
+            case (nil, nil):
                 out += "\(body)\n\n"
             }
         }
@@ -74,9 +58,13 @@ public struct MarkdownExporter: TranscriptExporter {
 
 struct TsvExporter: TranscriptExporter {
     let format: ExportFormat = .tsv
-    init() {}
+    let spec: ExportSpec
 
-    func render(_ transcript: Transcript) throws -> Data {
+    init(spec: ExportSpec = .standard(for: .tsv)) {
+        self.spec = spec
+    }
+
+    func encode(_ transcript: Transcript) throws -> Data {
         var out = "start_seconds\tend_seconds\tspeaker\ttext\n"
         for seg in transcript.segments {
             let trimmed = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -83,4 +83,40 @@ struct SpeakerParagraphGroupingTests {
     func emptyStaysEmpty() {
         #expect(ExportGrouping.speakerParagraphs.apply(to: []).isEmpty)
     }
+
+    @Test("the txt export renders one line per speaker turn")
+    func txtHonoursGrouping() throws {
+        var spec = ExportSpec.standard(for: .txt)
+        spec.options.grouping = .speakerParagraphs
+        let transcript = Transcript(segments: diarized(), language: "en", modelName: "x")
+        let out = try Exporters.exporter(for: spec).renderText(transcript)
+        #expect(out == """
+        Ada: Good morning. How did the run go?
+        Grace: Faster than last week.
+        Ada: Good to hear.
+
+        """)
+    }
+
+    @Test("the srt export merges a speaker's consecutive cues into one")
+    func srtHonoursGrouping() throws {
+        var spec = ExportSpec.standard(for: .srt)
+        spec.options.grouping = .speakerParagraphs
+        let transcript = Transcript(segments: diarized(), language: "en", modelName: "x")
+        let out = try Exporters.exporter(for: spec).renderText(transcript)
+        #expect(out.contains("Good morning. How did the run go?"))
+        #expect(out.contains("00:00:00,000 --> 00:00:05,000"))
+        #expect(out.split(separator: "\n").filter { $0.contains("-->") }.count == 3)
+    }
+
+    @Test("the json export merges the segments it writes")
+    func jsonHonoursGrouping() throws {
+        var spec = ExportSpec.standard(for: .json)
+        spec.options.grouping = .speakerParagraphs
+        let transcript = Transcript(segments: diarized(), language: "en", modelName: "x")
+        let data = try Exporters.exporter(for: spec).render(transcript)
+        let decoded = try JSONDecoder().decode(Transcript.self, from: data)
+        #expect(decoded.segments.count == 3)
+        #expect(decoded.segments[0].text == "Good morning. How did the run go?")
+    }
 }

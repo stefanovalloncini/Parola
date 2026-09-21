@@ -3555,17 +3555,27 @@ final class AppModel {
         CaptionLength(rawValue: subtitleCaptionLengthRaw) ?? .none
     }
 
-    func makeExporter(for format: ExportFormat, includeTimestamps: Bool? = nil) -> TranscriptExporter {
+    /// The spec the saved export settings describe for a format.
+    func exportSpec(for format: ExportFormat, includeTimestamps: Bool? = nil) -> ExportSpec {
+        var spec = ExportSpec.standard(for: format)
         switch format {
-        case .txt: return TxtExporter(options: TxtOptions(showTimestamps: includeTimestamps ?? txtExportTimestamps))
-        case .srt: return SrtExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
-        case .vtt: return VttExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
-        case .md:  return MarkdownExporter(options: MarkdownOptions(showTimestamps: includeTimestamps ?? markdownTimestamps))
+        case .txt:
+            spec.options.timestamps = includeTimestamps ?? txtExportTimestamps
+        case .md:
+            spec.options.timestamps = includeTimestamps ?? markdownTimestamps
         case .html:
-            let theme = HtmlExportTheme(rawValue: htmlExportThemeRaw) ?? .light
-            return HtmlExporter(options: HtmlOptions(theme: theme, showTimestamps: includeTimestamps ?? true))
-        default:   return Exporters.exporter(for: format)
+            spec.options.timestamps = includeTimestamps ?? spec.options.timestamps
+            spec.options.htmlTheme = HtmlExportTheme(rawValue: htmlExportThemeRaw) ?? .light
+        case .srt, .vtt:
+            spec.options.captionLength = subtitleCaptionLength
+        default:
+            break
         }
+        return spec
+    }
+
+    func makeExporter(for format: ExportFormat, includeTimestamps: Bool? = nil) -> TranscriptExporter {
+        Exporters.exporter(for: exportSpec(for: format, includeTimestamps: includeTimestamps))
     }
 }
 

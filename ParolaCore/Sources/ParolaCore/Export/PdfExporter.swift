@@ -4,7 +4,11 @@ import Foundation
 
 struct PdfExporter: TranscriptExporter {
     let format: ExportFormat = .pdf
-    init() {}
+    let spec: ExportSpec
+
+    init(spec: ExportSpec = .standard(for: .pdf)) {
+        self.spec = spec
+    }
 
     private static let pageWidth: CGFloat = 612    // US Letter
     private static let pageHeight: CGFloat = 792
@@ -12,7 +16,7 @@ struct PdfExporter: TranscriptExporter {
     private static let segmentsPerChunk: Int = 64
     private static let minRemainderHeight: CGFloat = 24
 
-    func render(_ transcript: Transcript) throws -> Data {
+    func encode(_ transcript: Transcript) throws -> Data {
         var mediaBox = CGRect(x: 0, y: 0, width: Self.pageWidth, height: Self.pageHeight)
         let pdfData = NSMutableData()
         guard let consumer = CGDataConsumer(data: pdfData) else {
@@ -30,7 +34,12 @@ struct PdfExporter: TranscriptExporter {
         var pageOpen = false
         var currentTop = textRect.maxY
 
-        var iterator = ChunkIterator(transcript: transcript, fonts: fonts, chunkSize: Self.segmentsPerChunk)
+        var iterator = ChunkIterator(
+            transcript: transcript,
+            fonts: fonts,
+            chunkSize: Self.segmentsPerChunk,
+            speakers: options.speakers
+        )
         while let chunk = iterator.next() {
             guard chunk.length > 0 else { continue }
             let framesetter = CTFramesetterCreateWithAttributedString(chunk)
@@ -103,13 +112,15 @@ struct PdfExporter: TranscriptExporter {
         let transcript: Transcript
         let fonts: Fonts
         let chunkSize: Int
+        let speakers: Bool
         private var cursor: Int = 0
         private var emittedTitle: Bool = false
 
-        init(transcript: Transcript, fonts: Fonts, chunkSize: Int) {
+        init(transcript: Transcript, fonts: Fonts, chunkSize: Int, speakers: Bool) {
             self.transcript = transcript
             self.fonts = fonts
             self.chunkSize = max(1, chunkSize)
+            self.speakers = speakers
         }
 
         mutating func next() -> NSAttributedString? {
@@ -125,7 +136,7 @@ struct PdfExporter: TranscriptExporter {
                 let seg = transcript.segments[index]
                 let text = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else { continue }
-                if let speaker = Format.presentationSpeakerLabel(seg.speaker) {
+                if speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                     chunk.append(NSAttributedString(string: "\(speaker): ", attributes: [fontKey: fonts.speaker]))
                 }
                 chunk.append(NSAttributedString(string: "\(text)\n\n", attributes: [fontKey: fonts.body]))

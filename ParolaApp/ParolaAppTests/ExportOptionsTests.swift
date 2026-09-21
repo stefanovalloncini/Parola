@@ -73,32 +73,44 @@ struct ExportOptionsTests {
         #expect(model.pendingExport == nil)
     }
 
-    @Test("makeExporter threads the txt timestamps choice into the exporter")
-    func makeExporterHonorsTxtTimestamps() {
+    @Test("the export spec threads the txt timestamps choice into the exporter")
+    func exportSpecHonorsTxtTimestamps() {
         let model = makeModel()
 
         model.txtExportTimestamps = true
-        #expect((model.makeExporter(for: .txt) as? TxtExporter)?.options.showTimestamps == true)
+        #expect(model.exportSpec(for: .txt).options.timestamps)
+        #expect(model.makeExporter(for: .txt).spec.options.timestamps)
 
         model.txtExportTimestamps = false
-        #expect((model.makeExporter(for: .txt) as? TxtExporter)?.options.showTimestamps == false)
+        #expect(model.exportSpec(for: .txt).options.timestamps == false)
     }
 
     @Test("an explicit includeTimestamps overrides the saved preference in both directions")
-    func makeExporterHonorsTimestampOverride() {
+    func exportSpecHonorsTimestampOverride() {
         let model = makeModel()
 
         model.txtExportTimestamps = false
         model.markdownTimestamps = false
-        #expect((model.makeExporter(for: .txt, includeTimestamps: true) as? TxtExporter)?.options.showTimestamps == true)
-        #expect((model.makeExporter(for: .md, includeTimestamps: true) as? MarkdownExporter)?.options.showTimestamps == true)
-        #expect((model.makeExporter(for: .html, includeTimestamps: false) as? HtmlExporter)?.options.showTimestamps == false)
+        #expect(model.exportSpec(for: .txt, includeTimestamps: true).options.timestamps)
+        #expect(model.exportSpec(for: .md, includeTimestamps: true).options.timestamps)
+        #expect(model.exportSpec(for: .html, includeTimestamps: false).options.timestamps == false)
 
         model.txtExportTimestamps = true
         model.markdownTimestamps = true
-        #expect((model.makeExporter(for: .txt, includeTimestamps: false) as? TxtExporter)?.options.showTimestamps == false)
-        #expect((model.makeExporter(for: .md, includeTimestamps: false) as? MarkdownExporter)?.options.showTimestamps == false)
-        #expect((model.makeExporter(for: .txt) as? TxtExporter)?.options.showTimestamps == true)
+        #expect(model.exportSpec(for: .txt, includeTimestamps: false).options.timestamps == false)
+        #expect(model.exportSpec(for: .md, includeTimestamps: false).options.timestamps == false)
+        #expect(model.exportSpec(for: .txt).options.timestamps)
+    }
+
+    @Test("the export spec carries the saved caption length and HTML theme")
+    func exportSpecCarriesSharedOptions() {
+        let model = makeModel()
+        model.subtitleCaptionLengthRaw = CaptionLength.short.rawValue
+        model.htmlExportThemeRaw = HtmlExportTheme.sepia.rawValue
+
+        #expect(model.exportSpec(for: .srt).options.captionLength == .short)
+        #expect(model.exportSpec(for: .vtt).options.captionLength == .short)
+        #expect(model.exportSpec(for: .html).options.htmlTheme == .sepia)
     }
 
     @Test("txt timestamps persist to defaults and survive reloadSettings")

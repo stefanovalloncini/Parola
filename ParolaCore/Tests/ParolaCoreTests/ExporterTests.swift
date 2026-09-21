@@ -83,7 +83,7 @@ struct ExporterTests {
 
     @Test("txt with timestamps prefixes each line with its start time")
     func txtTimestamps() throws {
-        let out = try TxtExporter(options: TxtOptions(showTimestamps: true)).renderText(sample())
+        let out = try TxtExporter(spec: .txt(timestamps: true)).renderText(sample())
         #expect(out == "[00:00:00] Hello world.\n[00:00:01] This is Parola.\n[00:00:04] Goodbye.\n")
     }
 
@@ -97,14 +97,14 @@ struct ExporterTests {
             language: "en",
             modelName: "x"
         )
-        let out = try TxtExporter(options: TxtOptions(showTimestamps: true)).renderText(transcript)
+        let out = try TxtExporter(spec: .txt(timestamps: true)).renderText(transcript)
         #expect(out == "[00:00:00] Alice: Hello.\n[00:01:01] Hi.\n")
     }
 
-    @Test("TxtOptions defaults to no timestamps")
+    @Test("the txt export ships without timestamps")
     func txtOptionsDefault() {
-        #expect(TxtOptions().showTimestamps == false)
-        #expect(TxtExporter().options == TxtOptions())
+        #expect(ExportSpec.standard(for: .txt).options.timestamps == false)
+        #expect(TxtExporter().spec == .standard(for: .txt))
     }
 
     @Test("srt has indexed blocks with comma-millisecond timestamps")
@@ -192,7 +192,7 @@ struct ExporterTests {
 
     @Test("markdown with timestamps adds italic [HH:MM:SS] prefix")
     func markdownTimestamps() throws {
-        let exporter = MarkdownExporter(options: MarkdownOptions(showTimestamps: true))
+        let exporter = MarkdownExporter(spec: .md(timestamps: true))
         let out = try exporter.renderText(sample())
         #expect(out.contains("*[00:00:00]* Hello world."))
         #expect(out.contains("*[00:00:01]* This is Parola."))
@@ -208,7 +208,7 @@ struct ExporterTests {
 
     @Test("markdown with speakers + timestamps combines both prefixes")
     func markdownBoth() throws {
-        let exporter = MarkdownExporter(options: MarkdownOptions(showTimestamps: true))
+        let exporter = MarkdownExporter(spec: .md(timestamps: true))
         let out = try exporter.renderText(sampleWithSpeakers())
         #expect(out.contains("**Speaker 1** *[00:00:00]*: Hello world."))
         #expect(out.contains("**Speaker 2** *[00:00:01]*: This is Parola."))
@@ -225,7 +225,7 @@ struct ExporterTests {
         #expect(plain == "# Transcript\n\nHello.\n")
         #expect(plain.contains("**:**") == false)
 
-        let timed = try MarkdownExporter(options: MarkdownOptions(showTimestamps: true)).renderText(transcript)
+        let timed = try MarkdownExporter(spec: .md(timestamps: true)).renderText(transcript)
         #expect(timed == "# Transcript\n\n*[00:00:00]* Hello.\n")
         #expect(timed.contains("****") == false)
     }
@@ -317,7 +317,7 @@ struct ExporterTests {
 
     @Test("html omits timestamps when showTimestamps is off")
     func htmlNoTimestamps() throws {
-        let out = try HtmlExporter(options: HtmlOptions(showTimestamps: false)).renderText(sample())
+        let out = try HtmlExporter(spec: .html(timestamps: false)).renderText(sample())
         #expect(!out.contains("class=\"t\""))
         #expect(!out.contains("[00:00:00]"))
         #expect(out.contains("Hello world."))
@@ -708,7 +708,7 @@ struct ExporterTests {
 
     @Test("srt with includeSpeakers prefixes each cue")
     func srtSpeakers() throws {
-        let exporter = SrtExporter(options: SubtitleOptions(includeSpeakers: true))
+        let exporter = SrtExporter(spec: .srt(speakers: true))
         let out = try exporter.renderText(sampleWithSpeakers())
         #expect(out.contains("Speaker 1: Hello world."))
         #expect(out.contains("Speaker 2: This is Parola."))
@@ -723,7 +723,7 @@ struct ExporterTests {
 
     @Test("vtt with includeSpeakers wraps cues in <v> tags")
     func vttSpeakers() throws {
-        let exporter = VttExporter(options: SubtitleOptions(includeSpeakers: true))
+        let exporter = VttExporter(spec: .vtt(speakers: true))
         let out = try exporter.renderText(sampleWithSpeakers())
         #expect(out.contains("<v Speaker 1>Hello world.</v>"))
         #expect(out.contains("<v Speaker 2>This is Parola.</v>"))
@@ -746,7 +746,7 @@ struct ExporterTests {
             sourceURL: URL(fileURLWithPath: "/tmp/x.wav"),
             durationSeconds: 1.5
         )
-        let out = try VttExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        let out = try VttExporter(spec: .vtt(speakers: true)).renderText(transcript)
         #expect(out.contains("a &lt; b &amp; c &gt; d"))
         #expect(out.contains("&lt;i&gt;x&lt;/i&gt;"))
         #expect(out.contains("<v Ann &lt;Boss&gt; &amp; Co>"))
@@ -767,7 +767,7 @@ struct ExporterTests {
             sourceURL: URL(fileURLWithPath: "/tmp/x.wav"),
             durationSeconds: 5
         )
-        let out = try SrtExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        let out = try SrtExporter(spec: .srt(speakers: true)).renderText(transcript)
         #expect(out.contains("Alice Bob: Hello"))
         let blocks = out
             .components(separatedBy: "\n\n")
@@ -786,7 +786,7 @@ struct ExporterTests {
             sourceURL: URL(fileURLWithPath: "/tmp/x.wav"),
             durationSeconds: 5
         )
-        let out = try VttExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        let out = try VttExporter(spec: .vtt(speakers: true)).renderText(transcript)
         #expect(out.contains("<v Alice Bob>Hello</v>"))
     }
 
@@ -799,7 +799,7 @@ struct ExporterTests {
             language: "en",
             modelName: "m"
         )
-        let out = try SrtExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        let out = try SrtExporter(spec: .srt(speakers: true)).renderText(transcript)
         #expect(out.contains("Hello"))
         #expect(out.contains(": Hello") == false)
     }
@@ -813,7 +813,7 @@ struct ExporterTests {
             language: "en",
             modelName: "m"
         )
-        let out = try VttExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        let out = try VttExporter(spec: .vtt(speakers: true)).renderText(transcript)
         #expect(out.contains("Hello"))
         #expect(out.contains("<v") == false)
     }
@@ -827,7 +827,7 @@ struct ExporterTests {
             language: "en",
             modelName: "m"
         )
-        let out = try SrtExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        let out = try SrtExporter(spec: .srt(speakers: true)).renderText(transcript)
         #expect(out.contains("Marco: Hello"))
     }
 
@@ -948,7 +948,7 @@ struct ExporterTests {
             language: "en",
             modelName: "m"
         )
-        let out = try SrtExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        let out = try SrtExporter(spec: .srt(speakers: true)).renderText(transcript)
         let blocks = out
             .components(separatedBy: "\n\n")
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

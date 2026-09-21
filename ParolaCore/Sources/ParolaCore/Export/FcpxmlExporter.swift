@@ -4,10 +4,13 @@ import Foundation
 /// over a single gap, ready for File > Import > XML in Final Cut Pro.
 public struct FcpxmlExporter: TranscriptExporter {
     public let format: ExportFormat = .fcpxml
+    public let spec: ExportSpec
 
-    public init() {}
+    public init(spec: ExportSpec = .standard(for: .fcpxml)) {
+        self.spec = spec
+    }
 
-    public func render(_ transcript: Transcript) throws -> Data {
+    public func encode(_ transcript: Transcript) throws -> Data {
         let title = Format.escapeXML(Format.documentTitle(for: transcript))
         let role = "iTT?captionFormat=ITT.\(Self.captionLanguage(transcript.language))"
         let lastEnd = transcript.segments.map(\.end).max() ?? 0

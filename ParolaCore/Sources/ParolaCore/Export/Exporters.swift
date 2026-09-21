@@ -40,10 +40,21 @@ public enum ExportFormat: String, CaseIterable, Sendable, Codable, Identifiable 
 
 public protocol TranscriptExporter: Sendable {
     var format: ExportFormat { get }
-    func render(_ transcript: Transcript) throws -> Data
+    var spec: ExportSpec { get }
+    /// The bytes for this format. Call ``render(_:)`` instead: it applies the spec's shared transforms first.
+    func encode(_ transcript: Transcript) throws -> Data
 }
 
 public extension TranscriptExporter {
+    var options: ExportOptions { spec.options }
+
+    /// Renders the transcript as the spec describes it, grouping segments before the format sees them.
+    func render(_ transcript: Transcript) throws -> Data {
+        var prepared = transcript
+        prepared.segments = spec.options.grouping.apply(to: transcript.segments)
+        return try encode(prepared)
+    }
+
     func renderText(_ transcript: Transcript) throws -> String {
         let data = try render(transcript)
         guard let text = String(data: data, encoding: .utf8) else {
@@ -56,21 +67,26 @@ public extension TranscriptExporter {
 func utf8(_ s: String) -> Data { Data(s.utf8) }
 
 public enum Exporters {
-    public static func exporter(for format: ExportFormat) -> TranscriptExporter {
-        switch format {
-        case .txt:  return TxtExporter()
-        case .srt:  return SrtExporter()
-        case .vtt:  return VttExporter()
-        case .json: return JsonExporter()
-        case .jsonl: return JsonLinesExporter()
-        case .md:   return MarkdownExporter()
-        case .html: return HtmlExporter()
-        case .csv:  return CsvExporter()
-        case .tsv:  return TsvExporter()
-        case .docx: return DocxExporter()
-        case .pdf:  return PdfExporter()
-        case .fcpxml: return FcpxmlExporter()
-        case .lrc:  return LrcExporter()
+    public static func exporter(for spec: ExportSpec) -> TranscriptExporter {
+        switch spec.format {
+        case .txt:  return TxtExporter(spec: spec)
+        case .srt:  return SrtExporter(spec: spec)
+        case .vtt:  return VttExporter(spec: spec)
+        case .json: return JsonExporter(spec: spec)
+        case .jsonl: return JsonLinesExporter(spec: spec)
+        case .md:   return MarkdownExporter(spec: spec)
+        case .html: return HtmlExporter(spec: spec)
+        case .csv:  return CsvExporter(spec: spec)
+        case .tsv:  return TsvExporter(spec: spec)
+        case .docx: return DocxExporter(spec: spec)
+        case .pdf:  return PdfExporter(spec: spec)
+        case .fcpxml: return FcpxmlExporter(spec: spec)
+        case .lrc:  return LrcExporter(spec: spec)
         }
+    }
+
+    /// The exporter a format uses when nothing has been configured.
+    public static func exporter(for format: ExportFormat) -> TranscriptExporter {
+        exporter(for: .standard(for: format))
     }
 }

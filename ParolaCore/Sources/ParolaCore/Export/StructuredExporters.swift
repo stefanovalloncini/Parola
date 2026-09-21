@@ -2,8 +2,13 @@ import Foundation
 
 public struct JsonExporter: TranscriptExporter {
     public let format: ExportFormat = .json
-    public init() {}
-    public func render(_ transcript: Transcript) throws -> Data {
+    public let spec: ExportSpec
+
+    public init(spec: ExportSpec = .standard(for: .json)) {
+        self.spec = spec
+    }
+
+    public func encode(_ transcript: Transcript) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         var clean = transcript
@@ -14,8 +19,13 @@ public struct JsonExporter: TranscriptExporter {
 
 struct JsonLinesExporter: TranscriptExporter {
     let format: ExportFormat = .jsonl
-    init() {}
-    func render(_ transcript: Transcript) throws -> Data {
+    let spec: ExportSpec
+
+    init(spec: ExportSpec = .standard(for: .jsonl)) {
+        self.spec = spec
+    }
+
+    func encode(_ transcript: Transcript) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         var data = Data()
@@ -67,36 +77,15 @@ public enum HtmlExportTheme: String, Sendable, Codable, CaseIterable, Identifiab
     }
 }
 
-public struct HtmlOptions: Sendable, Codable, Hashable {
-    public var theme: HtmlExportTheme
-    public var showTimestamps: Bool
-
-    public init(theme: HtmlExportTheme = .light, showTimestamps: Bool = true) {
-        self.theme = theme
-        self.showTimestamps = showTimestamps
-    }
-
-    public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        theme = try c.decodeIfPresent(HtmlExportTheme.self, forKey: .theme) ?? .light
-        showTimestamps = try c.decodeIfPresent(Bool.self, forKey: .showTimestamps) ?? true
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case theme
-        case showTimestamps
-    }
-}
-
 public struct HtmlExporter: TranscriptExporter {
     public let format: ExportFormat = .html
-    public let options: HtmlOptions
+    public let spec: ExportSpec
 
-    public init(options: HtmlOptions = HtmlOptions()) {
-        self.options = options
+    public init(spec: ExportSpec = .standard(for: .html)) {
+        self.spec = spec
     }
 
-    public func render(_ transcript: Transcript) throws -> Data {
+    public func encode(_ transcript: Transcript) throws -> Data {
         var body = ""
         for seg in transcript.segments {
             let trimmed = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -104,16 +93,16 @@ public struct HtmlExporter: TranscriptExporter {
             let text = Format.escapeHTML(trimmed)
             let anchor = "t-\(seg.id)"
             var paragraph = "<p id=\"\(anchor)\">"
-            if options.showTimestamps {
-                paragraph += "<a class=\"t\" href=\"#\(anchor)\">[\(Format.timestampHHMMSS(seg.start))]</a> "
+            if let stamp = options.timestampLabel(start: seg.start, end: seg.end) {
+                paragraph += "<a class=\"t\" href=\"#\(anchor)\">[\(Format.escapeHTML(stamp))]</a> "
             }
-            if let speaker = Format.presentationSpeakerLabel(seg.speaker) {
+            if options.speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                 paragraph += "<span class=\"s\">\(Format.escapeHTML(speaker))</span>: "
             }
             paragraph += "\(text)</p>\n"
             body += paragraph
         }
-        let theme = options.theme
+        let theme = options.htmlTheme
         let title = Format.escapeHTML(Format.documentTitle(for: transcript))
         let css = "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.5;background:\(theme.background);color:\(theme.foreground)}.t{color:\(theme.timestamp);font-family:ui-monospace,monospace;font-size:.85em;text-decoration:none;margin-right:.4em}.s{font-weight:600}p{margin:0 0 1em}"
         let doc = """
@@ -129,9 +118,13 @@ public struct HtmlExporter: TranscriptExporter {
 
 struct CsvExporter: TranscriptExporter {
     let format: ExportFormat = .csv
-    init() {}
+    let spec: ExportSpec
 
-    func render(_ transcript: Transcript) throws -> Data {
+    init(spec: ExportSpec = .standard(for: .csv)) {
+        self.spec = spec
+    }
+
+    func encode(_ transcript: Transcript) throws -> Data {
         var out = "start_seconds,end_seconds,speaker,text\n"
         for seg in transcript.segments {
             let text = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -152,9 +145,13 @@ struct CsvExporter: TranscriptExporter {
 
 struct DocxExporter: TranscriptExporter {
     let format: ExportFormat = .docx
-    init() {}
+    let spec: ExportSpec
 
-    func render(_ transcript: Transcript) throws -> Data {
+    init(spec: ExportSpec = .standard(for: .docx)) {
+        self.spec = spec
+    }
+
+    func encode(_ transcript: Transcript) throws -> Data {
         let document = buildDocumentXML(transcript)
         let files: [Zip.File] = [
             Zip.File(name: "[Content_Types].xml", data: utf8(Self.contentTypesXML)),
@@ -170,7 +167,7 @@ struct DocxExporter: TranscriptExporter {
             let trimmed = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
             let text = Format.escapeXML(trimmed)
-            if let speaker = Format.presentationSpeakerLabel(seg.speaker) {
+            if options.speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                 let escapedSpeaker = Format.escapeXML(speaker)
                 body += "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">\(escapedSpeaker): </w:t></w:r><w:r><w:t xml:space=\"preserve\">\(text)</w:t></w:r></w:p>"
             } else {

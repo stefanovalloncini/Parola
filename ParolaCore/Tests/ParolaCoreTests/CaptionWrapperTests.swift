@@ -96,7 +96,7 @@ struct CaptionWrapperTests {
             language: "en",
             modelName: "x"
         )
-        let exporter = SrtExporter(options: SubtitleOptions(captionLength: .short))
+        let exporter = SrtExporter(spec: .srt(captionLength: .short))
         let raw = try exporter.render(transcript)
         let output = String(data: raw, encoding: .utf8) ?? ""
         let bodyLines = output
