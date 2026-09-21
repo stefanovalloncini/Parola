@@ -9,8 +9,8 @@ struct ToolbarSearchMetricsTests {
     private let defaultWindow: CGFloat = 1180
     private let capsule = ToolbarSearchMetrics.defaultIntakeWidth
 
-    private func collapses(_ windowWidth: CGFloat, intakeWidth: CGFloat) -> Bool {
-        ToolbarSearchMetrics.collapses(windowWidth: windowWidth, intakeWidth: intakeWidth)
+    private func collapses(_ windowWidth: CGFloat, intakeWidth: CGFloat, isFocused: Bool = false) -> Bool {
+        ToolbarSearchMetrics.collapses(windowWidth: windowWidth, intakeWidth: intakeWidth, isFocused: isFocused)
     }
 
     @Test("only the introduction hides the field")
@@ -45,6 +45,12 @@ struct ToolbarSearchMetricsTests {
     func widerCapsuleCollapsesSooner() {
         #expect(!collapses(1000, intakeWidth: capsule))
         #expect(collapses(1000, intakeWidth: capsule + 120))
+    }
+
+    @Test("a field holding the keyboard is never taken away")
+    func focusedFieldNeverCollapses() {
+        #expect(!collapses(MainWindowLayout.minimumWidth, intakeWidth: capsule, isFocused: true))
+        #expect(!collapses(600, intakeWidth: capsule, isFocused: true))
     }
 
     @Test("widening a window never takes the field away")

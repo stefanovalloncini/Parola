@@ -29,14 +29,19 @@ enum ToolbarSearchMetrics {
     }
 
     /// An unmeasured window proposes nothing, so it keeps the full field rather than flashing the chip.
-    static func collapses(windowWidth: CGFloat, intakeWidth: CGFloat) -> Bool {
+    static func isTight(windowWidth: CGFloat, intakeWidth: CGFloat) -> Bool {
         windowWidth > 0 && roomForSearch(windowWidth: windowWidth, intakeWidth: intakeWidth) < focusedWidth
+    }
+
+    /// A drag-resize must not take the field out from under the caret, so a focused field never collapses.
+    static func collapses(windowWidth: CGFloat, intakeWidth: CGFloat, isFocused: Bool) -> Bool {
+        !isFocused && isTight(windowWidth: windowWidth, intakeWidth: intakeWidth)
     }
 
     /// A chip opened on a narrow toolbar takes the room that is left rather than pushing the New menu off the edge.
     static func fieldWidth(windowWidth: CGFloat, intakeWidth: CGFloat, focused: Bool) -> CGFloat {
         let wanted = focused ? focusedWidth : restingWidth
-        guard collapses(windowWidth: windowWidth, intakeWidth: intakeWidth) else { return wanted }
+        guard isTight(windowWidth: windowWidth, intakeWidth: intakeWidth) else { return wanted }
         return max(minimumFieldWidth, min(wanted, roomForSearch(windowWidth: windowWidth, intakeWidth: intakeWidth)))
     }
 
@@ -143,7 +148,11 @@ struct ToolbarSearchField: View {
     }
 
     private var collapsed: Bool {
-        !expanded && ToolbarSearchMetrics.collapses(windowWidth: windowWidth, intakeWidth: intakeWidth)
+        !expanded && ToolbarSearchMetrics.collapses(
+            windowWidth: windowWidth,
+            intakeWidth: intakeWidth,
+            isFocused: editing
+        )
     }
 
     private var query: Binding<String> {
@@ -196,11 +205,25 @@ struct ToolbarSearchField: View {
             DispatchQueue.main.async { ToolbarSearchFocus.placeCaret() }
         } label: {
             Image(systemName: "magnifyingglass")
+                .overlay(alignment: .topTrailing) {
+                    if !model.searchQuery.isEmpty {
+                        Circle()
+                            .fill(DS.Color.accent)
+                            .frame(width: 6, height: 6)
+                            .offset(x: 3, y: -2)
+                    }
+                }
         }
         .buttonStyle(DSIconChipButtonStyle(side: ToolbarSearchMetrics.chipSide))
-        .help("Search history")
-        .accessibilityLabel("Search history")
+        .help(chipLabel)
+        .accessibilityLabel(chipLabel)
         .axLeaf("Toolbar.Button.ExpandSearch")
+    }
+
+    /// The chip hides the query, so what it is filtering by has to reach the tooltip and VoiceOver.
+    private var chipLabel: String {
+        let query = model.searchQuery.trimmingCharacters(in: .whitespaces)
+        return query.isEmpty ? String(localized: "Search history") : String(localized: "Searching for “\(query)”")
     }
 
     private func escape() -> KeyPress.Result {

@@ -8567,6 +8567,17 @@
         }
       }
     },
+    "Searching for “%@”": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricerca di “%@”"
+          }
+        }
+      }
+    },
     "Segment note": {
       "extractionState": "manual",
       "localizations": {
