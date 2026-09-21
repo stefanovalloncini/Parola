@@ -135,16 +135,18 @@ final class AppModel {
     /// Diarizer speaker-count hint; 0 means auto-detect and threads nil into the options.
     var expectedSpeakersRaw: Int = 0 { didSet { defaults.set(expectedSpeakersRaw, forKey: "expectedSpeakersRaw") } }
     var generatesCardMetadata: Bool = true { didSet { defaults.set(generatesCardMetadata, forKey: "generateCardMetadata") } }
+    // Bumps libraryVersion even during a settings reload: a bridge setSetting, an import, or a
+    // Reset must repaint rows whose title or excerpt this toggle switches.
     var showAITitles: Bool = true {
         didSet {
             defaults.set(showAITitles, forKey: "showAITitles")
-            if !isReloadingSettings { libraryVersion &+= 1 }
+            libraryVersion &+= 1
         }
     }
     var showAISummaries: Bool = true {
         didSet {
             defaults.set(showAISummaries, forKey: "showAISummaries")
-            if !isReloadingSettings { libraryVersion &+= 1 }
+            libraryVersion &+= 1
         }
     }
     var customTitlePrompt: String = "" { didSet { defaults.set(customTitlePrompt, forKey: "customTitlePrompt") } }

@@ -85,6 +85,19 @@ struct ReloadSettingsTests {
         #expect(model.translate == true)
     }
 
+    @Test("reloading a flipped showAITitles key bumps libraryVersion so rows repaint")
+    func reloadShowAITitlesBumpsLibraryVersion() {
+        let defaults = temporaryDefaults()
+        let model = makeModel(defaults)
+        let before = model.libraryVersion
+
+        defaults.set(false, forKey: "showAITitles")
+        model.reloadObservedSetting(key: "showAITitles")
+
+        #expect(model.showAITitles == false)
+        #expect(model.libraryVersion != before)
+    }
+
     @Test("inputDeviceUID persists to defaults and reloadSettings re-reads it")
     func inputDeviceUIDPersistsAndReloads() {
         let defaults = temporaryDefaults()
