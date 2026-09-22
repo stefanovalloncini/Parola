@@ -170,9 +170,13 @@ public struct DeliveryQueueStore: Sendable {
     }
 
     private func write<T: Encodable>(_ value: T, to url: URL) {
-        guard let data = try? Self.encoder.encode(value) else { return }
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try? data.write(to: url, options: .atomic)
+        do {
+            let data = try Self.encoder.encode(value)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            ParolaLog.error(.export, "delivery state could not be written", [.error: .error(error)])
+        }
     }
 
     private static let encoder: JSONEncoder = {

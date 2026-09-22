@@ -459,6 +459,25 @@ struct DeliveryLogTests {
         #expect(sink.records.filter { $0.level == .error }.count == 2)
     }
 
+    @Test("a queue that cannot be written is logged rather than lost in silence")
+    func unwritableQueueIsLogged() async throws {
+        let blocked = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-delivery-blocked-\(UUID().uuidString)")
+        try Data("not a directory".utf8).write(to: blocked)
+        defer { try? FileManager.default.removeItem(at: blocked) }
+        let store = DeliveryQueueStore(directory: blocked)
+
+        let sink = CapturingDiagnosticsSink()
+        await ParolaLog.withSink(sink) {
+            store.save(queue: [
+                QueuedDelivery(entryID: "entry-1", destinationID: UUID(), attempt: 1, nextAttemptAt: Date())
+            ])
+        }
+
+        #expect(sink.records.contains { $0.level == .error })
+        #expect(store.loadQueue().isEmpty)
+    }
+
     @Test("an absent file reads as an empty queue and log")
     func absentFiles() {
         let store = DeliveryQueueStore(
