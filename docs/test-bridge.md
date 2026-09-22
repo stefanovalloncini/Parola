@@ -98,6 +98,11 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_list_windows` | — | Visible NSWindows: title, size, key/main flags. A transcript window carries the entry's title, so a driver can find it. |
 | `translateTranscript` | **language** | Translate the loaded transcript into that language code and store the result. Uses whichever translator is installed (`installMockTranslator` in test mode). Replies `{translated, targetLanguage, segmentCount, provider}`, or `{translated: false, reason}` when the run failed or was refused. |
 | `removeTranslation` | — | Drop the loaded transcript's translation. Replies `{removed}`. |
+| `installMockTranslator` | **mode**, map, delayMs | Test mode: install a translator that never touches the Translation framework. `mode` is `reverseWords` or `map`; `map` is source text → translated text for the `map` mode; `delayMs` holds each batch. Replies `{installed, mode, mapCount, delayMs}`. Clear it with `clearMocks` scope `translator`. |
+| `setSegmentFavorite` | **segmentID**, **isFavorite** | Star or unstar one segment of the loaded transcript, the way the card's star does. Replies `{applied, segmentID, isFavorite}`, or `{applied: false, reason}` when no entry is selected. Unstarring the last favorite also turns the Favorites-only filter off. |
+| `setTranscriptPaneMode` | **mode** | Switch the transcript column between `transcript`, `summary` and `chat`, the way ⌘1/2/3 do. A mode the transcript or the AI feature can't support is ignored. Replies `{mode}` with the mode that landed. |
+| `setSummaryOptions` | **options** | Merge fields over the saved summary options and persist the result (`{"options": {"length": "short"}}`). Replies `{summaryOptions}`. |
+| `generateCardMetadata` | **id**, force | Write the AI title and one-line summary for a library entry. Needs the AI feature, and the `generateCardMetadata` setting unless `force: true` — which is the Info inspector's Regenerate, the one path that ignores the toggle. Replies `{generated, aiTitle, shortSummary}`, or `{generated: false, reason}`. |
 | `toggleInspector` | — | Toggle the transcript inspector, the same way ⌘⇧I does. Below ~1050 pt of window the pane folds the inspector away, and this is the only way to bring it back. |
 | `setWindowFrame` | x, y, w, h | Move and resize the main window; the reply carries the frame that landed after the window's minimum size clamped it. AX resize is refused on ad-hoc-signed builds, so layout checks go through here. |
 | `showIntroduction` | — | Restart the first-run introduction, the way Help ▸ Show Introduction does. Works in test mode too, even without `--show-introduction`. |
@@ -114,6 +119,9 @@ The five introduction commands and `getState.introduction` all reply `{visible, 
 `null` otherwise. A run in flight wins over a translation already stored: it reports the target it is heading for,
 `segmentCount` as the segments sent so far and `inProgress: true`, so a script can wait on a first translation.
 `getState.translationSideBySide` is the two-column preference.
+`getState.favoriteSegments` lists the starred segment ids of the open entry and `getState.favoritesOnly` says whether the transcript is filtered to them.
+`getState.transcriptPaneMode` is which of `transcript` / `summary` / `chat` the column is showing.
+`getState.summaryOptions` is the saved summary options as `setSummaryOptions` takes them, and `getState.autostartSummary` whether a finished transcription summarises itself.
 `getState.aiServices` lists the configured AI services (`id`, `kind`, `name`, `model`, `endpoint`, `hasKey`) — the API key itself is never returned by any command, and never reaches the diagnostics export.
 `getState.languageModelSelection` is the per-task selection as `setLanguageModelSelection` takes it, and `getState.remoteAIAcknowledged` says whether the one-time "transcripts leave this Mac" notice has been accepted (`setSetting remoteAIAcknowledged true` skips the sheet in a script).
 `getState.people` is the people directory as `listPeople` returns it, `getState.speakerAssignments` the open entry's label → person id map (empty for a transcript that isn't in the library), `getState.personFilter` the person the library list is filtered to, and `getState.showMostUsedPeople` whether the PEOPLE sidebar section shows (`setSetting showMostUsedPeople false` hides it).
@@ -163,7 +171,7 @@ Rows named without the `parola_app_` prefix are raw bridge commands, called thro
 | `parola_app_clear_batch` | — | Cancel and remove all queued jobs. |
 | `parola_app_select_batch_job` | **id** | Select a specific job to view its transcript. |
 | `parola_app_get_batch_jobs` | — | All jobs: id, file, status (pending/transcribing/done/failed/cancelled), progress, error. |
-| `parola_app_summarize_latest_entry` | — | Run the on-device summarizer against the most recent library entry. |
+| `parola_app_summarize_latest_entry` | options | Run the on-device summarizer against the most recent library entry. `options` merges `SummaryOptions` fields over the saved ones for this run only. |
 | `parola_app_reveal_cache_directory` | — | Open Finder showing the model cache directory. |
 
 ## Workflow
