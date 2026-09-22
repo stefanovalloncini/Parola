@@ -57,7 +57,7 @@ struct SummaryOptionsSettingsTests {
         model.persistToLibrary(makeTranscript(text: longText), audioSource: nil, source: .file, activate: true)
 
         await waitUntil(timeoutMs: 5000) { model.transcript?.summary != nil }
-        #expect(await callCount.value == 1)
+        #expect(callCount.value == 1)
     }
 
     @Test("autostart never runs when activate is false")
@@ -76,7 +76,7 @@ struct SummaryOptionsSettingsTests {
         model.persistToLibrary(makeTranscript(text: longText), audioSource: nil, source: .file, activate: false)
 
         try? await Task.sleep(for: .milliseconds(200))
-        #expect(await callCount.value == 0)
+        #expect(callCount.value == 0)
     }
 
     @Test("transcriptPaneMode defaults to transcript, can move to chat, and resets on clearLoadedEntry")
@@ -130,7 +130,7 @@ struct SummaryOptionsSettingsTests {
         model.selectedEntryID = "somewhere-else"
 
         try? await Task.sleep(for: .milliseconds(600))
-        #expect(await callCount.value == 0)
+        #expect(callCount.value == 0)
     }
 
     @Test("summariseTranscript passes the saved options to the operation")
@@ -151,7 +151,7 @@ struct SummaryOptionsSettingsTests {
         model.summariseTranscript()
         await waitUntil { !model.isSummarising }
 
-        #expect(await received.value == options)
+        #expect(received.value == options)
     }
 }
 
