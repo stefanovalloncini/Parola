@@ -90,44 +90,42 @@ struct ExportSheetTests {
         #expect(model.pendingExport == json.spec)
     }
 
+    /// A board of this suite's own: `.general` is shared with every other pasteboard suite running
+    /// in parallel, and with whoever is running the tests.
+    private func makePasteboard() -> NSPasteboard {
+        NSPasteboard(name: NSPasteboard.Name("export-sheet-test-\(UUID())"))
+    }
+
     @Test("copying renders the spec to the pasteboard")
-    func copyWritesThePasteboard() async throws {
+    func copyWritesThePasteboard() async {
         let model = makeModel()
         model.transcript = Self.transcript()
         model.openExportSheet()
         model.setExportSpec(model.exportSheetSpec.changing(format: .txt))
+        let pasteboard = makePasteboard()
 
-        NSPasteboard.general.clearContents()
-        model.copyExportToPasteboard()
+        model.copyExportToPasteboard(pasteboard: pasteboard)
 
-        var text: String?
-        for _ in 0..<200 {
-            text = NSPasteboard.general.string(forType: .string)
-            if text == "Ada: Hello world.\nGrace: Goodbye.\n" { break }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        #expect(text == "Ada: Hello world.\nGrace: Goodbye.\n")
+        #expect(await waitUntil { pasteboard.string(forType: .string) == Self.copiedText })
     }
 
     @Test("copying a Word export puts its text on the pasteboard")
-    func copyOfABinaryFormatCopiesItsText() async throws {
+    func copyOfABinaryFormatCopiesItsText() async {
         let model = makeModel()
         model.transcript = Self.transcript()
         model.openExportSheet()
         model.setExportSpec(model.exportSheetSpec.changing(format: .docx))
+        let pasteboard = makePasteboard()
 
-        NSPasteboard.general.clearContents()
-        model.copyExportToPasteboard()
+        model.copyExportToPasteboard(pasteboard: pasteboard)
 
-        var text: String?
-        for _ in 0..<200 {
-            text = NSPasteboard.general.string(forType: .string)
-            if text == "Ada: Hello world.\nGrace: Goodbye.\n" { break }
-            try await Task.sleep(for: .milliseconds(10))
+        #expect(await waitUntil { pasteboard.string(forType: .string) == Self.copiedText })
+        if case .failed(let message) = model.phase {
+            Issue.record("the copy failed: \(message)")
         }
-        #expect(text == "Ada: Hello world.\nGrace: Goodbye.\n")
-        #expect(model.phase != .failed(message: ""))
     }
+
+    private static let copiedText = "Ada: Hello world.\nGrace: Goodbye.\n"
 
     @Test("the sheet reopens on the spec it was left on")
     func sheetRemembersTheSessionSpec() {
@@ -219,7 +217,7 @@ struct ExportSheetTests {
     }
 
     @Test("switching to a binary format drops the options it cannot honour")
-    func binaryFormatPreviewMatchesTheFile() async throws {
+    func switchingFormatDropsOptionsItCannotHonour() async throws {
         let model = makeModel()
         model.transcript = Self.transcript()
         model.openExportSheet()

@@ -260,15 +260,15 @@ struct ParolaApp: App {
                     .keyboardShortcut("[", modifiers: [.command])
                     .disabled(!model.canReturnToOrigin)
                 Divider()
-                Button("Copy Plain Text") { model.copyTranscriptToPasteboard(withTimestamps: false) }
+                Button("Copy Plain Text") { model.copyTranscriptToPasteboard(withTimestamps: false, pasteboard: .general) }
                     .keyboardShortcut("c", modifiers: [.command, .shift])
                     .disabled(!model.mainTranscriptCommandsEnabled)
-                Button("Copy with Timestamps") { model.copyTranscriptToPasteboard(withTimestamps: true) }
+                Button("Copy with Timestamps") { model.copyTranscriptToPasteboard(withTimestamps: true, pasteboard: .general) }
                     .keyboardShortcut("c", modifiers: [.command, .option])
                     .disabled(!model.mainTranscriptCommandsEnabled)
                 Button("Copy as SRT") { model.copyTranscriptAsFormat(.srt) }
                     .disabled(!model.mainTranscriptCommandsEnabled)
-                Button("Copy Favorites") { model.copyTranscriptToPasteboard(withTimestamps: true, favoritesOnly: true) }
+                Button("Copy Favorites") { model.copyTranscriptToPasteboard(withTimestamps: true, favoritesOnly: true, pasteboard: .general) }
                     .disabled(model.favoriteSegmentIDs.isEmpty || model.keyWindowIsViewer)
                 Button("Send via Mail…") { model.shareTranscriptViaMail() }
                     .keyboardShortcut("m", modifiers: [.command, .shift])

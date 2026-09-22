@@ -28,16 +28,6 @@ struct ModelDetailsTests {
 
     private func lines(_ text: String) -> [String] { text.components(separatedBy: "\n") }
 
-    private func withPasteboardRestored(_ body: () async throws -> Void) async rethrows {
-        let pasteboard = NSPasteboard.general
-        let saved = pasteboard.string(forType: .string)
-        defer {
-            pasteboard.clearContents()
-            if let saved { pasteboard.setString(saved, forType: .string) }
-        }
-        try await body()
-    }
-
     @Test("an installed model names itself, its engine, its source, its path and its measured size")
     func installedModelDetails() {
         let model = makeModel("details-installed")

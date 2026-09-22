@@ -41,7 +41,9 @@ extension AppModel {
         addExportPreset(name: trimmed, spec: exportSheetSpec)
     }
 
-    func copyExportToPasteboard() {
+    /// The pasteboard is a parameter, not `.general` reached for inside: a test that wants to read
+    /// back what was copied must not have to take the user's clipboard to do it.
+    func copyExportToPasteboard(pasteboard: NSPasteboard) {
         guard let transcript else { return }
         // docx and pdf have no text to paste; the clipboard gets what the preview shows.
         let spec = exportSheetSpec.textRendering
@@ -49,8 +51,8 @@ extension AppModel {
             guard let self else { return }
             do {
                 let text = try await AppModel.offMainIO { try Exporters.exporter(for: spec).renderText(transcript) }
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
+                pasteboard.clearContents()
+                pasteboard.setString(text, forType: .string)
             } catch {
                 ParolaLog.error(.export, "copy failed as \(spec.format)", [.error: .error(error)])
                 self.phase = .failed(message: Self.exportFailureMessage(for: error))
@@ -133,7 +135,7 @@ extension AppModel {
         picker.show(relativeTo: anchor, of: anchorView, preferredEdge: .minY)
     }
 
-    func copyTranscriptToPasteboard(withTimestamps: Bool, favoritesOnly: Bool = false) {
+    func copyTranscriptToPasteboard(withTimestamps: Bool, favoritesOnly: Bool = false, pasteboard: NSPasteboard) {
         guard let transcript else { return }
         let favorites = favoriteSegmentIDs
         Task {
@@ -144,8 +146,8 @@ extension AppModel {
                 }
                 return withTimestamps ? TranscriptTimestampedText.render(source) : source.text
             }) else { return }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
         }
     }
 

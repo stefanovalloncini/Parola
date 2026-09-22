@@ -11,17 +11,6 @@ struct DictationInsertionLoggingTests {
         try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
-    // Both inserters leave the dictated text on the clipboard when they give up, so the tests hand it back.
-    private func withPasteboardRestored(_ body: () async throws -> Void) async rethrows {
-        let pasteboard = NSPasteboard.general
-        let saved = pasteboard.string(forType: .string)
-        defer {
-            pasteboard.clearContents()
-            if let saved { pasteboard.setString(saved, forType: .string) }
-        }
-        try await body()
-    }
-
     private func permissionRecord(
         _ sink: CapturingDiagnosticsSink, message: String
     ) -> LogRecord? {

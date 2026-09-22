@@ -184,7 +184,7 @@ struct ExportSheet: View {
 
             Spacer()
 
-            Button("Copy to Clipboard") { model.copyExportToPasteboard() }
+            Button("Copy to Clipboard") { model.copyExportToPasteboard(pasteboard: .general) }
                 .sheetSecondaryAction()
                 .disabled(!model.hasTranscript)
                 .axLeaf("Export.Button.Copy")
