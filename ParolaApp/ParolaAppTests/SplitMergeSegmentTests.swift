@@ -50,6 +50,20 @@ struct SplitMergeSegmentTests {
 
     // MARK: - Split with word timings
 
+    @Test("split hands back the ids it minted")
+    func splitReturnsTheNewIDs() throws {
+        let segments = Self.wordedTranscript().segments
+        let byWord = try #require(SegmentSurgery.split(segments: segments, id: 0, atWordIndex: 2))
+        #expect(byWord.firstID == 2 && byWord.secondID == 3)
+        #expect(byWord.segments.map(\.id) == [byWord.firstID, byWord.secondID, 1])
+
+        let byFraction = try #require(
+            SegmentSurgery.split(segments: Self.plainTranscript().segments, id: 0, atFraction: 0.5)
+        )
+        #expect(byFraction.firstID == 2 && byFraction.secondID == 3)
+        #expect(byFraction.segments.map(\.id) == [byFraction.firstID, byFraction.secondID, 1])
+    }
+
     @Test("split at a word boundary distributes words, times, and text")
     func splitAtWordBoundary() throws {
         model.transcript = Self.wordedTranscript()

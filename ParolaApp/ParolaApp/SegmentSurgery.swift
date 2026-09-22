@@ -5,7 +5,11 @@ import ParolaCore
 /// so callers can skip the undo registration entirely.
 enum SegmentSurgery {
 
-    static func split(segments: [TranscriptSegment], id: TranscriptSegment.ID, atWordIndex index: Int) -> [TranscriptSegment]? {
+    /// The split list and the two ids it minted, so a caller remapping what the old id carried
+    /// does not have to work them out again.
+    typealias Split = (segments: [TranscriptSegment], firstID: Int, secondID: Int)
+
+    static func split(segments: [TranscriptSegment], id: TranscriptSegment.ID, atWordIndex index: Int) -> Split? {
         guard let position = segments.firstIndex(where: { $0.id == id }) else { return nil }
         let segment = segments[position]
         guard let words = segment.words, (1..<words.count).contains(index) else { return nil }
@@ -32,10 +36,10 @@ enum SegmentSurgery {
         guard !first.text.isEmpty, !second.text.isEmpty else { return nil }
         var out = segments
         out.replaceSubrange(position...position, with: [first, second])
-        return out
+        return (out, firstID, secondID)
     }
 
-    static func split(segments: [TranscriptSegment], id: TranscriptSegment.ID, atFraction fraction: Double) -> [TranscriptSegment]? {
+    static func split(segments: [TranscriptSegment], id: TranscriptSegment.ID, atFraction fraction: Double) -> Split? {
         guard let position = segments.firstIndex(where: { $0.id == id }) else { return nil }
         let segment = segments[position]
         if let words = segment.words, words.count >= 2 {
@@ -48,12 +52,13 @@ enum SegmentSurgery {
         guard !head.isEmpty, !tail.isEmpty else { return nil }
         let boundary = segment.start + segment.duration * (Double(offset) / Double(text.count))
         let firstID = nextID(after: segments)
+        let secondID = firstID + 1
         var out = segments
         out.replaceSubrange(position...position, with: [
             TranscriptSegment(id: firstID, start: segment.start, end: boundary, text: head, speaker: segment.speaker),
-            TranscriptSegment(id: firstID + 1, start: boundary, end: segment.end, text: tail, speaker: segment.speaker),
+            TranscriptSegment(id: secondID, start: boundary, end: segment.end, text: tail, speaker: segment.speaker),
         ])
-        return out
+        return (out, firstID, secondID)
     }
 
     static func mergeWithNext(segments: [TranscriptSegment], id: TranscriptSegment.ID) -> [TranscriptSegment]? {

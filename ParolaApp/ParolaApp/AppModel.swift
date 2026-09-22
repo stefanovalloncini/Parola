@@ -3178,23 +3178,21 @@ final class AppModel {
 
     func splitSegment(id: TranscriptSegment.ID, atWordIndex index: Int) {
         guard var t = transcript else { return }
-        let firstID = (t.segments.map(\.id).max() ?? -1) + 1
-        guard let segments = SegmentSurgery.split(segments: t.segments, id: id, atWordIndex: index) else { return }
-        t.segments = segments
-        t.translation = t.translation?.afterSplit(of: id, into: firstID)
+        guard let split = SegmentSurgery.split(segments: t.segments, id: id, atWordIndex: index) else { return }
+        t.segments = split.segments
+        t.translation = t.translation?.afterSplit(of: id, into: split.firstID)
         let favorites = favoriteSegmentIDs
-        let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: firstID)
+        let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: split.firstID)
         applyTranscriptEdit(t, actionName: String(localized: "Split Segment"), favorites: (favorites, newFavorites))
     }
 
     func splitSegment(id: TranscriptSegment.ID, atFraction fraction: Double) {
         guard var t = transcript else { return }
-        let firstID = (t.segments.map(\.id).max() ?? -1) + 1
-        guard let segments = SegmentSurgery.split(segments: t.segments, id: id, atFraction: fraction) else { return }
-        t.segments = segments
-        t.translation = t.translation?.afterSplit(of: id, into: firstID)
+        guard let split = SegmentSurgery.split(segments: t.segments, id: id, atFraction: fraction) else { return }
+        t.segments = split.segments
+        t.translation = t.translation?.afterSplit(of: id, into: split.firstID)
         let favorites = favoriteSegmentIDs
-        let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: firstID)
+        let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: split.firstID)
         applyTranscriptEdit(t, actionName: String(localized: "Split Segment"), favorites: (favorites, newFavorites))
     }
 
