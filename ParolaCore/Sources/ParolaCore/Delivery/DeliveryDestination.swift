@@ -111,7 +111,7 @@ public enum DeliveryError: Error, LocalizedError, Equatable {
 }
 
 /// A destination's stored settings, held as plain JSON so a kind this build does not implement
-/// re-encodes exactly as it was read.
+/// re-encodes with the same values. Key order is not kept, and every number travels as a `Double`.
 public enum DestinationConfig: Codable, Sendable, Hashable {
     case null
     case bool(Bool)
