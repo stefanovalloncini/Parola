@@ -95,6 +95,7 @@ struct EntryWindowSessionTests {
 
         a.scrub(to: 1.5)
         a.searchQuery = "alpha"
+        #expect(await waitUntil { a.matches.count == 2 })
 
         #expect(a.currentTime == 1.5)
         #expect(b.currentTime == 0)
@@ -225,6 +226,7 @@ struct EntryWindowSessionTests {
         let session = await EntryWindowTestSupport.openSession(model, entry)
         session.scrub(to: 1.2)
         session.searchQuery = "beta"
+        #expect(await waitUntil { session.matches.count == 1 })
 
         try await EntryWindowTestSupport.store(model).setFavoriteSegments([1], for: entry.id)
         await EntryWindowTestSupport.syncLibrary(model)
@@ -281,8 +283,8 @@ struct EntryWindowSessionTests {
         let session = await EntryWindowTestSupport.openSession(model, entry)
 
         session.searchQuery = "al"
+        #expect(await waitUntil { session.matches.count == 3 })
 
-        #expect(session.matches.count == 3)
         #expect(session.currentSegmentID == 0)
 
         session.goToNextMatch()

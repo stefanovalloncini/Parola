@@ -23,7 +23,7 @@ final class EntryWindowSession {
     var rate: Double { didSet { applyRate() } }
 
     var searchIsOpen = false
-    var searchQuery: String = "" { didSet { recomputeMatches() } }
+    var searchQuery: String = "" { didSet { scheduleMatchRecompute() } }
     private(set) var matches: [TranscriptMatch] = []
     private(set) var currentMatchIndex = 0
     var showsInfo = false
@@ -35,6 +35,10 @@ final class EntryWindowSession {
     @ObservationIgnored private var statusObserver: NSKeyValueObservation?
     @ObservationIgnored private var matchesBySegment: [TranscriptSegment.ID: [TranscriptMatch]] = [:]
     @ObservationIgnored private var segmentsByID: [TranscriptSegment.ID: TranscriptSegment] = [:]
+    @ObservationIgnored private var searchDebounceTask: Task<Void, Never>?
+    @ObservationIgnored private(set) var appliedUpdatedAt: Date?
+    /// Counts the bundle reads, so a test can tell a skipped reload from a silent one.
+    @ObservationIgnored private(set) var loadGeneration = 0
 
     init(entryID: LibraryEntry.ID, model: AppModel) {
         self.entryID = entryID
@@ -59,7 +63,8 @@ final class EntryWindowSession {
 
     var entry: LibraryEntry? { model.libraryEntry(id: entryID) }
 
-    var favorites: Set<Int> { Set(document?.manifest.favoriteSegments ?? []) }
+    /// Rebuilt when the document lands, not per row: every visible row reads it.
+    private(set) var favorites: Set<Int> = []
 
     var translations: [Int: String] { document?.transcript.translation?.segments ?? [:] }
 
@@ -74,13 +79,17 @@ final class EntryWindowSession {
     }
 
     /// The colour each speaker label wears in this window, read from this entry's own map.
-    var speakerColorIndices: [String: Int] {
+    /// Cached with the document: rebuilding it cost a person lookup per assignment per row.
+    private(set) var speakerColorIndices: [String: Int] = [:]
+
+    private func rebuildSideMaps() {
+        favorites = Set(document?.manifest.favoriteSegments ?? [])
         var indices: [String: Int] = [:]
         for (label, personID) in document?.manifest.speakerAssignments ?? [:] {
             guard let person = model.person(id: personID) else { continue }
             indices[label] = person.colorIndex
         }
-        return indices
+        speakerColorIndices = indices
     }
 
     func isFavorite(_ segmentID: TranscriptSegment.ID) -> Bool {
@@ -98,7 +107,18 @@ final class EntryWindowSession {
         startLoad(keepingPlace: true)
     }
 
+    /// What a library bump calls: any entry's change bumps the counter, only this one's is worth a read.
+    func reloadIfEntryChanged() {
+        guard let entry = model.libraryEntry(id: entryID) else {
+            if !loadFailed { reload() }
+            return
+        }
+        guard entry.updatedAt != appliedUpdatedAt else { return }
+        reload()
+    }
+
     private func startLoad(keepingPlace: Bool) {
+        loadGeneration += 1
         loadTask?.cancel()
         loadTask = Task { [model, entryID] in
             do {
@@ -115,9 +135,11 @@ final class EntryWindowSession {
     private func apply(_ loaded: LoadedEntry, keepingPlace: Bool) {
         document = loaded.document
         title = LibraryEntryDisplay.title(for: loaded.entry)
+        appliedUpdatedAt = loaded.entry.updatedAt
         isLoading = false
         loadFailed = false
         rebuildSegmentIndex()
+        rebuildSideMaps()
         refreshMatches()
         let audioURL = loaded.document.audioURL
         if let audioURL, player == nil || !keepingPlace || audioURL != playerURL {
@@ -131,9 +153,11 @@ final class EntryWindowSession {
 
     private func markUnavailable() {
         document = nil
+        appliedUpdatedAt = nil
         isLoading = false
         loadFailed = true
         rebuildSegmentIndex()
+        rebuildSideMaps()
         refreshMatches()
         tearDownPlayer()
     }
@@ -150,6 +174,8 @@ final class EntryWindowSession {
     func release() {
         loadTask?.cancel()
         loadTask = nil
+        searchDebounceTask?.cancel()
+        searchDebounceTask = nil
         tearDownPlayer()
     }
 
@@ -258,6 +284,20 @@ final class EntryWindowSession {
         guard !matches.isEmpty else { return }
         currentMatchIndex = (currentMatchIndex - 1 + matches.count) % matches.count
         snapToCurrentMatch()
+    }
+
+    /// A keystroke must not scan the whole transcript: the scan follows the typing by ~150 ms.
+    private func scheduleMatchRecompute() {
+        searchDebounceTask?.cancel()
+        guard !searchQuery.isEmpty else {
+            recomputeMatches()
+            return
+        }
+        searchDebounceTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            self?.recomputeMatches()
+        }
     }
 
     private func recomputeMatches() {
