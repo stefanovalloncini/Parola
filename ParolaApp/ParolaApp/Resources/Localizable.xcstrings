@@ -8261,6 +8261,17 @@
         }
       }
     },
+    "Notion": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion"
+          }
+        }
+      }
+    },
     "Nudge Timing…": {
       "extractionState": "manual",
       "localizations": {
@@ -8294,7 +8305,29 @@
         }
       }
     },
+    "Obsidian Local REST": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obsidian Local REST"
+          }
+        }
+      }
+    },
     "Obsidian Vault Folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartella di un vault Obsidian"
+          }
+        }
+      }
+    },
+    "Obsidian vault folder": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -14121,6 +14154,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli WebVTT"
+          }
+        }
+      }
+    },
+    "Webhook": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Webhook"
           }
         }
       }
