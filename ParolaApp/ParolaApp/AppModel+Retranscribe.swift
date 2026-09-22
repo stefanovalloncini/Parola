@@ -119,7 +119,7 @@ extension AppModel {
         phase = .ready
         playCompletionSound()
         // The card-metadata hook lives in persistToLibrary, which a re-run never passes through.
-        await AsyncTimeout.run(.seconds(30)) { [weak self] in
+        _ = await AsyncTimeout.run(.seconds(30)) { [weak self] in
             await self?.generateCardMetadata(for: entryID, transcript: transcript)
         }
     }

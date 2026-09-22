@@ -97,14 +97,15 @@ struct InfoInspector: View {
             }
             .axLeaf("Info.Button.RetranscribeConfirm")
         } message: { pending in
-            if let substitute = pending.substituteModelLabel {
-                Text("The current transcript, its favorites, notes, summary and translation will be replaced.")
-                + Text(verbatim: "\n\n")
-                + Text("This transcript's own model isn't available, so Parola will run \(substitute).")
-            } else {
-                Text("The current transcript, its favorites, notes, summary and translation will be replaced.")
-            }
+            Text(verbatim: alertMessage(for: pending))
         }
+    }
+
+    private func alertMessage(for pending: PendingRetranscribe) -> String {
+        let replaced = String(localized: "The current transcript, its favorites, notes, summary and translation will be replaced.")
+        guard let substitute = pending.substituteModelLabel else { return replaced }
+        let fallback = String(localized: "This transcript's own model isn't available, so Parola will run \(substitute).")
+        return replaced + "\n\n" + fallback
     }
 
     private var alertTitle: String {

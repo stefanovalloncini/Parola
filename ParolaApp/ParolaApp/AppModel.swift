@@ -1636,7 +1636,7 @@ final class AppModel {
                 if activate {
                     if playsCompletionSound { playCompletionSound() }
                     // A parked on-device model session must never hold up auto-export.
-                    await AsyncTimeout.run(.seconds(30)) { [weak self] in
+                    _ = await AsyncTimeout.run(.seconds(30)) { [weak self] in
                         await self?.generateCardMetadata(for: entry.id, transcript: result)
                     }
                     if autostartSummary,
