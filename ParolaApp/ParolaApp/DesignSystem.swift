@@ -85,8 +85,8 @@ enum DS {
     }
 
     // nonisolated(unsafe): both slots are written and read on the main actor only — work that runs off it takes the colors it needs as parameters.
-    nonisolated(unsafe) private static var activeTheme = ThemePreset.terracotta.palette
-    nonisolated(unsafe) private static var resolved = Resolved(ThemePreset.terracotta.palette)
+    nonisolated(unsafe) private static var activeTheme = ThemePreset.defaultPreset.palette
+    nonisolated(unsafe) private static var resolved = Resolved(ThemePreset.defaultPreset.palette)
 
     /// One instance per palette, so repeated reads compare equal and SwiftUI can skip redraws; a dynamic NSColor re-runs its provider per draw, so the cached instance still follows the appearance.
     private struct Resolved {

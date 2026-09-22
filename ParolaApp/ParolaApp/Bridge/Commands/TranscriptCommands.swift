@@ -209,7 +209,7 @@ private func translationRefusal(_ model: AppModel) -> String {
 }
 
 private func buildCustomPalette(_ obj: [String: AutomationValue]) -> ThemePalette {
-    let base = ThemePreset.terracotta.palette
+    let base = ThemePreset.defaultPreset.palette
     func token(_ key: String, _ fallback: ThemeColor) -> ThemeColor {
         if case .string(let hex)? = obj[key], let rgba = RGBA(hex: hex) { return .uniform(rgba) }
         return fallback

@@ -39,6 +39,32 @@ struct ReloadSettingsTests {
         #expect(model.appAccentRaw == "ocean")
     }
 
+    @Test("a library with no stored accent opens on the default preset")
+    func unsetAccentTakesTheDefault() {
+        let previous = DS.theme
+        defer { DS.theme = previous }
+        let defaults = temporaryDefaults()
+        #expect(defaults.string(forKey: AppAccent.storageKey) == nil)
+        let model = makeModel(defaults)
+
+        #expect(model.appAccentRaw == ThemePreset.defaultPreset.rawValue)
+        #expect(model.themeSelection == .preset(.slate))
+        #expect(model.themeSelection.palette.accent == ThemePreset.slate.accent)
+    }
+
+    @Test("a stored accent survives the change of default", arguments: ThemePreset.allCases)
+    func storedAccentSurvives(preset: ThemePreset) {
+        let previous = DS.theme
+        defer { DS.theme = previous }
+        let defaults = temporaryDefaults()
+        defaults.set(preset.rawValue, forKey: AppAccent.storageKey)
+        let model = makeModel(defaults)
+
+        #expect(model.appAccentRaw == preset.rawValue)
+        #expect(model.themeSelection == .preset(preset))
+        #expect(model.themeSelection.palette.accent == preset.accent)
+    }
+
     @Test("reloading to an uninstalled model resets it to a valid one (refreshModelList ran)")
     func uninstalledModelResets() async {
         let defaults = temporaryDefaults()

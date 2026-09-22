@@ -774,7 +774,7 @@ final class AppModel {
         self.appTheme = defaults.string(forKey: "appTheme") ?? "system"
         self.monospacedTimestamps = readBool("monospacedTimestamps", default: true)
         self.sidebarDensity = defaults.string(forKey: "sidebarDensity") ?? "comfortable"
-        self.appAccentRaw = defaults.string(forKey: AppAccent.storageKey) ?? AppAccent.terracotta.rawValue
+        self.appAccentRaw = defaults.string(forKey: AppAccent.storageKey) ?? AppAccent.defaultAccent.rawValue
         self.themeIsCustom = defaults.bool(forKey: "themeIsCustom")
         self.themeCustomPaletteJSON = defaults.string(forKey: "themeCustomPaletteJSON") ?? ""
         self.automationBridgeEnabled = readBool("automationBridgeEnabled", default: AppModel.defaultBridgeEnabled)
@@ -837,10 +837,10 @@ final class AppModel {
             watchedFolders.reloadFromDefaults()
         }
     }
-    var appAccentRaw: String = AppAccent.terracotta.rawValue { didSet { defaults.set(appAccentRaw, forKey: AppAccent.storageKey) } }
+    var appAccentRaw: String = AppAccent.defaultAccent.rawValue { didSet { defaults.set(appAccentRaw, forKey: AppAccent.storageKey) } }
 
     var appAccent: AppAccent {
-        get { AppAccent(rawValue: appAccentRaw) ?? .terracotta }
+        get { AppAccent(rawValue: appAccentRaw) ?? .defaultAccent }
         set { appAccentRaw = newValue.rawValue }
     }
 
@@ -855,7 +855,7 @@ final class AppModel {
         if themeIsCustom, let palette = decodedCustomPalette() {
             return .custom(palette)
         }
-        return .preset(ThemePreset(rawValue: appAccentRaw) ?? .terracotta)
+        return .preset(ThemePreset(rawValue: appAccentRaw) ?? .defaultPreset)
     }
 
     @discardableResult
