@@ -76,6 +76,7 @@ struct DemoTranscriptCard: View {
         if script.words.isEmpty {
             Text(verbatim: script.text)
                 .font(DS.Font.transcript)
+                .lineSpacing(DS.Spacing.transcriptLeading)
                 .foregroundStyle(DS.Color.primaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
@@ -85,7 +86,7 @@ struct DemoTranscriptCard: View {
 
     private func wordFlow(visible: Int, caretLit: Bool) -> some View {
         let freshFrom = max(0, visible - 2)
-        return LeadingFlow(spacing: DS.Spacing.tight) {
+        return LeadingFlow(spacing: DS.Spacing.tight, rowSpacing: DS.Spacing.transcriptLeading) {
             ForEach(script.words.indices.prefix(visible), id: \.self) { index in
                 Text(verbatim: script.words[index].text)
                     .font(DS.Font.transcript)

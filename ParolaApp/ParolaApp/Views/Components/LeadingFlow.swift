@@ -3,6 +3,10 @@ import SwiftUI
 /// Lays its subviews out from the leading edge, wrapping to the next row when the proposed width runs out.
 struct LeadingFlow: Layout {
     var spacing: CGFloat = DS.Spacing.tight
+    /// The gap between rows when it differs from the gap between items, so a reading surface can set its leading.
+    var rowSpacing: CGFloat?
+
+    private var rowGap: CGFloat { rowSpacing ?? spacing }
 
     func makeCache(subviews: Subviews) -> FlowRows.Cache {
         FlowRows.Cache(sizes: subviews.map { $0.sizeThatFits(.unspecified) })
@@ -13,7 +17,7 @@ struct LeadingFlow: Layout {
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout FlowRows.Cache) -> CGSize {
-        FlowRows.size(of: rows(within: proposal.width ?? .infinity, of: cache), spacing: spacing)
+        FlowRows.size(of: rows(within: proposal.width ?? .infinity, of: cache), spacing: rowGap)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout FlowRows.Cache) {
@@ -28,7 +32,7 @@ struct LeadingFlow: Layout {
                 )
                 x += size.width + spacing
             }
-            y += row.height + spacing
+            y += row.height + rowGap
         }
     }
 

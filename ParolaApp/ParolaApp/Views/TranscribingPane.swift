@@ -164,6 +164,7 @@ struct TranscribingPane: View {
                             let ticks = Int(context.date.timeIntervalSince(startDate) / StreamingReveal.caretBlinkPeriod)
                             Text("\(Text(bodyText))\(StreamingReveal.caret(visible: reduceMotion || ticks % 2 == 0))")
                                 .font(DS.Font.transcript)
+                                .lineSpacing(DS.Spacing.transcriptLeading)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
                                 .contentTransition(.interpolate)

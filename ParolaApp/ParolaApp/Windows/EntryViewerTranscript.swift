@@ -162,12 +162,14 @@ private struct EntryViewerSegmentRow: View {
             currentMatchID: currentMatchID
         ))
         .font(DS.Font.transcript)
+        .lineSpacing(DS.Spacing.transcriptLeading)
         .textSelection(.enabled)
     }
 
     private func translationText(_ value: String) -> some View {
         Text(verbatim: value.trimmingCharacters(in: .whitespacesAndNewlines))
             .font(DS.Font.transcript)
+            .lineSpacing(DS.Spacing.transcriptLeading)
             .foregroundStyle(DS.Color.secondaryText)
             .textSelection(.enabled)
             .axLeaf("Text.Translation")

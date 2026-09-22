@@ -150,6 +150,7 @@ struct SegmentCard: View {
     private func translationText(_ text: String) -> some View {
         Text(Self.displayText(text))
             .font(DS.Font.transcript)
+            .lineSpacing(DS.Spacing.transcriptLeading)
             .foregroundStyle(DS.Color.secondaryText)
             .textSelection(.enabled)
             .axLeaf("Card.Text.Translation")
@@ -271,6 +272,7 @@ struct SegmentCard: View {
             TextField("Segment text", text: $draftText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(DS.Font.transcript)
+                .lineSpacing(DS.Spacing.transcriptLeading)
                 .lineLimit(1...20)
                 .writingToolsBehavior(.complete)
                 .focused($editingFocus)
@@ -281,10 +283,12 @@ struct SegmentCard: View {
         } else if model.findIsOpen, !model.findQuery.isEmpty {
             highlightedText
                 .font(DS.Font.transcript)
+                .lineSpacing(DS.Spacing.transcriptLeading)
                 .textSelection(.enabled)
         } else if showsWordKaraoke, let words = segment.words {
             karaoke(words: words)
                 .font(DS.Font.transcript)
+                .lineSpacing(DS.Spacing.transcriptLeading)
                 .textSelection(.enabled)
                 .tint(.primary)
                 .environment(\.openURL, OpenURLAction { url in
@@ -298,10 +302,12 @@ struct SegmentCard: View {
         } else if isCurrent, model.karaokeHighlight, model.player != nil {
             SyntheticKaraoke(segment: segment)
                 .font(DS.Font.transcript)
+                .lineSpacing(DS.Spacing.transcriptLeading)
                 .textSelection(.enabled)
         } else {
             Text(Self.displayText(segment.text))
                 .font(DS.Font.transcript)
+                .lineSpacing(DS.Spacing.transcriptLeading)
                 .textSelection(.enabled)
         }
     }
