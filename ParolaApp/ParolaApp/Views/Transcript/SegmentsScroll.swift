@@ -116,7 +116,9 @@ struct SegmentsScroll: View {
             entryID: model.selectedEntryID,
             speakerFilter: speakerFilter,
             favoritesOnly: model.favoritesOnly,
-            favorites: model.favoriteSegmentIDs
+            // With the filter off the set cannot change the result, and carrying it would re-derive
+            // the whole transcript on every star click.
+            favorites: model.favoritesOnly ? model.favoriteSegmentIDs : []
         )
     }
 

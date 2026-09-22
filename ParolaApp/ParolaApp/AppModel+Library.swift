@@ -324,7 +324,12 @@ extension AppModel {
         return entry.favoriteSegments
     }
 
-    func isSegmentFavorite(_ id: Int) -> Bool { favoriteSegmentIDs.contains(id) }
+    /// Reads the stored array: `favoriteSegmentIDs` builds a `Set` per call, and the cards ask this
+    /// several times a row.
+    func isSegmentFavorite(_ id: Int) -> Bool {
+        guard let entryID = selectedEntryID, let entry = libraryEntry(id: entryID) else { return false }
+        return entry.manifest.favoriteSegments.contains(id)
+    }
 
     /// The single write path for a segment's favorite, shared by the UI toggle and the bridge; nil means no entry is selected.
     @discardableResult

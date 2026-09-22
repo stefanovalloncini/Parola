@@ -28,8 +28,10 @@ struct SegmentCard: View {
     private var isCurrent: Bool { model.currentSegmentID == segment.id }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            speakerLine
+        // Read once: the star shows in the speaker line, the action strip and the ••• menu.
+        let isFavorite = model.isSegmentFavorite(segment.id)
+        return VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            speakerLine(isFavorite: isFavorite)
             contentRow
 
             if !qcIssues.isEmpty {
@@ -49,7 +51,7 @@ struct SegmentCard: View {
         .background(cardBackground)
         .overlay(alignment: .bottomTrailing) {
             if hovering && !isEditing {
-                actionStrip
+                actionStrip(isFavorite: isFavorite)
                     .padding(.bottom, DS.Spacing.snug)
                     .padding(.trailing, DS.Spacing.snug)
                     .transition(.opacity)
@@ -146,7 +148,7 @@ struct SegmentCard: View {
             .axLeaf("Card.Text.Translation")
     }
 
-    private var speakerLine: some View {
+    private func speakerLine(isFavorite: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
             if let rawSpeaker = segment.speaker, let speaker = Self.speakerLabel(for: rawSpeaker) {
                 speakerChip(raw: rawSpeaker, label: speaker)
@@ -323,9 +325,7 @@ struct SegmentCard: View {
 
     @State private var timingPopoverOpen = false
 
-    private var isFavorite: Bool { model.isSegmentFavorite(segment.id) }
-
-    private var actionStrip: some View {
+    private func actionStrip(isFavorite: Bool) -> some View {
         HStack(spacing: 4) {
             cardButton(
                 systemName: isFavorite ? "star.fill" : "star",
@@ -350,7 +350,7 @@ struct SegmentCard: View {
                 NSPasteboard.general.setString(draggablePayload, forType: .string)
             }
             .axLeaf("Card.Button.Copy")
-            moreMenu
+            moreMenu(isFavorite: isFavorite)
         }
         .padding(.horizontal, DS.Spacing.snug)
         .padding(.vertical, DS.Spacing.tight)
@@ -361,7 +361,7 @@ struct SegmentCard: View {
         )
     }
 
-    private var moreMenu: some View {
+    private func moreMenu(isFavorite: Bool) -> some View {
         Menu {
             Button(isFavorite ? "Unfavorite" : "Favorite") { model.toggleSegmentFavorite(segment.id) }
                 .axLeaf("Card.Button.ToggleFavorite")
