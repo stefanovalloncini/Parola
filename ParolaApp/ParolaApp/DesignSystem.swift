@@ -40,8 +40,7 @@ enum DS {
         static let demoTranscriptMinHeight: CGFloat = 220
     }
 
-    /// Letter-spacing for the three display tiers: SwiftUI takes tracking as a view modifier, so the
-    /// tier lives here and the call site pairs `.font(DS.Font.hero)` with `.tracking(DS.Tracking.hero)`.
+    /// Letter-spacing for the display tiers; SwiftUI takes tracking as a view modifier, so the call site pairs the two.
     enum Tracking {
         static let wordmark: CGFloat = -1.5
         static let hero: CGFloat = -1.0

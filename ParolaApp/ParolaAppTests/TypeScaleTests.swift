@@ -54,6 +54,7 @@ struct TypeScaleTests {
         #expect(measured(DS.Font.display) == measured(.system(size: 28, weight: .bold)))
         #expect(measured(DS.Font.title) == measured(.system(size: 22, weight: .semibold)))
         #expect(measured(DS.Font.hero) != measured(.system(size: 40, weight: .semibold)))
+        #expect(measured(DS.Font.display) != measured(.system(size: 28, weight: .semibold)))
     }
 
     @Test("the recording timer is rounded and its digits are all one width")
