@@ -75,10 +75,13 @@ extension AppModel {
             // pending wave ends in another .finished, and the parked files drain there.
             let pending = batchJobs.filter { $0.status == .pending }
             if pending.isEmpty {
+                // Read before the drain: a wave it starts resets the flag, and a run the user
+                // cancelled would then ring.
+                let wasCancelled = batchRunCancelled
                 drainDeferredArrivals()
                 // One sound for the run that just ended, whatever mix of done and failed it ended
                 // with. Files the drain picked up are a run of their own and ring when they finish.
-                if !batchRunCancelled { playCompletionSound() }
+                if !wasCancelled { playCompletionSound() }
             } else {
                 resumeBatch(pendingJobs: pending)
             }
@@ -94,7 +97,10 @@ extension AppModel {
                 let entry = try await library.add(
                     transcript: transcript, audioSource: sourceURL, category: .transcription, source: .file
                 )
-                await generateCardMetadata(for: entry.id, transcript: transcript)
+                // A parked on-device model session must not hold a task per batch job open.
+                _ = await AsyncTimeout.run(.seconds(30)) { [weak self] in
+                    await self?.generateCardMetadata(for: entry.id, transcript: transcript)
+                }
             } catch {
                 nonFatalWarning = "\(sourceURL.lastPathComponent) was transcribed, but Parola couldn't save it to your library. \(error.localizedDescription)"
             }

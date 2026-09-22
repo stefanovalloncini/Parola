@@ -147,6 +147,21 @@ struct AppModelBatchTests {
         model.batchTask = nil
     }
 
+    @Test("a run the user cancelled does not ring when it finishes")
+    func cancelledRunDoesNotRing() async {
+        let model = makeModel()
+        model.playSoundWhenFinished = true
+        let counter = PlayCounter()
+        model.completionSoundPlayer = { counter.bump() }
+
+        await model.handleBatchEvent(.finished)
+        #expect(counter.plays == 1)
+
+        model.cancelAllInFlightBatchJobs()
+        await model.handleBatchEvent(.finished)
+        #expect(counter.plays == 1, "a cancelled run must stay silent even when the drain starts another wave")
+    }
+
     @Test("cancelBatchJob removes a non-running job from the list")
     func cancelRemovesFinishedJob() {
         let model = makeModel()
@@ -912,4 +927,11 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.contains { $0.url == audio })
         #expect(!model.batchJobs.contains { $0.url == parola })
     }
+}
+
+/// Counts the completion sound without reaching for the real player.
+@MainActor
+final class PlayCounter {
+    private(set) var plays = 0
+    func bump() { plays += 1 }
 }
