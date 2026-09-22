@@ -7416,13 +7416,13 @@
         }
       }
     },
-    "NVIDIA Parakeet via FluidAudio. The fastest engine; v3 is multilingual.": {
+    "NVIDIA Parakeet via FluidAudio. Transcribes an hour of audio in seconds; v3 is multilingual.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "NVIDIA Parakeet tramite FluidAudio. Il motore più veloce; v3 è multilingue."
+            "value": "NVIDIA Parakeet tramite FluidAudio. Trascrive un'ora di audio in pochi secondi; v3 è multilingue."
           }
         }
       }
@@ -8426,6 +8426,17 @@
         }
       }
     },
+    "On-device speech recognition built into macOS. Nothing to download.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riconoscimento vocale on-device integrato in macOS. Niente da scaricare."
+          }
+        }
+      }
+    },
     "On-device speech-to-text for macOS, built on WhisperKit.": {
       "localizations": {
         "it": {
@@ -8698,6 +8709,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aprili come trascrizione"
+          }
+        }
+      }
+    },
+    "OpenAI Whisper compiled to Core ML. Multilingual, can translate to English.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI Whisper compilato in Core ML. Multilingue, può tradurre in inglese."
           }
         }
       }

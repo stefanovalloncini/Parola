@@ -13,21 +13,21 @@ struct ModelsCategory: Identifiable {
         .init(
             id: "apple-speech",
             title: "Apple Speech",
-            description: "On-device speech recognition built into macOS. Nothing to download.",
+            description: String(localized: "On-device speech recognition built into macOS. Nothing to download."),
             symbol: "waveform.and.mic",
             tint: .secondary
         ),
         .init(
             id: "whisperkit",
             title: "WhisperKit",
-            description: "OpenAI Whisper compiled to Core ML. Multilingual, can translate to English.",
+            description: String(localized: "OpenAI Whisper compiled to Core ML. Multilingual, can translate to English."),
             symbol: "waveform",
             tint: .teal
         ),
         .init(
             id: "parakeet",
             title: "Parakeet",
-            description: String(localized: "NVIDIA Parakeet via FluidAudio. The fastest engine; v3 is multilingual."),
+            description: String(localized: "NVIDIA Parakeet via FluidAudio. Transcribes an hour of audio in seconds; v3 is multilingual."),
             symbol: "bird",
             tint: DS.Palette.success
         )
