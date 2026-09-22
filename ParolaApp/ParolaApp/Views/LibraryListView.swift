@@ -130,7 +130,7 @@ enum LibraryListContent {
         personFilter: UUID?
     ) -> Bool {
         if let category, entry.category != category { return false }
-        if let personFilter, !entry.personIDs.contains(personFilter) { return false }
+        if let personFilter, !entry.assigns(personID: personFilter) { return false }
         if let labelFilter,
            !entry.labels.contains(where: { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }) {
             return false

@@ -40,6 +40,12 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     /// The people this transcript's speakers stand for.
     public var personIDs: Set<UUID> { Set(manifest.speakerAssignments.values) }
 
+    /// Whether one of this transcript's speakers stands for that person, without building the set —
+    /// this is the question a list filter asks of every row.
+    public func assigns(personID: UUID) -> Bool {
+        manifest.speakerAssignments.values.contains(personID)
+    }
+
     public func note(forSegment id: Int) -> String? {
         manifest.segmentNotes[String(id)]
     }

@@ -88,6 +88,9 @@ struct SpeakerAssignmentTests {
 
         let reloaded = try await store.load(entry.id)
         #expect(reloaded.entry.personIDs == [ada, grace])
+        #expect(reloaded.entry.assigns(personID: ada))
+        #expect(reloaded.entry.assigns(personID: grace))
+        #expect(!reloaded.entry.assigns(personID: UUID()))
     }
 
     @Test("an entry with no assignments has no person ids")
@@ -95,6 +98,7 @@ struct SpeakerAssignmentTests {
         let store = try makeStore()
         let entry = try await addEntry(to: store)
         #expect(entry.personIDs.isEmpty)
+        #expect(!entry.assigns(personID: ada))
     }
 
     @Test("a transform changes the map in place, keyed and by value")
