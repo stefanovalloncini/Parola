@@ -209,6 +209,7 @@ struct LiveTranscriptView: View {
                     ForEach(model.liveSegments) { seg in
                         Text(seg.text.trimmingCharacters(in: .whitespaces))
                             .font(DS.Font.transcript)
+                            .lineSpacing(DS.Spacing.transcriptLeading)
                             .foregroundStyle(DS.Color.primaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .id(seg.id)
@@ -216,6 +217,7 @@ struct LiveTranscriptView: View {
                     if !model.livePartialText.isEmpty {
                         Text(model.livePartialText)
                             .font(DS.Font.transcript)
+                            .lineSpacing(DS.Spacing.transcriptLeading)
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.7))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .id("__partial")
