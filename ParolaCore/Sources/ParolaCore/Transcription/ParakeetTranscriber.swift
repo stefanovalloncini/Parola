@@ -26,20 +26,22 @@ actor ParakeetTranscriber: Transcriber {
         return supportedLanguages(forModel: model).allows(language)
     }
 
-    /// The language a finished run is stamped with. A guess is clamped to what the model speaks:
-    /// an unsupported one is rejected by this very engine the next time the entry is run.
+    /// The language a finished run is stamped with, and what the run can tell the user about it —
+    /// nothing when they named it or the model speaks only English, which was never choosing. A
+    /// guess is clamped to what the model speaks: an unsupported one is rejected by this very
+    /// engine the next time the entry is run.
     nonisolated static func resolvedLanguage(
         for segments: [TranscriptSegment],
         options: TranscriptionOptions,
         model: String
-    ) -> String {
-        if let pinned = options.language?.lowercased() { return pinned }
+    ) -> (language: String, detection: LanguageDetection?) {
+        if let pinned = options.language?.lowercased() { return (pinned, nil) }
         let supported = supportedLanguages(forModel: model)
-        guard !supported.isEnglishOnly,
-              let guess = TextLanguageGuess.dominantLanguage(of: segments),
-              supported.allows(guess)
-        else { return "en" }
-        return guess
+        guard !supported.isEnglishOnly else { return ("en", nil) }
+        guard let guess = TextLanguageGuess.dominantLanguage(of: segments), supported.allows(guess) else {
+            return ("en", .assumed("en"))
+        }
+        return (guess, .detected(guess))
     }
 
     func load(model: String) async throws {
@@ -109,13 +111,14 @@ actor ParakeetTranscriber: Transcriber {
         }
 
         let segments = Self.makeSegments(from: result, includeWords: options.wordTimestamps)
-        let language = Self.resolvedLanguage(for: segments, options: options, model: modelName)
+        let resolved = Self.resolvedLanguage(for: segments, options: options, model: modelName)
         // durationSeconds comes from the source asset, not the engine: TranscriptionSession fills it in.
         return Transcript(
             segments: segments,
-            language: language,
+            language: resolved.language,
             modelName: modelName,
-            sourceURL: url
+            sourceURL: url,
+            languageDetection: resolved.detection
         )
     }
 

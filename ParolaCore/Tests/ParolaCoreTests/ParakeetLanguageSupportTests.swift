@@ -28,7 +28,7 @@ struct ParakeetLanguageSupportTests {
         #expect(
             ParakeetTranscriber.resolvedLanguage(
                 for: catalan, options: TranscriptionOptions(), model: "nvidia_parakeet-tdt-0.6b-v3"
-            ) == "en"
+            ) == ("en", .assumed("en"))
         )
     }
 
@@ -44,18 +44,20 @@ struct ParakeetLanguageSupportTests {
         #expect(
             ParakeetTranscriber.resolvedLanguage(
                 for: italian, options: TranscriptionOptions(), model: "nvidia_parakeet-tdt-0.6b-v3"
-            ) == "it"
+            ) == ("it", .detected("it")),
+            "a guess the model can run is what the entry was detected as"
         )
         #expect(
             ParakeetTranscriber.resolvedLanguage(
                 for: italian, options: TranscriptionOptions(), model: "nvidia_parakeet-tdt-0.6b-v2"
-            ) == "en",
-            "an English-only variant never guesses"
+            ) == ("en", nil),
+            "an English-only variant never guesses, so it has nothing to report"
         )
         #expect(
             ParakeetTranscriber.resolvedLanguage(
                 for: italian, options: pinned, model: "nvidia_parakeet-tdt-0.6b-v3"
-            ) == "de"
+            ) == ("de", nil),
+            "a language the caller named is not a detection"
         )
     }
 
