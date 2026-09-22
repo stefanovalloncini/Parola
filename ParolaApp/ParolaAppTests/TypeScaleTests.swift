@@ -32,8 +32,8 @@ struct TypeScaleTests {
     }
 
     /// Width as well as height: two tiers can share a line height and differ in weight or design.
-    private func measured(_ font: Font) -> CGSize {
-        NSHostingView(rootView: Text(verbatim: "Hxg 019").font(font)).fittingSize
+    private func measured(_ font: Font, text: String = "Hxg 019") -> CGSize {
+        NSHostingView(rootView: Text(verbatim: text).font(font)).fittingSize
     }
 
     @Test("tiers that share a line height still differ on screen")
@@ -41,6 +41,26 @@ struct TypeScaleTests {
         #expect(measured(DS.Font.body) != measured(DS.Font.bodyStrong))
         #expect(measured(DS.Font.secondary) != measured(DS.Font.mono))
         #expect(measured(DS.Font.transcript) != measured(DS.Font.heading))
+        // transcriptEmphasis is the transcript face at semibold: same line, wider glyphs.
+        #expect(height(DS.Font.transcriptEmphasis) == height(DS.Font.transcript))
+        #expect(measured(DS.Font.transcriptEmphasis) != measured(DS.Font.transcript))
+    }
+
+    /// A `Font` carries no readable weight or design, so a tier is pinned by rendering equal to its reference.
+    @Test("the three display tiers are bold and the page title below them is not")
+    func displayTiersAreBold() {
+        #expect(measured(DS.Font.wordmark) == measured(.system(size: 56, weight: .bold)))
+        #expect(measured(DS.Font.hero) == measured(.system(size: 40, weight: .bold)))
+        #expect(measured(DS.Font.display) == measured(.system(size: 28, weight: .bold)))
+        #expect(measured(DS.Font.title) == measured(.system(size: 22, weight: .semibold)))
+        #expect(measured(DS.Font.hero) != measured(.system(size: 40, weight: .semibold)))
+    }
+
+    @Test("the recording timer is rounded and its digits are all one width")
+    func timerIsRoundedAndTabular() {
+        #expect(measured(DS.Font.timer) == measured(.system(size: 22, weight: .light, design: .rounded).monospacedDigit()))
+        #expect(measured(DS.Font.timer) != measured(.system(size: 22, weight: .light, design: .monospaced).monospacedDigit()))
+        #expect(measured(DS.Font.timer, text: "00:00") == measured(DS.Font.timer, text: "11:11"))
     }
 
     @Test("a section caption is the caption tier, not a one-off")
