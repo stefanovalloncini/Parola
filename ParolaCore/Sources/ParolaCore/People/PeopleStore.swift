@@ -19,6 +19,24 @@ public actor PeopleStore {
         } else {
             self.people = []
         }
+        if Self.spreadDefaultColours(&people) {
+            Self.write(people, to: storageURL)
+        }
+    }
+
+    /// A directory written before people carried a colour decodes with everybody on the first one.
+    /// Spread those over the palette once; a colour already chosen stays where it is, and a single
+    /// person on the default is the ordinary case, not a legacy one.
+    static func spreadDefaultColours(_ people: inout [Person]) -> Bool {
+        let onDefault = people.indices.filter { people[$0].colorIndex == 0 }
+        guard onDefault.count > 1 else { return false }
+        var taken = Set(people.map(\.colorIndex))
+        for index in onDefault.dropFirst() {
+            let free = (0..<colorCount).first { !taken.contains($0) } ?? (index % colorCount)
+            taken.insert(free)
+            people[index].colorIndex = free
+        }
+        return true
     }
 
     @discardableResult
@@ -119,10 +137,14 @@ public actor PeopleStore {
     }
 
     private func save() {
-        let parent = storageURL.deletingLastPathComponent()
+        Self.write(people, to: storageURL)
+    }
+
+    private static func write(_ people: [Person], to url: URL) {
+        let parent = url.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         if let data = try? JSONEncoder().encode(people) {
-            try? data.write(to: storageURL, options: .atomic)
+            try? data.write(to: url, options: .atomic)
         }
     }
 }

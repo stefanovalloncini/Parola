@@ -62,6 +62,39 @@ struct PeopleStoreTests {
         #expect(people.isEmpty)
     }
 
+    @Test("a directory written before colours existed is spread over the palette once")
+    func legacyColoursSpread() async throws {
+        let url = makeTempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let names = ["Alice", "Bob", "Cara", "Dan"]
+        let legacy = names.map { name in
+            """
+            {"id":"\(UUID().uuidString)","name":"\(name)","lastUsedAt":747000000,"usageCount":1}
+            """
+        }
+        try Data("[\(legacy.joined(separator: ","))]".utf8).write(to: url)
+
+        let store = PeopleStore(storageURL: url)
+        let spread = await store.people
+        #expect(spread.map(\.colorIndex) == [0, 1, 2, 3])
+
+        // Written back, so the next launch reads the same colours instead of spreading again.
+        let reopened = PeopleStore(storageURL: url)
+        #expect(await reopened.people.map(\.colorIndex) == [0, 1, 2, 3])
+    }
+
+    @Test("a colour someone already holds survives the spread")
+    func chosenColoursSurviveTheSpread() {
+        var people = [
+            Person(name: "Alice", colorIndex: 0),
+            Person(name: "Bob", colorIndex: 2),
+            Person(name: "Cara", colorIndex: 0),
+        ]
+        #expect(PeopleStore.spreadDefaultColours(&people))
+        #expect(people.map(\.colorIndex) == [0, 2, 1])
+        #expect(!PeopleStore.spreadDefaultColours(&people), "the spread is one-shot")
+    }
+
     @Test("registry persists across instances")
     func persistence() async throws {
         let url = makeTempURL()
