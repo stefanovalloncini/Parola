@@ -76,6 +76,15 @@ struct SettingsPaneScopeTests {
         }
     }
 
+    @Test("the summary options belong to no pane, and still export")
+    func summaryKeysAreUnscoped() {
+        let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
+        for key in ["summaryOptions", "autostartSummary"] {
+            #expect(scoped.contains(key) == false, "\(key) is not shown by any pane, so no pane's reset may clear it")
+            #expect(UnscopedSettingsKeys.all.contains(key), "\(key) must still be backed up and reset with the whole app")
+        }
+    }
+
     @Test("the export presets pane resets its own library")
     func exportFormatsResetsThePresets() {
         #expect(SettingsPaneScope.exportFormats.defaultsKeys == ["exportPresets"])

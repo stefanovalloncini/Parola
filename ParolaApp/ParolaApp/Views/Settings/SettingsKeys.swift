@@ -127,7 +127,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
                 "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt", "diarize",
                 "generateCardMetadata", "showAITitles", "showAISummaries",
                 "customTitlePrompt", "customSummaryPrompt", "showSubtitleQC",
-                "summaryOptions", "autostartSummary", "openEntriesInNewWindow",
+                "openEntriesInNewWindow",
                 "playSoundWhenFinished", "appVisibilityMode", "duplicateImportPolicy"
             ]
         case .customization:
@@ -229,6 +229,7 @@ enum UnscopedSettingsKeys {
         "mainWindowAlwaysOnTop", "pinnedModel",
         "liveCaptions.fontSize", "liveCaptions.opacity", "presenter.fontSize",
         "introductionComplete",
+        "summaryOptions", "autostartSummary",
     ]
 }
 
