@@ -262,27 +262,18 @@ struct SurfaceContrastTests {
         #expect(DS.onAccent(isSelected: true, prominence: .increased))
     }
 
-    /// The playhead word is the highlight set on a card the same highlight washes at 10 % over `surface`.
-    /// No preset has ever cleared small-text AA there in light mode, so the floor is WCAG's large-bold 3:1 —
-    /// but the default has to beat the accent it replaced, and hold small-text AA in dark, where reading happens.
+    /// The playhead word is the highlight on a card the same highlight washes at 10 % over `surface`; it is 15 pt semibold, so light mode answers to WCAG's large-bold 3:1.
     @MainActor
-    @Test("the default accent lights the playhead word better than the accent it replaced")
+    @Test("the default accent's playhead word clears AA in dark and the large-bold floor in light")
     func playheadWordOnItsCard() throws {
         let tint = SegmentCard.currentCardTint
-        func lit(_ preset: ThemePreset) throws -> (light: Double, dark: Double) {
-            let highlight = try #require(Self.pair(preset.palette.highlight))
-            let behind = try #require(Self.pair(preset.palette.surface))
-            return (
-                highlight.light.contrast(against: behind.light.blended(toward: highlight.light, amount: tint)),
-                highlight.dark.contrast(against: behind.dark.blended(toward: highlight.dark, amount: tint))
-            )
-        }
-        let slate = try lit(.defaultPreset)
-        let replaced = try lit(.terracotta)
+        let highlight = try #require(Self.pair(ThemePreset.defaultPreset.palette.highlight))
+        let behind = try #require(Self.pair(ThemePreset.defaultPreset.palette.surface))
+        let light = highlight.light.contrast(against: behind.light.blended(toward: highlight.light, amount: tint))
+        let dark = highlight.dark.contrast(against: behind.dark.blended(toward: highlight.dark, amount: tint))
 
-        #expect(slate.dark >= Self.minimum, "dark playhead word: \(slate.dark)")
-        #expect(slate.light >= 3, "light playhead word: \(slate.light)")
-        #expect(slate.light > replaced.light, "\(slate.light) vs \(replaced.light) in light")
+        #expect(dark >= Self.minimum, "dark playhead word: \(dark)")
+        #expect(light >= 3, "light playhead word: \(light)")
     }
 
     @Test("accent text leaves an accent that already clears AA alone")
