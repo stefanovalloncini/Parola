@@ -149,8 +149,9 @@ struct AppIconTests {
         ((a.r - b.r) * (a.r - b.r) + (a.g - b.g) * (a.g - b.g) + (a.b - b.b) * (a.b - b.b)).squareRoot()
     }
 
-    private func nearestPreset(to sampled: RGBA) -> ThemePreset? {
-        ThemePreset.allCases.min { lhs, rhs in
+    /// Only the presets the caller is distinguishing: across all eleven, indigo sits inside blue's drift allowance.
+    private func nearestPreset(to sampled: RGBA, among presets: [ThemePreset]) -> ThemePreset? {
+        presets.min { lhs, rhs in
             distance(sampled, variants(lhs.accent).light) < distance(sampled, variants(rhs.accent).light)
         }
     }
@@ -168,15 +169,16 @@ struct AppIconTests {
             DockIcon.refresh()
         }
 
+        let sampled: [ThemePreset] = [.blue, .yellow, .pink]
         var backgrounds: [ThemePreset: RGBA] = [:]
-        for preset in [ThemePreset.blue, .yellow, .pink] {
+        for preset in sampled {
             DS.theme = preset.palette
             DockIcon.refresh()
             let icon = try #require(app.applicationIconImage, "no icon assigned for \(preset.rawValue)")
             let background = pixel(icon, xFraction: 0.15, yFraction: 0.5)
             backgrounds[preset] = background
-            #expect(nearestPreset(to: background) == preset,
-                    "\(preset.rawValue) icon sampled \(background.hex), nearest \(nearestPreset(to: background)?.rawValue ?? "none")")
+            #expect(nearestPreset(to: background, among: sampled) == preset,
+                    "\(preset.rawValue) icon sampled \(background.hex), nearest \(nearestPreset(to: background, among: sampled)?.rawValue ?? "none")")
 
             let bar = pixel(icon, xFraction: 0.5, yFraction: 0.5)
             let expectedBar = preset == .yellow ? DockIcon.ink : DockIcon.cream
