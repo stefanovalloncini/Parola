@@ -24,6 +24,17 @@ struct SummaryOptionsTests {
         #expect(SummaryService.structuredInstructions(for: o).contains("Italian"))
     }
 
+    @Test("the output language is named in English, whatever the app is running in")
+    func outputLanguageIsNamedInEnglish() {
+        var options = SummaryOptions.default
+        options.outputLanguage = "en"
+        let text = SummaryService.textInstructions(for: options)
+        #expect(text.contains("Write everything in English."))
+        // The name an Italian UI would have produced, which has no place in an English prompt.
+        #expect(Locale(identifier: "it_IT").localizedString(forLanguageCode: "en") == "inglese")
+        #expect(!text.contains("inglese"))
+    }
+
     @Test("structuredInstructions tells the model to leave action items empty when the flag is off")
     func structuredInstructionsDropsActionItems() {
         var o = SummaryOptions.default

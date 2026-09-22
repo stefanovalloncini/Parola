@@ -188,7 +188,8 @@ public actor SummaryService {
             sentences.append("Give only the key points, no narrative.")
         }
         if let code = options.outputLanguage {
-            let name = Locale.current.localizedString(forLanguageCode: code) ?? code
+            // The instruction around it is English, so the language is named in English too.
+            let name = Locale(identifier: "en_US_POSIX").localizedString(forLanguageCode: code) ?? code
             sentences.append("Write everything in \(name).")
         }
         if let customPrompt = options.customPrompt, !customPrompt.isEmpty {
