@@ -145,10 +145,8 @@ extension AppModel {
         return true
     }
 
-    /// The one way a speaker label's text changes: the segments and the entry's map move together,
-    /// inside the same undo step.
-    /// Whether ``renameSpeakerLabel(_:to:)`` would do anything — what a bulk rename groups on, so a
-    /// sheet that changed nothing leaves no empty undo step behind.
+    /// Whether ``renameSpeakerLabel(_:to:)`` would do anything, so a sheet that changed nothing
+    /// leaves no empty undo step behind.
     func renamesSomething(_ label: String, to newName: String) -> Bool {
         let from = label.trimmingCharacters(in: .whitespacesAndNewlines)
         let to = newName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -156,6 +154,7 @@ extension AppModel {
         return transcript?.uniqueSpeakers.contains(from) ?? false
     }
 
+    /// The one way a speaker label's text changes: the segments and the entry's map move together, inside the same undo step.
     func renameSpeakerLabel(_ label: String, to newName: String) {
         let from = label.trimmingCharacters(in: .whitespacesAndNewlines)
         let to = newName.trimmingCharacters(in: .whitespacesAndNewlines)
