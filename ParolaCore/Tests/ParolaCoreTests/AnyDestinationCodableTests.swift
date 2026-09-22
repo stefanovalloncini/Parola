@@ -164,6 +164,13 @@ struct AnyDestinationCodableTests {
         #expect(restored[0].destination == nil)
     }
 
+    @Test("a mock destination is kept out of the stored list")
+    func mocksAreNotPersisted() {
+        let list: [AnyDestination] = [.obsidianFolder(obsidian()), .mock(MockDestination(name: "Mock vault"))]
+        #expect(list.filter(\.isPersistable).map(\.name) == ["Vault"])
+        #expect(AnyDestination.unsupported(kind: "notion", config: .object([:])).isPersistable)
+    }
+
     @Test("every destination kind has a stable raw value")
     func kindRawValues() {
         #expect(DestinationKind.allCases.map(\.rawValue) == [

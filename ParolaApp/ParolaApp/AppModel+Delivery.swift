@@ -54,7 +54,7 @@ extension AppModel {
     func setDestinations(_ destinations: [AnyDestination]) {
         guard destinationsEnabled else { return }
         self.destinations = destinations
-        writeJSON(destinations, forKey: "destinations")
+        writeJSON(destinations.filter(\.isPersistable), forKey: "destinations")
     }
 
     func addDestination(_ destination: AnyDestination) {

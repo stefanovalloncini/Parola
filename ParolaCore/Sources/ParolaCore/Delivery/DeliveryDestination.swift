@@ -207,6 +207,13 @@ public enum AnyDestination: Codable, Sendable, Identifiable {
         }
     }
 
+    /// Whether this destination belongs in the stored list. A mock lives only as long as the
+    /// process that installed it, so it is never written.
+    public var isPersistable: Bool {
+        if case .mock = self { return false }
+        return true
+    }
+
     public var id: UUID { destination?.id ?? Self.fallbackID(for: self) }
     public var name: String { destination?.name ?? kind?.displayName ?? "" }
     public var isEnabled: Bool { destination?.isEnabled ?? false }
