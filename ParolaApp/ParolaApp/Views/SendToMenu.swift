@@ -15,6 +15,7 @@ struct SendToMenu: View {
                     model.openSettings(route: .sendTo)
                 }
                 .accessibilityIdentifier("SendTo.MenuItem.SetUp")
+                .axLeaf("SendTo.MenuItem.SetUp")
             } else {
                 ForEach(model.sendableDestinations, id: \.id) { destination in
                     Button {
@@ -25,8 +26,10 @@ struct SendToMenu: View {
                     }
                     .disabled(entryID == nil)
                     .accessibilityIdentifier("SendTo.MenuItem.\(destination.id.uuidString)")
+                    .axLeaf("SendTo.MenuItem.\(destination.id.uuidString)")
                 }
             }
         }
+        .axLeaf("Menu.SendTo")
     }
 }

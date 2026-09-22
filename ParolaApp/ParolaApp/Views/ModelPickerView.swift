@@ -3,8 +3,8 @@ import ParolaCore
 
 struct ModelPickerView: View {
     @Environment(AppModel.self) private var model
-    var shell: PillPickerShell = .segment
-    var leaf: String? = nil
+    let shell: PillPickerShell
+    let leaf: String?
 
     @State private var searchText = ""
     @State private var installedOnly = false

@@ -50,11 +50,6 @@ struct ChatPane: View {
         .task { await refreshUserPrompts() }
         .onAppear { isSearching = isSearchingPersisted }
         .onChange(of: isSearching) { _, value in isSearchingPersisted = value }
-        // Mirrors PromptsMenu's per-open refresh: a prompt added in Settings shows up next time this pane is visible.
-        .onChange(of: model.transcriptPaneMode) { _, mode in
-            guard mode == .chat else { return }
-            Task { await refreshUserPrompts() }
-        }
         .focusedSceneValue(\.focusChatComposer, FocusChatComposerAction { composerFocused = true })
         .axBranch("Chat")
     }
