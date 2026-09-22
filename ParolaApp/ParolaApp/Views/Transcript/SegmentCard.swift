@@ -272,7 +272,6 @@ struct SegmentCard: View {
             TextField("Segment text", text: $draftText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(DS.Font.transcript)
-                .lineSpacing(DS.Spacing.transcriptLeading)
                 .lineLimit(1...20)
                 .writingToolsBehavior(.complete)
                 .focused($editingFocus)
