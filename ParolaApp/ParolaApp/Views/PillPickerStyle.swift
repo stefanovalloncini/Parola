@@ -226,12 +226,12 @@ struct PillPopoverRow: View {
         } label: {
             HStack(spacing: DS.Spacing.small) {
                 leadingView
-                    .opacity(isDimmed ? 0.55 : 1)
+                    .opacity(isDimmed && !isSelected ? 0.55 : 1)
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: DS.Spacing.snug) {
                         Text(title)
                             .font(DS.Font.bodyStrong)
-                            .foregroundStyle(isDimmed ? HierarchicalShapeStyle.secondary : .primary)
+                            .foregroundStyle(isDimmed ? AnyShapeStyle(secondaryInk) : AnyShapeStyle(HierarchicalShapeStyle.primary))
                             .lineLimit(1)
                             .truncationMode(.tail)
                         if let badge {
@@ -240,11 +240,17 @@ struct PillPopoverRow: View {
                         }
                     }
                     if let subtitle {
-                        Text(subtitle)
-                            .font(DS.Font.secondary)
-                            .foregroundStyle(subtitleStyle)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                        HStack(spacing: DS.Spacing.tight) {
+                            if showsWarningGlyph {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(DS.Font.caption)
+                            }
+                            Text(subtitle)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                        .font(DS.Font.secondary)
+                        .foregroundStyle(subtitleInk)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -260,8 +266,8 @@ struct PillPopoverRow: View {
             .padding(.vertical, DS.Spacing.snug)
             .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading)
             .rowChrome(selected: isSelected, hovered: hovering, selection: Self.selectionStyle)
-            // The chrome paints the selected pair from inside the row, so the resting pair sits outside it.
-            .foregroundStyle(DS.Color.primaryText, DS.Color.secondaryText)
+            // The chrome paints the selected foreground from inside the row, so the resting one sits outside it.
+            .foregroundStyle(DS.Color.primaryText)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -282,10 +288,10 @@ struct PillPopoverRow: View {
         case .tile(let name, let tint):
             ZStack {
                 RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                    .fill(tint.opacity(0.15))
+                    .fill(isSelected ? DS.Color.onAccentWash : tint.opacity(0.15))
                 Image(systemName: name)
                     .font(DS.Font.bodyStrong)
-                    .foregroundStyle(tint)
+                    .foregroundStyle(isSelected ? DS.Color.onAccent : tint)
             }
             .frame(width: Self.leadingSlot, height: Self.leadingSlot)
         case .monogram(let text):
@@ -293,7 +299,7 @@ struct PillPopoverRow: View {
                 .font(DS.Font.caption)
                 .foregroundStyle(symbolStyle(nil))
                 .frame(width: Self.leadingSlot, height: Self.leadingSlot)
-                .background(Circle().fill(isSelected ? DS.Color.onAccent.opacity(0.18) : DS.Palette.pillFill))
+                .background(Circle().fill(isSelected ? DS.Color.onAccentWash : DS.Palette.pillFill))
         }
     }
 
@@ -306,7 +312,7 @@ struct PillPopoverRow: View {
             Text(text)
                 .font(DS.Font.secondary)
                 .monospacedDigit()
-                .foregroundStyle(HierarchicalShapeStyle.secondary)
+                .foregroundStyle(secondaryInk)
         case .download(let text):
             HStack(spacing: 3) {
                 Image(systemName: "arrow.down.circle")
@@ -315,7 +321,7 @@ struct PillPopoverRow: View {
                     .font(DS.Font.secondary)
                     .monospacedDigit()
             }
-            .foregroundStyle(HierarchicalShapeStyle.secondary)
+            .foregroundStyle(secondaryInk)
         case .progress(let value):
             HStack(spacing: 5) {
                 PillProgressRing(
@@ -325,25 +331,34 @@ struct PillPopoverRow: View {
                 )
                 Text(AppFormat.percent(max(0, min(1, value))))
                     .font(DS.Font.mono)
-                    .foregroundStyle(HierarchicalShapeStyle.secondary)
+                    .foregroundStyle(secondaryInk)
             }
         }
     }
 
     /// A caller's tint is meant for the resting row; on the accent fill it sinks, so selection takes the glyph back.
     private func symbolStyle(_ tint: Color?) -> AnyShapeStyle {
-        if isSelected { return AnyShapeStyle(HierarchicalShapeStyle.primary) }
+        if isSelected { return AnyShapeStyle(DS.Color.onAccent) }
         return AnyShapeStyle(tint ?? DS.Color.secondaryText)
     }
 
-    private var subtitleStyle: AnyShapeStyle {
-        if isSelected { return AnyShapeStyle(HierarchicalShapeStyle.secondary) }
-        return AnyShapeStyle(subtitleTint ?? DS.Color.secondaryText)
+    /// The row's second text tier. `.secondary` resolves against SwiftUI's own hierarchy inside a `Text`, not
+    /// against the chrome's pair, so the tier is named here instead of inherited.
+    private var secondaryInk: Color {
+        isSelected ? DS.Color.onAccentSecondary : DS.Color.secondaryText
     }
+
+    private var subtitleInk: Color {
+        guard !isSelected, let subtitleTint else { return secondaryInk }
+        return subtitleTint
+    }
+
+    /// Selection paints over a caller's warning tint, so the warning says so with a glyph instead.
+    private var showsWarningGlyph: Bool { isSelected && subtitleTint != nil }
 
     private var badgeTokens: (fill: Color, text: Color) {
         isSelected
-            ? (fill: DS.Color.onAccent.opacity(0.18), text: DS.Color.onAccent)
+            ? (fill: DS.Color.onAccentWash, text: DS.Color.onAccent)
             : DS.Color.neutralChip
     }
 }

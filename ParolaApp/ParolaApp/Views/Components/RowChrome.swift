@@ -90,8 +90,7 @@ private struct SelectedForeground: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if let color {
-            // Both levels: hierarchy's own secondary drops to half opacity, which disappears on an accent fill.
-            content.foregroundStyle(color, color.opacity(0.9))
+            content.foregroundStyle(color)
         } else {
             content
         }
