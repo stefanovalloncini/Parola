@@ -130,6 +130,8 @@ struct ParolaApp: App {
                 Divider()
                 Button("Keyboard Shortcuts…") { shortcutSheetOpen = true }
                     .keyboardShortcut("/", modifiers: [.command])
+                Button("Copy Model Details") { model.copyModelDetails() }
+                    .axLeaf("Menu.Help.CopyModelDetails")
                 Button("Send Feedback") {
                     if let url = SupportLinks.feedbackMailto {
                         NSWorkspace.shared.open(url)

@@ -3240,6 +3240,17 @@
         }
       }
     },
+    "Copy Model Details": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia i dettagli del modello"
+          }
+        }
+      }
+    },
     "Copy Path": {
       "extractionState": "manual",
       "localizations": {
@@ -4573,6 +4584,17 @@
         }
       }
     },
+    "Engine: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motore: %@"
+          }
+        }
+      }
+    },
     "English only": {
       "extractionState": "manual",
       "localizations": {
@@ -5735,6 +5757,17 @@
         }
       }
     },
+    "Identifier: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identificativo: %@"
+          }
+        }
+      }
+    },
     "Identify multiple speakers in the audio (slower).": {
       "extractionState": "manual",
       "localizations": {
@@ -5995,6 +6028,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Solo installati"
+          }
+        }
+      }
+    },
+    "Installed: no": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installato: no"
+          }
+        }
+      }
+    },
+    "Installed: yes": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installato: sì"
           }
         }
       }
@@ -6317,6 +6372,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lingua che userà una nuova trascrizione"
+          }
+        }
+      }
+    },
+    "Languages: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lingue: %@"
           }
         }
       }
@@ -7120,6 +7186,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Storage modelli"
+          }
+        }
+      }
+    },
+    "Model: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modello: %@"
           }
         }
       }
@@ -8930,6 +9007,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Percorso copiato"
+          }
+        }
+      }
+    },
+    "Path: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Percorso: %@"
           }
         }
       }
@@ -11378,6 +11466,28 @@
         }
       }
     },
+    "Size: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimensione: %@"
+          }
+        }
+      }
+    },
+    "Size: about %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimensione: circa %@"
+          }
+        }
+      }
+    },
     "Skip": {
       "extractionState": "manual",
       "localizations": {
@@ -11572,6 +11682,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sorgente Z→A"
+          }
+        }
+      }
+    },
+    "Source: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Origine: %@"
           }
         }
       }
@@ -12697,6 +12818,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questa settimana"
+          }
+        }
+      }
+    },
+    "This build's catalog has no entry for it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il catalogo di questa build non ha una voce per questo modello."
           }
         }
       }
@@ -14520,6 +14652,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "es. uh, um, hmm"
+          }
+        }
+      }
+    },
+    "every language the engine knows": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tutte le lingue che il motore conosce"
           }
         }
       }

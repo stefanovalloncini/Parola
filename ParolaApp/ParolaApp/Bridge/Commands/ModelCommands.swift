@@ -19,6 +19,17 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "copyModelDetails",
+                area: .model,
+                summary: "Puts the selected model's details on the pasteboard, the way Help ▸ Copy Model Details does, and replies with the same text.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    ctx.model.copyModelDetails()
+                    return .object(["text": .string(ctx.model.modelDetailsText())])
+                }
+            ),
+
+            AutomationCommand(
                 name: "downloadModel",
                 area: .model,
                 summary: "Starts an async download of the named model.",

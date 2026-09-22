@@ -75,6 +75,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_delete_entry` | **id** | Move an entry to Recently Deleted. |
 | `parola_app_download_model` | **name** | Trigger a download from inside the app. Progress shows in the UI. |
 | `parola_app_delete_model` | **name** | Delete a downloaded model. |
+| `copyModelDetails` | — | Put the selected model's details on the pasteboard, the way Help ▸ Copy Model Details does: name, identifier, engine, catalog source, install state, path, size on disk and language coverage. Replies `{text}` with the same block. |
 | `parola_app_export_transcript` | **format** | txt / md / html / docx / pdf / csv / srt / vtt / json. The app's save panel handles the destination. |
 | `openExportSheet` | — | Open the Export sheet on the loaded transcript. Replies `{open, spec}`; `PRECONDITION` when nothing is loaded. |
 | `setExportSpec` | **spec** | Merge fields over the sheet's spec (`options` merges field by field, so `{"options":{"timestamps":true}}` keeps the rest). Naming `format` moves the spec to that format's style; naming `style` alone picks that style's first format. Replies `{spec}`. |
