@@ -14,6 +14,8 @@ enum DS {
         static let xlarge: CGFloat = 36
         /// Leading for every transcript reading surface, so one line-height rule covers them all.
         static let transcriptLeading: CGFloat = 5
+        /// The same rule for the compact tier, tighter so compact mode still buys the rows it promises.
+        static let transcriptLeadingCompact: CGFloat = 3
     }
 
     enum Radius {

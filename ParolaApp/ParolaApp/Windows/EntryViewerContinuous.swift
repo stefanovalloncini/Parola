@@ -97,7 +97,7 @@ struct EntryViewerContinuous: View {
     private func chunkText(_ text: AttributedString) -> some View {
         Text(text)
             .font(model.transcriptCompact ? DS.Font.transcriptCompact : DS.Font.transcript)
-            .lineSpacing(DS.Spacing.transcriptLeading)
+            .lineSpacing(model.transcriptCompact ? DS.Spacing.transcriptLeadingCompact : DS.Spacing.transcriptLeading)
             .textSelection(.enabled)
             // Definite height; without it the layout pass re-typesets the chunk Text in a loop on long audio.
             .fixedSize(horizontal: false, vertical: true)
