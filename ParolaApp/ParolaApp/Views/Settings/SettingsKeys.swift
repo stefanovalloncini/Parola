@@ -234,6 +234,7 @@ enum UnscopedSettingsKeys {
 
 struct ResetPaneButton: View {
     let scope: SettingsPaneScope
+    @Environment(AppModel.self) private var model
     @State private var confirming = false
 
     var body: some View {
@@ -254,6 +255,7 @@ struct ResetPaneButton: View {
                 titleVisibility: .visible
             ) {
                 Button("Reset", role: .destructive) {
+                    if scope == .aiServices { model.forgetAIServiceKeys() }
                     SettingsResetService.reset(scope: scope)
                 }
                 Button("Cancel", role: .cancel) {}

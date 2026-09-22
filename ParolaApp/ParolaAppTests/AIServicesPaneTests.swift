@@ -77,6 +77,41 @@ struct AIServicesPaneTests {
         #expect(!String(decoding: stored, as: UTF8.self).contains("sk-secret-value"))
     }
 
+    @Test("removing the last service of a kind takes its key with it")
+    func removingTheLastRowDeletesTheKey() async throws {
+        let keyStore = InMemoryAPIKeyStore()
+        let model = makeModel(defaults: temporaryDefaults(), keyStore: keyStore)
+        let second = AIServiceConfig(kind: .openAI, name: "Personal OpenAI", endpoint: nil, model: "gpt-4o")
+
+        await model.saveAIService(openAI(), apiKey: "sk-secret-value")
+        model.setAIServices(model.aiServices + [second])
+        let first = try #require(model.aiServices.first)
+
+        model.removeAIService(id: first.id)
+        await settle()
+        #expect(try await keyStore.get(for: .openAI) == "sk-secret-value")
+
+        model.removeAIService(id: second.id)
+        #expect(await waitUntil { (try? await keyStore.get(for: .openAI)) == .some(nil) })
+    }
+
+    @Test("resetting the pane deletes every configured kind's key")
+    func resettingThePaneDeletesTheKeys() async throws {
+        let keyStore = InMemoryAPIKeyStore()
+        let model = makeModel(defaults: temporaryDefaults(), keyStore: keyStore)
+
+        await model.saveAIService(openAI(), apiKey: "sk-secret-value")
+        await model.saveAIService(
+            AIServiceConfig(kind: .groq, name: "Groq", endpoint: nil, model: "llama-3.3-70b"),
+            apiKey: "gsk-secret-value"
+        )
+
+        model.forgetAIServiceKeys()
+
+        #expect(await waitUntil { (try? await keyStore.get(for: .openAI)) == .some(nil) })
+        #expect(await waitUntil { (try? await keyStore.get(for: .groq)) == .some(nil) })
+    }
+
     @Test("the one-time notice gates remote choices only, and only until it is accepted")
     func acknowledgementGate() async throws {
         let model = makeModel(defaults: temporaryDefaults())

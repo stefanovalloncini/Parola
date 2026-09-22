@@ -182,8 +182,25 @@ extension AppModel {
     }
 
     /// Removing a service leaves its selections stored; they resolve back to the on-device model.
+    /// The key goes with the last row of its kind: nothing else can reach it once the row is gone.
     func removeAIService(id: UUID) {
+        let removed = aiService(id: id)
         setAIServices(aiServices.filter { $0.id != id })
+        guard let removed, let provider = removed.kind.keyProviderID,
+              !aiServices.contains(where: { $0.kind == removed.kind }) else { return }
+        Task { [apiKeyStore] in try? await apiKeyStore.set(nil, for: provider) }
+    }
+
+    /// Deletes every configured kind's stored key. The pane reset and the full reset call this
+    /// before they clear the rows, which are the only thing naming the keys.
+    func forgetAIServiceKeys() {
+        let providers = Set(aiServices.compactMap { $0.kind.keyProviderID })
+        guard !providers.isEmpty else { return }
+        Task { [apiKeyStore] in
+            for provider in providers {
+                try? await apiKeyStore.set(nil, for: provider)
+            }
+        }
     }
 
     func aiService(id: UUID) -> AIServiceConfig? {

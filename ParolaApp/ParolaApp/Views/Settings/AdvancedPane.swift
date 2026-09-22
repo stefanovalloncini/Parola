@@ -73,6 +73,7 @@ struct AdvancedPane: View {
             titleVisibility: .visible
         ) {
             Button("Reset", role: .destructive) {
+                model.forgetAIServiceKeys()
                 SettingsResetService.resetAll()
             }
             Button("Cancel", role: .cancel) {}
