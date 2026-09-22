@@ -9,6 +9,50 @@ import ParolaTestSupport
 @Suite("Entry window viewer")
 struct EntryWindowViewerTests {
 
+    @Test("an edit that keeps the segment count still changes the flowing key")
+    func aTextEditChangesTheFlowingKey() async throws {
+        let model = EntryWindowTestSupport.makeModel("viewerkey")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha", "beta"], speakers: [nil, nil], audio: nil
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        let before = EntryViewerContinuous.contentSignature(for: session)
+
+        var edited = try #require(session.transcript)
+        edited.segments[0].text = "alpha edited"
+        try await EntryWindowTestSupport.store(model).updateTranscript(edited, for: entry.id, reindex: false)
+        await EntryWindowTestSupport.syncLibrary(model)
+        session.reload()
+        await session.loadTask?.value
+
+        #expect(session.transcript?.segments.count == 2)
+        #expect(session.transcript?.segments.first?.text == "alpha edited")
+        #expect(EntryViewerContinuous.contentSignature(for: session) != before)
+    }
+
+    @Test("a library bump for another entry does not re-read this one")
+    func reloadOnlyFollowsThisEntry() async throws {
+        let model = EntryWindowTestSupport.makeModel("viewerreload")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha"], speakers: [nil], audio: nil
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        let loads = session.loadGeneration
+
+        session.reloadIfEntryChanged()
+        #expect(session.loadGeneration == loads, "nothing about this entry changed, so nothing is re-read")
+
+        var edited = try #require(session.transcript)
+        edited.segments[0].text = "alpha edited"
+        try await EntryWindowTestSupport.store(model).updateTranscript(edited, for: entry.id, reindex: false)
+        await EntryWindowTestSupport.syncLibrary(model)
+
+        session.reloadIfEntryChanged()
+        await session.loadTask?.value
+        #expect(session.loadGeneration == loads + 1)
+        #expect(session.transcript?.segments.first?.text == "alpha edited")
+    }
+
     @Test("the window reads favorites and the translation from the document")
     func favoritesAndTranslationComeFromTheDocument() async throws {
         let model = EntryWindowTestSupport.makeModel("viewerdoc")

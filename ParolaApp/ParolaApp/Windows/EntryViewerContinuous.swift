@@ -7,9 +7,12 @@ struct EntryViewerContinuous: View {
     let onEditAttempt: () -> Void
 
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var chunks: [ContinuousChunks.Chunk] = []
     @State private var chunkIndexBySegment: [TranscriptSegment.ID: Int] = [:]
     @State private var highlightedSegmentID: TranscriptSegment.ID?
+    @State private var buildTask: Task<Void, Never>?
+    @State private var appliedSignature: Int?
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -38,13 +41,18 @@ struct EntryViewerContinuous: View {
                 return .handled
             })
             .onAppear { rebuild() }
-            .onChange(of: buildKey) { _, _ in rebuild() }
+            .onChange(of: contentSignature) { _, _ in rebuild() }
             // The chunks cache resolved colours, so a theme change has to rebuild them.
-            .onChange(of: model.themeRevision) { _, _ in rebuild() }
+            .onChange(of: model.themeRevision) { _, _ in rebuild(force: true) }
+            .onDisappear { buildTask?.cancel() }
             .onChange(of: session.currentSegmentID) { _, id in
                 applyHighlight()
                 guard let id, let chunkID = chunkIndexBySegment[id] else { return }
-                withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(chunkID, anchor: .center) }
+                if reduceMotion {
+                    proxy.scrollTo(chunkID, anchor: .center)
+                } else {
+                    withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(chunkID, anchor: .center) }
+                }
             }
         }
     }
@@ -96,45 +104,72 @@ struct EntryViewerContinuous: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private struct BuildKey: Equatable {
-        let segmentCount: Int
-        let favorites: Set<Int>
-        let colors: [String: Int]
-        let translations: Int
-        let loaded: Bool
-    }
-
-    private var buildKey: BuildKey {
-        BuildKey(
-            segmentCount: session.transcript?.segments.count ?? 0,
+    /// Content, not counts: an edit that leaves the segment count alone still has to rebuild.
+    static func contentSignature(for session: EntryWindowSession) -> Int {
+        ContinuousChunks.contentSignature(
+            segments: session.transcript?.segments ?? [],
+            useSpeakerColor: session.speakers.count >= 2,
+            favoritesOnly: false,
             favorites: session.favorites,
-            colors: session.speakerColorIndices,
-            translations: session.translations.count,
-            loaded: session.transcript != nil
+            translations: session.translations,
+            speakerColorIndices: session.speakerColorIndices
         )
     }
 
-    private func rebuild() {
+    private var contentSignature: Int { Self.contentSignature(for: session) }
+
+    private func rebuild(force: Bool = false) {
+        buildTask?.cancel()
         guard let transcript = session.transcript else {
             chunks = []
             chunkIndexBySegment = [:]
             highlightedSegmentID = nil
+            appliedSignature = nil
             return
         }
+        let signature = contentSignature
+        guard force || signature != appliedSignature else { return }
         let useSpeakerColor = session.speakers.count >= 2
-        let built = ContinuousChunks.build(
-            segments: transcript.segments,
-            useSpeakerColor: useSpeakerColor,
-            speakerColorIndices: useSpeakerColor ? session.speakerColorIndices : [:],
-            primaryText: DS.Color.primaryText,
-            favoriteColor: DS.Color.accent,
-            favorites: session.favorites,
-            translations: session.translations,
-            translationColor: DS.Color.secondaryText
-        )
+        let segments = transcript.segments
+        let colors = useSpeakerColor ? session.speakerColorIndices : [:]
+        let favorites = session.favorites
+        let translations = session.translations
+        // DS's resolved palette is main-actor storage; read it here so the detached build never touches it.
+        let primaryText = DS.Color.primaryText
+        let accent = DS.Color.accent
+        let secondaryText = DS.Color.secondaryText
+        if segments.count <= ContinuousChunks.synchronousBuildCap {
+            apply(
+                ContinuousChunks.build(
+                    segments: segments, useSpeakerColor: useSpeakerColor, speakerColorIndices: colors,
+                    primaryText: primaryText, favoriteColor: accent, favorites: favorites,
+                    translations: translations, translationColor: secondaryText
+                ),
+                signature: signature
+            )
+        } else {
+            buildTask = Task {
+                await ContinuousChunks.buildOffMain(
+                    segments: segments,
+                    useSpeakerColor: useSpeakerColor,
+                    speakerColorIndices: colors,
+                    primaryText: primaryText,
+                    favoriteColor: accent,
+                    favorites: favorites,
+                    translations: translations,
+                    translationColor: secondaryText,
+                    signature: signature,
+                    apply: apply
+                )
+            }
+        }
+    }
+
+    private func apply(_ built: [ContinuousChunks.Chunk], signature: Int) {
         chunks = built
         chunkIndexBySegment = ContinuousChunks.chunkIndexBySegment(for: built)
         highlightedSegmentID = nil
+        appliedSignature = signature
         applyHighlight()
     }
 
