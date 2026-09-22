@@ -47,6 +47,13 @@ extension AppModel {
         }
     }
 
+    /// The bridge's write path for the saved options, so it goes through a seam like its four
+    /// JSON-backed siblings; the options column binds to the property directly.
+    func setSummaryOptions(_ options: SummaryOptions) {
+        guard options != summaryOptions else { return }
+        summaryOptions = options
+    }
+
     func clearSummary() {
         guard transcript?.summary != nil else { return }
         transcript?.summary = nil

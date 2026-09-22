@@ -40,21 +40,32 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "generateCardMetadata",
                 area: .library,
-                summary: "Writes the on-device title and one-line summary for an entry. Needs the AI feature and the generation toggle; use installMockLanguageModel in tests.",
+                summary: "Writes the on-device title and one-line summary for an entry. Needs the AI feature and the generation toggle unless force is set; use installMockLanguageModel in tests.",
                 kind: .mutating,
                 args: [
                     .init(name: "id", kind: .string(), required: true, summary: "Library entry ID"),
+                    .init(
+                        name: "force",
+                        kind: .boolean,
+                        required: false,
+                        summary: "Ignore the generation toggle, the way the Info inspector's Regenerate does",
+                        defaultValue: .bool(false)
+                    ),
                 ],
                 handler: { args, ctx in
                     let id = try args.string("id")
+                    let force = try args.optionalBool("force") ?? false
                     guard ctx.model.features.isEnabled(.ai) else {
                         return .object(["generated": .bool(false), "reason": .string("the AI feature is off")])
                     }
-                    guard ctx.model.generatesCardMetadata else {
+                    guard force || ctx.model.generatesCardMetadata else {
                         return .object(["generated": .bool(false), "reason": .string("card metadata generation is off")])
                     }
                     let loaded = try await ctx.model.library.load(id)
-                    guard let meta = await ctx.model.generateCardMetadata(for: id, transcript: loaded.document.transcript) else {
+                    let written = force
+                        ? await ctx.model.regenerateCardMetadata(for: id, transcript: loaded.document.transcript)
+                        : await ctx.model.generateCardMetadata(for: id, transcript: loaded.document.transcript)
+                    guard let meta = written else {
                         return .object(["generated": .bool(false), "reason": .string("generation failed or the transcript was too short")])
                     }
                     return .object([
@@ -365,8 +376,8 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     let merged = try ctx.model.mergedSummaryOptions(overriding: try args.object("options"))
-                    ctx.model.summaryOptions = merged
-                    return .object(["summaryOptions": ParolaAutomationServer.encode(merged)])
+                    ctx.model.setSummaryOptions(merged)
+                    return .object(["summaryOptions": ParolaAutomationServer.encode(ctx.model.summaryOptions)])
                 }
             ),
 

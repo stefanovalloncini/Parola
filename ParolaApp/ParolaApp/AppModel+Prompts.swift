@@ -179,7 +179,13 @@ extension AppModel {
     /// An explicit user request from the Info inspector: bypasses the generation toggle, still needs the AI feature.
     func regenerateCardMetadata() {
         guard let id = selectedEntryID, let transcript else { return }
-        Task { [weak self] in await self?.writeCardMetadata(for: id, transcript: transcript) }
+        Task { [weak self] in await self?.regenerateCardMetadata(for: id, transcript: transcript) }
+    }
+
+    /// The same explicit request, aimed at a named entry: what the bridge's `force` routes to.
+    @discardableResult
+    func regenerateCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) async -> CardMetadata? {
+        await writeCardMetadata(for: id, transcript: transcript)
     }
 
     /// Blank custom prompts fall back to the built-in instructions instead of being sent as empty text.
@@ -202,6 +208,8 @@ extension AppModel {
         )
         do {
             let meta = try await CardMetadataService.generate(for: transcript, prompts: prompts, features: features)
+            // A run the 30 s timeout gave up on must not land on top of a manual regenerate.
+            guard !Task.isCancelled else { return nil }
             try await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id)
             await refreshLibraryAndWait()
             return meta
