@@ -114,6 +114,16 @@ struct RowChromeTests {
         #expect(popover.foreground == DS.Color.onAccent)
     }
 
+    @Test("the find bar's toggle inks its glyph with the same token the popover row does")
+    func findToggleCarriesTheLegibleInk() {
+        let popover = appearance(selected: true, hovered: false, PillPopoverRow.selectionStyle)
+        let toggle = appearance(selected: true, hovered: false, FindToggleButton.selectionStyle)
+        #expect(FindToggleButton.ink(isOn: true) == popover.foreground)
+        #expect(FindToggleButton.ink(isOn: false) != popover.foreground)
+        // The toggle is a 22 pt glyph, not a row of text: it takes the accent at full strength.
+        #expect(toggle.fill == DS.Color.accent)
+    }
+
     @Test("a row in a List animates its hover, never the selection the List paints")
     func nativeSelectionIsNotAnimated() {
         let pointedAndSelected = RowChromeState(selected: true, hovered: true)

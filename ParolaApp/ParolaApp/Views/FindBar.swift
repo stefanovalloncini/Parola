@@ -158,7 +158,7 @@ private struct FindIconButton: View {
     }
 }
 
-private struct FindToggleButton: View {
+struct FindToggleButton: View {
     let systemName: String
     let isOn: Bool
     let help: LocalizedStringKey
@@ -166,17 +166,21 @@ private struct FindToggleButton: View {
 
     @State private var hovered = false
 
+    /// Computed, not stored: a stored colour would freeze the palette the app launched with.
+    static var selectionStyle: RowSelectionStyle { .prominent(fill: DS.Color.accent) }
+
+    /// Set here, not through the chrome's foreground: an inner `foregroundStyle` wins over it.
+    static func ink(isOn: Bool) -> Color {
+        isOn ? DS.Color.onAccent : Color.primary.opacity(0.85)
+    }
+
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(DS.Font.bodyStrong)
-                .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.85))
+                .foregroundStyle(Self.ink(isOn: isOn))
                 .frame(width: 22, height: 22)
-                .rowChrome(
-                    selected: isOn,
-                    hovered: hovered,
-                    selection: .prominent(fill: DS.Color.accent)
-                )
+                .rowChrome(selected: isOn, hovered: hovered, selection: Self.selectionStyle)
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
