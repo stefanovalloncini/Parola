@@ -281,6 +281,33 @@ extension AppModel {
         }
     }
 
+    /// The notes of the selected entry keyed the way the transcript keys its segments.
+    var segmentNotesByID: [Int: String] {
+        guard let id = selectedEntryID, let entry = libraryEntry(id: id) else { return [:] }
+        return Dictionary(
+            entry.segmentNotes.compactMap { key, value in Int(key).map { ($0, value) } },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
+
+    /// Writes the whole note map, for an edit that renumbered the segments it is keyed by.
+    func replaceSegmentNotes(_ notes: [Int: String]) {
+        guard let entryID = selectedEntryID else { return }
+        let stored = Dictionary(
+            notes.map { (String($0.key), $0.value) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await library.setSegmentNotes(stored, for: entryID)
+            } catch {
+                nonFatalWarning = error.localizedDescription
+            }
+            refreshLibrary()
+        }
+    }
+
     func currentSegmentNote(for segmentID: Int) -> String? {
         guard let id = selectedEntryID, let entry = libraryEntry(id: id) else { return nil }
         return entry.note(forSegment: segmentID)

@@ -775,6 +775,22 @@ public actor LibraryStore {
         }
     }
 
+    /// Replaces the whole note map in one write, for an edit that renumbered the segments the
+    /// notes are keyed by. Re-indexes once, the way `setSegmentNote` does for a single note.
+    public func setSegmentNotes(_ notes: [String: String], for id: LibraryEntry.ID) async throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.segmentNotes = notes
+        }
+        let entry = try recacheEntry(at: bundleURL)
+        if let transcript = await transcriptForReindex(id, at: bundleURL) {
+            await indexEntry(entry, transcript: transcript)
+        }
+    }
+
     public func setSegmentFavorite(_ isFavorite: Bool, segmentID: Int, for id: LibraryEntry.ID) throws {
         try updateFavorites(for: id) { favorites in
             if isFavorite { favorites.insert(segmentID) } else { favorites.remove(segmentID) }

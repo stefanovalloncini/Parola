@@ -3,31 +3,36 @@ import Foundation
 import ParolaCore
 
 extension AppModel {
-    /// The single seam for user edits: installs the new value, persists, remaps favorites, and registers an inverse edit with the undo manager.
+    /// The single seam for user edits: installs the new value, persists, remaps the id-keyed side
+    /// maps, and registers an inverse edit with the undo manager.
     func applyTranscriptEdit(
         _ new: Transcript,
         actionName: String,
         textChanged: Bool = true,
         favorites: (old: Set<Int>, new: Set<Int>)? = nil,
+        notes: (old: [Int: String], new: [Int: String])? = nil,
         assignments: SpeakerAssignmentEdit? = nil
     ) {
         guard let old = transcript, old != new else { return }
         let resolvedFavorites = favorites ?? (favoriteSegmentIDs, favoriteSegmentIDs)
+        let resolvedNotes = notes ?? (segmentNotesByID, segmentNotesByID)
         // Read before the edit lands: the inverse has to restore what the map held a moment ago.
         let inverseAssignments = assignments.map { $0.inverse(of: speakerAssignments) }
         transcript = new
         persistCurrentTranscriptIfLoaded(textChanged: textChanged)
         if resolvedFavorites.new != resolvedFavorites.old { replaceFavorites(resolvedFavorites.new) }
+        if resolvedNotes.new != resolvedNotes.old { replaceSegmentNotes(resolvedNotes.new) }
         if let assignments { applySpeakerAssignmentEdit(assignments) }
         registerTranscriptUndo(
-            restoring: old, favorites: resolvedFavorites, actionName: actionName, textChanged: textChanged,
-            assignments: inverseAssignments
+            restoring: old, favorites: resolvedFavorites, notes: resolvedNotes, actionName: actionName,
+            textChanged: textChanged, assignments: inverseAssignments
         )
     }
 
     private func registerTranscriptUndo(
         restoring old: Transcript,
         favorites: (old: Set<Int>, new: Set<Int>),
+        notes: (old: [Int: String], new: [Int: String]),
         actionName: String,
         textChanged: Bool,
         assignments: SpeakerAssignmentEdit?
@@ -36,6 +41,7 @@ extension AppModel {
         let entryID = selectedEntryID
         // From the undo closure's perspective this edit's `new` favorites are current; `old` is the restore target.
         let inverseFavorites = (old: favorites.new, new: favorites.old)
+        let inverseNotes = (old: notes.new, new: notes.old)
         // Only group explicitly when event grouping is off (tests): nesting inside the window's per-event group would leave that group unnamed, and the Edit menu title reads the top-level group's name.
         let opensGroup = !undoManager.groupsByEvent && !undoManager.isUndoing && !undoManager.isRedoing
             && undoManager.groupingLevel == 0
@@ -46,7 +52,7 @@ extension AppModel {
                 guard model.selectedEntryID == entryID else { return }
                 model.applyTranscriptEdit(
                     old, actionName: actionName, textChanged: textChanged, favorites: inverseFavorites,
-                    assignments: assignments
+                    notes: inverseNotes, assignments: assignments
                 )
             }
         }
@@ -69,8 +75,13 @@ extension AppModel {
         t.segments.removeAll { $0.id == id }
         t.translation = t.translation?.afterDelete(of: id)
         let favorites = favoriteSegmentIDs
-        let newFavorites = FavoriteRemap.afterDelete(favorites, of: id)
-        applyTranscriptEdit(t, actionName: String(localized: "Delete Segment"), favorites: (favorites, newFavorites))
+        let notes = segmentNotesByID
+        applyTranscriptEdit(
+            t,
+            actionName: String(localized: "Delete Segment"),
+            favorites: (favorites, FavoriteRemap.afterDelete(favorites, of: id)),
+            notes: (notes, SegmentNoteRemap.afterDelete(notes, of: id))
+        )
     }
 
     func assignSpeaker(_ name: String?, toSegmentID id: TranscriptSegment.ID) {
@@ -109,8 +120,13 @@ extension AppModel {
         t.segments = split.segments
         t.translation = t.translation?.afterSplit(of: id, into: split.firstID)
         let favorites = favoriteSegmentIDs
-        let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: split.firstID)
-        applyTranscriptEdit(t, actionName: String(localized: "Split Segment"), favorites: (favorites, newFavorites))
+        let notes = segmentNotesByID
+        applyTranscriptEdit(
+            t,
+            actionName: String(localized: "Split Segment"),
+            favorites: (favorites, FavoriteRemap.afterSplit(favorites, of: id, into: split.firstID)),
+            notes: (notes, SegmentNoteRemap.afterSplit(notes, of: id, into: split.firstID))
+        )
     }
 
     func splitSegment(id: TranscriptSegment.ID, atFraction fraction: Double) {
@@ -119,8 +135,13 @@ extension AppModel {
         t.segments = split.segments
         t.translation = t.translation?.afterSplit(of: id, into: split.firstID)
         let favorites = favoriteSegmentIDs
-        let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: split.firstID)
-        applyTranscriptEdit(t, actionName: String(localized: "Split Segment"), favorites: (favorites, newFavorites))
+        let notes = segmentNotesByID
+        applyTranscriptEdit(
+            t,
+            actionName: String(localized: "Split Segment"),
+            favorites: (favorites, FavoriteRemap.afterSplit(favorites, of: id, into: split.firstID)),
+            notes: (notes, SegmentNoteRemap.afterSplit(notes, of: id, into: split.firstID))
+        )
     }
 
     func mergeSegmentWithNext(id: TranscriptSegment.ID) {
@@ -131,8 +152,13 @@ extension AppModel {
         t.segments = segments
         t.translation = t.translation?.afterMerge(of: id, with: nextID)
         let favorites = favoriteSegmentIDs
-        let newFavorites = FavoriteRemap.afterMerge(favorites, of: id, with: nextID)
-        applyTranscriptEdit(t, actionName: String(localized: "Merge Segments"), favorites: (favorites, newFavorites))
+        let notes = segmentNotesByID
+        applyTranscriptEdit(
+            t,
+            actionName: String(localized: "Merge Segments"),
+            favorites: (favorites, FavoriteRemap.afterMerge(favorites, of: id, with: nextID)),
+            notes: (notes, SegmentNoteRemap.afterMerge(notes, of: id, with: nextID))
+        )
     }
 
     func nudgeSegmentStart(id: TranscriptSegment.ID, frames: Int) {
