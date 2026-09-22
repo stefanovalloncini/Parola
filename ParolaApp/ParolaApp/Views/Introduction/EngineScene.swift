@@ -99,6 +99,7 @@ private struct EngineCard: View {
                 radius: DS.Radius.regular,
                 selection: .wash(fill: DS.Color.accent.opacity(EngineScene.selectedTintOpacity))
             )
+            // Outside the chrome, not inside it: an inner background would sit on top of the selection wash.
             .background(shape.fill(DS.Color.surfaceElevated))
         }
         .buttonStyle(.plain)
