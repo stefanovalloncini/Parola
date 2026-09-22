@@ -46,7 +46,7 @@ struct DSPillButtonStyle: ButtonStyle {
                 .opacity(dimsWholeView && !isEnabled ? DS.Opacity.disabled : (configuration.isPressed ? 0.85 : 1.0))
                 .contentShape(Capsule())
                 .rowStateAnimation(hovering)
-                .onHover { hovering = isEnabled && $0 }
+                .onHover { hovering = $0 }
         }
 
         /// Only the secondary pill fades whole: the primary swaps its pair instead, so neither half thins out.
@@ -65,7 +65,7 @@ struct DSPillButtonStyle: ButtonStyle {
             case .primary:
                 return isEnabled ? DS.Color.accent.opacity(pressed ? 0.85 : 1.0) : DSPillButtonStyle.disabledFill
             case .secondary:
-                return hovering ? DS.Palette.pillFillHover : DS.Color.surfaceElevated
+                return isEnabled && hovering ? DS.Palette.pillFillHover : DS.Color.surfaceElevated
             }
         }
     }
@@ -118,12 +118,14 @@ struct DSIconChipButtonStyle: ButtonStyle {
                 .frame(width: fitsLabel ? nil : side, height: side)
                 .background(
                     RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(hovering || configuration.isPressed ? DS.Palette.pillFillHover : DS.Color.surfaceElevated)
+                        .fill(lit ? DS.Palette.pillFillHover : DS.Color.surfaceElevated)
                 )
                 .opacity(isEnabled ? 1 : DS.Opacity.disabled)
                 .contentShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
                 .rowStateAnimation(hovering)
-                .onHover { hovering = isEnabled && $0 }
+                .onHover { hovering = $0 }
         }
+
+        private var lit: Bool { configuration.isPressed || (isEnabled && hovering) }
     }
 }
