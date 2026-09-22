@@ -398,7 +398,9 @@ struct WordsView: View {
     }
 
     /// WhisperKit word timings split an elision into an apostrophe-leading tail ("l'altro" → ["l", "'altro"]); fold that tail back so the chips read as one word instead of "l" and "'altro" split by the layout gap.
-    static func mergeElidedWords(_ words: [WordTiming]) -> [MergedWord] {
+    /// `nonisolated` because it is a pure function of its argument: `View` would otherwise infer the
+    /// main actor onto it and every caller outside `body` would have to hop for nothing.
+    nonisolated static func mergeElidedWords(_ words: [WordTiming]) -> [MergedWord] {
         var merged: [MergedWord] = []
         for word in words {
             if let last = merged.last, word.word.first == "'" || word.word.first == "\u{2019}" {
