@@ -103,6 +103,7 @@ extension View {
             .background(Capsule(style: .continuous).fill(fill))
             .overlay(Capsule(style: .continuous).strokeBorder(border, lineWidth: 0.5))
             .contentShape(Capsule(style: .continuous))
+            .rowStateAnimation(RowChromeState(selected: isSelected, hovered: hovering))
     }
 }
 
