@@ -68,29 +68,32 @@ struct PeopleDirectoryList: View {
         .alert("Rename person", isPresented: isRenaming, presenting: renaming) { person in
             TextField("Name", text: $renameDraft)
             Button("Cancel", role: .cancel) { renaming = nil }
-            Button("Rename") {
-                let draft = renameDraft
-                Task { await model.renamePerson(person.id, to: draft) }
-                renaming = nil
-            }
+                .axLeaf("People.Button.RenameCancel")
+            Button("Rename") { commitRename(of: person) }
+                .disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .axLeaf("People.Button.RenameConfirm")
         } message: { _ in
             Text("The new name replaces the old one in every transcript. That rewrite can't be undone.")
         }
         .alert("Merge people", isPresented: isMerging, presenting: merging) { pair in
             Button("Cancel", role: .cancel) { merging = nil }
+                .axLeaf("People.Button.MergeCancel")
             Button("Merge") {
                 Task { await model.mergePerson(pair.source.id, into: pair.target.id) }
                 merging = nil
             }
+            .axLeaf("People.Button.MergeConfirm")
         } message: { pair in
             Text("\(pair.source.name) is folded into \(pair.target.name), and the transcripts that named them take the new name. That rewrite can't be undone.")
         }
         .alert("Delete person", isPresented: isDeleting, presenting: deleting) { person in
             Button("Cancel", role: .cancel) { deleting = nil }
+                .axLeaf("People.Button.DeleteCancel")
             Button("Delete", role: .destructive) {
                 Task { await model.deletePerson(person.id) }
                 deleting = nil
             }
+            .axLeaf("People.Button.DeleteConfirm")
         } message: { person in
             Text("\(person.name) is forgotten and the transcripts stop pointing at them. The names already written into them stay, and that can't be undone.")
         }
@@ -150,6 +153,20 @@ struct PeopleDirectoryList: View {
                 .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .axLeaf("People.Button.Add")
         }
+    }
+
+    /// A rename onto a name the directory already holds folds the two people together, so it asks
+    /// with the Merge wording instead of promising a plain rename.
+    private func commitRename(of person: Person) {
+        let draft = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        renaming = nil
+        guard !draft.isEmpty else { return }
+        if let existing = model.person(named: draft), existing.id != person.id {
+            // Next turn: a second alert raised while the first is still dismissing is dropped.
+            Task { @MainActor in merging = MergePair(source: person, target: existing) }
+            return
+        }
+        Task { await model.renamePerson(person.id, to: draft) }
     }
 
     private func add() {
