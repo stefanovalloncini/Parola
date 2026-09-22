@@ -23,6 +23,7 @@ struct EntryViewerSegments: View {
     let onEditAttempt: () -> Void
 
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -48,9 +49,15 @@ struct EntryViewerSegments: View {
                 .padding(.horizontal, DS.Spacing.large)
                 .padding(.vertical, DS.Spacing.regular)
             }
+            // The window deliberately ignores model.favoritesOnly: a filter set in the main pane is
+            // a transient view of that pane, not of a transcript opened in its own window.
             .onChange(of: session.currentSegmentID) { _, id in
                 guard let id else { return }
-                withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
+                if reduceMotion {
+                    proxy.scrollTo(id, anchor: .center)
+                } else {
+                    withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
+                }
             }
         }
     }

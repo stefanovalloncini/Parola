@@ -61,6 +61,7 @@ enum InspectorMode: String, CaseIterable, Identifiable {
 }
 
 struct TranscriptPane: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(AppModel.self) private var model
     @AppStorage(InspectorVisibility.preferenceKey, store: DefaultsStore.current) private var inspectorVisible: Bool = true
     @AppStorage(InspectorVisibility.modeKey, store: DefaultsStore.current) private var inspectorModeRaw: String = InspectorMode.format.rawValue
@@ -158,7 +159,7 @@ struct TranscriptPane: View {
                 MediaBar()
             }
         }
-        .animation(.smooth(duration: 0.25), value: model.visibleDeliveryNotice)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: model.visibleDeliveryNotice)
     }
 
     @ViewBuilder
