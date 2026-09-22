@@ -5,7 +5,7 @@ import Testing
 @Suite("Theme highlight")
 struct ThemeHighlightTests {
     @Test("vivid presets keep the accent as their highlight", arguments: [
-        ThemePreset.terracotta, .blue, .mint, .purple, .pink, .yellow,
+        ThemePreset.slate, .terracotta, .blue, .teal, .sage, .indigo, .mint, .purple, .pink, .yellow,
     ])
     func vividPresetsHighlightEqualsAccent(_ preset: ThemePreset) {
         let palette = preset.palette
@@ -24,13 +24,15 @@ struct ThemeHighlightTests {
         #expect(dark.chroma >= 0.15)
     }
 
+    /// Sage joins Mono on the other side of the floor: darkening its light value to clear AA costs it the chroma a tint needs.
     @Test(
         "a grey accent cannot tint text, a vivid one can",
-        arguments: ThemePreset.allCases.filter { $0 != .graphite }
+        arguments: ThemePreset.allCases.filter { $0 != .graphite && $0 != .sage }
     )
     func vividAccentsReadAsATint(_ preset: ThemePreset) {
         #expect(preset.palette.accentText.readsAsTint)
         #expect(ThemePreset.graphite.palette.accentText.readsAsTint == false)
+        #expect(ThemePreset.sage.palette.accentText.readsAsTint == false)
     }
 
     @Test("chroma is near zero for greys and large for saturated colors")

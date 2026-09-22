@@ -267,21 +267,33 @@ extension ThemeColor {
     }
 }
 
+/// The built-in accents, in the order the Customization pane's swatch row shows them: the default first.
 enum ThemePreset: String, CaseIterable, Codable, Identifiable, Sendable {
+    case slate
     case terracotta
     case blue
+    case teal
+    case sage
+    case indigo
     case mint
     case purple
     case pink
     case yellow
     case graphite
 
+    /// What the app paints with until somebody stores a choice.
+    static let defaultPreset: ThemePreset = .slate
+
     var id: String { rawValue }
 
     var label: String {
         switch self {
+        case .slate: return "Slate"
         case .terracotta: return "Terracotta"
         case .blue: return "Ocean"
+        case .teal: return "Sea"
+        case .sage: return "Sage"
+        case .indigo: return "Indigo"
         case .mint: return "Forest"
         case .purple: return "Purple"
         case .pink: return "Pink"
@@ -290,10 +302,16 @@ enum ThemePreset: String, CaseIterable, Codable, Identifiable, Sendable {
         }
     }
 
+    var localizedLabel: LocalizedStringKey { LocalizedStringKey(label) }
+
     var accent: ThemeColor {
         switch self {
+        case .slate: return .dynamic(light: RGBA(0.33, 0.45, 0.62), dark: RGBA(0.52, 0.64, 0.80))
         case .terracotta: return .dynamic(light: RGBA(0.78, 0.42, 0.25), dark: RGBA(0.93, 0.58, 0.41))
         case .blue: return .uniform(RGBA(0.20, 0.49, 0.96))
+        case .teal: return .dynamic(light: RGBA(0.13, 0.52, 0.58), dark: RGBA(0.33, 0.70, 0.76))
+        case .sage: return .dynamic(light: RGBA(0.36, 0.53, 0.42), dark: RGBA(0.55, 0.72, 0.60))
+        case .indigo: return .dynamic(light: RGBA(0.35, 0.34, 0.84), dark: RGBA(0.49, 0.48, 0.93))
         case .mint: return .uniform(RGBA(0.20, 0.70, 0.55))
         case .purple: return .uniform(RGBA(0.55, 0.35, 0.84))
         case .pink: return .uniform(RGBA(0.92, 0.38, 0.62))

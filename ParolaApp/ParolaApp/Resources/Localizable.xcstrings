@@ -1663,6 +1663,17 @@
         }
       }
     },
+    "Amber": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambra"
+          }
+        }
+      }
+    },
     "An appcast URL hasn't been configured yet, so checks won't run.": {
       "extractionState": "manual",
       "localizations": {
@@ -5410,6 +5421,17 @@
         }
       }
     },
+    "Forest": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foresta"
+          }
+        }
+      }
+    },
     "Format": {
       "extractionState": "manual",
       "localizations": {
@@ -5984,6 +6006,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stile indicatore"
+          }
+        }
+      }
+    },
+    "Indigo": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indaco"
           }
         }
       }
@@ -7295,6 +7328,17 @@
         }
       }
     },
+    "Mono": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mono"
+          }
+        }
+      }
+    },
     "Monospaced timestamps": {
       "extractionState": "manual",
       "localizations": {
@@ -8371,6 +8415,17 @@
         }
       }
     },
+    "Ocean": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oceano"
+          }
+        }
+      }
+    },
     "Off": {
       "extractionState": "manual",
       "localizations": {
@@ -9264,6 +9319,17 @@
         }
       }
     },
+    "Pink": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rosa"
+          }
+        }
+      }
+    },
     "Pinned": {
       "extractionState": "manual",
       "localizations": {
@@ -9569,6 +9635,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Proprietà"
+          }
+        }
+      }
+    },
+    "Purple": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viola"
           }
         }
       }
@@ -10668,6 +10745,17 @@
         }
       }
     },
+    "Sage": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvia"
+          }
+        }
+      }
+    },
     "Same control as the Dictation pane. Records any key combo.": {
       "extractionState": "manual",
       "localizations": {
@@ -10780,6 +10868,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salva le tue impostazioni in un file `.parola-settings`, o ripristinane uno. I modelli scaricati e la libreria dei prompt non sono inclusi."
+          }
+        }
+      }
+    },
+    "Sea": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mare"
           }
         }
       }
@@ -11627,6 +11726,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salta i silenzi (attivo)"
+          }
+        }
+      }
+    },
+    "Slate": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ardesia"
           }
         }
       }
@@ -12587,6 +12697,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Termini tecnici (Italiano)"
+          }
+        }
+      }
+    },
+    "Terracotta": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terracotta"
           }
         }
       }

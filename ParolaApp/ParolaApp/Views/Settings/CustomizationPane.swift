@@ -110,7 +110,7 @@ private struct ThemePresetGallery: View {
                     .padding(DS.Spacing.hair)
                 }
                 .buttonStyle(.plain)
-                .help(preset.label)
+                .help(preset.localizedLabel)
                 .axLeaf("Customization.Button.Theme.\(preset.rawValue)")
             }
         }

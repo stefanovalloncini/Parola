@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaTestSupport
@@ -24,6 +26,7 @@ struct AppAccentTests {
 
     @Test("labels map to their plain names")
     func labelMapping() {
+        #expect(AppAccent.slate.label == "Slate")
         #expect(AppAccent.terracotta.label == "Terracotta")
         #expect(AppAccent.blue.label == "Blue")
         #expect(AppAccent.graphite.label == "Graphite")
@@ -34,10 +37,22 @@ struct AppAccentTests {
         #expect(AppAccent.storageKey == "appAccentColor")
     }
 
-    @Test("current defaults to terracotta when nothing is stored")
+    @Test("current defaults to slate when nothing is stored")
     func currentDefault() {
         withDefaults { _ in
-            #expect(AppAccent.current == .terracotta)
+            #expect(AppAccent.current == .slate)
+            #expect(AppAccent.defaultAccent == .slate)
+        }
+    }
+
+    /// The migration rule: a stored preset outranks the new default, terracotta included.
+    @Test("current keeps a stored preset rather than moving it to the new default")
+    func currentKeepsStoredPreset() {
+        for accent in AppAccent.allCases {
+            withDefaults { defaults in
+                defaults.set(accent.rawValue, forKey: AppAccent.storageKey)
+                #expect(AppAccent.current == accent)
+            }
         }
     }
 
@@ -49,11 +64,11 @@ struct AppAccentTests {
         }
     }
 
-    @Test("current falls back to terracotta for an unrecognized raw value")
+    @Test("current falls back to the default for an unrecognized raw value")
     func currentRejectsGarbage() {
         withDefaults { defaults in
             defaults.set("chartreuse", forKey: AppAccent.storageKey)
-            #expect(AppAccent.current == .terracotta)
+            #expect(AppAccent.current == .defaultAccent)
         }
     }
 
@@ -61,6 +76,31 @@ struct AppAccentTests {
     func rawValueRoundTrip() {
         for accent in AppAccent.allCases {
             #expect(AppAccent(rawValue: accent.rawValue) == accent)
+        }
+    }
+
+    /// One stored string feeds both enums, so a case in one and not the other would silently resolve to the default.
+    @Test("every case names a theme preset, in the same order, with the same default")
+    func presetsAgree() {
+        #expect(AppAccent.allCases.map(\.rawValue) == ThemePreset.allCases.map(\.rawValue))
+        #expect(AppAccent.defaultAccent.rawValue == ThemePreset.defaultPreset.rawValue)
+        for accent in AppAccent.allCases {
+            #expect(accent.preset.rawValue == accent.rawValue)
+        }
+    }
+
+    @Test("the accent colour resolves to the preset's values, not the asset catalog's")
+    func colorFollowsThePreset() throws {
+        let aqua = try #require(NSAppearance(named: .aqua))
+        let night = try #require(NSAppearance(named: .darkAqua))
+        for accent in AppAccent.allCases {
+            let expected = accent.preset.accent.appearanceVariants
+            var light = RGBA(0, 0, 0)
+            var dark = RGBA(0, 0, 0)
+            aqua.performAsCurrentDrawingAppearance { light = RGBA(accent.color) }
+            night.performAsCurrentDrawingAppearance { dark = RGBA(accent.color) }
+            #expect(light.hex == expected.light.hex, "\(accent.rawValue) light")
+            #expect(dark.hex == expected.dark.hex, "\(accent.rawValue) dark")
         }
     }
 }

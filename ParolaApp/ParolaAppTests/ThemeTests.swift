@@ -103,10 +103,43 @@ struct ThemePaletteTests {
 
     @Test("preset labels map to the marketing names")
     func presetLabelMapping() {
+        #expect(ThemePreset.slate.label == "Slate")
         #expect(ThemePreset.terracotta.label == "Terracotta")
         #expect(ThemePreset.blue.label == "Ocean")
+        #expect(ThemePreset.teal.label == "Sea")
+        #expect(ThemePreset.sage.label == "Sage")
+        #expect(ThemePreset.indigo.label == "Indigo")
         #expect(ThemePreset.mint.label == "Forest")
         #expect(ThemePreset.graphite.label == "Mono")
+    }
+
+    /// The Customization pane draws `allCases` in order, so declaration order is the swatch order: the default first.
+    @Test("slate is the default and leads the swatch row")
+    func defaultPresetLeadsTheRow() {
+        #expect(ThemePreset.defaultPreset == .slate)
+        #expect(ThemePreset.allCases.map(\.rawValue) == [
+            "slate", "terracotta", "blue", "teal", "sage", "indigo",
+            "mint", "purple", "pink", "yellow", "graphite",
+        ])
+    }
+
+    @Test("the accents the owner picked keep the values they were shot with")
+    func pinnedAccentValues() throws {
+        let expected: [ThemePreset: (light: RGBA, dark: RGBA)] = [
+            .slate: (RGBA(0.33, 0.45, 0.62), RGBA(0.52, 0.64, 0.80)),
+            .terracotta: (RGBA(0.78, 0.42, 0.25), RGBA(0.93, 0.58, 0.41)),
+            .teal: (RGBA(0.13, 0.52, 0.58), RGBA(0.33, 0.70, 0.76)),
+            .sage: (RGBA(0.36, 0.53, 0.42), RGBA(0.55, 0.72, 0.60)),
+            .indigo: (RGBA(0.35, 0.34, 0.84), RGBA(0.49, 0.48, 0.93)),
+        ]
+        for (preset, values) in expected {
+            guard case .dynamic(let light, let dark) = preset.accent else {
+                Issue.record("\(preset.rawValue) is expected to be a dynamic color")
+                continue
+            }
+            #expect(light == values.light, "\(preset.rawValue) light")
+            #expect(dark == values.dark, "\(preset.rawValue) dark")
+        }
     }
 
     @Test("a preset palette uses the system primary color and the shared neutrals")
