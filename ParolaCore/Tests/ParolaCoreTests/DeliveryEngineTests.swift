@@ -8,7 +8,12 @@ import ParolaTestSupport
 // .logFacade: every attempt writes a ParolaLog line, which would otherwise land in a sink another
 // suite installed process-wide while it asserts on what it wrote.
 @Suite("Delivery engine", .serialized, .tags(.fileSystem), .logFacade)
-struct DeliveryEngineTests {
+final class DeliveryEngineTests {
+    private var tempDirectories: [URL] = []
+
+    deinit {
+        for url in tempDirectories { try? FileManager.default.removeItem(at: url) }
+    }
 
     // MARK: - Rig
 
@@ -16,6 +21,7 @@ struct DeliveryEngineTests {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-delivery-engine-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        tempDirectories.append(dir)
         return DeliveryQueueStore(directory: dir)
     }
 
