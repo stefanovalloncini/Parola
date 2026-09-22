@@ -175,7 +175,7 @@ struct LanguageModelSelectionTests {
 
     @Test("a cloud choice without a key fails instead of falling back")
     func cloudWithoutKey() async throws {
-        try await withMocks([:]) {
+        _ = try await withMocks([:]) {
             await #expect(throws: CloudLLMError.self) {
                 _ = try await answer(.cloud(provider: .openAI, model: "gpt-4o-mini"))
             }
