@@ -81,6 +81,8 @@ public struct ModelVariant: Sendable, Hashable, Identifiable, Codable {
     public let displayName: String
     public let tagline: String
     public let engineID: EngineID
+    /// What the install takes on disk: the files this variant needs, not the size of the repository
+    /// they are fetched from, which can hold several formats of the same weights.
     public let sizeBytes: Int64
     public let downloadSource: ModelDownloadSource
     public let category: ModelCategory
