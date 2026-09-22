@@ -77,7 +77,6 @@ struct JobRow: View {
     var cancel: JobCancelAction?
 
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
 
     /// Only the sidebar's selection is a solid accent fill; the pages wash theirs, where onAccent would vanish.
@@ -107,10 +106,8 @@ struct JobRow: View {
         .padding(.vertical, compact ? DS.Spacing.tight : DS.Spacing.small)
         .padding(.horizontal, compact ? 0 : DS.Spacing.small)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(rowBackground)
+        .rowChrome(selected: isSelected, hovered: isHovering, selection: selection)
         .clipShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
-        .contentShape(Rectangle())
-        .animation(reduceMotion ? nil : DS.Motion.rowState, value: isHovering)
         .onHover { isHovering = $0 }
     }
 
@@ -161,18 +158,9 @@ struct JobRow: View {
         .axLeaf(axID)
     }
 
-    @ViewBuilder
-    private var rowBackground: some View {
-        if isSelected, !compact {
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(DS.Color.accent.opacity(0.12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .strokeBorder(DS.Color.accent.opacity(0.35), lineWidth: 1)
-                )
-        } else if isHovering {
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(DS.Palette.surfaceHover)
-        }
+    private var selection: RowSelectionStyle {
+        compact
+            ? .native
+            : .wash(fill: DS.Color.selectionWash, border: DS.Color.accent.opacity(0.35))
     }
 }

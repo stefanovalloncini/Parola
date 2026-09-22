@@ -65,7 +65,6 @@ struct RecordRow: View {
     static let valueWidth: CGFloat = 120
 
     @State private var hovered = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func activate() {
         open(record.entry.id)
@@ -94,16 +93,11 @@ struct RecordRow: View {
             }
             .padding(.horizontal, DS.Spacing.small)
             .padding(.vertical, DS.Spacing.snug)
-            .background(
-                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                    .fill(hovered ? DS.Palette.surfaceHover : .clear)
-            )
-            .contentShape(Rectangle())
+            .rowChrome(selected: false, hovered: hovered, selection: .native)
         }
         .buttonStyle(.plain)
         .pointerStyle(.link)
         .onHover { hovered = $0 }
-        .animation(reduceMotion ? nil : DS.Motion.rowState, value: hovered)
         .axLeaf(record.kind.axID)
     }
 }

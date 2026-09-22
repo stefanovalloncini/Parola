@@ -12,7 +12,6 @@ struct RecentlyDeletedRow: View {
     let onPurge: () -> Void
     private let helpText: String
     @State private var hovered = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.backgroundProminence) private var backgroundProminence
 
     init(
@@ -48,9 +47,7 @@ struct RecentlyDeletedRow: View {
             )
             expiryBar
         }
-        .background(hoverWash)
-        .animation(reduceMotion ? nil : DS.Motion.rowState, value: hovered)
-        .contentShape(Rectangle())
+        .rowChrome(selected: isSelected, hovered: hovered, selection: .native)
         .onHover { hovered = $0 }
         .contextMenu {
             Button { onRestore() } label: {
@@ -70,14 +67,6 @@ struct RecentlyDeletedRow: View {
     static func previewText(_ preview: String?) -> String {
         guard let preview else { return String(localized: "Loading preview…") }
         return preview.isEmpty ? String(localized: "No transcript text.") : preview
-    }
-
-    @ViewBuilder
-    private var hoverWash: some View {
-        if hovered, !isSelected {
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(DS.Palette.surfaceHover)
-        }
     }
 
     private var countdown: some View {

@@ -116,7 +116,6 @@ struct SidebarRowLabel: View {
     static let badgeSide: CGFloat = 20
 
     @State private var isHovering = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: DS.Spacing.small) {
@@ -158,27 +157,20 @@ struct SidebarRowLabel: View {
         .padding(.horizontal, DS.Spacing.small)
         .frame(height: height)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(rowBackground)
-        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                .strokeBorder(borderColor, lineWidth: 1)
+        )
+        .rowChrome(
+            selected: isSelected,
+            hovered: isHovering,
+            selection: .prominent(fill: DS.Color.accent.opacity(0.85))
+        )
         .onHover { isHovering = $0 }
     }
 
     private var icon: some View {
         Image(systemName: systemImage)
-    }
-
-    // One shape with an animatable fill: the three states have to interpolate, not swap views.
-    private var rowBackground: some View {
-        RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-            .fill(rowFill)
-            .strokeBorder(borderColor, lineWidth: 1)
-            .animation(reduceMotion ? nil : DS.Motion.rowState, value: rowFill)
-    }
-
-    private var rowFill: Color {
-        if isSelected { return DS.Color.accent.opacity(0.85) }
-        if isHovering { return DS.Palette.surfaceHover }
-        return .clear
     }
 
     private var borderColor: Color {

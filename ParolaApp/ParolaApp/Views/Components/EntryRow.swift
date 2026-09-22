@@ -123,7 +123,6 @@ struct EntryRow<Accessory: View, Actions: View>: View {
 
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.backgroundProminence) private var backgroundProminence
     @State private var isHovering = false
 
@@ -191,9 +190,8 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         .padding(.vertical, compact ? DS.Spacing.tight : DS.Spacing.small)
         .frame(height: rowHeight, alignment: .top)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(rowBackground)
+        .rowChrome(selected: isSelected, hovered: showsHoverFill, selection: .native)
         .help(help ?? display.tooltip)
-        .animation(reduceMotion ? nil : DS.Motion.rowState, value: isHovering)
         .onHover { isHovering = $0 }
     }
 
@@ -248,17 +246,10 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         }
     }
 
-    @ViewBuilder
-    private var rowBackground: some View {
-        switch style {
-        case .list:
-            if drawsHover, isHovering, !isSelected {
-                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                    .fill(DS.Palette.surfaceHover)
-            }
-        case .home:
-            EmptyView()
-        }
+    /// Home paints its own hover around the row it wraps, so the `.home` style draws none here.
+    private var showsHoverFill: Bool {
+        guard case .list = style else { return false }
+        return drawsHover && isHovering
     }
 
     private var noteChip: some View {
