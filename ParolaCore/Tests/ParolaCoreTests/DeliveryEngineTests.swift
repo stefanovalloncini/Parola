@@ -473,7 +473,7 @@ struct DeliveryLogTests {
     }
 
     @Test("a queue and a log that will not decode read as empty, and say so in the log")
-    func corruptFilesReadAsEmpty() async throws {
+    func corruptFilesReadAsEmpty() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-delivery-corrupt-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -483,7 +483,7 @@ struct DeliveryLogTests {
         try Data("{ not json".utf8).write(to: store.logURL)
 
         let sink = CapturingDiagnosticsSink()
-        await ParolaLog.withSink(sink) {
+        ParolaLog.withSink(sink) {
             #expect(store.loadQueue().isEmpty)
             #expect(store.loadLog().entries.isEmpty)
         }
@@ -492,7 +492,7 @@ struct DeliveryLogTests {
     }
 
     @Test("a queue that cannot be written is logged rather than lost in silence")
-    func unwritableQueueIsLogged() async throws {
+    func unwritableQueueIsLogged() throws {
         let blocked = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-delivery-blocked-\(UUID().uuidString)")
         try Data("not a directory".utf8).write(to: blocked)
@@ -500,7 +500,7 @@ struct DeliveryLogTests {
         let store = DeliveryQueueStore(directory: blocked)
 
         let sink = CapturingDiagnosticsSink()
-        await ParolaLog.withSink(sink) {
+        ParolaLog.withSink(sink) {
             store.save(queue: [
                 QueuedDelivery(entryID: "entry-1", destinationID: UUID(), attempt: 1, nextAttemptAt: Date())
             ])
