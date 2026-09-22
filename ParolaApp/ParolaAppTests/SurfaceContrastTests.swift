@@ -276,10 +276,10 @@ struct SurfaceContrastTests {
         #expect(light >= 3, "light playhead word: \(light)")
     }
 
-    /// A solid-accent selection is under text AA by ruling; the tier below its title still needs a floor,
-    /// measured where the popover draws it — `onAccentSecondary` on `accent × selectionProminentTint`.
-    @Test("the second tier on a chosen row cannot drift below the prominent fill's floor")
-    func onAccentSecondaryOnTheProminentFill() throws {
+    /// A solid-accent selection is under text AA by ruling, so the inks below its title carry floors of their
+    /// own: the subtitle tier on `accent × selectionProminentTint`, and the count badge set straight on it.
+    @Test("the ink tiers on a chosen row each keep their floor")
+    func inkTiersOnTheProminentFill() throws {
         let accent = try #require(Self.pair(ThemePreset.defaultPreset.palette.accent))
         let ground = try #require(Self.pair(ThemePalette.sharedNeutrals.surfaceElevated))
         for (scheme, behind, tint) in [
@@ -290,13 +290,9 @@ struct SurfaceContrastTests {
             let second = fill.blended(toward: tint.legibleForeground, amount: DS.Color.onAccentSecondaryTint)
             #expect(second.contrast(against: fill) >= 2.75, "\(scheme): \(second.contrast(against: fill))")
 
-            // The badge is full `onAccent` on a pill that only lightens the fill under it, so it reads against the row.
-            let ink = tint.legibleForeground
-            let pill = fill.blended(toward: ink, amount: DS.Color.onAccentWashTint)
-            #expect(
-                ink.contrast(against: fill) >= 3,
-                "\(scheme) badge ink on the row \(ink.contrast(against: fill)), on its own pill \(ink.contrast(against: pill))"
-            )
+            // A chosen row's count badge has no pill of its own: the digit is set straight on the fill.
+            let badge = tint.legibleForeground
+            #expect(badge.contrast(against: fill) >= 3, "\(scheme) badge: \(badge.contrast(against: fill))")
         }
     }
 

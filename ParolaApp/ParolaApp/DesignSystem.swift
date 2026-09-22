@@ -162,10 +162,7 @@ enum DS {
         static let onAccentSecondaryTint = 0.9
 
         /// The backing a badge, tile or glyph keeps when it sits on an accent fill.
-        static var onAccentWash: SwiftUI.Color { DS.resolved.onAccent.opacity(onAccentWashTint) }
-
-        /// Its strength on its own, for the contrast test that blends it itself.
-        static let onAccentWashTint = 0.18
+        static var onAccentWash: SwiftUI.Color { DS.resolved.onAccent.opacity(0.18) }
 
         /// The accent as small text on a surface, darkened or lightened until it clears AA.
         static var accentText: SwiftUI.Color { DS.resolved.accentText }

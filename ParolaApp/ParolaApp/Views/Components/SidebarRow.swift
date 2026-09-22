@@ -149,12 +149,9 @@ struct SidebarRowLabel: View {
                     .foregroundStyle(isSelected ? DS.Color.onAccent : .secondary)
                     .padding(.horizontal, DS.Spacing.snug)
                     .padding(.vertical, 1)
+                    // No pill when chosen: it is a lightened copy of the fill under it, so it only costs the digit contrast.
                     .background(
-                        Capsule().fill(
-                            isSelected
-                                ? DS.Color.onAccentWash
-                                : Color.primary.opacity(0.10)
-                        )
+                        Capsule().fill(isSelected ? Color.clear : Color.primary.opacity(0.10))
                     )
             }
         }
