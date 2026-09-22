@@ -26,17 +26,15 @@ struct Models: AsyncParsableCommand {
             let store = ModelStore.shared
             let catalogEntries = store.catalog()
             let installedNames = Set(catalogEntries.filter(\.isInstalled).map(\.name))
-            let listedIDs = Set(ModelCatalog.listedVariants(isInstalled: installedNames.contains).map(\.id))
-            let entries = catalogEntries.filter { listedIDs.contains($0.name) }
+            let entries = Self.listedRows(catalogEntries)
 
             if json {
-                let data = try JSONEncoder.pretty.encode(entries)
-                print(String(decoding: data, as: UTF8.self))
+                print(try Self.jsonText(entries))
                 return
             }
 
             if flat {
-                printFlat(entries)
+                for line in Self.flatLines(entries) { print(line) }
                 return
             }
 
@@ -89,15 +87,27 @@ struct Models: AsyncParsableCommand {
             }
         }
 
-        private func printFlat(_ entries: [ModelInfo]) {
+        /// The catalog rows every one of the three listings is built from, under the rule the app's
+        /// pickers use: a variant that is only offered once installed is not listed until it is.
+        static func listedRows(_ catalog: [ModelInfo]) -> [ModelInfo] {
+            let installed = Set(catalog.filter(\.isInstalled).map(\.name))
+            let listed = Set(ModelCatalog.listedVariants(isInstalled: installed.contains).map(\.id))
+            return catalog.filter { listed.contains($0.name) }
+        }
+
+        static func jsonText(_ entries: [ModelInfo]) throws -> String {
+            String(decoding: try JSONEncoder.pretty.encode(entries), as: UTF8.self)
+        }
+
+        static func flatLines(_ entries: [ModelInfo]) -> [String] {
             let labelWidth = (entries.map { $0.label.count }.max() ?? 0) + 2
             let nameWidth = (entries.map { $0.name.count }.max() ?? 0) + 2
-            for m in entries {
+            return entries.map { m in
                 let mark = m.isInstalled ? "✓" : " "
                 let size = m.approximateSizeBytes.map(humanBytes) ?? "—"
                 let label = m.label.padding(toLength: labelWidth, withPad: " ", startingAt: 0)
                 let name = m.name.padding(toLength: nameWidth, withPad: " ", startingAt: 0)
-                print("\(mark)  \(name)\(label)\(size)")
+                return "\(mark)  \(name)\(label)\(size)"
             }
         }
     }
