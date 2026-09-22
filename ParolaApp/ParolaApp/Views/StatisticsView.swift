@@ -41,7 +41,6 @@ struct StatisticsView: View {
     private var header: some View {
         PageHeader(
             title: "Statistics",
-            prominence: .display,
             subtitle: stats.map {
                 StatisticsCopy.subtitle(entries: $0.totals.entries, audioSeconds: $0.totals.audioSeconds)
             }

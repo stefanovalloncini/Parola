@@ -1,29 +1,8 @@
 import SwiftUI
 
-/// How loud a page title reads: `display` is for a page that is one big readout rather than a list.
-enum PageHeaderProminence {
-    case standard
-    case display
-
-    var font: Font {
-        switch self {
-        case .standard: DS.Font.title
-        case .display: DS.Font.display
-        }
-    }
-
-    var tracking: CGFloat {
-        switch self {
-        case .standard: 0
-        case .display: DS.Tracking.display
-        }
-    }
-}
-
 /// Ax ids for anything inside `leading`/`trailing` are the caller's own — this view adds no branch of its own.
 struct PageHeader<Leading: View, Trailing: View>: View {
     let title: Text
-    let prominence: PageHeaderProminence
     let subtitle: String?
     let subtitleHelp: String?
     let subtitleAxID: String?
@@ -32,7 +11,6 @@ struct PageHeader<Leading: View, Trailing: View>: View {
 
     init(
         title: LocalizedStringKey,
-        prominence: PageHeaderProminence = .standard,
         subtitle: String? = nil,
         subtitleHelp: String? = nil,
         subtitleAxID: String? = nil,
@@ -40,7 +18,6 @@ struct PageHeader<Leading: View, Trailing: View>: View {
         @ViewBuilder trailing: () -> Trailing
     ) {
         self.title = Text(title)
-        self.prominence = prominence
         self.subtitle = subtitle
         self.subtitleHelp = subtitleHelp
         self.subtitleAxID = subtitleAxID
@@ -52,7 +29,6 @@ struct PageHeader<Leading: View, Trailing: View>: View {
     @_disfavoredOverload
     init(
         title: String,
-        prominence: PageHeaderProminence = .standard,
         subtitle: String? = nil,
         subtitleHelp: String? = nil,
         subtitleAxID: String? = nil,
@@ -60,7 +36,6 @@ struct PageHeader<Leading: View, Trailing: View>: View {
         @ViewBuilder trailing: () -> Trailing
     ) {
         self.title = Text(verbatim: title)
-        self.prominence = prominence
         self.subtitle = subtitle
         self.subtitleHelp = subtitleHelp
         self.subtitleAxID = subtitleAxID
@@ -75,8 +50,8 @@ struct PageHeader<Leading: View, Trailing: View>: View {
             HStack(spacing: DS.Spacing.regular) {
                 // A locale that runs long truncates the title rather than growing the header to two lines.
                 title
-                    .font(prominence.font)
-                    .tracking(prominence.tracking)
+                    .font(DS.Font.display)
+                    .tracking(DS.Tracking.display)
                     .foregroundStyle(DS.Color.primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -112,7 +87,6 @@ struct PageHeader<Leading: View, Trailing: View>: View {
 extension PageHeader where Leading == EmptyView {
     init(
         title: LocalizedStringKey,
-        prominence: PageHeaderProminence = .standard,
         subtitle: String? = nil,
         subtitleHelp: String? = nil,
         subtitleAxID: String? = nil,
@@ -120,7 +94,6 @@ extension PageHeader where Leading == EmptyView {
     ) {
         self.init(
             title: title,
-            prominence: prominence,
             subtitle: subtitle,
             subtitleHelp: subtitleHelp,
             subtitleAxID: subtitleAxID,
@@ -132,7 +105,6 @@ extension PageHeader where Leading == EmptyView {
     @_disfavoredOverload
     init(
         title: String,
-        prominence: PageHeaderProminence = .standard,
         subtitle: String? = nil,
         subtitleHelp: String? = nil,
         subtitleAxID: String? = nil,
@@ -140,7 +112,6 @@ extension PageHeader where Leading == EmptyView {
     ) {
         self.init(
             title: title,
-            prominence: prominence,
             subtitle: subtitle,
             subtitleHelp: subtitleHelp,
             subtitleAxID: subtitleAxID,
