@@ -353,6 +353,28 @@ struct LibraryCommandsTests {
         #expect(options["includeSpeakers"] == .bool(true))
     }
 
+    @Test("setSummaryOptions puts a field back to its default when the call sends null")
+    func setSummaryOptionsNullClearsAField() async throws {
+        let (model, server, context, commands) = try makeRig()
+        var initial = SummaryOptions.default
+        initial.bulletPoints = true
+        initial.outputLanguage = "it"
+        model.summaryOptions = initial
+        let command = try #require(commands["setSummaryOptions"])
+
+        _ = try await command.handler(
+            try command.validate(
+                AutomationArgs(["options": .object(["bulletPoints": .null, "outputLanguage": .null])])
+            ),
+            context
+        )
+        withExtendedLifetime(server) {}
+
+        #expect(model.summaryOptions.bulletPoints == false, "null clears a Bool back to its default")
+        #expect(model.summaryOptions.outputLanguage == nil)
+        #expect(model.summaryOptions.includeTimestamps, "the fields the call did not mention keep their value")
+    }
+
     @Test("setSummaryOptions rejects an options object that cannot decode as SummaryOptions")
     func setSummaryOptionsRejectsMalformedInput() async throws {
         let (model, server, context, commands) = try makeRig()

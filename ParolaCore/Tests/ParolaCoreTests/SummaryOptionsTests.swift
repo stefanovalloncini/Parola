@@ -11,6 +11,16 @@ struct SummaryOptionsTests {
         #expect(o.outputLanguage == nil && o.customPrompt == nil)
     }
 
+    @Test("options saved before a field existed decode with that field's default")
+    func partialObjectDecodesWithDefaults() throws {
+        let stored = Data(#"{"includeSpeakers":true,"outputLanguage":"it"}"#.utf8)
+        let decoded = try JSONDecoder().decode(SummaryOptions.self, from: stored)
+        #expect(decoded.includeSpeakers && decoded.outputLanguage == "it")
+        #expect(decoded.includeTimestamps && decoded.sections && decoded.actionItems)
+        #expect(!decoded.bulletPoints && !decoded.keyPointsOnly && decoded.customPrompt == nil)
+        #expect(try JSONDecoder().decode(SummaryOptions.self, from: Data("{}".utf8)) == .default)
+    }
+
     @Test("instructions follow the flags and never drop the format contract")
     func instructionsFollowFlags() {
         var o = SummaryOptions.default

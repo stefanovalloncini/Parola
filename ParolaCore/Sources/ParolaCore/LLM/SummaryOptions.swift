@@ -30,5 +30,17 @@ public struct SummaryOptions: Codable, Sendable, Equatable {
         self.customPrompt = customPrompt
     }
 
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        includeTimestamps = try c.decodeIfPresent(Bool.self, forKey: .includeTimestamps) ?? true
+        includeSpeakers = try c.decodeIfPresent(Bool.self, forKey: .includeSpeakers) ?? false
+        sections = try c.decodeIfPresent(Bool.self, forKey: .sections) ?? true
+        bulletPoints = try c.decodeIfPresent(Bool.self, forKey: .bulletPoints) ?? false
+        actionItems = try c.decodeIfPresent(Bool.self, forKey: .actionItems) ?? true
+        keyPointsOnly = try c.decodeIfPresent(Bool.self, forKey: .keyPointsOnly) ?? false
+        outputLanguage = try c.decodeIfPresent(String.self, forKey: .outputLanguage)
+        customPrompt = try c.decodeIfPresent(String.self, forKey: .customPrompt)
+    }
+
     public static let `default` = SummaryOptions()
 }
