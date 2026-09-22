@@ -92,12 +92,12 @@ private struct EntryViewerSegmentRow: View {
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.regular)
-        .background(isCurrent ? DS.Color.highlight.opacity(0.10) : DS.Color.surfaceElevated)
+        .background(isCurrent ? DS.Color.highlight.opacity(SegmentCard.currentCardTint) : DS.Color.surfaceElevated)
         .overlay(
             RoundedRectangle(cornerRadius: DS.Radius.regular)
                 .stroke(
-                    isCurrent ? DS.Color.highlight.opacity(0.55) : DS.Color.separator.opacity(0.6),
-                    lineWidth: isCurrent ? 1.5 : 1
+                    SegmentCard.borderColor(isCurrent: isCurrent),
+                    lineWidth: SegmentCard.borderWidth(isCurrent: isCurrent)
                 )
         )
         .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular))

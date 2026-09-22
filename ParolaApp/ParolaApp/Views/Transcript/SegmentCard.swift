@@ -67,7 +67,10 @@ struct SegmentCard: View {
         }
         .overlay(
             RoundedRectangle(cornerRadius: radius)
-                .stroke(borderColor, lineWidth: isCurrent ? 1.5 : 1)
+                .stroke(
+                    Self.borderColor(isCurrent: isCurrent, hovering: hovering),
+                    lineWidth: Self.borderWidth(isCurrent: isCurrent)
+                )
         )
         .overlay(alignment: .leading) {
             if let bucket = confidenceBucket {
@@ -255,18 +258,21 @@ struct SegmentCard: View {
     /// How much highlight the card under the playhead carries; the lit word is set on the result, so the contrast table pins it.
     static let currentCardTint = 0.10
 
+    /// The viewer window draws the same card, so its outline is defined here rather than copied there.
+    static func borderColor(isCurrent: Bool, hovering: Bool = false) -> Color {
+        if isCurrent { return DS.Color.highlight.opacity(0.55) }
+        if hovering { return DS.Color.accent.opacity(0.25) }
+        return DS.Color.separator.opacity(0.6)
+    }
+
+    static func borderWidth(isCurrent: Bool) -> CGFloat { isCurrent ? 1.5 : 1 }
+
     private var cardBackground: Color {
         isCurrent ? DS.Color.highlight.opacity(Self.currentCardTint) : DS.Color.surfaceElevated
     }
 
     private func confidenceColor(_ bucket: SegmentConfidence.Bucket) -> Color {
         DS.confidenceColor(for: bucket).opacity(0.7)
-    }
-
-    private var borderColor: Color {
-        if isCurrent { return DS.Color.highlight.opacity(0.55) }
-        if hovering { return DS.Color.accent.opacity(0.25) }
-        return DS.Color.separator.opacity(0.6)
     }
 
     @ViewBuilder
