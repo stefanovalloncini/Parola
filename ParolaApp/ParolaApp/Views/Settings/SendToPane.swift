@@ -26,7 +26,7 @@ struct SendToPane: View {
 
             addMenu
 
-            SettingHelper(text: "A destination writes a Markdown note when you send a transcript to it. Turn on Send automatically to write one as soon as a transcription finishes.")
+            SettingHelper(text: "A destination writes a Markdown note when you send a transcript to it. Turn on Send automatically to write one as soon as a transcription finishes. A batch run is not sent automatically.")
 
             ResetPaneButton(scope: .sendTo)
         }

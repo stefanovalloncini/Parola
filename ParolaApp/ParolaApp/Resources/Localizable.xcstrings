@@ -921,13 +921,13 @@
         }
       }
     },
-    "A destination writes a Markdown note when you send a transcript to it. Turn on Send automatically to write one as soon as a transcription finishes.": {
+    "A destination writes a Markdown note when you send a transcript to it. Turn on Send automatically to write one as soon as a transcription finishes. A batch run is not sent automatically.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Una destinazione scrive una nota Markdown quando le mandi una trascrizione. Attiva Invia automaticamente per scriverla appena la trascrizione è pronta."
+            "value": "Una destinazione scrive una nota Markdown quando le mandi una trascrizione. Attiva Invia automaticamente per scriverla appena la trascrizione è pronta. Un batch non viene inviato automaticamente."
           }
         }
       }
