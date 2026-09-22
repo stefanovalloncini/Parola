@@ -1,0 +1,33 @@
+# Parola website
+
+The marketing site for Parola. Astro, TypeScript and plain CSS, built to static files.
+
+## Work on it
+
+```sh
+pnpm install
+pnpm dev
+```
+
+`pnpm gate` runs everything a commit needs: type check, lint, formatting, the copy check,
+the build and the Playwright tests.
+
+## Assets
+
+- `src/assets/shots/` holds captures of the real app, 1180 × 760 pt at 2x.
+- The karaoke card reads the app's own demo clip from
+  `ParolaApp/ParolaApp/Resources/Introduction/`, so a new recording there shows up here too.
+- `pnpm brand` redraws `public/favicon.svg` and `public/apple-touch-icon.png` from the icon's bar
+  geometry in `src/data/brand.ts`.
+- `pnpm og` renders `public/og.png` from `/og-card` while `pnpm dev` is running.
+
+## Deploy
+
+The build in `dist/` is plain static files. `wrangler.jsonc` serves it from Cloudflare:
+
+```sh
+SITE_URL=https://example.com pnpm build
+pnpm dlx wrangler deploy
+```
+
+Set `SITE_URL` to the real domain so canonical links and the social card use absolute URLs.

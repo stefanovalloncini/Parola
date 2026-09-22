@@ -19,7 +19,9 @@
     "format:check": "prettier --check .",
     "check:copy": "bash scripts/check-copy.sh",
     "test": "playwright test",
-    "gate": "pnpm check && pnpm lint && pnpm format:check && pnpm check:copy && pnpm build && pnpm test"
+    "gate": "pnpm check && pnpm lint && pnpm format:check && pnpm check:copy && pnpm build && pnpm test",
+    "brand": "node --experimental-strip-types scripts/brand-assets.ts",
+    "og": "node --experimental-strip-types scripts/og-image.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

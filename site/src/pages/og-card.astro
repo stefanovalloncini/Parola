@@ -1,0 +1,88 @@
+---
+import "../styles/global.css";
+import BrandIcon from "../components/BrandIcon.astro";
+import { barFractions } from "../data/brand";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Parola social card</title>
+  </head>
+  <body>
+    <div class="card">
+      <p class="brand"><BrandIcon size={56} /> Parola</p>
+      <h1>Audio, <span class="mark">written down</span>.</h1>
+      <p class="sub">Speech to text on your Mac. Free and open source.</p>
+      <div class="bars" aria-hidden="true">
+        {barFractions.map((fraction) => <i style={`--h: ${fraction}`} />)}
+      </div>
+    </div>
+  </body>
+</html>
+
+<style>
+  body {
+    margin: 0;
+  }
+
+  .card {
+    position: relative;
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+    padding: 72px 80px;
+    box-sizing: border-box;
+    background:
+      radial-gradient(60% 70% at 100% 100%, rgb(107 138 107 / 0.3), transparent 70%),
+      linear-gradient(180deg, #fff 40%, #e8efe6);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: var(--font-display);
+    font-size: 34px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  h1 {
+    margin-top: 96px;
+    font-family: var(--font-display);
+    font-size: 104px;
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: -0.035em;
+    color: var(--ink);
+  }
+
+  .sub {
+    margin-top: 28px;
+    font-size: 34px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .bars {
+    position: absolute;
+    right: 88px;
+    top: 58px;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    height: 132px;
+  }
+
+  .bars i {
+    width: 14px;
+    height: calc(var(--h) * 100%);
+    border-radius: 8px;
+    background: var(--sage);
+    opacity: 0.9;
+  }
+</style>

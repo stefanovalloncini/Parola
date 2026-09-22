@@ -80,6 +80,16 @@ import StoryProps from "./StoryProps.astro";
     font-size: min(clamp(40px, 5.2vw + 8px, 68px), 8.4vh);
   }
 
+  @media (max-width: 720px) {
+    .story {
+      --device-top: clamp(300px, 50vh, 470px);
+    }
+
+    .beats {
+      gap: clamp(64px, 16vh, 140px);
+    }
+  }
+
   .track {
     position: absolute;
     inset: 0;
