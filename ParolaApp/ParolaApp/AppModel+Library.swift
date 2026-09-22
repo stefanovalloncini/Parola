@@ -82,9 +82,15 @@ extension AppModel {
     }
 
     /// `refreshLibrary()` is fire-and-forget; this awaits the scan so a caller sees `libraryEntries` updated before it returns.
+    /// A concurrent `refreshLibrary()` cancels and replaces the task, and a cancelled scan returns
+    /// without publishing — so wait again rather than answer from the listing it left behind.
     func refreshLibraryAndWait() async {
-        refreshLibrary()
-        await libraryRefreshTask?.value
+        repeat {
+            refreshLibrary()
+            guard let task = libraryRefreshTask else { return }
+            await task.value
+            if !task.isCancelled { return }
+        } while !Task.isCancelled
     }
 
     /// Rows quote a transcript's first lines; the index is the only place that text is already in memory.
@@ -333,13 +339,12 @@ extension AppModel {
     func toggleSegmentFavorite(_ id: Int) {
         guard selectedEntryID != nil else { return }
         let makeFavorite = !isSegmentFavorite(id)
-        clearFavoritesOnlyIfEmptied(unfavoriting: id, isFavorite: makeFavorite)
         Task { [weak self] in
             guard let self else { return }
             do {
                 try await setSegmentFavorite(id, isFavorite: makeFavorite)
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                nonFatalWarning = error.localizedDescription
             }
         }
     }
@@ -369,7 +374,7 @@ extension AppModel {
             do {
                 try await library.setFavoriteSegments(ids, for: entryID)
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                nonFatalWarning = error.localizedDescription
             }
             refreshLibrary()
         }
