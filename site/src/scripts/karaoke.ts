@@ -30,11 +30,10 @@ export function watchKaraoke(root: HTMLElement): void {
       word.el.classList.toggle("is-current", time >= word.start && time < word.end);
     }
     const centre = (bars.length - 1) / 2;
+    const resting = time >= duration;
     bars.forEach((bar, index) => {
-      const value = Math.min(
-        Math.max(level(time - Math.abs(index - centre) * levelLagPerBar), 0),
-        1,
-      );
+      const lag = Math.abs(index - centre) * levelLagPerBar;
+      const value = resting ? 1 : Math.min(Math.max(level(time - lag), 0), 1);
       bar.style.transform = `scaleY(${0.35 + 0.65 * value})`;
     });
   };
