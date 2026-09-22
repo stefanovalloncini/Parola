@@ -167,6 +167,7 @@ public struct ObsidianVaultFolderDestination: DeliveryDestination, Codable, Send
     /// stale flag is optional: a stale bookmark still resolves, and this type cannot re-mint one.
     func resolvedVaultURL() throws -> URL {
         guard !vaultBookmark.isEmpty else { throw DeliveryError.vaultUnavailable(name, vaultPath) }
+        #if os(macOS)
         if let url = try? NSURL(
             resolvingBookmarkData: vaultBookmark,
             options: .withSecurityScope,
@@ -175,6 +176,7 @@ public struct ObsidianVaultFolderDestination: DeliveryDestination, Codable, Send
         ) as URL {
             return url
         }
+        #endif
         if let url = try? NSURL(
             resolvingBookmarkData: vaultBookmark,
             options: [],
@@ -189,11 +191,13 @@ public struct ObsidianVaultFolderDestination: DeliveryDestination, Codable, Send
     /// A bookmark for a folder the user picked. Security-scoped where the process can mint one,
     /// plain where it cannot — the app is not sandboxed, so a plain bookmark still resolves.
     public static func bookmark(for url: URL) throws -> Data {
+        #if os(macOS)
         if let scoped = try? url.bookmarkData(
             options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil
         ) {
             return scoped
         }
+        #endif
         return try url.bookmarkData(includingResourceValuesForKeys: nil, relativeTo: nil)
     }
 
