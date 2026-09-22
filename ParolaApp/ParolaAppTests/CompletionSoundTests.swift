@@ -99,6 +99,73 @@ struct CompletionSoundTests {
         model.clearBatch()
     }
 
+    @Test("a batch that ends with a failure still rings once for the run")
+    func batchRingsWhateverTheOutcomeMix() async throws {
+        let (model, sound) = makeRig("sound-batch-mixed")
+        model.batchExportPresetIDs = []
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CompletionSoundTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let good = scratch.appendingPathComponent("good.wav")
+        let bad = scratch.appendingPathComponent("bad.wav")
+        try Data("fake".utf8).write(to: good)
+        try Data("fake".utf8).write(to: bad)
+        let goodJob = BatchJob(url: good, status: .transcribing)
+        let badJob = BatchJob(url: bad, status: .transcribing)
+        model.batchJobs = [goodJob, badJob]
+
+        await model.handleBatchEvent(.completed(jobID: goodJob.id, transcript: makeTranscript()))
+        await model.handleBatchEvent(.failed(jobID: badJob.id, reason: "boom"))
+        await model.handleBatchEvent(.finished)
+
+        #expect(sound.plays == 1)
+        model.clearBatch()
+    }
+
+    @Test("a leftover done job from an earlier batch does not ring for a later one")
+    func leftoverDoneJobDoesNotRingTwice() async {
+        let (model, sound) = makeRig("sound-batch-leftover")
+        let leftover = BatchJob(url: URL(fileURLWithPath: "/tmp/CompletionSoundTests/old.wav"), status: .done)
+        let failed = BatchJob(url: URL(fileURLWithPath: "/tmp/CompletionSoundTests/new.wav"), status: .failed)
+        model.batchJobs = [leftover, failed]
+
+        await model.handleBatchEvent(.finished)
+        #expect(sound.plays == 1)
+
+        // The same leftover is still sitting there; a second run's finish rings once more, not twice.
+        await model.handleBatchEvent(.finished)
+        #expect(sound.plays == 2)
+        model.clearBatch()
+    }
+
+    @Test("a run the user cancelled stays quiet")
+    func cancelledRunIsSilent() async {
+        let (model, sound) = makeRig("sound-batch-cancelled")
+        let job = BatchJob(url: URL(fileURLWithPath: "/tmp/CompletionSoundTests/cancel.wav"), status: .transcribing)
+        model.batchJobs = [job]
+
+        model.cancelAllInFlightBatchJobs()
+        await model.handleBatchEvent(.finished)
+
+        #expect(sound.plays == 0)
+        model.clearBatch()
+    }
+
+    @Test("importing subtitles is not a transcription and stays quiet")
+    func subtitleImportIsSilent() async throws {
+        let (model, sound) = makeRig("sound-subtitles")
+        let srt = FileManager.default.temporaryDirectory
+            .appendingPathComponent("completion-sound-\(UUID().uuidString).srt")
+        try "1\n00:00:00,000 --> 00:00:01,000\nimported line\n".write(to: srt, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: srt) }
+
+        model.importSubtitle(fileURL: srt)
+
+        #expect(await waitUntil { model.libraryEntries.count == 1 })
+        #expect(sound.plays == 0)
+    }
+
     @Test("a batch wave that still has pending jobs holds the sound")
     func partialWaveIsSilent() async {
         let (model, sound) = makeRig("sound-batch-partial")

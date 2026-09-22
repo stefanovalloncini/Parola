@@ -82,6 +82,7 @@ struct ParolaApp: App {
         let lc = LiveCaptionsController()
         m.liveCaptions = lc
         m.registerIntentPerformers()
+        AppDelegate.launchModel = m
         _model = State(initialValue: m)
         _liveCaptions = State(initialValue: lc)
     }

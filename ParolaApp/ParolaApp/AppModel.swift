@@ -114,6 +114,8 @@ final class AppModel {
     var batchDuplicatesSkipped: Int = 0
     @ObservationIgnored var duplicateCheckTask: Task<Void, Never>?
     @ObservationIgnored var batchImportTask: Task<Void, Never>?
+    /// A run the user stopped does not ring when its queue unwinds. Cleared when a wave starts.
+    @ObservationIgnored var batchRunCancelled = false
     var currentSegmentID: TranscriptSegment.ID?
     /// A segment a search result asked the transcript to open on. The write lands before the route
     /// builds the transcript view, so the view scrolls to this on appear rather than watching
@@ -212,7 +214,8 @@ final class AppModel {
         }
     }
     var recordingMaxMinutes: Int = 0 { didSet { defaults.set(recordingMaxMinutes, forKey: "recordingMaxMinutes") } }
-    var showMenuBarExtra: Bool = false { didSet { defaults.set(showMenuBarExtra, forKey: "showMenuBarExtra") } }
+    /// Derived from `appVisibilityMode` and never persisted: the stored key is the mode.
+    var showMenuBarExtra: Bool = false
     var appVisibilityModeRaw: String = AppVisibilityMode.dockAndMenuBar.rawValue {
         didSet {
             defaults.set(appVisibilityModeRaw, forKey: "appVisibilityMode")
@@ -223,15 +226,10 @@ final class AppModel {
         get { AppVisibilityMode(rawValue: appVisibilityModeRaw) ?? .dockAndMenuBar }
         set { appVisibilityModeRaw = newValue.rawValue }
     }
-    /// Set by the app delegate once the windows exist; nil in tests, which have no activation policy to change.
+    /// Set by the app delegate at launch; nil in tests, which have no activation policy to change.
     @ObservationIgnored var activationPolicyApplier: (@MainActor (NSApplication.ActivationPolicy) -> Void)?
-
-    /// `showMenuBarExtra` is derived from the mode, not chosen next to it: this is the only writer.
-    func applyAppVisibilityMode() {
-        let mode = appVisibilityMode
-        showMenuBarExtra = mode.showsMenuBarExtra
-        activationPolicyApplier?(mode.activationPolicy)
-    }
+    /// A headless launch has no UI to show, so neither half of the mode is applied to it.
+    @ObservationIgnored var isHeadless = CommandLine.arguments.contains("--headless")
 
     var playSoundWhenFinished: Bool = false { didSet { defaults.set(playSoundWhenFinished, forKey: "playSoundWhenFinished") } }
     var duplicateImportPolicyRaw: String = DuplicateImportPolicy.alwaysAsk.rawValue {
@@ -244,12 +242,6 @@ final class AppModel {
     /// What the finished sound actually is. Test mode clears it; a test stubs it to count the plays.
     @ObservationIgnored var completionSoundPlayer: (@MainActor () -> Void)? = {
         NSSound(named: NSSound.Name("Glass"))?.play()
-    }
-
-    /// One transcription, one batch run or one re-run has landed in the library.
-    func playCompletionSound() {
-        guard playSoundWhenFinished, let completionSoundPlayer else { return }
-        completionSoundPlayer()
     }
     var recordingCountInSeconds: Int = 0 { didSet { defaults.set(recordingCountInSeconds, forKey: "recordingCountInSeconds") } }
     var autoMuteWhileRecording: Bool = false { didSet { defaults.set(autoMuteWhileRecording, forKey: "autoMuteWhileRecording") } }
@@ -621,7 +613,7 @@ final class AppModel {
             return
         }
         let device = inputDeviceUID.isEmpty ? nil : inputDeviceUID
-        Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe), deviceUID: device) }
+        Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe, model: selectedModel, language: selectedLanguage), deviceUID: device) }
     }
 
     // MARK: - Dictation
@@ -761,8 +753,11 @@ final class AppModel {
         self.dictationContextClipboard = defaults.bool(forKey: "dictationContextClipboard")
         self.dictationContextScreen = defaults.bool(forKey: "dictationContextScreen")
         self.recordingMaxMinutes = defaults.integer(forKey: "recordingMaxMinutes")
-        self.showMenuBarExtra = defaults.bool(forKey: "showMenuBarExtra")
-        self.appVisibilityModeRaw = defaults.string(forKey: "appVisibilityMode") ?? AppVisibilityMode.dockAndMenuBar.rawValue
+        let visibility = AppModel.storedVisibilityMode(in: defaults)
+        defaults.set(visibility.rawValue, forKey: "appVisibilityMode")
+        // The old toggle has had its say; leaving it behind would let it out-vote a later reset.
+        defaults.removeObject(forKey: "showMenuBarExtra")
+        self.appVisibilityModeRaw = visibility.rawValue
         applyAppVisibilityMode()
         self.playSoundWhenFinished = defaults.bool(forKey: "playSoundWhenFinished")
         self.duplicateImportPolicyRaw = defaults.string(forKey: "duplicateImportPolicy") ?? DuplicateImportPolicy.alwaysAsk.rawValue
@@ -1219,8 +1214,7 @@ final class AppModel {
     @ObservationIgnored var derivedArtifactsGeneration = 0
     @ObservationIgnored var loadEntryGeneration = 0
 
-    /// A fresh token for a file run's partial, progress and stage handlers; anything holding an
-    /// older one is reporting on a run that has been replaced.
+    /// A fresh token for a file run's handlers; an older one belongs to a run that has been replaced.
     func nextFileRunToken() -> Int {
         fileRunGeneration &+= 1
         return fileRunGeneration
@@ -1614,7 +1608,8 @@ final class AppModel {
         source: EntrySource,
         title: String? = nil,
         activate: Bool = true,
-        sourceDigest: String? = nil
+        sourceDigest: String? = nil,
+        playsCompletionSound: Bool = true
     ) {
         let category = pendingRecordingCategory
         pendingRecordingCategory = .transcription
@@ -1639,7 +1634,7 @@ final class AppModel {
                     selectedEntryID = entry.id
                 }
                 if activate {
-                    playCompletionSound()
+                    if playsCompletionSound { playCompletionSound() }
                     // A parked on-device model session must never hold up auto-export.
                     await AsyncTimeout.run(.seconds(30)) { [weak self] in
                         await self?.generateCardMetadata(for: entry.id, transcript: result)
@@ -1664,63 +1659,10 @@ final class AppModel {
         }
     }
 
-    // MARK: - Model details
-
-    /// One pasteboard block naming the selected model: what it is, where it came from, whether it
-    /// is on disk and what it can transcribe. Help ▸ Copy Model Details and the bridge share it.
-    func modelDetailsText() -> String {
-        let id = selectedModel
-        guard let variant = ModelCatalog.variant(id: id) else {
-            return [
-                String(localized: "Model: \(id)"),
-                String(localized: "This build's catalog has no entry for it."),
-            ].joined(separator: "\n")
-        }
-        let info = availableModels.first { $0.name == id }
-        let isInstalled = info?.isInstalled ?? false
-        var lines = [
-            String(localized: "Model: \(variant.displayName)"),
-            String(localized: "Identifier: \(variant.id)"),
-            String(localized: "Engine: \(variant.engineID.displayName)"),
-            String(localized: "Source: \(AppModel.modelSourceLabel(variant.downloadSource))"),
-            isInstalled ? String(localized: "Installed: yes") : String(localized: "Installed: no"),
-        ]
-        if isInstalled, let path = info?.installedURL?.path {
-            lines.append(String(localized: "Path: \(path)"))
-        }
-        if isInstalled {
-            if let measured = modelSizes[id] {
-                lines.append(String(localized: "Size: \(AppFormat.byteSize(measured))"))
-            } else if variant.sizeBytes > 0 {
-                lines.append(String(localized: "Size: about \(AppFormat.byteSize(variant.sizeBytes))"))
-            }
-        }
-        lines.append(String(localized: "Languages: \(AppModel.modelLanguageSummary(for: id))"))
-        return lines.joined(separator: "\n")
-    }
-
-    /// The repo and folder the catalog pins this entry to — the closest it has to a version.
-    nonisolated static func modelSourceLabel(_ source: ModelDownloadSource) -> String {
-        source.subpath.isEmpty
-            ? source.huggingFaceRepo
-            : "\(source.huggingFaceRepo)/\(source.subpath)"
-    }
-
-    nonisolated static func modelLanguageSummary(for id: String) -> String {
-        let supported = ModelCatalog.staticCapabilities(forID: id)?.supportedLanguages ?? .all
-        switch supported {
-        case .all:
-            return String(localized: "every language the engine knows")
-        case .only(let codes):
-            if supported.isEnglishOnly { return String(localized: "English only") }
-            return String(localized: "\(codes.count) languages")
-        }
-    }
-
-    /// Help ▸ Copy Model Details, and the bridge command of the same name.
-    func copyModelDetails() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(modelDetailsText(), forType: .string)
+    /// One transcription, one batch run or one re-run has landed in the library.
+    func playCompletionSound() {
+        guard playSoundWhenFinished, let completionSoundPlayer else { return }
+        completionSoundPlayer()
     }
 
     // MARK: - Model list
@@ -2039,7 +1981,8 @@ final class AppModel {
             processed,
             audioSource: nil,
             source: .file,
-            title: fileURL.deletingPathExtension().lastPathComponent
+            title: fileURL.deletingPathExtension().lastPathComponent,
+            playsCompletionSound: false
         )
     }
 
@@ -2113,7 +2056,7 @@ final class AppModel {
                     : .downloadingModel(name: selectedModel, progress: 0)
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: fileURL),
-                    options: makeOptions(task: task),
+                    options: makeOptions(task: task, model: selectedModel, language: selectedLanguage),
                     downloadProgress: makeDownloadProgressHandler(for: selectedModel),
                     partialHandler: makeFilePartialHandler(runToken: runToken),
                     progressHandler: makeFileProgressHandler(runToken: runToken),
@@ -2229,16 +2172,16 @@ final class AppModel {
     }
 
     var currentOptions: TranscriptionOptions {
-        makeOptions(task: translate ? .translate : .transcribe)
+        makeOptions(task: translate ? .translate : .transcribe, model: selectedModel, language: selectedLanguage)
     }
 
-    private func makeOptions(task: TranscriptionTask) -> TranscriptionOptions {
-        // Drop the flags the selected engine can't honor instead of letting the session's
+    func makeOptions(task: TranscriptionTask, model modelName: String, language: String?) -> TranscriptionOptions {
+        // Drop the flags the chosen engine can't honor instead of letting the session's
         // validation fail the whole run; the settings panes show a matching advisory.
-        let caps = selectedModelCapabilities
+        let caps = ModelCatalog.staticCapabilities(forID: modelName) ?? .whisperKitDefaults
         return TranscriptionOptions(
-            model: selectedModel,
-            language: selectedLanguage,
+            model: modelName,
+            language: language,
             task: (task == .translate && !caps.supportsTranslate) ? .transcribe : task,
             wordTimestamps: wordTimestamps && caps.supportsWordTimestamps,
             initialPrompt: (initialPrompt.isEmpty || !caps.supportsInitialPrompt) ? nil : initialPrompt,
@@ -2445,7 +2388,8 @@ final class AppModel {
                     processed,
                     audioSource: nil,
                     source: .web,
-                    title: LibraryEntryDisplay.webVideoTitle(createdAt: Date())
+                    title: LibraryEntryDisplay.webVideoTitle(createdAt: Date()),
+                    playsCompletionSound: false
                 )
             } catch {
                 if !Task.isCancelled { applyTranscriptionError(error) }

@@ -125,7 +125,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .general:
             return [
                 "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt", "diarize",
-                "showMenuBarExtra", "generateCardMetadata", "showAITitles", "showAISummaries",
+                "generateCardMetadata", "showAITitles", "showAISummaries",
                 "customTitlePrompt", "customSummaryPrompt", "showSubtitleQC",
                 "summaryOptions", "autostartSummary", "openEntriesInNewWindow",
                 "playSoundWhenFinished", "appVisibilityMode", "duplicateImportPolicy"

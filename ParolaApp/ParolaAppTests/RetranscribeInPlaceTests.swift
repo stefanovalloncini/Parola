@@ -83,6 +83,15 @@ extension TranscriberMockSuites {
             return entry
         }
 
+        /// True once the run has reached the engine — the point past which the file is open and
+        /// the only thing left is the gate.
+        private func waitForEngine(_ model: AppModel) async -> Bool {
+            await waitUntil {
+                if case .transcribing = model.phase { return true }
+                return false
+            }
+        }
+
         private func load(_ model: AppModel, _ entryID: LibraryEntry.ID) async -> Bool {
             model.loadEntry(entryID)
             return await waitUntil { model.selectedEntryID == entryID && model.transcript != nil }
@@ -173,6 +182,71 @@ extension TranscriberMockSuites {
                 #expect(await waitUntil { counter.plays == 1 })
                 #expect(await waitUntil { model.retranscribeRequest == nil })
                 #expect(counter.plays == 1)
+            }
+        }
+
+        @Test("a cancelled re-run leaves every last thing about the old take alone")
+        func cancelledRunKeepsTheOldTake() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the new take")], gate: gate
+                ))
+                let model = makeModel("retranscribe-cancelled")
+                let wav = try makeWAV("cancelled")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                let personID = UUID()
+                let entry = try await seed(model, audio: wav, personID: personID)
+                #expect(await load(model, entry.id))
+
+                model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "it")
+                #expect(model.retranscribeRequest != nil)
+                #expect(await waitForEngine(model))
+
+                model.cancelCurrentWork()
+                await gate.open()
+                #expect(await waitUntil { model.retranscribeRequest == nil })
+                #expect(await waitUntil { model.fileTranscribeTask == nil })
+
+                let stored = try await model.library.load(entry.id)
+                #expect(stored.document.transcript.segments.map(\.text) == ["the old take"])
+                #expect(stored.document.transcript.translation?.targetLanguage == "it")
+                #expect(stored.entry.favoriteSegments == [0])
+                #expect(stored.entry.segmentNotes == ["0": "old note"])
+                #expect(stored.entry.speakerAssignments == ["Speaker 1": personID])
+                #expect(stored.entry.aiTitle == "Old AI title")
+                #expect(stored.entry.modelName == "openai_whisper-tiny")
+                #expect(model.phase == .idle)
+                #expect(model.canCancel == false)
+            }
+        }
+
+        @Test("a re-run whose entry went away leaves a warning and an idle app, not a stuck bar")
+        func saveFailureUnsticksThePhase() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the new take")], gate: gate
+                ))
+                let model = makeModel("retranscribe-savefail")
+                let wav = try makeWAV("savefail")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                let entry = try await seed(model, audio: wav)
+                #expect(await load(model, entry.id))
+
+                model.retranscribeCurrentEntry(model: Self.appleSpeech, language: nil)
+                #expect(model.retranscribeRequest != nil)
+                #expect(await waitForEngine(model))
+
+                // The bundle goes while the run is held; the write lands on nothing.
+                try FileManager.default.removeItem(at: entry.bundleURL)
+                await gate.open()
+
+                #expect(await waitUntil { model.retranscribeRequest == nil })
+                #expect(await waitUntil { model.nonFatalWarning != nil })
+                #expect(model.phase == .idle)
+                #expect(model.canCancel == false)
+                #expect(model.fileTranscribeTask == nil)
             }
         }
 

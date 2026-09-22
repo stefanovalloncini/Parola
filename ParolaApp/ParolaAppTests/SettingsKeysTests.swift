@@ -58,7 +58,8 @@ struct SettingsPaneScopeTests {
     func userFacingKeysAreScoped() {
         let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
         let expected = [
-            "showMenuBarExtra", "generateCardMetadata", "showAITitles", "showAISummaries",
+            "appVisibilityMode", "duplicateImportPolicy", "playSoundWhenFinished",
+            "generateCardMetadata", "showAITitles", "showAISummaries",
             "customTitlePrompt", "customSummaryPrompt",
             "themeIsCustom", "themeCustomPaletteJSON",
             "recordingMaxMinutes", "recordingCountInSeconds",
@@ -84,6 +85,14 @@ struct SettingsPaneScopeTests {
     func modelsPathStaysExcluded() {
         let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
         #expect(scoped.contains("parola.modelsStoragePath") == false)
+    }
+
+    @Test("a key nothing but the app derives stays out of every scope")
+    func derivedKeysStayExcluded() {
+        // showMenuBarExtra follows appVisibilityMode; exporting or resetting it on its own would
+        // hand back a value the next launch overwrites.
+        let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
+        #expect(scoped.contains("showMenuBarExtra") == false)
     }
 
     @Test("panes with no persisted state expose no reset keys")

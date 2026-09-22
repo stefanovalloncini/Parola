@@ -75,8 +75,10 @@ extension AppModel {
             // pending wave ends in another .finished, and the parked files drain there.
             let pending = batchJobs.filter { $0.status == .pending }
             if pending.isEmpty {
-                if batchJobs.contains(where: { $0.status == .done }) { playCompletionSound() }
                 drainDeferredArrivals()
+                // One sound for the run that just ended, whatever mix of done and failed it ended
+                // with. Files the drain picked up are a run of their own and ring when they finish.
+                if !batchRunCancelled { playCompletionSound() }
             } else {
                 resumeBatch(pendingJobs: pending)
             }
@@ -104,6 +106,7 @@ extension AppModel {
     }
 
     private func runBatchTask(jobs: [BatchJob]) {
+        batchRunCancelled = false
         batchTask?.cancel()
         let queue = BatchQueue(session: session, features: features)
         let opts = currentOptions
@@ -293,6 +296,7 @@ extension AppModel {
     }
 
     func cancelAllInFlightBatchJobs() {
+        batchRunCancelled = true
         cancelAndTrack(&batchTask)
         for idx in batchJobs.indices where batchJobs[idx].status == .pending || batchJobs[idx].status == .transcribing {
             batchJobs[idx].status = .cancelled

@@ -4,6 +4,10 @@ import ParolaCore
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Handed over while the App value is built, so applicationDidFinishLaunching can bind before
+    /// any window exists — a menu-bar-only launch that restores none would otherwise be unreachable.
+    static weak var launchModel: AppModel?
+
     private weak var model: AppModel?
     private let provider = ServicesProvider()
     private var dictationSubscription: DictationSubscription?
@@ -15,14 +19,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appearanceObservation: NSKeyValueObservation?
 
     func bind(model: AppModel) {
+        guard self.model !== model else { return }
         self.model = model
         provider.model = model
         menuBar.bind(model)
         playbackKeys.bind(model)
-        model.activationPolicyApplier = { policy in
-            guard !CommandLine.arguments.contains("--headless") else { return }
-            NSApp.setActivationPolicy(policy)
-        }
+        model.activationPolicyApplier = { NSApp.setActivationPolicy($0) }
         model.applyAppVisibilityMode()
         if dictationSubscription == nil {
             dictationSubscription = DictationSignal.subscribe { [weak self] name in
@@ -59,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let model = AppDelegate.launchModel { bind(model: model) }
         ParolaLog.info(.appLifecycle, "app launched, version \(AppVersionToken())")
         NSApp.servicesProvider = provider
         NSUpdateDynamicServices()

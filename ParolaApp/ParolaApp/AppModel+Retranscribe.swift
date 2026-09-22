@@ -23,11 +23,11 @@ extension AppModel {
         return String(localized: "This transcript came in without its audio, so there is nothing to transcribe again.")
     }
 
-    /// Runs the loaded entry's own audio again through the chosen model and language and replaces
-    /// what the entry holds. The inspector's two menus and the bridge both come through here.
+    /// Runs the loaded entry's own audio again and replaces what the entry holds; the one entry point.
     func retranscribeCurrentEntry(model modelName: String, language: String?) {
         guard let entryID = selectedEntryID, canRetranscribeSelectedEntry, retranscribeRequest == nil else { return }
-        let options = retranscribeOptions(model: modelName, language: language)
+        // Always transcribe: translating to English would ignore the language the menu just picked.
+        let options = makeOptions(task: .transcribe, model: modelName, language: language)
         retranscribeRequest = RetranscribeRequest(
             entryID: entryID, modelName: modelName, language: options.language
         )
@@ -38,21 +38,6 @@ extension AppModel {
                 entryID: entryID, modelName: modelName, options: options, runToken: runToken
             )
         }
-    }
-
-    /// The chosen model and language; everything else stays what the settings say. The task is
-    /// always transcribe — translating to English would ignore the language the menu just picked.
-    private func retranscribeOptions(model modelName: String, language: String?) -> TranscriptionOptions {
-        let caps = ModelCatalog.staticCapabilities(forID: modelName) ?? .whisperKitDefaults
-        return TranscriptionOptions(
-            model: modelName,
-            language: language,
-            task: .transcribe,
-            wordTimestamps: wordTimestamps && caps.supportsWordTimestamps,
-            initialPrompt: (initialPrompt.isEmpty || !caps.supportsInitialPrompt) ? nil : initialPrompt,
-            diarize: diarize && caps.supportsDiarization,
-            expectedSpeakers: expectedSpeakersRaw > 0 ? expectedSpeakersRaw : nil
-        )
     }
 
     private func runRetranscription(
@@ -82,9 +67,14 @@ extension AppModel {
             )
             try Task.checkCancellation()
             let processed = await postProcessDetached(result)
+            // Post-processing is another suspension a cancel can land in, and past this line the
+            // old transcript is gone: re-check rather than overwrite a take the user stopped.
+            try Task.checkCancellation()
             await replaceEntry(entryID, with: processed, clearingNotes: loaded.entry.segmentNotes)
         } catch {
-            if !Task.isCancelled { applyTranscriptionError(error) }
+            // applyTranscriptionError parks a cancelled run at .idle and a failed one at .failed;
+            // either way the phase stops reading "transcribing" once this task has let go.
+            if fileRunGeneration == runToken { applyTranscriptionError(error) }
         }
         retranscribeRequest = nil
         guard fileRunGeneration == runToken else { return }
@@ -94,13 +84,13 @@ extension AppModel {
         fileTranscribeTask = nil
     }
 
-    /// The old transcript's favorites, notes, speaker map and card metadata all point at segments
-    /// and labels this run has just replaced, so they go with it.
+    /// Favorites, notes, the speaker map and the card metadata all name segments and labels this run replaced.
     private func replaceEntry(
         _ entryID: LibraryEntry.ID,
         with transcript: Transcript,
         clearingNotes notes: [String: String]
     ) async {
+        guard !Task.isCancelled else { return }
         do {
             try await library.updateTranscript(transcript, for: entryID)
             try await library.setTranscriptionDetails(
@@ -117,6 +107,8 @@ extension AppModel {
             nonFatalWarning = String(
                 localized: "The transcript ran again, but Parola couldn't save the result. \(error.localizedDescription)"
             )
+            // The task is already letting go, so nothing else will move the phase off the run.
+            phase = .idle
             return
         }
         refreshLibrary()

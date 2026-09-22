@@ -517,6 +517,9 @@ final class ParolaAutomationServer {
             "showMostUsedPeople": .bool(model.showMostUsedPeople),
             "openEntriesInNewWindow": .bool(model.openEntriesInNewWindow),
             "openEntryWindows": .array(model.openEntryWindowIDs.map { .string($0) }),
+            "retranscribing": .bool(model.retranscribeRequest != nil),
+            "appVisibilityMode": .string(model.appVisibilityMode.rawValue),
+            "playSoundWhenFinished": .bool(model.playSoundWhenFinished),
         ])
     }
 
