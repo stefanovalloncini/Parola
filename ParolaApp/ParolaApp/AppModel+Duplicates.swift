@@ -36,6 +36,16 @@ extension AppModel {
                 self.beginFileTranscription(fileURL: fileURL, translateOverride: translateOverride, sourceDigest: digest)
                 return
             }
+            switch self.duplicateImportPolicy {
+            case .transcribeAgain:
+                self.beginFileTranscription(fileURL: fileURL, translateOverride: translateOverride, sourceDigest: digest)
+                return
+            case .openExisting:
+                self.loadEntry(existing.id)
+                return
+            case .alwaysAsk:
+                break
+            }
             self.duplicateImport = DuplicateImport(
                 entryID: existing.id,
                 entryTitle: LibraryEntryDisplay.title(for: existing),
@@ -57,14 +67,16 @@ extension AppModel {
         }
     }
 
-    func openExistingDuplicate() {
+    func openExistingDuplicate(remembering remember: Bool) {
         guard let pending = duplicateImport else { return }
+        if remember { duplicateImportPolicy = .openExisting }
         duplicateImport = nil
         loadEntry(pending.entryID)
     }
 
-    func transcribeDuplicateAgain() {
+    func transcribeDuplicateAgain(remembering remember: Bool) {
         guard let pending = duplicateImport else { return }
+        if remember { duplicateImportPolicy = .transcribeAgain }
         duplicateImport = nil
         beginFileTranscription(
             fileURL: pending.fileURL,

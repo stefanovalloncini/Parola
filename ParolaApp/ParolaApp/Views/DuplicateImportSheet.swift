@@ -4,6 +4,7 @@ import ParolaCore
 struct DuplicateImportSheet: View {
     @Environment(AppModel.self) private var model
     let pending: DuplicateImport
+    @State private var remember = false
 
     var body: some View {
         SheetFrame(
@@ -65,13 +66,18 @@ struct DuplicateImportSheet: View {
 
     private var footerBody: some View {
         HStack(spacing: DS.Spacing.small) {
+            Toggle("Remember this choice", isOn: $remember)
+                .toggleStyle(.checkbox)
+                .font(DS.Font.secondary)
+                .axLeaf("Duplicate.Toggle.Remember")
+
             Spacer(minLength: DS.Spacing.small)
 
-            Button("Transcribe Again") { model.transcribeDuplicateAgain() }
+            Button("Transcribe Again") { model.transcribeDuplicateAgain(remembering: remember) }
                 .sheetSecondaryAction()
                 .axLeaf("Duplicate.Button.TranscribeAgain")
 
-            Button("Open Existing") { model.openExistingDuplicate() }
+            Button("Open Existing") { model.openExistingDuplicate(remembering: remember) }
                 .sheetPrimaryAction()
                 .keyboardShortcut(.defaultAction)
                 .axLeaf("Duplicate.Button.OpenExisting")

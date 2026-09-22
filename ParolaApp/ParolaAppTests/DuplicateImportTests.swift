@@ -124,7 +124,7 @@ extension TranscriberMockSuites {
 
             model.transcribe(fileURL: wav)
             await model.awaitDuplicateCheck()
-            model.openExistingDuplicate()
+            model.openExistingDuplicate(remembering: false)
 
             #expect(model.duplicateImport == nil)
             #expect(await waitUntil { model.selectedEntryID == existing.id })
@@ -144,7 +144,7 @@ extension TranscriberMockSuites {
 
                 model.transcribe(fileURL: wav)
                 await model.awaitDuplicateCheck()
-                model.transcribeDuplicateAgain()
+                model.transcribeDuplicateAgain(remembering: false)
 
                 #expect(model.duplicateImport == nil)
                 #expect(model.fileTranscribeTask != nil)

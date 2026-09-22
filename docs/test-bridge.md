@@ -138,6 +138,8 @@ Rows named without the `parola_app_` prefix are raw bridge commands, called thro
 | `parola_app_search` | **query**, limit | Full-text search across the library; polls until the 200 ms debounce settles. |
 | `parola_app_list_deleted_entries` | limit | Recently Deleted entries with id, title, category, deletedAt. |
 | `selectDeletedEntries` | ids | Select rows on the Recently Deleted page, the way a click would; omit `ids` to clear. Ids the page isn't showing are ignored. Replies `{selected, ids}`. |
+| `getDuplicateImport` | — | The "Already in your library" sheet: whether it is open, the entry it matched, and how many files the last batch import skipped. |
+| `resolveDuplicateImport` | **choice**, remember | Press `openExisting`, `transcribeAgain` or `dismiss`. `remember: true` ticks the sheet's checkbox first, so the choice becomes the `duplicateImportPolicy` setting (`alwaysAsk` / `transcribeAgain` / `openExisting`, also writable with `setSetting`). Replies `{choice, duplicateImportPolicy}`. |
 | `parola_app_restore_entry` | **id** | Move an entry back from Recently Deleted. |
 | `parola_app_purge_entry` | **id** | Permanently delete from Recently Deleted. |
 

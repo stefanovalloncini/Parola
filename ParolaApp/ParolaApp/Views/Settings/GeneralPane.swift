@@ -50,6 +50,18 @@ struct GeneralPane: View {
                     Toggle("", isOn: $model.playSoundWhenFinished).labelsHidden()
                         .axLeaf("General.Toggle.PlaySoundWhenFinished")
                 }
+                SettingRow("When a file was already transcribed",
+                           description: "Parola recognises a file by its contents, so a renamed copy counts as the same recording.") {
+                    Picker("", selection: $model.duplicateImportPolicy) {
+                        ForEach(DuplicateImportPolicy.allCases) { policy in
+                            Text(policy.label).tag(policy)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 180, alignment: .trailing)
+                    .axLeaf("General.Picker.DuplicateImportPolicy")
+                }
             }
 
             SettingsSection("Every transcript") {

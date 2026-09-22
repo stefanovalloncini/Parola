@@ -1807,6 +1807,17 @@
         }
       }
     },
+    "Ask me": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiedimelo"
+          }
+        }
+      }
+    },
     "Asks Whisper for word-level timestamps. More accurate karaoke, but slower.": {
       "extractionState": "manual",
       "localizations": {
@@ -8548,6 +8559,17 @@
         }
       }
     },
+    "Open the one I have": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri quello che ho già"
+          }
+        }
+      }
+    },
     "Open them as a transcript": {
       "extractionState": "manual",
       "localizations": {
@@ -8763,6 +8785,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola usa questi strumenti solo quando glielo chiedi."
+          }
+        }
+      }
+    },
+    "Parola recognises a file by its contents, so a renamed copy counts as the same recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola riconosce un file dal contenuto, quindi una copia rinominata conta come la stessa registrazione."
           }
         }
       }
@@ -9884,6 +9917,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Release candidate"
+          }
+        }
+      }
+    },
+    "Remember this choice": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricorda questa scelta"
           }
         }
       }
@@ -13027,6 +13071,17 @@
         }
       }
     },
+    "Transcribe it again": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivilo di nuovo"
+          }
+        }
+      }
+    },
     "Transcribe later": {
       "extractionState": "manual",
       "localizations": {
@@ -13912,6 +13967,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Come si chiama questo servizio nei menu."
+          }
+        }
+      }
+    },
+    "When a file was already transcribed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando un file è già stato trascritto"
           }
         }
       }

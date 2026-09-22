@@ -92,7 +92,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     /// Search keywords surfaced by the sidebar search beyond the label match.
     var searchKeywords: [String] {
         switch self {
-        case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "dock", "hide", "sound", "login", "launch", "startup", "title", "window", "new window"]
+        case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "dock", "hide", "sound", "duplicate", "already transcribed", "login", "launch", "startup", "title", "window", "new window"]
         case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced", "accent", "color", "terracotta", "custom colors", "palette"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
         case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio", "permission", "screen recording", "consent"]
@@ -128,7 +128,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
                 "showMenuBarExtra", "generateCardMetadata", "showAITitles", "showAISummaries",
                 "customTitlePrompt", "customSummaryPrompt", "showSubtitleQC",
                 "summaryOptions", "autostartSummary", "openEntriesInNewWindow",
-                "playSoundWhenFinished", "appVisibilityMode"
+                "playSoundWhenFinished", "appVisibilityMode", "duplicateImportPolicy"
             ]
         case .customization:
             return [

@@ -183,7 +183,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "resolveDuplicateImport",
                 area: .library,
-                summary: "Presses one of the duplicate sheet's buttons: openExisting, transcribeAgain or dismiss.",
+                summary: "Presses one of the duplicate sheet's buttons: openExisting, transcribeAgain or dismiss. With remember: true the choice becomes the duplicateImportPolicy setting, the way the sheet's checkbox does.",
                 kind: .mutating,
                 args: [
                     .init(
@@ -192,6 +192,7 @@ extension ParolaAutomationServer {
                         required: true,
                         summary: "Which button to press"
                     ),
+                    .init(name: "remember", kind: .boolean, required: false, summary: "Tick \"Remember this choice\" before pressing", defaultValue: .bool(false)),
                 ],
                 followsWith: ["waitForPhase"],
                 handler: { args, ctx in
@@ -199,12 +200,16 @@ extension ParolaAutomationServer {
                         throw AutomationError.invalidArgs(field: "choice", reason: "no duplicate sheet is open")
                     }
                     let choice = try args.string("choice")
+                    let remember = (try args.optionalBool("remember")) ?? false
                     switch choice {
-                    case "openExisting": ctx.model.openExistingDuplicate()
-                    case "transcribeAgain": ctx.model.transcribeDuplicateAgain()
+                    case "openExisting": ctx.model.openExistingDuplicate(remembering: remember)
+                    case "transcribeAgain": ctx.model.transcribeDuplicateAgain(remembering: remember)
                     default: ctx.model.dismissDuplicateImport()
                     }
-                    return .object(["choice": .string(choice)])
+                    return .object([
+                        "choice": .string(choice),
+                        "duplicateImportPolicy": .string(ctx.model.duplicateImportPolicy.rawValue),
+                    ])
                 }
             ),
 

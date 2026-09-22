@@ -232,6 +232,13 @@ final class AppModel {
     }
 
     var playSoundWhenFinished: Bool = false { didSet { defaults.set(playSoundWhenFinished, forKey: "playSoundWhenFinished") } }
+    var duplicateImportPolicyRaw: String = DuplicateImportPolicy.alwaysAsk.rawValue {
+        didSet { defaults.set(duplicateImportPolicyRaw, forKey: "duplicateImportPolicy") }
+    }
+    var duplicateImportPolicy: DuplicateImportPolicy {
+        get { DuplicateImportPolicy(rawValue: duplicateImportPolicyRaw) ?? .alwaysAsk }
+        set { duplicateImportPolicyRaw = newValue.rawValue }
+    }
     /// What the finished sound actually is. Test mode clears it; a test stubs it to count the plays.
     @ObservationIgnored var completionSoundPlayer: (@MainActor () -> Void)? = {
         NSSound(named: NSSound.Name("Glass"))?.play()
@@ -756,6 +763,7 @@ final class AppModel {
         self.appVisibilityModeRaw = defaults.string(forKey: "appVisibilityMode") ?? AppVisibilityMode.dockAndMenuBar.rawValue
         applyAppVisibilityMode()
         self.playSoundWhenFinished = defaults.bool(forKey: "playSoundWhenFinished")
+        self.duplicateImportPolicyRaw = defaults.string(forKey: "duplicateImportPolicy") ?? DuplicateImportPolicy.alwaysAsk.rawValue
         self.recordingCountInSeconds = defaults.integer(forKey: "recordingCountInSeconds")
         self.autoMuteWhileRecording = defaults.bool(forKey: "autoMuteWhileRecording")
         self.autoPauseMediaWhileRecording = defaults.bool(forKey: "autoPauseMediaWhileRecording")
