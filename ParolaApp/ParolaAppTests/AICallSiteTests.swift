@@ -93,16 +93,6 @@ struct AICallSiteTests {
         return service
     }
 
-    private func waitUntil(timeoutMs: Int = 3000, _ condition: @MainActor () -> Bool) async -> Bool {
-        var elapsed = 0
-        while elapsed < timeoutMs {
-            if condition() { return true }
-            try? await Task.sleep(for: .milliseconds(15))
-            elapsed += 15
-        }
-        return condition()
-    }
-
     @Test("a prompt runs on the model picked for prompts")
     func promptsUseTheirChoice() async throws {
         try await withInstalledMocks {
@@ -170,7 +160,7 @@ struct AICallSiteTests {
             pick(openAI(), for: .dictationCleanup, on: model)
 
             let processor = PromptDictationProcessor(
-                defaultPrompt: try #require(Prompt.builtIns.first),
+                defaultPrompt: Prompt.builtIns.first { $0.name == "Cleanup" },
                 overrides: [:],
                 cleanupRunner: model.dictationCleanupRunner()
             )

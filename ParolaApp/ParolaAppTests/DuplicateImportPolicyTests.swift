@@ -38,16 +38,6 @@ extension TranscriberMockSuites {
             return url
         }
 
-        private func waitUntil(timeoutMs: Int = 5_000, _ condition: @MainActor () -> Bool) async -> Bool {
-            var elapsed = 0
-            while elapsed < timeoutMs {
-                if condition() { return true }
-                try? await Task.sleep(for: .milliseconds(15))
-                elapsed += 15
-            }
-            return condition()
-        }
-
         @discardableResult
         private func seedLibrary(_ model: AppModel, with audio: URL) async throws -> LibraryEntry {
             let transcript = Transcript(

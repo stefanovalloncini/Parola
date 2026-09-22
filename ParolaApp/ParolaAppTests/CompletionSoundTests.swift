@@ -29,16 +29,6 @@ struct CompletionSoundTests {
         )
     }
 
-    private func waitUntil(timeoutMs: Int = 5_000, _ condition: @MainActor () -> Bool) async -> Bool {
-        var elapsed = 0
-        while elapsed < timeoutMs {
-            if condition() { return true }
-            try? await Task.sleep(for: .milliseconds(15))
-            elapsed += 15
-        }
-        return condition()
-    }
-
     @Test("a finished transcription plays the sound once")
     func finishedTranscriptionPlaysOnce() async {
         let (model, sound) = makeRig("sound-one")

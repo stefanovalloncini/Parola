@@ -36,7 +36,7 @@ enum PeopleTestSupport {
 
     static func open(_ model: AppModel, entry: LibraryEntry) async throws {
         model.loadEntry(entry.id)
-        try await until { model.selectedEntryID == entry.id && model.transcript != nil }
+        await waitUntil(timeoutMs: 3000) { model.selectedEntryID == entry.id && model.transcript != nil }
         // loadEntry ends with a library refresh; letting it land keeps its snapshot from
         // overwriting the map a later assignment patches in.
         await model.libraryRefreshTask?.value
@@ -46,18 +46,6 @@ enum PeopleTestSupport {
         let entry = try await seed(model)
         try await open(model, entry: entry)
         return entry
-    }
-
-    /// Polls a condition on the main actor. Fails the test rather than hanging when it never holds.
-    static func until(
-        _ condition: () -> Bool,
-        sourceLocation: SourceLocation = #_sourceLocation
-    ) async throws {
-        for _ in 0..<300 {
-            if condition() { return }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        Issue.record("condition never held", sourceLocation: sourceLocation)
     }
 }
 
@@ -207,7 +195,7 @@ struct AssignSpeakerPeopleTests {
         let grace = try #require(model.person(named: "Grace"))
 
         model.renameSpeakerLabel("SPEAKER_01", to: "Grace")
-        try await PeopleTestSupport.until { model.people.first?.usageCount == 2 }
+        await waitUntil(timeoutMs: 3000) { model.people.first?.usageCount == 2 }
 
         #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_00", "Grace", "SPEAKER_00"])
         #expect(model.speakerAssignments == ["Grace": grace.id])
@@ -224,7 +212,7 @@ struct AssignSpeakerPeopleTests {
         let grace = try #require(model.person(named: "Grace Hopper"))
 
         model.renameSpeakerLabel("SPEAKER_01", to: "grace hopper")
-        try await PeopleTestSupport.until { model.people.first?.usageCount == 2 }
+        await waitUntil(timeoutMs: 3000) { model.people.first?.usageCount == 2 }
 
         #expect(model.speakerAssignments == ["grace hopper": grace.id])
         // Counting the use must not rewrite the person to the typed spelling.
@@ -327,7 +315,7 @@ struct AssignSpeakerPeopleTests {
 
         model.assignSpeaker("SPEAKER_01", toSegmentID: 0)
         // Let the store hop the per-segment path takes settle before reading the directory.
-        for _ in 0..<20 where model.people.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        await settle()
 
         #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_01", "SPEAKER_01", "SPEAKER_00"])
         #expect(model.people.isEmpty)
@@ -354,7 +342,7 @@ struct AssignSpeakerPeopleTests {
         await model.addPerson(named: "Grace")
 
         model.assignSpeaker("Grace", toSegmentID: 1)
-        try await PeopleTestSupport.until { model.speakerAssignments["Grace"] != nil }
+        await waitUntil(timeoutMs: 3000) { model.speakerAssignments["Grace"] != nil }
 
         let grace = try #require(model.person(forSpeaker: "Grace"))
         #expect(grace.usageCount == 2)

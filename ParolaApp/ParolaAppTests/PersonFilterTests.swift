@@ -177,11 +177,11 @@ struct PersonFilterTests {
     }
 
     @Test("the People pane sits in the transcription group, after Translation")
-    func paneIsInTheSidebar() {
-        let group = try? #require(
+    func paneIsInTheSidebar() throws {
+        let group = try #require(
             SettingsSidebarCatalog.all.first { $0.id == "transcription" }
         )
-        let routes = group?.routes ?? []
+        let routes = group.routes
         #expect(routes.contains(.people))
         if let translation = routes.firstIndex(of: .translation), let people = routes.firstIndex(of: .people) {
             #expect(people == translation + 1)

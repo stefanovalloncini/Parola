@@ -171,7 +171,7 @@ struct OpenInNewWindowSettingTests {
             model, texts: ["alpha"], speakers: [nil], audio: nil
         )
         model.loadEntry(entry.id)
-        try await PeopleTestSupport.until { model.hasTranscript }
+        await waitUntil(timeoutMs: 3000) { model.hasTranscript }
 
         #expect(model.mainTranscriptCommandsEnabled)
 
@@ -191,7 +191,7 @@ struct OpenInNewWindowSettingTests {
             model, texts: ["alpha"], speakers: [nil], audio: nil
         )
         model.loadEntry(entry.id)
-        try await PeopleTestSupport.until { model.hasTranscript }
+        await waitUntil(timeoutMs: 3000) { model.hasTranscript }
         let session = await EntryWindowTestSupport.openSession(model, entry)
         model.entryWindowKeyChanged(entry.id, isKey: true)
 

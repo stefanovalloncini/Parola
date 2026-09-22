@@ -62,7 +62,7 @@ struct EntryWindowViewerTests {
         try await EntryWindowTestSupport.store(model).setSpeakerAssignments(["Grace": grace.id], for: other.id)
         await model.refreshLibraryAndWait()
         model.loadEntry(other.id)
-        try await PeopleTestSupport.until { model.selectedEntryID == other.id }
+        await waitUntil(timeoutMs: 3000) { model.selectedEntryID == other.id }
 
         let session = await EntryWindowTestSupport.openSession(model, shown)
 

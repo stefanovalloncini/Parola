@@ -19,13 +19,6 @@ struct SummaryOptionsSettingsTests {
         )
     }
 
-    private func waitUntil(timeoutMs: Int = 3000, _ condition: @MainActor () -> Bool) async {
-        let deadline = ContinuousClock().now.advanced(by: .milliseconds(timeoutMs))
-        while !condition(), ContinuousClock().now < deadline {
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-    }
-
     @Test("summaryOptions round-trips through defaults")
     func summaryOptionsRoundTrips() {
         let defaults = temporaryDefaults()

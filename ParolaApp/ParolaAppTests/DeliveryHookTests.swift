@@ -43,18 +43,6 @@ struct DeliveryHookTests {
         return mock
     }
 
-    private func poll(
-        budget: Duration = .seconds(10),
-        until condition: @MainActor () async -> Bool
-    ) async -> Bool {
-        let deadline = ContinuousClock.now + budget
-        while ContinuousClock.now < deadline {
-            if await condition() { return true }
-            try? await Task.sleep(for: .milliseconds(20))
-        }
-        return await condition()
-    }
-
     @Test("a finished transcription reaches the auto-send destinations")
     func autoSendsOnCompletion() async {
         let model = makeModel()
@@ -63,7 +51,7 @@ struct DeliveryHookTests {
 
         model.persistToLibrary(Self.transcript(), audioSource: nil, source: .file, title: "Riunione")
 
-        #expect(await poll { await !recorder.recorded().isEmpty }, "the entry should have been sent")
+        #expect(await waitUntil(timeoutMs: 10_000) { await !recorder.recorded().isEmpty }, "the entry should have been sent")
         let entries = await model.library.list()
         #expect(await recorder.recorded().map(\.entryID) == entries.map(\.id))
         #expect(await recorder.recorded().first?.title == "Riunione")
@@ -77,10 +65,10 @@ struct DeliveryHookTests {
 
         model.persistToLibrary(Self.transcript(), audioSource: nil, source: .file, title: "Riunione")
 
-        #expect(await poll { await !recorder.recorded().isEmpty })
+        #expect(await waitUntil(timeoutMs: 10_000) { await !recorder.recorded().isEmpty })
         let entryID = try #require(await recorder.recorded().first?.entryID)
         let loaded = try await model.library.load(entryID)
-        #expect(await poll { (try? await model.library.load(entryID).entry.deliveries.count) == 1 })
+        #expect(await waitUntil(timeoutMs: 10_000) { (try? await model.library.load(entryID).entry.deliveries.count) == 1 })
         #expect(loaded.entry.title == "Riunione")
     }
 
@@ -92,7 +80,7 @@ struct DeliveryHookTests {
 
         model.persistToLibrary(Self.transcript(), audioSource: nil, source: .file, activate: false)
 
-        #expect(await poll { await model.library.list().count == 1 }, "the entry should still be saved")
+        #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 }, "the entry should still be saved")
         #expect(await recorder.recorded().isEmpty)
     }
 
@@ -112,7 +100,7 @@ struct DeliveryHookTests {
 
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.transcript()))
 
-        #expect(await poll { await model.library.list().count == 1 }, "the batch entry should be saved")
+        #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 }, "the batch entry should be saved")
         #expect(await recorder.recorded().isEmpty)
     }
 
@@ -124,7 +112,7 @@ struct DeliveryHookTests {
 
         model.persistToLibrary(Self.transcript(), audioSource: nil, source: .file)
 
-        #expect(await poll { await model.library.list().count == 1 })
+        #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 })
         #expect(await recorder.recorded().isEmpty)
         #expect(model.deliveryNotice == nil)
     }
@@ -137,7 +125,7 @@ struct DeliveryHookTests {
 
         model.persistToLibrary(Self.transcript(), audioSource: nil, source: .file)
 
-        #expect(await poll { await model.library.list().count == 1 })
+        #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 })
         #expect(await recorder.recorded().isEmpty)
         #expect(model.deliveryNotice == nil)
     }
@@ -183,10 +171,10 @@ struct DeliveryHookTests {
 
         let note = vault.appendingPathComponent("Riunione.md")
         #expect(
-            await poll { FileManager.default.fileExists(atPath: note.path) },
+            await waitUntil(timeoutMs: 10_000) { FileManager.default.fileExists(atPath: note.path) },
             "the queued delivery should have run at launch"
         )
-        #expect(await poll { store.loadQueue().isEmpty })
+        #expect(await waitUntil(timeoutMs: 10_000) { store.loadQueue().isEmpty })
         #expect(model.destinations.count == 1)
     }
 
