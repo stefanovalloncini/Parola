@@ -13,11 +13,17 @@ import { barFractions } from "../data/brand";
   </head>
   <body>
     <div class="card">
-      <p class="brand"><BrandIcon size={56} /> Parola</p>
-      <h1>Audio, <span class="mark">written down</span>.</h1>
+      <p class="brand">
+        <BrandIcon size={56} /> Parola
+      </p>
+      <h1>
+        Audio, <span class="mark">written down</span>.
+      </h1>
       <p class="sub">Speech to text on your Mac. Free and open source.</p>
       <div class="bars" aria-hidden="true">
-        {barFractions.map((fraction) => <i style={`--h: ${fraction}`} />)}
+        {barFractions.map((fraction) => (
+          <i style={`--h: ${fraction}`} />
+        ))}
       </div>
     </div>
   </body>
