@@ -152,7 +152,7 @@ struct PillToggleButton: View {
     }
 
     private var fillColor: Color {
-        if isOn { return DS.Color.accent.opacity(hovering ? 0.95 : 0.85) }
+        if isOn { return hovering ? DS.Color.accent.opacity(0.95) : DS.Color.selectionProminent }
         return Color.primary.opacity(hovering ? 0.10 : 0.06)
     }
 
@@ -216,7 +216,7 @@ struct PillPopoverRow: View {
 
     /// A popover list is a menu: the current value is a solid accent row, like the sidebar's.
     static var selectionStyle: RowSelectionStyle {
-        .prominent(fill: DS.Color.accent.opacity(0.85), foreground: DS.Color.onAccent)
+        .prominent(fill: DS.Color.selectionProminent, foreground: DS.Color.onAccent)
     }
 
     var body: some View {

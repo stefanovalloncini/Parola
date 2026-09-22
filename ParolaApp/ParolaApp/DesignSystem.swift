@@ -173,6 +173,12 @@ enum DS {
         /// The wash's strength on its own, for the contrast tests that blend it themselves.
         static let selectionWashTint = 0.12
 
+        /// What a chosen sidebar row, menu row or preset chip is filled with; `onAccent` is its ink.
+        static var selectionProminent: SwiftUI.Color { DS.resolved.accent.opacity(selectionProminentTint) }
+
+        /// The prominent fill's strength on its own, for the contrast tests that blend it themselves.
+        static let selectionProminentTint = 0.85
+
         /// `danger` / `success` as small text, adjusted until they clear AA on the card fill.
         static var dangerText: SwiftUI.Color { DS.resolved.dangerText }
         static var successText: SwiftUI.Color { DS.resolved.successText }

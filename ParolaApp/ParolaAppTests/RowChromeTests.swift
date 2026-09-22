@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct RowChromeTests {
     private let prominent = RowSelectionStyle.prominent(
-        fill: DS.Color.accent.opacity(0.85),
+        fill: DS.Color.selectionProminent,
         foreground: DS.Color.onAccent
     )
     private let wash = RowSelectionStyle.wash(
@@ -54,7 +54,7 @@ struct RowChromeTests {
     @Test("a prominent row carries its family's fill and foreground")
     func prominentCarriesItsPair() {
         let selected = appearance(selected: true, hovered: false, prominent)
-        #expect(selected.fill == DS.Color.accent.opacity(0.85))
+        #expect(selected.fill == DS.Color.selectionProminent)
         #expect(selected.foreground == DS.Color.onAccent)
         #expect(selected.border == nil)
     }
@@ -90,7 +90,7 @@ struct RowChromeTests {
     @Test("a chosen popover row is a solid accent with a legible foreground")
     func popoverRowIsProminent() {
         let selected = appearance(selected: true, hovered: false, PillPopoverRow.selectionStyle)
-        #expect(selected.fill == DS.Color.accent.opacity(0.85))
+        #expect(selected.fill == DS.Color.selectionProminent)
         #expect(selected.foreground == DS.Color.onAccent)
         #expect(selected.border == nil)
     }
@@ -109,6 +109,8 @@ struct RowChromeTests {
         let popover = appearance(selected: true, hovered: false, PillPopoverRow.selectionStyle)
         let sidebar = appearance(selected: true, hovered: false, SidebarRowLabel.selectionStyle)
         #expect(popover.fill == sidebar.fill)
+        #expect(popover.fill == DS.Color.selectionProminent)
+        #expect(DS.Color.selectionProminent != DS.Color.accent)
         // The sidebar's labels name their own onAccent tiers; the popover row lets the chrome paint the first one.
         #expect(sidebar.foreground == nil)
         #expect(popover.foreground == DS.Color.onAccent)

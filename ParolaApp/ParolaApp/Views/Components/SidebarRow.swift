@@ -117,7 +117,7 @@ struct SidebarRowLabel: View {
 
     /// The solid accent a chosen sidebar row wears; its labels name their own onAccent tiers, so it carries no foreground.
     static var selectionStyle: RowSelectionStyle {
-        .prominent(fill: DS.Color.accent.opacity(0.85))
+        .prominent(fill: DS.Color.selectionProminent)
     }
 
     @State private var isHovering = false

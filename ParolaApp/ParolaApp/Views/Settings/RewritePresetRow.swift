@@ -13,7 +13,7 @@ struct RewritePresetRow: View {
                     isSelected: on,
                     size: .prominent,
                     style: .subtle,
-                    selectedFill: DS.Color.accent.opacity(0.85)
+                    selectedFill: DS.Color.selectionProminent
                 ) {
                     selectedID = on ? "" : preset.id.uuidString
                 }

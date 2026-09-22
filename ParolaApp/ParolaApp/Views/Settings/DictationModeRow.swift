@@ -14,7 +14,7 @@ struct DictationModeRow: View {
                     isSelected: selectedID == targetID,
                     size: .prominent,
                     style: .subtle,
-                    selectedFill: DS.Color.accent.opacity(0.85)
+                    selectedFill: DS.Color.selectionProminent
                 ) {
                     selectedID = targetID
                 }
