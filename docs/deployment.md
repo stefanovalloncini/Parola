@@ -18,11 +18,12 @@ governs every frontend.
 
 | Key | Type | Effect |
 |---|---|---|
-| `enabledFeatures` | array of strings | Allowlist of feature units. Absent: everything on. Present: exactly the listed units run — their UI disappears, their subsystems never start, and the CLI, App Intents, URL scheme, and MCP bridge refuse them. Unknown names are ignored. Empty array: all nine units off; file transcription, library, export, search, and settings still work. |
+| `enabledFeatures` | array of strings | Allowlist of feature units. Absent: everything on. Present: exactly the listed units run — their UI disappears, their subsystems never start, and the CLI, App Intents, URL scheme, and MCP bridge refuse them. Unknown names are ignored. Empty array: all ten units off; file transcription, library, export, search, and settings still work. |
 | `defaultModel` | string | Model id selected at first launch. |
 | `allowedEngines` | array of strings | Restricts transcription engines and the model catalog. |
 | `disableDictation` | bool | Legacy switch for the `dictation` unit. |
 | `disableYouTubeIngestion` | bool | Legacy switch for the `youtube` unit. |
+| `disableDestinations` | bool | Switch for the `destinations` unit (Send To). |
 | `disableCloudLLM` | bool | Blocks cloud LLM providers; on-device AI keeps working. |
 | `disableModelDownloads` | bool | Blocks new model downloads. |
 | `requireEnglishOnly` | bool | Forces English transcription. |
@@ -33,7 +34,7 @@ combination wins.
 ## Feature units
 
 `dictation`, `meetings`, `micRecording`, `liveCaptions`, `youtube`, `batch`,
-`ai`, `automation`, `watchedFolders`.
+`ai`, `automation`, `watchedFolders`, `destinations`.
 
 A dictation-only deployment:
 
