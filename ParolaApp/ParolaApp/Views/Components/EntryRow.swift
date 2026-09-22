@@ -99,6 +99,11 @@ struct EntryBadge: View {
 enum EntryRowStyle {
     case list
     case home
+
+    /// Home and Recently Deleted wrap the row in chrome of their own, so the row draws none inside it.
+    func paintsRowChrome(drawsHover: Bool) -> Bool {
+        self == .list && drawsHover
+    }
 }
 
 /// The line under a row's title: what the entry says, or where a search hit it.
@@ -178,7 +183,14 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: DS.Spacing.regular) {
+        chromedRow
+            .help(help ?? display.tooltip)
+            .onHover { isHovering = $0 }
+    }
+
+    @ViewBuilder
+    private var chromedRow: some View {
+        let row = HStack(alignment: .top, spacing: DS.Spacing.regular) {
             EntryBadge(kind: display.sourceKind, onAccent: onAccent)
             VStack(alignment: .leading, spacing: DS.Spacing.hair) {
                 titleLine
@@ -190,9 +202,12 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         .padding(.vertical, compact ? DS.Spacing.tight : DS.Spacing.small)
         .frame(height: rowHeight, alignment: .top)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .rowChrome(selected: isSelected, hovered: showsHoverFill, selection: .native)
-        .help(help ?? display.tooltip)
-        .onHover { isHovering = $0 }
+
+        if style.paintsRowChrome(drawsHover: drawsHover) {
+            row.rowChrome(selected: isSelected, hovered: isHovering, selection: .native)
+        } else {
+            row
+        }
     }
 
     private var titleLine: some View {
@@ -245,12 +260,6 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             }
             accessory
         }
-    }
-
-    /// Home paints its own hover around the row it wraps, so the `.home` style draws none here.
-    private var showsHoverFill: Bool {
-        guard case .list = style else { return false }
-        return drawsHover && isHovering
     }
 
     private var noteChip: some View {

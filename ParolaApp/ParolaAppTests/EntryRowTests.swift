@@ -5,6 +5,14 @@ import ParolaCore
 
 @Suite("Entry row")
 struct EntryRowTests {
+    @Test("a row that somebody else wraps in chrome draws none of its own")
+    func wrappedRowsLeaveTheChromeToTheirCaller() {
+        #expect(EntryRowStyle.list.paintsRowChrome(drawsHover: true))
+        // Home wraps the row in a button that hovers; Recently Deleted washes the row and its expiry bar together.
+        #expect(!EntryRowStyle.home.paintsRowChrome(drawsHover: true))
+        #expect(!EntryRowStyle.list.paintsRowChrome(drawsHover: false))
+    }
+
     @Test("an excerpt stops on the last whole word that fits and says it was cut")
     func excerptCutsOnAWordBoundary() {
         let text = "Il primo paragrafo della trascrizione continua ben oltre il limite richiesto."
