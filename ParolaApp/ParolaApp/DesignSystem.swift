@@ -48,8 +48,9 @@ enum DS {
         static let display: CGFloat = -0.5
     }
 
-    /// Thirteen fixed tiers, ours rather than the system text styles, so a tier means the same thing
+    /// Fourteen fixed tiers, ours rather than the system text styles, so a tier means the same thing
     /// on every surface. Pick by role — page title, section heading, row title, meta line, caption.
+    /// Three faces: SF for the chrome, `transcript`/`transcriptEmphasis` for the reading surface, SF Rounded for the timer.
     enum Font {
         /// The brand lockup on the first-run stage, nowhere else.
         static let wordmark = SwiftUI.Font.system(size: 56, weight: .bold)
