@@ -12932,6 +12932,17 @@
         }
       }
     },
+    "This transcript's own model isn't available, so Parola will run %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il modello di questa trascrizione non è disponibile, quindi Parola userà %@."
+          }
+        }
+      }
+    },
     "This will remove %@ from disk. You can re-download it later.": {
       "extractionState": "manual",
       "localizations": {
