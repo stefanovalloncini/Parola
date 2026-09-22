@@ -170,6 +170,7 @@ struct AppIconTests {
         }
 
         let sampled: [ThemePreset] = [.blue, .yellow, .pink]
+        let among = sampled.map(\.rawValue).joined(separator: ", ")
         var backgrounds: [ThemePreset: RGBA] = [:]
         for preset in sampled {
             DS.theme = preset.palette
@@ -178,7 +179,7 @@ struct AppIconTests {
             let background = pixel(icon, xFraction: 0.15, yFraction: 0.5)
             backgrounds[preset] = background
             #expect(nearestPreset(to: background, among: sampled) == preset,
-                    "\(preset.rawValue) icon sampled \(background.hex), nearest \(nearestPreset(to: background, among: sampled)?.rawValue ?? "none")")
+                    "\(preset.rawValue) icon sampled \(background.hex); of \(among) the nearest is \(nearestPreset(to: background, among: sampled)?.rawValue ?? "none")")
 
             let bar = pixel(icon, xFraction: 0.5, yFraction: 0.5)
             let expectedBar = preset == .yellow ? DockIcon.ink : DockIcon.cream
