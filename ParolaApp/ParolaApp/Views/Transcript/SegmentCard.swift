@@ -28,11 +28,19 @@ struct SegmentCard: View {
     private var isCurrent: Bool { model.currentSegmentID == segment.id }
 
     var body: some View {
-        // Read once: the star shows in the speaker line, the action strip and the ••• menu.
+        // Read once: the star shows in the meta cluster, the action strip and the ••• menu.
         let isFavorite = model.isSegmentFavorite(segment.id)
         return VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            speakerLine(isFavorite: isFavorite)
-            contentRow
+            if let speaker = labelledSpeaker {
+                speakerLine(speaker: speaker, isFavorite: isFavorite)
+                contentRow
+            } else {
+                // With no chip to carry, the meta cluster rides the text's first line rather than holding a row of its own.
+                HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
+                    contentRow
+                    metaCluster(isFavorite: isFavorite)
+                }
+            }
 
             if !qcIssues.isEmpty {
                 Image(systemName: "exclamationmark.triangle")
@@ -147,12 +155,21 @@ struct SegmentCard: View {
             .axLeaf("Card.Text.Translation")
     }
 
-    private func speakerLine(isFavorite: Bool) -> some View {
+    private var labelledSpeaker: (raw: String, label: String)? {
+        guard let raw = segment.speaker, let label = Self.speakerLabel(for: raw) else { return nil }
+        return (raw, label)
+    }
+
+    private func speakerLine(speaker: (raw: String, label: String), isFavorite: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
-            if let rawSpeaker = segment.speaker, let speaker = Self.speakerLabel(for: rawSpeaker) {
-                speakerChip(raw: rawSpeaker, label: speaker)
-            }
+            speakerChip(raw: speaker.raw, label: speaker.label)
             Spacer(minLength: DS.Spacing.small)
+            metaCluster(isFavorite: isFavorite)
+        }
+    }
+
+    private func metaCluster(isFavorite: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
             if isFavorite {
                 Image(systemName: "star.fill")
                     .font(DS.Font.caption)
@@ -173,6 +190,7 @@ struct SegmentCard: View {
             // A speakerless segment renders no chip, so the timestamp carries the assign menu too.
             .contextMenu { assignSpeakerMenu }
         }
+        .fixedSize()
     }
 
     private func speakerChip(raw: String, label: String) -> some View {
