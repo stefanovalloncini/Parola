@@ -5,8 +5,7 @@ import Observation
 import ParolaCore
 import SwiftUI
 
-/// One library entry open in a window of its own: the document it shows, its own player and clock,
-/// and the search inside that window. Nothing here reaches the main window's transcript or player.
+/// One library entry open in a window of its own: its document, its own player and clock, its own search.
 @MainActor
 @Observable
 final class EntryWindowSession {
@@ -31,17 +30,18 @@ final class EntryWindowSession {
 
     @ObservationIgnored private let model: AppModel
     @ObservationIgnored private(set) var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var playerURL: URL?
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var statusObserver: NSKeyValueObservation?
     @ObservationIgnored private var matchesBySegment: [TranscriptSegment.ID: [TranscriptMatch]] = [:]
+    @ObservationIgnored private var segmentsByID: [TranscriptSegment.ID: TranscriptSegment] = [:]
 
     init(entryID: LibraryEntry.ID, model: AppModel) {
         self.entryID = entryID
         self.model = model
         let stored = model.defaults.object(forKey: "playbackRate") as? Double
         self.rate = (stored ?? 0) > 0 ? (stored ?? 1) : 1
-        // The title the main window's header and the bridge's displayTitle use, so a driver
-        // looking for this window by name finds it.
+        // The title the main window's header and the bridge's displayTitle use, so a driver finds it by name.
         self.title = model.libraryEntry(id: entryID)
             .map { LibraryEntryDisplay.title(for: $0) }
             ?? String(localized: "Transcript")
@@ -51,6 +51,11 @@ final class EntryWindowSession {
     // MARK: - What the window shows
 
     var transcript: Transcript? { document?.transcript }
+
+    /// The rows the window draws: every segment that has something to say, built once per load.
+    private(set) var visibleSegments: [TranscriptSegment] = []
+
+    func segment(_ id: TranscriptSegment.ID) -> TranscriptSegment? { segmentsByID[id] }
 
     var entry: LibraryEntry? { model.libraryEntry(id: entryID) }
 
@@ -85,43 +90,85 @@ final class EntryWindowSession {
     // MARK: - Loading
 
     private func load() {
+        startLoad(keepingPlace: false)
+    }
+
+    /// Re-reads the bundle after the library changed, keeping the window where the reader left it.
+    func reload() {
+        startLoad(keepingPlace: true)
+    }
+
+    private func startLoad(keepingPlace: Bool) {
+        loadTask?.cancel()
         loadTask = Task { [model, entryID] in
             do {
                 let loaded = try await model.library.load(entryID)
                 guard !Task.isCancelled else { return }
-                apply(loaded)
+                apply(loaded, keepingPlace: keepingPlace)
             } catch {
                 guard !Task.isCancelled else { return }
-                isLoading = false
-                loadFailed = true
+                markUnavailable()
             }
         }
     }
 
-    private func apply(_ loaded: LoadedEntry) {
+    private func apply(_ loaded: LoadedEntry, keepingPlace: Bool) {
         document = loaded.document
         title = LibraryEntryDisplay.title(for: loaded.entry)
         isLoading = false
         loadFailed = false
-        if let audioURL = loaded.document.audioURL { installPlayer(for: audioURL) }
+        rebuildSegmentIndex()
+        refreshMatches()
+        let audioURL = loaded.document.audioURL
+        if let audioURL, player == nil || !keepingPlace || audioURL != playerURL {
+            installPlayer(for: audioURL)
+        } else if audioURL == nil {
+            tearDownPlayer()
+        }
+        // A reload can move the segment under a standing clock; a first load has no clock to honour.
+        if keepingPlace { updateCurrentSegment(time: currentTime) }
+    }
+
+    private func markUnavailable() {
+        document = nil
+        isLoading = false
+        loadFailed = true
+        rebuildSegmentIndex()
+        refreshMatches()
+        tearDownPlayer()
+    }
+
+    private func rebuildSegmentIndex() {
+        let segments = transcript?.segments ?? []
+        visibleSegments = segments.filter {
+            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        segmentsByID = Dictionary(segments.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Frees the window's player and its observers. The registry calls this when the window closes.
     func release() {
         loadTask?.cancel()
         loadTask = nil
+        tearDownPlayer()
+    }
+
+    private func tearDownPlayer() {
         if let timeObserver, let player { player.removeTimeObserver(timeObserver) }
         timeObserver = nil
         statusObserver?.invalidate()
         statusObserver = nil
         player?.pause()
         player = nil
+        playerURL = nil
         isPlaying = false
     }
 
     // MARK: - Playback
 
     private func installPlayer(for url: URL) {
+        tearDownPlayer()
+        playerURL = url
         let player = AVPlayer(url: url)
         player.defaultRate = Float(rate)
         self.player = player
@@ -156,11 +203,10 @@ final class EntryWindowSession {
         player.rate = Float(rate)
     }
 
-    /// Moves the window's clock, with or without a player behind it: a transcript imported without
-    /// its media still follows the segment the scrubber names.
+    /// Moves the window's clock even with no player behind it, so a media-less transcript still follows along.
     func scrub(to seconds: Double) {
         guard seconds.isFinite else { return }
-        let target = max(0, seconds)
+        let target = durationSeconds > 0 ? min(max(0, seconds), durationSeconds) : max(0, seconds)
         currentTime = target
         updateCurrentSegment(time: target)
         player?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
@@ -216,14 +262,21 @@ final class EntryWindowSession {
 
     private func recomputeMatches() {
         currentMatchIndex = 0
+        refreshMatches()
+        snapToCurrentMatch()
+    }
+
+    /// Re-runs the standing query over a transcript that changed under it, keeping the reader's place in the list.
+    private func refreshMatches() {
         guard let transcript, !searchQuery.isEmpty else {
             matches = []
             matchesBySegment = [:]
+            currentMatchIndex = 0
             return
         }
         matches = transcript.findMatches(searchQuery)
         matchesBySegment = Dictionary(grouping: matches, by: \.segmentID)
-        snapToCurrentMatch()
+        currentMatchIndex = min(currentMatchIndex, max(matches.count - 1, 0))
     }
 
     private func snapToCurrentMatch() {

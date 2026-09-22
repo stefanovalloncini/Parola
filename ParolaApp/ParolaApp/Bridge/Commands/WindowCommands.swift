@@ -130,9 +130,13 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     let id = try args.string("entryID")
-                    ctx.model.openEntryWindow(id)
+                    let opened = ctx.model.openEntryWindow(id)
+                    let reason = ctx.model.libraryEntry(id: id) == nil
+                        ? "no library entry with that id"
+                        : "the app is not ready to open windows yet"
                     return .object([
-                        "opened": .bool(ctx.model.openEntryWindowIDs.contains(id)),
+                        "opened": .bool(opened),
+                        "reason": opened ? .null : .string(reason),
                         "openEntryWindows": .array(ctx.model.openEntryWindowIDs.map { .string($0) }),
                     ])
                 }

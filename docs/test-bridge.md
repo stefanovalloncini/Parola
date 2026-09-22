@@ -70,7 +70,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_clear_transcript` | — | Drop the in-memory transcript. |
 | `parola_app_list_entries` | category, limit | Library entries with id, title (as stored), displayTitle (what the rows show), category, createdAt, durationSeconds, language. |
 | `parola_app_load_entry` | **id** | Open a library entry by id — into the main pane, or into its own window when `openEntriesInNewWindow` is on. |
-| `openEntryInNewWindow` | **entryID** | Open a library entry in its own read-only transcript window, the way ⇧⌘N and the row's context menu do. The window is titled after the entry. Replies `{opened, openEntryWindows}`. |
+| `openEntryInNewWindow` | **entryID** | Open a library entry in its own read-only transcript window, the way ⇧⌘N and the row's context menu do. The window is titled after the entry. Replies `{opened, reason, openEntryWindows}`; `opened: false` when the library has no such entry or no window scene is ready yet. |
 | `parola_app_delete_entry` | **id** | Move an entry to Recently Deleted. |
 | `parola_app_download_model` | **name** | Trigger a download from inside the app. Progress shows in the UI. |
 | `parola_app_delete_model` | **name** | Delete a downloaded model. |

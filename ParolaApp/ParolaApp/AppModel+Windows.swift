@@ -3,24 +3,24 @@ import ParolaCore
 
 extension AppModel {
 
-    /// Hands the scene's `openWindow` to the model, which the menu, the library rows and the bridge
-    /// all reach through ``openEntryWindow(_:)``.
+    /// Hands the scene's `openWindow` to the model, the one thing that can put a window on screen.
     func bindOpenEntryWindow(_ action: @escaping (LibraryEntry.ID) -> Void) {
         openEntryWindowAction = action
     }
 
-    /// The one way a transcript window opens. An id the library does not hold opens nothing.
-    /// The session is made here rather than when the view appears, so the document is already
-    /// loading as the window draws and `openEntryWindowIDs` answers for it straight away.
-    func openEntryWindow(_ id: LibraryEntry.ID) {
-        guard libraryEntry(id: id) != nil else { return }
+    /// The one way a transcript window opens; false when the library has no such entry or no scene can open one.
+    @discardableResult
+    func openEntryWindow(_ id: LibraryEntry.ID) -> Bool {
+        // The session is made before the window so the document is already loading as it draws — but
+        // only once the window is certain, or an unopened window would leave a session nobody closes.
+        guard libraryEntry(id: id) != nil, let action = openEntryWindowAction else { return false }
         introduction.defer()
         _ = entryWindows.session(for: id, model: self)
-        openEntryWindowAction?(id)
+        action(id)
+        return true
     }
 
-    /// Opening a library row: the main pane, or a window of its own when the user asked for that
-    /// with the setting or by holding Option.
+    /// Opening a library row: the main pane, or a window of its own when the setting or Option asks for one.
     func openEntryFromLibrary(_ id: LibraryEntry.ID, inNewWindow forced: Bool) {
         if forced || openEntriesInNewWindow {
             openEntryWindow(id)
@@ -33,17 +33,16 @@ extension AppModel {
         entryWindows.session(for: id, model: self)
     }
 
-    func releaseEntryWindow(_ id: LibraryEntry.ID) {
-        keyViewerEntryIDs.remove(id)
-        entryWindows.release(id)
+    func releaseEntryWindow(_ session: EntryWindowSession) {
+        guard entryWindows.release(session) else { return }
+        keyViewerEntryIDs.remove(session.entryID)
     }
 
     var openEntryWindowIDs: [LibraryEntry.ID] { entryWindows.openIDs }
 
     // MARK: - Which window the commands act on
 
-    /// Set by each transcript window as it takes or loses key. Keyed by entry so two windows
-    /// trading focus can't leave the flag stuck on.
+    /// Keyed by entry, so two windows trading focus can't leave the flag stuck on.
     func entryWindowKeyChanged(_ id: LibraryEntry.ID, isKey: Bool) {
         if isKey {
             keyViewerEntryIDs.insert(id)
@@ -58,8 +57,7 @@ extension AppModel {
         keyViewerEntryIDs.sorted().lazy.compactMap { self.entryWindows.existingSession(for: $0) }.first
     }
 
-    /// Commands that act on the transcript in the main window: off while a viewer holds focus,
-    /// where they would edit or export something the user can't see.
+    /// Off while a viewer holds focus, where these would edit or export something the user can't see.
     var mainTranscriptCommandsEnabled: Bool { hasTranscript && !keyWindowIsViewer }
 
     var findCommandEnabled: Bool {

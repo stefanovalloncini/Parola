@@ -28,7 +28,7 @@ struct EntryViewerSegments: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
-                    ForEach(visibleSegments) { segment in
+                    ForEach(session.visibleSegments) { segment in
                         EntryViewerSegmentRow(
                             segment: segment,
                             isCurrent: session.currentSegmentID == segment.id,
@@ -55,11 +55,6 @@ struct EntryViewerSegments: View {
         }
     }
 
-    private var visibleSegments: [TranscriptSegment] {
-        session.transcript?.segments.filter {
-            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        } ?? []
-    }
 }
 
 private struct EntryViewerSegmentRow: View {
@@ -135,17 +130,14 @@ private struct EntryViewerSegmentRow: View {
         }
     }
 
-    @ViewBuilder
     private var text: some View {
-        if matches.isEmpty {
-            Text(verbatim: segment.text.trimmingCharacters(in: .whitespacesAndNewlines))
-                .font(DS.Font.transcript)
-                .textSelection(.enabled)
-        } else {
-            Text(EntryViewerText.highlighted(segment.text, matches: matches, currentMatchID: currentMatchID))
-                .font(DS.Font.transcript)
-                .textSelection(.enabled)
-        }
+        Text(TranscriptSearchHighlight.attributed(
+            segment.text,
+            matches: matches,
+            currentMatchID: currentMatchID
+        ))
+        .font(DS.Font.transcript)
+        .textSelection(.enabled)
     }
 
     private func translationText(_ value: String) -> some View {

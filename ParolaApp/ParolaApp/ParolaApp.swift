@@ -306,7 +306,7 @@ struct ParolaApp: App {
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
                 .disabled(model.selectedEntryID == nil || model.keyWindowIsViewer)
-                .help("Save the transcript to the library first")
+                .help(model.selectedEntryID == nil ? "Save the transcript to the library first" : "")
                 if model.destinationsEnabled {
                     Divider()
                     SendToMenu(model: model, entryID: model.selectedEntryID)
@@ -331,9 +331,9 @@ struct ParolaApp: App {
                 .preferredColorScheme(model.preferredColorScheme)
         }
 
+        // No .id(themeRevision) here: re-identifying the view would release a live window's session.
         WindowGroup("Transcript", id: EntryWindowScene.id, for: LibraryEntry.ID.self) { $entryID in
             EntryWindowView(entryID: entryID)
-                .id(model.themeRevision)
                 .tint(DS.Color.accent)
                 .environment(model)
                 .preferredColorScheme(model.preferredColorScheme)

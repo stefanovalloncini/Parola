@@ -1,8 +1,7 @@
 import SwiftUI
 import ParolaCore
 
-/// The window's flowing-text mode. It builds the same chunks the main pane does, with the same
-/// speaker colours and favorite stars, and answers a click on a run by seeking this window's player.
+/// The window's flowing-text mode: the same chunks the main pane builds, seeking this window's player.
 struct EntryViewerContinuous: View {
     let session: EntryWindowSession
     let onEditAttempt: () -> Void
@@ -40,6 +39,8 @@ struct EntryViewerContinuous: View {
             })
             .onAppear { rebuild() }
             .onChange(of: buildKey) { _, _ in rebuild() }
+            // The chunks cache resolved colours, so a theme change has to rebuild them.
+            .onChange(of: model.themeRevision) { _, _ in rebuild() }
             .onChange(of: session.currentSegmentID) { _, id in
                 applyHighlight()
                 guard let id, let chunkID = chunkIndexBySegment[id] else { return }
@@ -49,20 +50,40 @@ struct EntryViewerContinuous: View {
     }
 
     private func chunkRow(_ chunk: ContinuousChunks.Chunk) -> some View {
-        Group {
+        let text = searched(chunk)
+        return Group {
             if let translation = chunk.translation, model.translationSideBySide {
                 HStack(alignment: .top, spacing: DS.Spacing.regular) {
-                    chunkText(chunk.text)
+                    chunkText(text)
                     chunkText(translation)
                 }
             } else {
                 VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                    chunkText(chunk.text)
+                    chunkText(text)
                     if let translation = chunk.translation { chunkText(translation) }
                 }
             }
         }
         .simultaneousGesture(TapGesture(count: 2).onEnded { onEditAttempt() })
+    }
+
+    /// Painted per row, not in the stored chunks: only the paragraphs on screen pay, and the playhead's tint survives.
+    private func searched(_ chunk: ContinuousChunks.Chunk) -> AttributedString {
+        guard !session.matches.isEmpty else { return chunk.text }
+        var text = chunk.text
+        let currentMatchID = session.currentMatch?.id
+        for (segmentID, run) in chunk.runs {
+            let matches = session.matches(in: segmentID)
+            guard !matches.isEmpty, let segment = session.segment(segmentID) else { continue }
+            TranscriptSearchHighlight.paint(
+                in: &text,
+                runOffsets: run.offsets,
+                rawText: segment.text,
+                matches: matches,
+                currentMatchID: currentMatchID
+            )
+        }
+        return text
     }
 
     private func chunkText(_ text: AttributedString) -> some View {

@@ -72,7 +72,7 @@ struct EntryWindowViewerTests {
 
     @Test("a search match is painted, the rest of the line is not")
     func matchesArePainted() {
-        let highlighted = EntryViewerText.highlighted(
+        let highlighted = TranscriptSearchHighlight.attributed(
             "alpha beta",
             matches: [TranscriptMatch(segmentID: 0, range: 6..<10)],
             currentMatchID: nil
@@ -89,7 +89,7 @@ struct EntryWindowViewerTests {
     func currentMatchStandsOut() {
         let first = TranscriptMatch(segmentID: 0, range: 0..<5)
         let second = TranscriptMatch(segmentID: 0, range: 6..<11)
-        let highlighted = EntryViewerText.highlighted(
+        let highlighted = TranscriptSearchHighlight.attributed(
             "alpha alpha",
             matches: [first, second],
             currentMatchID: second.id
@@ -98,6 +98,40 @@ struct EntryWindowViewerTests {
         let runs = Array(highlighted.runs)
         #expect(runs.count == 3)
         #expect(runs[0].backgroundColor != runs[2].backgroundColor)
+    }
+
+    @Test("a match is painted the same way whether the segment carries stray whitespace or not")
+    func paintingIgnoresSurroundingWhitespace() {
+        let match = TranscriptMatch(segmentID: 0, range: 7..<11)
+        let highlighted = TranscriptSearchHighlight.attributed(
+            " alpha beta ",
+            matches: [match],
+            currentMatchID: match.id
+        )
+
+        #expect(String(highlighted.characters) == "alpha beta")
+        let runs = Array(highlighted.runs)
+        #expect(runs.count == 2)
+        #expect(String(highlighted[runs[1].range].characters) == "beta")
+        #expect(runs[1].backgroundColor != nil)
+    }
+
+    @Test("a match inside a flowing-text chunk is painted where the segment sits")
+    func flowingChunkMatchesArePainted() {
+        var chunk = AttributedString("alpha beta gamma")
+        let match = TranscriptMatch(segmentID: 1, range: 1..<5)
+
+        TranscriptSearchHighlight.paint(
+            in: &chunk,
+            runOffsets: 5..<10,
+            rawText: " beta",
+            matches: [match],
+            currentMatchID: nil
+        )
+
+        let painted = Array(chunk.runs).filter { $0.backgroundColor != nil }
+        #expect(painted.count == 1)
+        #expect(String(chunk[painted[0].range].characters) == "beta")
     }
 
     @Test("an entry with no audio shows the transcript and no transport")

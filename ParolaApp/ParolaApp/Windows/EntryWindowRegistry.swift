@@ -2,8 +2,7 @@ import Foundation
 import Observation
 import ParolaCore
 
-/// The sessions behind the open transcript windows, keyed by the entry each window shows. A second
-/// window on the same entry is the same window, so the same session answers for it.
+/// The sessions behind the open transcript windows, keyed by the entry each window shows.
 @MainActor
 @Observable
 final class EntryWindowRegistry {
@@ -22,7 +21,12 @@ final class EntryWindowRegistry {
         sessions[entryID]
     }
 
-    func release(_ entryID: LibraryEntry.ID) {
-        sessions.removeValue(forKey: entryID)?.release()
+    /// Identity-checked: a window reports its close twice, and the second must not take down its replacement.
+    @discardableResult
+    func release(_ session: EntryWindowSession) -> Bool {
+        guard sessions[session.entryID] === session else { return false }
+        sessions.removeValue(forKey: session.entryID)
+        session.release()
+        return true
     }
 }

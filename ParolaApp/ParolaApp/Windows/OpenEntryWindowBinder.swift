@@ -1,8 +1,7 @@
 import SwiftUI
 import ParolaCore
 
-/// Hands the scene's `openWindow` to the model. `openWindow` only exists inside scene content, and
-/// the menu, the library rows and the bridge all open windows through the model.
+/// Hands the scene's `openWindow` to the model: it exists only inside scene content, and every opener goes through the model.
 private struct OpenEntryWindowBinder: ViewModifier {
     let model: AppModel
 

@@ -34,10 +34,11 @@ struct EntryWindowView: View {
             guard let entryID else { return }
             model.entryWindowKeyChanged(entryID, isKey: state == .key)
         }
+        .onChange(of: model.libraryVersion) { _, _ in session?.reload() }
         .onDisappear {
             hintTask?.cancel()
-            guard let entryID else { return }
-            model.releaseEntryWindow(entryID)
+            guard let session else { return }
+            model.releaseEntryWindow(session)
         }
     }
 
@@ -76,7 +77,7 @@ struct EntryWindowView: View {
         }
         .animation(.easeOut(duration: 0.15), value: showsEditHint)
         .navigationTitle(session.title)
-        .background(WindowCloseReporter { model.releaseEntryWindow(entryID) })
+        .background(WindowCloseReporter { model.releaseEntryWindow(session) })
         .axBranch("EntryWindow.\(entryID)")
     }
 
@@ -128,8 +129,7 @@ struct EntryViewerNotice: View {
     }
 }
 
-/// Reports the window's close. SwiftUI's `onDisappear` can trail a window teardown, and the
-/// session's player has to stop with the window that owns it.
+/// Reports the window's close: SwiftUI's `onDisappear` can trail a window teardown, and the player has to stop with it.
 struct WindowCloseReporter: NSViewRepresentable {
     let onClose: @MainActor @Sendable () -> Void
 

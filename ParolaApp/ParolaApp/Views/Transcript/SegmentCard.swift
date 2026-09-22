@@ -508,24 +508,12 @@ struct SegmentCard: View {
 
     private var highlightedText: Text {
         // Only cards holding a match read currentMatchIndex, so stepping through matches leaves the rest alone.
-        guard !model.matches.isEmpty else { return Text(segment.text) }
-        let segmentMatches = model.match(in: segment.id)
-        guard !segmentMatches.isEmpty else { return Text(segment.text) }
-        var attr = AttributedString(segment.text)
-        let text = segment.text
-        let currentMatchID = model.currentMatch?.id
-        for m in segmentMatches {
-            guard
-                let stringLo = text.utf16.index(text.utf16.startIndex, offsetBy: m.range.lowerBound, limitedBy: text.utf16.endIndex),
-                let stringHi = text.utf16.index(text.utf16.startIndex, offsetBy: m.range.upperBound, limitedBy: text.utf16.endIndex),
-                let attrLo = AttributedString.Index(stringLo, within: attr),
-                let attrHi = AttributedString.Index(stringHi, within: attr)
-            else { continue }
-            let isCurrent = m.id == currentMatchID
-            attr[attrLo..<attrHi].backgroundColor = isCurrent ? DS.Color.accent : Color.yellow
-            attr[attrLo..<attrHi].foregroundColor = Color.black
-        }
-        return Text(attr)
+        let segmentMatches = model.matches.isEmpty ? [] : model.match(in: segment.id)
+        return Text(TranscriptSearchHighlight.attributed(
+            segment.text,
+            matches: segmentMatches,
+            currentMatchID: model.currentMatch?.id
+        ))
     }
 
     private func karaoke(words: [WordTiming]) -> Text {

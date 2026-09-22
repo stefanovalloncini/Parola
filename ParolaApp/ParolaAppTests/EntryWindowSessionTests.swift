@@ -24,8 +24,15 @@ enum EntryWindowTestSupport {
                 )
             },
             language: "en",
-            modelName: "stub"
+            modelName: "stub",
+            durationSeconds: Double(texts.count) - 0.1
         )
+    }
+
+    /// A box for the ids a bound open action was handed, so an escaping closure can record them.
+    @MainActor
+    final class OpenedWindows {
+        var ids: [LibraryEntry.ID] = []
     }
 
     static func store(_ model: AppModel) -> LibraryStore {
@@ -44,8 +51,15 @@ enum EntryWindowTestSupport {
             audioSource: audio,
             category: .transcription
         )
-        await model.refreshLibraryAndWait()
+        await syncLibrary(model)
         return entry
+    }
+
+    /// The tests write through a second store on the same directory, so the model's store has to be
+    /// told its cached listing and documents are stale.
+    static func syncLibrary(_ model: AppModel) async {
+        await model.library.dropCaches()
+        await model.refreshLibraryAndWait()
     }
 
     static func silentAudioFile() throws -> URL {
@@ -104,6 +118,7 @@ struct EntryWindowSessionTests {
 
         #expect(session.currentTime == 0)
         #expect(session.currentSegmentID == nil)
+        #expect(model.currentSegmentID == nil)
 
         session.scrub(to: 1.5)
 
@@ -137,10 +152,110 @@ struct EntryWindowSessionTests {
         #expect(first === second)
         #expect(model.openEntryWindowIDs == [entry.id])
 
-        model.releaseEntryWindow(entry.id)
+        model.releaseEntryWindow(first)
 
         #expect(model.openEntryWindowIDs.isEmpty)
         #expect(model.entryWindowSession(for: entry.id) !== first)
+    }
+
+    @Test("a late close report does not take down the window that replaced it")
+    func releaseChecksIdentity() async throws {
+        let model = EntryWindowTestSupport.makeModel("windowsreplaced")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha"], speakers: [nil], audio: nil
+        )
+
+        let first = model.entryWindowSession(for: entry.id)
+        model.releaseEntryWindow(first)
+        let second = model.entryWindowSession(for: entry.id)
+
+        model.releaseEntryWindow(first)
+
+        #expect(second !== first)
+        #expect(model.openEntryWindowIDs == [entry.id])
+        #expect(model.entryWindowSession(for: entry.id) === second)
+    }
+
+    @Test("a theme change leaves an open window alone")
+    func themeChangeKeepsTheSession() async throws {
+        let defaults = temporaryDefaults()
+        let model = AppModel(
+            skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("windowstheme")
+        )
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha"], speakers: [nil], audio: try EntryWindowTestSupport.silentAudioFile()
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        let player = try #require(session.player)
+        let revisionBefore = model.themeRevision
+
+        defaults.set("dark", forKey: "appTheme")
+        model.reloadSettings()
+
+        #expect(model.themeRevision != revisionBefore)
+        #expect(model.openEntryWindowIDs == [entry.id])
+        #expect(model.entryWindowSession(for: entry.id) === session)
+        #expect(session.player === player)
+    }
+
+    @Test("nothing opens, and nothing is registered, until a scene can show a window")
+    func openNeedsAWindowScene() async throws {
+        let model = EntryWindowTestSupport.makeModel("windowsunbound")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha"], speakers: [nil], audio: nil
+        )
+
+        #expect(model.openEntryWindow(entry.id) == false)
+        #expect(model.openEntryWindowIDs.isEmpty)
+
+        let opened = EntryWindowTestSupport.OpenedWindows()
+        model.bindOpenEntryWindow { opened.ids.append($0) }
+
+        #expect(model.openEntryWindow(entry.id))
+        #expect(opened.ids == [entry.id])
+        #expect(model.openEntryWindowIDs == [entry.id])
+    }
+
+    @Test("a library change reloads the window and keeps its place")
+    func reloadKeepsThePlace() async throws {
+        let model = EntryWindowTestSupport.makeModel("windowsreload")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha", "beta"], speakers: [nil, nil], audio: nil
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        session.scrub(to: 1.2)
+        session.searchQuery = "beta"
+
+        try await EntryWindowTestSupport.store(model).setFavoriteSegments([1], for: entry.id)
+        await EntryWindowTestSupport.syncLibrary(model)
+        session.reload()
+        await session.loadTask?.value
+
+        #expect(session.favorites == [1])
+        #expect(session.currentTime == 1.2)
+        #expect(session.searchQuery == "beta")
+        #expect(session.matches.count == 1)
+        #expect(session.loadFailed == false)
+    }
+
+    @Test("reloading an entry that has gone leaves the empty state")
+    func reloadOfADeletedEntryEmpties() async throws {
+        let model = EntryWindowTestSupport.makeModel("windowsreloadgone")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha"], speakers: [nil], audio: try EntryWindowTestSupport.silentAudioFile()
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        #expect(session.player != nil)
+
+        try await EntryWindowTestSupport.store(model).purge(entry.id)
+        await EntryWindowTestSupport.syncLibrary(model)
+        session.reload()
+        await session.loadTask?.value
+
+        #expect(session.transcript == nil)
+        #expect(session.loadFailed)
+        #expect(session.player == nil)
+        #expect(session.visibleSegments.isEmpty)
     }
 
     @Test("an entry that is gone leaves an empty window instead of crashing")
@@ -190,10 +305,28 @@ struct EntryWindowSessionTests {
         let session = await EntryWindowTestSupport.openSession(model, entry)
         let player = try #require(session.player)
 
-        model.releaseEntryWindow(entry.id)
+        model.releaseEntryWindow(session)
 
         #expect(session.player == nil)
         #expect(player.timeControlStatus != .playing)
+    }
+
+    @Test("the clock never runs past the media")
+    func scrubIsClamped() async throws {
+        let model = EntryWindowTestSupport.makeModel("windowsclamp")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha", "beta"], speakers: [nil, nil], audio: nil
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+
+        session.scrub(to: 500)
+        #expect(session.currentTime == session.durationSeconds)
+
+        session.skip(by: 500)
+        #expect(session.currentTime == session.durationSeconds)
+
+        session.skip(by: -500)
+        #expect(session.currentTime == 0)
     }
 
     @Test("a segment click seeks the window's own clock")

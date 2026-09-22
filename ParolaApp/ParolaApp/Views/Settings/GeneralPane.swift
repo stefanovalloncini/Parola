@@ -66,17 +66,17 @@ struct GeneralPane: View {
                     Toggle("", isOn: $model.diarize).labelsHidden()
                         .axLeaf("General.Toggle.Diarize")
                 }
-                SettingRow("Always open transcripts in a new window",
-                           description: "Double-clicking a library row opens its own window instead of taking over the main one. Hold Option to open a window either way.") {
-                    Toggle("", isOn: $model.openEntriesInNewWindow).labelsHidden()
-                        .axLeaf("General.Toggle.OpenEntriesInNewWindow")
-                }
                 if let warning = model.diarizeMismatchWarning {
                     Label(warning, systemImage: "exclamationmark.triangle.fill")
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.warningText)
                         .padding(.top, DS.Spacing.hair)
                         .axLeaf("General.Label.DiarizeWarning")
+                }
+                SettingRow("Always open transcripts in a new window",
+                           description: "Double-clicking a library row opens its own window instead of taking over the main one. Hold Option to open a window either way.") {
+                    Toggle("", isOn: $model.openEntriesInNewWindow).labelsHidden()
+                        .axLeaf("General.Toggle.OpenEntriesInNewWindow")
                 }
             }
 
