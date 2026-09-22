@@ -81,8 +81,7 @@ const { name, tabs, label } = Astro.props;
   .panel :global(img) {
     width: 100%;
     height: auto;
-    border-radius: var(--radius-window);
-    box-shadow: var(--window-shadow);
+    filter: drop-shadow(0 0 0.5px rgb(0 0 0 / 0.28)) drop-shadow(0 20px 34px rgb(15 26 20 / 0.2));
   }
 
   .panel[hidden] {
