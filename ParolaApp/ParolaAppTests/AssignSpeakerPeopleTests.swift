@@ -242,6 +242,18 @@ struct AssignSpeakerPeopleTests {
         #expect(model.speakerAssignments.isEmpty)
     }
 
+    @Test("a rename onto a label the same pass renames does not chain")
+    func chainedRenamesDoNotCollapse() async throws {
+        let model = PeopleTestSupport.makeModel("assignchainedrename")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+
+        model.applySpeakerRenames(["SPEAKER_00": "SPEAKER_01", "SPEAKER_01": "Anna"])
+        await model.awaitSpeakerAssignmentWrites()
+
+        #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_01", "Anna", "SPEAKER_01"])
+        #expect(model.transcript?.segments.first?.words?.first?.speaker == "SPEAKER_01")
+    }
+
     @Test("undo puts the map back, and redo re-applies it")
     func assignmentMapRoundTripsThroughUndo() async throws {
         let model = PeopleTestSupport.makeModel("assignmapundo")

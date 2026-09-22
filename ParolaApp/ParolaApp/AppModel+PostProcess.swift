@@ -46,16 +46,39 @@ extension AppModel {
         }.value
     }
 
-    /// The Speakers sheet's bulk rename: one label at a time through the entry point that keeps
-    /// the entry's speaker map in step.
+    /// The Speakers sheet's bulk rename. One simultaneous pass, so a pair like
+    /// `["Speaker 1": "Speaker 2", "Speaker 2": "Anna"]` cannot collapse both speakers into Anna:
+    /// every segment's new label is read from the label it carried before the pass.
     func applySpeakerRenames(_ renames: [String: String]) {
-        let effective = renames.filter { renamesSomething($0.key, to: $0.value) }
-        guard !effective.isEmpty else { return }
-        // One group, so the sheet's whole pass comes back on a single ⌘Z.
-        undoManager?.beginUndoGrouping()
-        for (from, to) in effective {
-            renameSpeakerLabel(from, to: to)
+        var targets: [String: String] = [:]
+        for (from, to) in renames where renamesSomething(from, to: to) {
+            targets[from.trimmingCharacters(in: .whitespacesAndNewlines)] =
+                to.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        undoManager?.endUndoGrouping()
+        guard !targets.isEmpty, let current = transcript else { return }
+        var edit = SpeakerAssignmentEdit()
+        var reused: [Person] = []
+        for (from, to) in targets {
+            if let assigned = speakerAssignments[from] {
+                edit.assign[to] = assigned
+            } else if let existing = person(named: to) {
+                edit.assign[to] = existing.id
+                reused.append(existing)
+            }
+            edit.clear.append(from)
+        }
+        let renamed = current.renamingSpeakers(targets)
+        guard renamed != current else { return }
+        applyTranscriptEdit(
+            renamed,
+            actionName: String(localized: "Rename Speaker"),
+            assignments: edit.isEmpty ? nil : edit
+        )
+        guard !reused.isEmpty else { return }
+        Task { [peopleStore] in
+            // The stored spelling, not the typed one: counting a use must not rename the person.
+            for person in reused { _ = await peopleStore.recordUsage(name: person.name) }
+            await refreshPeople()
+        }
     }
 }
