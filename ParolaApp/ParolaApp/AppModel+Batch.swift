@@ -75,6 +75,7 @@ extension AppModel {
             // pending wave ends in another .finished, and the parked files drain there.
             let pending = batchJobs.filter { $0.status == .pending }
             if pending.isEmpty {
+                if batchJobs.contains(where: { $0.status == .done }) { playCompletionSound() }
                 drainDeferredArrivals()
             } else {
                 resumeBatch(pendingJobs: pending)

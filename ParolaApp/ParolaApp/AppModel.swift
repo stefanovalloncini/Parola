@@ -211,6 +211,17 @@ final class AppModel {
     }
     var recordingMaxMinutes: Int = 0 { didSet { defaults.set(recordingMaxMinutes, forKey: "recordingMaxMinutes") } }
     var showMenuBarExtra: Bool = false { didSet { defaults.set(showMenuBarExtra, forKey: "showMenuBarExtra") } }
+    var playSoundWhenFinished: Bool = false { didSet { defaults.set(playSoundWhenFinished, forKey: "playSoundWhenFinished") } }
+    /// What the finished sound actually is. Test mode clears it; a test stubs it to count the plays.
+    @ObservationIgnored var completionSoundPlayer: (@MainActor () -> Void)? = {
+        NSSound(named: NSSound.Name("Glass"))?.play()
+    }
+
+    /// One transcription, one batch run or one re-run has landed in the library.
+    func playCompletionSound() {
+        guard playSoundWhenFinished, let completionSoundPlayer else { return }
+        completionSoundPlayer()
+    }
     var recordingCountInSeconds: Int = 0 { didSet { defaults.set(recordingCountInSeconds, forKey: "recordingCountInSeconds") } }
     var autoMuteWhileRecording: Bool = false { didSet { defaults.set(autoMuteWhileRecording, forKey: "autoMuteWhileRecording") } }
     var autoPauseMediaWhileRecording: Bool = false { didSet { defaults.set(autoPauseMediaWhileRecording, forKey: "autoPauseMediaWhileRecording") } }
@@ -722,6 +733,7 @@ final class AppModel {
         self.dictationContextScreen = defaults.bool(forKey: "dictationContextScreen")
         self.recordingMaxMinutes = defaults.integer(forKey: "recordingMaxMinutes")
         self.showMenuBarExtra = defaults.bool(forKey: "showMenuBarExtra")
+        self.playSoundWhenFinished = defaults.bool(forKey: "playSoundWhenFinished")
         self.recordingCountInSeconds = defaults.integer(forKey: "recordingCountInSeconds")
         self.autoMuteWhileRecording = defaults.bool(forKey: "autoMuteWhileRecording")
         self.autoPauseMediaWhileRecording = defaults.bool(forKey: "autoPauseMediaWhileRecording")
@@ -1435,6 +1447,7 @@ final class AppModel {
             storageURL: bootstrap.library.map { $0.appendingPathComponent("Prompts.json") }
                 ?? PromptLibrary.defaultStorageURL
         )
+        if bootstrap.mode == .test { self.completionSoundPlayer = nil }
         // Suppress the settings didSets during the bulk read: side effects (notably startDictation)
         // must wait until after wireDictationController + the gated side-effect block below, or the
         // dictation coordinator is built before appModel is wired.
@@ -1587,6 +1600,7 @@ final class AppModel {
                     selectedEntryID = entry.id
                 }
                 if activate {
+                    playCompletionSound()
                     // A parked on-device model session must never hold up auto-export.
                     await AsyncTimeout.run(.seconds(30)) { [weak self] in
                         await self?.generateCardMetadata(for: entry.id, transcript: result)

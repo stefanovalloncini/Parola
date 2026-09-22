@@ -9066,6 +9066,17 @@
         }
       }
     },
+    "Play a sound when a transcription finishes": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riproduci un suono al termine di una trascrizione"
+          }
+        }
+      }
+    },
     "Play from here": {
       "extractionState": "manual",
       "localizations": {
@@ -9112,6 +9123,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Player"
+          }
+        }
+      }
+    },
+    "Plays the system Glass sound as the transcript lands in your library. A batch plays it once, at the end.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riproduce il suono di sistema Glass quando la trascrizione entra nella libreria. Un batch lo riproduce una volta sola, alla fine."
           }
         }
       }

@@ -38,6 +38,11 @@ struct GeneralPane: View {
                     Toggle("", isOn: $model.showMenuBarExtra).labelsHidden()
                         .axLeaf("General.Toggle.MenuBarExtra")
                 }
+                SettingRow("Play a sound when a transcription finishes",
+                           description: "Plays the system Glass sound as the transcript lands in your library. A batch plays it once, at the end.") {
+                    Toggle("", isOn: $model.playSoundWhenFinished).labelsHidden()
+                        .axLeaf("General.Toggle.PlaySoundWhenFinished")
+                }
             }
 
             SettingsSection("Every transcript") {
