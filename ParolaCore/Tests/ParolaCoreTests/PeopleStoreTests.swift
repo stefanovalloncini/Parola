@@ -50,12 +50,12 @@ struct PeopleStoreTests {
         #expect(suggestions.map(\.name) == ["Cara", "Bob"])
     }
 
-    @Test("remove drops the person and persists")
-    func remove() async throws {
+    @Test("delete drops the person and persists")
+    func delete() async throws {
         let url = makeTempURL()
         let store = PeopleStore(storageURL: url)
         let p = await store.recordUsage(name: "Stefano")
-        let ok = await store.remove(p.id)
+        let ok = await store.delete(p.id)
         #expect(ok)
         let reopened = PeopleStore(storageURL: url)
         let people = await reopened.people

@@ -74,13 +74,9 @@ public actor PeopleStore {
         return people.first { $0.id == target }
     }
 
+    /// Forgets a person. The names they were assigned to stay where they are.
     @discardableResult
     public func delete(_ id: UUID) -> Bool {
-        remove(id)
-    }
-
-    @discardableResult
-    public func remove(_ id: UUID) -> Bool {
         let before = people.count
         people.removeAll { $0.id == id }
         let removed = people.count != before
