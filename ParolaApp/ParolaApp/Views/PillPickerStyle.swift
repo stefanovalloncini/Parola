@@ -254,21 +254,16 @@ struct PillPopoverRow: View {
             .padding(.horizontal, DS.Spacing.small)
             .padding(.vertical, DS.Spacing.snug)
             .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                    .fill(fill)
+            .rowChrome(
+                selected: isSelected,
+                hovered: hovering,
+                selection: .wash(fill: DS.Color.accentWash)
             )
-            .contentShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .axLeaf("Pill.PopoverRow.\(title)")
-    }
-
-    private var fill: Color {
-        if isSelected { return DS.Color.accentWash }
-        return hovering ? Color.secondary.opacity(0.18) : Color.clear
     }
 
     @ViewBuilder

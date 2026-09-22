@@ -96,8 +96,7 @@ private struct OutlineRow: View {
             }
             .padding(.horizontal, DS.Spacing.regular)
             .padding(.vertical, DS.Spacing.snug)
-            .background(hovering ? DS.Palette.surfaceHover : Color.clear)
-            .contentShape(Rectangle())
+            .rowChrome(selected: false, hovered: hovering, selection: .native)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }

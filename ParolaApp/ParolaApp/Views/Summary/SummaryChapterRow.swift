@@ -26,10 +26,9 @@ struct SummaryChapterRow: View {
             }
             .padding(.horizontal, DS.Spacing.regular)
             .padding(.vertical, DS.Spacing.small)
-            .contentShape(Rectangle())
+            .rowChrome(selected: false, hovered: hovering, selection: .native)
         }
         .buttonStyle(.plain)
-        .background(hovering ? DS.Color.accent.opacity(0.06) : Color.clear)
         .onHover { hovering = $0 }
     }
 }
