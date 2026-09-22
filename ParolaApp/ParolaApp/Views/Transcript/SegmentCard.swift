@@ -72,11 +72,10 @@ struct SegmentCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: radius))
         .contentShape(Rectangle())
+        .rowStateAnimation(hovering)
         .contextMenu { assignSegmentMenu }
         .draggable(draggablePayload)
-        .onHover { hover in
-            withAnimation(.easeOut(duration: 0.12)) { hovering = hover }
-        }
+        .onHover { hovering = $0 }
         // simultaneousGesture: .textSelection consumes plain taps, so a card-level .onTapGesture never fires on text.
         // Skipped while word karaoke shows: its per-word links own the click, and a simultaneous segment seek would race the word seek.
         // hoveredSpeaker is nil unless the pointer sits on the chip, which is the one place in the
