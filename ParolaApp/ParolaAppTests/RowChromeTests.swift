@@ -87,6 +87,28 @@ struct RowChromeTests {
         #expect(DS.Color.selectionWash == DS.Color.accent.opacity(0.12))
     }
 
+    @Test("a chosen popover row is a solid accent with a legible foreground")
+    func popoverRowIsProminent() {
+        let selected = appearance(selected: true, hovered: false, PillPopoverRow.selectionStyle)
+        #expect(selected.fill == DS.Color.accent.opacity(0.85))
+        #expect(selected.foreground == DS.Color.onAccent)
+        #expect(selected.border == nil)
+    }
+
+    @Test("a popover row under the pointer takes the shared hover fill, not the accent")
+    func popoverRowHoverIsShared() {
+        let hovered = appearance(selected: false, hovered: true, PillPopoverRow.selectionStyle)
+        #expect(hovered.fill == DS.Palette.surfaceHover)
+        #expect(hovered.foreground == nil)
+        #expect(appearance(selected: true, hovered: true, PillPopoverRow.selectionStyle)
+            == appearance(selected: true, hovered: false, PillPopoverRow.selectionStyle))
+    }
+
+    @Test("the popover row and the sidebar row say chosen the same way")
+    func popoverRowMatchesTheSidebar() {
+        #expect(PillPopoverRow.selectionStyle == prominent)
+    }
+
     @Test("a row in a List animates its hover, never the selection the List paints")
     func nativeSelectionIsNotAnimated() {
         let pointedAndSelected = RowChromeState(selected: true, hovered: true)
