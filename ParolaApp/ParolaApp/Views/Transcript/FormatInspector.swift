@@ -4,6 +4,7 @@ import ParolaCore
 struct FormatInspector: View {
     @Environment(AppModel.self) private var model
     @State private var newSpeaker: String = ""
+    @State private var speakerRows: [(label: String, count: Int)] = []
     @FocusState private var speakerFocused: Bool
 
     private var displayMode: TranscriptDisplayMode {
@@ -17,7 +18,7 @@ struct FormatInspector: View {
             TranslationSection()
 
             InspectorSection(title: "People") {
-                ForEach(model.speakerSegmentCounts, id: \.label) { row in
+                ForEach(speakerRows, id: \.label) { row in
                     SpeakerPersonRow(label: row.label, segmentCount: row.count)
                 }
                 TextField("Add a speaker…", text: $newSpeaker)
@@ -31,6 +32,9 @@ struct FormatInspector: View {
                     .axLeaf("Inspector.Button.ManagePeople")
             }
         }
+        // Counting walks every segment; the body re-runs on the favourites toggle and on translation
+        // progress, neither of which can change the count.
+        .task(id: model.transcriptVersion) { speakerRows = model.speakerSegmentCounts }
     }
 
     private var displayModesSection: some View {

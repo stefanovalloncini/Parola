@@ -4,6 +4,8 @@ import ParolaCore
 struct TranslationSection: View {
     @Environment(AppModel.self) private var model
     @State private var targets: [String] = SupportedLanguages.codes
+    @State private var menuTargets: [(code: String, name: String)] = []
+    @State private var characterCount = 0
 
     var body: some View {
         InspectorSection(title: "Translation") {
@@ -22,13 +24,22 @@ struct TranslationSection: View {
                 }
             }
         }
-        .task { targets = await model.translationCoordinator.supportedTargets() }
+        .task {
+            targets = await model.translationCoordinator.supportedTargets()
+            rebuildMenuTargets()
+        }
+        // The list is ~100 languages sorted by locale, and the count walks the whole transcript;
+        // neither belongs in a body pass the progress rows re-run per batch.
+        .task(id: model.transcriptVersion) {
+            characterCount = model.transcriptText.count
+            rebuildMenuTargets()
+        }
     }
 
     private var idleRows: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             targetMenu(title: "Translate to…")
-            Text("\(model.transcriptText.count) characters")
+            Text("\(characterCount) characters")
                 .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
         }
@@ -87,6 +98,7 @@ struct TranslationSection: View {
         Menu(title) {
             ForEach(menuTargets, id: \.code) { target in
                 Button(target.name) { translate(to: target.code) }
+                    .axLeaf("Translation.MenuItem.Target.\(target.code)")
             }
         }
         .menuStyle(.button)
@@ -96,9 +108,9 @@ struct TranslationSection: View {
         .axLeaf("Translation.Menu.TranslateTo")
     }
 
-    private var menuTargets: [(code: String, name: String)] {
+    private func rebuildMenuTargets() {
         let source = model.transcript.flatMap { TranslationCoordinator.sourceLanguage(for: $0.language) }
-        return targets
+        menuTargets = targets
             .filter { $0 != source }
             .map { (code: $0, name: SupportedLanguages.displayName(for: $0)) }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }

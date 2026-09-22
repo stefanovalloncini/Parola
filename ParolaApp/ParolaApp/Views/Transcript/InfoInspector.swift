@@ -29,7 +29,9 @@ struct InfoInspector: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.large) {
+        // Built once per pass: the three menu rows below all read it.
+        let variants = installedVariants
+        return VStack(alignment: .leading, spacing: DS.Spacing.large) {
             InspectorSection(title: "Properties") {
                 InfoRow(icon: "clock", label: "Audio duration", value: durationLabel, numeric: true)
                 InfoRow(icon: "calendar", label: "Created", value: dateLabel(entry?.createdAt))
@@ -50,9 +52,9 @@ struct InfoInspector: View {
             }
 
             InspectorSection(title: "Transcription Details") {
-                languageRow
+                languageRow(variants: variants)
                 if let modelName = model.transcript?.modelName {
-                    modelRow(current: modelName)
+                    modelRow(current: modelName, variants: variants)
                 }
                 if let engineLabel {
                     InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
@@ -113,8 +115,9 @@ struct InfoInspector: View {
         return String(localized: "Transcribe again with \(pending.choiceLabel)?")
     }
 
-    private var languageRow: some View {
-        InfoMenuRow(
+    private func languageRow(variants: [ModelVariant]) -> some View {
+        let scope = runScope(variants: variants)
+        return InfoMenuRow(
             icon: "globe",
             label: "Language",
             value: languageLabel,
@@ -128,14 +131,14 @@ struct InfoInspector: View {
             Divider()
             ForEach(SupportedLanguages.codes, id: \.self) { code in
                 let name = SupportedLanguages.displayName(for: code)
-                menuChoice(name, isCurrent: code == currentLanguageCode, isAllowed: runScope.allows(code)) {
+                menuChoice(name, isCurrent: code == currentLanguageCode, isAllowed: scope.allows(code)) {
                     ask(language: code, label: name)
                 }
             }
         }
     }
 
-    private func modelRow(current: String) -> some View {
+    private func modelRow(current: String, variants: [ModelVariant]) -> some View {
         InfoMenuRow(
             icon: "cube",
             label: "Model",
@@ -144,7 +147,7 @@ struct InfoInspector: View {
             isEnabled: menusAreOpen,
             leaf: "Info.Menu.Model"
         ) {
-            ForEach(installedVariants, id: \.id) { variant in
+            ForEach(variants, id: \.id) { variant in
                 menuChoice(
                     "\(variant.displayName) — \(variant.engineID.displayName)",
                     isCurrent: variant.id == current,
@@ -186,14 +189,14 @@ struct InfoInspector: View {
     }
 
     /// The model a language pick runs: the entry's own, or the toolbar's when that one is gone.
-    private var runModel: String {
+    private func runModel(variants: [ModelVariant]) -> String {
         let current = model.transcript?.modelName ?? ""
-        return installedVariants.contains { $0.id == current } ? current : model.selectedModel
+        return variants.contains { $0.id == current } ? current : model.selectedModel
     }
 
     /// What that model can transcribe, so the menu can shut the codes it would refuse.
-    private var runScope: ParolaCore.SupportedLanguages {
-        ModelCatalog.staticCapabilities(forID: runModel)?.supportedLanguages ?? .all
+    private func runScope(variants: [ModelVariant]) -> ParolaCore.SupportedLanguages {
+        ModelCatalog.staticCapabilities(forID: runModel(variants: variants))?.supportedLanguages ?? .all
     }
 
     /// Picking the value the entry already carries asks nothing: there is no re-run to confirm.
@@ -209,9 +212,10 @@ struct InfoInspector: View {
 
     private func ask(language code: String?, label: String) {
         guard code != currentLanguageCode else { return }
-        let substitute = runModel == model.transcript?.modelName ? nil : AppModel.modelLabel(runModel)
+        let runs = runModel(variants: installedVariants)
+        let substitute = runs == model.transcript?.modelName ? nil : AppModel.modelLabel(runs)
         pendingRetranscribe = PendingRetranscribe(
-            modelName: runModel,
+            modelName: runs,
             language: code,
             choiceLabel: label,
             substituteModelLabel: substitute
