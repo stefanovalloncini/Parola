@@ -211,6 +211,26 @@ final class AppModel {
     }
     var recordingMaxMinutes: Int = 0 { didSet { defaults.set(recordingMaxMinutes, forKey: "recordingMaxMinutes") } }
     var showMenuBarExtra: Bool = false { didSet { defaults.set(showMenuBarExtra, forKey: "showMenuBarExtra") } }
+    var appVisibilityModeRaw: String = AppVisibilityMode.dockAndMenuBar.rawValue {
+        didSet {
+            defaults.set(appVisibilityModeRaw, forKey: "appVisibilityMode")
+            applyAppVisibilityMode()
+        }
+    }
+    var appVisibilityMode: AppVisibilityMode {
+        get { AppVisibilityMode(rawValue: appVisibilityModeRaw) ?? .dockAndMenuBar }
+        set { appVisibilityModeRaw = newValue.rawValue }
+    }
+    /// Set by the app delegate once the windows exist; nil in tests, which have no activation policy to change.
+    @ObservationIgnored var activationPolicyApplier: (@MainActor (NSApplication.ActivationPolicy) -> Void)?
+
+    /// `showMenuBarExtra` is derived from the mode, not chosen next to it: this is the only writer.
+    func applyAppVisibilityMode() {
+        let mode = appVisibilityMode
+        showMenuBarExtra = mode.showsMenuBarExtra
+        activationPolicyApplier?(mode.activationPolicy)
+    }
+
     var playSoundWhenFinished: Bool = false { didSet { defaults.set(playSoundWhenFinished, forKey: "playSoundWhenFinished") } }
     /// What the finished sound actually is. Test mode clears it; a test stubs it to count the plays.
     @ObservationIgnored var completionSoundPlayer: (@MainActor () -> Void)? = {
@@ -733,6 +753,8 @@ final class AppModel {
         self.dictationContextScreen = defaults.bool(forKey: "dictationContextScreen")
         self.recordingMaxMinutes = defaults.integer(forKey: "recordingMaxMinutes")
         self.showMenuBarExtra = defaults.bool(forKey: "showMenuBarExtra")
+        self.appVisibilityModeRaw = defaults.string(forKey: "appVisibilityMode") ?? AppVisibilityMode.dockAndMenuBar.rawValue
+        applyAppVisibilityMode()
         self.playSoundWhenFinished = defaults.bool(forKey: "playSoundWhenFinished")
         self.recordingCountInSeconds = defaults.integer(forKey: "recordingCountInSeconds")
         self.autoMuteWhileRecording = defaults.bool(forKey: "autoMuteWhileRecording")

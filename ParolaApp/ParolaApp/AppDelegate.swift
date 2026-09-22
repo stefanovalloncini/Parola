@@ -19,6 +19,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         provider.model = model
         menuBar.bind(model)
         playbackKeys.bind(model)
+        model.activationPolicyApplier = { policy in
+            guard !CommandLine.arguments.contains("--headless") else { return }
+            NSApp.setActivationPolicy(policy)
+        }
+        model.applyAppVisibilityMode()
         if dictationSubscription == nil {
             dictationSubscription = DictationSignal.subscribe { [weak self] name in
                 Task { @MainActor [weak self] in

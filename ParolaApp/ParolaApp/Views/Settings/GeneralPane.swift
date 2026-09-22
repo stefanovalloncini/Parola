@@ -33,10 +33,17 @@ struct GeneralPane: View {
                         .onAppear { launchAtLogin = LaunchAtLogin.isEnabled }
                         .axLeaf("General.Toggle.LaunchAtLogin")
                 }
-                SettingRow("Show menu bar icon",
-                           description: "Adds a Parola item to the system menu bar with quick actions and recent transcripts.") {
-                    Toggle("", isOn: $model.showMenuBarExtra).labelsHidden()
-                        .axLeaf("General.Toggle.MenuBarExtra")
+                SettingRow("Show Parola in",
+                           description: "The menu bar item carries quick actions and recent transcripts. Without the Dock icon Parola stays out of ⌘-Tab.") {
+                    Picker("", selection: $model.appVisibilityMode) {
+                        ForEach(AppVisibilityMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 180, alignment: .trailing)
+                    .axLeaf("General.Picker.AppVisibility")
                 }
                 SettingRow("Play a sound when a transcription finishes",
                            description: "Plays the system Glass sound as the transcript lands in your library. A batch plays it once, at the end.") {

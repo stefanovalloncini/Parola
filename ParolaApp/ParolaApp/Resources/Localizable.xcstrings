@@ -4175,6 +4175,28 @@
         }
       }
     },
+    "Dock and menu bar": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dock e barra dei menu"
+          }
+        }
+      }
+    },
+    "Dock only": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo Dock"
+          }
+        }
+      }
+    },
     "Done": {
       "extractionState": "manual",
       "localizations": {
@@ -6878,6 +6900,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riunioni"
+          }
+        }
+      }
+    },
+    "Menu bar only": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo barra dei menu"
           }
         }
       }
@@ -11081,6 +11114,17 @@
         }
       }
     },
+    "Show Parola in": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra Parola in"
+          }
+        }
+      }
+    },
     "Show Recently Deleted": {
       "extractionState": "manual",
       "localizations": {
@@ -12367,6 +12411,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La toolbar della finestra principale fa override di queste impostazioni per trascrizione."
+          }
+        }
+      }
+    },
+    "The menu bar item carries quick actions and recent transcripts. Without the Dock icon Parola stays out of ⌘-Tab.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voce nella barra dei menu contiene azioni rapide e trascrizioni recenti. Senza icona nel Dock, Parola resta fuori da ⌘-Tab."
           }
         }
       }
