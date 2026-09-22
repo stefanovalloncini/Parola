@@ -59,6 +59,7 @@ struct StatisticsView: View {
                     stats.timed, wordsCountedFor: stats.totals.wordsCountedFor, entries: stats.totals.entries
                 ))
                     .font(DS.Font.secondary)
+                    .monospacedDigit()
                     .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .axLeaf("Text.Coverage")
@@ -196,6 +197,7 @@ struct StatisticsView: View {
             ActivityChart(buckets: buckets, range: activityRange, caption: caption)
             Text(caption)
                 .font(DS.Font.body)
+                .monospacedDigit()
                 .foregroundStyle(DS.Color.primaryText)
                 .axLeaf(activityRange == .days30 ? "Text.Last30Days" : "Text.Last12Months")
         }

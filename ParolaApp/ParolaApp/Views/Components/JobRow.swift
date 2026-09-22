@@ -119,6 +119,7 @@ struct JobRow: View {
             }
             Text(BatchJobStatus.text(for: job))
                 .font(DS.Font.secondary)
+                .monospacedDigit()
                 .lineLimit(1)
                 .truncationMode(.tail)
         }

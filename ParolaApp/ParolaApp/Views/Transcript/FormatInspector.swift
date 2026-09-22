@@ -118,6 +118,7 @@ struct SpeakerPersonRow: View {
                     .lineLimit(1)
                 Text(verbatim: SegmentCount.label(segmentCount))
                     .font(DS.Font.caption)
+                    .monospacedDigit()
                     .foregroundStyle(DS.Color.secondaryText)
             }
             Spacer(minLength: DS.Spacing.small)

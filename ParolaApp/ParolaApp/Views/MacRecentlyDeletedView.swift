@@ -150,6 +150,7 @@ struct MacRecentlyDeletedView: View {
                 )
                 Text(verbatim: AppFormat.integer(group.rows.count))
                     .font(DS.Font.caption)
+                    .monospacedDigit()
                     .foregroundStyle(DS.Color.secondaryText)
             }
             .textCase(nil)

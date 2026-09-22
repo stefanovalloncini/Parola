@@ -72,6 +72,7 @@ struct RecentlyDeletedRow: View {
     private var countdown: some View {
         Text(timeLeft)
             .font(DS.Font.secondary)
+            .monospacedDigit()
             .foregroundStyle(bucket.countdownColor(isSelected: isSelected, prominence: backgroundProminence))
             .lineLimit(1)
             .fixedSize()

@@ -110,6 +110,7 @@ struct PeopleDirectoryList: View {
             Spacer(minLength: DS.Spacing.small)
             Text(verbatim: SegmentCount.assignments(person.usageCount))
                 .font(DS.Font.caption)
+                .monospacedDigit()
                 .foregroundStyle(DS.Color.secondaryText)
             Menu {
                 Button("Rename…") {

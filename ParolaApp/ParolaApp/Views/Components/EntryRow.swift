@@ -211,6 +211,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             }
             Text(showsTimeOnly ? display.timeOfDay : display.shortDate)
                 .font(DS.Font.secondary)
+                .monospacedDigit()
                 .foregroundStyle(secondaryStyle)
                 .lineLimit(1)
                 .fixedSize()
@@ -258,6 +259,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                 .font(DS.Font.caption)
             Text(verbatim: AppFormat.integer(display.noteCount))
                 .font(DS.Font.caption)
+                .monospacedDigit()
         }
         .foregroundStyle(DS.Color.accentText)
         .padding(.horizontal, DS.Spacing.tight)
@@ -275,7 +277,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                     chip(Text(verbatim: label))
                 }
                 if hidden > 0 {
-                    chip(Text(verbatim: "+\(AppFormat.integer(hidden))"))
+                    chip(Text(verbatim: "+\(AppFormat.integer(hidden))").monospacedDigit())
                 }
             }
             .help(display.labels.joined(separator: ", "))
