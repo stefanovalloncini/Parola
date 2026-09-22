@@ -287,8 +287,7 @@ private struct IntakeDropWell: View {
                     .foregroundStyle(DS.Color.accent)
                 VStack(alignment: .leading, spacing: DS.Spacing.tight) {
                     Text("Drop audio or video")
-                        .font(DS.Font.display)
-                        .tracking(DS.Tracking.display)
+                        .font(DS.Font.heading)
                         .foregroundStyle(DS.Color.primaryText)
                     Text("or click to choose files")
                         .font(DS.Font.secondary)
