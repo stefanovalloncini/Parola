@@ -107,7 +107,6 @@ struct RecordingCard: View {
                     Text(String(format: "%02d:%02d", elapsed / 60, elapsed % 60))
                         .font(DS.Font.timer)
                         .foregroundStyle(DS.Color.primaryText)
-                        .monospacedDigit()
                 }
                 HStack(spacing: 6) {
                     Circle()

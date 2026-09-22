@@ -64,7 +64,7 @@ enum DS {
         static let mono = SwiftUI.Font.system(size: 12, design: .monospaced).monospacedDigit()
         static let transcript = SwiftUI.Font.system(size: 15)
         static let transcriptCompact = SwiftUI.Font.system(size: 13)
-        static let timer = SwiftUI.Font.system(size: 22, weight: .light, design: .monospaced)
+        static let timer = SwiftUI.Font.system(size: 22, weight: .light, design: .rounded).monospacedDigit()
     }
 
     /// The active palette every element color funnels through. AppModel.applyTheme() sets it on the main actor.
