@@ -27,8 +27,10 @@ struct TypeScaleTests {
             #expect(height(bigger) > height(smaller))
         }
         #expect(height(DS.Font.bodyStrong) == height(DS.Font.body))
-        #expect(height(DS.Font.transcript) == height(DS.Font.heading))
-        #expect(height(DS.Font.transcriptCompact) == height(DS.Font.body))
+        // The reading tier is New York on its own rhythm, so it steps down within itself rather than
+        // matching a chrome tier's line height.
+        #expect(height(DS.Font.transcript) > height(DS.Font.transcriptCompact))
+        #expect(height(DS.Font.transcriptCompact) > height(DS.Font.body))
     }
 
     /// Width as well as height: two tiers can share a line height and differ in weight or design.
@@ -40,8 +42,8 @@ struct TypeScaleTests {
     func tiersSharingAHeightDiffer() {
         #expect(measured(DS.Font.body) != measured(DS.Font.bodyStrong))
         #expect(measured(DS.Font.secondary) != measured(DS.Font.mono))
-        #expect(measured(DS.Font.transcript) != measured(DS.Font.heading))
-        // transcriptEmphasis is the transcript face at semibold: same line, wider glyphs.
+        // transcriptEmphasis is the transcript face at semibold: same line, wider glyphs. It is the
+        // reading tier's own pair now that transcript no longer shares the heading tier's height.
         #expect(height(DS.Font.transcriptEmphasis) == height(DS.Font.transcript))
         #expect(measured(DS.Font.transcriptEmphasis) != measured(DS.Font.transcript))
     }
@@ -55,6 +57,15 @@ struct TypeScaleTests {
         #expect(measured(DS.Font.title) == measured(.system(size: 22, weight: .semibold)))
         #expect(measured(DS.Font.hero) != measured(.system(size: 40, weight: .semibold)))
         #expect(measured(DS.Font.display) != measured(.system(size: 28, weight: .semibold)))
+    }
+
+    @Test("the reading tier is New York, the chrome around it is SF")
+    func readingTierIsSerif() {
+        #expect(measured(DS.Font.transcript) == measured(.system(size: 17, design: .serif)))
+        #expect(measured(DS.Font.transcript) != measured(.system(size: 17)))
+        #expect(measured(DS.Font.transcriptCompact) == measured(.system(size: 15, design: .serif)))
+        #expect(measured(DS.Font.transcriptCompact) != measured(.system(size: 15)))
+        #expect(measured(DS.Font.body) == measured(.system(size: 13)))
     }
 
     @Test("the recording timer is rounded and its digits are all one width")
