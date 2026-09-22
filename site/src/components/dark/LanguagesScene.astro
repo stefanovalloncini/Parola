@@ -1,14 +1,15 @@
 ---
 const rows = [
   "English:en Italiano:it Español:es Français:fr Deutsch:de Português:pt Nederlands:nl Polski:pl",
-  "日本語:ja 中文:zh 한국어:ko العربية:ar Русский:ru हिन्दी:hi Українська:uk Ελληνικά:el",
-  "Svenska:sv Dansk:da Suomi:fi Čeština:cs Magyar:hu Română:ro Hrvatski:hr Български:bg",
+  "日本語:ja 中文:zh 한국어:ko العربية:ar हिन्दी:hi Русский:ru Українська:uk Ελληνικά:el",
+  "Svenska:sv Dansk:da Suomi:fi Eesti:et Latviešu:lv Lietuvių:lt Čeština:cs Slovenčina:sk",
+  "Slovenščina:sl Magyar:hu Română:ro Hrvatski:hr Български:bg Malti:mt",
 ].map((row) => row.split(" ").map((pair) => pair.split(":") as [string, string]));
 ---
 
 <div class="languages" data-loop aria-hidden="true">
   {rows.map((row, r) => (
-    <div class:list={["row", { reverse: r === 1 }]}>
+    <div class:list={["row", { reverse: r % 2 === 1 }]}>
       <ul class="track" style={`--speed: ${38 + r * 6}s`}>
         {[...row, ...row].map(([name, code]) => (
           <li lang={code}>{name}</li>
