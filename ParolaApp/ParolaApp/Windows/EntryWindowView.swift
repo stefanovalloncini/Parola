@@ -8,6 +8,7 @@ struct EntryWindowView: View {
 
     @Environment(AppModel.self) private var model
     @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var session: EntryWindowSession?
     @State private var showsEditHint = false
     @State private var hintTask: Task<Void, Never>?
@@ -25,16 +26,16 @@ struct EntryWindowView: View {
         }
         .frame(minWidth: 520, minHeight: 380)
         .background(DS.Palette.canvas)
-        .task(id: entryID) {
-            guard let entryID else { return }
-            session = model.entryWindowSession(for: entryID)
-        }
+        // onAppear, not task: it is synchronous, so it always pairs with the onDisappear that
+        // releases the session. A window opened and closed in the same tick left one registered.
+        .onAppear { adoptSession() }
+        .onChange(of: entryID) { _, _ in adoptSession() }
         // initial: a window opens already key, and the commands have to know that before focus moves again.
         .onChange(of: controlActiveState, initial: true) { _, state in
             guard let entryID else { return }
             model.entryWindowKeyChanged(entryID, isKey: state == .key)
         }
-        .onChange(of: model.libraryVersion) { _, _ in session?.reload() }
+        .onChange(of: model.libraryVersion) { _, _ in session?.reloadIfEntryChanged() }
         .onDisappear {
             hintTask?.cancel()
             guard let session else { return }
@@ -75,7 +76,7 @@ struct EntryWindowView: View {
                 EntryViewerPlaybackBar(session: session)
             }
         }
-        .animation(.easeOut(duration: 0.15), value: showsEditHint)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: showsEditHint)
         .navigationTitle(session.title)
         .background(WindowCloseReporter { model.releaseEntryWindow(session) })
         .axBranch("EntryWindow.\(entryID)")
@@ -97,6 +98,16 @@ struct EntryWindowView: View {
         } else {
             EntryViewerTranscript(session: session, onEditAttempt: flashEditHint)
         }
+    }
+
+    private func adoptSession() {
+        guard let entryID else {
+            session = nil
+            return
+        }
+        guard session?.entryID != entryID else { return }
+        if let session { model.releaseEntryWindow(session) }
+        session = model.entryWindowSession(for: entryID)
     }
 
     private func flashEditHint() {
