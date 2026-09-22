@@ -217,6 +217,22 @@ struct ThemePaletteTests {
         #expect(terracottaLight.contrast(against: foreground) >= 3.0)
     }
 
+    /// Same floor for the preset almost everyone reads: Slate's light fill takes white at 4.87 today.
+    @Test("the default accent keeps a white foreground on its light fill, above the UI-component floor")
+    func defaultPresetKeepsWhiteForeground() throws {
+        guard case .dynamic(let defaultLight, _) = ThemePreset.defaultPreset.accent else {
+            Issue.record("the default preset's accent is expected to be a dynamic color")
+            return
+        }
+        let light = try #require(NSAppearance(named: .aqua))
+        var foreground = RGBA(0, 0, 0)
+        light.performAsCurrentDrawingAppearance {
+            foreground = RGBA(ThemePreset.defaultPreset.accent.legibleForeground)
+        }
+        #expect(foreground.hex == RGBA(1, 1, 1).hex)
+        #expect(defaultLight.contrast(against: foreground) >= 3.0)
+    }
+
     @Test("a palette round-trips through Codable")
     func paletteCodableRoundTrip() throws {
         let palette = ThemePreset.terracotta.palette
