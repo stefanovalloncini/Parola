@@ -230,7 +230,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         }
         let finalTranscript = Transcript(
             segments: allConfirmed,
-            language: optionsForRun?.language ?? "auto",
+            language: Self.finalLanguage(for: allConfirmed, options: optionsForRun),
             modelName: loadedModel ?? "unknown",
             sourceURL: recordedURL,
             durationSeconds: allConfirmed.last?.end
@@ -238,6 +238,12 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         continuation?.yield(.finished(finalTranscript))
         continuation?.finish()
         teardown()
+    }
+
+    /// What a finished take is stamped with: the language the run was pinned to, else what the
+    /// text reads as, else "auto" — so a mic take reads like the same audio transcribed from a file.
+    static func finalLanguage(for segments: [TranscriptSegment], options: TranscriptionOptions?) -> String {
+        options?.language ?? TextLanguageGuess.dominantLanguage(of: segments) ?? "auto"
     }
 
     public func currentModel() -> String? { loadedModel }

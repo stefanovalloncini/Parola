@@ -39,6 +39,20 @@ private final class RecordingLabeler: StreamingSpeakerLabeler {
 
 @Suite("Streaming session event translation")
 struct StreamingTranscriptionSessionTests {
+    @Test("a finished take is stamped with the language its text reads as, not \"auto\"")
+    func finalLanguageFollowsTheText() {
+        let segments = [
+            TranscriptSegment(id: 0, start: 0, end: 2, text: "Buongiorno a tutti, oggi parliamo della distinta base."),
+            TranscriptSegment(id: 1, start: 2, end: 4, text: "I componenti sono stati ordinati al magazzino."),
+        ]
+        var pinned = TranscriptionOptions()
+        pinned.language = "en"
+
+        #expect(StreamingTranscriptionSession.finalLanguage(for: segments, options: pinned) == "en")
+        #expect(StreamingTranscriptionSession.finalLanguage(for: segments, options: nil) == "it")
+        #expect(StreamingTranscriptionSession.finalLanguage(for: [], options: nil) == "auto")
+    }
+
     @Test("voice activity is silent until the buffer has at least one energy sample")
     func voiceActivityWaitsForFirstSample() async {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(16))

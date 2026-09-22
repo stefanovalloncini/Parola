@@ -20,4 +20,12 @@ struct TextLanguageGuessTests {
         #expect(TextLanguageGuess.dominantLanguage(of: "") == nil)
         #expect(TextLanguageGuess.dominantLanguage(of: "12 34 56") == nil)
     }
+
+    @Test("a run of segments is guessed from a prefix, not the whole transcript")
+    func segmentsPrefix() {
+        let opening = TranscriptSegment(id: 0, start: 0, end: 1, text: String(repeating: "Buongiorno a tutti, parliamo della distinta base. ", count: 100))
+        let later = TranscriptSegment(id: 1, start: 1, end: 2, text: String(repeating: "Ask not what your country can do for you. ", count: 100))
+        #expect(TextLanguageGuess.dominantLanguage(of: [opening, later]) == "it")
+        #expect(TextLanguageGuess.dominantLanguage(of: [TranscriptSegment]()) == nil)
+    }
 }
