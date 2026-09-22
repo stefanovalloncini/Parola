@@ -214,6 +214,11 @@ struct PillPopoverRow: View {
     /// Rows in a list with subtitles share this height, so a row without one stays as tall as its neighbours.
     static let twoLineHeight: CGFloat = 44
 
+    /// A popover list is a menu: the current value is a solid accent row, like the sidebar's.
+    static var selectionStyle: RowSelectionStyle {
+        .prominent(fill: DS.Color.accent.opacity(0.85), foreground: DS.Color.onAccent)
+    }
+
     var body: some View {
         Button {
             action()
@@ -226,18 +231,18 @@ struct PillPopoverRow: View {
                     HStack(spacing: DS.Spacing.snug) {
                         Text(title)
                             .font(DS.Font.bodyStrong)
-                            .foregroundStyle(isDimmed ? DS.Color.secondaryText : DS.Color.primaryText)
+                            .foregroundStyle(isDimmed ? HierarchicalShapeStyle.secondary : .primary)
                             .lineLimit(1)
                             .truncationMode(.tail)
                         if let badge {
-                            ModelTagChip(label: badge, fill: DS.Color.neutralChip.fill, text: DS.Color.neutralChip.text)
+                            ModelTagChip(label: badge, fill: badgeTokens.fill, text: badgeTokens.text)
                                 .fixedSize()
                         }
                     }
                     if let subtitle {
                         Text(subtitle)
                             .font(DS.Font.secondary)
-                            .foregroundStyle(subtitleTint ?? DS.Color.secondaryText)
+                            .foregroundStyle(subtitleStyle)
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -247,18 +252,16 @@ struct PillPopoverRow: View {
                     .fixedSize()
                 Image(systemName: "checkmark")
                     .font(DS.Font.bodyStrong)
-                    .foregroundStyle(DS.Color.accent)
+                    .foregroundStyle(isSelected ? AnyShapeStyle(HierarchicalShapeStyle.primary) : AnyShapeStyle(DS.Color.accent))
                     .frame(width: 14)
                     .opacity(isSelected ? 1 : 0)
             }
             .padding(.horizontal, DS.Spacing.small)
             .padding(.vertical, DS.Spacing.snug)
             .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading)
-            .rowChrome(
-                selected: isSelected,
-                hovered: hovering,
-                selection: .wash(fill: DS.Color.accentWash)
-            )
+            .rowChrome(selected: isSelected, hovered: hovering, selection: Self.selectionStyle)
+            // The chrome paints the selected pair from inside the row, so the resting pair sits outside it.
+            .foregroundStyle(DS.Color.primaryText, DS.Color.secondaryText)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -274,7 +277,7 @@ struct PillPopoverRow: View {
         case .symbol(let name, let tint):
             Image(systemName: name)
                 .font(DS.Font.bodyStrong)
-                .foregroundStyle(tint ?? DS.Color.secondaryText)
+                .foregroundStyle(symbolStyle(tint))
                 .frame(width: Self.leadingSlot, height: Self.leadingSlot)
         case .tile(let name, let tint):
             ZStack {
@@ -288,9 +291,9 @@ struct PillPopoverRow: View {
         case .monogram(let text):
             Text(verbatim: text)
                 .font(DS.Font.caption)
-                .foregroundStyle(DS.Color.secondaryText)
+                .foregroundStyle(symbolStyle(nil))
                 .frame(width: Self.leadingSlot, height: Self.leadingSlot)
-                .background(Circle().fill(DS.Palette.pillFill))
+                .background(Circle().fill(isSelected ? DS.Color.onAccent.opacity(0.18) : DS.Palette.pillFill))
         }
     }
 
@@ -303,7 +306,7 @@ struct PillPopoverRow: View {
             Text(text)
                 .font(DS.Font.secondary)
                 .monospacedDigit()
-                .foregroundStyle(DS.Color.secondaryText)
+                .foregroundStyle(HierarchicalShapeStyle.secondary)
         case .download(let text):
             HStack(spacing: 3) {
                 Image(systemName: "arrow.down.circle")
@@ -312,28 +315,51 @@ struct PillPopoverRow: View {
                     .font(DS.Font.secondary)
                     .monospacedDigit()
             }
-            .foregroundStyle(DS.Color.secondaryText)
+            .foregroundStyle(HierarchicalShapeStyle.secondary)
         case .progress(let value):
             HStack(spacing: 5) {
-                PillProgressRing(value: value)
+                PillProgressRing(
+                    value: value,
+                    tint: isSelected ? DS.Color.onAccent : DS.Color.accent,
+                    track: isSelected ? DS.Color.onAccent.opacity(0.3) : DS.Palette.pillFill
+                )
                 Text(AppFormat.percent(max(0, min(1, value))))
                     .font(DS.Font.mono)
-                    .foregroundStyle(DS.Color.secondaryText)
+                    .foregroundStyle(HierarchicalShapeStyle.secondary)
             }
         }
+    }
+
+    /// A caller's tint is meant for the resting row; on the accent fill it sinks, so selection takes the glyph back.
+    private func symbolStyle(_ tint: Color?) -> AnyShapeStyle {
+        if isSelected { return AnyShapeStyle(HierarchicalShapeStyle.primary) }
+        return AnyShapeStyle(tint ?? DS.Color.secondaryText)
+    }
+
+    private var subtitleStyle: AnyShapeStyle {
+        if isSelected { return AnyShapeStyle(HierarchicalShapeStyle.secondary) }
+        return AnyShapeStyle(subtitleTint ?? DS.Color.secondaryText)
+    }
+
+    private var badgeTokens: (fill: Color, text: Color) {
+        isSelected
+            ? (fill: DS.Color.onAccent.opacity(0.18), text: DS.Color.onAccent)
+            : DS.Color.neutralChip
     }
 }
 
 struct PillProgressRing: View {
     let value: Double
+    let tint: Color
+    let track: Color
 
     var body: some View {
         ZStack {
             Circle()
-                .stroke(DS.Palette.pillFill, lineWidth: 2)
+                .stroke(track, lineWidth: 2)
             Circle()
                 .trim(from: 0, to: max(0, min(1, value)))
-                .stroke(DS.Color.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(DS.Motion.progress, value: value)
         }
