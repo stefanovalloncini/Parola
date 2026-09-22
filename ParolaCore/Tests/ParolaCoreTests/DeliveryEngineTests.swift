@@ -330,6 +330,39 @@ struct DeliveryEngineTests {
         #expect(await engine.pending().isEmpty)
     }
 
+    @Test("a transcript the retry cannot read is queued again, not dropped")
+    func payloadFailureOnRetryStaysQueued() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let destination = await mock(failuresBeforeSuccess: 1, recorder: recorder)
+        let payloads = PayloadSpy(failingCall: 2)
+        let engine = makeEngine(
+            destinations: [.mock(destination)],
+            store: try makeStore(),
+            clock: clock,
+            payload: { try await payloads.build($0) }
+        )
+
+        _ = await engine.send(entryID: "entry-1", to: destination.id)
+        #expect(await poll { clock.sleeperCount == 1 })
+        let first = await engine.timerTask(for: "entry-1", destinationID: destination.id)
+        clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
+        await first?.value
+
+        let queued = try #require(await engine.pending().first, "a transcript that cannot be read stays queued")
+        #expect(queued.attempt == 2)
+        #expect(await engine.recentLog().last?.event == .queued)
+
+        #expect(await poll { clock.sleeperCount == 1 })
+        let second = await engine.timerTask(for: "entry-1", destinationID: destination.id)
+        clock.advance(by: DeliveryEngine.delay(forAttempt: 2))
+        await second?.value
+
+        #expect(await engine.pending().isEmpty)
+        #expect(await recorder.recorded().map(\.entryID) == ["entry-1"])
+        #expect(await engine.recentLog().last?.event == .delivered)
+    }
+
     @Test("a queue written by an earlier run is picked up by the next one")
     func queueSurvivesReInit() async throws {
         let recorder = MockDeliveryRecorder()
@@ -409,6 +442,25 @@ struct DeliveryLogTests {
         )
         #expect(store.loadQueue().isEmpty)
         #expect(store.loadLog().entries.isEmpty)
+    }
+}
+
+/// Builds the payload the engine sends, and throws on one chosen call so a retry can be made to
+/// fail on reading the transcript rather than on the destination.
+actor PayloadSpy {
+    private var calls = 0
+    private let failingCall: Int
+
+    init(failingCall: Int) {
+        self.failingCall = failingCall
+    }
+
+    func build(_ entryID: LibraryEntry.ID) throws -> DeliveryPayload {
+        calls += 1
+        guard calls != failingCall else { throw LibraryStore.LibraryError.notFound(entryID) }
+        var payload = DeliveryPayloadTests.payload()
+        payload.entryID = entryID
+        return payload
     }
 }
 

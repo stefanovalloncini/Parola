@@ -386,12 +386,7 @@ public actor DeliveryEngine {
             let payload = try await payloadProvider(key.entryID)
             _ = await attempt(payload: payload, destination: destination)
         } catch {
-            let attempt = queueAttempt(key)
-            dequeue(key)
-            append(
-                .dropped, entryID: key.entryID, destination: destination,
-                attempt: attempt, detail: error.localizedDescription
-            )
+            _ = failed(key, destination: destination, attempt: queueAttempt(key) + 1, error: error)
         }
     }
 
