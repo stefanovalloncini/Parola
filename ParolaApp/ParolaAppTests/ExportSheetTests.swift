@@ -269,6 +269,20 @@ struct ExportSheetTests {
         #expect(byOption.options.speakers == model.exportSheetSpec.options.speakers)
     }
 
+    @Test("an options-only merge is masked the way setExportSpec masks")
+    func mergedSpecMasksAnOptionsOnlyOverride() throws {
+        let model = makeModel()
+        model.transcript = Self.transcript()
+        model.openExportSheet()
+        model.setExportSpec(.standard(for: .srt))
+
+        let merged = try model.mergedExportSpec(overriding: ["options": .object(["timestamps": .bool(true)])])
+
+        #expect(merged.format == .srt)
+        #expect(merged.options.timestamps == false, "srt cannot honour timestamps, and exportWithSpec must drop them the way setExportSpec does")
+        #expect(merged == merged.changing(format: merged.format))
+    }
+
     @Test("a merged spec that decodes to nothing is refused")
     func mergedSpecRefusesGarbage() {
         let model = makeModel()

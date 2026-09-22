@@ -81,9 +81,12 @@ extension AppModel {
         guard let preset = exportPreset(id: id), !preset.isBuiltIn else { return }
         // Prune first: normalization puts a format preset straight back while a rule still names it.
         batchExportPresetIDs = batchExportPresetIDs.filter { $0 != id }
-        for index in autoExportRules.indices where autoExportRules[index].presetIDs.contains(id) {
-            autoExportRules[index].presetIDs.removeAll { $0 == id }
+        // One assignment: the property's didSet writes the whole array on every element write.
+        var rules = autoExportRules
+        for index in rules.indices where rules[index].presetIDs.contains(id) {
+            rules[index].presetIDs.removeAll { $0 == id }
         }
+        if rules != autoExportRules { autoExportRules = rules }
         setExportPresets(exportPresets.filter { $0.id != id })
     }
 
@@ -190,8 +193,9 @@ extension AppModel {
               let decoded = try? JSONDecoder().decode(ExportSpec.self, from: data) else {
             throw AutomationError.invalidArgs(field: "spec", reason: "could not decode an ExportSpec from the given fields")
         }
-        if raw["format"] != nil { return decoded.changing(format: decoded.format) }
         if raw["style"] != nil { return decoded.changing(style: decoded.style) }
-        return decoded
+        // Always mask: setExportSpec re-masks whatever it is handed, and the two commands must not
+        // read the same JSON differently.
+        return decoded.changing(format: decoded.format)
     }
 }
