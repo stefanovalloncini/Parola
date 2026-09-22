@@ -1,0 +1,95 @@
+---
+interface Props {
+  ext: string;
+  name?: string;
+  tint?: string;
+  class?: string;
+  style?: string;
+}
+
+const { ext, name, tint = "#6b8a6b", class: className, style } = Astro.props;
+---
+
+<span class:list={["doc", className]} style={`--tint: ${tint}; ${style ?? ""}`} aria-hidden="true">
+  <span class="sheet">
+    <svg viewBox="0 0 48 60" class="glyph">
+      <path d="M14 30v6M19 26v14M24 22v22M29 27v12M34 31v4"></path>
+    </svg>
+    <span class="ext">{ext}</span>
+  </span>
+  {name && <span class="name">{name}</span>}
+</span>
+
+<style>
+  .doc {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 84px;
+  }
+
+  .sheet {
+    position: relative;
+    display: block;
+    width: 64px;
+    height: 80px;
+    border-radius: 6px 16px 6px 6px;
+    background: linear-gradient(180deg, #ffffff, #f6f7f5);
+    box-shadow:
+      0 0 0 0.5px rgb(15 26 20 / 0.14),
+      0 8px 18px -8px rgb(15 26 20 / 0.35);
+  }
+
+  .sheet::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 0 16px 0 6px;
+    background: linear-gradient(225deg, transparent 50%, #e3e7e2 50%);
+    box-shadow: -0.5px 0.5px 0 rgb(15 26 20 / 0.1);
+  }
+
+  .glyph {
+    position: absolute;
+    left: 8px;
+    top: 10px;
+    width: 48px;
+    height: 44px;
+    fill: none;
+    stroke: var(--tint);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+
+  .ext {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: 7px;
+    padding: 2px 0;
+    border-radius: 4px;
+    background: var(--tint);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+  }
+
+  .name {
+    max-width: 100%;
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-body);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>

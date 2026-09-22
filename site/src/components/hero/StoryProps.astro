@@ -1,0 +1,195 @@
+---
+import DocTile from "../DocTile.astro";
+
+const files = [
+  { ext: "M4A", name: "Interview.m4a", tint: "#6b8a6b", x: 4, y: 16, r: -8 },
+  { ext: "MP4", name: "Lecture 4.mp4", tint: "#54739e", x: 11, y: 52, r: 6 },
+  { ext: "WAV", name: "Standup.wav", tint: "#a07b5a", x: 2, y: 80, r: -4 },
+  { ext: "MOV", name: "Keynote.mov", tint: "#7b6f95", x: 16, y: 88, r: 9 },
+  { ext: "MP3", name: "Episode 31.mp3", tint: "#3f6048", x: 88, y: 14, r: 7 },
+  { ext: "M4A", name: "Memo 12 Sept.m4a", tint: "#6b8a6b", x: 94, y: 46, r: -6 },
+  { ext: "MP4", name: "Workshop.mp4", tint: "#54739e", x: 83, y: 76, r: 5 },
+  { ext: "OGG", name: "Voice note.ogg", tint: "#a07b5a", x: 96, y: 86, r: -9 },
+];
+
+const people = [
+  { initials: "M", hue: "#6b8a6b", x: 7, y: 22 },
+  { initials: "T", hue: "#54739e", x: 14, y: 58 },
+  { initials: "A", hue: "#a07b5a", x: 5, y: 84 },
+  { initials: "S", hue: "#7b6f95", x: 91, y: 20 },
+  { initials: "J", hue: "#3f6048", x: 86, y: 56 },
+  { initials: "R", hue: "#54739e", x: 94, y: 82 },
+];
+
+const barCount = 44;
+const bars = Array.from({ length: barCount }, (_, i) => {
+  const wave = Math.abs(Math.sin(i * 1.7) * 0.55 + Math.sin(i * 0.43) * 0.45);
+  return { h: 0.22 + wave * 0.78, fade: 1 - i / barCount, delay: (i * 0.137) % 1.3 };
+});
+---
+
+<div class="props" aria-hidden="true">
+  <div class="set files">
+    {files.map((file, i) => (
+      <span class="prop" style={`--x: ${file.x}; --y: ${file.y}; --r: ${file.r}deg; --i: ${i}`}>
+        <DocTile ext={file.ext} name={file.name} tint={file.tint} />
+      </span>
+    ))}
+  </div>
+  <div class="set people">
+    {people.map((person, i) => (
+      <span
+        class="prop person"
+        style={`--x: ${person.x}; --y: ${person.y}; --hue: ${person.hue}; --i: ${i}`}
+      >
+        {person.initials}
+      </span>
+    ))}
+  </div>
+  <div class="set stream">
+    {["left", "right"].map((side) => (
+      <span class:list={["bars", side]}>
+        {bars.map((bar) => (
+          <i style={`--h: ${bar.h}; --fade: ${bar.fade}; --d: ${bar.delay}s`} />
+        ))}
+      </span>
+    ))}
+  </div>
+</div>
+
+<style>
+  .props {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .set {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.6s var(--ease-out);
+  }
+
+  .prop {
+    position: absolute;
+    left: calc(var(--x) * 1%);
+    top: calc(var(--y) * 1%);
+    translate: -50% -50%;
+    rotate: var(--r, 0deg);
+    transition:
+      translate 0.9s var(--ease-out),
+      scale 0.9s var(--ease-out),
+      opacity 0.6s var(--ease-out);
+    transition-delay: calc(var(--i) * 40ms);
+  }
+
+  :global([data-scene="0"]) .files,
+  :global([data-scene="1"]) .files,
+  :global([data-scene="2"]) .people,
+  :global([data-scene="3"]) .stream {
+    opacity: 1;
+  }
+
+  :global([data-scene="1"]) .files .prop {
+    translate: calc((50 - var(--x)) * 0.62vw - 50%) calc((44 - var(--y)) * 5px - 50%);
+    scale: 0.4;
+    opacity: 0;
+  }
+
+  .person {
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--hue);
+    color: #fff;
+    font: 600 24px var(--font-display);
+    box-shadow: 0 10px 24px -10px rgb(15 26 20 / 0.5);
+  }
+
+  .person::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 2px solid var(--hue);
+    opacity: 0;
+  }
+
+  .bars {
+    position: absolute;
+    top: 47%;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 72px;
+    translate: 0 -50%;
+  }
+
+  .bars.left {
+    right: calc(50% + min(430px, 46vw) + 12px);
+    flex-direction: row-reverse;
+  }
+
+  .bars.right {
+    left: calc(50% + min(430px, 46vw) + 12px);
+  }
+
+  .bars i {
+    flex: none;
+    width: 7px;
+    height: calc(var(--h) * 100%);
+    border-radius: 4px;
+    background: var(--sage);
+    opacity: calc(0.15 + var(--fade) * 0.55);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .files .prop {
+      animation: drift 7s var(--ease-in-out) infinite alternate;
+      animation-delay: calc(var(--i) * -0.9s);
+    }
+
+    .person::after {
+      animation: speak 2.4s var(--ease-out) infinite;
+      animation-delay: calc(var(--i) * 0.4s);
+    }
+
+    :global([data-scene="3"]) .bars i {
+      animation: pulse 1.3s var(--ease-in-out) infinite alternate;
+      animation-delay: calc(var(--d) * -1);
+    }
+  }
+
+  @keyframes drift {
+    to {
+      transform: translateY(-10px) rotate(2deg);
+    }
+  }
+
+  @keyframes speak {
+    0% {
+      opacity: 0.7;
+      scale: 0.9;
+    }
+    100% {
+      opacity: 0;
+      scale: 1.25;
+    }
+  }
+
+  @keyframes pulse {
+    to {
+      transform: scaleY(0.3);
+    }
+  }
+
+  @media (max-width: 1100px) {
+    .files,
+    .people {
+      display: none;
+    }
+  }
+</style>

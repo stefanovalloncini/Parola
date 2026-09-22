@@ -1,0 +1,156 @@
+---
+import { Image } from "astro:assets";
+import windowShot from "../../assets/shots/hero-window.png";
+import Desktop from "../device/Desktop.astro";
+import MacBook from "../device/MacBook.astro";
+import SceneDictation from "./SceneDictation.astro";
+import SceneMeeting from "./SceneMeeting.astro";
+import StoryProps from "./StoryProps.astro";
+---
+
+<section class="story" data-story aria-labelledby="story-title">
+  <div class="beats">
+    <h1 id="story-title" class="t-hero beat" data-beat>
+      Audio, <span class="mark">written down</span>. Right here on your Mac.
+    </h1>
+    <p class="t-hero beat" data-beat>
+      Drop in <span class="mark">lectures</span>, <span class="mark">interviews</span>,
+      <span class="mark">voice memos</span> or a YouTube link.
+    </p>
+    <p class="t-hero beat" data-beat>
+      It records your <span class="mark">meetings</span> too. No bot joins the call.
+    </p>
+    <p class="t-hero beat" data-beat>
+      Hold a key and <span class="mark">speak</span>. The words land where you type.
+    </p>
+  </div>
+
+  <div class="track" aria-hidden="true">
+    <div class="fade"></div>
+    <div class="device" data-device data-scene="0">
+      <StoryProps />
+      <MacBook class="laptop">
+        <Desktop>
+          <div class="scene scene-window">
+            <Image
+              src={windowShot}
+              alt=""
+              widths={[720, 1080, 1440]}
+              sizes="(max-width: 900px) 70vw, 660px"
+              loading="eager"
+              fetchpriority="high"
+            />
+          </div>
+          <div class="scene scene-call">
+            <SceneMeeting />
+          </div>
+          <div class="scene scene-type">
+            <SceneDictation />
+          </div>
+        </Desktop>
+      </MacBook>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { watchStory } from "../../scripts/story";
+  watchStory();
+</script>
+
+<style>
+  .story {
+    --laptop: min(860px, 92vw);
+    --device-top: clamp(236px, 37vh, 360px);
+    position: relative;
+    overflow: clip;
+  }
+
+  .beats {
+    position: relative;
+    width: min(100% - 2 * var(--gutter), 720px);
+    margin-inline: auto;
+    padding-top: clamp(28px, 6vh, 64px);
+    padding-bottom: calc(var(--laptop) * 0.7 + 30vh);
+    display: grid;
+    gap: clamp(56px, 12vh, 120px);
+  }
+
+  .beat {
+    font-size: min(clamp(40px, 5.2vw + 8px, 68px), 8.4vh);
+  }
+
+  .track {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .fade {
+    position: sticky;
+    top: var(--header-height);
+    height: 56px;
+    background: linear-gradient(var(--paper), rgb(255 255 255 / 0));
+  }
+
+  .device {
+    position: sticky;
+    top: var(--device-top);
+    margin-top: calc(var(--device-top) - var(--header-height) - 56px);
+  }
+
+  .device::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: 100vh;
+    background: var(--paper);
+  }
+
+  .device :global(.laptop) {
+    width: var(--laptop);
+    margin-inline: auto;
+  }
+
+  .scene {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.55s var(--ease-out);
+  }
+
+  [data-scene="0"] .scene-window,
+  [data-scene="1"] .scene-window,
+  [data-scene="2"] .scene-call,
+  [data-scene="3"] .scene-type {
+    opacity: 1;
+  }
+
+  .scene-window :global(img) {
+    position: absolute;
+    left: 50%;
+    top: calc(52 * var(--pt));
+    width: calc(1240 * var(--pt));
+    translate: -50% 0;
+    filter: drop-shadow(0 calc(12 * var(--pt)) calc(26 * var(--pt)) rgb(0 0 0 / 0.3));
+    transition: scale 0.8s var(--ease-out);
+  }
+
+  [data-scene="1"] .scene-window :global(img) {
+    scale: 0.985;
+  }
+
+  :global(.js) .beat .mark {
+    background-size: 0% 100%;
+    color: inherit;
+    transition:
+      background-size 0.7s var(--ease-out) 0.15s,
+      color 0.5s var(--ease-out) 0.15s;
+  }
+
+  :global(.js) .beat[data-seen] .mark {
+    background-size: 100% 100%;
+    color: var(--sage-deep);
+  }
+</style>

@@ -1,0 +1,50 @@
+---
+import { barFractions } from "../data/brand";
+
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<span class:list={["wave-glyph", className]} aria-hidden="true">
+  {barFractions.map((fraction, index) => (
+    <i style={`--h: ${fraction}; --i: ${index}`} />
+  ))}
+</span>
+
+<style>
+  .wave-glyph {
+    display: inline-flex;
+    align-items: center;
+    gap: 1.5px;
+    height: 14px;
+  }
+
+  .wave-glyph i {
+    display: block;
+    width: 2px;
+    height: calc(var(--h) * 100%);
+    border-radius: 2px;
+    background: currentColor;
+    transform-origin: center;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .wave-glyph i {
+      animation: breathe 1.6s var(--ease-in-out) infinite;
+      animation-delay: calc(var(--i) * -0.18s);
+    }
+  }
+
+  @keyframes breathe {
+    0%,
+    100% {
+      transform: scaleY(1);
+    }
+    50% {
+      transform: scaleY(0.45);
+    }
+  }
+</style>

@@ -1,0 +1,132 @@
+---
+import WaveGlyph from "../WaveGlyph.astro";
+
+interface Props {
+  app?: string;
+  menus?: string[];
+  clock?: string;
+}
+
+const {
+  app = "Parola",
+  menus = ["File", "Edit", "View", "Playback", "Captions", "Transcript", "Window", "Help"],
+  clock = "Tue 22 Sep  9:41",
+} = Astro.props;
+---
+
+<div class="desktop">
+  <div class="wallpaper" aria-hidden="true"></div>
+  <div class="menubar" aria-hidden="true">
+    <span class="menus">
+      <b>{app}</b>
+      {menus.map((menu) => (
+        <span>{menu}</span>
+      ))}
+    </span>
+    <span class="status">
+      <WaveGlyph class="menu-glyph" />
+      <svg viewBox="0 0 20 14" class="wifi">
+        <path d="M10 13.2 7.4 10.4a3.7 3.7 0 0 1 5.2 0L10 13.2Zm-4.5-4.8L3.9 6.7a8.6 8.6 0 0 1 12.2 0l-1.6 1.7a6.3 6.3 0 0 0-9 0ZM2 4.9.4 3.2a13.5 13.5 0 0 1 19.2 0L18 4.9a11.2 11.2 0 0 0-16 0Z"></path>
+      </svg>
+      <span class="battery">
+        <i></i>
+      </span>
+      <span>{clock}</span>
+    </span>
+  </div>
+  <slot />
+</div>
+
+<style>
+  .desktop {
+    --pt: calc(100cqw / 1512);
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+  }
+
+  .wallpaper {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(70% 60% at 88% 0%, rgb(252 242 230 / 0.95), rgb(252 242 230 / 0) 70%),
+      radial-gradient(60% 70% at 0% 100%, #243a2c, rgb(36 58 44 / 0) 70%),
+      radial-gradient(55% 55% at 22% 28%, rgb(169 194 166 / 0.9), rgb(169 194 166 / 0) 70%),
+      radial-gradient(50% 45% at 75% 85%, rgb(84 115 158 / 0.55), rgb(84 115 158 / 0) 70%),
+      linear-gradient(160deg, #b9cfb5 0%, #7d9c7b 45%, #4a6b51 100%);
+  }
+
+  .wallpaper::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(120% 60% at 50% 120%, rgb(15 26 20 / 0.35), transparent 60%),
+      repeating-radial-gradient(
+        140% 90% at -10% 110%,
+        rgb(255 255 255 / 0) 0 calc(60 * var(--pt)),
+        rgb(255 255 255 / 0.06) calc(61 * var(--pt)) calc(62 * var(--pt))
+      );
+  }
+
+  .menubar {
+    position: absolute;
+    inset: 0 0 auto;
+    height: calc(24 * var(--pt));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-inline: calc(18 * var(--pt));
+    font-size: calc(13 * var(--pt));
+    color: rgb(15 26 20 / 0.86);
+    background: rgb(255 255 255 / 0.18);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .menus,
+  .status {
+    display: flex;
+    align-items: center;
+    gap: calc(19 * var(--pt));
+    white-space: nowrap;
+  }
+
+  .menus b {
+    font-weight: 700;
+  }
+
+  .status :global(.menu-glyph) {
+    height: calc(12 * var(--pt));
+    gap: calc(1.4 * var(--pt));
+  }
+
+  .status :global(.menu-glyph i) {
+    width: calc(1.8 * var(--pt));
+  }
+
+  .wifi {
+    width: calc(16 * var(--pt));
+    fill: currentColor;
+  }
+
+  .battery {
+    display: inline-block;
+    width: calc(24 * var(--pt));
+    height: calc(11 * var(--pt));
+    border: calc(1 * var(--pt)) solid currentColor;
+    border-radius: calc(3 * var(--pt));
+    padding: calc(1.5 * var(--pt));
+    opacity: 0.9;
+  }
+
+  .battery i {
+    display: block;
+    width: 78%;
+    height: 100%;
+    border-radius: calc(1.5 * var(--pt));
+    background: currentColor;
+  }
+</style>

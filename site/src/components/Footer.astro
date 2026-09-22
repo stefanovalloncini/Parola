@@ -1,0 +1,85 @@
+---
+import { links } from "../data/links";
+import BrandIcon from "./BrandIcon.astro";
+
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="container footer-top">
+    <div class="maker">
+      <BrandIcon size={40} />
+      <p>
+        Made by Stefano Valloncini.
+        <br />
+        <span>Parola is free software under the MIT license.</span>
+      </p>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href={links.repository}>GitHub</a>
+      <a href={links.releases}>Releases</a>
+      <a href="/privacy">Privacy</a>
+      <a href={`mailto:${links.feedbackEmail}?subject=Parola`}>Contact</a>
+    </nav>
+  </div>
+  <div class="container footer-bottom">
+    <p>This website sets no cookies and loads nothing from other servers.</p>
+    <p>&copy; {year} Stefano Valloncini</p>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    background: var(--mist);
+    border-top: 0.5px solid var(--hairline);
+    padding-block: 44px 36px;
+    font-size: 15px;
+  }
+
+  .footer-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 28px;
+    border-bottom: 0.5px solid var(--hairline);
+  }
+
+  .maker {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--ink);
+    line-height: 1.35;
+  }
+
+  .maker span {
+    color: var(--muted);
+  }
+
+  .footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+  }
+
+  .footer-links a {
+    color: var(--muted);
+    transition: color 0.2s;
+  }
+
+  .footer-links a:hover {
+    color: var(--ink);
+  }
+
+  .footer-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 24px;
+    padding-top: 20px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+</style>
