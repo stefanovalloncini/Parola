@@ -35,7 +35,7 @@ const { name, tabs, label } = Astro.props;
           formats={["avif", "webp"]}
           widths={[720, 1040, 1560, 2080]}
           sizes="(max-width: 1088px) calc(100vw - 32px), 1040px"
-          loading={i === 0 ? "eager" : "lazy"}
+          loading="lazy"
         />
       </div>
     ))}
