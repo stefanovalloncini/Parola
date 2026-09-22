@@ -25,6 +25,36 @@ private struct FlakyTranslator: TranscriptTranslating {
     }
 }
 
+/// Holds a run open until the test lets it go.
+private actor TranslationGate {
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var opened = false
+
+    func wait() async {
+        guard !opened else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        opened = true
+        for waiter in waiters { waiter.resume() }
+        waiters = []
+    }
+}
+
+/// Waits on a gate before handing its batch back, so a test can hold a run in flight.
+private struct GatedTranslator: TranscriptTranslating {
+    let providerName = "stub"
+    let gate: TranslationGate
+
+    func translate(
+        _ texts: [(id: Int, text: String)], from source: String?, to target: String
+    ) async throws -> [Int: String] {
+        await gate.wait()
+        return Dictionary(uniqueKeysWithValues: texts.map { ($0.id, "T\($0.id)") })
+    }
+}
+
 /// Translates a batch, then runs `afterBatch` — the test uses it to cancel mid-run.
 private struct InterruptingTranslator: TranscriptTranslating {
     let providerName = "stub"
@@ -76,6 +106,44 @@ struct TranslationCoordinatorTests {
             language: language,
             modelName: "stub"
         )
+    }
+
+    @Test("a second run is refused while one is in flight")
+    func oneRunAtATime() async {
+        let coordinator = TranslationCoordinator()
+        let gate = TranslationGate()
+        coordinator.translatorOverride = GatedTranslator(gate: gate)
+
+        async let first = coordinator.translate(entryID: "e1", transcript: transcript(segments: 2), to: "en")
+        #expect(await waitUntil { coordinator.isRunning })
+
+        let second = await coordinator.translate(entryID: "e1", transcript: transcript(segments: 2), to: "fr")
+        #expect(second == nil, "the run in flight owns the state until it ends")
+        #expect(coordinator.activeTarget == "en")
+
+        await gate.open()
+        #expect(await first != nil)
+        #expect(coordinator.state == .idle)
+    }
+
+    @Test("a session the host never delivers fails instead of waiting forever")
+    func sessionWaitIsBounded() async {
+        let coordinator = TranslationCoordinator()
+        coordinator.sessionWaitBudget = .milliseconds(50)
+
+        // No stub translator and no language of its own: the run takes the Apple path, publishes a
+        // configuration, and nothing is on screen to hand a session back.
+        let outcome = await coordinator.translate(
+            entryID: "e1", transcript: transcript(segments: 2, language: "auto"), to: "en"
+        )
+
+        #expect(outcome == nil)
+        #expect(coordinator.sessionConfiguration == nil)
+        if case .failed(let message) = coordinator.state {
+            #expect(message.contains("translator"))
+        } else {
+            Issue.record("expected a failure, got \(coordinator.state)")
+        }
     }
 
     @Test("the mock translator fills every segment")
@@ -367,6 +435,8 @@ struct AppModelTranslationTests {
     @Test("an installed mock translator is what a run uses")
     func installedMockIsResolved() async throws {
         let (model, _) = try await loadedModel()
+        // Unleased on purpose: every other translation test sets translatorOverride, which wins over
+        // the registry, so a suite running in parallel cannot resolve what this one installs.
         MockTranslatorRegistry.shared.install(MockTranslator(mode: .map, map: ["come stai": "how are you"]))
         defer { MockTranslatorRegistry.shared.clear() }
 

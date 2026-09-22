@@ -12745,6 +12745,17 @@
         }
       }
     },
+    "The system translator didn't start in time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il traduttore di sistema non è partito in tempo."
+          }
+        }
+      }
+    },
     "The text of the transcript is sent to %@, and is handled under that provider's terms.": {
       "extractionState": "manual",
       "localizations": {

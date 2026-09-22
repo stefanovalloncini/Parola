@@ -42,8 +42,12 @@ final class TranslationCoordinator {
     /// Test seam: when set, replaces the resolved translator so a test never touches the shared mock registry.
     @ObservationIgnored var translatorOverride: (any TranscriptTranslating)?
 
+    /// How long a run waits for ``TranslationHostView`` to hand back a live session.
+    @ObservationIgnored var sessionWaitBudget: Duration = .seconds(10)
+
     @ObservationIgnored private var pending: PendingRun?
     @ObservationIgnored private var cancelRequested = false
+    @ObservationIgnored private var sessionWaitTask: Task<Void, Never>?
 
     /// The state to show for an entry: a run belongs to the entry that started it, so switching
     /// entries mid-run leaves the other transcript's section idle.
@@ -103,9 +107,11 @@ final class TranslationCoordinator {
     }
 
     func translate(entryID: LibraryEntry.ID, transcript: Transcript, to target: String) async -> Outcome? {
+        // One run at a time: a second `perform` loop would race the first for `state` and for the
+        // outcome the caller writes to the entry.
+        guard !isRunning else { return nil }
         let units = TranslationBatcher.units(from: transcript.segments)
         guard !units.isEmpty else { return nil }
-        cancel()
         cancelRequested = false
         activeEntryID = entryID
         activeTarget = target
@@ -127,11 +133,34 @@ final class TranslationCoordinator {
                 source: source.map { Locale.Language(identifier: $0) },
                 target: Locale.Language(identifier: target)
             )
+            startSessionWait()
         }
+    }
+
+    /// The framework only hands a session to a live `.translationTask`. When no host view answers,
+    /// the caller would wait in `.preparing` with nothing to cancel but the Cancel button.
+    private func startSessionWait() {
+        sessionWaitTask?.cancel()
+        let budget = sessionWaitBudget
+        sessionWaitTask = Task { [weak self] in
+            try? await Task.sleep(for: budget)
+            guard !Task.isCancelled else { return }
+            self?.failSessionWait()
+        }
+    }
+
+    private func failSessionWait() {
+        guard let run = pending else { return }
+        pending = nil
+        sessionConfiguration = nil
+        state = .failed(String(localized: "The system translator didn't start in time."))
+        run.continuation.resume(returning: nil)
     }
 
     /// Called by ``TranslationHostView`` with the session the framework built for the published configuration.
     func run(session: TranslationSession) async {
+        sessionWaitTask?.cancel()
+        sessionWaitTask = nil
         guard let run = pending else { return }
         pending = nil
         let outcome = await perform(
@@ -144,6 +173,8 @@ final class TranslationCoordinator {
     /// Stops after the batch in flight, keeping everything that already came back.
     func cancel() {
         cancelRequested = true
+        sessionWaitTask?.cancel()
+        sessionWaitTask = nil
         guard let run = pending else { return }
         pending = nil
         sessionConfiguration = nil
