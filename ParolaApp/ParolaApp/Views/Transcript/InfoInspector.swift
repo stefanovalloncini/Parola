@@ -184,14 +184,13 @@ struct InfoInspector: View {
         return code.isEmpty ? nil : code
     }
 
-    /// The model a language pick would run: the entry's own, or the toolbar's when that one is
-    /// gone from the catalog or off the disk — re-running it would start a download nobody asked for.
+    /// The model a language pick runs: the entry's own, or the toolbar's when that one is gone.
     private var runModel: String {
         let current = model.transcript?.modelName ?? ""
         return installedVariants.contains { $0.id == current } ? current : model.selectedModel
     }
 
-    /// What that model can transcribe, so the language menu can shut the codes it would refuse.
+    /// What that model can transcribe, so the menu can shut the codes it would refuse.
     private var runScope: ParolaCore.SupportedLanguages {
         ModelCatalog.staticCapabilities(forID: runModel)?.supportedLanguages ?? .all
     }
@@ -247,11 +246,6 @@ struct InfoInspector: View {
 
     private var languageLabel: String {
         LanguageDisplay.name(for: model.transcript?.language) ?? String(localized: "Auto")
-    }
-
-    private var modelLabel: String? {
-        guard let modelName = model.transcript?.modelName else { return nil }
-        return AppModel.modelLabel(modelName)
     }
 
     private var engineLabel: String? {
