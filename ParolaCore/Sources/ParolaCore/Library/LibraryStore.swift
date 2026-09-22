@@ -310,6 +310,8 @@ public actor LibraryStore {
 
     /// The transcript's size and modification time. A bundle written straight into the library
     /// folder never passes through `index`, so the snapshot is checked against the files themselves.
+    /// Indexed manifest fields — the card's title and summary, segment notes — do not move it: they
+    /// live outside transcript.json, so a lost index write over them reads as up to date.
     nonisolated static func bundleFingerprint(_ bundleURL: URL) -> String {
         let url = bundleURL.appendingPathComponent("transcript.json")
         let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
