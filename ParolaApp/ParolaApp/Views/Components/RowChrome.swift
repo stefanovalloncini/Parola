@@ -87,13 +87,10 @@ private struct RowChrome: ViewModifier {
 private struct SelectedForeground: ViewModifier {
     let color: Color?
 
-    @ViewBuilder
+    /// One modifier in every state, never an `if`: a conditional here hands the row a new identity on each
+    /// selection flip, and the chrome snaps instead of crossfading. `.foreground` is "whatever was inherited".
     func body(content: Content) -> some View {
-        if let color {
-            content.foregroundStyle(color)
-        } else {
-            content
-        }
+        content.foregroundStyle(color.map(AnyShapeStyle.init) ?? AnyShapeStyle(.foreground))
     }
 }
 
