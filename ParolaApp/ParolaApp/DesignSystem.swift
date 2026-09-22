@@ -156,7 +156,10 @@ enum DS {
         static var onAccent: SwiftUI.Color { DS.resolved.onAccent }
 
         /// The second text tier on an accent fill: `onAccent`, softened just enough to rank below it.
-        static var onAccentSecondary: SwiftUI.Color { DS.resolved.onAccent.opacity(0.9) }
+        static var onAccentSecondary: SwiftUI.Color { DS.resolved.onAccent.opacity(onAccentSecondaryTint) }
+
+        /// Its strength on its own, for the contrast test that blends it itself.
+        static let onAccentSecondaryTint = 0.9
 
         /// The backing a badge, tile or glyph keeps when it sits on an accent fill.
         static var onAccentWash: SwiftUI.Color { DS.resolved.onAccent.opacity(0.18) }

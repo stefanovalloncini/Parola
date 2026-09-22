@@ -276,6 +276,22 @@ struct SurfaceContrastTests {
         #expect(light >= 3, "light playhead word: \(light)")
     }
 
+    /// A solid-accent selection is under text AA by ruling; the tier below its title still needs a floor,
+    /// measured where the popover draws it — `onAccentSecondary` on `accent × selectionProminentTint`.
+    @Test("the second tier on a chosen row cannot drift below the prominent fill's floor")
+    func onAccentSecondaryOnTheProminentFill() throws {
+        let accent = try #require(Self.pair(ThemePreset.defaultPreset.palette.accent))
+        let ground = try #require(Self.pair(ThemePalette.sharedNeutrals.surfaceElevated))
+        for (scheme, behind, tint) in [
+            ("light", ground.light, accent.light),
+            ("dark", ground.dark, accent.dark),
+        ] {
+            let fill = behind.blended(toward: tint, amount: DS.Color.selectionProminentTint)
+            let second = fill.blended(toward: tint.legibleForeground, amount: DS.Color.onAccentSecondaryTint)
+            #expect(second.contrast(against: fill) >= 2.75, "\(scheme): \(second.contrast(against: fill))")
+        }
+    }
+
     @Test("accent text leaves an accent that already clears AA alone")
     func accentTextKeepsLegibleAccents() {
         let dark = RGBA(0.1, 0.1, 0.1)
