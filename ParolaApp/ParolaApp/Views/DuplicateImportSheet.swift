@@ -15,7 +15,7 @@ struct DuplicateImportSheet: View {
             content: { contentBody },
             footer: { footerBody }
         )
-        .sheetSize(width: 440, minHeight: 200, maxHeight: 320)
+        .sheetSize(width: 500, minHeight: 200, maxHeight: 320)
         .closeLeaf("Duplicate.Button.Close")
         .axBranch("Duplicate")
     }
@@ -69,6 +69,7 @@ struct DuplicateImportSheet: View {
             Toggle("Remember this choice", isOn: $remember)
                 .toggleStyle(.checkbox)
                 .font(DS.Font.secondary)
+                .fixedSize()
                 .axLeaf("Duplicate.Toggle.Remember")
 
             Spacer(minLength: DS.Spacing.small)
