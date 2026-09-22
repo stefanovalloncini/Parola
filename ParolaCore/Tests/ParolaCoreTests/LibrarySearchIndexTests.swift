@@ -28,7 +28,11 @@ final class LibrarySearchIndexTests {
     private var tempDirectories: [URL] = []
 
     deinit {
-        for url in tempDirectories { try? FileManager.default.removeItem(at: url) }
+        for url in tempDirectories {
+            try? FileManager.default.removeItem(at: url)
+            // The legacy single-file snapshot is a sibling of the directory, not inside it.
+            try? FileManager.default.removeItem(at: url.appendingPathExtension("json"))
+        }
     }
 
     private func makeObservedIndex(
@@ -53,13 +57,14 @@ final class LibrarySearchIndexTests {
     }
 
     private func makeTempDirectory(_ name: String = "parola-search-test") -> URL {
-        FileManager.default.temporaryDirectory
+        let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(name)-\(UUID().uuidString)", isDirectory: true)
+        tempDirectories.append(url)
+        return url
     }
 
     private func makeTempIndex(saveDebounce: Duration = .seconds(60)) -> (LibrarySearchIndex, URL) {
         let url = makeTempDirectory()
-        tempDirectories.append(url)
         return (LibrarySearchIndex(indexDirectory: url, saveDebounce: saveDebounce), url)
     }
 
@@ -255,10 +260,6 @@ final class LibrarySearchIndexTests {
     @Test("a v7 snapshot's raw-segment boundaries are discarded")
     func snapshotWithRawSegmentBoundariesIsDiscarded() async throws {
         let url = makeTempDirectory("parola-search-v7")
-        defer {
-            try? FileManager.default.removeItem(at: url)
-            try? FileManager.default.removeItem(at: legacySnapshotURL(for: url))
-        }
         let v7 = #"{"version":7,"entries":[{"id":"e1","title":"Riunione","excerpt":"Buongiorno a tutti lancio",""#
             + #""excerptTruncated":false,"tokens":["buongiorno","lancio","riunione","tutti"],"counts":[1,1,1,1],"#
             + #""offsets":[0,19,-1,14],"boundaryOffsets":[0,19,19],"boundaryCentiseconds":[0,450,900],"#
@@ -741,10 +742,6 @@ final class LibrarySearchIndexTests {
     @Test("a v10 single-file snapshot is discarded and its file removed once the directory lands")
     func legacySingleFileSnapshotIsReplaced() async throws {
         let url = makeTempDirectory()
-        defer {
-            try? FileManager.default.removeItem(at: url)
-            try? FileManager.default.removeItem(at: legacySnapshotURL(for: url))
-        }
         let v10 = #"{"version":10,"entries":[{"id":"e1","title":"Notes","text":"sprint planning",""#
             + #""tokens":["notes","planning","sprint"],"counts":[1,1,1],"offsets":[-1,7,0],"#
             + #""boundaryOffsets":[],"boundaryCentiseconds":[],"fingerprint":"f1"}]}"#
@@ -766,7 +763,6 @@ final class LibrarySearchIndexTests {
     @Test("a manifest row whose entry file is gone makes the snapshot stale")
     func missingEntryFileIsStale() async throws {
         let (index1, url) = makeTempIndex()
-        defer { try? FileManager.default.removeItem(at: url) }
         await index1.index(id: "e1", title: "Notes", text: "sprint planning", fingerprint: "f1", createdAt: Date())
         await index1.index(id: "e2", title: "Other", text: "retro feedback", fingerprint: "f2", createdAt: Date())
         await index1.flush()
@@ -780,7 +776,6 @@ final class LibrarySearchIndexTests {
     @Test("a manifest row whose entry file will not decode makes the snapshot stale")
     func corruptEntryFileIsStale() async throws {
         let (index1, url) = makeTempIndex()
-        defer { try? FileManager.default.removeItem(at: url) }
         await index1.index(id: "e1", title: "Notes", text: "sprint planning", fingerprint: "f1", createdAt: Date())
         await index1.flush()
         try Data("not json".utf8).write(to: entryURL("e1", in: url))
@@ -793,7 +788,6 @@ final class LibrarySearchIndexTests {
     @Test("an entry file whose fingerprint is not the manifest's makes the snapshot stale")
     func fingerprintMismatchIsStale() async throws {
         let (index1, url) = makeTempIndex()
-        defer { try? FileManager.default.removeItem(at: url) }
         await index1.index(id: "e1", title: "Notes", text: "sprint planning", fingerprint: "f1", createdAt: Date())
         await index1.flush()
         // The manifest of a later save, over an entry file an earlier save failed to replace.
@@ -811,7 +805,6 @@ final class LibrarySearchIndexTests {
     @Test("an entry file the manifest does not list is ignored and pruned")
     func unlistedEntryFileIsPruned() async throws {
         let (index1, url) = makeTempIndex()
-        defer { try? FileManager.default.removeItem(at: url) }
         await index1.index(id: "e1", title: "Notes", text: "sprint planning", createdAt: Date())
         await index1.flush()
         let ghost = entryURL("ghost", in: url)
@@ -829,7 +822,6 @@ final class LibrarySearchIndexTests {
     @Test("a crash-orphaned temp file in entries/ is pruned even without a json extension")
     func unlistedNonJSONFileIsPruned() async throws {
         let (index1, url) = makeTempIndex()
-        defer { try? FileManager.default.removeItem(at: url) }
         await index1.index(id: "e1", title: "Notes", text: "sprint planning", createdAt: Date())
         await index1.flush()
         let entryData = try Data(contentsOf: entryURL("e1", in: url))
@@ -922,7 +914,6 @@ final class LibrarySearchIndexTests {
     @Test("a save writes the entries that changed and the manifest last")
     func saveWritesOnlyTheChangedEntries() async throws {
         let url = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: url) }
         let (index, log) = makeObservedIndex(at: url)
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
@@ -941,7 +932,6 @@ final class LibrarySearchIndexTests {
     @Test("a save deletes the file of a removed entry")
     func saveDeletesRemovedEntryFiles() async throws {
         let url = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: url) }
         let (index, log) = makeObservedIndex(at: url)
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         await index.index(id: "e2", title: "Two", text: "retro feedback", createdAt: Date())
@@ -960,7 +950,6 @@ final class LibrarySearchIndexTests {
     @Test("flushing an unchanged index writes nothing")
     func cleanFlushWritesNothing() async throws {
         let url = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: url) }
         let (index, log) = makeObservedIndex(at: url)
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         await index.flush()
@@ -974,7 +963,6 @@ final class LibrarySearchIndexTests {
     @Test("a superseded snapshot write leaves the manifest to the newer generation")
     func supersededWriteDropped() async throws {
         let url = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: url) }
         let gate = DispatchSemaphore(value: 0)
         let log = OSAllocatedUnfairLock(initialState: SnapshotWrites())
         let index = LibrarySearchIndex(
@@ -1019,7 +1007,6 @@ final class LibrarySearchIndexTests {
     @Test("a snapshot write that fails leaves the index pending, not clean")
     func failedWriteStaysPending() async throws {
         let url = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: url) }
         let attempts = OSAllocatedUnfairLock(initialState: 0)
         let index = LibrarySearchIndex(
             indexDirectory: url,
@@ -1050,7 +1037,6 @@ final class LibrarySearchIndexTests {
     @Test("a failed write reschedules itself without another mutation")
     func failedWriteReschedules() async throws {
         let url = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: url) }
         let attempts = OSAllocatedUnfairLock(initialState: 0)
         let index = LibrarySearchIndex(
             indexDirectory: url,
