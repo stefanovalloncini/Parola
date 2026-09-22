@@ -146,7 +146,7 @@ struct SidebarRowLabel: View {
             if let badge {
                 Text("\(badge)")
                     .font(DS.Font.caption)
-                    .foregroundStyle(isSelected ? DS.Color.onAccentSecondary : .secondary)
+                    .foregroundStyle(isSelected ? DS.Color.onAccent : .secondary)
                     .padding(.horizontal, DS.Spacing.snug)
                     .padding(.vertical, 1)
                     .background(

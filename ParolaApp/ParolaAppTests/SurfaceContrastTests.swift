@@ -289,6 +289,14 @@ struct SurfaceContrastTests {
             let fill = behind.blended(toward: tint, amount: DS.Color.selectionProminentTint)
             let second = fill.blended(toward: tint.legibleForeground, amount: DS.Color.onAccentSecondaryTint)
             #expect(second.contrast(against: fill) >= 2.75, "\(scheme): \(second.contrast(against: fill))")
+
+            // The badge is full `onAccent` on a pill that only lightens the fill under it, so it reads against the row.
+            let ink = tint.legibleForeground
+            let pill = fill.blended(toward: ink, amount: DS.Color.onAccentWashTint)
+            #expect(
+                ink.contrast(against: fill) >= 3,
+                "\(scheme) badge ink on the row \(ink.contrast(against: fill)), on its own pill \(ink.contrast(against: pill))"
+            )
         }
     }
 
