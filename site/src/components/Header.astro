@@ -22,7 +22,7 @@ const anchor = (id: string) => (onHome ? `#${id}` : `/#${id}`);
       <a class="github" href={links.repository}>
         GitHub
       </a>
-      <a class="download" href={links.download}>
+      <a class="download" href={anchor("download")}>
         <span>Download</span>
         <WaveGlyph />
       </a>
