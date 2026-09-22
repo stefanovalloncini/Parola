@@ -52,6 +52,14 @@ const ogImage = Astro.site ? new URL("/og.png", Astro.site).href : undefined;
   </body>
 </html>
 
+<script>
+  import { playWhenVisible, revealWords } from "../scripts/reveal";
+  import { runSceneLoops } from "../scripts/scene-loop";
+  revealWords();
+  playWhenVisible();
+  runSceneLoops();
+</script>
+
 <style>
   .skip {
     position: absolute;

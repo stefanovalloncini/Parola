@@ -1,0 +1,131 @@
+---
+import demo from "../../../../ParolaApp/ParolaApp/Resources/Introduction/demo-en.json";
+import clip from "../../../../ParolaApp/ParolaApp/Resources/Introduction/demo-en.m4a?url";
+import { barFractions } from "../../data/brand";
+---
+
+<div
+  class="karaoke"
+  data-karaoke
+  data-levels={JSON.stringify(demo.levels)}
+  data-rate={demo.levelRate}
+  data-duration={demo.duration}
+>
+  <div class="meter" aria-hidden="true">
+    {barFractions.map((fraction) => (
+      <i data-bar style={`--h: ${fraction}`} />
+    ))}
+  </div>
+  <p class="words">
+    {demo.words.map((word) => (
+      <span data-s={word.start} data-e={word.end}>
+        {word.text}{" "}
+      </span>
+    ))}
+  </p>
+  <button type="button" class="play" data-play aria-pressed="false">
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path class="glyph-play" d="M7 5.2v9.6L15 10 7 5.2Z"></path>
+      <path class="glyph-pause" d="M6.5 5h2.2v10H6.5zM11.3 5h2.2v10h-2.2z"></path>
+    </svg>
+    <span data-label>Play with sound</span>
+  </button>
+  <audio preload="none" src={clip}></audio>
+</div>
+
+<script>
+  import { watchKaraoke } from "../../scripts/karaoke";
+  document.querySelectorAll<HTMLElement>("[data-karaoke]").forEach(watchKaraoke);
+</script>
+
+<style>
+  .karaoke {
+    --u: calc(100cqw / 500);
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding: calc(40 * var(--u)) calc(42 * var(--u)) calc(34 * var(--u));
+    background:
+      radial-gradient(80% 60% at 50% 0%, rgb(107 138 107 / 0.22), transparent 70%),
+      rgb(255 255 255 / 0.02);
+  }
+
+  .meter {
+    display: flex;
+    align-items: center;
+    gap: calc(7 * var(--u));
+    height: calc(64 * var(--u));
+    margin-bottom: calc(30 * var(--u));
+  }
+
+  .meter i {
+    width: calc(8 * var(--u));
+    height: calc(var(--h) * 100%);
+    border-radius: calc(4 * var(--u));
+    background: var(--sage-soft);
+    transform: scaleY(0.35);
+    transition: transform 0.08s linear;
+  }
+
+  .words {
+    font-family: var(--font-serif);
+    font-size: calc(27 * var(--u));
+    line-height: 1.32;
+    letter-spacing: -0.005em;
+    color: var(--cream);
+    text-wrap: pretty;
+  }
+
+  .words span {
+    color: rgb(252 242 230 / 0.32);
+    border-radius: calc(4 * var(--u));
+    transition:
+      color 0.15s,
+      background-color 0.15s;
+  }
+
+  .words span:global(.is-spoken) {
+    color: var(--cream);
+  }
+
+  .words span:global(.is-current) {
+    color: #fff;
+    background: rgb(169 194 166 / 0.28);
+  }
+
+  .play {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(8 * var(--u));
+    align-self: flex-start;
+    margin-top: auto;
+    padding: calc(9 * var(--u)) calc(16 * var(--u)) calc(9 * var(--u)) calc(12 * var(--u));
+    border-radius: 999px;
+    background: rgb(252 242 230 / 0.1);
+    box-shadow: inset 0 0 0 1px rgb(252 242 230 / 0.14);
+    color: var(--cream);
+    font-size: max(13px, calc(14 * var(--u)));
+    font-weight: 550;
+    transition: background-color 0.2s;
+  }
+
+  .play:hover {
+    background: rgb(252 242 230 / 0.16);
+  }
+
+  .play svg {
+    width: calc(18 * var(--u));
+    min-width: 16px;
+    fill: currentColor;
+  }
+
+  .glyph-pause,
+  :global([data-audible]) .glyph-play {
+    display: none;
+  }
+
+  :global([data-audible]) .glyph-pause {
+    display: inline;
+  }
+</style>

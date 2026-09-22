@@ -1,0 +1,45 @@
+---
+interface Props {
+  title: string;
+  text: string;
+  class?: string;
+}
+
+const { title, text, class: className } = Astro.props;
+---
+
+<article class:list={["feature", className]}>
+  <h3 class="t-card">{title}</h3>
+  <p class="t-lead">{text}</p>
+  <div class="stage">
+    <slot />
+  </div>
+</article>
+
+<style>
+  .feature {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .t-lead {
+    margin-top: 14px;
+    max-width: 24em;
+  }
+
+  .stage {
+    --u: calc(100cqw / 500);
+    position: relative;
+    margin-top: 32px;
+    aspect-ratio: 504 / 440;
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    background: var(--mist);
+    container-type: inline-size;
+    isolation: isolate;
+  }
+
+  .stage > :global(*) {
+    --u: calc(100cqw / 500);
+  }
+</style>

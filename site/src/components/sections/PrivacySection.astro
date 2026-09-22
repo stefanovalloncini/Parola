@@ -1,0 +1,103 @@
+---
+import Icon, { type IconName } from "../Icon.astro";
+
+const points: { icon: IconName; title: string; text: string }[] = [
+  {
+    icon: "chip",
+    title: "On-device engines",
+    text: "Apple Speech, Whisper and Parakeet all run on your Mac's own chips.",
+  },
+  {
+    icon: "offline",
+    title: "Works offline",
+    text: "Once a model is downloaded, transcription needs no connection.",
+  },
+  {
+    icon: "person",
+    title: "No account",
+    text: "No sign-in and no analytics. An AI service you add gets the text, never the audio.",
+  },
+];
+---
+
+<section class="privacy section" id="privacy" aria-labelledby="privacy-title">
+  <div class="container">
+    <div class="section-head">
+      <span class="lock">
+        <Icon name="lock" size={34} />
+      </span>
+      <h2 id="privacy-title" class="t-title" data-words>
+        Your words stay
+        <br />
+        on your Mac.
+      </h2>
+    </div>
+    <ul class="points">
+      {points.map((point) => (
+        <li>
+          <h3>
+            <Icon name={point.icon} size={24} />
+            {point.title}
+          </h3>
+          <p>{point.text}</p>
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .privacy {
+    padding-top: clamp(40px, 5vw, 80px);
+  }
+
+  .lock {
+    display: inline-grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    margin-bottom: 22px;
+    border-radius: 20px;
+    background: var(--sage-tint);
+    color: var(--sage-deep);
+  }
+
+  .points {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+
+  li {
+    padding: 34px 32px 36px;
+    border-radius: var(--radius-card);
+    background: var(--mist);
+  }
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 650;
+    letter-spacing: -0.018em;
+    color: var(--ink);
+  }
+
+  p {
+    font-size: 18px;
+    line-height: 1.4;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  @media (max-width: 900px) {
+    .points {
+      grid-template-columns: 1fr;
+      max-width: 520px;
+      margin-inline: auto;
+    }
+  }
+</style>

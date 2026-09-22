@@ -1,0 +1,64 @@
+---
+import Icon, { type IconName } from "./Icon.astro";
+
+export interface FeatureRow {
+  icon: IconName;
+  title: string;
+  text: string;
+}
+
+interface Props {
+  rows: FeatureRow[];
+}
+
+const { rows } = Astro.props;
+---
+
+<ul class="rows">
+  {rows.map((row) => (
+    <li>
+      <h3 class="t-row">
+        <Icon name={row.icon} size={26} />
+        {row.title}
+      </h3>
+      <p class="t-lead">{row.text}</p>
+    </li>
+  ))}
+</ul>
+
+<style>
+  .rows {
+    margin-top: clamp(64px, 8vw, 104px);
+    border-top: 0.5px solid var(--hairline);
+  }
+
+  li {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 32px;
+    padding-block: 30px;
+    border-bottom: 0.5px solid var(--hairline);
+  }
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  h3 :global(.icon) {
+    flex: none;
+    color: var(--ink);
+  }
+
+  .t-lead {
+    max-width: 30em;
+  }
+
+  @media (max-width: 720px) {
+    li {
+      grid-template-columns: 1fr;
+      padding-block: 24px;
+    }
+  }
+</style>

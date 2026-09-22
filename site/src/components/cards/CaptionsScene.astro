@@ -1,0 +1,161 @@
+---
+const lines = [
+  "Good morning, everyone. Thanks for coming.",
+  "Today we're looking at the spring pilot.",
+  "Three schools took part this year,",
+  "and two of them want to keep going.",
+  "Let's start with attendance.",
+];
+const steps = lines.slice(1).map((_, i) => [i * 1900, `l${i}`]);
+---
+
+<div
+  class="captions"
+  data-scene-loop={JSON.stringify(steps)}
+  data-duration={String((lines.length - 1) * 1900)}
+  data-still="l1"
+  aria-hidden="true"
+>
+  <div class="slide">
+    <p class="slide-title">Spring pilot</p>
+    <span class="chart">
+      <i style="--h: .45"></i>
+      <i style="--h: .7"></i>
+      <i style="--h: .9"></i>
+    </span>
+  </div>
+  <div class="panel">
+    <span class="chip">
+      <svg viewBox="0 0 12 16">
+        <rect x="3" y="0.5" width="6" height="10" rx="3"></rect>
+        <path d="M1 7.5a5 5 0 0 0 10 0M6 12.5V15"></path>
+      </svg>
+      Mic
+    </span>
+    <div class="window">
+      <div class="lines">
+        {lines.map((line) => (
+          <p>{line}</p>
+        ))}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .captions {
+    --line: calc(30 * var(--u));
+    position: absolute;
+    inset: 0;
+    background: #2f3b34;
+  }
+
+  .slide {
+    position: absolute;
+    inset: calc(26 * var(--u)) calc(26 * var(--u)) calc(90 * var(--u));
+    padding: calc(28 * var(--u));
+    border-radius: calc(10 * var(--u));
+    background: linear-gradient(150deg, #f7f5ef, #e7ece4);
+    filter: blur(calc(1.4 * var(--u)));
+    opacity: 0.92;
+  }
+
+  .slide-title {
+    font-family: var(--font-display);
+    font-size: calc(30 * var(--u));
+    font-weight: 700;
+    color: #2c3530;
+  }
+
+  .chart {
+    position: absolute;
+    left: calc(28 * var(--u));
+    right: calc(160 * var(--u));
+    bottom: calc(26 * var(--u));
+    height: calc(120 * var(--u));
+    display: flex;
+    align-items: flex-end;
+    gap: calc(18 * var(--u));
+  }
+
+  .chart i {
+    flex: 1;
+    height: calc(var(--h) * 100%);
+    border-radius: calc(6 * var(--u)) calc(6 * var(--u)) 0 0;
+    background: var(--sage);
+  }
+
+  .panel {
+    position: absolute;
+    left: calc(34 * var(--u));
+    right: calc(34 * var(--u));
+    bottom: calc(24 * var(--u));
+    padding: calc(16 * var(--u)) calc(20 * var(--u));
+    border-radius: calc(16 * var(--u));
+    background: rgb(12 14 13 / 0.78);
+    box-shadow:
+      inset 0 0 0 calc(1 * var(--u)) rgb(255 255 255 / 0.06),
+      0 calc(18 * var(--u)) calc(40 * var(--u)) rgb(0 0 0 / 0.35);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .chip {
+    position: absolute;
+    top: calc(-11 * var(--u));
+    right: calc(14 * var(--u));
+    display: inline-flex;
+    align-items: center;
+    gap: calc(4 * var(--u));
+    height: calc(20 * var(--u));
+    padding-inline: calc(8 * var(--u));
+    border-radius: 999px;
+    background: #3a403c;
+    color: rgb(255 255 255 / 0.8);
+    font: 600 calc(9.5 * var(--u)) var(--font-mono);
+    text-transform: uppercase;
+  }
+
+  .chip svg {
+    width: calc(8 * var(--u));
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+  }
+
+  .window {
+    height: calc(var(--line) * 2);
+    overflow: hidden;
+  }
+
+  .lines {
+    transition: translate 0.5s var(--ease-out);
+  }
+
+  .lines p {
+    height: var(--line);
+    font-size: calc(19 * var(--u));
+    font-weight: 600;
+    line-height: var(--line);
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    transition: opacity 0.4s;
+  }
+
+  [data-state="l0"] .lines {
+    transition: none;
+  }
+
+  [data-state="l1"] .lines {
+    translate: 0 calc(var(--line) * -1);
+  }
+
+  [data-state="l2"] .lines {
+    translate: 0 calc(var(--line) * -2);
+  }
+
+  [data-state="l3"] .lines {
+    translate: 0 calc(var(--line) * -3);
+  }
+</style>

@@ -1,0 +1,71 @@
+---
+const rows = [
+  "English:en Italiano:it Español:es Français:fr Deutsch:de Português:pt Nederlands:nl Polski:pl",
+  "日本語:ja 中文:zh 한국어:ko العربية:ar Русский:ru हिन्दी:hi Українська:uk Ελληνικά:el",
+  "Svenska:sv Dansk:da Suomi:fi Čeština:cs Magyar:hu Română:ro Hrvatski:hr Български:bg",
+].map((row) => row.split(" ").map((pair) => pair.split(":") as [string, string]));
+---
+
+<div class="languages" data-loop aria-hidden="true">
+  {rows.map((row, r) => (
+    <div class:list={["row", { reverse: r === 1 }]}>
+      <ul class="track" style={`--speed: ${38 + r * 6}s`}>
+        {[...row, ...row].map(([name, code]) => (
+          <li lang={code}>{name}</li>
+        ))}
+      </ul>
+    </div>
+  ))}
+</div>
+
+<style>
+  .languages {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: calc(14 * var(--u));
+    mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+  }
+
+  .row {
+    overflow: hidden;
+  }
+
+  .track {
+    display: flex;
+    gap: calc(10 * var(--u));
+    width: max-content;
+  }
+
+  li {
+    flex: none;
+    padding: calc(9 * var(--u)) calc(16 * var(--u));
+    border-radius: calc(12 * var(--u));
+    background: rgb(255 255 255 / 0.04);
+    box-shadow: inset 0 0 0 1px rgb(252 242 230 / 0.08);
+    color: var(--cream);
+    font-family: var(--font-display);
+    font-size: calc(24 * var(--u));
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-playing] .track {
+      animation: marquee var(--speed) linear infinite;
+    }
+
+    [data-playing] .reverse .track {
+      animation-direction: reverse;
+    }
+  }
+
+  @keyframes marquee {
+    to {
+      translate: calc(-50% - 5 * var(--u)) 0;
+    }
+  }
+</style>

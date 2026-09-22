@@ -1,0 +1,132 @@
+---
+import Icon from "../Icon.astro";
+
+const providers = [
+  { name: "Apple Intelligence", where: "On this Mac", local: true },
+  { name: "Ollama", where: "On this Mac", local: true },
+  { name: "OpenAI", where: "Your key", local: false },
+  { name: "Anthropic", where: "Your key", local: false },
+];
+const steps = providers.map((_, i) => [i * 1600, `s${i}`]);
+---
+
+<div
+  class="providers"
+  data-scene-loop={JSON.stringify(steps)}
+  data-duration={String(providers.length * 1600)}
+  data-still="s0"
+  aria-hidden="true"
+>
+  <ul>
+    {providers.map((provider, i) => (
+      <li class={`s${i}`}>
+        <span class:list={["tile", { local: provider.local }]}>
+          <Icon name={provider.local ? "chip" : "globe"} size={22} />
+        </span>
+        <span class="text">
+          <b>{provider.name}</b>
+          <small>{provider.where}</small>
+        </span>
+        <span class="check">
+          <Icon name="check" size={16} />
+        </span>
+      </li>
+    ))}
+  </ul>
+</div>
+
+<style>
+  .providers {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: calc(28 * var(--u));
+  }
+
+  ul {
+    display: grid;
+    gap: calc(12 * var(--u));
+    width: calc(400 * var(--u));
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: calc(14 * var(--u));
+    padding: calc(14 * var(--u)) calc(18 * var(--u));
+    border-radius: calc(18 * var(--u));
+    background: #fff;
+    box-shadow:
+      0 0 0 calc(1 * var(--u)) rgb(15 26 20 / 0.06),
+      0 calc(6 * var(--u)) calc(14 * var(--u)) rgb(15 26 20 / 0.05);
+  }
+
+  .tile {
+    display: grid;
+    place-items: center;
+    width: calc(48 * var(--u));
+    height: calc(48 * var(--u));
+    border-radius: calc(13 * var(--u));
+    background: #e8edf5;
+    color: var(--slate);
+  }
+
+  .tile.local {
+    background: var(--sage-tint);
+    color: var(--sage-deep);
+  }
+
+  .tile :global(svg) {
+    width: calc(24 * var(--u));
+    height: calc(24 * var(--u));
+  }
+
+  .text {
+    flex: 1;
+    display: grid;
+  }
+
+  .text b {
+    font-family: var(--font-display);
+    font-size: calc(19 * var(--u));
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+
+  .text small {
+    font-size: calc(14 * var(--u));
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .check {
+    display: grid;
+    place-items: center;
+    width: calc(26 * var(--u));
+    height: calc(26 * var(--u));
+    border-radius: 50%;
+    background: var(--sage-deep);
+    color: #fff;
+    opacity: 0;
+    scale: 0.5;
+    transition:
+      opacity 0.25s var(--ease-out),
+      scale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .check :global(svg) {
+    width: calc(15 * var(--u));
+    height: calc(15 * var(--u));
+    stroke-width: 2.4;
+  }
+
+  [data-state="s0"] .s0 .check,
+  [data-state="s1"] .s1 .check,
+  [data-state="s2"] .s2 .check,
+  [data-state="s3"] .s3 .check {
+    opacity: 1;
+    scale: 1;
+  }
+</style>

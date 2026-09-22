@@ -1,0 +1,77 @@
+---
+import CaptionsScene from "../cards/CaptionsScene.astro";
+import DictationScene from "../cards/DictationScene.astro";
+import FeatureCard from "../cards/FeatureCard.astro";
+import LinkScene from "../cards/LinkScene.astro";
+import MeetingScene from "../cards/MeetingScene.astro";
+import FeatureRows, { type FeatureRow } from "../FeatureRows.astro";
+
+const rows: FeatureRow[] = [
+  {
+    icon: "speaker",
+    title: "Your Mac's audio",
+    text: "Record the microphone or anything your Mac plays. Set a timer and the recording stops on its own.",
+  },
+  {
+    icon: "stack",
+    title: "Batch",
+    text: "Queue a folder of files. They run one after another and skip anything already in your library.",
+  },
+  {
+    icon: "folder",
+    title: "Watched folders",
+    text: "Pick a folder and every new file that lands in it gets transcribed.",
+  },
+  {
+    icon: "search",
+    title: "Search everything",
+    text: "Find a word across every transcript, summary and speaker name in your library.",
+  },
+];
+---
+
+<section class="section" aria-label="Recording, dictation and captions">
+  <div class="container">
+    <div class="grid">
+      <FeatureCard
+        title="Meetings"
+        text="When Zoom, Teams or Webex opens, Parola offers to record the call. The recording stays on your Mac."
+      >
+        <MeetingScene />
+      </FeatureCard>
+      <FeatureCard
+        title="Dictation"
+        text="Hold a key and speak. The words land in whatever app you're typing in."
+      >
+        <DictationScene />
+      </FeatureCard>
+      <FeatureCard
+        title="Live captions"
+        text="Your words as subtitles, in a panel that stays on top. It can translate them to English as you speak."
+      >
+        <CaptionsScene />
+      </FeatureCard>
+      <FeatureCard
+        title="Links"
+        text="Paste a link from YouTube, Vimeo or SoundCloud. Parola fetches the audio and writes it down."
+      >
+        <LinkScene />
+      </FeatureCard>
+    </div>
+    <FeatureRows rows={rows} />
+  </div>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(64px, 8vw, 104px) 32px;
+  }
+
+  @media (max-width: 820px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -1,0 +1,90 @@
+---
+const formats = [
+  ".srt",
+  ".vtt",
+  ".docx",
+  ".pdf",
+  ".md",
+  ".txt",
+  ".html",
+  ".fcpxml",
+  ".lrc",
+  ".json",
+  ".jsonl",
+  ".csv",
+  ".tsv",
+];
+const steps = formats.map((_, i) => [i * 620, `f${i}`]);
+---
+
+<div
+  class="formats"
+  data-scene-loop={JSON.stringify(steps)}
+  data-duration={String(formats.length * 620)}
+  data-still="none"
+  aria-hidden="true"
+>
+  <ul>
+    {formats.map((format, i) => (
+      <li data-at={`f${i}`}>{format}</li>
+    ))}
+    <li class="burn">Burn into video</li>
+  </ul>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>(".formats[data-scene-loop]").forEach((root) => {
+    const chips = root.querySelectorAll<HTMLElement>("[data-at]");
+    new MutationObserver(() => {
+      chips.forEach((chip) =>
+        chip.classList.toggle("is-on", chip.dataset.at === root.dataset.state),
+      );
+    }).observe(root, { attributes: true, attributeFilter: ["data-state"] });
+  });
+</script>
+
+<style>
+  .formats {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: calc(34 * var(--u));
+  }
+
+  ul {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: calc(10 * var(--u));
+    max-width: calc(380 * var(--u));
+  }
+
+  li {
+    padding: calc(9 * var(--u)) calc(16 * var(--u));
+    border-radius: calc(12 * var(--u));
+    background: rgb(255 255 255 / 0.04);
+    box-shadow: inset 0 0 0 1px rgb(252 242 230 / 0.08);
+    color: rgb(252 242 230 / 0.55);
+    font-family: var(--font-display);
+    font-size: calc(24 * var(--u));
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    transition:
+      color 0.3s,
+      background-color 0.3s,
+      box-shadow 0.3s;
+  }
+
+  li:global(.is-on) {
+    color: var(--cream);
+    background: rgb(169 194 166 / 0.2);
+    box-shadow: inset 0 0 0 1px rgb(169 194 166 / 0.5);
+  }
+
+  .burn {
+    color: var(--sage-soft);
+    font-size: calc(18 * var(--u));
+    letter-spacing: -0.01em;
+  }
+</style>

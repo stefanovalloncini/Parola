@@ -1,0 +1,94 @@
+---
+const prompts = [
+  { name: "Cleanup", hue: "#6b8a6b" },
+  { name: "Action items", hue: "#54739e" },
+  { name: "Highlight key points", hue: "#a07b5a" },
+  { name: "Generate FAQ", hue: "#7b6f95" },
+  { name: "Create a mind map", hue: "#3f6048" },
+  { name: "Translate to Italian", hue: "#b0655c" },
+];
+const steps = prompts.map((_, i) => [i * 1300, `p${i}`]);
+---
+
+<div
+  class="prompts"
+  data-scene-loop={JSON.stringify(steps)}
+  data-duration={String(prompts.length * 1300)}
+  data-still="p1"
+  aria-hidden="true"
+>
+  <ul>
+    {prompts.map((prompt, i) => (
+      <li class={`p${i}`} style={`--hue: ${prompt.hue}`}>
+        <i />
+        {prompt.name}
+      </li>
+    ))}
+  </ul>
+</div>
+
+<style>
+  .prompts {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: calc(28 * var(--u));
+  }
+
+  ul {
+    display: grid;
+    gap: calc(10 * var(--u));
+    width: calc(380 * var(--u));
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: calc(14 * var(--u));
+    padding: calc(13 * var(--u)) calc(18 * var(--u));
+    border-radius: calc(16 * var(--u));
+    background: color-mix(in srgb, var(--hue) 11%, #fff);
+    box-shadow: inset 0 0 0 calc(1 * var(--u)) color-mix(in srgb, var(--hue) 22%, transparent);
+    color: color-mix(in srgb, var(--hue) 82%, #000);
+    font-family: var(--font-display);
+    font-size: calc(21 * var(--u));
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    transition:
+      background-color 0.35s var(--ease-out),
+      color 0.35s var(--ease-out),
+      scale 0.35s var(--ease-out),
+      box-shadow 0.35s var(--ease-out);
+  }
+
+  li i {
+    width: calc(20 * var(--u));
+    height: calc(20 * var(--u));
+    border-radius: calc(6 * var(--u));
+    background: var(--hue);
+    opacity: 0.85;
+  }
+
+  [data-state="p0"] .p0,
+  [data-state="p1"] .p1,
+  [data-state="p2"] .p2,
+  [data-state="p3"] .p3,
+  [data-state="p4"] .p4,
+  [data-state="p5"] .p5 {
+    background: var(--hue);
+    color: #fff;
+    scale: 1.03;
+    box-shadow: 0 calc(10 * var(--u)) calc(24 * var(--u))
+      color-mix(in srgb, var(--hue) 40%, transparent);
+  }
+
+  [data-state="p0"] .p0 i,
+  [data-state="p1"] .p1 i,
+  [data-state="p2"] .p2 i,
+  [data-state="p3"] .p3 i,
+  [data-state="p4"] .p4 i,
+  [data-state="p5"] .p5 i {
+    background: #fff;
+  }
+</style>

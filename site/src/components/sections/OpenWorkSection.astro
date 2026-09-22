@@ -1,0 +1,192 @@
+---
+import { links } from "../../data/links";
+import BrandIcon from "../BrandIcon.astro";
+
+const credits = [
+  {
+    before: "Runs OpenAI's Whisper as",
+    mark: "Core ML models on Apple silicon",
+    after: ".",
+    name: "WhisperKit, by Argmax",
+    href: "https://github.com/argmaxinc/WhisperKit",
+  },
+  {
+    before: "Tells the voices in a recorded file",
+    mark: "apart",
+    after: ", so each line gets a speaker.",
+    name: "SpeakerKit, by Argmax",
+    href: "https://github.com/argmaxinc/WhisperKit",
+  },
+  {
+    before: "Runs NVIDIA's Parakeet and the live speaker labels",
+    mark: "on the Neural Engine",
+    after: ".",
+    name: "FluidAudio",
+    href: "https://github.com/FluidInference/FluidAudio",
+  },
+  {
+    before: "The",
+    mark: "speech engine built into macOS 26",
+    after: ". Nothing to download.",
+    name: "Speech framework, by Apple",
+  },
+  {
+    before: "Summaries, chapters and titles,",
+    mark: "written on your Mac",
+    after: ".",
+    name: "Apple Intelligence",
+  },
+  {
+    before: "Fetches the audio behind",
+    mark: "a link you paste",
+    after: ", from YouTube and many other sites.",
+    name: "yt-dlp",
+    href: "https://github.com/yt-dlp/yt-dlp",
+  },
+  {
+    before: "Translates a finished transcript",
+    mark: "on device",
+    after: ", into the languages your Mac offers.",
+    name: "Translation framework, by Apple",
+  },
+];
+---
+
+<section class="open section" aria-labelledby="open-title">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="open-title" class="t-section" data-words>
+        Built on open work.
+      </h2>
+      <p class="t-lead">The pieces under Parola are open source or part of macOS.</p>
+    </div>
+    <ul class="wall">
+      {credits.map((credit) => (
+        <li>
+          <p class="quote">
+            {credit.before} <span class="hl">{credit.mark}</span>
+            {credit.after}
+          </p>
+          {credit.href ? (
+            <a class="credit" href={credit.href}>
+              {credit.name}
+            </a>
+          ) : (
+            <span class="credit">{credit.name}</span>
+          )}
+        </li>
+      ))}
+      <li class="source">
+        <BrandIcon size={44} />
+        <p class="quote">
+          Parola itself is MIT licensed. <span class="hl">Read every line</span>, change what you
+          like.
+        </p>
+        <a class="button" href={links.repository}>
+          View the source on GitHub
+        </a>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<style>
+  .wall {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  li {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 28px;
+    min-height: 250px;
+    padding: 30px 32px;
+    border-radius: var(--radius-card);
+    background: linear-gradient(180deg, #fff, #fbfcfb);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+  }
+
+  .quote {
+    font-family: var(--font-display);
+    font-size: clamp(22px, 1vw + 14px, 26px);
+    font-weight: 650;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  .hl {
+    color: var(--sage-deep);
+    background: var(--sage-tint);
+    border-radius: 0.2em;
+    padding: 0 0.12em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  .credit {
+    font-size: 15px;
+    font-weight: 550;
+    color: var(--muted);
+  }
+
+  a.credit:hover {
+    color: var(--ink);
+  }
+
+  .source {
+    grid-column: span 2;
+    justify-content: flex-start;
+    background:
+      radial-gradient(70% 90% at 100% 0%, rgb(107 138 107 / 0.35), transparent 70%), var(--night);
+    box-shadow: none;
+  }
+
+  .source .quote {
+    max-width: 18em;
+    color: var(--cream);
+  }
+
+  .source .hl {
+    color: #cfe0cb;
+    background: rgb(169 194 166 / 0.18);
+  }
+
+  .button {
+    align-self: flex-start;
+    margin-top: auto;
+    padding: 12px 20px;
+    border-radius: var(--radius-control);
+    background: var(--cream);
+    color: var(--ink);
+    font-weight: 600;
+    transition: transform 0.2s var(--ease-out);
+  }
+
+  .button:hover {
+    transform: translateY(-1px);
+  }
+
+  @media (max-width: 960px) {
+    .wall {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .wall {
+      grid-template-columns: 1fr;
+    }
+
+    .source {
+      grid-column: auto;
+    }
+
+    li {
+      min-height: 0;
+    }
+  }
+</style>

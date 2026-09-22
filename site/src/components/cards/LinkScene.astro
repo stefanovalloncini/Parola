@@ -1,0 +1,230 @@
+---
+const steps = [
+  [0, "empty"],
+  [500, "typing"],
+  [2300, "press"],
+  [2600, "fetching"],
+  [4100, "writing"],
+  [6300, "done"],
+];
+const url = "youtube.com/watch?v=plywood-shelf";
+const lines = [
+  ["00:00", "Welcome back to the workshop."],
+  ["00:04", "Today we're building a bookshelf from one sheet of plywood."],
+  ["00:11", "First, the cutting plan."],
+];
+---
+
+<div
+  class="link"
+  data-scene-loop={JSON.stringify(steps)}
+  data-duration="8800"
+  data-still="done"
+  aria-hidden="true"
+>
+  <div class="sheet">
+    <p class="title">Add video URL</p>
+    <p class="hint">
+      Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any supported site.
+    </p>
+    <div class="input">
+      <span data-type="typing" data-text={url}>
+        {url}
+      </span>
+    </div>
+    <div class="actions">
+      <span class="button">Use Captions</span>
+      <span class="button primary">Transcribe</span>
+    </div>
+  </div>
+  <div class="result">
+    <div class="progress">
+      <span class="status">
+        <span class="fetch">Downloading audio</span>
+        <span class="write">Transcribing</span>
+      </span>
+      <span class="track">
+        <i></i>
+      </span>
+    </div>
+    <ol class="lines">
+      {lines.map(([time, text], i) => (
+        <li style={`--i: ${i}`}>
+          <time>{time}</time>
+          <span>{text}</span>
+        </li>
+      ))}
+    </ol>
+  </div>
+</div>
+
+<style>
+  .link {
+    position: absolute;
+    inset: 0;
+    padding: calc(30 * var(--u)) calc(34 * var(--u));
+    background: linear-gradient(180deg, #eef2ed, #e3e9e1);
+    font-size: calc(12.5 * var(--u));
+    color: #1d201e;
+  }
+
+  .sheet,
+  .result {
+    border-radius: calc(16 * var(--u));
+    background: #fff;
+    box-shadow:
+      0 0 0 calc(0.6 * var(--u)) rgb(15 26 20 / 0.1),
+      0 calc(12 * var(--u)) calc(30 * var(--u)) rgb(15 26 20 / 0.14);
+  }
+
+  .sheet {
+    padding: calc(18 * var(--u)) calc(18 * var(--u)) calc(16 * var(--u));
+  }
+
+  .title {
+    font-size: calc(14 * var(--u));
+    font-weight: 700;
+  }
+
+  .hint {
+    margin: calc(4 * var(--u)) 0 calc(12 * var(--u));
+    color: var(--muted);
+    font-size: calc(11 * var(--u));
+    line-height: 1.35;
+  }
+
+  .input {
+    min-height: calc(32 * var(--u));
+    padding: calc(7 * var(--u)) calc(11 * var(--u));
+    border-radius: calc(8 * var(--u));
+    box-shadow: inset 0 0 0 calc(1 * var(--u)) rgb(15 26 20 / 0.18);
+    font-family: var(--font-mono);
+    font-size: calc(11.5 * var(--u));
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: calc(8 * var(--u));
+    margin-top: calc(12 * var(--u));
+  }
+
+  .button {
+    padding: calc(5 * var(--u)) calc(12 * var(--u));
+    border-radius: calc(8 * var(--u));
+    background: rgb(0 0 0 / 0.07);
+    font-size: calc(11.5 * var(--u));
+    font-weight: 500;
+    transition:
+      scale 0.15s,
+      filter 0.15s;
+  }
+
+  .button.primary {
+    background: #54739e;
+    color: #fff;
+  }
+
+  [data-state="press"] .primary {
+    scale: 0.95;
+    filter: brightness(0.85);
+  }
+
+  .result {
+    margin-top: calc(14 * var(--u));
+    padding: calc(14 * var(--u)) calc(16 * var(--u));
+    opacity: 0;
+    translate: 0 calc(8 * var(--u));
+    transition:
+      opacity 0.35s var(--ease-out),
+      translate 0.45s var(--ease-out);
+  }
+
+  .progress {
+    display: grid;
+    gap: calc(6 * var(--u));
+    font-size: calc(11 * var(--u));
+    color: var(--muted);
+  }
+
+  .status {
+    display: grid;
+  }
+
+  .status > span {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s;
+  }
+
+  .write {
+    opacity: 0;
+  }
+
+  .track {
+    height: calc(4 * var(--u));
+    border-radius: 999px;
+    background: rgb(15 26 20 / 0.08);
+    overflow: hidden;
+  }
+
+  .track i {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: #54739e;
+    transition: width 1.4s linear;
+  }
+
+  .lines {
+    display: grid;
+    gap: calc(8 * var(--u));
+    margin-top: calc(12 * var(--u));
+    font-family: var(--font-serif);
+    font-size: calc(13.5 * var(--u));
+    line-height: 1.35;
+  }
+
+  .lines li {
+    display: grid;
+    grid-template-columns: calc(40 * var(--u)) 1fr;
+    gap: calc(8 * var(--u));
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-out);
+    transition-delay: calc(var(--i) * 0.55s);
+  }
+
+  .lines time {
+    font-family: var(--font-mono);
+    font-size: calc(10.5 * var(--u));
+    color: #54739e;
+    padding-top: calc(2 * var(--u));
+  }
+
+  :is([data-state="fetching"], [data-state="writing"], [data-state="done"]) .result {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  [data-state="fetching"] .track i {
+    width: 64%;
+  }
+
+  :is([data-state="writing"], [data-state="done"]) .track i {
+    width: 100%;
+  }
+
+  :is([data-state="writing"], [data-state="done"]) .fetch {
+    opacity: 0;
+  }
+
+  :is([data-state="writing"], [data-state="done"]) .write {
+    opacity: 1;
+  }
+
+  :is([data-state="writing"], [data-state="done"]) .lines li {
+    opacity: 1;
+  }
+</style>

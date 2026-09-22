@@ -1,0 +1,103 @@
+---
+import exportShot from "../../assets/shots/export.png";
+import interview from "../../assets/shots/interview.png";
+import lecture from "../../assets/shots/lecture.png";
+import memo from "../../assets/shots/memo.png";
+import DocTile from "../DocTile.astro";
+import ShotTabs from "../ShotTabs.astro";
+
+const fan = [
+  { ext: "MP3", tint: "#3f6048", r: -16, x: -150, y: 26 },
+  { ext: "MP4", tint: "#54739e", r: -8, x: -76, y: 6 },
+  { ext: "M4A", tint: "#6b8a6b", r: 0, x: 0, y: 0 },
+  { ext: "MOV", tint: "#7b6f95", r: 8, x: 76, y: 6 },
+  { ext: "WAV", tint: "#a07b5a", r: 16, x: 150, y: 26 },
+];
+
+const tabs = [
+  {
+    id: "interviews",
+    label: "Interviews",
+    image: interview,
+    alt: "An interview in Parola. Each line carries the speaker's name and a timestamp.",
+  },
+  {
+    id: "memos",
+    label: "Voice memos",
+    image: memo,
+    alt: "A short voice memo in Parola, summarised with its action items.",
+  },
+  {
+    id: "lectures",
+    label: "Lectures",
+    image: lecture,
+    alt: "A lecture transcript in Parola with chapters you can jump to.",
+  },
+  {
+    id: "subtitles",
+    label: "Subtitles",
+    image: exportShot,
+    alt: "Parola's export sheet previewing SubRip subtitles before saving.",
+  },
+];
+---
+
+<section class="drop section" id="features" aria-labelledby="drop-title">
+  <div class="container">
+    <div class="fan" data-loop aria-hidden="true">
+      {fan.map((tile, i) => (
+        <span
+          class="fan-tile"
+          style={`--r: ${tile.r}deg; --x: ${tile.x}px; --y: ${tile.y}px; --i: ${i}`}
+        >
+          <DocTile ext={tile.ext} tint={tile.tint} />
+        </span>
+      ))}
+    </div>
+    <div class="section-head">
+      <h2 id="drop-title" class="t-section" data-words>
+        Drop a file.
+        <br />
+        Read every word.
+      </h2>
+      <p class="t-lead">
+        Audio or video, one file or a whole folder. Click any line to hear it again.
+      </p>
+    </div>
+    <ShotTabs name="drop" tabs={tabs} label="Things people transcribe" />
+  </div>
+</section>
+
+<style>
+  .drop {
+    background: linear-gradient(180deg, var(--paper) 22%, #e2ebe0 100%);
+  }
+
+  .fan {
+    position: relative;
+    height: 112px;
+    margin: 0 auto 28px;
+    width: 1px;
+  }
+
+  .fan-tile {
+    position: absolute;
+    left: 0;
+    top: 0;
+    translate: calc(-50% + var(--x)) var(--y);
+    rotate: var(--r);
+    transition:
+      translate 0.9s var(--ease-out),
+      rotate 0.9s var(--ease-out);
+    transition-delay: calc(var(--i) * 50ms);
+  }
+
+  .fan-tile :global(.doc) {
+    width: 72px;
+  }
+
+  :global(.js) .fan:not([data-seen]) .fan-tile {
+    translate: -50% 18px;
+    rotate: 0deg;
+  }
+</style>

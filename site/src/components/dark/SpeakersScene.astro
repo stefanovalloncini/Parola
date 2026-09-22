@@ -1,0 +1,231 @@
+---
+const people = [
+  { name: "Maya Chen", hue: "#a9c2a6" },
+  { name: "Aiko Tanaka", hue: "#d9b48f" },
+  { name: "Tom Reyes", hue: "#85a3cc" },
+];
+const turns = [
+  { who: 0, time: "00:00", text: "Okay, let's start. Three things today.", width: 24 },
+  { who: 1, time: "00:06", text: "I rewrote the onboarding copy. It's shorter now.", width: 28 },
+  { who: 2, time: "00:12", text: "The second screen still sounds like a brochure.", width: 22 },
+  { who: 0, time: "00:37", text: "Then that's the plan. Copy by Friday.", width: 26 },
+];
+const steps = turns.map((_, i) => [i * 2100, `t${i}`]);
+const barsPerTurn = 12;
+---
+
+<div
+  class="speakers"
+  data-scene-loop={JSON.stringify(steps)}
+  data-duration={String(turns.length * 2100)}
+  data-still="t1"
+  aria-hidden="true"
+>
+  <ul class="people">
+    {people.map((person) => (
+      <li style={`--hue: ${person.hue}`}>
+        <i />
+        {person.name}
+      </li>
+    ))}
+  </ul>
+  <div class="strip">
+    {turns.map((turn, t) => (
+      <span class="turn" style={`--hue: ${people[turn.who]?.hue}; flex: ${turn.width}`}>
+        {Array.from({ length: barsPerTurn }, (_, b) => (
+          <i style={`--h: ${0.3 + Math.abs(Math.sin((t + 1) * (b + 2) * 0.9)) * 0.7}`} />
+        ))}
+      </span>
+    ))}
+    <span class="head"></span>
+  </div>
+  <div class="cards">
+    {turns.map((turn, i) => (
+      <div class={`card c${i}`} style={`--hue: ${people[turn.who]?.hue}`}>
+        <p class="who">
+          <b>{people[turn.who]?.name}</b>
+          <time>{turn.time}</time>
+        </p>
+        <p class="line">{turn.text}</p>
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  .speakers {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: calc(26 * var(--u));
+    padding: calc(40 * var(--u)) calc(38 * var(--u));
+  }
+
+  .people {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(8 * var(--u));
+  }
+
+  .people li {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(7 * var(--u));
+    padding: calc(5 * var(--u)) calc(11 * var(--u));
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.06);
+    color: var(--cream);
+    font-size: calc(13 * var(--u));
+    font-weight: 550;
+  }
+
+  .people i {
+    width: calc(8 * var(--u));
+    height: calc(8 * var(--u));
+    border-radius: 50%;
+    background: var(--hue);
+  }
+
+  .strip {
+    position: relative;
+    display: flex;
+    gap: calc(8 * var(--u));
+    height: calc(84 * var(--u));
+  }
+
+  .turn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(2 * var(--u));
+  }
+
+  .turn i {
+    flex: 1;
+    height: calc(var(--h) * 100%);
+    border-radius: calc(3 * var(--u));
+    background: var(--hue);
+    opacity: 0.85;
+  }
+
+  .head {
+    position: absolute;
+    top: calc(-8 * var(--u));
+    bottom: calc(-8 * var(--u));
+    left: 0;
+    width: calc(2 * var(--u));
+    border-radius: 2px;
+    background: var(--cream);
+    box-shadow: 0 0 calc(10 * var(--u)) rgb(252 242 230 / 0.6);
+  }
+
+  [data-state="t0"] .head {
+    animation: seg0 2.1s linear forwards;
+  }
+
+  [data-state="t1"] .head {
+    animation: seg1 2.1s linear forwards;
+  }
+
+  [data-state="t2"] .head {
+    animation: seg2 2.1s linear forwards;
+  }
+
+  [data-state="t3"] .head {
+    animation: seg3 2.1s linear forwards;
+  }
+
+  .cards {
+    display: grid;
+    margin-top: auto;
+  }
+
+  .card {
+    grid-area: 1 / 1;
+    padding: calc(16 * var(--u)) calc(18 * var(--u));
+    border-radius: calc(14 * var(--u));
+    background: rgb(255 255 255 / 0.05);
+    box-shadow: inset calc(3 * var(--u)) 0 0 var(--hue);
+    opacity: 0;
+    translate: 0 calc(8 * var(--u));
+    transition:
+      opacity 0.35s var(--ease-out),
+      translate 0.45s var(--ease-out);
+  }
+
+  .who {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: calc(6 * var(--u));
+    font-size: calc(12.5 * var(--u));
+  }
+
+  .who b {
+    color: var(--hue);
+    font-weight: 600;
+  }
+
+  .who time {
+    font-family: var(--font-mono);
+    color: var(--cream-muted);
+  }
+
+  .line {
+    font-family: var(--font-serif);
+    font-size: calc(19 * var(--u));
+    line-height: 1.3;
+    color: var(--cream);
+  }
+
+  [data-state="t0"] .c0,
+  [data-state="t1"] .c1,
+  [data-state="t2"] .c2,
+  [data-state="t3"] .c3 {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .head {
+      left: 38%;
+      animation: none !important;
+    }
+  }
+
+  @keyframes seg0 {
+    from {
+      left: 0%;
+    }
+    to {
+      left: 24%;
+    }
+  }
+
+  @keyframes seg1 {
+    from {
+      left: 24%;
+    }
+    to {
+      left: 52%;
+    }
+  }
+
+  @keyframes seg2 {
+    from {
+      left: 52%;
+    }
+    to {
+      left: 74%;
+    }
+  }
+
+  @keyframes seg3 {
+    from {
+      left: 74%;
+    }
+    to {
+      left: 100%;
+    }
+  }
+</style>

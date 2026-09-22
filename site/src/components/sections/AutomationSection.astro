@@ -1,0 +1,95 @@
+---
+import { links } from "../../data/links";
+import FeatureCard from "../cards/FeatureCard.astro";
+import McpScene from "../cards/McpScene.astro";
+import TerminalScene from "../cards/TerminalScene.astro";
+
+const intents = [
+  "Transcribe File",
+  "Start Recording",
+  "Stop Recording",
+  "Start Dictation",
+  "Stop Dictation",
+  "Summarize Last Transcript",
+  "Open Last Transcript",
+];
+---
+
+<section class="automation section" aria-labelledby="automation-title">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="automation-title" class="t-section" data-words>
+        Works with Shortcuts,
+        <br />
+        the terminal and Claude.
+      </h2>
+    </div>
+    <div class="grid">
+      <FeatureCard
+        title="The parola command"
+        text="Transcribe, record and export from the terminal, with the same engines the app uses."
+      >
+        <TerminalScene />
+      </FeatureCard>
+      <FeatureCard
+        title="Claude and other LLMs"
+        text="Parola speaks MCP. Add it to Claude Code, then ask for what you want in plain words."
+      >
+        <McpScene />
+      </FeatureCard>
+    </div>
+    <div class="shortcuts">
+      <h3 class="t-row">Shortcuts actions</h3>
+      <ul>
+        {intents.map((intent) => (
+          <li>{intent}</li>
+        ))}
+      </ul>
+      <p class="t-lead">
+        Setup for Claude Desktop and other clients is in the <a href={links.mcpDocs}>MCP guide</a>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px 32px;
+  }
+
+  .shortcuts {
+    margin-top: clamp(64px, 8vw, 104px);
+    padding-top: 30px;
+    border-top: 0.5px solid var(--hairline);
+  }
+
+  .shortcuts ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 20px 0 24px;
+  }
+
+  .shortcuts li {
+    padding: 9px 16px;
+    border-radius: 12px;
+    background: var(--mist);
+    font-size: 16px;
+    font-weight: 550;
+    color: var(--ink);
+  }
+
+  .shortcuts a {
+    color: var(--sage-deep);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  @media (max-width: 820px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

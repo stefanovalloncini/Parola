@@ -1,0 +1,183 @@
+---
+import chatShot from "../../assets/shots/ai-chat.png";
+import promptsShot from "../../assets/shots/ai-prompts.png";
+import summaryShot from "../../assets/shots/ai-summary.png";
+import FeatureCard from "../cards/FeatureCard.astro";
+import PromptsScene from "../cards/PromptsScene.astro";
+import ProvidersScene from "../cards/ProvidersScene.astro";
+import Icon from "../Icon.astro";
+import ShotTabs from "../ShotTabs.astro";
+
+const tabs = [
+  {
+    id: "summary",
+    label: "Summary",
+    image: summaryShot,
+    alt: "A meeting summary in Parola with key points and action items.",
+  },
+  {
+    id: "chat",
+    label: "Chat",
+    image: chatShot,
+    alt: "A chat about a transcript in Parola, answering with the timestamp it quotes.",
+  },
+  {
+    id: "prompts",
+    label: "Prompts",
+    image: promptsShot,
+    alt: "Parola's prompt settings with the built-in prompts and your own.",
+  },
+];
+
+const services = [
+  { name: "Apple Intelligence", where: "On this Mac", local: true },
+  { name: "Ollama", where: "On this Mac", local: true },
+  { name: "OpenAI", where: "Your key", local: false },
+  { name: "Anthropic", where: "Your key", local: false },
+  { name: "Groq", where: "Your key", local: false },
+  { name: "Cerebras", where: "Your key", local: false },
+  { name: "Your own endpoint", where: "OpenAI-compatible", local: false },
+];
+---
+
+<section class="ai section" aria-labelledby="ai-title">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="ai-title" class="t-section" data-words>
+        Summaries and answers,
+        <br />
+        on your terms.
+      </h2>
+      <p class="t-lead">
+        Apple Intelligence answers on your Mac. Add your own key for OpenAI or Anthropic, or run a
+        model with Ollama.
+      </p>
+    </div>
+    <ShotTabs name="ai" tabs={tabs} label="AI views" />
+
+    <div class="grid">
+      <FeatureCard
+        title="Nineteen prompts"
+        text="From action items to a mind map, one click away. Or write your own in plain words."
+      >
+        <PromptsScene />
+      </FeatureCard>
+      <FeatureCard
+        title="Local or cloud"
+        text="Pick a service for each job: summary, chat, prompts or dictation cleanup. Keys stay in your keychain."
+      >
+        <ProvidersScene />
+      </FeatureCard>
+    </div>
+
+    <div class="services">
+      <h3 class="t-card">Use the model you already have</h3>
+      <p class="t-lead">
+        A cloud service gets text, never your audio, and Parola asks before the first time.
+      </p>
+      <ul>
+        {services.map((service) => (
+          <li>
+            <span class:list={["tile", { local: service.local }]}>
+              <Icon name={service.local ? "chip" : "globe"} size={22} />
+            </span>
+            <span>
+              <b>{service.name}</b>
+              <small>{service.where}</small>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+</section>
+
+<style>
+  .ai {
+    background:
+      radial-gradient(60% 40% at 18% 8%, rgb(107 138 107 / 0.16), transparent 70%),
+      radial-gradient(50% 36% at 85% 4%, rgb(84 115 158 / 0.13), transparent 70%),
+      linear-gradient(180deg, #f6f8f5 0%, var(--paper) 42%);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px 32px;
+    margin-top: clamp(96px, 11vw, 160px);
+  }
+
+  .services {
+    margin-top: clamp(96px, 11vw, 150px);
+  }
+
+  .services .t-lead {
+    margin-top: 12px;
+  }
+
+  .services ul {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    margin-top: 40px;
+    border-top: 0.5px solid var(--hairline);
+  }
+
+  .services li {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 24px 12px 24px 0;
+    border-bottom: 0.5px solid var(--hairline);
+  }
+
+  .services li span:last-child {
+    display: grid;
+  }
+
+  .services b {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+
+  .services small {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .tile {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #e8edf5;
+    color: var(--slate);
+  }
+
+  .tile.local {
+    background: var(--sage-tint);
+    color: var(--sage-deep);
+  }
+
+  @media (max-width: 900px) {
+    .services ul {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 820px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .services ul {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -1,0 +1,144 @@
+---
+const command = "parola transcribe interview.m4a -f srt";
+const cues = [
+  ["1", "00:00:00,000 --> 00:00:06,480", "Thanks for making time, Maya."],
+  ["2", "00:00:07,020 --> 00:00:14,760", "Sure. It was our Thursday planning call."],
+  ["3", "00:00:15,100 --> 00:00:16,900", "How did that go?"],
+];
+const steps = [
+  [0, "prompt"],
+  [300, "typing"],
+  [2600, "output"],
+  [5600, "rest"],
+];
+---
+
+<div
+  class="terminal"
+  data-scene-loop={JSON.stringify(steps)}
+  data-duration="8400"
+  data-still="output"
+  aria-hidden="true"
+>
+  <div class="bar">
+    <i></i>
+    <i></i>
+    <i></i>
+    <span>zsh</span>
+  </div>
+  <div class="screen">
+    <p class="line">
+      <span class="sigil">~/Recordings $</span>
+      <span data-type="typing" data-text={command}>
+        {command}
+      </span>
+      <i class="cursor"></i>
+    </p>
+    <div class="out">
+      {cues.map(([index, time, text], i) => (
+        <p style={`--i: ${i}`}>
+          <span class="dim">{index}</span>
+          <br />
+          <span class="time">{time}</span>
+          <br />
+          {text}
+        </p>
+      ))}
+    </div>
+  </div>
+</div>
+
+<style>
+  .terminal {
+    position: absolute;
+    inset: calc(30 * var(--u));
+    display: flex;
+    flex-direction: column;
+    border-radius: calc(14 * var(--u));
+    background: #101512;
+    box-shadow:
+      inset 0 0 0 1px rgb(252 242 230 / 0.08),
+      0 calc(18 * var(--u)) calc(40 * var(--u)) rgb(15 26 20 / 0.3);
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: calc(12.5 * var(--u));
+    line-height: 1.5;
+    color: #dfe7dc;
+  }
+
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: calc(7 * var(--u));
+    height: calc(32 * var(--u));
+    padding-inline: calc(12 * var(--u));
+    background: rgb(255 255 255 / 0.04);
+  }
+
+  .bar i {
+    width: calc(10 * var(--u));
+    height: calc(10 * var(--u));
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.16);
+  }
+
+  .bar span {
+    margin-left: auto;
+    margin-right: auto;
+    padding-right: calc(40 * var(--u));
+    color: rgb(223 231 220 / 0.5);
+    font-family: var(--font-sans);
+    font-size: calc(11.5 * var(--u));
+  }
+
+  .screen {
+    padding: calc(16 * var(--u)) calc(18 * var(--u));
+  }
+
+  .sigil {
+    color: var(--sage-soft);
+    margin-right: calc(6 * var(--u));
+  }
+
+  .cursor {
+    display: inline-block;
+    width: calc(7 * var(--u));
+    height: 1.1em;
+    vertical-align: text-bottom;
+    background: #dfe7dc;
+    animation: blink 1s steps(1) infinite;
+  }
+
+  .out {
+    margin-top: calc(10 * var(--u));
+  }
+
+  .out p {
+    margin-bottom: calc(10 * var(--u));
+    opacity: 0;
+    transition: opacity 0.25s;
+    transition-delay: calc(var(--i) * 0.4s);
+  }
+
+  .dim {
+    color: rgb(223 231 220 / 0.45);
+  }
+
+  .time {
+    color: #9fb8d6;
+  }
+
+  :is([data-state="output"], [data-state="rest"]) .out p {
+    opacity: 1;
+  }
+
+  :is([data-state="output"], [data-state="rest"]) .cursor {
+    display: none;
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+</style>
