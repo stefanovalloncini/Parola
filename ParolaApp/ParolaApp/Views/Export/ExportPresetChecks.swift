@@ -13,7 +13,7 @@ struct ExportPresetChecks: View {
         LazyVGrid(columns: grid, alignment: .leading, spacing: 4) {
             ForEach(presets) { preset in
                 Toggle(isOn: binding(for: preset.id)) {
-                    Text(LocalizedStringKey(preset.name)).font(DS.Font.secondary)
+                    ExportPresetChecks.label(preset).font(DS.Font.secondary)
                 }
                 .toggleStyle(.checkbox)
                 .axLeaf("\(leafPrefix).Toggle.Preset.\(ExportPresetChecks.slug(preset))")
@@ -25,8 +25,16 @@ struct ExportPresetChecks: View {
         Binding(get: { isOn(id) }, set: { setOn(id, $0) })
     }
 
+    /// A built-in's name is a catalog key; a name the user typed is their own text and must never
+    /// be looked one up as — "Cancel" would come back translated, and "%@" as a format string.
+    static func label(_ preset: ExportPreset) -> Text {
+        preset.isBuiltIn ? Text(LocalizedStringKey(preset.name)) : Text(verbatim: preset.name)
+    }
+
+    /// Nothing stops two presets sharing a name, so the id's stem keeps their ax ids apart.
     static func slug(_ preset: ExportPreset) -> String {
         let letters = preset.name.filter { $0.isLetter || $0.isNumber }
-        return letters.isEmpty ? preset.spec.format.fileExtension : letters
+        let stem = preset.id.uuidString.prefix(8)
+        return letters.isEmpty ? "\(preset.spec.format.fileExtension).\(stem)" : "\(letters).\(stem)"
     }
 }

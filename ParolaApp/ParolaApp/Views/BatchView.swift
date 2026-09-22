@@ -41,9 +41,13 @@ struct BatchView: View {
                             model.toggleBatchExportPreset(preset.id)
                         } label: {
                             if isOn {
-                                Label(LocalizedStringKey(preset.name), systemImage: "checkmark")
+                                Label {
+                                    ExportPresetChecks.label(preset)
+                                } icon: {
+                                    Image(systemName: "checkmark")
+                                }
                             } else {
-                                Text(LocalizedStringKey(preset.name))
+                                ExportPresetChecks.label(preset)
                             }
                         }
                         .axLeaf("Header.MenuItem.Preset.\(ExportPresetChecks.slug(preset))")

@@ -45,7 +45,7 @@ struct BatchPresetCard: View {
 
     var body: some View {
         HStack(spacing: DS.Spacing.small) {
-            Text(LocalizedStringKey(preset.name))
+            ExportPresetChecks.label(preset)
                 .font(DS.Font.body.weight(.semibold))
                 .foregroundStyle(DS.Color.primaryText)
             BatchFormatChip(extension: preset.spec.format.fileExtension)

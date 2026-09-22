@@ -296,9 +296,13 @@ struct ParolaApp: App {
                     .disabled(!model.mainTranscriptCommandsEnabled)
                 Menu("Export As") {
                     ForEach(Array(model.exportPresets.enumerated()), id: \.element.id) { position, preset in
-                        Button(LocalizedStringKey(preset.name)) { model.exportWithPreset(preset.id) }
-                            // ⌘E has always been the one-key export; it follows whichever preset is on top.
-                            .keyboardShortcut(position == 0 ? KeyboardShortcut("e", modifiers: .command) : nil)
+                        Button {
+                            model.exportWithPreset(preset.id)
+                        } label: {
+                            ExportPresetChecks.label(preset)
+                        }
+                        // ⌘E has always been the one-key export; it follows whichever preset is on top.
+                        .keyboardShortcut(position == 0 ? KeyboardShortcut("e", modifiers: .command) : nil)
                     }
                 }
                 .disabled(!model.mainTranscriptCommandsEnabled)

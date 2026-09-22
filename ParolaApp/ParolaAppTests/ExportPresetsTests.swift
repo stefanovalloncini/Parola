@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
@@ -18,6 +19,26 @@ struct ExportPresetsTests {
 
     private var txtPreset: ExportPreset { ExportPreset.builtIn(for: .txt)! }
     private var srtPreset: ExportPreset { ExportPreset.builtIn(for: .srt)! }
+
+    @Test("a preset the user named is rendered verbatim, a built-in through the catalog")
+    func userNamesAreNotCatalogKeys() {
+        let typed = ExportPreset(name: "Cancel", spec: .standard(for: .txt))
+
+        #expect(typed.isBuiltIn == false)
+        #expect(ExportPresetChecks.label(typed) == Text(verbatim: "Cancel"))
+        #expect(ExportPresetChecks.label(typed) != Text(LocalizedStringKey("Cancel")))
+        #expect(ExportPresetChecks.label(txtPreset) == Text(LocalizedStringKey(txtPreset.name)))
+    }
+
+    @Test("two presets sharing a name still get different ax ids")
+    func slugsSurviveDuplicateNames() {
+        let first = ExportPreset(name: "Subtitles", spec: .standard(for: .srt))
+        let second = ExportPreset(name: "Subtitles", spec: .standard(for: .srt))
+
+        #expect(ExportPresetChecks.slug(first) != ExportPresetChecks.slug(second))
+        #expect(ExportPresetChecks.slug(first).hasPrefix("Subtitles."))
+        #expect(ExportPresetChecks.slug(first) == ExportPresetChecks.slug(first))
+    }
 
     @Test("a fresh model starts with the built-in presets")
     func startsWithBuiltIns() {

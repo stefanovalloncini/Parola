@@ -78,7 +78,7 @@ private struct ExportPresetRow: View {
                             .onSubmit(onCommitRename)
                             .axLeaf("ExportFormats.TextField.Name.\(ExportPresetChecks.slug(preset))")
                     } else {
-                        Text(LocalizedStringKey(preset.name))
+                        ExportPresetChecks.label(preset)
                             .font(DS.Font.body)
                             .foregroundStyle(DS.Color.primaryText)
                     }
