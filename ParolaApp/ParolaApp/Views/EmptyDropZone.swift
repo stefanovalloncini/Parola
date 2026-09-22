@@ -323,9 +323,8 @@ private struct IntakeDropWell: View {
             .contentShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
-        }
+        .rowStateAnimation(isHovering)
+        .onHover { isHovering = $0 }
         .help("Drop audio or video")
     }
 }
@@ -347,13 +346,10 @@ private struct RecentEntryRow: View {
                 showsTimeOnly: showsTime
             )
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DS.Palette.surfaceHover.opacity(isHovering ? 1 : 0))
-            .contentShape(Rectangle())
+            .rowChrome(selected: false, hovered: isHovering, selection: .native)
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
-        }
+        .onHover { isHovering = $0 }
         .axLeaf("Empty.Recent.\(display.id)")
     }
 }
@@ -379,9 +375,8 @@ private struct ModeButton: View {
             .opacity(isEnabled ? (isHovering ? 1 : 0.88) : DS.Opacity.disabled)
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
-        }
+        .rowStateAnimation(isHovering)
+        .onHover { isHovering = $0 }
         .help(title)
     }
 }
@@ -428,14 +423,13 @@ struct ActionCard: View {
             .contentShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
-        }
+        .rowStateAnimation(isHovering)
+        .onHover { isHovering = $0 }
         .help(title)
     }
 
     private var cardBackground: some View {
         DS.Color.surfaceElevated
-            .overlay(SwiftUI.Color.white.opacity(isHovering ? 0.04 : 0))
+            .overlay(DS.Palette.surfaceHover.opacity(isHovering ? 1 : 0))
     }
 }
