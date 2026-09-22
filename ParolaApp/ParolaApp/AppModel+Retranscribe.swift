@@ -65,10 +65,9 @@ extension AppModel {
                 progressHandler: makeFileProgressHandler(runToken: runToken),
                 stageHandler: makeFileStageHandler(fileURL: audioURL, runToken: runToken)
             )
-            try Task.checkCancellation()
             let processed = await postProcessDetached(result)
-            // Post-processing is another suspension a cancel can land in, and past this line the
-            // old transcript is gone: re-check rather than overwrite a take the user stopped.
+            // Post-processing is a suspension a cancel can land in, and past this line the old
+            // transcript is gone: check rather than overwrite a take the user stopped.
             try Task.checkCancellation()
             await replaceEntry(entryID, with: processed, clearingNotes: loaded.entry.segmentNotes)
         } catch {

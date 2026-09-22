@@ -39,6 +39,7 @@ extension AppModel {
     /// Runs the rule pipeline off the main actor; completion paths await this so a long
     /// transcript's regex pass can't hitch the UI right as results land.
     func postProcessDetached(_ transcript: Transcript) async -> Transcript {
+        if let postProcessOperation { return await postProcessOperation(transcript) }
         let ignored = ignoredSegmentRules
         let findReplace = findReplaceRules
         return await Task.detached(priority: .userInitiated) {

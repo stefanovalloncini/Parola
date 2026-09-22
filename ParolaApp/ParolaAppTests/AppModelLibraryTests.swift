@@ -1,13 +1,34 @@
 import Foundation
+import os
 import Testing
 @testable import Parola
 import ParolaCore
 import ParolaTestSupport
 
 /// A throwaway library directory under the temp dir so tests never touch the real on-disk library.
+/// Swept at process exit the way `temporaryDefaults` sweeps its plists: there are 160-odd call
+/// sites and every run would otherwise leave that many `.parola` bundles behind.
 func makeTempLibraryURL(_ label: String = "appmodel") -> URL {
-    FileManager.default.temporaryDirectory
+    let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("parola-test-\(label)-\(UUID().uuidString)", isDirectory: true)
+    TemporaryLibraries.register(url)
+    return url
+}
+
+enum TemporaryLibraries {
+    private static let registered = OSAllocatedUnfairLock<[URL]>(initialState: [])
+    private static let sweepAtExit: Void = { _ = atexit { TemporaryLibraries.discardAll() } }()
+
+    static func register(_ url: URL) {
+        _ = sweepAtExit
+        registered.withLock { $0.append(url) }
+    }
+
+    private static func discardAll() {
+        for url in registered.withLock({ $0 }) {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
 }
 
 // @unchecked: only written from the observation callback, which the library refresh raises on the main actor.

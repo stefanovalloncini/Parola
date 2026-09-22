@@ -159,6 +159,9 @@ final class AppModel {
     var customSummaryPrompt: String = "" { didSet { defaults.set(customSummaryPrompt, forKey: "customSummaryPrompt") } }
     /// Test seam: when set, replaces CardMetadataService so a test never touches the shared mock LLM store.
     @ObservationIgnored var cardMetadataOperation: (@Sendable (Transcript) async -> CardMetadata?)?
+    /// Test seam: when set, replaces the rule pipeline, so a test controls the one suspension
+    /// between the engine returning and the old take being overwritten.
+    @ObservationIgnored var postProcessOperation: (@Sendable (Transcript) async -> Transcript)?
     var subtitleFPS: Double = 30 { didSet { defaults.set(subtitleFPS, forKey: "subtitleFPS") } }
     var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue { didSet { defaults.set(subtitleCaptionLengthRaw, forKey: "subtitleCaptionLength") } }
     var transcriptCompact: Bool = false { didSet { defaults.set(transcriptCompact, forKey: "transcriptCompact") } }

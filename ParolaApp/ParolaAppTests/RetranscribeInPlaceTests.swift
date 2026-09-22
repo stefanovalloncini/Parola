@@ -20,12 +20,17 @@ extension TranscriberMockSuites {
         }
 
         private func makeModel(_ label: String) -> AppModel {
-            AppModel(
+            let model = AppModel(
                 skipBootstrap: true,
                 defaults: temporaryDefaults(),
                 libraryURL: makeTempLibraryURL(label),
                 features: Set(ParolaFeature.allCases)
             )
+            // Without it the card-metadata call reaches the shared mock LLM store outside any lease,
+            // and the "the re-run cleared aiTitle" assertions would only hold while the fixture text
+            // stays under CardMetadataService.minimumCharacters.
+            model.cardMetadataOperation = { _ in nil }
+            return model
         }
 
         private func makeWAV(_ label: String) throws -> URL {
@@ -60,6 +65,7 @@ extension TranscriberMockSuites {
             transcript.translation = TranscriptTranslation(
                 targetLanguage: "it", segments: [0: "la vecchia presa"], createdAt: Date(), provider: "mock"
             )
+            transcript.summary = Summary(text: "old recap")
             let entry = try await model.library.add(
                 transcript: transcript, audioSource: audio, category: .transcription, title: "Board meeting"
             )
@@ -148,6 +154,7 @@ extension TranscriberMockSuites {
                 let stored = try await model.library.load(entry.id).document.transcript
                 #expect(stored.segments.map(\.text) == ["the new take"])
                 #expect(stored.translation == nil)
+                #expect(stored.summary == nil)
             }
         }
 
@@ -172,6 +179,78 @@ extension TranscriberMockSuites {
                 #expect(await waitUntil(timeoutMs: 10_000) { counter.plays == 1 })
                 #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
                 #expect(counter.plays == 1)
+            }
+        }
+
+        @Test("a cancel that lands in post-processing still leaves the old take alone")
+        func cancelDuringPostProcessingKeepsTheOldTake() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the new take")]
+                ))
+                let model = makeModel("retranscribe-cancel-postprocess")
+                let wav = try makeWAV("cancel-postprocess")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                let personID = UUID()
+                let entry = try await seed(model, audio: wav, personID: personID)
+                #expect(await load(model, entry.id))
+
+                // The engine is done and the file is closed; this is the only suspension left
+                // before the write that replaces the old take.
+                model.postProcessOperation = { [weak model] transcript in
+                    await MainActor.run { model?.cancelCurrentWork() }
+                    return transcript
+                }
+
+                model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "it")
+                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
+                #expect(await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask == nil })
+
+                let stored = try await model.library.load(entry.id)
+                #expect(stored.document.transcript.segments.map(\.text) == ["the old take"])
+                #expect(stored.document.transcript.summary?.text == "old recap")
+                #expect(stored.entry.favoriteSegments == [0])
+                #expect(stored.entry.segmentNotes == ["0": "old note"])
+                #expect(stored.entry.speakerAssignments == ["Speaker 1": personID])
+                #expect(stored.entry.aiTitle == "Old AI title")
+                // Without the check the write is skipped inside replaceEntry and the phase is left
+                // reading "transcribing" for a run that is over.
+                #expect(model.phase == .idle)
+            }
+        }
+
+        @Test("an engine failure leaves the old take and everything hanging off it alone")
+        func engineFailureKeepsTheOldTake() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "the engine went down")
+                ))
+                let model = makeModel("retranscribe-enginefail")
+                let wav = try makeWAV("enginefail")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                let personID = UUID()
+                let entry = try await seed(model, audio: wav, personID: personID)
+                #expect(await load(model, entry.id))
+
+                model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "it")
+                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
+                #expect(await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask == nil })
+
+                let stored = try await model.library.load(entry.id)
+                #expect(stored.document.transcript.segments.map(\.text) == ["the old take"])
+                #expect(stored.document.transcript.summary?.text == "old recap")
+                #expect(stored.document.transcript.translation?.targetLanguage == "it")
+                #expect(stored.entry.favoriteSegments == [0])
+                #expect(stored.entry.segmentNotes == ["0": "old note"])
+                #expect(stored.entry.speakerAssignments == ["Speaker 1": personID])
+                #expect(stored.entry.aiTitle == "Old AI title")
+                #expect(stored.entry.modelName == "openai_whisper-tiny")
+                #expect(model.transcript?.segments.first?.text == "the old take")
+                if case .failed(let message) = model.phase {
+                    #expect(message.contains("the engine went down"))
+                } else {
+                    Issue.record("expected the failure to reach the phase, got \(model.phase)")
+                }
             }
         }
 
