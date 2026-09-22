@@ -91,6 +91,7 @@ private struct EngineCard: View {
                     lineWidth: isSelected ? 2 : 0.5
                 )
             )
+            // No hover: the intro's cards are chosen, not browsed.
             .rowChrome(
                 selected: isSelected,
                 hovered: false,
