@@ -277,7 +277,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                     chip(Text(verbatim: label))
                 }
                 if hidden > 0 {
-                    chip(Text(verbatim: "+\(AppFormat.integer(hidden))").monospacedDigit())
+                    chip(Text(verbatim: "+\(AppFormat.integer(hidden))"))
                 }
             }
             .help(display.labels.joined(separator: ", "))
@@ -288,6 +288,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     private func chip(_ label: Text) -> some View {
         label
             .font(DS.Font.caption)
+            .monospacedDigit()
             .foregroundStyle(secondaryStyle)
             .lineLimit(1)
             .padding(.horizontal, DS.Spacing.snug)

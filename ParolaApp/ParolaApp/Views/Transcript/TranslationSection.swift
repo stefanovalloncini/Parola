@@ -64,6 +64,7 @@ struct TranslationSection: View {
             HStack(spacing: DS.Spacing.small) {
                 Text(progressLabel(completed: completed, total: total))
                     .font(DS.Font.body)
+                    .monospacedDigit()
                     .foregroundStyle(DS.Color.secondaryText)
                 Spacer()
                 Button("Cancel") { model.cancelTranslation() }
