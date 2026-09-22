@@ -93,7 +93,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     var searchKeywords: [String] {
         switch self {
         case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "dock", "hide", "sound", "duplicate", "already transcribed", "login", "launch", "startup", "title", "window", "new window"]
-        case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced", "accent", "color", "terracotta", "custom colors", "palette"]
+        case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced", "accent", "color", "slate", "terracotta", "sea", "sage", "indigo", "custom colors", "palette"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
         case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio", "permission", "screen recording", "consent"]
         case .shortcuts: return ["hotkey", "key combo", "mic recording", "dictation key", "global", "keyboard"]
