@@ -440,6 +440,25 @@ struct DeliveryLogTests {
         #expect(FileManager.default.fileExists(atPath: store.logURL.path))
     }
 
+    @Test("a queue and a log that will not decode read as empty, and say so in the log")
+    func corruptFilesReadAsEmpty() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-delivery-corrupt-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = DeliveryQueueStore(directory: dir)
+        try Data("{ not json".utf8).write(to: store.queueURL)
+        try Data("{ not json".utf8).write(to: store.logURL)
+
+        let sink = CapturingDiagnosticsSink()
+        await ParolaLog.withSink(sink) {
+            #expect(store.loadQueue().isEmpty)
+            #expect(store.loadLog().entries.isEmpty)
+        }
+
+        #expect(sink.records.filter { $0.level == .error }.count == 2)
+    }
+
     @Test("an absent file reads as an empty queue and log")
     func absentFiles() {
         let store = DeliveryQueueStore(
