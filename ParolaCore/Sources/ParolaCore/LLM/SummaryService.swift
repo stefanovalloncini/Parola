@@ -301,8 +301,11 @@ public actor SummaryService {
         var chapters: [Chapter] = []
         var actionItems: [String] = []
 
-        enum Section { case none, summary, chapters, actionItems }
-        var section: Section = .none
+        enum Section { case summary, chapters, actionItems }
+        // A reply that never says SUMMARY: is all summary — small local models drop the header under
+        // extra instructions. An explicit SUMMARY: section replaces whatever came before it.
+        var section: Section = .summary
+        var sawSummaryHeader = false
 
         func flushParagraph() {
             if !currentParagraph.isEmpty {
@@ -316,6 +319,11 @@ public actor SummaryService {
             // Models often wrap the section header in markdown ("**SUMMARY:**", "## CHAPTERS:").
             let header = line.drop(while: { "#*_ ".contains($0) })
             if header.uppercased().hasPrefix("SUMMARY:") {
+                if !sawSummaryHeader {
+                    sawSummaryHeader = true
+                    summaryParagraphs.removeAll()
+                    currentParagraph.removeAll()
+                }
                 section = .summary
                 let remainder = header.dropFirst("SUMMARY:".count)
                     .trimmingCharacters(in: CharacterSet(charactersIn: " *_"))
@@ -334,8 +342,6 @@ public actor SummaryService {
             }
 
             switch section {
-            case .none:
-                continue
             case .summary:
                 if line.isEmpty {
                     flushParagraph()

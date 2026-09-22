@@ -301,6 +301,41 @@ struct SummaryServiceTests {
         #expect(summary.text == "It went well.")
     }
 
+    @Test("a reply that never writes SUMMARY: is all summary, not an empty one")
+    func headerlessReplyIsTheSummary() {
+        let response = """
+        The team went through the roadmap and agreed to ship the beta on Friday.
+
+        Budget was left for the next call.
+
+        ACTION ITEMS:
+        - Send the deck
+
+        CHAPTERS:
+        00:00 Roadmap
+        """
+        let summary = SummaryService.parse(response)
+        #expect(summary.text == "The team went through the roadmap and agreed to ship the beta on Friday.\n\nBudget was left for the next call.")
+        #expect(summary.actionItems == ["Send the deck"])
+        #expect(summary.chapters.map(\.title) == ["Roadmap"])
+    }
+
+    @Test("an explicit SUMMARY: section replaces anything said before it")
+    func summarySectionBeatsThePreamble() {
+        let response = """
+        Sure! Here is the summary you asked for.
+
+        SUMMARY:
+        The team agreed to ship on Friday.
+
+        CHAPTERS:
+        00:00 Intro
+        """
+        let summary = SummaryService.parse(response)
+        #expect(summary.text == "The team agreed to ship on Friday.")
+        #expect(summary.chapters.map(\.title) == ["Intro"])
+    }
+
     @Test("summarise injects an external model so callers can swap providers")
     func summariseWithInjectedModel() async throws {
         let model = MockLanguageModel(scriptedResponses: ["""
