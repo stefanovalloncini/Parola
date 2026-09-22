@@ -87,6 +87,22 @@ struct RowChromeTests {
         #expect(DS.Color.selectionWash == DS.Color.accent.opacity(0.12))
     }
 
+    @Test("a row in a List animates its hover, never the selection the List paints")
+    func nativeSelectionIsNotAnimated() {
+        let pointedAndSelected = RowChromeState(selected: true, hovered: true)
+        #expect(
+            pointedAndSelected.animationValue(for: .native)
+                == RowChromeState(selected: false, hovered: true)
+        )
+        #expect(
+            RowChromeState(selected: true, hovered: false).animationValue(for: .native)
+                == RowChromeState(selected: false, hovered: false)
+        )
+        for selection in [prominent, wash] {
+            #expect(pointedAndSelected.animationValue(for: selection) == pointedAndSelected)
+        }
+    }
+
     @Test("reduce motion leaves the row state unanimated")
     func reduceMotionSkipsTheAnimation() {
         #expect(RowChromeAppearance.animation(reduceMotion: true) == nil)

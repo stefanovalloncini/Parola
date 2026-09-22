@@ -13,6 +13,12 @@ enum RowSelectionStyle: Equatable {
 struct RowChromeState: Equatable {
     var selected: Bool
     var hovered: Bool
+
+    /// A `List` paints its own selection at once, so a native row animates its hover and nothing else.
+    func animationValue(for selection: RowSelectionStyle) -> RowChromeState {
+        guard case .native = selection else { return self }
+        return RowChromeState(selected: false, hovered: hovered)
+    }
 }
 
 /// What a row draws in one state. Selection beats hover, so a selected row never washes.
@@ -67,7 +73,10 @@ private struct RowChrome: ViewModifier {
             )
             .contentShape(shape)
             .modifier(SelectedForeground(color: appearance.foreground))
-            .animation(RowChromeAppearance.animation(reduceMotion: reduceMotion), value: state)
+            .animation(
+                RowChromeAppearance.animation(reduceMotion: reduceMotion),
+                value: state.animationValue(for: selection)
+            )
     }
 
     private var shape: RoundedRectangle {
