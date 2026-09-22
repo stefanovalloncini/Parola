@@ -16,8 +16,9 @@ public struct TranscriptTranslation: Codable, Hashable, Sendable {
         self.provider = provider
     }
 
-    /// The translation after a segment splits in two. The first half keeps the text; the new second
-    /// half has none, because no part of a translated sentence maps to half its source.
+    /// The translation after a segment splits in two. Both halves get fresh ids: the first half of
+    /// the split keeps the text, the second gets none, because no part of a translated sentence
+    /// maps to half its source.
     public func afterSplit(of id: Int, into firstID: Int) -> TranscriptTranslation {
         guard let text = segments[id] else { return self }
         var out = self
