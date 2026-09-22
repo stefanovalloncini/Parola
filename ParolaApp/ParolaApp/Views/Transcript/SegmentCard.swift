@@ -204,7 +204,7 @@ struct SegmentCard: View {
             }
             assignSpeakerMenu
         }
-        .axLeaf("Segment.Button.Speaker")
+        .axLeaf("Card.Button.Speaker")
     }
 
     private func beginEditingNote() {
