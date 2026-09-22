@@ -159,7 +159,7 @@ struct ExportLoggingTests {
     @Test("no export site hands an error's localized description to the log")
     func exportSitesNeverLogLocalizedDescriptions() throws {
         var total = 0
-        for name in ["AppModel", "AppModel+Library", "AppModel+AutoExport"] {
+        for name in ["AppModel", "AppModel+Export", "AppModel+Library", "AppModel+AutoExport"] {
             let source = try appSource(name)
             for chunk in source.components(separatedBy: "ParolaLog.").dropFirst() {
                 total += 1
