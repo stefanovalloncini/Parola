@@ -4,7 +4,7 @@ import Testing
 import ParolaCore
 
 @MainActor
-@Suite("Library row display prefers AI metadata when asked")
+@Suite("Library row display")
 struct LibraryRowDisplayTests {
     private func entry(aiTitle: String?, summary: String?) -> LibraryEntry {
         var manifest = ParolaDocument.Manifest(originalAudioName: "New Recording 160.m4a", modelName: "m", language: "it")

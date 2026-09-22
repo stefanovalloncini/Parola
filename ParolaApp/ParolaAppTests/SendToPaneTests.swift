@@ -64,7 +64,10 @@ struct SendToPaneTests {
         model.moveDestination(id: b.id, by: -1)
         #expect(model.destinations.map(\.name) == ["B", "A"], "a move off the end changes nothing")
 
-        guard case .obsidianFolder(var edited) = a else { return }
+        guard case .obsidianFolder(var edited) = a else {
+            Issue.record("the destination the test built is not an obsidianFolder")
+            return
+        }
         edited.name = "A renamed"
         model.updateDestination(.obsidianFolder(edited))
         #expect(model.destinations.map(\.name) == ["B", "A renamed"])

@@ -97,7 +97,11 @@ struct TranslationCommandsTests {
         withExtendedLifetime(server) {}
 
         #expect(try field(result, "translated") == .bool(false))
-        #expect(try field(result, "reason") != .string(""))
+        guard case .string(let reason) = try field(result, "reason") else {
+            Issue.record("expected a reason string")
+            return
+        }
+        #expect(reason.contains("translator went down"), "the refusal has to name what failed, got \(reason)")
     }
 
     @Test("translateTranscript needs a transcript")

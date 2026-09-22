@@ -26,6 +26,25 @@ struct DeliveryCommandsTests {
         return (model, server, context, commands)
     }
 
+    /// Resets the shared recorder on entry and on both exit paths. Cleared here rather than in a
+    /// defer: a `Task` in a defer is unordered and can land after the next test has installed its own.
+    private func withRecorderCleared<T>(_ body: () async throws -> T) async throws -> T {
+        await MockDeliveryRecorder.shared.reset()
+        do {
+            let value = try await body()
+            await MockDeliveryRecorder.shared.reset()
+            return value
+        } catch {
+            await MockDeliveryRecorder.shared.reset()
+            throw error
+        }
+    }
+
+    private func stringValue(_ value: AutomationValue) -> String? {
+        guard case .string(let text) = value else { return nil }
+        return text
+    }
+
     private func field(_ value: AutomationValue, _ key: String) throws -> AutomationValue {
         guard case .object(let fields) = value, let found = fields[key] else {
             throw AutomationError.notFound(kind: "field", id: key)
@@ -59,82 +78,82 @@ struct DeliveryCommandsTests {
 
     @Test("installMockDestination lands in the list and in getState")
     func installMock() async throws {
-        // Cleared here rather than in a defer: a `Task` in a defer is unordered and can land
-        // after the next test has installed its own failures.
-        await MockDeliveryRecorder.shared.reset()
-        let (model, server, context, commands) = try makeRig()
+        try await withRecorderCleared {
+            let (model, server, context, commands) = try makeRig()
 
-        let installed = try await run(commands, "installMockDestination", ["name": .string("Bridge mock")], context)
+            let installed = try await run(commands, "installMockDestination", ["name": .string("Bridge mock")], context)
 
-        #expect(try field(installed, "installed") == .bool(true))
-        #expect(model.destinations.count == 1)
-        guard case .array(let rows) = ParolaAutomationServer.destinationsState(model) else {
-            Issue.record("expected a destination array")
-            return
+            #expect(try field(installed, "installed") == .bool(true))
+            #expect(model.destinations.count == 1)
+            guard case .array(let rows) = ParolaAutomationServer.destinationsState(model) else {
+                Issue.record("expected a destination array")
+                return
+            }
+            #expect(try field(rows[0], "name") == .string("Bridge mock"))
+            #expect(try field(rows[0], "kind") == .string("obsidianFolder"))
+            withExtendedLifetime(server) {}
         }
-        #expect(try field(rows[0], "name") == .string("Bridge mock"))
-        #expect(try field(rows[0], "kind") == .string("obsidianFolder"))
-        withExtendedLifetime(server) {}
     }
 
     @Test("sendEntry delivers, records the receipt and reads it back")
     func sendEntryRoundTrip() async throws {
-        // Cleared here rather than in a defer: a `Task` in a defer is unordered and can land
-        // after the next test has installed its own failures.
-        await MockDeliveryRecorder.shared.reset()
-        let (model, server, context, commands) = try makeRig()
-        let entryID = try await seed(model)
-        let installed = try await run(commands, "installMockDestination", [:], context)
-        let destinationID = try field(installed, "destinationID")
-        guard case .string(let destinationRaw) = destinationID else { return }
+        try await withRecorderCleared {
+            let (model, server, context, commands) = try makeRig()
+            let entryID = try await seed(model)
+            let installed = try await run(commands, "installMockDestination", [:], context)
+            let destinationID = try field(installed, "destinationID")
+            let destinationRaw = try #require(stringValue(destinationID), "installMockDestination returned no destinationID")
 
-        let sent = try await run(
-            commands, "sendEntry",
-            ["entryID": .string(entryID), "destinationID": .string(destinationRaw)],
-            context
-        )
-        #expect(try field(sent, "outcome") == .string("delivered"))
+            let sent = try await run(
+                commands, "sendEntry",
+                ["entryID": .string(entryID), "destinationID": .string(destinationRaw)],
+                context
+            )
+            #expect(try field(sent, "outcome") == .string("delivered"))
 
-        let recorded = try await run(commands, "readMockDeliveries", [:], context)
-        guard case .array(let deliveries) = try field(recorded, "deliveries") else {
-            Issue.record("expected recorded deliveries")
-            return
+            let recorded = try await run(commands, "readMockDeliveries", [:], context)
+            guard case .array(let deliveries) = try field(recorded, "deliveries") else {
+                Issue.record("expected recorded deliveries")
+                return
+            }
+            #expect(deliveries.count == 1)
+            #expect(try field(deliveries[0], "entryID") == .string(entryID))
+            #expect(try field(deliveries[0], "title") == .string("Riunione"))
+
+            let listed = try await run(commands, "listDeliveries", ["entryID": .string(entryID)], context)
+            guard case .array(let receipts) = try field(listed, "receipts") else {
+                Issue.record("expected receipts")
+                return
+            }
+            #expect(receipts.count == 1)
+            #expect(try field(receipts[0], "destinationName") == .string("Mock destination"))
+            withExtendedLifetime(server) {}
         }
-        #expect(deliveries.count == 1)
-        #expect(try field(deliveries[0], "entryID") == .string(entryID))
-        #expect(try field(deliveries[0], "title") == .string("Riunione"))
-
-        let listed = try await run(commands, "listDeliveries", ["entryID": .string(entryID)], context)
-        guard case .array(let receipts) = try field(listed, "receipts") else {
-            Issue.record("expected receipts")
-            return
-        }
-        #expect(receipts.count == 1)
-        #expect(try field(receipts[0], "destinationName") == .string("Mock destination"))
-        withExtendedLifetime(server) {}
     }
 
     @Test("a mock told to fail reports the send as queued")
     func failingSendIsQueued() async throws {
-        // Cleared here rather than in a defer: a `Task` in a defer is unordered and can land
-        // after the next test has installed its own failures.
-        await MockDeliveryRecorder.shared.reset()
-        let (model, server, context, commands) = try makeRig()
-        let entryID = try await seed(model)
-        let installed = try await run(
-            commands, "installMockDestination", ["failuresBeforeSuccess": .int(1)], context
-        )
-        guard case .string(let destinationRaw) = try field(installed, "destinationID") else { return }
+        try await withRecorderCleared {
+            let (model, server, context, commands) = try makeRig()
+            let entryID = try await seed(model)
+            let installed = try await run(
+                commands, "installMockDestination", ["failuresBeforeSuccess": .int(1)], context
+            )
+            let destinationRaw = try #require(
+                stringValue(try field(installed, "destinationID")),
+                "installMockDestination returned no destinationID"
+            )
 
-        let sent = try await run(
-            commands, "sendEntry",
-            ["entryID": .string(entryID), "destinationID": .string(destinationRaw)],
-            context
-        )
+            let sent = try await run(
+                commands, "sendEntry",
+                ["entryID": .string(entryID), "destinationID": .string(destinationRaw)],
+                context
+            )
 
-        #expect(try field(sent, "outcome") == .string("queued"))
-        #expect(try field(sent, "attempt") == .int(1))
-        withExtendedLifetime(server) {}
+            #expect(try field(sent, "outcome") == .string("queued"))
+            #expect(try field(sent, "attempt") == .int(1))
+            withExtendedLifetime(server) {}
+        }
     }
 
     @Test("setDestinations turns a test-mode vaultPath into a bookmark")
