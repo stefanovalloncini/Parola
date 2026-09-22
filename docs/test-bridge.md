@@ -71,6 +71,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_list_entries` | category, limit | Library entries with id, title (as stored), displayTitle (what the rows show), category, createdAt, durationSeconds, language. |
 | `parola_app_load_entry` | **id** | Open a library entry by id — into the main pane, or into its own window when `openEntriesInNewWindow` is on. |
 | `openEntryInNewWindow` | **entryID** | Open a library entry in its own read-only transcript window, the way ⇧⌘N and the row's context menu do. The window is titled after the entry. Replies `{opened, reason, openEntryWindows}`; `opened: false` when the library has no such entry or no window scene is ready yet. |
+| `retranscribeEntry` | **entryID**, model, language | Run that entry's own audio again into the same entry, the way the Info inspector's Model and Language menus do. It opens the entry first if it isn't the one showing. Omitted arguments keep what the entry carries; `language: ""` means Auto. The entry keeps its id, title, labels, category and date; its favorites, notes, summary, translation, speaker map and card metadata are replaced. Replies `{entryID, model, language}`; `PRECONDITION` for an entry with no audio or while another re-run is going. |
 | `parola_app_delete_entry` | **id** | Move an entry to Recently Deleted. |
 | `parola_app_download_model` | **name** | Trigger a download from inside the app. Progress shows in the UI. |
 | `parola_app_delete_model` | **name** | Delete a downloaded model. |

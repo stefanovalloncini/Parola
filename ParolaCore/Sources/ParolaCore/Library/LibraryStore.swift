@@ -613,6 +613,20 @@ public actor LibraryStore {
         }
     }
 
+    /// Re-stamps the engine and language on an entry the user transcribed again. `updateTranscript`
+    /// leaves them alone, so without this the rows keep naming the model of the run that was replaced.
+    public func setTranscriptionDetails(modelName: String, language: String, for id: LibraryEntry.ID) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.modelName = modelName
+            manifest.language = language
+        }
+        try recacheEntry(at: bundleURL)
+    }
+
     /// Changes the category of an entry.
     public func setCategory(_ category: EntryCategory, for id: LibraryEntry.ID) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

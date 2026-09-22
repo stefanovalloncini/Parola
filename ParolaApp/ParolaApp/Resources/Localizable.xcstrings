@@ -12437,6 +12437,17 @@
         }
       }
     },
+    "The current transcript, its favorites, notes, summary and translation will be replaced.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione attuale, con preferiti, note, riassunto e traduzione, verrà sostituita."
+          }
+        }
+      }
+    },
     "The hotkey that turns speech into text in any app.": {
       "extractionState": "manual",
       "localizations": {
@@ -12565,6 +12576,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il testo della trascrizione viene inviato al servizio che hai scelto e trattato secondo le condizioni di quel servizio."
+          }
+        }
+      }
+    },
+    "The transcript ran again, but Parola couldn't save the result. %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione è stata rifatta, ma Parola non è riuscita a salvare il risultato. %@"
           }
         }
       }
@@ -12707,6 +12729,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questo modello è solo inglese."
+          }
+        }
+      }
+    },
+    "This transcript came in without its audio, so there is nothing to transcribe again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa trascrizione è arrivata senza audio, quindi non c'è nulla da trascrivere di nuovo."
+          }
+        }
+      }
+    },
+    "This transcript came in without its audio.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa trascrizione è arrivata senza audio."
           }
         }
       }
@@ -13022,6 +13066,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi un file e qui comparirà il tempo impiegato."
+          }
+        }
+      }
+    },
+    "Transcribe again with %@?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivere di nuovo con %@?"
           }
         }
       }

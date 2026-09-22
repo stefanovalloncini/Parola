@@ -105,6 +105,21 @@ struct LibraryStoreTests {
         #expect(await store.list().first { $0.id == entry.id }?.aiTitle == nil)
     }
 
+    @Test("a re-run re-stamps the engine and language the rows name")
+    func transcriptionDetailsFollowTheRerun() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: makeFakeAudio(), category: .transcription)
+        try await store.setLabels(["keep"], for: entry.id)
+
+        try await store.setTranscriptionDetails(modelName: "openai_whisper-large-v3_turbo", language: "it", for: entry.id)
+
+        let reloaded = try #require(await store.list().first { $0.id == entry.id })
+        #expect(reloaded.modelName == "openai_whisper-large-v3_turbo")
+        #expect(reloaded.language == "it")
+        #expect(reloaded.labels == ["keep"])
+        #expect(reloaded.title == entry.title)
+    }
+
     @Test("favorites toggle per segment and can be replaced wholesale")
     func favoritesPersist() async throws {
         let (store, _) = try makeTempLibrary()

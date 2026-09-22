@@ -10,8 +10,16 @@ struct InfoInspector: View {
         var speechRate: [SpeechRateBin] = []
     }
 
+    /// A pick waiting on the "Transcribe again?" alert.
+    private struct PendingRetranscribe: Equatable {
+        let modelName: String
+        let language: String?
+        let choiceLabel: String
+    }
+
     @Environment(AppModel.self) private var model
     @State private var derived = Derived()
+    @State private var pendingRetranscribe: PendingRetranscribe?
 
     private var entry: LibraryEntry? {
         guard let id = model.selectedEntryID else { return nil }
@@ -40,8 +48,10 @@ struct InfoInspector: View {
             }
 
             InspectorSection(title: "Transcription Details") {
-                InfoRow(icon: "globe", label: "Language", value: languageLabel)
-                InfoRow(icon: "cube", label: "Model", value: modelLabel)
+                if model.transcript != nil {
+                    languageRow
+                    modelRow
+                }
                 if let engineLabel {
                     InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
                 }
@@ -69,6 +79,97 @@ struct InfoInspector: View {
             }
         }
         .task(id: model.transcriptVersion) { await recomputeDerived() }
+        .alert(
+            alertTitle,
+            isPresented: Binding(
+                get: { pendingRetranscribe != nil },
+                set: { if !$0 { pendingRetranscribe = nil } }
+            ),
+            presenting: pendingRetranscribe
+        ) { pending in
+            Button("Cancel", role: .cancel) { pendingRetranscribe = nil }
+                .axLeaf("Info.Button.RetranscribeCancel")
+            Button("Transcribe Again") {
+                model.retranscribeCurrentEntry(model: pending.modelName, language: pending.language)
+                pendingRetranscribe = nil
+            }
+            .axLeaf("Info.Button.RetranscribeConfirm")
+        } message: { _ in
+            Text("The current transcript, its favorites, notes, summary and translation will be replaced.")
+        }
+    }
+
+    private var alertTitle: String {
+        guard let pending = pendingRetranscribe else { return "" }
+        return String(localized: "Transcribe again with \(pending.choiceLabel)?")
+    }
+
+    private var languageRow: some View {
+        InfoMenuRow(
+            icon: "globe",
+            label: "Language",
+            value: languageLabel,
+            help: model.retranscribeUnavailableReason,
+            isEnabled: menusAreOpen,
+            leaf: "Info.Menu.Language"
+        ) {
+            Button(LanguagePickerPopover.autoLabel) { ask(language: nil, label: LanguagePickerPopover.autoLabel) }
+            Divider()
+            ForEach(SupportedLanguages.codes, id: \.self) { code in
+                let name = SupportedLanguages.displayName(for: code)
+                Button(name) { ask(language: code, label: name) }
+            }
+        }
+    }
+
+    private var modelRow: some View {
+        InfoMenuRow(
+            icon: "cube",
+            label: "Model",
+            value: modelLabel ?? "",
+            help: model.retranscribeUnavailableReason,
+            isEnabled: menusAreOpen,
+            leaf: "Info.Menu.Model"
+        ) {
+            ForEach(installedVariants, id: \.id) { variant in
+                Button {
+                    ask(model: variant.id, label: variant.displayName)
+                } label: {
+                    Text(verbatim: "\(variant.displayName) — \(variant.engineID.displayName)")
+                }
+            }
+        }
+    }
+
+    private var menusAreOpen: Bool {
+        model.canRetranscribeSelectedEntry && model.retranscribeRequest == nil
+    }
+
+    private var installedVariants: [ModelVariant] {
+        AppModel.selectableModels(model.availableModels)
+            .filter(\.isInstalled)
+            .compactMap { ModelCatalog.variant(id: $0.name) }
+    }
+
+    /// Auto and "no language recorded" are the same answer, and the menu offers it once.
+    private var currentLanguageCode: String? {
+        let code = model.transcript?.language ?? ""
+        return code.isEmpty ? nil : code
+    }
+
+    /// Picking the value the entry already carries asks nothing: there is no re-run to confirm.
+    private func ask(model modelName: String, label: String) {
+        guard modelName != model.transcript?.modelName else { return }
+        pendingRetranscribe = PendingRetranscribe(
+            modelName: modelName, language: currentLanguageCode, choiceLabel: label
+        )
+    }
+
+    private func ask(language code: String?, label: String) {
+        guard code != currentLanguageCode else { return }
+        pendingRetranscribe = PendingRetranscribe(
+            modelName: model.transcript?.modelName ?? model.selectedModel, language: code, choiceLabel: label
+        )
     }
 
     private func recomputeDerived() async {
@@ -149,6 +250,37 @@ struct InfoInspector: View {
     private var sentenceCount: Int { derived.text.sentenceCount }
 
     private var wordCount: Int { derived.text.wordCount }
+}
+
+/// An InfoRow whose value is a menu: picking another one runs the entry's audio again.
+struct InfoMenuRow<Content: View>: View {
+    let icon: String
+    let label: LocalizedStringKey
+    let value: String
+    let help: String?
+    let isEnabled: Bool
+    let leaf: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: DS.Spacing.small) {
+            Image(systemName: icon)
+                .font(DS.Font.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
+                .frame(width: 16)
+            Text(label)
+                .font(DS.Font.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
+            Spacer()
+            Menu(value) { content }
+                .menuStyle(.button)
+                .controlSize(.small)
+                .fixedSize()
+                .disabled(!isEnabled)
+                .help(help ?? "")
+                .axLeaf(leaf)
+        }
+    }
 }
 
 struct InfoRow: View {

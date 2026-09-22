@@ -85,6 +85,55 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "retranscribeEntry",
+                area: .library,
+                summary: "Runs a library entry's own audio again into the same entry, the way the Info inspector's Model and Language menus do. Omitted arguments keep what the entry already carries; an empty language means Auto. Favorites, notes, summary, translation, the speaker map and the card metadata are replaced. Refused for an entry with no audio.",
+                kind: .mutating,
+                args: [
+                    .init(name: "entryID", kind: .string(), required: true, summary: "Library entry ID"),
+                    .init(name: "model", kind: .string(), required: false, summary: "Catalog model id to run instead"),
+                    .init(name: "language", kind: .string(), required: false, summary: "Two-letter language code, or an empty string for Auto"),
+                ],
+                followsWith: ["waitForPhase"],
+                handler: { args, ctx in
+                    let id = try args.string("entryID")
+                    guard let entry = ctx.model.libraryEntry(id: id) else {
+                        throw AutomationError.invalidArgs(field: "entryID", reason: "no library entry with id \(id)")
+                    }
+                    if ctx.model.selectedEntryID != id {
+                        ctx.model.loadEntry(id)
+                        var waitedMs = 0
+                        while ctx.model.selectedEntryID != id, waitedMs < 4_000 {
+                            try? await Task.sleep(for: .milliseconds(25))
+                            waitedMs += 25
+                        }
+                    }
+                    guard ctx.model.selectedEntryID == id else {
+                        throw AutomationError.precondition("entry \(id) could not be opened")
+                    }
+                    let modelName = (try args.optionalString("model")) ?? entry.modelName
+                    // Read raw: optionalString folds "" into nil, and "" is how a caller asks for Auto.
+                    let language: String?
+                    if let requested = args.rawValue("language") {
+                        if case .string(let code) = requested, !code.isEmpty { language = code } else { language = nil }
+                    } else {
+                        language = entry.language.isEmpty ? nil : entry.language
+                    }
+                    ctx.model.retranscribeCurrentEntry(model: modelName, language: language)
+                    guard let request = ctx.model.retranscribeRequest else {
+                        throw AutomationError.precondition(
+                            ctx.model.retranscribeUnavailableReason ?? "a re-transcription is already running"
+                        )
+                    }
+                    return .object([
+                        "entryID": .string(request.entryID),
+                        "model": .string(request.modelName),
+                        "language": request.language.map { .string($0) } ?? .null,
+                    ])
+                }
+            ),
+
+            AutomationCommand(
                 name: "deleteEntry",
                 area: .library,
                 summary: "Soft-deletes a library entry.",

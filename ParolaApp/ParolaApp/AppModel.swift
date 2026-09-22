@@ -108,6 +108,8 @@ final class AppModel {
     }
     /// The import waiting on the "Already in your library" sheet. Nil the rest of the time.
     var duplicateImport: DuplicateImport?
+    /// The re-transcription in flight. Nil the rest of the time; the inspector menus watch it.
+    var retranscribeRequest: RetranscribeRequest?
     /// How many files the last batch import dropped because the library already had them.
     var batchDuplicatesSkipped: Int = 0
     @ObservationIgnored var duplicateCheckTask: Task<Void, Never>?
@@ -1217,6 +1219,13 @@ final class AppModel {
     @ObservationIgnored var derivedArtifactsGeneration = 0
     @ObservationIgnored var loadEntryGeneration = 0
 
+    /// A fresh token for a file run's partial, progress and stage handlers; anything holding an
+    /// older one is reporting on a run that has been replaced.
+    func nextFileRunToken() -> Int {
+        fileRunGeneration &+= 1
+        return fileRunGeneration
+    }
+
     var transcribeTaskRunning: Bool {
         fileTranscribeTask != nil || youtubeTranscribeTask != nil || youtubeSubsTask != nil
             || duplicateCheckTask != nil
@@ -2012,8 +2021,7 @@ final class AppModel {
     /// The run itself, past the routing and the duplicate check an arriving file goes through:
     /// Retry means this file, now.
     func beginFileTranscription(fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil) {
-        fileRunGeneration &+= 1
-        let runToken = fileRunGeneration
+        let runToken = nextFileRunToken()
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
@@ -2406,7 +2414,7 @@ final class AppModel {
         return url
     }
 
-    private func applyTranscriptionError(_ error: Error, source: URL? = nil, translateOverride: Bool? = nil) {
+    func applyTranscriptionError(_ error: Error, source: URL? = nil, translateOverride: Bool? = nil) {
         if error is CancellationError || Task.isCancelled {
             phase = .idle
         } else {
