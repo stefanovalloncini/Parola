@@ -81,18 +81,20 @@ extension View {
         size: Chip.Size = .compact,
         style: Chip.Style = .elevated,
         hovering: Bool = false,
+        pressed: Bool = false,
         selectedFill: Color = DS.Color.accent,
         bordered: Bool = true,
         border overrideBorder: Color? = nil,
         horizontalPadding: CGFloat? = nil
     ) -> some View {
         let fill: Color
+        let lit = hovering || pressed
         if isSelected {
             fill = selectedFill
         } else {
             switch style {
-            case .elevated: fill = hovering ? DS.Color.surfaceElevated : DS.Color.surfaceElevated.opacity(0.6)
-            case .subtle: fill = hovering ? DS.Color.surfaceElevated : Color.primary.opacity(0.06)
+            case .elevated: fill = lit ? DS.Color.surfaceElevated : DS.Color.surfaceElevated.opacity(0.6)
+            case .subtle: fill = lit ? DS.Color.surfaceElevated : Color.primary.opacity(0.06)
             }
         }
         let border: Color = bordered
@@ -131,7 +133,8 @@ struct ChipButtonStyle: ButtonStyle {
                 .chipChrome(
                     isSelected: isSelected,
                     size: size,
-                    hovering: hovering || configuration.isPressed
+                    hovering: hovering,
+                    pressed: configuration.isPressed
                 )
                 .onHover { hovering = $0 }
                 .opacity(configuration.isPressed ? 0.85 : 1)
