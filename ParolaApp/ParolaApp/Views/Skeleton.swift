@@ -17,6 +17,7 @@ struct SkeletonLines: View {
             ForEach(0..<count, id: \.self) { index in
                 Text(Self.lines[index % Self.lines.count])
                     .font(DS.Font.transcript)
+                    .lineSpacing(DS.Spacing.transcriptLeading)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
