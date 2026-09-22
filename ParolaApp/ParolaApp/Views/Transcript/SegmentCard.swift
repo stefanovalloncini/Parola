@@ -252,8 +252,11 @@ struct SegmentCard: View {
         )
     }
 
+    /// How much highlight the card under the playhead carries; the lit word is set on the result, so the contrast table pins it.
+    static let currentCardTint = 0.10
+
     private var cardBackground: Color {
-        isCurrent ? DS.Color.highlight.opacity(0.10) : DS.Color.surfaceElevated
+        isCurrent ? DS.Color.highlight.opacity(Self.currentCardTint) : DS.Color.surfaceElevated
     }
 
     private func confidenceColor(_ bucket: SegmentConfidence.Bucket) -> Color {
