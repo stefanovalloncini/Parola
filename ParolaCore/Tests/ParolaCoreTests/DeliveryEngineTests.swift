@@ -369,6 +369,38 @@ final class DeliveryEngineTests {
         #expect(await engine.recentLog().last?.event == .delivered)
     }
 
+    @Test("a second send for the same destination while one is in flight is skipped")
+    func oneKeyIsSentOnceAtATime() async throws {
+        let recorder = MockDeliveryRecorder()
+        let destination = await mock(recorder: recorder)
+        let engines = EngineBox()
+        let reentrant = OutcomeBox()
+        let engine = DeliveryEngine(
+            destinations: { [.mock(destination)] },
+            payload: { id in
+                var payload = DeliveryPayloadTests.payload()
+                payload.entryID = id
+                return payload
+            },
+            store: try makeStore(),
+            clock: TestClock(),
+            // Re-entering here is what two simultaneous sends look like from inside the engine:
+            // the first attempt is suspended and still holds the key.
+            recordReceipt: { _, entryID in
+                guard let engine = await engines.engine else { return }
+                await reentrant.record(await engine.send(entryID: entryID, to: destination.id))
+            }
+        )
+        await engines.set(engine)
+
+        let outcome = await engine.send(entryID: "entry-1", to: destination.id)
+
+        #expect(outcome.isDelivered)
+        #expect(await reentrant.outcomes == [.skipped(reason: .alreadySending("Mock vault"))])
+        #expect(await recorder.recorded().count == 1, "the second send must not write a second note")
+        #expect(await engine.pending().isEmpty)
+    }
+
     @Test("a queue written by an earlier run is picked up by the next one")
     func queueSurvivesReInit() async throws {
         let recorder = MockDeliveryRecorder()
@@ -486,6 +518,24 @@ struct DeliveryLogTests {
         )
         #expect(store.loadQueue().isEmpty)
         #expect(store.loadLog().entries.isEmpty)
+    }
+}
+
+/// Hands the engine to a callback the engine itself was built with.
+actor EngineBox {
+    private(set) var engine: DeliveryEngine?
+
+    func set(_ engine: DeliveryEngine) {
+        self.engine = engine
+    }
+}
+
+/// Collects the outcomes of sends made from inside another send.
+actor OutcomeBox {
+    private(set) var outcomes: [DeliveryOutcome] = []
+
+    func record(_ outcome: DeliveryOutcome) {
+        outcomes.append(outcome)
     }
 }
 

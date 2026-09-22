@@ -26,6 +26,7 @@ public enum DeliverySkipReason: Sendable, Equatable {
     case unsupportedKind(String)
     case payloadUnavailable(String)
     case givenUp(String)
+    case alreadySending(String)
 
     public var message: String {
         switch self {
@@ -39,6 +40,8 @@ public enum DeliverySkipReason: Sendable, Equatable {
             return "Parola couldn't read the transcript to send. \(reason)"
         case .givenUp(let name):
             return "Parola stopped trying to send to \(name)."
+        case .alreadySending(let name):
+            return "Parola is already sending that transcript to \(name)."
         }
     }
 }
@@ -219,6 +222,7 @@ public actor DeliveryEngine {
     private var queue: [QueuedDelivery]
     private var log: DeliveryLog
     private var timers: [QueueKey: Task<Void, Never>] = [:]
+    private var inFlight: Set<QueueKey> = []
 
     public init(
         destinations: @escaping @Sendable () async -> [AnyDestination],
@@ -314,6 +318,13 @@ public actor DeliveryEngine {
 
     private func attempt(payload: DeliveryPayload, destination: any DeliveryDestination) async -> DeliveryOutcome {
         let key = QueueKey(entryID: payload.entryID, destinationID: destination.id)
+        guard inFlight.insert(key).inserted else {
+            return skip(
+                .alreadySending(destination.name),
+                entryID: key.entryID, destinationID: key.destinationID, name: destination.name
+            )
+        }
+        defer { inFlight.remove(key) }
         let attemptsSoFar = queue.first { $0.entryID == key.entryID && $0.destinationID == key.destinationID }?.attempt ?? 0
         do {
             let receipt = try await destination.deliver(payload)
