@@ -27,8 +27,7 @@ struct TypeScaleTests {
             #expect(height(bigger) > height(smaller))
         }
         #expect(height(DS.Font.bodyStrong) == height(DS.Font.body))
-        // The reading tier is New York on its own rhythm, so it steps down within itself rather than
-        // matching a chrome tier's line height.
+        // The reading tier is New York on its own rhythm, so it steps down within itself, not against chrome.
         #expect(height(DS.Font.transcript) > height(DS.Font.transcriptCompact))
         #expect(height(DS.Font.transcriptCompact) > height(DS.Font.body))
     }
@@ -42,8 +41,7 @@ struct TypeScaleTests {
     func tiersSharingAHeightDiffer() {
         #expect(measured(DS.Font.body) != measured(DS.Font.bodyStrong))
         #expect(measured(DS.Font.secondary) != measured(DS.Font.mono))
-        // transcriptEmphasis is the transcript face at semibold: same line, wider glyphs. It is the
-        // reading tier's own pair now that transcript no longer shares the heading tier's height.
+        // transcriptEmphasis is the transcript face at semibold: same line, wider glyphs — the serif's own pair.
         #expect(height(DS.Font.transcriptEmphasis) == height(DS.Font.transcript))
         #expect(measured(DS.Font.transcriptEmphasis) != measured(DS.Font.transcript))
     }
