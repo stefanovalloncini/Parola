@@ -45,13 +45,12 @@ struct GeneralPane: View {
                     .frame(width: 180, alignment: .trailing)
                     .axLeaf("General.Picker.AppVisibility")
                 }
-                SettingRow("Play a sound when a transcription finishes",
-                           description: "Plays the system Glass sound as the transcript lands in your library. A batch plays it once, at the end.") {
-                    Toggle("", isOn: $model.playSoundWhenFinished).labelsHidden()
-                        .axLeaf("General.Toggle.PlaySoundWhenFinished")
-                }
+            }
+
+            SettingsSection("Files you add") {
                 SettingRow("When a file was already transcribed",
-                           description: "Parola recognises a file by its contents, so a renamed copy counts as the same recording.") {
+                           description: "Parola recognises a file by its contents, so a renamed copy counts as the same recording.",
+                           isFirst: true) {
                     Picker("", selection: $model.duplicateImportPolicy) {
                         ForEach(DuplicateImportPolicy.allCases) { policy in
                             Text(policy.label).tag(policy)
@@ -101,6 +100,11 @@ struct GeneralPane: View {
                            description: "Double-clicking a library row opens its own window instead of taking over the main one. Hold Option to open a window either way.") {
                     Toggle("", isOn: $model.openEntriesInNewWindow).labelsHidden()
                         .axLeaf("General.Toggle.OpenEntriesInNewWindow")
+                }
+                SettingRow("Play a sound when a transcription finishes",
+                           description: "Plays the system Glass sound as the transcript lands in your library. A batch plays it once, at the end.") {
+                    Toggle("", isOn: $model.playSoundWhenFinished).labelsHidden()
+                        .axLeaf("General.Toggle.PlaySoundWhenFinished")
                 }
             }
 

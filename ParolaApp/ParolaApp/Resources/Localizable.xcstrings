@@ -5042,6 +5042,17 @@
         }
       }
     },
+    "Files you add": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I file che aggiungi"
+          }
+        }
+      }
+    },
     "Files you transcribe in batch show up here while they run, then stay until you clear them.": {
       "comment": "A description of the content of the \"No jobs yet\" view.",
       "extractionState": "stale",
