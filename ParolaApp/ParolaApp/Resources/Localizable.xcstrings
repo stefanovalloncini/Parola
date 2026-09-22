@@ -1510,6 +1510,17 @@
         }
       }
     },
+    "Adjust Timing": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regola i tempi"
+          }
+        }
+      }
+    },
     "Advanced": {
       "extractionState": "manual",
       "localizations": {
@@ -4457,6 +4468,17 @@
         }
       }
     },
+    "Edit Segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifica segmento"
+          }
+        }
+      }
+    },
     "Edit in the main window.": {
       "extractionState": "manual",
       "localizations": {
@@ -7043,6 +7065,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Unisci a"
+          }
+        }
+      }
+    },
+    "Merge Segments": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unisci segmenti"
           }
         }
       }
@@ -10181,6 +10214,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rinomina persona"
+          }
+        }
+      }
+    },
+    "Rename Speaker": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rinomina speaker"
           }
         }
       }
