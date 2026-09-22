@@ -13,7 +13,7 @@ struct HelloScene: View {
             VStack(spacing: DS.Spacing.small) {
                 Text(verbatim: "Parola")
                     .font(DS.Font.wordmark)
-                    .kerning(-0.5)
+                    .tracking(DS.Tracking.wordmark)
                     .foregroundStyle(DS.Color.primaryText)
                 Text("Audio, written down.")
                     .font(DS.Font.title)

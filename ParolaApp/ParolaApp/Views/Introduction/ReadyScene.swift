@@ -29,6 +29,7 @@ struct ReadyScene: View {
         return VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             Text("You're ready.")
                 .font(DS.Font.hero)
+                .tracking(DS.Tracking.hero)
                 .foregroundStyle(DS.Color.primaryText)
                 .sceneEntrance(order: 0)
             if !rows.isEmpty {

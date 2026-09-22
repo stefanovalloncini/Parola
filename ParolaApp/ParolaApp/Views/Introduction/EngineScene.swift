@@ -17,6 +17,7 @@ struct EngineScene: View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             Text("Choose how it listens.")
                 .font(DS.Font.hero)
+                .tracking(DS.Tracking.hero)
                 .foregroundStyle(DS.Color.primaryText)
                 .sceneEntrance(order: 0)
             Text("You can change this any time in Settings.")

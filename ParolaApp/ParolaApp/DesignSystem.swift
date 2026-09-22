@@ -40,13 +40,21 @@ enum DS {
         static let demoTranscriptMinHeight: CGFloat = 220
     }
 
+    /// Letter-spacing for the three display tiers: SwiftUI takes tracking as a view modifier, so the
+    /// tier lives here and the call site pairs `.font(DS.Font.hero)` with `.tracking(DS.Tracking.hero)`.
+    enum Tracking {
+        static let wordmark: CGFloat = -1.5
+        static let hero: CGFloat = -1.0
+        static let display: CGFloat = -0.5
+    }
+
     /// Thirteen fixed tiers, ours rather than the system text styles, so a tier means the same thing
     /// on every surface. Pick by role — page title, section heading, row title, meta line, caption.
     enum Font {
         /// The brand lockup on the first-run stage, nowhere else.
-        static let wordmark = SwiftUI.Font.system(size: 56, weight: .semibold)
-        static let hero = SwiftUI.Font.system(size: 40, weight: .semibold)
-        static let display = SwiftUI.Font.system(size: 28, weight: .semibold)
+        static let wordmark = SwiftUI.Font.system(size: 56, weight: .bold)
+        static let hero = SwiftUI.Font.system(size: 40, weight: .bold)
+        static let display = SwiftUI.Font.system(size: 28, weight: .bold)
         static let title = SwiftUI.Font.system(size: 22, weight: .semibold)
         static let heading = SwiftUI.Font.system(size: 15, weight: .semibold)
         static let body = SwiftUI.Font.system(size: 13)

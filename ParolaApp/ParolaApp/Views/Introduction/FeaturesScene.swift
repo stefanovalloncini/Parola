@@ -49,6 +49,7 @@ struct FeaturesScene: View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {
             Text("What it does.")
                 .font(DS.Font.hero)
+                .tracking(DS.Tracking.hero)
                 .foregroundStyle(DS.Color.primaryText)
                 .sceneEntrance(order: 0)
             grid

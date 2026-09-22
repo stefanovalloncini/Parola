@@ -8,6 +8,7 @@ struct TranscribeScene: View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             Text("It listens and writes.")
                 .font(DS.Font.hero)
+                .tracking(DS.Tracking.hero)
                 .foregroundStyle(DS.Color.primaryText)
                 .sceneEntrance(order: 0)
             Text("Every word stays on this Mac.")
