@@ -69,10 +69,11 @@ struct ExportPreview: View {
 
     static func render(transcript: Transcript, spec: ExportSpec) async throws -> String {
         let target = spec.textRendering
+        let cap = Self.characterCap
         return try await AppModel.offMainIO {
             let text = try Exporters.exporter(for: target).renderText(transcript)
-            guard text.count > characterCap else { return text }
-            return String(text.prefix(characterCap)) + "\n…"
+            guard text.count > cap else { return text }
+            return String(text.prefix(cap)) + "\n…"
         }
     }
 }

@@ -207,8 +207,8 @@ struct ExportSheet: View {
         _ title: LocalizedStringKey,
         detail: LocalizedStringKey,
         leaf: String,
-        get: @escaping () -> Bool,
-        set: @escaping (inout ExportOptions, Bool) -> Void
+        get: @escaping @MainActor @Sendable () -> Bool,
+        set: @escaping @MainActor @Sendable (inout ExportOptions, Bool) -> Void
     ) -> some View {
         labelledRow(title, detail: detail) {
             Toggle("", isOn: Binding(get: get, set: { isOn in

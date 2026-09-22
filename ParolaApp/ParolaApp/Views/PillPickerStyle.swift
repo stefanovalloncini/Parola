@@ -28,9 +28,17 @@ enum PillPickerShell {
     case standalone
 }
 
+/// Written by hand rather than with `@Entry`: the macro warns about storing a closure it cannot compare.
+private struct DismissPillPopoverKey: EnvironmentKey {
+    static let defaultValue: @MainActor @Sendable () -> Void = {}
+}
+
 extension EnvironmentValues {
     /// Rows call it after a pick so the popover closes the way a menu does; controls that refine the list leave it open.
-    @Entry var dismissPillPopover: () -> Void = {}
+    var dismissPillPopover: @MainActor @Sendable () -> Void {
+        get { self[DismissPillPopoverKey.self] }
+        set { self[DismissPillPopoverKey.self] = newValue }
+    }
 }
 
 struct PillPickerButton<MenuContent: View>: View {
