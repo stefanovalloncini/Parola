@@ -325,6 +325,9 @@ struct ContinuousChunks: View {
         var segmentCount = 0
         var lastEndedSentence = false
         var shownSpeaker: String?
+        // The raw label, not the flattened one the heading shows: the manifest's speaker map is
+        // keyed by what the segment carries, and the assign popover has to look it up under that.
+        var chunkSpeaker: String?
         var lastEnd: Double?
 
         func closeChunk() {
@@ -334,7 +337,7 @@ struct ContinuousChunks: View {
                 text: text,
                 translation: translatedSegments == 0 ? nil : translated,
                 runs: runs,
-                speaker: shownSpeaker
+                speaker: chunkSpeaker
             ))
             text = AttributedString()
             translated = AttributedString()
@@ -367,6 +370,7 @@ struct ContinuousChunks: View {
                 text.append(heading)
                 translatedPrefix = heading
                 shownSpeaker = label
+                chunkSpeaker = seg.speaker
             } else if segmentCount >= hardCap || (segmentCount >= softCap && (lastEndedSentence || pauseBreak)) {
                 closeChunk()
             } else if pauseBreak, !text.characters.isEmpty {
@@ -465,7 +469,7 @@ private struct ChunkSpeakerAssignment: ViewModifier {
                         .axLeaf("Chunk.MenuItem.AssignSpeaker")
                 }
                 .popover(isPresented: $isPresented, arrowEdge: .bottom) {
-                    AssignSpeakerPopover(label: speaker) { onRenameLabel(label) }
+                    AssignSpeakerPopover(label: speaker) { onRenameLabel(speaker) }
                         .environment(model)
                 }
         } else {

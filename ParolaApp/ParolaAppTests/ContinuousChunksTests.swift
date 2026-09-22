@@ -109,6 +109,21 @@ struct ContinuousChunksTests {
         #expect(chunks[0].translation.map { String($0.characters) } == "How are you?")
     }
 
+    @Test("the chunk carries the raw speaker, not the flattened heading")
+    func chunkKeepsTheRawSpeaker() {
+        let raw = " Ada Lovelace\n"
+        let chunks = build(
+            [segment(0, "Ciao.", speaker: raw), segment(1, "Come stai?", speaker: raw)],
+            useSpeakerColor: true,
+            speakerColorIndices: [raw: 0]
+        )
+
+        // The manifest's speakerAssignments is keyed by what the segment carries, so the assign
+        // popover has to be handed the same string the card would hand it.
+        #expect(chunks.first?.speaker == raw)
+        #expect(SegmentCard.speakerLabel(for: raw) == "Ada Lovelace")
+    }
+
     @Test("a new translation is a different signature")
     func translationChangesTheSignature() {
         let segments = [segment(0, "Ciao.")]
