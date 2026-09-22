@@ -18,41 +18,55 @@ struct DSPillButtonStyle: ButtonStyle {
     static var disabledFill: Color { DS.Palette.subtleFill }
     static var disabledLabel: Color { DS.Color.secondaryText }
 
-    @Environment(\.isEnabled) private var isEnabled
-
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(DS.Font.bodyStrong)
-            .foregroundStyle(foreground)
-            .frame(minWidth: size == .regular ? 104 : nil, minHeight: size == .regular ? 36 : 28)
-            .padding(.horizontal, size == .regular ? DS.Spacing.medium : DS.Spacing.regular)
-            .background(background(pressed: configuration.isPressed))
-            .clipShape(Capsule())
-            .overlay {
-                if kind == .secondary {
-                    Capsule().strokeBorder(DS.Color.separator, lineWidth: 0.5)
+        Chrome(configuration: configuration, kind: kind, size: size)
+    }
+
+    private struct Chrome: View {
+        let configuration: Configuration
+        let kind: Kind
+        let size: Size
+
+        @Environment(\.isEnabled) private var isEnabled
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .font(DS.Font.bodyStrong)
+                .foregroundStyle(foreground)
+                .frame(minWidth: size == .regular ? 104 : nil, minHeight: size == .regular ? 36 : 28)
+                .padding(.horizontal, size == .regular ? DS.Spacing.medium : DS.Spacing.regular)
+                .background(background(pressed: configuration.isPressed))
+                .clipShape(Capsule())
+                .overlay {
+                    if kind == .secondary {
+                        Capsule().strokeBorder(DS.Color.separator, lineWidth: 0.5)
+                    }
                 }
-            }
-            .opacity(dimsWholeView && !isEnabled ? DS.Opacity.disabled : (configuration.isPressed ? 0.85 : 1.0))
-            .contentShape(Capsule())
-    }
-
-    /// Only the secondary pill fades whole: the primary swaps its pair instead, so neither half thins out.
-    private var dimsWholeView: Bool { kind == .secondary }
-
-    private var foreground: Color {
-        switch kind {
-        case .primary: return isEnabled ? DS.Color.onAccent : Self.disabledLabel
-        case .secondary: return DS.Color.primaryText
+                .opacity(dimsWholeView && !isEnabled ? DS.Opacity.disabled : (configuration.isPressed ? 0.85 : 1.0))
+                .contentShape(Capsule())
+                .rowStateAnimation(hovering)
+                .onHover { hovering = isEnabled && $0 }
         }
-    }
 
-    private func background(pressed: Bool) -> Color {
-        switch kind {
-        case .primary:
-            return isEnabled ? DS.Color.accent.opacity(pressed ? 0.85 : 1.0) : Self.disabledFill
-        case .secondary:
-            return DS.Color.surfaceElevated
+        /// Only the secondary pill fades whole: the primary swaps its pair instead, so neither half thins out.
+        private var dimsWholeView: Bool { kind == .secondary }
+
+        private var foreground: Color {
+            switch kind {
+            case .primary: return isEnabled ? DS.Color.onAccent : DSPillButtonStyle.disabledLabel
+            case .secondary: return DS.Color.primaryText
+            }
+        }
+
+        /// The primary pill is the chosen one, and a chosen row takes no hover.
+        private func background(pressed: Bool) -> Color {
+            switch kind {
+            case .primary:
+                return isEnabled ? DS.Color.accent.opacity(pressed ? 0.85 : 1.0) : DSPillButtonStyle.disabledFill
+            case .secondary:
+                return hovering ? DS.Palette.pillFillHover : DS.Color.surfaceElevated
+            }
         }
     }
 }
@@ -84,19 +98,32 @@ struct DSIconChipButtonStyle: ButtonStyle {
     /// A chip carrying a word instead of a glyph: `side` is then only its height, and the label sets the width.
     var fitsLabel = false
 
-    @Environment(\.isEnabled) private var isEnabled
-
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(DS.Font.bodyStrong)
-            .foregroundStyle(DS.Color.secondaryText)
-            .padding(.horizontal, fitsLabel ? DS.Spacing.snug : 0)
-            .frame(width: fitsLabel ? nil : side, height: side)
-            .background(
-                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                    .fill(configuration.isPressed ? DS.Palette.pillFillHover : DS.Color.surfaceElevated)
-            )
-            .opacity(isEnabled ? 1 : DS.Opacity.disabled)
-            .contentShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
+        Chrome(configuration: configuration, side: side, fitsLabel: fitsLabel)
+    }
+
+    private struct Chrome: View {
+        let configuration: Configuration
+        let side: CGFloat
+        let fitsLabel: Bool
+
+        @Environment(\.isEnabled) private var isEnabled
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .font(DS.Font.bodyStrong)
+                .foregroundStyle(DS.Color.secondaryText)
+                .padding(.horizontal, fitsLabel ? DS.Spacing.snug : 0)
+                .frame(width: fitsLabel ? nil : side, height: side)
+                .background(
+                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                        .fill(hovering || configuration.isPressed ? DS.Palette.pillFillHover : DS.Color.surfaceElevated)
+                )
+                .opacity(isEnabled ? 1 : DS.Opacity.disabled)
+                .contentShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
+                .rowStateAnimation(hovering)
+                .onHover { hovering = isEnabled && $0 }
+        }
     }
 }
