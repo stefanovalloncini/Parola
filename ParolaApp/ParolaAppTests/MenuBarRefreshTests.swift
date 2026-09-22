@@ -98,6 +98,7 @@ struct MenuBarRefreshTests {
     @Test("a hidden menu bar skips the entry scan")
     func hiddenModeSkipsEntries() async {
         let model = await makeModel()
+        model.appVisibilityMode = .dockOnly
         model.libraryEntries = [entry("a", offset: 100, pinned: true)]
 
         let snapshot = MenuBarController.snapshot(for: model)
