@@ -498,7 +498,7 @@ struct SegmentCard: View {
             var piece = AttributedString(token + (index == tokens.count - 1 ? "" : " "))
             if index == spokenIndex {
                 piece.foregroundColor = DS.Color.highlight
-                piece.font = .body.bold()
+                piece.font = DS.Font.transcriptEmphasis
             }
             attr.append(piece)
         }
@@ -532,7 +532,7 @@ struct SegmentCard: View {
             piece.foregroundColor = DS.Color.primaryText
             if word.id == activeWordID {
                 piece.foregroundColor = DS.Color.highlight
-                piece.font = .body.bold()
+                piece.font = DS.Font.transcriptEmphasis
             }
             attr.append(piece)
         }

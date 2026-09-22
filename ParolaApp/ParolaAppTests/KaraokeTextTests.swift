@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 import ParolaCore
 @testable import Parola
@@ -86,6 +87,19 @@ struct KaraokeTextTests {
         #expect(active?.foregroundColor != inactive?.foregroundColor)
     }
 
+    @Test("the active word takes the transcript face at emphasis, its neighbours none")
+    func activeWordTakesTheEmphasisTier() {
+        let words = [
+            timedWord("0-0", "ciao", start: 0, end: 0.5),
+            timedWord("0-1", "mondo", start: 0.5, end: 1.0),
+        ]
+        let attr = SegmentCard.karaokeText(words: words, activeWordID: "0-1")
+        let active = attr.runs.first { $0.link == URL(string: "parola-seek-time://0.5") }
+        let inactive = attr.runs.first { $0.link == URL(string: "parola-seek-time://0.0") }
+        #expect(active?.font == DS.Font.transcriptEmphasis)
+        #expect(inactive?.font == nil)
+    }
+
     // MARK: - Synthetic karaoke
 
     private func cumulative(_ tokens: [String]) -> [Int] {
@@ -121,6 +135,13 @@ struct KaraokeTextTests {
     func syntheticTextJoinsWords() {
         let attr = SegmentCard.syntheticKaraokeText(tokens: ["uno", "due", "tre"], spokenIndex: 1)
         #expect(String(attr.characters) == "uno due tre")
+    }
+
+    @Test("the spoken token takes the transcript face at emphasis")
+    func syntheticSpokenTokenTakesTheEmphasisTier() {
+        let attr = SegmentCard.syntheticKaraokeText(tokens: ["uno", "due", "tre"], spokenIndex: 1)
+        let fonts = attr.runs.compactMap(\.font)
+        #expect(fonts == [DS.Font.transcriptEmphasis])
     }
 
     @Test("exactly one token carries the highlight")

@@ -63,6 +63,8 @@ enum DS {
         static let caption = SwiftUI.Font.system(size: 11, weight: .medium)
         static let mono = SwiftUI.Font.system(size: 12, design: .monospaced).monospacedDigit()
         static let transcript = SwiftUI.Font.system(size: 15)
+        /// Derived so the karaoke word under the playhead follows the transcript face wherever it goes.
+        static let transcriptEmphasis = transcript.weight(.semibold)
         static let transcriptCompact = SwiftUI.Font.system(size: 13)
         static let timer = SwiftUI.Font.system(size: 22, weight: .light, design: .rounded).monospacedDigit()
     }
