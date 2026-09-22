@@ -96,6 +96,12 @@ const tabs = [
     width: 72px;
   }
 
+  @media (max-width: 440px) {
+    .fan {
+      scale: 0.78;
+    }
+  }
+
   :global(.js) .fan:not([data-seen]) .fan-tile {
     translate: -50% 18px;
     rotate: 0deg;

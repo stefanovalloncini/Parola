@@ -1,5 +1,5 @@
 ---
-import "@fontsource-variable/inter";
+import "@fontsource-variable/inter/opsz.css";
 import "@fontsource-variable/newsreader";
 import "../styles/global.css";
 import Footer from "../components/Footer.astro";
@@ -63,6 +63,16 @@ const ogImage = Astro.site ? new URL("/og.png", Astro.site).href : undefined;
 </script>
 
 <style>
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+  }
+
+  main {
+    flex: 1;
+  }
+
   .skip {
     position: absolute;
     left: 16px;

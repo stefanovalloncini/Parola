@@ -1,11 +1,17 @@
 ---
 import AppWindow from "../device/AppWindow.astro";
 
+interface Props {
+  scene: number;
+}
+
+const { scene } = Astro.props;
+
 const typed = "Thanks for today. I'll send the notes by Friday and book the review for Tuesday.";
 const levels = [0.35, 0.7, 1, 0.55, 0.85, 0.45, 0.75];
 ---
 
-<div class="scene-dictation" data-typewriter>
+<div class="scene-dictation" data-typewriter={scene}>
   <AppWindow title="Re: Launch review" class="editor">
     <div class="fields" aria-hidden="true">
       <p>
@@ -58,9 +64,9 @@ const levels = [0.35, 0.7, 1, 0.55, 0.85, 0.45, 0.75];
 
   .scene-dictation :global(.editor) {
     left: calc(300 * var(--pt));
-    top: calc(128 * var(--pt));
+    top: calc(100 * var(--pt));
     width: calc(912 * var(--pt));
-    height: calc(620 * var(--pt));
+    height: calc(450 * var(--pt));
   }
 
   .fields {
@@ -105,7 +111,7 @@ const levels = [0.35, 0.7, 1, 0.55, 0.85, 0.45, 0.75];
     position: absolute;
     left: calc(24 * var(--pt));
     top: calc(170 * var(--pt));
-    width: calc(470 * var(--pt));
+    width: calc(400 * var(--pt));
     padding: calc(11 * var(--pt)) calc(16 * var(--pt));
     border-radius: calc(19 * var(--pt));
     background: rgb(0 0 0 / 0.88);

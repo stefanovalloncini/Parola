@@ -1,27 +1,42 @@
 ---
-import { Image } from "astro:assets";
+import { Picture } from "astro:assets";
+import dropShot from "../../assets/shots/drop-zone.png";
 import windowShot from "../../assets/shots/hero-window.png";
 import Desktop from "../device/Desktop.astro";
+import DraggedFile from "./DraggedFile.astro";
 import MacBook from "../device/MacBook.astro";
 import SceneDictation from "./SceneDictation.astro";
 import SceneMeeting from "./SceneMeeting.astro";
 import StoryProps from "./StoryProps.astro";
+
+const shotSizes = "calc(min(860px, 92vw) * 0.8)";
 ---
 
 <section class="story" data-story aria-labelledby="story-title">
   <div class="beats">
     <h1 id="story-title" class="t-hero beat" data-beat>
-      Audio, <span class="mark">written down</span>. Right here on your Mac.
+      Audio,{" "}
+      <span class="keep">
+        <span class="mark">written down</span>.
+      </span>{" "}
+      Right here on your Mac.
     </h1>
     <p class="t-hero beat" data-beat>
-      Drop in <span class="mark">lectures</span>, <span class="mark">interviews</span>,
-      <span class="mark">voice memos</span> or a YouTube link.
+      Drop in{" "}
+      <span class="keep">
+        <span class="mark">any recording</span>,
+      </span>{" "}
+      or paste a YouTube link.
     </p>
     <p class="t-hero beat" data-beat>
       It records your <span class="mark">meetings</span> too. No bot joins the call.
     </p>
     <p class="t-hero beat" data-beat>
-      Hold a key and <span class="mark">speak</span>. The words land where you type.
+      Hold a key and{" "}
+      <span class="keep">
+        <span class="mark">speak</span>.
+      </span>{" "}
+      The words land where you type.
     </p>
   </div>
 
@@ -32,20 +47,31 @@ import StoryProps from "./StoryProps.astro";
       <MacBook class="laptop">
         <Desktop>
           <div class="scene scene-window">
-            <Image
+            <Picture
               src={windowShot}
               alt=""
-              widths={[720, 1080, 1440]}
-              sizes="(max-width: 900px) 70vw, 660px"
+              formats={["avif", "webp"]}
+              widths={[720, 1080, 1440, 2160]}
+              sizes={shotSizes}
               loading="eager"
               fetchpriority="high"
             />
+          </div>
+          <div class="scene scene-drop">
+            <Picture
+              src={dropShot}
+              alt=""
+              formats={["avif", "webp"]}
+              widths={[720, 1080, 1440, 2160]}
+              sizes={shotSizes}
+            />
+            <DraggedFile />
           </div>
           <div class="scene scene-call">
             <SceneMeeting />
           </div>
           <div class="scene scene-type">
-            <SceneDictation />
+            <SceneDictation scene={3} />
           </div>
         </Desktop>
       </MacBook>
@@ -62,52 +88,60 @@ import StoryProps from "./StoryProps.astro";
   .story {
     --laptop: min(860px, 92vw);
     --device-top: clamp(236px, 37vh, 360px);
+    --fade: 24px;
+    --band: calc(var(--device-top) - var(--header-height) - var(--fade));
     position: relative;
     overflow: clip;
   }
 
   .beats {
     position: relative;
-    width: min(100% - 2 * var(--gutter), 720px);
+    width: min(100% - 2 * var(--gutter), 720px, var(--laptop) - 48px);
     margin-inline: auto;
-    padding-top: clamp(28px, 6vh, 64px);
-    padding-bottom: calc(var(--laptop) * 0.7 + 30vh);
+    padding-bottom: calc(var(--laptop) * 0.7 + 26vh);
     display: grid;
-    gap: clamp(56px, 12vh, 120px);
+    grid-template-rows: minmax(calc(var(--band) - 4px), auto);
+    gap: calc((var(--device-top) - var(--header-height)) * 0.55);
   }
 
   .beat {
-    font-size: min(clamp(40px, 5.2vw + 8px, 68px), 8.4vh);
+    font-size: min(clamp(40px, 5.2vw + 8px, 68px), calc(var(--band) / 2.9));
+    line-height: 0.87;
+  }
+
+  .beat:first-child {
+    align-self: end;
+  }
+
+  .keep {
+    white-space: nowrap;
   }
 
   @media (max-width: 720px) {
     .story {
       --device-top: clamp(300px, 50vh, 470px);
     }
-
-    .beats {
-      gap: clamp(64px, 16vh, 140px);
-    }
   }
 
   .track {
     position: absolute;
-    inset: 0;
+    inset: 0 0 96px;
     z-index: 2;
     pointer-events: none;
   }
 
   .fade {
     position: sticky;
-    top: var(--header-height);
-    height: 56px;
-    background: linear-gradient(var(--paper), rgb(255 255 255 / 0));
+    top: 0;
+    height: calc(var(--header-height) + var(--fade));
+    margin-top: calc(-1 * var(--header-height));
+    background: linear-gradient(var(--paper) calc(100% - var(--fade)), rgb(255 255 255 / 0));
   }
 
   .device {
     position: sticky;
     top: var(--device-top);
-    margin-top: calc(var(--device-top) - var(--header-height) - 56px);
+    margin-top: calc(var(--device-top) - var(--header-height) - var(--fade));
   }
 
   .device::after {
@@ -119,6 +153,8 @@ import StoryProps from "./StoryProps.astro";
   }
 
   .device :global(.laptop) {
+    position: relative;
+    z-index: 1;
     width: var(--laptop);
     margin-inline: auto;
   }
@@ -131,24 +167,19 @@ import StoryProps from "./StoryProps.astro";
   }
 
   [data-scene="0"] .scene-window,
-  [data-scene="1"] .scene-window,
+  [data-scene="1"] .scene-drop,
   [data-scene="2"] .scene-call,
   [data-scene="3"] .scene-type {
     opacity: 1;
   }
 
-  .scene-window :global(img) {
+  .scene :global(picture img) {
     position: absolute;
     left: 50%;
-    top: calc(52 * var(--pt));
-    width: calc(1240 * var(--pt));
+    top: calc(100 * var(--pt));
+    width: calc(1180 * var(--pt));
     translate: -50% 0;
     filter: drop-shadow(0 calc(12 * var(--pt)) calc(26 * var(--pt)) rgb(0 0 0 / 0.3));
-    transition: scale 0.8s var(--ease-out);
-  }
-
-  [data-scene="1"] .scene-window :global(img) {
-    scale: 0.985;
   }
 
   :global(.js) .beat .mark {

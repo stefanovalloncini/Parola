@@ -11,7 +11,7 @@ const people = [
 ---
 
 <div class="scene-meeting">
-  <AppWindow title="Weekly sync" tone="dark" class="call">
+  <AppWindow title="Zoom Meeting" tone="dark" class="call">
     <div class="grid">
       {people.map((person) => (
         <div class:list={["tile", { speaking: person.speaking }]} style={`--hue: ${person.hue}`}>
@@ -47,7 +47,7 @@ const people = [
 
   .scene-meeting :global(.call) {
     left: calc(250 * var(--pt));
-    top: calc(118 * var(--pt));
+    top: calc(100 * var(--pt));
     width: calc(1012 * var(--pt));
     height: calc(640 * var(--pt));
   }
@@ -128,7 +128,7 @@ const people = [
   .alert {
     position: absolute;
     left: 50%;
-    top: calc(150 * var(--pt));
+    top: calc(170 * var(--pt));
     width: calc(340 * var(--pt));
     display: flex;
     flex-direction: column;
@@ -142,7 +142,6 @@ const people = [
       0 0 0 calc(0.6 * var(--pt)) rgb(0 0 0 / 0.14),
       0 calc(20 * var(--pt)) calc(60 * var(--pt)) rgb(0 0 0 / 0.35);
     backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
     translate: -50% 0;
   }
 

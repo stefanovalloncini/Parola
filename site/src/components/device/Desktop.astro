@@ -52,23 +52,17 @@ const {
     inset: 0;
     background:
       radial-gradient(70% 60% at 88% 0%, rgb(252 242 230 / 0.95), rgb(252 242 230 / 0) 70%),
-      radial-gradient(60% 70% at 0% 100%, #243a2c, rgb(36 58 44 / 0) 70%),
+      radial-gradient(55% 60% at 0% 100%, rgb(63 96 72 / 0.75), rgb(63 96 72 / 0) 70%),
       radial-gradient(55% 55% at 22% 28%, rgb(169 194 166 / 0.9), rgb(169 194 166 / 0) 70%),
-      radial-gradient(50% 45% at 75% 85%, rgb(84 115 158 / 0.55), rgb(84 115 158 / 0) 70%),
-      linear-gradient(160deg, #b9cfb5 0%, #7d9c7b 45%, #4a6b51 100%);
+      radial-gradient(50% 45% at 78% 88%, rgb(133 163 204 / 0.5), rgb(133 163 204 / 0) 70%),
+      linear-gradient(160deg, #c3d6bf 0%, #8faa8c 48%, #62826a 100%);
   }
 
   .wallpaper::after {
     content: "";
     position: absolute;
     inset: 0;
-    background:
-      radial-gradient(120% 60% at 50% 120%, rgb(15 26 20 / 0.35), transparent 60%),
-      repeating-radial-gradient(
-        140% 90% at -10% 110%,
-        rgb(255 255 255 / 0) 0 calc(60 * var(--pt)),
-        rgb(255 255 255 / 0.06) calc(61 * var(--pt)) calc(62 * var(--pt))
-      );
+    background: radial-gradient(120% 60% at 50% 125%, rgb(15 26 20 / 0.18), transparent 60%);
   }
 
   .menubar {
@@ -83,7 +77,6 @@ const {
     color: rgb(15 26 20 / 0.86);
     background: rgb(255 255 255 / 0.18);
     backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
   }
 
   .menus,

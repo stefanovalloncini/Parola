@@ -2,23 +2,23 @@
 import DocTile from "../DocTile.astro";
 
 const files = [
-  { ext: "M4A", name: "Interview.m4a", tint: "#6b8a6b", x: 4, y: 16, r: -8 },
-  { ext: "MP4", name: "Lecture 4.mp4", tint: "#54739e", x: 11, y: 52, r: 6 },
-  { ext: "WAV", name: "Standup.wav", tint: "#a07b5a", x: 2, y: 80, r: -4 },
-  { ext: "MOV", name: "Keynote.mov", tint: "#7b6f95", x: 16, y: 88, r: 9 },
-  { ext: "MP3", name: "Episode 31.mp3", tint: "#3f6048", x: 88, y: 14, r: 7 },
-  { ext: "M4A", name: "Memo 12 Sept.m4a", tint: "#6b8a6b", x: 94, y: 46, r: -6 },
-  { ext: "MP4", name: "Workshop.mp4", tint: "#54739e", x: 83, y: 76, r: 5 },
-  { ext: "OGG", name: "Voice note.ogg", tint: "#a07b5a", x: 96, y: 86, r: -9 },
+  { ext: "M4A", name: "Interview.m4a", tint: "#6b8a6b", x: 9, y: 16, r: -8 },
+  { ext: "MP4", name: "Lecture 4.mp4", tint: "#54739e", x: 13, y: 45, r: 6 },
+  { ext: "WAV", name: "Standup.wav", tint: "#a07b5a", x: 8, y: 72, r: -4 },
+  { ext: "MOV", name: "Keynote.mov", tint: "#7b6f95", x: 13, y: 96, r: 8 },
+  { ext: "MP3", name: "Episode 31.mp3", tint: "#3f6048", x: 91, y: 14, r: 7 },
+  { ext: "M4A", name: "Memo 12 Sept.m4a", tint: "#6b8a6b", x: 87, y: 42, r: -6 },
+  { ext: "MP4", name: "Workshop.mp4", tint: "#54739e", x: 92, y: 70, r: 5 },
+  { ext: "OGG", name: "Voice note.ogg", tint: "#a07b5a", x: 87, y: 95, r: -8 },
 ];
 
 const people = [
-  { initials: "M", hue: "#6b8a6b", x: 7, y: 22 },
-  { initials: "T", hue: "#54739e", x: 14, y: 58 },
-  { initials: "A", hue: "#a07b5a", x: 5, y: 84 },
-  { initials: "S", hue: "#7b6f95", x: 91, y: 20 },
-  { initials: "J", hue: "#3f6048", x: 86, y: 56 },
-  { initials: "R", hue: "#54739e", x: 94, y: 82 },
+  { initials: "M", hue: "#6b8a6b", x: 9, y: 20 },
+  { initials: "T", hue: "#54739e", x: 13, y: 55 },
+  { initials: "A", hue: "#a07b5a", x: 8, y: 88 },
+  { initials: "S", hue: "#7b6f95", x: 91, y: 18 },
+  { initials: "J", hue: "#3f6048", x: 87, y: 52 },
+  { initials: "R", hue: "#54739e", x: 92, y: 86 },
 ];
 
 const barCount = 44;
@@ -59,8 +59,15 @@ const bars = Array.from({ length: barCount }, (_, i) => {
 
 <style>
   .props {
+    --box: calc(var(--laptop) * 1.62);
+    --box-h: calc(var(--laptop) * 0.7);
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 50%;
+    z-index: 2;
+    width: var(--box);
+    height: var(--box-h);
+    translate: -50% 0;
     pointer-events: none;
   }
 
@@ -80,8 +87,12 @@ const bars = Array.from({ length: barCount }, (_, i) => {
     transition:
       translate 0.9s var(--ease-out),
       scale 0.9s var(--ease-out),
-      opacity 0.6s var(--ease-out);
+      opacity 0.7s var(--ease-out);
     transition-delay: calc(var(--i) * 40ms);
+  }
+
+  .files .prop {
+    --doc-width: 104px;
   }
 
   :global([data-scene="0"]) .files,
@@ -92,8 +103,9 @@ const bars = Array.from({ length: barCount }, (_, i) => {
   }
 
   :global([data-scene="1"]) .files .prop {
-    translate: calc((50 - var(--x)) * 0.62vw - 50%) calc((44 - var(--y)) * 5px - 50%);
-    scale: 0.4;
+    translate: calc((50 - var(--x)) * var(--box) / 100 - 50%)
+      calc((40 - var(--y)) * var(--box-h) / 100 - 50%);
+    scale: 0.35;
     opacity: 0;
   }
 
@@ -129,12 +141,12 @@ const bars = Array.from({ length: barCount }, (_, i) => {
   }
 
   .bars.left {
-    right: calc(50% + min(430px, 46vw) + 12px);
+    right: calc(50% + var(--laptop) / 2 + 14px);
     flex-direction: row-reverse;
   }
 
   .bars.right {
-    left: calc(50% + min(430px, 46vw) + 12px);
+    left: calc(50% + var(--laptop) / 2 + 14px);
   }
 
   .bars i {
@@ -147,7 +159,7 @@ const bars = Array.from({ length: barCount }, (_, i) => {
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .files .prop {
+    .files .prop :global(.doc) {
       animation: drift 7s var(--ease-in-out) infinite alternate;
       animation-delay: calc(var(--i) * -0.9s);
     }
@@ -160,6 +172,10 @@ const bars = Array.from({ length: barCount }, (_, i) => {
     :global([data-scene="3"]) .bars i {
       animation: pulse 1.3s var(--ease-in-out) infinite alternate;
       animation-delay: calc(var(--d) * -1);
+    }
+
+    :global([data-story]:not([data-active])) .props * {
+      animation-play-state: paused;
     }
   }
 

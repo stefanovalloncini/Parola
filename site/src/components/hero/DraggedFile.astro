@@ -1,0 +1,77 @@
+<span class="dragged" aria-hidden="true">
+  <span class="sheet">
+    <i>M4A</i>
+  </span>
+  <b>+</b>
+  <span class="label">Interview.m4a</span>
+</span>
+
+<style>
+  .dragged {
+    position: absolute;
+    left: 50%;
+    top: calc(430 * var(--pt));
+    display: grid;
+    justify-items: center;
+    gap: calc(6 * var(--pt));
+    translate: calc(300 * var(--pt)) calc(300 * var(--pt));
+    opacity: 0;
+    transition:
+      translate 1.1s var(--ease-out) 0.25s,
+      opacity 0.3s var(--ease-out) 0.25s;
+  }
+
+  .sheet {
+    position: relative;
+    width: calc(64 * var(--pt));
+    height: calc(80 * var(--pt));
+    border-radius: calc(6 * var(--pt)) calc(16 * var(--pt)) calc(6 * var(--pt)) calc(6 * var(--pt));
+    background: #fff;
+    box-shadow:
+      0 0 0 calc(0.6 * var(--pt)) rgb(15 26 20 / 0.14),
+      0 calc(14 * var(--pt)) calc(24 * var(--pt)) rgb(15 26 20 / 0.3);
+  }
+
+  .sheet i {
+    position: absolute;
+    left: calc(7 * var(--pt));
+    right: calc(7 * var(--pt));
+    bottom: calc(8 * var(--pt));
+    padding: calc(2 * var(--pt)) 0;
+    border-radius: calc(4 * var(--pt));
+    background: var(--sage-deep);
+    color: #fff;
+    font: 700 calc(11 * var(--pt)) / 1.2 var(--font-sans);
+    font-style: normal;
+    text-align: center;
+  }
+
+  .dragged b {
+    position: absolute;
+    right: calc(-9 * var(--pt));
+    top: calc(56 * var(--pt));
+    display: grid;
+    place-items: center;
+    width: calc(24 * var(--pt));
+    height: calc(24 * var(--pt));
+    border-radius: 50%;
+    background: #30d158;
+    color: #fff;
+    font: 700 calc(18 * var(--pt)) / 1 var(--font-sans);
+    box-shadow: 0 0 0 calc(2 * var(--pt)) #fff;
+  }
+
+  .label {
+    padding: calc(2 * var(--pt)) calc(7 * var(--pt));
+    border-radius: calc(5 * var(--pt));
+    background: #3478f6;
+    color: #fff;
+    font: 500 calc(12 * var(--pt)) / 1.3 var(--font-sans);
+    white-space: nowrap;
+  }
+
+  :global([data-scene="1"]) .dragged {
+    translate: calc(-50% + 190 * var(--pt)) calc(-50% + 40 * var(--pt));
+    opacity: 1;
+  }
+</style>

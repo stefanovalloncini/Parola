@@ -20,12 +20,48 @@ for (const width of widths) {
   test(`home has no horizontal overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow).toBeLessThanOrEqual(0);
+    const worst = await page.evaluate(async () => {
+      let max = 0;
+      const step = window.innerHeight * 0.8;
+      for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
+        window.scrollTo(0, y);
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        max = Math.max(
+          max,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+      }
+      return max;
+    });
+    expect(worst).toBeLessThanOrEqual(0);
   });
 }
+
+test("the header keeps its blur in the production build", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await expect(page.locator("[data-header]")).toHaveAttribute("data-scrolled", "");
+  const filter = await page
+    .locator("[data-header]")
+    .evaluate((header) => getComputedStyle(header).backdropFilter);
+  expect(filter).not.toBe("none");
+});
+
+test("the header only turns dark over the dark band", async ({ page }) => {
+  await page.goto("/");
+  for (const y of [0, 900, 1500, 2200]) {
+    await page.evaluate((top) => window.scrollTo(0, top), y);
+    await page.waitForTimeout(120);
+    await expect(page.locator("[data-header]")).not.toHaveAttribute("data-over-dark", "");
+  }
+  await page
+    .locator('[data-theme="dark"]')
+    .first()
+    .evaluate((band) => {
+      window.scrollTo(0, band.getBoundingClientRect().top + window.scrollY + 200);
+    });
+  await expect(page.locator("[data-header]")).toHaveAttribute("data-over-dark", "");
+});
 
 test("the page loads nothing from other servers", async ({ page, baseURL }) => {
   const foreign: string[] = [];

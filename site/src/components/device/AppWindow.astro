@@ -8,7 +8,7 @@ interface Props {
 const { title, tone = "light", class: className } = Astro.props;
 ---
 
-<div class:list={["app-window", tone, className]}>
+<div class:list={["app-window", className]} data-tone={tone}>
   <div class="titlebar">
     <span class="lights" aria-hidden="true">
       <i></i>
@@ -37,7 +37,7 @@ const { title, tone = "light", class: className } = Astro.props;
       0 calc(10 * var(--pt)) calc(40 * var(--pt)) rgb(0 0 0 / 0.3);
   }
 
-  .app-window.dark {
+  .app-window[data-tone="dark"] {
     background: #202222;
     color: #eceeed;
     box-shadow:

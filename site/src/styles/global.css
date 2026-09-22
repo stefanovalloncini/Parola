@@ -114,7 +114,7 @@ button {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: clamp(40px, 5.2vw + 8px, 68px);
-  line-height: 0.92;
+  line-height: 0.87;
   letter-spacing: -0.032em;
   color: var(--ink);
   text-wrap: balance;
@@ -168,13 +168,13 @@ button {
 }
 
 .mark {
+  display: inline-block;
+  line-height: 1;
+  padding: 0.04em 0.1em;
+  margin: -0.105em -0.03em;
+  border-radius: 0.16em;
   color: var(--sage-deep);
   background: linear-gradient(var(--sage-tint), var(--sage-tint)) no-repeat left / 100% 100%;
-  border-radius: 0.14em;
-  padding: 0 0.1em;
-  margin: 0 -0.04em;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
 }
 
 .section {
@@ -191,7 +191,7 @@ button {
   margin: 20px auto 0;
 }
 
-.dark {
+[data-theme="dark"] {
   --ink: var(--cream);
   --ink-body: rgb(252 242 230 / 0.86);
   --muted: rgb(252 242 230 / 0.6);
