@@ -613,6 +613,27 @@ public actor LibraryStore {
         }
     }
 
+    /// Changes the entry's transcript in place and returns what it holds afterwards. The transform
+    /// runs between the read and the write with nothing suspended in between, so an edit that lands
+    /// alongside it is not reverted; a transform that changes nothing writes nothing.
+    @discardableResult
+    public func mutateTranscript(
+        for id: LibraryEntry.ID,
+        reindex: Bool = true,
+        _ transform: @Sendable (inout Transcript) -> Void
+    ) async throws -> Transcript {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        let stored = try Self.readCleanedDocument(at: bundleURL).transcript
+        var transcript = stored
+        transform(&transcript)
+        guard transcript != stored else { return stored }
+        try await updateTranscript(transcript, for: id, reindex: reindex)
+        return transcript
+    }
+
     /// Re-stamps the engine and language on an entry the user transcribed again. `updateTranscript`
     /// leaves them alone, so without this the rows keep naming the model of the run that was replaced.
     public func setTranscriptionDetails(modelName: String, language: String, for id: LibraryEntry.ID) throws {
@@ -672,10 +693,7 @@ public actor LibraryStore {
     /// Replaces the entry's translation, or clears it when `translation` is nil. Translations are
     /// not searchable, so this write skips the index.
     public func setTranslation(_ translation: TranscriptTranslation?, for id: LibraryEntry.ID) async throws {
-        var transcript = try await load(id).document.transcript
-        guard transcript.translation != translation else { return }
-        transcript.translation = translation
-        try await updateTranscript(transcript, for: id, reindex: false)
+        try await mutateTranscript(for: id, reindex: false) { $0.translation = translation }
     }
 
     /// Writes the on-device title and summary shown on the entry's card, then re-indexes so both are searchable.

@@ -66,6 +66,71 @@ struct LibraryStoreTests {
         #expect(try await store.load(entry.id).document.transcript.translation == nil)
     }
 
+    @Test("a translation does not revert a transcript edit it never read")
+    func setTranslationKeepsAnEditItNeverSaw() async throws {
+        let (store, tmp) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        _ = try await store.load(entry.id)
+
+        // What another writer's finished write looks like to a reader holding an older copy.
+        var edited = makeTranscript()
+        edited.segments[0].text = "edited elsewhere"
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(edited).write(
+            to: tmp.appendingPathComponent("\(entry.id).parola", isDirectory: true)
+                .appendingPathComponent("transcript.json"),
+            options: .atomic
+        )
+
+        try await store.setTranslation(
+            TranscriptTranslation(
+                targetLanguage: "it",
+                segments: [0: "ciao"],
+                createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+                provider: "mock"
+            ),
+            for: entry.id
+        )
+
+        let after = try await store.load(entry.id).document.transcript
+        #expect(after.segments.first?.text == "edited elsewhere")
+        #expect(after.translation?.targetLanguage == "it")
+    }
+
+    @Test("two transcript changes in flight at once both land")
+    func concurrentTranscriptMutationsBothLand() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let translation = TranscriptTranslation(
+            targetLanguage: "it",
+            segments: [0: "ciao"],
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            provider: "mock"
+        )
+
+        async let first = store.mutateTranscript(for: entry.id, reindex: false) { $0.translation = translation }
+        async let second = store.mutateTranscript(for: entry.id, reindex: false) {
+            $0.chatHistory = [ChatMessage(role: .user, text: "who spoke first?")]
+        }
+        _ = try await [first, second]
+
+        let after = try await store.load(entry.id).document.transcript
+        #expect(after.translation == translation)
+        #expect(after.chatHistory?.map(\.text) == ["who spoke first?"])
+    }
+
+    @Test("a transcript change that changes nothing is not written")
+    func unchangedTranscriptIsNotWritten() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let before = try await store.load(entry.id).entry.updatedAt
+
+        try await store.mutateTranscript(for: entry.id) { _ in }
+
+        #expect(try await store.load(entry.id).entry.updatedAt == before)
+    }
+
     @Test("a translation is never searchable")
     func translationIsNotIndexed() async throws {
         let (store, _) = try makeTempLibrary()

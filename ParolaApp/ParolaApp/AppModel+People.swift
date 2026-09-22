@@ -288,9 +288,9 @@ extension AppModel {
             }
             if !renames.isEmpty {
                 do {
-                    var stored = try await library.load(entry.id).document.transcript
-                    for name in renames { stored = stored.renamingSpeaker(name, to: newName) }
-                    try await library.updateTranscript(stored, for: entry.id)
+                    try await library.mutateTranscript(for: entry.id) { stored in
+                        for name in renames { stored = stored.renamingSpeaker(name, to: newName) }
+                    }
                 } catch {
                     ParolaLog.error(.library, "person rename not written", Self.entryFields(entry.id, error))
                     continue
