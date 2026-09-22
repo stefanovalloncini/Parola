@@ -217,11 +217,13 @@ struct ThemePaletteTests {
         #expect(terracottaLight.contrast(against: foreground) >= 3.0)
     }
 
-    /// Same floor for the preset almost everyone reads: Slate's light fill takes white at 4.87 today.
-    @Test("the default accent keeps a white foreground on its light fill, above the UI-component floor")
+    /// Same floor for the preset almost everyone reads, on what a chosen row really draws: the accent at
+    /// `selectionProminentTint` over the page, which is 3.64 today against the flat fill's 4.87.
+    @Test("the default accent keeps a white foreground on the fill a chosen row draws, above the UI-component floor")
     func defaultPresetKeepsWhiteForeground() throws {
-        guard case .dynamic(let defaultLight, _) = ThemePreset.defaultPreset.accent else {
-            Issue.record("the default preset's accent is expected to be a dynamic color")
+        guard case .dynamic(let defaultLight, _) = ThemePreset.defaultPreset.accent,
+              case .dynamic(let behind, _) = ThemePalette.sharedNeutrals.surface else {
+            Issue.record("the default accent and the page behind it are expected to be dynamic colors")
             return
         }
         let light = try #require(NSAppearance(named: .aqua))
@@ -229,8 +231,9 @@ struct ThemePaletteTests {
         light.performAsCurrentDrawingAppearance {
             foreground = RGBA(ThemePreset.defaultPreset.accent.legibleForeground)
         }
+        let drawn = behind.blended(toward: defaultLight, amount: DS.Color.selectionProminentTint)
         #expect(foreground.hex == RGBA(1, 1, 1).hex)
-        #expect(defaultLight.contrast(against: foreground) >= 3.0)
+        #expect(drawn.contrast(against: foreground) >= 3.0, "drawn: \(drawn.contrast(against: foreground))")
     }
 
     @Test("a palette round-trips through Codable")
