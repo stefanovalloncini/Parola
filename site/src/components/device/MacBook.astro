@@ -93,6 +93,13 @@ const { class: className } = Astro.props;
     z-index: -1;
   }
 
+  @media (max-width: 1000px) {
+    .base {
+      width: 106%;
+      margin-left: -3%;
+    }
+  }
+
   .scoop {
     position: absolute;
     top: 0;
