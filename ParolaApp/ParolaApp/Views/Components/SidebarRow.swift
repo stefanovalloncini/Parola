@@ -115,6 +115,11 @@ struct SidebarRowLabel: View {
 
     static let badgeSide: CGFloat = 20
 
+    /// The solid accent a chosen sidebar row wears; its labels name their own onAccent tiers, so it carries no foreground.
+    static var selectionStyle: RowSelectionStyle {
+        .prominent(fill: DS.Color.accent.opacity(0.85))
+    }
+
     @State private var isHovering = false
 
     var body: some View {
@@ -126,7 +131,7 @@ struct SidebarRowLabel: View {
                     .frame(width: Self.badgeSide, height: Self.badgeSide)
                     .background(
                         RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                            .fill(isSelected ? DS.Color.onAccent.opacity(0.18) : iconTint.opacity(0.18))
+                            .fill(isSelected ? DS.Color.onAccentWash : iconTint.opacity(0.18))
                     )
             } else {
                 icon
@@ -141,13 +146,13 @@ struct SidebarRowLabel: View {
             if let badge {
                 Text("\(badge)")
                     .font(DS.Font.caption)
-                    .foregroundStyle(isSelected ? DS.Color.onAccent.opacity(0.9) : .secondary)
+                    .foregroundStyle(isSelected ? DS.Color.onAccentSecondary : .secondary)
                     .padding(.horizontal, DS.Spacing.snug)
                     .padding(.vertical, 1)
                     .background(
                         Capsule().fill(
                             isSelected
-                                ? DS.Color.onAccent.opacity(0.18)
+                                ? DS.Color.onAccentWash
                                 : Color.primary.opacity(0.10)
                         )
                     )
@@ -161,11 +166,7 @@ struct SidebarRowLabel: View {
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .strokeBorder(borderColor, lineWidth: 1)
         )
-        .rowChrome(
-            selected: isSelected,
-            hovered: isHovering,
-            selection: .prominent(fill: DS.Color.accent.opacity(0.85))
-        )
+        .rowChrome(selected: isSelected, hovered: isHovering, selection: Self.selectionStyle)
         .onHover { isHovering = $0 }
     }
 

@@ -84,7 +84,7 @@ struct EntryBadge: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-            .fill(onAccent ? DS.Color.onAccent.opacity(0.18) : kind.tint.opacity(0.14))
+            .fill(onAccent ? DS.Color.onAccentWash : kind.tint.opacity(0.14))
             .frame(width: side, height: side)
             .overlay {
                 Image(systemName: kind.symbol)
@@ -294,7 +294,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             .padding(.horizontal, DS.Spacing.snug)
             .background(
                 Capsule(style: .continuous)
-                    .fill(onAccent ? DS.Color.onAccent.opacity(0.18) : DS.Color.surfaceElevated)
+                    .fill(onAccent ? DS.Color.onAccentWash : DS.Color.surfaceElevated)
             )
             .overlay(
                 Capsule(style: .continuous)

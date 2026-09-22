@@ -155,6 +155,12 @@ enum DS {
         /// accents (Amber, Mint, custom), white on dark ones. Resolves per appearance.
         static var onAccent: SwiftUI.Color { DS.resolved.onAccent }
 
+        /// The second text tier on an accent fill: `onAccent`, softened just enough to rank below it.
+        static var onAccentSecondary: SwiftUI.Color { DS.resolved.onAccent.opacity(0.9) }
+
+        /// The backing a badge, tile or glyph keeps when it sits on an accent fill.
+        static var onAccentWash: SwiftUI.Color { DS.resolved.onAccent.opacity(0.18) }
+
         /// The accent as small text on a surface, darkened or lightened until it clears AA.
         static var accentText: SwiftUI.Color { DS.resolved.accentText }
 

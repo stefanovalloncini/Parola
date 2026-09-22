@@ -50,7 +50,7 @@ struct SearchResultRow: View {
                     isSelected: isSelected,
                     size: .compact,
                     style: .subtle,
-                    selectedFill: DS.Color.onAccent.opacity(0.18),
+                    selectedFill: DS.Color.onAccentWash,
                     border: isSelected ? DS.Color.onAccent.opacity(0.35) : DS.Color.accent.opacity(0.25)
                 )
         }
