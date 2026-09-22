@@ -149,11 +149,7 @@ private struct FindIconButton: View {
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(disabled ? Color.secondary.opacity(0.4) : Color.primary.opacity(0.85))
                 .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(hovered && !disabled ? DS.Color.surfaceElevated : Color.clear)
-                )
-                .contentShape(Rectangle())
+                .rowChrome(selected: false, hovered: hovered && !disabled, selection: .native)
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -176,20 +172,14 @@ private struct FindToggleButton: View {
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.85))
                 .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(background)
+                .rowChrome(
+                    selected: isOn,
+                    hovered: hovered,
+                    selection: .prominent(fill: DS.Color.accent)
                 )
-                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
         .help(help)
-    }
-
-    private var background: Color {
-        if isOn { return DS.Color.accent }
-        if hovered { return DS.Color.surfaceElevated }
-        return .clear
     }
 }

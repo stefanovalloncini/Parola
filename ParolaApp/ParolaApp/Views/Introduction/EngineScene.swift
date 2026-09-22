@@ -76,8 +76,6 @@ private struct EngineCard: View {
     let downloadProgress: Double?
     let choose: () -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         Button(action: choose) {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -89,17 +87,19 @@ private struct EngineCard: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(DS.Spacing.medium)
-            .background {
-                shape.fill(DS.Color.surfaceElevated)
-                shape.fill(isSelected ? DS.Color.accent.opacity(EngineScene.selectedTintOpacity) : .clear)
-            }
             .overlay(
                 shape.strokeBorder(
                     isSelected ? DS.Color.accent : DS.Color.separator,
                     lineWidth: isSelected ? 2 : 0.5
                 )
             )
-            .contentShape(shape)
+            .rowChrome(
+                selected: isSelected,
+                hovered: false,
+                radius: DS.Radius.regular,
+                selection: .wash(fill: DS.Color.accent.opacity(EngineScene.selectedTintOpacity))
+            )
+            .background(shape.fill(DS.Color.surfaceElevated))
         }
         .buttonStyle(.plain)
         .focusable()
@@ -107,7 +107,6 @@ private struct EngineCard: View {
             choose()
             return .handled
         }
-        .animation(reduceMotion ? nil : DS.Motion.rowState, value: isSelected)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .axLeaf("Introduction.Button.Engine.\(variant.id)")
     }
