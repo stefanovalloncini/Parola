@@ -79,8 +79,16 @@ private struct EntryViewerSegmentRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            speakerLine
-            contentRow
+            if let speaker = labelledSpeaker {
+                speakerLine(speaker: speaker)
+                contentRow
+            } else {
+                // Matches SegmentCard: with no chip to carry, the meta cluster rides the text's first line.
+                HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
+                    contentRow
+                    metaCluster
+                }
+            }
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.regular)
@@ -99,14 +107,23 @@ private struct EntryViewerSegmentRow: View {
         .simultaneousGesture(TapGesture().onEnded { onSeek() })
     }
 
-    private var speakerLine: some View {
+    private var labelledSpeaker: (raw: String, label: String)? {
+        guard let raw = segment.speaker, let label = SegmentCard.speakerLabel(for: raw) else { return nil }
+        return (raw, label)
+    }
+
+    private func speakerLine(speaker: (raw: String, label: String)) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
-            if let raw = segment.speaker, let label = SegmentCard.speakerLabel(for: raw) {
-                Text(verbatim: label)
-                    .font(DS.Font.bodyStrong)
-                    .foregroundStyle(DS.speakerColor(for: raw, colorIndex: speakerColorIndex))
-            }
+            Text(verbatim: speaker.label)
+                .font(DS.Font.bodyStrong)
+                .foregroundStyle(DS.speakerColor(for: speaker.raw, colorIndex: speakerColorIndex))
             Spacer(minLength: DS.Spacing.small)
+            metaCluster
+        }
+    }
+
+    private var metaCluster: some View {
+        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
             if isFavorite {
                 Image(systemName: "star.fill")
                     .font(DS.Font.caption)
@@ -118,6 +135,7 @@ private struct EntryViewerSegmentRow: View {
                 .font(monospacedTimestamps ? DS.Font.mono : DS.Font.secondary)
                 .foregroundStyle(isCurrent ? DS.Color.highlight : DS.Color.secondaryText)
         }
+        .fixedSize()
     }
 
     @ViewBuilder
