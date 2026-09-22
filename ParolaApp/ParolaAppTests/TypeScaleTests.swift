@@ -61,6 +61,8 @@ struct TypeScaleTests {
     func readingTierIsSerif() {
         #expect(measured(DS.Font.transcript) == measured(.system(size: 17, design: .serif)))
         #expect(measured(DS.Font.transcript) != measured(.system(size: 17)))
+        #expect(measured(DS.Font.transcriptEmphasis) == measured(.system(size: 17, weight: .semibold, design: .serif)))
+        #expect(measured(DS.Font.transcriptEmphasis) != measured(.system(size: 17, weight: .semibold)))
         #expect(measured(DS.Font.transcriptCompact) == measured(.system(size: 15, design: .serif)))
         #expect(measured(DS.Font.transcriptCompact) != measured(.system(size: 15)))
         #expect(measured(DS.Font.body) == measured(.system(size: 13)))
@@ -71,6 +73,12 @@ struct TypeScaleTests {
         #expect(measured(DS.Font.timer) == measured(.system(size: 22, weight: .light, design: .rounded).monospacedDigit()))
         #expect(measured(DS.Font.timer) != measured(.system(size: 22, weight: .light, design: .monospaced).monospacedDigit()))
         #expect(measured(DS.Font.timer, text: "00:00") == measured(DS.Font.timer, text: "11:11"))
+    }
+
+    @Test("the compact reading tier is the tighter of the two leadings")
+    func compactLeadingIsTighter() {
+        #expect(DS.Spacing.transcriptLeadingCompact < DS.Spacing.transcriptLeading)
+        #expect(DS.Spacing.transcriptLeadingCompact > 0)
     }
 
     @Test("a section caption is the caption tier, not a one-off")
