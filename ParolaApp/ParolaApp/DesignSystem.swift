@@ -162,7 +162,10 @@ enum DS {
         static var accentWash: SwiftUI.Color { DS.resolved.accentWash }
 
         /// What a selected content row or card carries, where a solid accent would swallow its text.
-        static var selectionWash: SwiftUI.Color { DS.resolved.accent.opacity(0.12) }
+        static var selectionWash: SwiftUI.Color { DS.resolved.accent.opacity(selectionWashTint) }
+
+        /// The wash's strength on its own, for the contrast tests that blend it themselves.
+        static let selectionWashTint = 0.12
 
         /// `danger` / `success` as small text, adjusted until they clear AA on the card fill.
         static var dangerText: SwiftUI.Color { DS.resolved.dangerText }

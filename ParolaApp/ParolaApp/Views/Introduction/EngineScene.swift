@@ -5,9 +5,6 @@ import ParolaCore
 struct EngineScene: View {
     @Environment(AppModel.self) private var model
 
-    /// How much accent the chosen card's fill carries; `SurfaceContrastTests` pins the detail line's contrast on it.
-    nonisolated static let selectedTintOpacity = 0.10
-
     /// The chip follows the rule that picked the card.
     nonisolated static func isRecommended(_ variant: ModelVariant) -> Bool {
         IntroductionEngineChoices.isRecommended(variant)
@@ -98,7 +95,7 @@ private struct EngineCard: View {
                 selected: isSelected,
                 hovered: false,
                 radius: DS.Radius.regular,
-                selection: .wash(fill: DS.Color.accent.opacity(EngineScene.selectedTintOpacity))
+                selection: .wash(fill: DS.Color.selectionWash)
             )
             // Outside the chrome, not inside it: an inner background would sit on top of the selection wash.
             .background(shape.fill(DS.Color.surfaceElevated))

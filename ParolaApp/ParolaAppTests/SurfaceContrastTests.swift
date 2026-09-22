@@ -105,13 +105,13 @@ struct SurfaceContrastTests {
         }
     }
 
-    /// The introduction's chosen engine card tints `surfaceElevated` with the accent and sets its detail line on that tint.
+    /// The introduction's chosen engine card tints `surfaceElevated` with the selection wash and sets its detail line on that tint.
     @Test("the chosen engine card's detail clears AA on its accent tint", arguments: ThemePreset.allCases)
     func selectedEngineCardDetailContrast(preset: ThemePreset) throws {
         let palette = preset.palette
         let accent = try #require(Self.pair(palette.accent))
         let card = try #require(Self.pair(palette.surfaceElevated))
-        let amount = EngineScene.selectedTintOpacity
+        let amount = DS.Color.selectionWashTint
         let tint = (
             light: card.light.blended(toward: accent.light, amount: amount),
             dark: card.dark.blended(toward: accent.dark, amount: amount)
