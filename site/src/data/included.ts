@@ -82,15 +82,15 @@ const italian: IncludedGroup[] = [
       "File audio e video, uno alla volta o un'intera cartella",
       "Link da YouTube, Vimeo, SoundCloud e altri siti",
       "Una coda batch e cartelle monitorate",
-      "Nomi di chi parla e tempi delle parole",
-      "Traduzione, affiancata al testo",
+      "Nomi di chi parla e timestamp di ogni parola",
+      "Traduzione affiancata al testo",
     ],
   },
   {
     title: "Registrazione",
     icon: "speaker",
     items: [
-      "Il microfono o qualsiasi suono del Mac",
+      "Il microfono o qualsiasi audio riprodotto dal Mac",
       "Un invito a registrare quando apri Zoom, Teams o Webex",
       "Sottotitoli in tempo reale in un pannello sempre in primo piano",
     ],
@@ -127,7 +127,7 @@ const italian: IncludedGroup[] = [
     icon: "terminal",
     items: [
       "Azioni per Comandi Rapidi e lo schema URL parola://",
-      "Lo strumento da riga di comando parola",
+      "Lo strumento a riga di comando parola",
       "Un server MCP per Claude e altri LLM",
     ],
   },
@@ -136,7 +136,7 @@ const italian: IncludedGroup[] = [
     icon: "search",
     items: [
       "Ricerca in tutte le trascrizioni",
-      "Righe preferite, elementi fissati ed etichette",
+      "Righe preferite, trascrizioni fissate in alto ed etichette",
       "Eliminati di recente conserva le trascrizioni per 30 giorni",
     ],
   },

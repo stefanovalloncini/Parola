@@ -68,12 +68,12 @@ export const credits: Record<"en" | "it", Credit[]> = {
     {
       before: "Distingue",
       mark: "le voci",
-      after: " di un file registrato, così ogni riga ha il suo autore.",
+      after: " di un file registrato, così ogni riga indica chi parla.",
       name: "SpeakerKit, di Argmax",
       href: whisperKit,
     },
     {
-      before: "Esegue Parakeet di NVIDIA e le etichette dei parlanti in diretta sul",
+      before: "Esegue Parakeet di NVIDIA e distingue chi parla in diretta sul",
       mark: "Neural Engine",
       after: ".",
       name: "FluidAudio",
@@ -92,7 +92,7 @@ export const credits: Record<"en" | "it", Credit[]> = {
       name: "Apple Intelligence",
     },
     {
-      before: "Scarica l'audio che sta dietro",
+      before: "Scarica l'audio di",
       mark: "un link",
       after: " che incolli, da YouTube e da molti altri siti.",
       name: "yt-dlp",
@@ -101,7 +101,7 @@ export const credits: Record<"en" | "it", Credit[]> = {
     {
       before: "Traduce una trascrizione finita",
       mark: "sul dispositivo",
-      after: ", nelle lingue che il tuo Mac mette a disposizione.",
+      after: ", nelle lingue disponibili sul tuo Mac.",
       name: "Framework Translation, di Apple",
     },
   ],
@@ -119,7 +119,7 @@ export const openWork = {
   it: {
     title: "Costruito sull'open source.",
     lead: "Tutto quello che c'è sotto Parola è open source o fa parte di macOS.",
-    sourceBefore: "Anche Parola ha licenza MIT.",
+    sourceBefore: "Parola ha licenza MIT.",
     sourceMark: "Leggi ogni riga",
     sourceAfter: ", cambia quello che vuoi.",
     button: "Vedi il codice su GitHub",

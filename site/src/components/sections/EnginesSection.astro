@@ -24,7 +24,7 @@ const tabs: ShotTab[] = [
   },
   {
     id: "timing",
-    label: t({ en: "Word timing", it: "Tempi delle parole" }),
+    label: t({ en: "Word timing", it: "Timestamp" }),
     shot: "dark-karaoke",
     alt: t({
       en: "A transcript playing back in dark mode, with the word being spoken highlighted.",
@@ -74,7 +74,7 @@ const rows: FeatureRow[] = t({
     {
       icon: "bolt",
       title: "Parakeet",
-      text: "Il modello di NVIDIA, tramite FluidAudio. È l'opzione multilingue più veloce su Apple Silicon.",
+      text: "Il modello di NVIDIA, eseguito tramite FluidAudio. È l'opzione multilingue più veloce su Apple Silicon.",
     },
   ],
 });
@@ -106,18 +106,18 @@ const copy = t({
   },
   it: {
     title: ["Chi ha detto cosa,", "e quando."],
-    lead: "I nomi di chi parla e i tempi delle parole vengono da modelli che girano sul tuo Mac.",
+    lead: "I nomi di chi parla e i timestamp di ogni parola vengono da modelli che girano sul tuo Mac.",
     engines: "Tre motori. Scegli quello che fa per te.",
     enginesLead:
-      "Apple Speech funziona appena apri Parola. Whisper e Parakeet si scaricano una volta sola, poi lavorano offline.",
+      "Apple Speech funziona appena apri Parola. Whisper e Parakeet si scaricano una volta sola, poi funzionano offline.",
     tabs: "Viste della trascrizione",
     speakers: {
       title: "Un nome per ogni voce",
-      text: "Attiva Diarizza e ogni riga ha il suo autore. Dai un nome alle persone: nome e colore le seguono in ogni trascrizione a cui le aggiungi.",
+      text: "Attiva Diarizza e ogni riga indica chi parla. Dai un nome alle persone: nome e colore le seguono in ogni trascrizione a cui le aggiungi.",
     },
     words: {
       title: "Parola per parola",
-      text: "La parola pronunciata si illumina mentre ascolti. Fai clic su una riga per saltare lì.",
+      text: "La parola pronunciata si illumina mentre ascolti. Fai clic su una riga per saltare a quel punto.",
     },
     formats: {
       title: "Tredici formati",

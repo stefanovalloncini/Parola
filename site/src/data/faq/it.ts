@@ -29,7 +29,7 @@ export const italian: Question[] = [
     answer: [
       {
         text: [
-          "No. La trascrizione avviene sul tuo Mac. Parola va online solo per scaricare un modello, recuperare un link che incolli o raggiungere un servizio AI che aggiungi tu. Un servizio AI riceve il testo, mai l'audio, e Parola chiede conferma la prima volta.",
+          "No. La trascrizione avviene sul tuo Mac. Parola va online solo per scaricare un modello, recuperare l'audio di un link che incolli o collegarsi a un servizio AI che aggiungi tu. Un servizio AI riceve il testo, mai l'audio, e Parola chiede conferma la prima volta.",
         ],
       },
     ],
@@ -39,7 +39,7 @@ export const italian: Question[] = [
     answer: [
       {
         text: [
-          "Sì. Quando un modello è sul tuo Mac, la trascrizione non ha bisogno della rete. Apple Speech non richiede alcun download da Parola, anche se macOS può scaricare i file della lingua.",
+          "Sì. Una volta che un modello è sul tuo Mac, la trascrizione non ha bisogno della rete. Apple Speech non richiede alcun download da Parola, anche se macOS può scaricare i file delle lingue.",
         ],
       },
     ],
@@ -103,7 +103,7 @@ export const italian: Question[] = [
     answer: [
       {
         text: [
-          "Sì. Parola include un server MCP. Aggiungilo a Claude Code e chiedi quello che ti serve a parole:",
+          "Sì. Parola include un server MCP. Aggiungilo a Claude Code e chiedi quello che ti serve con parole tue:",
         ],
       },
       { code: `claude mcp add parola -- ${cli} mcp` },
@@ -123,7 +123,7 @@ export const italian: Question[] = [
       { code: `${cli} diagnostics` },
       {
         text: [
-          "Il rapporto non contiene il testo delle trascrizioni, nomi di file o percorsi, quindi puoi leggerlo prima di allegarlo a una ",
+          "Il rapporto non contiene il testo delle trascrizioni, nomi di file o percorsi, e puoi leggerlo prima di allegarlo a una ",
           { href: links.issues, label: "segnalazione su GitHub" },
           ".",
         ],
