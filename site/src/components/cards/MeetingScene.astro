@@ -40,7 +40,7 @@ const steps = [
   <div class="dock">
     <IconTile mark="zoom" size="calc(34 * var(--u))" class="running" />
     <IconTile mark="webex" size="calc(34 * var(--u))" />
-    <span class="parola">
+    <span class="parola running">
       <BrandIcon size={34} />
       <b class="badge"></b>
     </span>
@@ -73,6 +73,7 @@ const steps = [
   .parola :global(svg) {
     width: calc(34 * var(--u));
     height: calc(34 * var(--u));
+    filter: drop-shadow(0 1px 2px rgb(15 26 20 / 0.14)) drop-shadow(0 2px 6px rgb(15 26 20 / 0.2));
   }
 
   .parola {
