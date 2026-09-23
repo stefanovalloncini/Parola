@@ -1,42 +1,49 @@
 ---
+import type { GlyphName, Hue } from "../../data/icons";
 import { translator } from "../../i18n";
-import Icon, { type IconName } from "../Icon.astro";
+import IconTile from "../IconTile.astro";
 import Lines from "../Lines.astro";
 import OfflineScene from "../cards/OfflineScene.astro";
 
 const t = translator(Astro.currentLocale);
 
-const points: { icon: IconName; title: string; text: string }[] = t({
+const points: { glyph: GlyphName; hue: Hue; title: string; text: string }[] = t({
   en: [
     {
-      icon: "folder",
+      glyph: "folder-lock",
+      hue: "sage",
       title: "Nothing uploaded",
       text: "Your recordings and transcripts stay in your library on this Mac.",
     },
     {
-      icon: "offline",
+      glyph: "wifi-slash",
+      hue: "slate",
       title: "Works offline",
       text: "Once a model is downloaded, transcription needs no connection.",
     },
     {
-      icon: "person",
+      glyph: "eye-slash",
+      hue: "clay",
       title: "No account",
       text: "Parola has no sign-in and sends no analytics. An AI service you add gets the text, never the audio.",
     },
   ],
   it: [
     {
-      icon: "folder",
+      glyph: "folder-lock",
+      hue: "sage",
       title: "Nessun caricamento",
       text: "Registrazioni e trascrizioni restano nella libreria, su questo Mac.",
     },
     {
-      icon: "offline",
+      glyph: "wifi-slash",
+      hue: "slate",
       title: "Funziona offline",
       text: "Una volta scaricato un modello, la trascrizione non ha bisogno della rete.",
     },
     {
-      icon: "person",
+      glyph: "eye-slash",
+      hue: "clay",
       title: "Nessun account",
       text: "Parola non chiede di accedere e non invia statistiche. Un servizio AI che aggiungi riceve il testo, mai l’audio.",
     },
@@ -47,9 +54,7 @@ const points: { icon: IconName; title: string; text: string }[] = t({
 <section class="privacy section" id="privacy" aria-labelledby="privacy-title">
   <div class="container">
     <div class="section-head">
-      <span class="lock">
-        <Icon name="lock" size={34} />
-      </span>
+      <IconTile glyph="lock" hue="sage" size="64px" class="lock" />
       <h2 id="privacy-title" class="t-section" data-words>
         <Lines
           lines={t({
@@ -72,7 +77,7 @@ const points: { icon: IconName; title: string; text: string }[] = t({
       {points.map((point) => (
         <li>
           <h3>
-            <Icon name={point.icon} size={22} />
+            <IconTile glyph={point.glyph} hue={point.hue} size="34px" />
             {point.title}
           </h3>
           <p>{point.text}</p>
@@ -83,15 +88,8 @@ const points: { icon: IconName; title: string; text: string }[] = t({
 </section>
 
 <style>
-  .lock {
-    display: inline-grid;
-    place-items: center;
-    width: 64px;
-    height: 64px;
+  .section-head :global(.lock) {
     margin-bottom: 22px;
-    border-radius: 20px;
-    background: var(--sage-tint);
-    color: var(--sage-deep);
   }
 
   .stage {
@@ -118,8 +116,8 @@ const points: { icon: IconName; title: string; text: string }[] = t({
   h3 {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
+    gap: 12px;
+    margin-bottom: 10px;
     font-family: var(--font-display);
     font-size: 19px;
     font-weight: 650;

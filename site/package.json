@@ -33,6 +33,7 @@
     "@astrojs/check": "^0.9.10",
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
+    "@phosphor-icons/core": "^2.1.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^24.13.6",
     "eslint": "^10.11.0",

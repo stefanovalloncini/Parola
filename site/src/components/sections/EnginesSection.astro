@@ -4,7 +4,7 @@ import FeatureCard from "../cards/FeatureCard.astro";
 import FormatsScene from "../dark/FormatsScene.astro";
 import Karaoke from "../dark/Karaoke.astro";
 import LanguagesScene from "../dark/LanguagesScene.astro";
-import Icon from "../Icon.astro";
+import IconTile from "../IconTile.astro";
 import Lines from "../Lines.astro";
 import ShotTabs, { type ShotTab } from "../ShotTabs.astro";
 
@@ -35,19 +35,22 @@ const tabs: ShotTab[] = [
 const engines = t({
   en: [
     {
-      icon: "wave",
+      glyph: "waveform",
+      hue: "sage",
       title: "Apple Speech",
       chip: "Ready now",
       text: "Built into macOS, so there’s nothing to download.",
     },
     {
-      icon: "bubble",
+      glyph: "globe-simple",
+      hue: "slate",
       title: "Whisper",
       chip: "1.6 GB, once",
       text: "OpenAI’s speech model, compiled for Apple Silicon. Large v3 Turbo is the best balance for most people.",
     },
     {
-      icon: "bolt",
+      glyph: "lightning",
+      hue: "clay",
       title: "Parakeet",
       chip: "Fastest",
       text: "NVIDIA’s model, running through FluidAudio. It covers 25 European languages.",
@@ -55,19 +58,22 @@ const engines = t({
   ],
   it: [
     {
-      icon: "wave",
+      glyph: "waveform",
+      hue: "sage",
       title: "Apple Speech",
       chip: "Pronto subito",
       text: "Integrato in macOS, quindi non c’è niente da scaricare.",
     },
     {
-      icon: "bubble",
+      glyph: "globe-simple",
+      hue: "slate",
       title: "Whisper",
       chip: "1,6 GB, una volta",
       text: "Il modello vocale di OpenAI, compilato per Apple Silicon. Large v3 Turbo è il compromesso migliore per quasi tutti.",
     },
     {
-      icon: "bolt",
+      glyph: "lightning",
+      hue: "clay",
       title: "Parakeet",
       chip: "Il più veloce",
       text: "Il modello di NVIDIA, eseguito tramite FluidAudio. Copre 25 lingue europee.",
@@ -151,7 +157,7 @@ const copy = t({
         <li>
           <span class="chip">{engine.chip}</span>
           <h4 class="t-row">
-            <Icon name={engine.icon} size={26} />
+            <IconTile glyph={engine.glyph} hue={engine.hue} size="36px" />
             {engine.title}
           </h4>
           <p>{engine.text}</p>

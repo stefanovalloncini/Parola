@@ -1,13 +1,23 @@
 ---
+import { hues, type GlyphName, type Hue } from "../../data/icons";
 import { links } from "../../data/links";
 import { translator } from "../../i18n";
 import FeatureCard from "../cards/FeatureCard.astro";
 import McpScene from "../cards/McpScene.astro";
 import TerminalScene from "../cards/TerminalScene.astro";
+import IconTile from "../IconTile.astro";
 import Lines from "../Lines.astro";
 
 const t = translator(Astro.currentLocale);
-const hues = ["#54739e", "#a07b5a", "#a07b5a", "#6b8a6b", "#6b8a6b", "#7b6f95", "#7b6f95"];
+const actions: { glyph: GlyphName; hue: Hue }[] = [
+  { glyph: "file-audio", hue: "slate" },
+  { glyph: "record", hue: "clay" },
+  { glyph: "stop", hue: "clay" },
+  { glyph: "microphone", hue: "sage" },
+  { glyph: "microphone-slash", hue: "sage" },
+  { glyph: "sparkle", hue: "plum" },
+  { glyph: "file-text", hue: "plum" },
+];
 
 const copy = t({
   en: {
@@ -77,8 +87,11 @@ const copy = t({
     <div class="shortcuts">
       <h3 class="t-row">{copy.shortcuts}</h3>
       <ul>
-        {copy.intents.map((intent, i) => (
-          <li style={`--hue: ${hues[i]}`}>{intent}</li>
+        {actions.map((action, i) => (
+          <li style={`--hue: ${hues[action.hue].accent}`}>
+            <IconTile glyph={action.glyph} hue={action.hue} size="22px" />
+            {copy.intents[i]}
+          </li>
         ))}
       </ul>
       <p class="t-lead">
@@ -109,7 +122,10 @@ const copy = t({
   }
 
   .shortcuts li {
-    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 16px 10px 10px;
     border-radius: 999px;
     white-space: nowrap;
     background: color-mix(in srgb, var(--hue) 14%, #fff);

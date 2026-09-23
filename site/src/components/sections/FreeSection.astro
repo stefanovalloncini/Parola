@@ -5,6 +5,7 @@ import { translator } from "../../i18n";
 import BrandIcon from "../BrandIcon.astro";
 import DownloadButtons from "../DownloadButtons.astro";
 import Icon from "../Icon.astro";
+import IconTile from "../IconTile.astro";
 
 const t = translator(Astro.currentLocale);
 const included = t(groups);
@@ -54,14 +55,14 @@ const copy = t({
       {included.map((group) => (
         <div class="group">
           <h3>
-            <Icon name={group.icon} size={22} />
+            <IconTile glyph={group.glyph} hue={group.hue} size="32px" />
             {group.title}
           </h3>
           <ul>
             {group.items.map((item) => (
               <li>
                 <span class="tick">
-                  <Icon name="check" size={13} />
+                  <Icon name="check" size={11} />
                 </span>
                 {item}
               </li>
@@ -216,7 +217,7 @@ const copy = t({
   h3 {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     font-family: var(--font-display);
     font-size: 19px;
     font-weight: 650;
@@ -246,10 +247,6 @@ const copy = t({
     border-radius: 50%;
     background: var(--sage-deep);
     color: #fff;
-  }
-
-  .tick :global(svg) {
-    stroke-width: 2.6;
   }
 
   @media (max-width: 1000px) {

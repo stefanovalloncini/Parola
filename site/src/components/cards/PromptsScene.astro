@@ -1,11 +1,14 @@
 ---
-const prompts = [
-  { name: "Cleanup", hue: "#6b8a6b" },
-  { name: "Action items", hue: "#54739e" },
-  { name: "Highlight key points", hue: "#a07b5a" },
-  { name: "Generate FAQ", hue: "#7b6f95" },
-  { name: "Create a mind map", hue: "#3f6048" },
-  { name: "Translate to Italian", hue: "#b0655c" },
+import { hues, type GlyphName, type Hue } from "../../data/icons";
+import IconTile from "../IconTile.astro";
+
+const prompts: { name: string; glyph: GlyphName; hue: Hue }[] = [
+  { name: "Cleanup", glyph: "broom", hue: "sage" },
+  { name: "Action items", glyph: "list-checks", hue: "slate" },
+  { name: "Highlight key points", glyph: "highlighter", hue: "clay" },
+  { name: "Generate FAQ", glyph: "question", hue: "plum" },
+  { name: "Create a mind map", glyph: "tree-structure", hue: "teal" },
+  { name: "Translate to Italian", glyph: "translate", hue: "rose" },
 ];
 const steps = prompts.map((_, i) => [i * 1300, `p${i}`]);
 ---
@@ -20,8 +23,8 @@ const steps = prompts.map((_, i) => [i * 1300, `p${i}`]);
 >
   <ul>
     {prompts.map((prompt, i) => (
-      <li class={`p${i}`} style={`--hue: ${prompt.hue}`}>
-        <i />
+      <li class={`p${i}`} style={`--hue: ${hues[prompt.hue].accent}`}>
+        <IconTile glyph={prompt.glyph} hue={prompt.hue} size="calc(28 * var(--u))" />
         {prompt.name}
       </li>
     ))}
@@ -63,12 +66,19 @@ const steps = prompts.map((_, i) => [i * 1300, `p${i}`]);
       box-shadow 0.35s var(--ease-out);
   }
 
-  li i {
-    width: calc(20 * var(--u));
-    height: calc(20 * var(--u));
-    border-radius: calc(6 * var(--u));
-    background: var(--hue);
-    opacity: 0.85;
+  li :global(.tile) {
+    transition: color 0.35s var(--ease-out);
+  }
+
+  li :global(.tile)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    corner-shape: inherit;
+    background: #fff;
+    opacity: 0;
+    transition: opacity 0.35s var(--ease-out);
   }
 
   [data-state="p0"] .p0,
@@ -84,12 +94,21 @@ const steps = prompts.map((_, i) => [i * 1300, `p${i}`]);
       color-mix(in srgb, var(--hue) 40%, transparent);
   }
 
-  [data-state="p0"] .p0 i,
-  [data-state="p1"] .p1 i,
-  [data-state="p2"] .p2 i,
-  [data-state="p3"] .p3 i,
-  [data-state="p4"] .p4 i,
-  [data-state="p5"] .p5 i {
-    background: #fff;
+  [data-state="p0"] .p0 :global(.tile),
+  [data-state="p1"] .p1 :global(.tile),
+  [data-state="p2"] .p2 :global(.tile),
+  [data-state="p3"] .p3 :global(.tile),
+  [data-state="p4"] .p4 :global(.tile),
+  [data-state="p5"] .p5 :global(.tile) {
+    color: var(--hue);
+  }
+
+  [data-state="p0"] .p0 :global(.tile)::after,
+  [data-state="p1"] .p1 :global(.tile)::after,
+  [data-state="p2"] .p2 :global(.tile)::after,
+  [data-state="p3"] .p3 :global(.tile)::after,
+  [data-state="p4"] .p4 :global(.tile)::after,
+  [data-state="p5"] .p5 :global(.tile)::after {
+    opacity: 1;
   }
 </style>

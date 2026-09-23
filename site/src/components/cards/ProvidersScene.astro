@@ -34,7 +34,7 @@ const steps = order.map((index, i) => [i * 1300, `s${index}`]);
     {providers.map((provider, i) => (
       <li class={`s${i}`}>
         <span class:list={["tile", { local: provider.local }]}>
-          <Icon name={provider.local ? "chip" : "globe"} size={22} />
+          <Icon name={provider.local ? "cpu" : "globe-simple"} size={22} />
         </span>
         <span class="text">
           <b>{provider.name}</b>
@@ -134,9 +134,8 @@ const steps = order.map((index, i) => [i * 1300, `s${index}`]);
   }
 
   .check :global(svg) {
-    width: calc(15 * var(--u));
-    height: calc(15 * var(--u));
-    stroke-width: 2.4;
+    width: calc(14 * var(--u));
+    height: calc(14 * var(--u));
   }
 
   [data-state="s0"] {

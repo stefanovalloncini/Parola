@@ -1,15 +1,17 @@
-import type { IconName } from "../components/Icon.astro";
+import type { GlyphName, Hue } from "./icons";
 
 export interface IncludedGroup {
   title: string;
-  icon: IconName;
+  glyph: GlyphName;
+  hue: Hue;
   items: string[];
 }
 
 const english: IncludedGroup[] = [
   {
     title: "Transcription",
-    icon: "wave",
+    glyph: "waveform",
+    hue: "sage",
     items: [
       "Audio and video files, one at a time or a whole folder",
       "Links from YouTube, Vimeo, SoundCloud and more",
@@ -20,7 +22,8 @@ const english: IncludedGroup[] = [
   },
   {
     title: "Recording",
-    icon: "speaker",
+    glyph: "microphone",
+    hue: "rose",
     items: [
       "The microphone or anything your Mac plays",
       "A recording prompt when Zoom, Teams or Webex opens",
@@ -30,7 +33,8 @@ const english: IncludedGroup[] = [
   },
   {
     title: "Dictation",
-    icon: "bubble",
+    glyph: "keyboard",
+    hue: "slate",
     items: [
       "Dictation into any app, on a key you choose",
       "Styles for messages, email, notes and code",
@@ -39,7 +43,8 @@ const english: IncludedGroup[] = [
   },
   {
     title: "Export",
-    icon: "stack",
+    glyph: "export",
+    hue: "clay",
     items: [
       "Thirteen formats with a live preview",
       "Captions burned into a copy of the video",
@@ -48,7 +53,8 @@ const english: IncludedGroup[] = [
   },
   {
     title: "AI",
-    icon: "sparkle",
+    glyph: "sparkle",
+    hue: "plum",
     items: [
       "Summaries, chapters and chat",
       "Nineteen prompts, plus your own",
@@ -57,7 +63,8 @@ const english: IncludedGroup[] = [
   },
   {
     title: "Automation",
-    icon: "terminal",
+    glyph: "terminal-window",
+    hue: "graphite",
     items: [
       "Shortcuts actions and a parola:// URL scheme",
       "The parola command-line tool",
@@ -66,7 +73,8 @@ const english: IncludedGroup[] = [
   },
   {
     title: "Library",
-    icon: "search",
+    glyph: "books",
+    hue: "teal",
     items: [
       "Search across every transcript",
       "Edit any line, and fix a name everywhere with find and replace",
@@ -79,7 +87,8 @@ const english: IncludedGroup[] = [
 const italian: IncludedGroup[] = [
   {
     title: "Trascrizione",
-    icon: "wave",
+    glyph: "waveform",
+    hue: "sage",
     items: [
       "File audio e video, uno alla volta o un’intera cartella",
       "Link da YouTube, Vimeo, SoundCloud e altri siti",
@@ -90,7 +99,8 @@ const italian: IncludedGroup[] = [
   },
   {
     title: "Registrazione",
-    icon: "speaker",
+    glyph: "microphone",
+    hue: "rose",
     items: [
       "Il microfono o qualsiasi audio riprodotto dal Mac",
       "Un invito a registrare quando apri Zoom, Teams o Webex",
@@ -100,7 +110,8 @@ const italian: IncludedGroup[] = [
   },
   {
     title: "Dettatura",
-    icon: "bubble",
+    glyph: "keyboard",
+    hue: "slate",
     items: [
       "Dettatura in qualsiasi app, con il tasto che scegli",
       "Stili per messaggi, email, note e codice",
@@ -109,7 +120,8 @@ const italian: IncludedGroup[] = [
   },
   {
     title: "Esportazione",
-    icon: "stack",
+    glyph: "export",
+    hue: "clay",
     items: [
       "Tredici formati con anteprima",
       "Sottotitoli impressi in una copia del video",
@@ -118,7 +130,8 @@ const italian: IncludedGroup[] = [
   },
   {
     title: "AI",
-    icon: "sparkle",
+    glyph: "sparkle",
+    hue: "plum",
     items: [
       "Riassunti, capitoli e chat",
       "Diciannove prompt, più i tuoi",
@@ -127,7 +140,8 @@ const italian: IncludedGroup[] = [
   },
   {
     title: "Automazione",
-    icon: "terminal",
+    glyph: "terminal-window",
+    hue: "graphite",
     items: [
       "Azioni per Comandi Rapidi e lo schema URL parola://",
       "Lo strumento a riga di comando parola",
@@ -136,7 +150,8 @@ const italian: IncludedGroup[] = [
   },
   {
     title: "Libreria",
-    icon: "search",
+    glyph: "books",
+    hue: "teal",
     items: [
       "Ricerca in tutte le trascrizioni",
       "Modifica qualsiasi riga e correggi un nome ovunque con Trova e sostituisci",

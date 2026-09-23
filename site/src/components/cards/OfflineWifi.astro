@@ -1,4 +1,6 @@
 ---
+import Icon from "../Icon.astro";
+
 interface Props {
   label: string;
   network: string;
@@ -10,11 +12,7 @@ const { label, network, off } = Astro.props;
 
 <div class="control">
   <span class="glyph">
-    <svg viewBox="0 0 20 16">
-      <path d="M10 13.6 12.6 11a3.7 3.7 0 0 0-5.2 0L10 13.6Z"></path>
-      <path d="M5.3 9a6.6 6.6 0 0 1 9.4 0l1.5-1.5a8.8 8.8 0 0 0-12.4 0L5.3 9Z"></path>
-      <path d="M2.2 5.9a11 11 0 0 1 15.6 0l1.5-1.5a13.2 13.2 0 0 0-18.6 0l1.5 1.5Z"></path>
-    </svg>
+    <Icon name="wifi-high" />
   </span>
   <span class="label">
     <b>{label}</b>
@@ -54,9 +52,9 @@ const { label, network, off } = Astro.props;
     color: #fff;
     transition: background-color 0.3s;
   }
-  .glyph svg {
-    width: calc(16 * var(--u));
-    fill: currentColor;
+  .glyph :global(svg) {
+    width: calc(18 * var(--u));
+    height: calc(18 * var(--u));
   }
   .label {
     display: grid;
