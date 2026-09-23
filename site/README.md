@@ -22,6 +22,8 @@ the build and the Playwright tests.
   `ParolaApp/ParolaApp/Resources/Introduction/`, so a new recording there shows up here too.
 - `pnpm brand` redraws `public/favicon.svg` and `public/apple-touch-icon.png` from the icon's bar
   geometry in `src/data/brand.ts`.
+- The icons are Phosphor glyphs (MIT) and brand marks from Simple Icons (CC0) and Lobe Icons (MIT);
+  the marks belong to their owners and only name products Parola works with.
 - `pnpm og` renders `public/og.png` and `public/og-it.png` from `/og-card` and `/it/og-card`
   while `pnpm dev` is running.
 
