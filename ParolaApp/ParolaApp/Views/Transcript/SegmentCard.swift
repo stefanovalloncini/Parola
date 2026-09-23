@@ -289,9 +289,13 @@ struct SegmentCard: View {
                 .writingToolsBehavior(.complete)
                 .focused($editingFocus)
                 .onChange(of: editingFocus) { _, focused in
-                    if !focused { commitEdit() }
+                    if !focused { endEditing(.commit) }
                 }
-                .onSubmit { commitEdit() }
+                .onSubmit { endEditing(.commit) }
+                .onKeyPress(.escape) {
+                    endEditing(.cancel)
+                    return .handled
+                }
         } else if model.findIsOpen, !model.findQuery.isEmpty {
             highlightedText
                 .font(DS.Font.transcript)
@@ -516,9 +520,23 @@ struct SegmentCard: View {
         Task { @MainActor in editingFocus = true }
     }
 
-    private func commitEdit() {
-        if draftText != segment.text {
-            model.editSegment(id: segment.id, newText: draftText)
+    /// How an inline edit ends: Return and focus loss keep the draft, Escape throws it away.
+    enum EditEnding {
+        case commit
+        case cancel
+
+        /// The text to write back, or nil when the transcript stays as it is.
+        func textToWrite(draft: String, original: String) -> String? {
+            guard self == .commit, draft != original else { return nil }
+            return draft
+        }
+    }
+
+    /// Runs once per edit: the field losing focus as it leaves after Return or Escape finds the edit already over.
+    private func endEditing(_ ending: EditEnding) {
+        guard isEditing else { return }
+        if let text = ending.textToWrite(draft: draftText, original: segment.text) {
+            model.editSegment(id: segment.id, newText: text)
         }
         isEditing = false
     }
