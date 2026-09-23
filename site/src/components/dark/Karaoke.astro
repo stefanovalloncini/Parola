@@ -36,7 +36,7 @@ const labels = t({
       </span>
     ))}
   </p>
-  <button type="button" class="play" data-play aria-pressed="false">
+  <button type="button" class="play" data-play>
     <svg viewBox="0 0 20 20" aria-hidden="true">
       <path class="glyph-play" d="M7 5.2v9.6L15 10 7 5.2Z"></path>
       <path class="glyph-pause" d="M6.5 5h2.2v10H6.5zM11.3 5h2.2v10h-2.2z"></path>
@@ -90,7 +90,7 @@ const labels = t({
   }
 
   .words span {
-    color: rgb(252 242 230 / 0.32);
+    color: rgb(252 242 230 / 0.5);
     border-radius: calc(4 * var(--u));
     transition:
       color 0.15s,

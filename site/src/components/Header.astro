@@ -77,6 +77,7 @@ const anchor = (id: string) => (onHome ? `#${id}` : `${home}#${id}`);
       color 0.3s var(--ease-out);
   }
 
+  :global(html:not(.js)) .site-header,
   .site-header[data-scrolled] {
     background: rgb(255 255 255 / 0.78);
     box-shadow: 0 0.5px 0 var(--hairline);

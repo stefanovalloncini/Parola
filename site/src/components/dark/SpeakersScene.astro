@@ -36,6 +36,7 @@ const barsPerTurn = 12;
   data-scene-loop={JSON.stringify(steps)}
   data-duration={String(turns.length * 2100)}
   data-still="t1"
+  data-state="t1"
   aria-hidden="true"
 >
   <ul class="people">
@@ -54,7 +55,9 @@ const barsPerTurn = 12;
         ))}
       </span>
     ))}
-    <span class="head"></span>
+    <span class="playhead">
+      <span class="head"></span>
+    </span>
   </div>
   <div class="cards">
     {turns.map((turn, i) => (
@@ -127,30 +130,33 @@ const barsPerTurn = 12;
     opacity: 0.85;
   }
 
+  .playhead {
+    position: absolute;
+    inset: calc(-8 * var(--u)) 0;
+  }
+
   .head {
     position: absolute;
-    top: calc(-8 * var(--u));
-    bottom: calc(-8 * var(--u));
-    left: 0;
+    inset: 0 auto 0 0;
     width: calc(2 * var(--u));
     border-radius: 2px;
     background: var(--cream);
     box-shadow: 0 0 calc(10 * var(--u)) rgb(252 242 230 / 0.6);
   }
 
-  [data-state="t0"] .head {
+  [data-state="t0"] .playhead {
     animation: seg0 2.1s linear forwards;
   }
 
-  [data-state="t1"] .head {
+  [data-state="t1"] .playhead {
     animation: seg1 2.1s linear forwards;
   }
 
-  [data-state="t2"] .head {
+  [data-state="t2"] .playhead {
     animation: seg2 2.1s linear forwards;
   }
 
-  [data-state="t3"] .head {
+  [data-state="t3"] .playhead {
     animation: seg3 2.1s linear forwards;
   }
 
@@ -204,45 +210,45 @@ const barsPerTurn = 12;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .head {
-      left: 38%;
+    .playhead {
+      translate: 38% 0;
       animation: none !important;
     }
   }
 
   @keyframes seg0 {
     from {
-      left: 0%;
+      translate: 0 0;
     }
     to {
-      left: 24%;
+      translate: 24% 0;
     }
   }
 
   @keyframes seg1 {
     from {
-      left: 24%;
+      translate: 24% 0;
     }
     to {
-      left: 52%;
+      translate: 52% 0;
     }
   }
 
   @keyframes seg2 {
     from {
-      left: 52%;
+      translate: 52% 0;
     }
     to {
-      left: 74%;
+      translate: 74% 0;
     }
   }
 
   @keyframes seg3 {
     from {
-      left: 74%;
+      translate: 74% 0;
     }
     to {
-      left: 100%;
+      translate: 100% 0;
     }
   }
 </style>

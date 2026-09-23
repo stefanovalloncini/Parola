@@ -47,6 +47,7 @@ const lines = copy.lines;
   data-scene-loop={JSON.stringify(steps)}
   data-duration="8800"
   data-still="done"
+  data-state="done"
   aria-hidden="true"
 >
   <div class="sheet">
@@ -197,10 +198,10 @@ const lines = copy.lines;
   .track i {
     display: block;
     height: 100%;
-    width: 0;
-    border-radius: inherit;
     background: #54739e;
-    transition: width 1.4s linear;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 1.4s linear;
   }
 
   .lines {
@@ -234,11 +235,11 @@ const lines = copy.lines;
   }
 
   [data-state="fetching"] .track i {
-    width: 64%;
+    transform: scaleX(0.64);
   }
 
   :is([data-state="writing"], [data-state="done"]) .track i {
-    width: 100%;
+    transform: none;
   }
 
   :is([data-state="writing"], [data-state="done"]) .fetch {

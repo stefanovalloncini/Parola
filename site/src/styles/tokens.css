@@ -1,7 +1,7 @@
 :root {
   --ink: #0f1a14;
   --ink-body: #2c3530;
-  --muted: #66706a;
+  --muted: #5c665f;
   --hairline: rgb(15 26 20 / 0.09);
   --paper: #ffffff;
   --mist: #f3f5f2;
@@ -24,7 +24,7 @@
   --font-display:
     -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter Variable", "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
-  --font-serif: ui-serif, "New York", "Newsreader Variable", "Iowan Old Style", Georgia, serif;
+  --font-serif: ui-serif, "New York", "Newsreader", "Iowan Old Style", Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
   --container: 1040px;

@@ -47,6 +47,7 @@ const sizesFor = (shot: TabShot) => {
         class="panel"
         id={`${name}-${tab.id}-panel`}
         role="tabpanel"
+        tabindex="0"
         aria-labelledby={`${name}-${tab.id}-tab`}
         data-panel
         hidden={i !== 0}
@@ -145,6 +146,10 @@ const sizesFor = (shot: TabShot) => {
     animation: shot-in 0.6s var(--ease-out);
   }
 
+  :global(html:not(.js)) .list {
+    display: none;
+  }
+
   .list {
     display: grid;
     grid-template-columns: repeat(var(--count), 1fr);
@@ -180,24 +185,28 @@ const sizesFor = (shot: TabShot) => {
   .fill {
     display: block;
     height: 100%;
-    width: 0;
-    border-radius: inherit;
     background: var(--ink);
+    transform: scaleX(0);
+    transform-origin: left;
   }
 
   [aria-selected="true"] .fill {
-    width: 100%;
+    transform: none;
   }
 
   @media (prefers-reduced-motion: no-preference) {
     [data-playing] [aria-selected="true"] .fill {
       animation: fill var(--dwell) linear both;
     }
+
+    [data-held] [aria-selected="true"] .fill {
+      animation-play-state: paused;
+    }
   }
 
   @keyframes fill {
     from {
-      width: 0;
+      transform: scaleX(0);
     }
   }
 

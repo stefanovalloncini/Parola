@@ -24,7 +24,15 @@ export function watchKaraoke(root: HTMLElement): void {
 
   const level = (time: number) => (time < 0 ? 0 : (levels[Math.floor(time * rate)] ?? 0));
 
+  let shown = "";
+
   const paint = (time: number) => {
+    const spoken = words.filter((word) => time >= word.end).length;
+    const current = words.findIndex((word) => time >= word.start && time < word.end);
+    const sample = time >= duration ? -1 : Math.floor(time * rate);
+    const key = `${spoken}:${current}:${sample}`;
+    if (key === shown) return;
+    shown = key;
     for (const word of words) {
       word.el.classList.toggle("is-spoken", time >= word.end);
       word.el.classList.toggle("is-current", time >= word.start && time < word.end);
@@ -57,7 +65,6 @@ export function watchKaraoke(root: HTMLElement): void {
 
   const setPlaying = (playing: boolean) => {
     root.toggleAttribute("data-audible", playing);
-    button.setAttribute("aria-pressed", String(playing));
     const label = button.querySelector("[data-label]");
     if (label)
       label.textContent = (playing ? root.dataset.pauseLabel : root.dataset.playLabel) ?? "";
