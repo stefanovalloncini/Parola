@@ -1,6 +1,6 @@
 ---
 import { links } from "../data/links";
-import { localeOf, pathFor, translator } from "../i18n";
+import { localeOf, pathFor, switchPath, translator } from "../i18n";
 import BrandIcon from "./BrandIcon.astro";
 import WaveGlyph from "./WaveGlyph.astro";
 
@@ -9,6 +9,7 @@ const t = translator(locale);
 const home = pathFor(locale, "/");
 const onHome = Astro.url.pathname === home;
 const anchor = (id: string) => (onHome ? `#${id}` : `${home}#${id}`);
+const other = locale === "it" ? "en" : "it";
 ---
 
 <header class="site-header" data-header>
@@ -23,6 +24,9 @@ const anchor = (id: string) => (onHome ? `#${id}` : `${home}#${id}`);
       <a href={anchor("faq")}>{t({ en: "FAQ", it: "Domande" })}</a>
     </nav>
     <div class="actions">
+      <a class="github" href={switchPath(other, Astro.url.pathname)} hreflang={other} lang={other}>
+        {other === "it" ? "Italiano" : "English"}
+      </a>
       <a class="github" href={links.repository}>
         GitHub
       </a>
@@ -79,7 +83,7 @@ const anchor = (id: string) => (onHome ? `#${id}` : `${home}#${id}`);
 
   :global(html:not(.js)) .site-header,
   .site-header[data-scrolled] {
-    background: rgb(255 255 255 / 0.78);
+    background: rgb(255 255 255 / 0.88);
     box-shadow: 0 0.5px 0 var(--hairline);
     backdrop-filter: saturate(180%) blur(20px);
   }
@@ -162,7 +166,13 @@ const anchor = (id: string) => (onHome ? `#${id}` : `${home}#${id}`);
       0 10px 24px -10px rgb(15 26 20 / 0.7);
     transition:
       transform 0.2s var(--ease-out),
-      box-shadow 0.2s var(--ease-out);
+      box-shadow 0.2s var(--ease-out),
+      opacity 0.2s var(--ease-out);
+  }
+
+  :global(html:has([data-stick-card].is-stuck)) .download {
+    opacity: 0;
+    pointer-events: none;
   }
 
   .download :global(.wave-glyph) {

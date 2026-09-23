@@ -1,14 +1,13 @@
 ---
 import { links } from "../data/links";
-import { localeOf, pathFor, translator } from "../i18n";
+import { localeOf, pathFor, switchPath, translator } from "../i18n";
 import BrandIcon from "./BrandIcon.astro";
 
 const locale = localeOf(Astro.currentLocale);
 const t = translator(locale);
 const other = locale === "it" ? "en" : "it";
 const path = Astro.url.pathname;
-const missing = pathFor("en", path).startsWith("/404");
-const switchTo = pathFor(other, missing ? "/" : path);
+const switchTo = switchPath(other, path);
 const year = new Date().getFullYear();
 ---
 

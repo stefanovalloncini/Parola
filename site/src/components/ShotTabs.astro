@@ -22,7 +22,7 @@ const locale = localeOf(Astro.currentLocale);
 const phone = "(max-width: 640px)";
 const phoneSizes = "calc(100vw - 32px)";
 const wideSizes =
-  "(max-width: 720px) calc(100vw - 32px), (max-width: 1088px) calc(100vw - 48px), 1040px";
+  "(max-width: 720px) calc(100vw - 32px), (max-width: 984px) calc(100vw - 48px), 936px";
 
 const pictures = await Promise.all(
   tabs.map(async (tab) => {
@@ -123,6 +123,8 @@ const pictures = await Promise.all(
 <style>
   .shot-tabs {
     --dwell: 6s;
+    max-width: 936px;
+    margin-inline: auto;
   }
 
   .frame {
@@ -161,13 +163,13 @@ const pictures = await Promise.all(
     visibility: hidden;
     opacity: 0;
     transition:
-      visibility 0s 0.6s,
-      opacity 0s 0.6s;
+      opacity 0.35s var(--ease-out),
+      visibility 0s 0.35s;
   }
 
   .panel:not([hidden]) {
     z-index: 1;
-    animation: shot-in 0.6s var(--ease-out);
+    animation: shot-in 0.35s var(--ease-out);
   }
 
   :global(html:not(.js)) .list {

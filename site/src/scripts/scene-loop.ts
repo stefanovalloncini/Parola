@@ -42,9 +42,8 @@ function play(scene: Scene): void {
     });
   });
   scene.cycles += 1;
-  if (scene.cycles < cyclesPerVisit) {
-    scene.timers.push(window.setTimeout(() => play(scene), scene.duration));
-  }
+  const next = scene.cycles < cyclesPerVisit ? play : showStill;
+  scene.timers.push(window.setTimeout(() => next(scene), scene.duration));
 }
 
 function stop(scene: Scene): void {

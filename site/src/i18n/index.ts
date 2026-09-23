@@ -13,6 +13,11 @@ export function translator(value: string | undefined) {
 }
 
 /** The same page in another locale: `/privacy` ↔ `/it/privacy`, `/` ↔ `/it/`. */
+export function switchPath(locale: Locale, path: string): string {
+  const missing = pathFor("en", path).startsWith("/404");
+  return pathFor(locale, missing ? "/" : path);
+}
+
 export function pathFor(locale: Locale, path: string): string {
   const bare = path.replace(/^\/it(?=\/|$)/, "") || "/";
   return locale === "it" ? `/it${bare === "/" ? "/" : bare}` : bare;

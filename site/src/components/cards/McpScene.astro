@@ -77,12 +77,17 @@ const steps = [
   .you {
     display: grid;
     align-self: flex-end;
+    transition: opacity 0.2s;
     background: var(--ink);
     color: var(--cream);
   }
 
   .you > span {
     grid-area: 1 / 1;
+  }
+
+  .you:has([data-type]:empty) {
+    opacity: 0;
   }
 
   .sizer {

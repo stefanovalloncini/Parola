@@ -12,16 +12,20 @@ const { title, text, note, class: className } = Astro.props;
 <article class:list={["feature", className]}>
   <h3 class="t-card">{title}</h3>
   <p class="t-lead">{text}</p>
-  <div class="stage">
-    <slot />
+  <div class="visual">
+    <div class="stage">
+      <slot />
+    </div>
+    {note && <p class="note">{note}</p>}
   </div>
-  {note && <p class="note">{note}</p>}
 </article>
 
 <style>
   .feature {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    row-gap: 0;
   }
 
   .t-lead {

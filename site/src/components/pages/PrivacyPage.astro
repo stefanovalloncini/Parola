@@ -9,6 +9,7 @@ const copy = t({
     title: "Privacy – Parola",
     description: "What Parola and this website do with your data.",
     lead: "Parola is built to keep your recordings and transcripts on your Mac.",
+    updated: "Last updated 23 September 2026.",
     app: "The app",
     local:
       "Parola transcribes on your Mac. Your audio is never uploaded. There is no account, and Parola sends no analytics, crash reports or usage data anywhere.",
@@ -32,6 +33,7 @@ const copy = t({
     title: "Privacy – Parola",
     description: "Cosa fanno Parola e questo sito con i tuoi dati.",
     lead: "Parola nasce per tenere le tue registrazioni e trascrizioni sul tuo Mac.",
+    updated: "Ultimo aggiornamento: 23 settembre 2026.",
     app: "L'app",
     local:
       "Parola trascrive sul tuo Mac e il tuo audio non viene mai caricato online. Non serve un account e Parola non invia da nessuna parte statistiche, rapporti sugli arresti anomali o dati d'uso.",
@@ -59,6 +61,7 @@ const mail = `mailto:${links.feedbackEmail}?subject=${encodeURIComponent(copy.su
   <article class="narrow legal">
     <h1 class="t-title">Privacy</h1>
     <p class="t-lead">{copy.lead}</p>
+    <p class="updated">{copy.updated}</p>
 
     <h2>{copy.app}</h2>
     <p>{copy.local}</p>
@@ -88,7 +91,13 @@ const mail = `mailto:${links.feedbackEmail}?subject=${encodeURIComponent(copy.su
 
   .legal .t-lead {
     margin-top: 16px;
-    margin-bottom: 48px;
+  }
+
+  .legal .updated {
+    margin-top: 10px;
+    margin-bottom: 40px;
+    font-size: 14px;
+    color: var(--muted);
   }
 
   h2 {

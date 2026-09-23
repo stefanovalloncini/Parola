@@ -39,6 +39,7 @@ const title = t({ en: ["Questions,", "answered."], it: ["Domande", "e risposte."
 <style>
   .list {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
   }
 
@@ -62,6 +63,11 @@ const title = t({ en: ["Questions,", "answered."], it: ["Domande", "e risposte."
 
   summary::-webkit-details-marker {
     display: none;
+  }
+
+  summary:focus-visible {
+    border-radius: 14px;
+    outline-offset: -3px;
   }
 
   summary::before,
@@ -115,7 +121,8 @@ const title = t({ en: ["Questions,", "answered."], it: ["Domande", "e risposte."
     box-shadow: inset 0 0 0 1px var(--hairline);
     font-family: var(--font-mono);
     font-size: 14px;
-    white-space: pre;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
   details a {

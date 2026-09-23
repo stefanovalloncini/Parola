@@ -103,9 +103,9 @@ for (const home of homes) {
 
 test("the language link keeps the reader on the same page", async ({ page }) => {
   await page.goto("/privacy/");
-  await page.getByRole("link", { name: "Italiano" }).click();
+  await page.locator("footer").getByRole("link", { name: "Italiano" }).click();
   await expect(page).toHaveURL(/\/it\/privacy\/$/);
-  await page.getByRole("link", { name: "English" }).click();
+  await page.locator("header").getByRole("link", { name: "English" }).click();
   await expect(page).toHaveURL(/\/privacy\/$/);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });

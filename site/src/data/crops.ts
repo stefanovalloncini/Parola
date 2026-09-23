@@ -12,7 +12,7 @@ export const crops = {
   interview: { wide: pane, narrow: [256, 88, 400, 340] },
   memo: { wide: pane, narrow: [248, 96, 400, 340] },
   lecture: { wide: pane, narrow: [256, 96, 400, 340] },
-  export: { wide: [214, 124, 754, 509], narrow: [214, 170, 400, 340] },
+  export: { wide: [214, 124, 754, 509], narrow: [560, 130, 400, 340], fade: "both" },
   "dark-speakers": { wide: pane, narrow: [256, 88, 400, 340] },
   "dark-karaoke": { wide: pane, narrow: [256, 300, 400, 340] },
   "dark-translation": { wide: pane, narrow: [480, 140, 400, 340], fade: "both" },

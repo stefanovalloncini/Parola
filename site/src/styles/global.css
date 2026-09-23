@@ -227,3 +227,14 @@ button {
     transition-delay: 0s !important;
   }
 }
+
+p,
+li,
+summary,
+.quote {
+  text-wrap: pretty;
+}
+
+.section-head .t-lead {
+  text-wrap: balance;
+}
