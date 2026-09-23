@@ -13,7 +13,7 @@ const locale = localeOf(Astro.currentLocale);
 const t = translator(locale);
 const shots = shotsFor(locale);
 const shotSizes =
-  "(min-width: 1600px) min(787px, calc(108vh - 441px)), calc(min(860px, 92vw) * 0.757)";
+  "(min-width: 1600px) min(787px, calc(108vh - 424px)), (min-width: 721px) min(651px, 70vw, calc(108vh - 424px)), 70vw";
 
 const beats = t({
   en: [
@@ -28,14 +28,14 @@ const beats = t({
     {
       before: "It records your",
       mark: "meetings",
-      punct: "",
-      after: "too. No bot joins the call.",
+      punct: ".",
+      after: "No\u00a0bot joins the call.",
     },
     {
       before: "Hold a key and",
       mark: "speak",
       punct: ".",
-      after: "The words land where you type.",
+      after: "Words land where you type.",
     },
   ],
   it: [
@@ -53,10 +53,10 @@ const beats = t({
       after: "o incolla un link di YouTube.",
     },
     {
-      before: "Registra anche le tue",
+      before: "Registra anche le",
       mark: "riunioni",
-      punct: ",",
-      after: "senza bot in chiamata.",
+      punct: ".",
+      after: "Nessun bot in chiamata.",
     },
     {
       before: "Tieni premuto un tasto e",
@@ -143,7 +143,7 @@ const beats = t({
 
   .beats {
     position: relative;
-    width: min(100% - 2 * var(--gutter), 720px, var(--laptop) - 48px);
+    width: min(100% - 2 * var(--gutter), 800px);
     margin-inline: auto;
     padding-bottom: calc(var(--laptop) * 0.7 + 26vh);
     display: grid;
@@ -168,9 +168,23 @@ const beats = t({
     display: block;
   }
 
+  @media (min-width: 721px) {
+    .story {
+      --laptop: min(860px, 92vw, (100svh - var(--device-top) - 32px) / 0.7);
+    }
+  }
+
   @media (max-width: 720px) {
     .story {
       --device-top: clamp(250px, 34vh, 340px);
+    }
+
+    .beats {
+      width: min(100% - 2 * var(--gutter), 720px);
+    }
+
+    .beat {
+      font-size: clamp(34px, 10vw, 40px);
     }
 
     .story .track {
@@ -200,7 +214,7 @@ const beats = t({
 
   @media (min-width: 1600px) {
     .story {
-      --laptop: min(1040px, 92vw, (100svh - var(--device-top) - 48px) / 0.7);
+      --laptop: min(1040px, 92vw, (100svh - var(--device-top) - 32px) / 0.7);
     }
   }
 
@@ -223,6 +237,7 @@ const beats = t({
     position: sticky;
     top: var(--device-top);
     margin-top: calc(var(--device-top) - var(--header-height) - var(--fade));
+    background: var(--paper);
   }
 
   .device::after {
