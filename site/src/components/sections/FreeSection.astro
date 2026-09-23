@@ -1,10 +1,10 @@
 ---
 import { included as groups } from "../../data/included";
-import { links, requirements } from "../../data/links";
+import { requirements } from "../../data/links";
 import { translator } from "../../i18n";
 import BrandIcon from "../BrandIcon.astro";
+import DownloadButtons from "../DownloadButtons.astro";
 import Icon from "../Icon.astro";
-import WaveGlyph from "../WaveGlyph.astro";
 
 const t = translator(Astro.currentLocale);
 const included = t(groups);
@@ -14,16 +14,12 @@ const copy = t({
     lead: "Every feature is in the download. There's no paid tier and no account.",
     price: "Free",
     license: `MIT license. ${requirements.en}.`,
-    download: "Download for Mac",
-    source: "View on GitHub",
   },
   it: {
     title: "Gratis e open source.",
     lead: "Ogni funzione è inclusa nel download. Non c'è una versione a pagamento né un account.",
     price: "Gratis",
     license: `Licenza MIT. ${requirements.it}.`,
-    download: "Scarica per Mac",
-    source: "Vedi su GitHub",
   },
 });
 ---
@@ -31,7 +27,7 @@ const copy = t({
 <section class="free section" id="download" aria-labelledby="free-title">
   <div class="narrow">
     <div class="section-head">
-      <h2 id="free-title" class="t-section" data-words>
+      <h2 id="free-title" class="t-section minor" data-words>
         {copy.title}
       </h2>
       <p class="t-lead">{copy.lead}</p>
@@ -47,13 +43,7 @@ const copy = t({
         </div>
       </div>
       <div class="actions">
-        <a class="primary" href={links.download}>
-          {copy.download}
-          <WaveGlyph />
-        </a>
-        <a class="secondary" href={links.repository}>
-          {copy.source}
-        </a>
+        <DownloadButtons stacked />
       </div>
     </div>
 
@@ -127,50 +117,7 @@ const copy = t({
   }
 
   .actions {
-    display: grid;
-    gap: 10px;
     min-width: min(100%, 250px);
-  }
-
-  .primary,
-  .secondary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    height: 50px;
-    padding-inline: 24px;
-    border-radius: var(--radius-control);
-    font-size: 17px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    transition:
-      transform 0.2s var(--ease-out),
-      box-shadow 0.2s var(--ease-out);
-  }
-
-  .primary {
-    background: radial-gradient(60% 120% at 50% 0%, #7f9e7e, var(--sage-deep));
-    color: #fff;
-    box-shadow:
-      0 0 0 1px #33503b,
-      0 1px 1px rgb(15 26 20 / 0.08),
-      0 10px 22px -10px rgb(63 96 72 / 0.8);
-  }
-
-  .primary :global(.wave-glyph) {
-    color: #d7e6d3;
-  }
-
-  .secondary {
-    background: var(--paper);
-    color: var(--ink);
-    box-shadow: inset 0 0 0 1px rgb(15 26 20 / 0.14);
-  }
-
-  .primary:hover,
-  .secondary:hover {
-    transform: translateY(-1px);
   }
 
   .groups {

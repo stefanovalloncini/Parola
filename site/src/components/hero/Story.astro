@@ -12,11 +12,17 @@ import StoryProps from "./StoryProps.astro";
 const locale = localeOf(Astro.currentLocale);
 const t = translator(locale);
 const shots = shotsFor(locale);
-const shotSizes = "calc(min(860px, 92vw) * 0.8)";
+const shotSizes = "(min-width: 1600px) 832px, calc(min(860px, 92vw) * 0.8)";
 
 const beats = t({
   en: [
-    { before: "Audio,", mark: "written down", punct: ".", after: "Right here on your Mac." },
+    {
+      before: "Audio,",
+      mark: "written down",
+      punct: ".",
+      after: "Right here on your Mac.",
+      ownLine: true,
+    },
     { before: "Drop in", mark: "any recording", punct: ",", after: "or paste a YouTube link." },
     {
       before: "It records your",
@@ -32,7 +38,7 @@ const beats = t({
     },
   ],
   it: [
-    { before: "Audio,", mark: "in parola", punct: ".", after: "Qui, sul tuo Mac." },
+    { before: "Audio,", mark: "in parola", punct: ".", after: "Qui, sul tuo Mac.", ownLine: true },
     {
       before: "Trascina",
       mark: "una registrazione",
@@ -66,7 +72,7 @@ const beats = t({
             <span class="mark">{beat.mark}</span>
             {beat.punct}
           </span>{" "}
-          {beat.after}
+          {"ownLine" in beat ? <span class="own-line">{beat.after}</span> : beat.after}
         </Tag>
       );
     })}
@@ -149,9 +155,23 @@ const beats = t({
     white-space: nowrap;
   }
 
+  .own-line {
+    display: block;
+  }
+
   @media (max-width: 720px) {
     .story {
-      --device-top: clamp(300px, 50vh, 470px);
+      --device-top: clamp(250px, 34vh, 340px);
+    }
+
+    .story .track {
+      bottom: 132px;
+    }
+  }
+
+  @media (min-width: 1600px) {
+    .story {
+      --laptop: min(1040px, 92vw, (100svh - var(--device-top) - 48px) / 0.7);
     }
   }
 

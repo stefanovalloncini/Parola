@@ -1,85 +1,9 @@
 ---
-import { translator } from "../../i18n";
+import { propsFor } from "../../data/story";
+import { localeOf } from "../../i18n";
 import DocTile from "../DocTile.astro";
 
-const t = translator(Astro.currentLocale);
-
-const files = [
-  {
-    ext: "M4A",
-    name: t({ en: "Interview.m4a", it: "Intervista.m4a" }),
-    tint: "#6b8a6b",
-    x: 9,
-    y: 16,
-    r: -8,
-  },
-  {
-    ext: "MP4",
-    name: t({ en: "Lecture 4.mp4", it: "Lezione 4.mp4" }),
-    tint: "#54739e",
-    x: 13,
-    y: 45,
-    r: 6,
-  },
-  {
-    ext: "WAV",
-    name: t({ en: "Standup.wav", it: "Riunione.wav" }),
-    tint: "#a07b5a",
-    x: 8,
-    y: 72,
-    r: -4,
-  },
-  {
-    ext: "MOV",
-    name: t({ en: "Keynote.mov", it: "Presentazione.mov" }),
-    tint: "#7b6f95",
-    x: 13,
-    y: 96,
-    r: 8,
-  },
-  {
-    ext: "MP3",
-    name: t({ en: "Episode 31.mp3", it: "Puntata 31.mp3" }),
-    tint: "#3f6048",
-    x: 91,
-    y: 14,
-    r: 7,
-  },
-  {
-    ext: "M4A",
-    name: t({ en: "Memo 12 Sept.m4a", it: "Memo 12 set.m4a" }),
-    tint: "#6b8a6b",
-    x: 87,
-    y: 42,
-    r: -6,
-  },
-  {
-    ext: "MP4",
-    name: t({ en: "Workshop.mp4", it: "Laboratorio.mp4" }),
-    tint: "#54739e",
-    x: 92,
-    y: 70,
-    r: 5,
-  },
-  {
-    ext: "OGG",
-    name: t({ en: "Voice note.ogg", it: "Nota vocale.ogg" }),
-    tint: "#a07b5a",
-    x: 87,
-    y: 95,
-    r: -8,
-  },
-];
-
-const people = [
-  { initials: "M", hue: "#6b8a6b", x: 9, y: 20 },
-  { initials: "T", hue: "#54739e", x: 13, y: 55 },
-  { initials: "A", hue: "#a07b5a", x: 8, y: 88 },
-  { initials: "S", hue: "#7b6f95", x: 91, y: 18 },
-  { initials: "J", hue: "#3f6048", x: 87, y: 52 },
-  { initials: "R", hue: "#54739e", x: 92, y: 86 },
-];
-
+const { files, people } = propsFor(localeOf(Astro.currentLocale));
 const barCount = 44;
 const bars = Array.from({ length: barCount }, (_, i) => {
   const wave = Math.abs(Math.sin(i * 1.7) * 0.55 + Math.sin(i * 0.43) * 0.45);
@@ -271,6 +195,69 @@ const bars = Array.from({ length: barCount }, (_, i) => {
   @media (max-width: 900px) {
     .stream {
       display: none;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .props {
+      top: calc(100% + 30px);
+      width: 100%;
+      height: 84px;
+    }
+
+    .props .set {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .prop {
+      position: relative;
+      left: auto;
+      top: auto;
+      translate: 0 0;
+    }
+
+    .files .prop {
+      --doc-width: 50px;
+    }
+
+    .files .prop:nth-child(n + 6),
+    .person:nth-child(n + 6),
+    .bars i:nth-child(n + 15) {
+      display: none;
+    }
+
+    .files .prop :global(.name) {
+      display: none;
+    }
+
+    :global([data-scene="1"]) .files .prop {
+      translate: 0 -120px;
+      scale: 0.4;
+      opacity: 0;
+    }
+
+    .person {
+      width: 46px;
+      height: 46px;
+      font-size: 18px;
+    }
+
+    .stream {
+      gap: 5px;
+    }
+
+    .bars {
+      position: static;
+      gap: 5px;
+      height: 56px;
+      translate: 0 0;
+    }
+
+    .bars i {
+      width: 5px;
     }
   }
 </style>

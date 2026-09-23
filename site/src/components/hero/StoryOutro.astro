@@ -1,0 +1,32 @@
+---
+import { requirements } from "../../data/links";
+import { translator } from "../../i18n";
+import DownloadButtons from "../DownloadButtons.astro";
+
+const t = translator(Astro.currentLocale);
+---
+
+<div class="outro">
+  <DownloadButtons />
+  <p>
+    {t({
+      en: `Free and open source. ${requirements.en}.`,
+      it: `Gratis e open source. ${requirements.it}.`,
+    })}
+  </p>
+</div>
+
+<style>
+  .outro {
+    display: grid;
+    justify-items: center;
+    gap: 18px;
+    padding: 0 var(--gutter) clamp(24px, 4vw, 48px);
+    text-align: center;
+  }
+
+  p {
+    font-size: 15px;
+    color: var(--muted);
+  }
+</style>

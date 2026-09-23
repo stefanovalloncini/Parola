@@ -3,6 +3,7 @@ import { links } from "../../data/links";
 import { localeOf, translator } from "../../i18n";
 import Base from "../../layouts/Base.astro";
 import Story from "../hero/Story.astro";
+import StoryOutro from "../hero/StoryOutro.astro";
 import AISection from "../sections/AISection.astro";
 import AutomationSection from "../sections/AutomationSection.astro";
 import DropSection from "../sections/DropSection.astro";
@@ -40,6 +41,7 @@ const app = {
 <Base title={title} description={description}>
   <script type="application/ld+json" slot="head" set:html={JSON.stringify(app)}></script>
   <Story />
+  <StoryOutro />
   <DropSection />
   <FeaturesSection />
   <PrivacySection />
