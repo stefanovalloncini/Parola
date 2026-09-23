@@ -1,5 +1,4 @@
 ---
-import { shotsFor } from "../../data/shots";
 import { localeOf, translator } from "../../i18n";
 import FeatureCard from "../cards/FeatureCard.astro";
 import FormatsScene from "../dark/FormatsScene.astro";
@@ -8,17 +7,16 @@ import LanguagesScene from "../dark/LanguagesScene.astro";
 import SpeakersScene from "../dark/SpeakersScene.astro";
 import FeatureRows, { type FeatureRow } from "../FeatureRows.astro";
 import Lines from "../Lines.astro";
-import ShotTabs from "../ShotTabs.astro";
+import ShotTabs, { type ShotTab } from "../ShotTabs.astro";
 
 const locale = localeOf(Astro.currentLocale);
 const t = translator(locale);
-const shots = shotsFor(locale);
 
-const tabs = [
+const tabs: ShotTab[] = [
   {
     id: "speakers",
     label: t({ en: "Speakers", it: "Persone" }),
-    image: shots["dark-speakers"],
+    shot: "dark-speakers",
     alt: t({
       en: "A meeting transcript in dark mode with three named speakers, each in their own color.",
       it: "La trascrizione di una riunione in modalità scura, con tre persone e un colore per ciascuna.",
@@ -27,7 +25,7 @@ const tabs = [
   {
     id: "timing",
     label: t({ en: "Word timing", it: "Tempi delle parole" }),
-    image: shots["dark-karaoke"],
+    shot: "dark-karaoke",
     alt: t({
       en: "A transcript playing back in dark mode, with the word being spoken highlighted.",
       it: "Una trascrizione in riproduzione in modalità scura, con la parola pronunciata evidenziata.",
@@ -36,7 +34,7 @@ const tabs = [
   {
     id: "translation",
     label: t({ en: "Translation", it: "Traduzione" }),
-    image: shots["dark-translation"],
+    shot: "dark-translation",
     alt: t({
       en: "A transcript in dark mode with its translation shown side by side.",
       it: "Una trascrizione in modalità scura con la traduzione affiancata.",
@@ -61,11 +59,6 @@ const rows: FeatureRow[] = t({
       title: "Parakeet",
       text: "NVIDIA's model, running through FluidAudio. It's the fastest multilingual option on Apple Silicon.",
     },
-    {
-      icon: "pencil",
-      title: "Edit and fix",
-      text: "Edit any line, or split and merge segments. Find and replace fixes a name everywhere at once.",
-    },
   ],
   it: [
     {
@@ -83,21 +76,19 @@ const rows: FeatureRow[] = t({
       title: "Parakeet",
       text: "Il modello di NVIDIA, tramite FluidAudio. È l'opzione multilingue più veloce su Apple Silicon.",
     },
-    {
-      icon: "pencil",
-      title: "Modifica e correggi",
-      text: "Modifica qualsiasi riga, oppure dividi e unisci i segmenti. Trova e sostituisci corregge un nome ovunque in un colpo solo.",
-    },
   ],
 });
 
 const copy = t({
   en: {
-    title: ["Three engines.", "Pick the one that fits."],
-    lead: "Apple Speech works the moment you open Parola. Whisper and Parakeet download once, then run offline.",
+    title: ["Who said what,", "and when."],
+    lead: "Speaker labels and word timings come from models running on your Mac.",
+    engines: "Three engines. Pick the one that fits.",
+    enginesLead:
+      "Apple Speech works the moment you open Parola. Whisper and Parakeet download once, then run offline.",
     tabs: "Transcript views",
     speakers: {
-      title: "Who said what",
+      title: "A name for every voice",
       text: "Turn on Diarize and every line gets a speaker. Name them, and a person keeps their name and color in every transcript you add them to.",
     },
     words: {
@@ -114,11 +105,14 @@ const copy = t({
     },
   },
   it: {
-    title: ["Tre motori.", "Scegli quello che fa per te."],
-    lead: "Apple Speech funziona appena apri Parola. Whisper e Parakeet si scaricano una volta sola, poi lavorano offline.",
+    title: ["Chi ha detto cosa,", "e quando."],
+    lead: "I nomi di chi parla e i tempi delle parole vengono da modelli che girano sul tuo Mac.",
+    engines: "Tre motori. Scegli quello che fa per te.",
+    enginesLead:
+      "Apple Speech funziona appena apri Parola. Whisper e Parakeet si scaricano una volta sola, poi lavorano offline.",
     tabs: "Viste della trascrizione",
     speakers: {
-      title: "Chi ha detto cosa",
+      title: "Un nome per ogni voce",
       text: "Attiva Diarizza e ogni riga ha il suo autore. Dai un nome alle persone: nome e colore le seguono in ogni trascrizione a cui le aggiungi.",
     },
     words: {
@@ -161,6 +155,10 @@ const copy = t({
         <LanguagesScene />
       </FeatureCard>
     </div>
+    <div class="engines-head">
+      <h3 class="t-title">{copy.engines}</h3>
+      <p class="t-lead">{copy.enginesLead}</p>
+    </div>
     <FeatureRows rows={rows} />
   </div>
 </section>
@@ -181,13 +179,30 @@ const copy = t({
     margin-top: clamp(96px, 11vw, 160px);
   }
 
+  .engines-head {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: end;
+    gap: 16px 32px;
+    margin-top: clamp(96px, 11vw, 160px);
+  }
+
+  .engines-head .t-lead {
+    max-width: 30em;
+  }
+
+  .engines-head + :global(.rows) {
+    margin-top: 36px;
+  }
+
   .engines :global(.stage) {
     background: rgb(255 255 255 / 0.035);
     box-shadow: inset 0 0 0 1px rgb(252 242 230 / 0.06);
   }
 
   @media (max-width: 820px) {
-    .grid {
+    .grid,
+    .engines-head {
       grid-template-columns: 1fr;
     }
   }

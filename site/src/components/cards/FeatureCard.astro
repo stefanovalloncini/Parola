@@ -2,10 +2,11 @@
 interface Props {
   title: string;
   text: string;
+  note?: string;
   class?: string;
 }
 
-const { title, text, class: className } = Astro.props;
+const { title, text, note, class: className } = Astro.props;
 ---
 
 <article class:list={["feature", className]}>
@@ -14,6 +15,7 @@ const { title, text, class: className } = Astro.props;
   <div class="stage">
     <slot />
   </div>
+  {note && <p class="note">{note}</p>}
 </article>
 
 <style>
@@ -41,5 +43,11 @@ const { title, text, class: className } = Astro.props;
 
   .stage > :global(*) {
     --u: calc(100cqw / 500);
+  }
+
+  .note {
+    margin-top: 16px;
+    font-size: 15px;
+    color: var(--muted);
   }
 </style>

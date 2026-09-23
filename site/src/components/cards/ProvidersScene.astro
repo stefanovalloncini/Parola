@@ -10,15 +10,23 @@ const providers = [
   { name: "Ollama", where: here, local: true },
   { name: "OpenAI", where: key, local: false },
   { name: "Anthropic", where: key, local: false },
+  { name: "Groq", where: key, local: false },
+  { name: "Cerebras", where: key, local: false },
+  {
+    name: t({ en: "Custom endpoint", it: "Endpoint personalizzato" }),
+    where: t({ en: "OpenAI-compatible", it: "Compatibile con OpenAI" }),
+    local: false,
+  },
 ];
-const steps = providers.map((_, i) => [i * 1600, `s${i}`]);
+const order = [0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1];
+const steps = order.map((index, i) => [i * 1300, `s${index}`]);
 ---
 
 <div
   class="providers"
   data-scene-loop={JSON.stringify(steps)}
-  data-duration={String(providers.length * 1600)}
-  data-still="s0"
+  data-duration={String(order.length * 1300)}
+  data-still="s2"
   aria-hidden="true"
 >
   <ul>
@@ -41,24 +49,28 @@ const steps = providers.map((_, i) => [i * 1600, `s${i}`]);
 
 <style>
   .providers {
+    --at: 2;
     position: absolute;
     inset: 0;
-    display: grid;
-    place-items: center;
-    padding: calc(28 * var(--u));
+    overflow: hidden;
+    mask-image: linear-gradient(transparent, #000 24%, #000 76%, transparent);
   }
 
   ul {
     display: grid;
     gap: calc(12 * var(--u));
     width: calc(400 * var(--u));
+    margin-inline: auto;
+    translate: 0 calc((180 - var(--at) * 88) * var(--u));
+    transition: translate 0.7s var(--ease-in-out);
   }
 
   li {
     display: flex;
     align-items: center;
     gap: calc(14 * var(--u));
-    padding: calc(14 * var(--u)) calc(18 * var(--u));
+    height: calc(76 * var(--u));
+    padding-inline: calc(18 * var(--u));
     border-radius: calc(18 * var(--u));
     background: #fff;
     box-shadow:
@@ -126,10 +138,37 @@ const steps = providers.map((_, i) => [i * 1600, `s${i}`]);
     stroke-width: 2.4;
   }
 
+  [data-state="s0"] {
+    --at: 0;
+  }
+
+  [data-state="s1"] {
+    --at: 1;
+  }
+
+  [data-state="s3"] {
+    --at: 3;
+  }
+
+  [data-state="s4"] {
+    --at: 4;
+  }
+
+  [data-state="s5"] {
+    --at: 5;
+  }
+
+  [data-state="s6"] {
+    --at: 6;
+  }
+
   [data-state="s0"] .s0 .check,
   [data-state="s1"] .s1 .check,
   [data-state="s2"] .s2 .check,
-  [data-state="s3"] .s3 .check {
+  [data-state="s3"] .s3 .check,
+  [data-state="s4"] .s4 .check,
+  [data-state="s5"] .s5 .check,
+  [data-state="s6"] .s6 .check {
     opacity: 1;
     scale: 1;
   }

@@ -1,22 +1,19 @@
 ---
-import { shotsFor } from "../../data/shots";
 import { localeOf, translator } from "../../i18n";
 import FeatureCard from "../cards/FeatureCard.astro";
 import PromptsScene from "../cards/PromptsScene.astro";
 import ProvidersScene from "../cards/ProvidersScene.astro";
-import Icon from "../Icon.astro";
 import Lines from "../Lines.astro";
-import ShotTabs from "../ShotTabs.astro";
+import ShotTabs, { type ShotTab } from "../ShotTabs.astro";
 
 const locale = localeOf(Astro.currentLocale);
 const t = translator(locale);
-const shots = shotsFor(locale);
 
-const tabs = [
+const tabs: ShotTab[] = [
   {
     id: "summary",
     label: t({ en: "Summary", it: "Riassunto" }),
-    image: shots["ai-summary"],
+    shot: "ai-summary",
     alt: t({
       en: "A meeting summary in Parola with key points and action items.",
       it: "Il riassunto di una riunione in Parola, con i punti chiave e le cose da fare.",
@@ -25,7 +22,7 @@ const tabs = [
   {
     id: "chat",
     label: "Chat",
-    image: shots["ai-chat"],
+    shot: "ai-chat",
     alt: t({
       en: "A chat about a transcript in Parola, answering with the timestamp it quotes.",
       it: "Una chat su una trascrizione in Parola, con il minutaggio della risposta.",
@@ -34,27 +31,11 @@ const tabs = [
   {
     id: "services",
     label: t({ en: "Services", it: "Servizi" }),
-    image: shots["ai-prompts"],
+    shot: "ai-prompts",
     alt: t({
       en: "Parola's AI Services settings: Apple Intelligence on the Mac, plus Ollama and OpenAI, picked per task.",
       it: "Le impostazioni dei servizi AI di Parola: Apple Intelligence sul Mac, più Ollama e OpenAI, scelti per compito.",
     }),
-  },
-];
-
-const here = t({ en: "On this Mac", it: "Su questo Mac" });
-const key = t({ en: "Your key", it: "La tua chiave" });
-const services = [
-  { name: "Apple Intelligence", where: here, local: true },
-  { name: "Ollama", where: here, local: true },
-  { name: "OpenAI", where: key, local: false },
-  { name: "Anthropic", where: key, local: false },
-  { name: "Groq", where: key, local: false },
-  { name: "Cerebras", where: key, local: false },
-  {
-    name: t({ en: "Your own endpoint", it: "Il tuo endpoint" }),
-    where: t({ en: "OpenAI-compatible", it: "Compatibile con OpenAI" }),
-    local: false,
   },
 ];
 
@@ -71,9 +52,7 @@ const copy = t({
       title: "Local or cloud",
       text: "Pick a service for each job: summary, chat, prompts or dictation cleanup. Keys stay in your keychain.",
     },
-    services: "Use the model you already have",
-    servicesLead:
-      "A cloud service gets text, never your audio, and Parola asks before the first time.",
+    privacy: "A cloud service gets text, never your audio, and Parola asks before the first time.",
   },
   it: {
     title: ["Riassunti e risposte,", "dal modello che scegli tu."],
@@ -87,8 +66,7 @@ const copy = t({
       title: "Locale o cloud",
       text: "Scegli un servizio per ogni compito: riassunto, chat, prompt o pulizia della dettatura. Le chiavi restano nel portachiavi.",
     },
-    services: "Usa il modello che hai già",
-    servicesLead:
+    privacy:
       "Un servizio cloud riceve il testo, mai il tuo audio, e Parola chiede conferma la prima volta.",
   },
 });
@@ -108,27 +86,9 @@ const copy = t({
       <FeatureCard title={copy.prompts.title} text={copy.prompts.text}>
         <PromptsScene />
       </FeatureCard>
-      <FeatureCard title={copy.local.title} text={copy.local.text}>
+      <FeatureCard title={copy.local.title} text={copy.local.text} note={copy.privacy}>
         <ProvidersScene />
       </FeatureCard>
-    </div>
-
-    <div class="services">
-      <h3 class="t-card">{copy.services}</h3>
-      <p class="t-lead">{copy.servicesLead}</p>
-      <ul>
-        {services.map((service) => (
-          <li>
-            <span class:list={["tile", { local: service.local }]}>
-              <Icon name={service.local ? "chip" : "globe"} size={22} />
-            </span>
-            <span>
-              <b>{service.name}</b>
-              <small>{service.where}</small>
-            </span>
-          </li>
-        ))}
-      </ul>
     </div>
   </div>
 </section>
@@ -148,76 +108,8 @@ const copy = t({
     margin-top: clamp(96px, 11vw, 160px);
   }
 
-  .services {
-    margin-top: clamp(96px, 11vw, 150px);
-  }
-
-  .services .t-lead {
-    margin-top: 12px;
-  }
-
-  .services ul {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    margin-top: 40px;
-    border-top: 0.5px solid var(--hairline);
-  }
-
-  .services li {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 24px 12px 24px 0;
-    border-bottom: 0.5px solid var(--hairline);
-  }
-
-  .services li span:last-child {
-    display: grid;
-  }
-
-  .services b {
-    font-family: var(--font-display);
-    font-size: 18px;
-    font-weight: 650;
-    letter-spacing: -0.015em;
-    color: var(--ink);
-  }
-
-  .services small {
-    font-size: 14px;
-    color: var(--muted);
-  }
-
-  .tile {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    background: #e8edf5;
-    color: var(--slate);
-  }
-
-  .tile.local {
-    background: var(--sage-tint);
-    color: var(--sage-deep);
-  }
-
-  @media (max-width: 900px) {
-    .services ul {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-
   @media (max-width: 820px) {
     .grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .services ul {
       grid-template-columns: 1fr;
     }
   }

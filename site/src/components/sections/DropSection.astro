@@ -1,13 +1,11 @@
 ---
-import { shotsFor } from "../../data/shots";
 import { localeOf, translator } from "../../i18n";
 import DocTile from "../DocTile.astro";
 import Lines from "../Lines.astro";
-import ShotTabs from "../ShotTabs.astro";
+import ShotTabs, { type ShotTab } from "../ShotTabs.astro";
 
 const locale = localeOf(Astro.currentLocale);
 const t = translator(locale);
-const shots = shotsFor(locale);
 
 const fan = [
   { ext: "MP3", tint: "#3f6048", r: -16, x: -150, y: 26 },
@@ -17,11 +15,11 @@ const fan = [
   { ext: "WAV", tint: "#a07b5a", r: 16, x: 150, y: 26 },
 ];
 
-const tabs = [
+const tabs: ShotTab[] = [
   {
     id: "interviews",
     label: t({ en: "Interviews", it: "Interviste" }),
-    image: shots.interview,
+    shot: "interview",
     alt: t({
       en: "An interview in Parola. Each line carries the speaker's name and a timestamp.",
       it: "Un'intervista in Parola. Ogni riga riporta il nome di chi parla e il minutaggio.",
@@ -30,7 +28,7 @@ const tabs = [
   {
     id: "memos",
     label: t({ en: "Voice memos", it: "Memo vocali" }),
-    image: shots.memo,
+    shot: "memo",
     alt: t({
       en: "A short voice memo in Parola, summarized with its action items.",
       it: "Un breve memo vocale in Parola, riassunto insieme alle cose da fare.",
@@ -39,7 +37,7 @@ const tabs = [
   {
     id: "lectures",
     label: t({ en: "Lectures", it: "Lezioni" }),
-    image: shots.lecture,
+    shot: "lecture",
     alt: t({
       en: "A lecture transcript in Parola with chapters you can jump to.",
       it: "La trascrizione di una lezione in Parola, con i capitoli a cui saltare.",
@@ -48,7 +46,7 @@ const tabs = [
   {
     id: "subtitles",
     label: t({ en: "Subtitles", it: "Sottotitoli" }),
-    image: shots.export,
+    shot: "export",
     alt: t({
       en: "Parola's export sheet previewing SubRip subtitles before saving.",
       it: "La finestra di esportazione di Parola con l'anteprima dei sottotitoli SubRip.",
