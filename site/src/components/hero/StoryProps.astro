@@ -78,6 +78,12 @@ const bars = Array.from({ length: barCount }, (_, i) => {
     --doc-width: 124px;
   }
 
+  @media (max-height: 740px) and (min-width: 1101px) {
+    .files .prop {
+      --doc-unit: 0.8px;
+    }
+  }
+
   :global([data-scene="0"]) .files,
   :global([data-scene="1"]) .files,
   :global([data-scene="2"]) .people,
