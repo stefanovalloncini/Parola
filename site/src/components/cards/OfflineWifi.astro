@@ -1,0 +1,121 @@
+---
+interface Props {
+  label: string;
+  network: string;
+  off: string;
+}
+
+const { label, network, off } = Astro.props;
+---
+
+<div class="control">
+  <span class="glyph">
+    <svg viewBox="0 0 20 16">
+      <path d="M10 13.6 12.6 11a3.7 3.7 0 0 0-5.2 0L10 13.6Z"></path>
+      <path d="M5.3 9a6.6 6.6 0 0 1 9.4 0l1.5-1.5a8.8 8.8 0 0 0-12.4 0L5.3 9Z"></path>
+      <path d="M2.2 5.9a11 11 0 0 1 15.6 0l1.5-1.5a13.2 13.2 0 0 0-18.6 0l1.5 1.5Z"></path>
+    </svg>
+  </span>
+  <span class="label">
+    <b>{label}</b>
+    <span class="state">
+      <span class="on">{network}</span>
+      <span class="off">{off}</span>
+    </span>
+  </span>
+  <span class="toggle">
+    <i></i>
+  </span>
+</div>
+
+<style>
+  .control {
+    position: absolute;
+    top: calc(40 * var(--u));
+    right: calc(16 * var(--u));
+    display: flex;
+    align-items: center;
+    gap: calc(12 * var(--u));
+    width: calc(250 * var(--u));
+    padding: calc(12 * var(--u)) calc(14 * var(--u));
+    border-radius: calc(18 * var(--u));
+    background: rgb(246 246 244 / 0.94);
+    box-shadow: 0 calc(12 * var(--u)) calc(30 * var(--u)) rgb(0 0 0 / 0.22);
+    color: #1d201e;
+  }
+  .glyph {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: calc(30 * var(--u));
+    height: calc(30 * var(--u));
+    border-radius: 50%;
+    background: #54739e;
+    color: #fff;
+    transition: background-color 0.3s;
+  }
+  .glyph svg {
+    width: calc(16 * var(--u));
+    fill: currentColor;
+  }
+  .label {
+    display: grid;
+    flex: 1;
+  }
+  .state {
+    display: grid;
+    color: #6b716d;
+    font-size: max(10px, calc(11.5 * var(--u)));
+  }
+  .state > span {
+    grid-area: 1 / 1;
+    transition: opacity 0.25s;
+  }
+  .toggle {
+    position: relative;
+    flex: none;
+    width: calc(38 * var(--u));
+    height: calc(22 * var(--u));
+    border-radius: 999px;
+    background: #54739e;
+    transition: background-color 0.3s;
+  }
+  .toggle i {
+    position: absolute;
+    top: calc(2 * var(--u));
+    left: calc(18 * var(--u));
+    width: calc(18 * var(--u));
+    height: calc(18 * var(--u));
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+    transition: translate 0.3s var(--ease-out);
+  }
+
+  .off {
+    opacity: 0;
+  }
+
+  :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .glyph,
+  :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .toggle {
+    background: #c9ccc9;
+  }
+
+  :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .toggle i {
+    translate: calc(-16 * var(--u)) 0;
+  }
+
+  :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .on {
+    opacity: 0;
+  }
+
+  :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .off {
+    opacity: 1;
+  }
+
+  @container (max-width: 699px) {
+    .control {
+      width: calc(260 * var(--u));
+    }
+  }
+</style>

@@ -1,0 +1,64 @@
+---
+interface Props {
+  menus: readonly string[];
+}
+
+const { menus } = Astro.props;
+---
+
+<div class="menubar">
+  <b>Parola</b>
+  {menus.map((menu) => (
+    <span>{menu}</span>
+  ))}
+  <span class="status">
+    <svg class="wifi" viewBox="0 0 20 16">
+      <path d="M10 13.6 12.6 11a3.7 3.7 0 0 0-5.2 0L10 13.6Z"></path>
+      <path class="arc" d="M5.3 9a6.6 6.6 0 0 1 9.4 0l1.5-1.5a8.8 8.8 0 0 0-12.4 0L5.3 9Z"></path>
+      <path
+        class="arc"
+        d="M2.2 5.9a11 11 0 0 1 15.6 0l1.5-1.5a13.2 13.2 0 0 0-18.6 0l1.5 1.5Z"
+      ></path>
+      <path class="slash" d="M3 1.5 17 15"></path>
+    </svg>
+    <span>9:41</span>
+  </span>
+</div>
+
+<style>
+  .menubar {
+    display: flex;
+    align-items: center;
+    gap: calc(16 * var(--u));
+    height: calc(28 * var(--u));
+    padding-inline: calc(16 * var(--u));
+    background: rgb(255 255 255 / 0.55);
+    color: #1d201e;
+    font-size: max(10px, calc(12 * var(--u)));
+  }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: calc(12 * var(--u));
+    margin-left: auto;
+  }
+  .wifi {
+    width: calc(18 * var(--u));
+    fill: currentColor;
+  }
+  .wifi .slash {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    opacity: 0;
+  }
+
+  :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .wifi .slash {
+    opacity: 1;
+  }
+
+  :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .wifi .arc {
+    opacity: 0.3;
+  }
+</style>

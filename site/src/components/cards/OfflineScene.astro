@@ -1,0 +1,200 @@
+---
+import { translator } from "../../i18n";
+import BrandIcon from "../BrandIcon.astro";
+import OfflineMenuBar from "./OfflineMenuBar.astro";
+import OfflineWifi from "./OfflineWifi.astro";
+
+const t = translator(Astro.currentLocale);
+const copy = t({
+  en: {
+    menus: ["File", "Edit", "View"],
+    wifi: "Wi‑Fi",
+    network: "Studio",
+    off: "Off",
+    working: "Transcribing Interview.m4a…",
+    done: "Interview.m4a",
+    lines: [
+      ["00:00", "Thanks for making time, Maya."],
+      ["00:07", "Sure. It was our Thursday planning call."],
+      ["00:15", "How did that go?"],
+    ],
+  },
+  it: {
+    menus: ["Archivio", "Modifica", "Vista"],
+    wifi: "Wi‑Fi",
+    network: "Studio",
+    off: "Disattivato",
+    working: "Trascrizione di Intervista.m4a…",
+    done: "Intervista.m4a",
+    lines: [
+      ["00:00", "Grazie per il tempo, Giulia."],
+      ["00:07", "Certo. Era la riunione del giovedì."],
+      ["00:15", "Com'è andata?"],
+    ],
+  },
+});
+const steps = [
+  [0, "online"],
+  [1100, "off"],
+  [2000, "working"],
+  [5600, "done"],
+];
+---
+
+<div
+  class="offline"
+  data-scene-loop={JSON.stringify(steps)}
+  data-duration="8800"
+  data-still="done"
+  data-state="done"
+  aria-hidden="true"
+>
+  <OfflineMenuBar menus={copy.menus} />
+  <OfflineWifi label={copy.wifi} network={copy.network} off={copy.off} />
+
+  <div class="panel">
+    <div class="head">
+      <BrandIcon size={28} class="icon" />
+      <p class="title">
+        <span class="work">{copy.working}</span>
+        <span class="done">{copy.done}</span>
+      </p>
+    </div>
+    <span class="track">
+      <i></i>
+    </span>
+    <ol class="lines">
+      {copy.lines.map(([time, text], i) => (
+        <li style={`--i: ${i}`}>
+          <time>{time}</time>
+          <span>{text}</span>
+        </li>
+      ))}
+    </ol>
+  </div>
+</div>
+
+<style>
+  .offline {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background:
+      radial-gradient(70% 80% at 85% 0%, rgb(252 242 230 / 0.85), transparent 70%),
+      radial-gradient(80% 90% at 0% 100%, #365342, transparent 70%),
+      linear-gradient(160deg, #b9cfb5, #6f8f6e 60%, #4a6b51);
+    font-size: max(11px, calc(13 * var(--u)));
+  }
+
+  .panel {
+    position: absolute;
+    left: calc(40 * var(--u));
+    bottom: calc(34 * var(--u));
+    width: calc(540 * var(--u));
+    padding: calc(18 * var(--u)) calc(20 * var(--u)) calc(20 * var(--u));
+    border-radius: calc(16 * var(--u));
+    background: #fbfbfa;
+    box-shadow: 0 calc(18 * var(--u)) calc(40 * var(--u)) rgb(0 0 0 / 0.28);
+    color: #1d201e;
+  }
+
+  .head {
+    display: flex;
+    align-items: center;
+    gap: calc(10 * var(--u));
+  }
+
+  .head :global(.icon) {
+    width: calc(28 * var(--u));
+    height: calc(28 * var(--u));
+  }
+
+  .title {
+    display: grid;
+    font-size: max(11px, calc(14 * var(--u)));
+    font-weight: 600;
+  }
+
+  .title > span {
+    grid-area: 1 / 1;
+    transition: opacity 0.25s;
+  }
+
+  .track {
+    display: block;
+    height: calc(4 * var(--u));
+    margin: calc(14 * var(--u)) 0 calc(12 * var(--u));
+    border-radius: 999px;
+    background: rgb(15 26 20 / 0.08);
+    overflow: hidden;
+    transition: opacity 0.3s;
+  }
+
+  .track i {
+    display: block;
+    height: 100%;
+    background: #54739e;
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  .lines {
+    display: grid;
+    gap: calc(8 * var(--u));
+    font-family: var(--font-serif);
+    font-size: max(12px, calc(17 * var(--u)));
+  }
+
+  .lines li {
+    display: grid;
+    grid-template-columns: max(38px, calc(44 * var(--u))) 1fr;
+    gap: calc(8 * var(--u));
+    opacity: 0;
+  }
+
+  .lines time {
+    padding-top: calc(2 * var(--u));
+    color: #54739e;
+    font-family: var(--font-mono);
+    font-size: max(10px, calc(11 * var(--u)));
+  }
+
+  .done {
+    opacity: 0;
+  }
+
+  [data-state="working"] .track i {
+    transform: none;
+    transition: transform 3.4s linear;
+  }
+
+  :is([data-state="working"], [data-state="done"]) .lines li {
+    opacity: 1;
+    transition: opacity 0.4s var(--ease-out) calc(var(--i) * 1s + 0.4s);
+  }
+
+  [data-state="done"] .lines li {
+    transition-delay: 0s;
+  }
+
+  [data-state="done"] .track {
+    opacity: 0;
+  }
+
+  [data-state="done"] .work {
+    opacity: 0;
+  }
+
+  [data-state="done"] .done {
+    opacity: 1;
+  }
+
+  @container (max-width: 699px) {
+    .panel {
+      left: calc(20 * var(--u));
+      right: calc(20 * var(--u));
+      bottom: calc(20 * var(--u));
+      width: auto;
+    }
+  }
+</style>
