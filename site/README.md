@@ -39,4 +39,5 @@ SITE_URL=https://example.com pnpm build
 pnpm dlx wrangler deploy
 ```
 
-Set `SITE_URL` to the real domain so canonical links and the social card use absolute URLs.
+Set `SITE_URL` to the real domain so canonical links and the social card use absolute URLs. The sitemap and
+the `Sitemap:` line in `robots.txt` are only generated when it is set.
