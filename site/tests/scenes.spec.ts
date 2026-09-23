@@ -77,3 +77,25 @@ test("tab screenshots fill their crop", async ({ page }) => {
     }
   }
 });
+
+test.describe("card scenes keep their parts apart", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  for (const path of ["/", "/it/"]) {
+    for (const width of [1440, 390]) {
+      test(`${path} meeting slide title clears the alert at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(path);
+        const gap = await page.locator(".meeting").evaluate((scene) => {
+          scene.dataset.state = "alert";
+          const title = scene.querySelector(".shared p");
+          const range = document.createRange();
+          range.selectNodeContents(title ?? scene);
+          const alert = scene.querySelector(".alert")?.getBoundingClientRect();
+          return (alert?.left ?? 0) - range.getBoundingClientRect().right;
+        });
+        expect(gap).toBeGreaterThan(4);
+      });
+    }
+  }
+});
