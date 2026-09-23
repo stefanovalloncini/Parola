@@ -36,6 +36,7 @@ const steps = [
   aria-hidden="true"
 >
   <p class="bubble you">
+    <span class="sizer">{ask}</span>
     <span data-type="asking" data-text={ask}>
       {ask}
     </span>
@@ -73,10 +74,18 @@ const steps = [
   }
 
   .you {
+    display: grid;
     align-self: flex-end;
-    min-height: calc(46 * var(--u));
     background: var(--ink);
     color: var(--cream);
+  }
+
+  .you > span {
+    grid-area: 1 / 1;
+  }
+
+  .sizer {
+    visibility: hidden;
   }
 
   .reply {

@@ -10,15 +10,17 @@ interface Scene {
   timers: number[];
 }
 
-function typeWords(target: HTMLElement, from: number, until: number, scene: Scene): void {
-  const words = (target.dataset.text ?? "").split(" ");
+function typeText(target: HTMLElement, from: number, until: number, scene: Scene): void {
+  const text = target.dataset.text ?? "";
+  const glue = text.includes(" ") ? " " : "";
+  const pieces = text.split(glue);
   const span = Math.max(until - from, 1);
   target.textContent = "";
-  words.forEach((_, index) => {
-    const at = from + (span * (index + 1)) / words.length;
+  pieces.forEach((_, index) => {
+    const at = from + (span * (index + 1)) / pieces.length;
     scene.timers.push(
       window.setTimeout(() => {
-        target.textContent = words.slice(0, index + 1).join(" ");
+        target.textContent = pieces.slice(0, index + 1).join(glue);
       }, at),
     );
   });
@@ -34,7 +36,7 @@ function play(scene: Scene): void {
     );
     const next = scene.steps[index + 1]?.[0] ?? scene.duration;
     scene.root.querySelectorAll<HTMLElement>(`[data-type="${state}"]`).forEach((target) => {
-      typeWords(target, at, next - 120, scene);
+      typeText(target, at, next - 120, scene);
     });
   });
   scene.timers.push(window.setTimeout(() => play(scene), scene.duration));

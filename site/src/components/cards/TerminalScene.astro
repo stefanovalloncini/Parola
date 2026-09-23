@@ -139,8 +139,6 @@ const steps = [
   .out p {
     margin-bottom: calc(10 * var(--u));
     opacity: 0;
-    transition: opacity 0.25s;
-    transition-delay: calc(var(--i) * 0.4s);
   }
 
   .dim {
@@ -153,6 +151,7 @@ const steps = [
 
   :is([data-state="output"], [data-state="rest"]) .out p {
     opacity: 1;
+    transition: opacity 0.25s calc(var(--i) * 0.4s);
   }
 
   :is([data-state="output"], [data-state="rest"]) .cursor {

@@ -8,15 +8,15 @@ const t = translator(Astro.currentLocale);
 const steps = [
   [0, "idle"],
   [700, "alert"],
-  [3000, "press"],
-  [3500, "recording"],
+  [2900, "press"],
+  [3300, "recording"],
 ];
 ---
 
 <div
   class="meeting"
   data-scene-loop={JSON.stringify(steps)}
-  data-duration="8200"
+  data-duration="7600"
   data-still="alert"
   aria-hidden="true"
 >
@@ -40,7 +40,7 @@ const steps = [
     <span class="app"></span>
     <span class="parola">
       <BrandIcon size={34} />
-      <b class="badge">0:04</b>
+      <b class="badge"></b>
     </span>
     <span class="app"></span>
   </div>
@@ -95,11 +95,9 @@ const steps = [
     font-size: calc(9.5 * var(--u));
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+    counter-reset: seconds var(--seconds);
     opacity: 0;
     scale: 0.6;
-    transition:
-      opacity 0.3s var(--ease-out),
-      scale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .alert {
@@ -172,8 +170,28 @@ const steps = [
     filter: brightness(0.86);
   }
 
+  .badge::after {
+    content: "0:0" counter(seconds);
+  }
+
   [data-state="recording"] .badge {
     opacity: 1;
     scale: 1;
+    transition:
+      opacity 0.3s var(--ease-out),
+      scale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: meeting-seconds 4s steps(4, jump-none) forwards;
+  }
+
+  @property --seconds {
+    syntax: "<integer>";
+    inherits: false;
+    initial-value: 1;
+  }
+
+  @keyframes meeting-seconds {
+    to {
+      --seconds: 4;
+    }
   }
 </style>
