@@ -91,3 +91,63 @@ export function propsFor(locale: Locale) {
     people: people.map((person) => ({ ...person, initials: person.initials[locale] })),
   };
 }
+
+interface Beat {
+  before: string;
+  mark: string;
+  punct: string;
+  after: string;
+  ownLine?: boolean;
+}
+
+export const storyBeats: Record<Locale, Beat[]> = {
+  en: [
+    {
+      before: "Audio,",
+      mark: "written down",
+      punct: ".",
+      after: "Right here on your Mac.",
+      ownLine: true,
+    },
+    { before: "Drop in", mark: "any recording", punct: ",", after: "or paste a YouTube link." },
+    {
+      before: "It records your",
+      mark: "meetings",
+      punct: ".",
+      after: "No\u00a0bot joins the call.",
+    },
+    {
+      before: "Hold a key and",
+      mark: "speak",
+      punct: ".",
+      after: "Words land where you type.",
+    },
+  ],
+  it: [
+    {
+      before: "Audio,",
+      mark: "per iscritto",
+      punct: ".",
+      after: "Qui, sul tuo Mac.",
+      ownLine: true,
+    },
+    {
+      before: "Trascina",
+      mark: "qualsiasi audio",
+      punct: ",",
+      after: "o incolla un link di YouTube.",
+    },
+    {
+      before: "Registra anche le",
+      mark: "riunioni",
+      punct: ".",
+      after: "Nessun bot in chiamata.",
+    },
+    {
+      before: "Tieni premuto un tasto e",
+      mark: "parla",
+      punct: ".",
+      after: "Il testo arriva dove scrivi.",
+    },
+  ],
+};

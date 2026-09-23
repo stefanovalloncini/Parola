@@ -1,6 +1,7 @@
 ---
 import { Picture } from "astro:assets";
 import { shotsFor } from "../../data/shots";
+import { storyBeats } from "../../data/story";
 import { localeOf, translator } from "../../i18n";
 import Desktop from "../device/Desktop.astro";
 import DraggedFile from "./DraggedFile.astro";
@@ -15,57 +16,7 @@ const shots = shotsFor(locale);
 const shotSizes =
   "(min-width: 1600px) min(787px, calc(108vh - 424px)), (min-width: 721px) min(651px, 70vw, calc(108vh - 424px)), 70vw";
 
-const beats = t({
-  en: [
-    {
-      before: "Audio,",
-      mark: "written down",
-      punct: ".",
-      after: "Right here on your Mac.",
-      ownLine: true,
-    },
-    { before: "Drop in", mark: "any recording", punct: ",", after: "or paste a YouTube link." },
-    {
-      before: "It records your",
-      mark: "meetings",
-      punct: ".",
-      after: "No\u00a0bot joins the call.",
-    },
-    {
-      before: "Hold a key and",
-      mark: "speak",
-      punct: ".",
-      after: "Words land where you type.",
-    },
-  ],
-  it: [
-    {
-      before: "Audio,",
-      mark: "per iscritto",
-      punct: ".",
-      after: "Qui, sul tuo Mac.",
-      ownLine: true,
-    },
-    {
-      before: "Trascina",
-      mark: "qualsiasi audio",
-      punct: ",",
-      after: "o incolla un link di YouTube.",
-    },
-    {
-      before: "Registra anche le",
-      mark: "riunioni",
-      punct: ".",
-      after: "Nessun bot in chiamata.",
-    },
-    {
-      before: "Tieni premuto un tasto e",
-      mark: "parla",
-      punct: ".",
-      after: "Il testo arriva dove scrivi.",
-    },
-  ],
-});
+const beats = t(storyBeats);
 ---
 
 <section class="story" data-story aria-labelledby="story-title">
@@ -79,7 +30,7 @@ const beats = t({
             <span class="mark">{beat.mark}</span>
             {beat.punct}
           </span>{" "}
-          {"ownLine" in beat ? <span class="own-line">{beat.after}</span> : beat.after}
+          {beat.ownLine ? <span class="own-line">{beat.after}</span> : beat.after}
         </Tag>
       );
     })}
