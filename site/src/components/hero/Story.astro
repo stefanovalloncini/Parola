@@ -1,7 +1,7 @@
 ---
 import { Picture } from "astro:assets";
-import dropShot from "../../assets/shots/drop-zone.png";
-import windowShot from "../../assets/shots/hero-window.png";
+import { shotsFor } from "../../data/shots";
+import { localeOf, translator } from "../../i18n";
 import Desktop from "../device/Desktop.astro";
 import DraggedFile from "./DraggedFile.astro";
 import MacBook from "../device/MacBook.astro";
@@ -9,35 +9,67 @@ import SceneDictation from "./SceneDictation.astro";
 import SceneMeeting from "./SceneMeeting.astro";
 import StoryProps from "./StoryProps.astro";
 
+const locale = localeOf(Astro.currentLocale);
+const t = translator(locale);
+const shots = shotsFor(locale);
 const shotSizes = "calc(min(860px, 92vw) * 0.8)";
+
+const beats = t({
+  en: [
+    { before: "Audio,", mark: "written down", punct: ".", after: "Right here on your Mac." },
+    { before: "Drop in", mark: "any recording", punct: ",", after: "or paste a YouTube link." },
+    {
+      before: "It records your",
+      mark: "meetings",
+      punct: "",
+      after: "too. No bot joins the call.",
+    },
+    {
+      before: "Hold a key and",
+      mark: "speak",
+      punct: ".",
+      after: "The words land where you type.",
+    },
+  ],
+  it: [
+    { before: "Audio,", mark: "in parola", punct: ".", after: "Qui, sul tuo Mac." },
+    {
+      before: "Trascina",
+      mark: "una registrazione",
+      punct: ",",
+      after: "o incolla un link di YouTube.",
+    },
+    {
+      before: "Registra anche le tue",
+      mark: "riunioni",
+      punct: ".",
+      after: "Nessun bot si unisce alla chiamata.",
+    },
+    {
+      before: "Tieni premuto un tasto e",
+      mark: "parla",
+      punct: ".",
+      after: "Le parole arrivano dove stai scrivendo.",
+    },
+  ],
+});
 ---
 
 <section class="story" data-story aria-labelledby="story-title">
   <div class="beats">
-    <h1 id="story-title" class="t-hero beat" data-beat>
-      Audio,{" "}
-      <span class="keep">
-        <span class="mark">written down</span>.
-      </span>{" "}
-      Right here on your Mac.
-    </h1>
-    <p class="t-hero beat" data-beat>
-      Drop in{" "}
-      <span class="keep">
-        <span class="mark">any recording</span>,
-      </span>{" "}
-      or paste a YouTube link.
-    </p>
-    <p class="t-hero beat" data-beat>
-      It records your <span class="mark">meetings</span> too. No bot joins the call.
-    </p>
-    <p class="t-hero beat" data-beat>
-      Hold a key and{" "}
-      <span class="keep">
-        <span class="mark">speak</span>.
-      </span>{" "}
-      The words land where you type.
-    </p>
+    {beats.map((beat, index) => {
+      const Tag = index === 0 ? "h1" : "p";
+      return (
+        <Tag id={index === 0 ? "story-title" : undefined} class="t-hero beat" data-beat>
+          {beat.before}{" "}
+          <span class="keep">
+            <span class="mark">{beat.mark}</span>
+            {beat.punct}
+          </span>{" "}
+          {beat.after}
+        </Tag>
+      );
+    })}
   </div>
 
   <div class="track" aria-hidden="true">
@@ -48,7 +80,7 @@ const shotSizes = "calc(min(860px, 92vw) * 0.8)";
         <Desktop>
           <div class="scene scene-window">
             <Picture
-              src={windowShot}
+              src={shots["hero-window"]}
               alt=""
               formats={["avif", "webp"]}
               widths={[720, 1080, 1440, 2160]}
@@ -59,7 +91,7 @@ const shotSizes = "calc(min(860px, 92vw) * 0.8)";
           </div>
           <div class="scene scene-drop">
             <Picture
-              src={dropShot}
+              src={shots["drop-zone"]}
               alt=""
               formats={["avif", "webp"]}
               widths={[720, 1080, 1440, 2160]}

@@ -1,64 +1,21 @@
 ---
+import { credits as creditCopy, openWork } from "../../data/credits";
 import { links } from "../../data/links";
+import { translator } from "../../i18n";
 import BrandIcon from "../BrandIcon.astro";
 
-const credits = [
-  {
-    before: "Runs OpenAI's Whisper as",
-    mark: "Core ML models on Apple Silicon",
-    after: ".",
-    name: "WhisperKit, by Argmax",
-    href: "https://github.com/argmaxinc/WhisperKit",
-  },
-  {
-    before: "Tells the voices in a recorded file",
-    mark: "apart",
-    after: ", so each line gets a speaker.",
-    name: "SpeakerKit, by Argmax",
-    href: "https://github.com/argmaxinc/WhisperKit",
-  },
-  {
-    before: "Runs NVIDIA's Parakeet and the live speaker labels",
-    mark: "on the Neural Engine",
-    after: ".",
-    name: "FluidAudio",
-    href: "https://github.com/FluidInference/FluidAudio",
-  },
-  {
-    before: "The",
-    mark: "speech engine built into macOS 26",
-    after: ", so there's nothing to download.",
-    name: "Speech framework, by Apple",
-  },
-  {
-    before: "Summaries, chapters and titles,",
-    mark: "written on your Mac",
-    after: ".",
-    name: "Apple Intelligence",
-  },
-  {
-    before: "Fetches the audio behind",
-    mark: "a link you paste",
-    after: ", from YouTube and many other sites.",
-    name: "yt-dlp",
-    href: "https://github.com/yt-dlp/yt-dlp",
-  },
-  {
-    before: "Translates a finished transcript",
-    mark: "on device",
-    after: ", into the languages your Mac offers.",
-    name: "Translation framework, by Apple",
-  },
-];
+const t = translator(Astro.currentLocale);
+const credits = t(creditCopy);
+const copy = t(openWork);
 ---
 
 <section class="open section" aria-labelledby="open-title">
   <div class="container">
     <div class="section-head">
       <h2 id="open-title" class="t-section" data-words>
-        Built on open work.
+        {copy.title}
       </h2>
-      <p class="t-lead">The pieces under Parola are open source or part of macOS.</p>
+      <p class="t-lead">{copy.lead}</p>
     </div>
     <ul class="wall">
       {credits.map((credit) => (
@@ -79,11 +36,11 @@ const credits = [
       <li class="source">
         <BrandIcon size={44} />
         <p class="quote">
-          Parola itself is MIT licensed. <span class="hl">Read every line</span>, change what you
-          like.
+          {copy.sourceBefore} <span class="hl">{copy.sourceMark}</span>
+          {copy.sourceAfter}
         </p>
         <a class="button" href={links.repository}>
-          View the source on GitHub
+          {copy.button}
         </a>
       </li>
     </ul>

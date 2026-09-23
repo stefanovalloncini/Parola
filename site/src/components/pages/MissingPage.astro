@@ -1,0 +1,53 @@
+---
+import { localeOf, pathFor, translator } from "../../i18n";
+import Base from "../../layouts/Base.astro";
+
+const locale = localeOf(Astro.currentLocale);
+const t = translator(locale);
+const copy = t({
+  en: {
+    title: "Page not found – Parola",
+    description: "This page doesn't exist.",
+    heading: "This page isn't here.",
+    lead: "The link may be old, or the address has a typo.",
+    home: "Go to the home page",
+  },
+  it: {
+    title: "Pagina non trovata – Parola",
+    description: "Questa pagina non esiste.",
+    heading: "Questa pagina non c'è.",
+    lead: "Il link potrebbe essere vecchio, o l'indirizzo contiene un errore.",
+    home: "Vai alla pagina iniziale",
+  },
+});
+---
+
+<Base title={copy.title} description={copy.description} indexed={false}>
+  <section class="narrow missing">
+    <h1 class="t-title">{copy.heading}</h1>
+    <p class="t-lead">{copy.lead}</p>
+    <a class="home" href={pathFor(locale, "/")}>
+      {copy.home}
+    </a>
+  </section>
+</Base>
+
+<style>
+  .missing {
+    min-height: 60vh;
+    display: grid;
+    align-content: center;
+    justify-items: start;
+    gap: 18px;
+    padding-block: 96px;
+  }
+
+  .home {
+    margin-top: 8px;
+    padding: 12px 20px;
+    border-radius: var(--radius-control);
+    background: var(--ink);
+    color: var(--cream);
+    font-weight: 600;
+  }
+</style>

@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-for (const path of ["/", "/privacy", "/404"]) {
+for (const path of ["/", "/privacy/", "/404", "/it/", "/it/privacy/", "/it/404.html"]) {
   test(`${path} has no axe violations`, async ({ page }) => {
     await page.goto(path);
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));

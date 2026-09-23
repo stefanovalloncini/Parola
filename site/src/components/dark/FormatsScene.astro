@@ -1,4 +1,7 @@
 ---
+import { translator } from "../../i18n";
+
+const t = translator(Astro.currentLocale);
 const formats = [
   ".srt",
   ".vtt",
@@ -28,7 +31,7 @@ const steps = formats.map((_, i) => [i * 620, `f${i}`]);
     {formats.map((format, i) => (
       <li data-at={`f${i}`}>{format}</li>
     ))}
-    <li class="burn">Burn into video</li>
+    <li class="burn">{t({ en: "Burn into video", it: "Imprimi nel video" })}</li>
   </ul>
 </div>
 

@@ -1,98 +1,163 @@
 ---
-import karaokeShot from "../../assets/shots/dark-karaoke.png";
-import speakersShot from "../../assets/shots/dark-speakers.png";
-import translationShot from "../../assets/shots/dark-translation.png";
+import { shotsFor } from "../../data/shots";
+import { localeOf, translator } from "../../i18n";
 import FeatureCard from "../cards/FeatureCard.astro";
 import FormatsScene from "../dark/FormatsScene.astro";
 import Karaoke from "../dark/Karaoke.astro";
 import LanguagesScene from "../dark/LanguagesScene.astro";
 import SpeakersScene from "../dark/SpeakersScene.astro";
 import FeatureRows, { type FeatureRow } from "../FeatureRows.astro";
+import Lines from "../Lines.astro";
 import ShotTabs from "../ShotTabs.astro";
+
+const locale = localeOf(Astro.currentLocale);
+const t = translator(locale);
+const shots = shotsFor(locale);
 
 const tabs = [
   {
     id: "speakers",
-    label: "Speakers",
-    image: speakersShot,
-    alt: "A meeting transcript in dark mode with three named speakers, each in their own color.",
+    label: t({ en: "Speakers", it: "Persone" }),
+    image: shots["dark-speakers"],
+    alt: t({
+      en: "A meeting transcript in dark mode with three named speakers, each in their own color.",
+      it: "La trascrizione di una riunione in modalità scura, con tre persone e un colore per ciascuna.",
+    }),
   },
   {
     id: "timing",
-    label: "Word timing",
-    image: karaokeShot,
-    alt: "A transcript playing back in dark mode, with the word being spoken highlighted.",
+    label: t({ en: "Word timing", it: "Tempi delle parole" }),
+    image: shots["dark-karaoke"],
+    alt: t({
+      en: "A transcript playing back in dark mode, with the word being spoken highlighted.",
+      it: "Una trascrizione in riproduzione in modalità scura, con la parola pronunciata evidenziata.",
+    }),
   },
   {
     id: "translation",
-    label: "Translation",
-    image: translationShot,
-    alt: "A transcript in dark mode with its translation shown side by side.",
+    label: t({ en: "Translation", it: "Traduzione" }),
+    image: shots["dark-translation"],
+    alt: t({
+      en: "A transcript in dark mode with its translation shown side by side.",
+      it: "Una trascrizione in modalità scura con la traduzione affiancata.",
+    }),
   },
 ];
 
-const rows: FeatureRow[] = [
-  {
-    icon: "wave",
-    title: "Apple Speech",
-    text: "It's built into macOS, so it works the moment you open Parola. There's nothing to download.",
+const rows: FeatureRow[] = t({
+  en: [
+    {
+      icon: "wave",
+      title: "Apple Speech",
+      text: "It's built into macOS, so it works the moment you open Parola. There's nothing to download.",
+    },
+    {
+      icon: "bubble",
+      title: "Whisper",
+      text: "OpenAI's speech model, compiled for Apple Silicon. Large v3 Turbo is the best balance for most people.",
+    },
+    {
+      icon: "bolt",
+      title: "Parakeet",
+      text: "NVIDIA's model, running through FluidAudio. It's the fastest multilingual option on Apple Silicon.",
+    },
+    {
+      icon: "pencil",
+      title: "Edit and fix",
+      text: "Edit any line, or split and merge segments. Find and replace fixes a name everywhere at once.",
+    },
+  ],
+  it: [
+    {
+      icon: "wave",
+      title: "Apple Speech",
+      text: "È integrato in macOS, quindi funziona appena apri Parola. Non c'è niente da scaricare.",
+    },
+    {
+      icon: "bubble",
+      title: "Whisper",
+      text: "Il modello vocale di OpenAI, compilato per Apple Silicon. Large v3 Turbo è il compromesso migliore per quasi tutti.",
+    },
+    {
+      icon: "bolt",
+      title: "Parakeet",
+      text: "Il modello di NVIDIA, tramite FluidAudio. È l'opzione multilingue più veloce su Apple Silicon.",
+    },
+    {
+      icon: "pencil",
+      title: "Modifica e correggi",
+      text: "Modifica qualsiasi riga, oppure dividi e unisci i segmenti. Trova e sostituisci corregge un nome ovunque in un colpo solo.",
+    },
+  ],
+});
+
+const copy = t({
+  en: {
+    title: ["Three engines.", "Pick the one that fits."],
+    lead: "Apple Speech works the moment you open Parola. Whisper and Parakeet download once, then run offline.",
+    tabs: "Transcript views",
+    speakers: {
+      title: "Who said what",
+      text: "Turn on Diarize and every line gets a speaker. Name them, and a person keeps their name and color in every transcript you add them to.",
+    },
+    words: {
+      title: "Word by word",
+      text: "The word being spoken lights up as you listen. Click a line to jump straight to it.",
+    },
+    formats: {
+      title: "Thirteen formats",
+      text: "Subtitles, documents or data, including SRT, Word, PDF and Final Cut Pro XML. You can also burn the captions into a copy of the video.",
+    },
+    languages: {
+      title: "Your language",
+      text: "Pick one of 13 languages or let Parola detect it. Parakeet v3 covers 25 European languages.",
+    },
   },
-  {
-    icon: "bubble",
-    title: "Whisper",
-    text: "OpenAI's speech model, compiled for Apple Silicon. Large v3 Turbo is the best balance for most people.",
+  it: {
+    title: ["Tre motori.", "Scegli quello che fa per te."],
+    lead: "Apple Speech funziona appena apri Parola. Whisper e Parakeet si scaricano una volta sola, poi lavorano offline.",
+    tabs: "Viste della trascrizione",
+    speakers: {
+      title: "Chi ha detto cosa",
+      text: "Attiva Diarizza e ogni riga ha il suo autore. Dai un nome alle persone: nome e colore le seguono in ogni trascrizione a cui le aggiungi.",
+    },
+    words: {
+      title: "Parola per parola",
+      text: "La parola pronunciata si illumina mentre ascolti. Fai clic su una riga per saltare lì.",
+    },
+    formats: {
+      title: "Tredici formati",
+      text: "Sottotitoli, documenti o dati, tra cui SRT, Word, PDF e Final Cut Pro XML. Puoi anche imprimere i sottotitoli in una copia del video.",
+    },
+    languages: {
+      title: "La tua lingua",
+      text: "Scegli una delle 13 lingue o lascia che Parola la riconosca. Parakeet v3 copre 25 lingue europee.",
+    },
   },
-  {
-    icon: "bolt",
-    title: "Parakeet",
-    text: "NVIDIA's model, running through FluidAudio. It's the fastest multilingual option on Apple Silicon.",
-  },
-  {
-    icon: "pencil",
-    title: "Edit and fix",
-    text: "Edit any line, or split and merge segments. Find and replace fixes a name everywhere at once.",
-  },
-];
+});
 ---
 
 <section class="engines section" data-theme="dark" aria-labelledby="engines-title">
   <div class="container">
     <div class="section-head">
       <h2 id="engines-title" class="t-section" data-words>
-        Three engines.
-        <br />
-        Pick the one that fits.
+        <Lines lines={copy.title} />
       </h2>
-      <p class="t-lead">
-        Apple Speech works the moment you open Parola. Whisper and Parakeet download once, then run
-        offline.
-      </p>
+      <p class="t-lead">{copy.lead}</p>
     </div>
-    <ShotTabs name="engines" tabs={tabs} label="Transcript views" />
+    <ShotTabs name="engines" tabs={tabs} label={copy.tabs} />
 
     <div class="grid">
-      <FeatureCard
-        title="Who said what"
-        text="Turn on Diarize and every line gets a speaker. Name them, and a person keeps their name and color in every transcript you add them to."
-      >
+      <FeatureCard title={copy.speakers.title} text={copy.speakers.text}>
         <SpeakersScene />
       </FeatureCard>
-      <FeatureCard
-        title="Word by word"
-        text="The word being spoken lights up as you listen. Click a line to jump straight to it."
-      >
+      <FeatureCard title={copy.words.title} text={copy.words.text}>
         <Karaoke />
       </FeatureCard>
-      <FeatureCard
-        title="Thirteen formats"
-        text="Subtitles, documents or data, including SRT, Word, PDF and Final Cut Pro XML. You can also burn the captions into a copy of the video."
-      >
+      <FeatureCard title={copy.formats.title} text={copy.formats.text}>
         <FormatsScene />
       </FeatureCard>
-      <FeatureCard
-        title="Your language"
-        text="Pick one of 13 languages or let Parola detect it. Parakeet v3 covers 25 European languages."
-      >
+      <FeatureCard title={copy.languages.title} text={copy.languages.text}>
         <LanguagesScene />
       </FeatureCard>
     </div>

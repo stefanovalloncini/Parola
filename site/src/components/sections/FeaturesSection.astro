@@ -4,57 +4,113 @@ import DictationScene from "../cards/DictationScene.astro";
 import FeatureCard from "../cards/FeatureCard.astro";
 import LinkScene from "../cards/LinkScene.astro";
 import MeetingScene from "../cards/MeetingScene.astro";
+import { translator } from "../../i18n";
 import FeatureRows, { type FeatureRow } from "../FeatureRows.astro";
 
-const rows: FeatureRow[] = [
-  {
-    icon: "speaker",
-    title: "Your Mac's audio",
-    text: "Record the microphone or anything your Mac plays. Set a timer and the recording stops on its own.",
+const t = translator(Astro.currentLocale);
+
+const rows: FeatureRow[] = t({
+  en: [
+    {
+      icon: "speaker",
+      title: "Your Mac's audio",
+      text: "Record the microphone or anything your Mac plays. Set a timer and the recording stops on its own.",
+    },
+    {
+      icon: "stack",
+      title: "Batch",
+      text: "Queue a folder of files. They run one after another and skip anything already in your library.",
+    },
+    {
+      icon: "folder",
+      title: "Watched folders",
+      text: "Pick a folder and every new file that lands in it gets transcribed.",
+    },
+    {
+      icon: "search",
+      title: "Search everything",
+      text: "Find a word across every transcript, summary and speaker name in your library.",
+    },
+  ],
+  it: [
+    {
+      icon: "speaker",
+      title: "L'audio del Mac",
+      text: "Registra il microfono o qualsiasi suono del Mac. Imposta un timer e la registrazione si ferma da sola.",
+    },
+    {
+      icon: "stack",
+      title: "Batch",
+      text: "Metti in coda una cartella di file. Partono uno dopo l'altro e saltano quelli già in libreria.",
+    },
+    {
+      icon: "folder",
+      title: "Cartelle monitorate",
+      text: "Scegli una cartella: ogni nuovo file che ci finisce dentro viene trascritto.",
+    },
+    {
+      icon: "search",
+      title: "Cerca ovunque",
+      text: "Trova una parola in tutte le trascrizioni, i riassunti e i nomi delle persone della libreria.",
+    },
+  ],
+});
+
+const cards = t({
+  en: {
+    label: "Recording, dictation and captions",
+    meetings: {
+      title: "Meetings",
+      text: "When Zoom, Teams or Webex opens, Parola offers to record the call. The recording stays on your Mac.",
+    },
+    dictation: {
+      title: "Dictation",
+      text: "Turn it on once, then hold F5 and talk. When you let go, the text appears in whatever app you were typing in.",
+    },
+    captions: {
+      title: "Live captions",
+      text: "Your words as subtitles, in a panel that stays on top. It can translate them to English as you speak.",
+    },
+    links: {
+      title: "Links",
+      text: "Paste a link from YouTube, Vimeo or SoundCloud. Parola fetches the audio and writes it down.",
+    },
   },
-  {
-    icon: "stack",
-    title: "Batch",
-    text: "Queue a folder of files. They run one after another and skip anything already in your library.",
+  it: {
+    label: "Registrazione, dettatura e sottotitoli",
+    meetings: {
+      title: "Riunioni",
+      text: "Quando apri Zoom, Teams o Webex, Parola propone di registrare la chiamata. La registrazione resta sul tuo Mac.",
+    },
+    dictation: {
+      title: "Dettatura",
+      text: "Attivala una volta, poi tieni premuto F5 e parla. Quando lo rilasci, il testo compare nell'app in cui stavi scrivendo.",
+    },
+    captions: {
+      title: "Sottotitoli in tempo reale",
+      text: "Le tue parole come sottotitoli, in un pannello sempre in primo piano. Se vuoi, le traduce in inglese mentre parli.",
+    },
+    links: {
+      title: "Link",
+      text: "Incolla un link da YouTube, Vimeo o SoundCloud. Parola scarica l'audio e lo trascrive.",
+    },
   },
-  {
-    icon: "folder",
-    title: "Watched folders",
-    text: "Pick a folder and every new file that lands in it gets transcribed.",
-  },
-  {
-    icon: "search",
-    title: "Search everything",
-    text: "Find a word across every transcript, summary and speaker name in your library.",
-  },
-];
+});
 ---
 
-<section class="section" aria-label="Recording, dictation and captions">
+<section class="section" aria-label={cards.label}>
   <div class="container">
     <div class="grid">
-      <FeatureCard
-        title="Meetings"
-        text="When Zoom, Teams or Webex opens, Parola offers to record the call. The recording stays on your Mac."
-      >
+      <FeatureCard title={cards.meetings.title} text={cards.meetings.text}>
         <MeetingScene />
       </FeatureCard>
-      <FeatureCard
-        title="Dictation"
-        text="Turn it on once, then hold F5 and talk. When you let go, the text appears in whatever app you were typing in."
-      >
+      <FeatureCard title={cards.dictation.title} text={cards.dictation.text}>
         <DictationScene />
       </FeatureCard>
-      <FeatureCard
-        title="Live captions"
-        text="Your words as subtitles, in a panel that stays on top. It can translate them to English as you speak."
-      >
+      <FeatureCard title={cards.captions.title} text={cards.captions.text}>
         <CaptionsScene />
       </FeatureCard>
-      <FeatureCard
-        title="Links"
-        text="Paste a link from YouTube, Vimeo or SoundCloud. Parola fetches the audio and writes it down."
-      >
+      <FeatureCard title={cards.links.title} text={cards.links.text}>
         <LinkScene />
       </FeatureCard>
     </div>

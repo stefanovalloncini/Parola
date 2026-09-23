@@ -1,14 +1,31 @@
 ---
+import { translator } from "../../i18n";
+
+const t = translator(Astro.currentLocale);
 const people = [
-  { name: "Maya Chen", hue: "#a9c2a6" },
-  { name: "Aiko Tanaka", hue: "#d9b48f" },
-  { name: "Tom Reyes", hue: "#85a3cc" },
+  { name: t({ en: "Maya Chen", it: "Giulia Ferri" }), hue: "#a9c2a6" },
+  { name: t({ en: "Aiko Tanaka", it: "Sara Conti" }), hue: "#d9b48f" },
+  { name: t({ en: "Tom Reyes", it: "Luca Moretti" }), hue: "#85a3cc" },
 ];
+const lines = t({
+  en: [
+    "Okay, let's start. Three things today.",
+    "I rewrote the onboarding copy. It's shorter now.",
+    "The second screen still sounds like a brochure.",
+    "Then that's the plan. Copy by Friday.",
+  ],
+  it: [
+    "Bene, cominciamo. Tre punti oggi.",
+    "Ho riscritto i testi dell'onboarding. Adesso sono più corti.",
+    "La seconda schermata sembra ancora un depliant.",
+    "Allora è deciso. Testi entro venerdì.",
+  ],
+});
 const turns = [
-  { who: 0, time: "00:00", text: "Okay, let's start. Three things today.", width: 24 },
-  { who: 1, time: "00:06", text: "I rewrote the onboarding copy. It's shorter now.", width: 28 },
-  { who: 2, time: "00:12", text: "The second screen still sounds like a brochure.", width: 22 },
-  { who: 0, time: "00:37", text: "Then that's the plan. Copy by Friday.", width: 26 },
+  { who: 0, time: "00:00", text: lines[0], width: 24 },
+  { who: 1, time: "00:06", text: lines[1], width: 28 },
+  { who: 2, time: "00:12", text: lines[2], width: 22 },
+  { who: 0, time: "00:37", text: lines[3], width: 26 },
 ];
 const steps = turns.map((_, i) => [i * 2100, `t${i}`]);
 const barsPerTurn = 12;

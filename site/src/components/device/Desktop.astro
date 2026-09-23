@@ -1,4 +1,5 @@
 ---
+import { translator } from "../../i18n";
 import WaveGlyph from "../WaveGlyph.astro";
 
 interface Props {
@@ -7,10 +8,23 @@ interface Props {
   clock?: string;
 }
 
+const t = translator(Astro.currentLocale);
 const {
   app = "Parola",
-  menus = ["File", "Edit", "View", "Playback", "Captions", "Transcript", "Window", "Help"],
-  clock = "Tue 22 Sep  9:41",
+  menus = t({
+    en: ["File", "Edit", "View", "Playback", "Captions", "Transcript", "Window", "Help"],
+    it: [
+      "Archivio",
+      "Modifica",
+      "Vista",
+      "Riproduzione",
+      "Sottotitoli",
+      "Trascrizione",
+      "Finestra",
+      "Aiuto",
+    ],
+  }),
+  clock = t({ en: "Tue 22 Sep  9:41", it: "mar 22 set  9:41" }),
 } = Astro.props;
 ---
 

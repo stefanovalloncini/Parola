@@ -1,33 +1,5 @@
 ---
-import Base from "../layouts/Base.astro";
+import MissingPage from "../components/pages/MissingPage.astro";
 ---
 
-<Base title="Page not found – Parola" description="This page doesn't exist.">
-  <section class="narrow missing">
-    <h1 class="t-title">This page isn't here.</h1>
-    <p class="t-lead">The link may be old, or the address has a typo.</p>
-    <a class="home" href="/">
-      Go to the home page
-    </a>
-  </section>
-</Base>
-
-<style>
-  .missing {
-    min-height: 60vh;
-    display: grid;
-    align-content: center;
-    justify-items: start;
-    gap: 18px;
-    padding-block: 96px;
-  }
-
-  .home {
-    margin-top: 8px;
-    padding: 12px 20px;
-    border-radius: var(--radius-control);
-    background: var(--ink);
-    color: var(--cream);
-    font-weight: 600;
-  }
-</style>
+<MissingPage />

@@ -1,80 +1,121 @@
 ---
-import chatShot from "../../assets/shots/ai-chat.png";
-import servicesShot from "../../assets/shots/ai-prompts.png";
-import summaryShot from "../../assets/shots/ai-summary.png";
+import { shotsFor } from "../../data/shots";
+import { localeOf, translator } from "../../i18n";
 import FeatureCard from "../cards/FeatureCard.astro";
 import PromptsScene from "../cards/PromptsScene.astro";
 import ProvidersScene from "../cards/ProvidersScene.astro";
 import Icon from "../Icon.astro";
+import Lines from "../Lines.astro";
 import ShotTabs from "../ShotTabs.astro";
+
+const locale = localeOf(Astro.currentLocale);
+const t = translator(locale);
+const shots = shotsFor(locale);
 
 const tabs = [
   {
     id: "summary",
-    label: "Summary",
-    image: summaryShot,
-    alt: "A meeting summary in Parola with key points and action items.",
+    label: t({ en: "Summary", it: "Riassunto" }),
+    image: shots["ai-summary"],
+    alt: t({
+      en: "A meeting summary in Parola with key points and action items.",
+      it: "Il riassunto di una riunione in Parola, con i punti chiave e le cose da fare.",
+    }),
   },
   {
     id: "chat",
     label: "Chat",
-    image: chatShot,
-    alt: "A chat about a transcript in Parola, answering with the timestamp it quotes.",
+    image: shots["ai-chat"],
+    alt: t({
+      en: "A chat about a transcript in Parola, answering with the timestamp it quotes.",
+      it: "Una chat su una trascrizione in Parola, con il minutaggio della risposta.",
+    }),
   },
   {
     id: "services",
-    label: "Services",
-    image: servicesShot,
-    alt: "Parola's AI Services settings: Apple Intelligence on the Mac, plus Ollama and OpenAI, picked per task.",
+    label: t({ en: "Services", it: "Servizi" }),
+    image: shots["ai-prompts"],
+    alt: t({
+      en: "Parola's AI Services settings: Apple Intelligence on the Mac, plus Ollama and OpenAI, picked per task.",
+      it: "Le impostazioni dei servizi AI di Parola: Apple Intelligence sul Mac, più Ollama e OpenAI, scelti per compito.",
+    }),
   },
 ];
 
+const here = t({ en: "On this Mac", it: "Su questo Mac" });
+const key = t({ en: "Your key", it: "La tua chiave" });
 const services = [
-  { name: "Apple Intelligence", where: "On this Mac", local: true },
-  { name: "Ollama", where: "On this Mac", local: true },
-  { name: "OpenAI", where: "Your key", local: false },
-  { name: "Anthropic", where: "Your key", local: false },
-  { name: "Groq", where: "Your key", local: false },
-  { name: "Cerebras", where: "Your key", local: false },
-  { name: "Your own endpoint", where: "OpenAI-compatible", local: false },
+  { name: "Apple Intelligence", where: here, local: true },
+  { name: "Ollama", where: here, local: true },
+  { name: "OpenAI", where: key, local: false },
+  { name: "Anthropic", where: key, local: false },
+  { name: "Groq", where: key, local: false },
+  { name: "Cerebras", where: key, local: false },
+  {
+    name: t({ en: "Your own endpoint", it: "Il tuo endpoint" }),
+    where: t({ en: "OpenAI-compatible", it: "Compatibile con OpenAI" }),
+    local: false,
+  },
 ];
+
+const copy = t({
+  en: {
+    title: ["Summaries and answers,", "from the model you choose."],
+    lead: "Apple Intelligence answers on your Mac. Add your own key for OpenAI or Anthropic, or run a model with Ollama.",
+    tabs: "AI views",
+    prompts: {
+      title: "Nineteen prompts",
+      text: "Action items, key points, an FAQ or a mind map, one click away. You can also write your own in plain words.",
+    },
+    local: {
+      title: "Local or cloud",
+      text: "Pick a service for each job: summary, chat, prompts or dictation cleanup. Keys stay in your keychain.",
+    },
+    services: "Use the model you already have",
+    servicesLead:
+      "A cloud service gets text, never your audio, and Parola asks before the first time.",
+  },
+  it: {
+    title: ["Riassunti e risposte,", "dal modello che scegli tu."],
+    lead: "Apple Intelligence risponde sul tuo Mac. Aggiungi la tua chiave per OpenAI o Anthropic, oppure usa un modello con Ollama.",
+    tabs: "Viste AI",
+    prompts: {
+      title: "Diciannove prompt",
+      text: "Azioni, punti chiave, FAQ o una mappa mentale, a un clic. Puoi anche scriverne di tuoi, con parole semplici.",
+    },
+    local: {
+      title: "Locale o cloud",
+      text: "Scegli un servizio per ogni compito: riassunto, chat, prompt o pulizia della dettatura. Le chiavi restano nel portachiavi.",
+    },
+    services: "Usa il modello che hai già",
+    servicesLead:
+      "Un servizio cloud riceve il testo, mai il tuo audio, e Parola chiede conferma la prima volta.",
+  },
+});
 ---
 
 <section class="ai section" aria-labelledby="ai-title">
   <div class="container">
     <div class="section-head">
       <h2 id="ai-title" class="t-section" data-words>
-        Summaries and answers,
-        <br />
-        from the model you choose.
+        <Lines lines={copy.title} />
       </h2>
-      <p class="t-lead">
-        Apple Intelligence answers on your Mac. Add your own key for OpenAI or Anthropic, or run a
-        model with Ollama.
-      </p>
+      <p class="t-lead">{copy.lead}</p>
     </div>
-    <ShotTabs name="ai" tabs={tabs} label="AI views" />
+    <ShotTabs name="ai" tabs={tabs} label={copy.tabs} />
 
     <div class="grid">
-      <FeatureCard
-        title="Nineteen prompts"
-        text="Action items, key points, an FAQ or a mind map, one click away. You can also write your own in plain words."
-      >
+      <FeatureCard title={copy.prompts.title} text={copy.prompts.text}>
         <PromptsScene />
       </FeatureCard>
-      <FeatureCard
-        title="Local or cloud"
-        text="Pick a service for each job: summary, chat, prompts or dictation cleanup. Keys stay in your keychain."
-      >
+      <FeatureCard title={copy.local.title} text={copy.local.text}>
         <ProvidersScene />
       </FeatureCard>
     </div>
 
     <div class="services">
-      <h3 class="t-card">Use the model you already have</h3>
-      <p class="t-lead">
-        A cloud service gets text, never your audio, and Parola asks before the first time.
-      </p>
+      <h3 class="t-card">{copy.services}</h3>
+      <p class="t-lead">{copy.servicesLead}</p>
       <ul>
         {services.map((service) => (
           <li>

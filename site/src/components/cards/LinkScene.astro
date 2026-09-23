@@ -1,4 +1,7 @@
 ---
+import { translator } from "../../i18n";
+
+const t = translator(Astro.currentLocale);
 const steps = [
   [0, "empty"],
   [500, "typing"],
@@ -8,11 +11,35 @@ const steps = [
   [6300, "done"],
 ];
 const url = "youtube.com/watch?v=plywood-shelf";
-const lines = [
-  ["00:00", "Welcome back to the workshop."],
-  ["00:04", "Today we're building a bookshelf from one sheet of plywood."],
-  ["00:11", "First, the cutting plan."],
-];
+const copy = t({
+  en: {
+    title: "Add video URL",
+    hint: "Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any supported site.",
+    captions: "Use Captions",
+    transcribe: "Transcribe",
+    fetch: "Preparing Plywood bookshelf.m4a…",
+    write: "Transcribing Plywood bookshelf.m4a…",
+    lines: [
+      ["00:00", "Welcome back to the workshop."],
+      ["00:04", "Today we're building a bookshelf from one sheet of plywood."],
+      ["00:11", "First, the cutting plan."],
+    ],
+  },
+  it: {
+    title: "Aggiungi URL video",
+    hint: "Incolla un link da YouTube, Vimeo, X, TikTok, SoundCloud o qualsiasi altro sito supportato.",
+    captions: "Usa i sottotitoli",
+    transcribe: "Trascrivi",
+    fetch: "Preparazione di Libreria in compensato.m4a…",
+    write: "Trascrizione Libreria in compensato.m4a…",
+    lines: [
+      ["00:00", "Bentornati in laboratorio."],
+      ["00:04", "Oggi costruiamo una libreria con un solo pannello di compensato."],
+      ["00:11", "Prima di tutto, lo schema di taglio."],
+    ],
+  },
+});
+const lines = copy.lines;
 ---
 
 <div
@@ -23,25 +50,23 @@ const lines = [
   aria-hidden="true"
 >
   <div class="sheet">
-    <p class="title">Add video URL</p>
-    <p class="hint">
-      Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any supported site.
-    </p>
+    <p class="title">{copy.title}</p>
+    <p class="hint">{copy.hint}</p>
     <div class="input">
       <span data-type="typing" data-text={url}>
         {url}
       </span>
     </div>
     <div class="actions">
-      <span class="button">Use Captions</span>
-      <span class="button primary">Transcribe</span>
+      <span class="button">{copy.captions}</span>
+      <span class="button primary">{copy.transcribe}</span>
     </div>
   </div>
   <div class="result">
     <div class="progress">
       <span class="status">
-        <span class="fetch">Preparing Plywood bookshelf.m4a…</span>
-        <span class="write">Transcribing Plywood bookshelf.m4a…</span>
+        <span class="fetch">{copy.fetch}</span>
+        <span class="write">{copy.write}</span>
       </span>
       <span class="track">
         <i></i>

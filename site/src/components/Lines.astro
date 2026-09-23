@@ -1,0 +1,16 @@
+---
+interface Props {
+  lines: string[];
+}
+
+const { lines } = Astro.props;
+const last = lines.length - 1;
+---
+
+{lines.map((line, index) => (
+  <Fragment>
+    {line}
+    {index < last && " "}
+    {index < last && <br />}
+  </Fragment>
+))}

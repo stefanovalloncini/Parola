@@ -1,11 +1,23 @@
 ---
-const lines = [
-  "Good morning, everyone. Thanks for coming.",
-  "Today we're looking at the spring pilot.",
-  "Three schools took part this year,",
-  "and two of them want to keep going.",
-  "Let's start with attendance.",
-];
+import { translator } from "../../i18n";
+
+const t = translator(Astro.currentLocale);
+const lines = t({
+  en: [
+    "Good morning, everyone. Thanks for coming.",
+    "Today we're looking at the spring pilot.",
+    "Three schools took part this year,",
+    "and two of them want to keep going.",
+    "Let's start with attendance.",
+  ],
+  it: [
+    "Buongiorno a tutti, grazie di essere qui.",
+    "Oggi guardiamo il progetto di primavera.",
+    "Quest'anno hanno partecipato tre scuole,",
+    "e due vogliono continuare.",
+    "Cominciamo dalle presenze.",
+  ],
+});
 const steps = lines.slice(1).map((_, i) => [i * 1900, `l${i}`]);
 ---
 
@@ -17,7 +29,7 @@ const steps = lines.slice(1).map((_, i) => [i * 1900, `l${i}`]);
   aria-hidden="true"
 >
   <div class="slide">
-    <p class="slide-title">Spring pilot</p>
+    <p class="slide-title">{t({ en: "Spring pilot", it: "Progetto di primavera" })}</p>
     <span class="chart">
       <i style="--h: .45"></i>
       <i style="--h: .7"></i>
@@ -30,7 +42,7 @@ const steps = lines.slice(1).map((_, i) => [i * 1900, `l${i}`]);
         <rect x="3" y="0.5" width="6" height="10" rx="3"></rect>
         <path d="M1 7.5a5 5 0 0 0 10 0M6 12.5V15"></path>
       </svg>
-      Mic
+      {t({ en: "Mic", it: "Microfono" })}
     </span>
     <div class="window">
       <div class="lines">

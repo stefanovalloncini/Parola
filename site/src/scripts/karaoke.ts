@@ -59,7 +59,8 @@ export function watchKaraoke(root: HTMLElement): void {
     root.toggleAttribute("data-audible", playing);
     button.setAttribute("aria-pressed", String(playing));
     const label = button.querySelector("[data-label]");
-    if (label) label.textContent = playing ? "Pause" : "Play with sound";
+    if (label)
+      label.textContent = (playing ? root.dataset.pauseLabel : root.dataset.playLabel) ?? "";
   };
 
   button.addEventListener("click", () => {

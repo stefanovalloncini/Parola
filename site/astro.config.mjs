@@ -1,11 +1,28 @@
+import { rename, rmdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "astro/config";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
+const localizedNotFound = {
+  name: "localized-404",
+  hooks: {
+    "astro:build:done": async ({ dir }) => {
+      await rename(new URL("it/404/index.html", dir), new URL("it/404.html", dir));
+      await rmdir(new URL("it/404/", dir));
+    },
+  },
+};
+
 export default defineConfig({
   site: process.env.SITE_URL,
   devToolbar: { enabled: false },
+  integrations: [localizedNotFound],
+  i18n: {
+    locales: ["en", "it"],
+    defaultLocale: "en",
+    routing: { prefixDefaultLocale: false },
+  },
   vite: {
     server: { fs: { allow: [repoRoot] } },
   },

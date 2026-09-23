@@ -1,100 +1,37 @@
 ---
-import { links, requirements } from "../../data/links";
+import { faq } from "../../data/faq";
+import { translator } from "../../i18n";
+import Lines from "../Lines.astro";
 
-const cli = "/Applications/Parola.app/Contents/MacOS/parola";
+const t = translator(Astro.currentLocale);
+const questions = t(faq);
+const title = t({ en: ["Questions,", "answered."], it: ["Domande", "e risposte."] });
 ---
 
 <section class="faq section" id="faq" aria-labelledby="faq-title">
   <div class="narrow">
     <div class="section-head">
       <h2 id="faq-title" class="t-section" data-words>
-        Questions,
-        <br />
-        answered.
+        <Lines lines={title} />
       </h2>
     </div>
     <div class="list">
-      <details>
-        <summary>What does Parola need?</summary>
-        <p>
-          {requirements}. Summaries and titles on device also need Apple Intelligence turned on.
-        </p>
-      </details>
-      <details>
-        <summary>Is it really free?</summary>
-        <p>
-          Yes. Parola is open source under the <a href={links.license}>MIT license</a>, and every
-          feature is in the download. There's nothing to buy and no account to make.
-        </p>
-      </details>
-      <details>
-        <summary>Does my audio leave my Mac?</summary>
-        <p>
-          No. Transcription runs on your Mac. Parola goes online only to download a model, fetch a
-          link you paste, or reach an AI service you add yourself. An AI service gets text, never
-          audio, and Parola asks before the first time.
-        </p>
-      </details>
-      <details>
-        <summary>Does it work offline?</summary>
-        <p>
-          Yes. Once a model is on your Mac, transcription needs no connection. Apple Speech needs no
-          download from Parola at all, though macOS may fetch its language files.
-        </p>
-      </details>
-      <details>
-        <summary>Which engine should I use?</summary>
-        <p>
-          Start with Apple Speech, which is ready straight away. Whisper Large v3 Turbo is more
-          accurate and downloads 1.6 GB once. Parakeet v3 is the fastest multilingual engine and
-          covers 25 European languages.
-        </p>
-      </details>
-      <details>
-        <summary>Which languages does it support?</summary>
-        <p>
-          In the app you can pick one of 13 languages or let Parola detect it. Parakeet v3 covers 25
-          European languages, and the command line takes any language code Whisper understands.
-        </p>
-      </details>
-      <details>
-        <summary>How do links work?</summary>
-        <p>
-          Parola uses yt-dlp to download the audio, then transcribes it on your Mac. If yt-dlp isn't
-          installed, Parola offers to install it with Homebrew.
-        </p>
-      </details>
-      <details>
-        <summary>How do I get updates?</summary>
-        <p>
-          New versions are published on the <a href={links.releases}>Releases page</a> on GitHub.
-        </p>
-      </details>
-      <details>
-        <summary>Can my company deploy it?</summary>
-        <p>
-          Yes. Parola reads a managed configuration, so IT can set the default model, limit the
-          engines, and turn off dictation, cloud AI, model downloads or other features. The
-          <a href={links.deploymentDocs}>deployment guide</a> lists every key.
-        </p>
-      </details>
-      <details>
-        <summary>Can Claude or another LLM use it?</summary>
-        <p>Yes. Parola includes an MCP server. Add it to Claude Code, then ask in plain words:</p>
-        <pre><code>claude mcp add parola -- {cli} mcp</code></pre>
-        <p>
-          The <a href={links.mcpDocs}>MCP guide</a> covers Claude Desktop and other clients.
-        </p>
-      </details>
-      <details>
-        <summary>Something went wrong. How do I report it?</summary>
-        <p>Run this in Terminal:</p>
-        <pre><code>{cli} diagnostics</code></pre>
-        <p>
-          The report holds no transcript text, file names or paths, so you can read it before you
-          attach it to an <a href={links.issues}>issue on GitHub</a>.
-        </p>
-      </details>
+      {questions.map(({ question, answer }) => (
+        <details>
+          <summary>{question}</summary>
+          {answer.map((block) =>
+            "code" in block ? (
+              <pre><code>{block.code}</code></pre>
+            ) : (
+              <p>
+                {block.text.map((part) =>
+                  typeof part === "string" ? part : <a href={part.href}>{part.label}</a>,
+                )}
+              </p>
+            ),
+          )}
+        </details>
+      ))}
     </div>
   </div>
 </section>

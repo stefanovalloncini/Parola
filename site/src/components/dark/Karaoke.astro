@@ -1,12 +1,25 @@
 ---
-import demo from "../../../../ParolaApp/ParolaApp/Resources/Introduction/demo-en.json";
-import clip from "../../../../ParolaApp/ParolaApp/Resources/Introduction/demo-en.m4a?url";
+import demoEn from "../../../../ParolaApp/ParolaApp/Resources/Introduction/demo-en.json";
+import clipEn from "../../../../ParolaApp/ParolaApp/Resources/Introduction/demo-en.m4a?url";
+import demoIt from "../../../../ParolaApp/ParolaApp/Resources/Introduction/demo-it.json";
+import clipIt from "../../../../ParolaApp/ParolaApp/Resources/Introduction/demo-it.m4a?url";
 import { barFractions } from "../../data/brand";
+import { translator } from "../../i18n";
+
+const t = translator(Astro.currentLocale);
+const demo = t({ en: demoEn, it: demoIt });
+const clip = t({ en: clipEn, it: clipIt });
+const labels = t({
+  en: { play: "Play with sound", pause: "Pause" },
+  it: { play: "Ascolta con l'audio", pause: "Pausa" },
+});
 ---
 
 <div
   class="karaoke"
   data-karaoke
+  data-play-label={labels.play}
+  data-pause-label={labels.pause}
   data-levels={JSON.stringify(demo.levels)}
   data-rate={demo.levelRate}
   data-duration={demo.duration}
@@ -28,7 +41,7 @@ import { barFractions } from "../../data/brand";
       <path class="glyph-play" d="M7 5.2v9.6L15 10 7 5.2Z"></path>
       <path class="glyph-pause" d="M6.5 5h2.2v10H6.5zM11.3 5h2.2v10h-2.2z"></path>
     </svg>
-    <span data-label>Play with sound</span>
+    <span data-label>{labels.play}</span>
   </button>
   <audio preload="none" src={clip}></audio>
 </div>

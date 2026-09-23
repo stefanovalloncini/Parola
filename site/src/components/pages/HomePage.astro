@@ -1,0 +1,52 @@
+---
+import { links } from "../../data/links";
+import { localeOf, translator } from "../../i18n";
+import Base from "../../layouts/Base.astro";
+import Story from "../hero/Story.astro";
+import AISection from "../sections/AISection.astro";
+import AutomationSection from "../sections/AutomationSection.astro";
+import DropSection from "../sections/DropSection.astro";
+import EnginesSection from "../sections/EnginesSection.astro";
+import FaqSection from "../sections/FaqSection.astro";
+import FeaturesSection from "../sections/FeaturesSection.astro";
+import FreeSection from "../sections/FreeSection.astro";
+import OpenWorkSection from "../sections/OpenWorkSection.astro";
+import PrivacySection from "../sections/PrivacySection.astro";
+
+const t = translator(Astro.currentLocale);
+const title = t({
+  en: "Parola – speech to text on your Mac",
+  it: "Parola – dalla voce al testo, sul tuo Mac",
+});
+const description = t({
+  en: "Parola transcribes recordings, meetings and dictation on your Mac. Free and open source.",
+  it: "Parola trascrive registrazioni, riunioni e dettature sul tuo Mac. Gratis e open source.",
+});
+const app = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Parola",
+  description,
+  inLanguage: localeOf(Astro.currentLocale),
+  applicationCategory: "MultimediaApplication",
+  operatingSystem: "macOS 26 or later, Apple Silicon",
+  downloadUrl: links.download,
+  license: "https://opensource.org/licenses/MIT",
+  author: { "@type": "Person", name: "Stefano Valloncini" },
+  offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+};
+---
+
+<Base title={title} description={description}>
+  <script type="application/ld+json" slot="head" set:html={JSON.stringify(app)}></script>
+  <Story />
+  <DropSection />
+  <FeaturesSection />
+  <PrivacySection />
+  <EnginesSection />
+  <AISection />
+  <AutomationSection />
+  <OpenWorkSection />
+  <FreeSection />
+  <FaqSection />
+</Base>

@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n";
+
 const repository = "https://github.com/stefanovalloncini/Parola";
 
 export const links = {
@@ -11,4 +13,9 @@ export const links = {
   feedbackEmail: "stefano.valloncini@gmail.com",
 } as const;
 
-export const requirements = "macOS 26 on a Mac with Apple Silicon";
+export const requirements: Record<Locale, string> = {
+  en: "macOS 26 on a Mac with Apple Silicon",
+  it: "macOS 26 su un Mac con Apple Silicon",
+};
+
+export const cli = "/Applications/Parola.app/Contents/MacOS/parola";

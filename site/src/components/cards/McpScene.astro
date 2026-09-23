@@ -1,5 +1,25 @@
 ---
-const ask = "Transcribe ~/Recordings/standup.m4a as SRT next to the file.";
+import { translator } from "../../i18n";
+
+const t = translator(Astro.currentLocale);
+const copy = t({
+  en: {
+    ask: "Transcribe ~/Recordings/standup.m4a as SRT next to the file.",
+    running: "running on this Mac",
+    done: "done",
+    replyBefore: "Done.",
+    replyAfter: "is next to the recording.",
+  },
+  it: {
+    ask: "Trascrivi ~/Registrazioni/riunione.m4a in SRT accanto al file.",
+    running: "in esecuzione su questo Mac",
+    done: "fatto",
+    replyBefore: "Fatto.",
+    replyAfter: "è accanto alla registrazione.",
+  },
+});
+const ask = copy.ask;
+const file = t({ en: "standup.srt", it: "riunione.srt" });
 const steps = [
   [0, "asking"],
   [2200, "tool"],
@@ -24,12 +44,12 @@ const steps = [
     <span class="dot"></span>
     <code>parola_transcribe</code>
     <span class="state">
-      <span class="run">running on this Mac</span>
-      <span class="ok">done</span>
+      <span class="run">{copy.running}</span>
+      <span class="ok">{copy.done}</span>
     </span>
   </p>
   <p class="bubble reply">
-    Done. <code>standup.srt</code> is next to the recording.
+    {copy.replyBefore} <code>{file}</code> {copy.replyAfter}
   </p>
 </div>
 

@@ -1,11 +1,15 @@
 ---
+import { translator } from "../../i18n";
 import Icon from "../Icon.astro";
 
+const t = translator(Astro.currentLocale);
+const here = t({ en: "On this Mac", it: "Su questo Mac" });
+const key = t({ en: "Your key", it: "La tua chiave" });
 const providers = [
-  { name: "Apple Intelligence", where: "On this Mac", local: true },
-  { name: "Ollama", where: "On this Mac", local: true },
-  { name: "OpenAI", where: "Your key", local: false },
-  { name: "Anthropic", where: "Your key", local: false },
+  { name: "Apple Intelligence", where: here, local: true },
+  { name: "Ollama", where: here, local: true },
+  { name: "OpenAI", where: key, local: false },
+  { name: "Anthropic", where: key, local: false },
 ];
 const steps = providers.map((_, i) => [i * 1600, `s${i}`]);
 ---

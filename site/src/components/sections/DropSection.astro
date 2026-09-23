@@ -1,10 +1,13 @@
 ---
-import exportShot from "../../assets/shots/export.png";
-import interview from "../../assets/shots/interview.png";
-import lecture from "../../assets/shots/lecture.png";
-import memo from "../../assets/shots/memo.png";
+import { shotsFor } from "../../data/shots";
+import { localeOf, translator } from "../../i18n";
 import DocTile from "../DocTile.astro";
+import Lines from "../Lines.astro";
 import ShotTabs from "../ShotTabs.astro";
+
+const locale = localeOf(Astro.currentLocale);
+const t = translator(locale);
+const shots = shotsFor(locale);
 
 const fan = [
   { ext: "MP3", tint: "#3f6048", r: -16, x: -150, y: 26 },
@@ -17,27 +20,39 @@ const fan = [
 const tabs = [
   {
     id: "interviews",
-    label: "Interviews",
-    image: interview,
-    alt: "An interview in Parola. Each line carries the speaker's name and a timestamp.",
+    label: t({ en: "Interviews", it: "Interviste" }),
+    image: shots.interview,
+    alt: t({
+      en: "An interview in Parola. Each line carries the speaker's name and a timestamp.",
+      it: "Un'intervista in Parola. Ogni riga riporta il nome di chi parla e il minutaggio.",
+    }),
   },
   {
     id: "memos",
-    label: "Voice memos",
-    image: memo,
-    alt: "A short voice memo in Parola, summarized with its action items.",
+    label: t({ en: "Voice memos", it: "Memo vocali" }),
+    image: shots.memo,
+    alt: t({
+      en: "A short voice memo in Parola, summarized with its action items.",
+      it: "Un breve memo vocale in Parola, riassunto insieme alle cose da fare.",
+    }),
   },
   {
     id: "lectures",
-    label: "Lectures",
-    image: lecture,
-    alt: "A lecture transcript in Parola with chapters you can jump to.",
+    label: t({ en: "Lectures", it: "Lezioni" }),
+    image: shots.lecture,
+    alt: t({
+      en: "A lecture transcript in Parola with chapters you can jump to.",
+      it: "La trascrizione di una lezione in Parola, con i capitoli a cui saltare.",
+    }),
   },
   {
     id: "subtitles",
-    label: "Subtitles",
-    image: exportShot,
-    alt: "Parola's export sheet previewing SubRip subtitles before saving.",
+    label: t({ en: "Subtitles", it: "Sottotitoli" }),
+    image: shots.export,
+    alt: t({
+      en: "Parola's export sheet previewing SubRip subtitles before saving.",
+      it: "La finestra di esportazione di Parola con l'anteprima dei sottotitoli SubRip.",
+    }),
   },
 ];
 ---
@@ -56,15 +71,25 @@ const tabs = [
     </div>
     <div class="section-head">
       <h2 id="drop-title" class="t-section" data-words>
-        Drop a file.
-        <br />
-        Read every word.
+        <Lines
+          lines={t({
+            en: ["Drop a file.", "Read every word."],
+            it: ["Trascina un file.", "Leggi ogni parola."],
+          })}
+        />
       </h2>
       <p class="t-lead">
-        Audio or video, one file or a whole folder. Click any line to hear it again.
+        {t({
+          en: "Audio or video, one file or a whole folder. Click any line to hear it again.",
+          it: "Audio o video, un file o un'intera cartella. Fai clic su una riga per riascoltarla.",
+        })}
       </p>
     </div>
-    <ShotTabs name="drop" tabs={tabs} label="Things people transcribe" />
+    <ShotTabs
+      name="drop"
+      tabs={tabs}
+      label={t({ en: "Things people transcribe", it: "Cosa si trascrive" })}
+    />
   </div>
 </section>
 

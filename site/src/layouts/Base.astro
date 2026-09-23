@@ -4,19 +4,25 @@ import "@fontsource-variable/newsreader";
 import "../styles/global.css";
 import Footer from "../components/Footer.astro";
 import Header from "../components/Header.astro";
+import { locales, localeOf, pathFor, translator } from "../i18n";
 
 interface Props {
   title: string;
   description: string;
+  indexed?: boolean;
 }
 
-const { title, description } = Astro.props;
-const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
-const ogImage = Astro.site ? new URL("/og.png", Astro.site).href : undefined;
+const { title, description, indexed = true } = Astro.props;
+const locale = localeOf(Astro.currentLocale);
+const t = translator(locale);
+const path = Astro.url.pathname;
+const absolute = (href: string) => (Astro.site ? new URL(href, Astro.site).href : undefined);
+const canonical = indexed ? absolute(path) : undefined;
+const ogImage = absolute(locale === "it" ? "/og-it.png" : "/og.png");
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={locale}>
   <head>
     <meta charset="utf-8" />
     <script is:inline>
@@ -30,7 +36,16 @@ const ogImage = Astro.site ? new URL("/og.png", Astro.site).href : undefined;
     <meta name="referrer" content="no-referrer" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    {!indexed && <meta name="robots" content="noindex" />}
     {canonical && <link rel="canonical" href={canonical} />}
+    {canonical &&
+      locales.map((other) => (
+        <link rel="alternate" hreflang={other} href={absolute(pathFor(other, path))} />
+      ))}
+    {canonical && (
+      <link rel="alternate" hreflang="x-default" href={absolute(pathFor("en", path))} />
+    )}
+    <meta property="og:locale" content={locale === "it" ? "it_IT" : "en_US"} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Parola" />
     <meta property="og:title" content={title} />
@@ -44,7 +59,7 @@ const ogImage = Astro.site ? new URL("/og.png", Astro.site).href : undefined;
   </head>
   <body>
     <a class="skip" href="#main">
-      Skip to content
+      {t({ en: "Skip to content", it: "Vai al contenuto" })}
     </a>
     <Header />
     <main id="main">

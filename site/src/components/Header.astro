@@ -1,29 +1,33 @@
 ---
 import { links } from "../data/links";
+import { localeOf, pathFor, translator } from "../i18n";
 import BrandIcon from "./BrandIcon.astro";
 import WaveGlyph from "./WaveGlyph.astro";
 
-const onHome = Astro.url.pathname === "/";
-const anchor = (id: string) => (onHome ? `#${id}` : `/#${id}`);
+const locale = localeOf(Astro.currentLocale);
+const t = translator(locale);
+const home = pathFor(locale, "/");
+const onHome = Astro.url.pathname === home;
+const anchor = (id: string) => (onHome ? `#${id}` : `${home}#${id}`);
 ---
 
 <header class="site-header" data-header>
   <div class="container header-inner">
-    <a class="brand" href="/" aria-label="Parola home">
+    <a class="brand" href={home} aria-label={t({ en: "Parola home", it: "Home di Parola" })}>
       <BrandIcon size={32} />
       <span>Parola</span>
     </a>
-    <nav class="nav" aria-label="Sections">
-      <a href={anchor("features")}>Features</a>
+    <nav class="nav" aria-label={t({ en: "Sections", it: "Sezioni" })}>
+      <a href={anchor("features")}>{t({ en: "Features", it: "Funzioni" })}</a>
       <a href={anchor("privacy")}>Privacy</a>
-      <a href={anchor("faq")}>FAQ</a>
+      <a href={anchor("faq")}>{t({ en: "FAQ", it: "Domande" })}</a>
     </nav>
     <div class="actions">
       <a class="github" href={links.repository}>
         GitHub
       </a>
       <a class="download" href={anchor("download")}>
-        <span>Download</span>
+        <span>{t({ en: "Download", it: "Scarica" })}</span>
         <WaveGlyph />
       </a>
     </div>

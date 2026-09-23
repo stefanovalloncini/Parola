@@ -1,9 +1,15 @@
+---
+import { translator } from "../../i18n";
+
+const t = translator(Astro.currentLocale);
+---
+
 <span class="dragged" aria-hidden="true">
   <span class="sheet">
     <i>M4A</i>
   </span>
   <b>+</b>
-  <span class="label">Interview.m4a</span>
+  <span class="label">{t({ en: "Interview.m4a", it: "Intervista.m4a" })}</span>
 </span>
 
 <style>

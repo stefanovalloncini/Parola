@@ -1,11 +1,32 @@
 ---
+import { translator } from "../../i18n";
+
+const t = translator(Astro.currentLocale);
 const steps = [
   [0, "idle"],
   [800, "listening"],
   [5000, "transcribing"],
   [5700, "done"],
 ];
-const said = "Tuesday works better for me. I'll bring the draft.";
+const copy = t({
+  en: {
+    who: "Maya Chen",
+    them: "Can we move the review? Monday is packed.",
+    me: "Let me check.",
+    said: "Tuesday works better for me. I'll bring the draft.",
+    listening: "Listening",
+    transcribing: "Transcribing",
+  },
+  it: {
+    who: "Giulia Ferri",
+    them: "Possiamo spostare la revisione? Lunedì sono pienissima.",
+    me: "Controllo.",
+    said: "Per me va meglio martedì. Porto io la bozza.",
+    listening: "In ascolto",
+    transcribing: "Trascrizione",
+  },
+});
+const said = copy.said;
 const levels = [0.4, 0.75, 1, 0.6, 0.85, 0.5, 0.7];
 ---
 
@@ -20,9 +41,9 @@ const levels = [0.4, 0.75, 1, 0.6, 0.85, 0.5, 0.7];
     <span>F5</span>
   </div>
   <div class="thread">
-    <p class="who">Maya Chen</p>
-    <p class="bubble them">Can we move the review? Monday is packed.</p>
-    <p class="bubble me">Let me check.</p>
+    <p class="who">{copy.who}</p>
+    <p class="bubble them">{copy.them}</p>
+    <p class="bubble me">{copy.me}</p>
     <div class="pill">
       <span class="row">
         <span class="bars">
@@ -31,8 +52,8 @@ const levels = [0.4, 0.75, 1, 0.6, 0.85, 0.5, 0.7];
           ))}
         </span>
         <span class="label">
-          <span class="on">Listening</span>
-          <span class="off">Transcribing</span>
+          <span class="on">{copy.listening}</span>
+          <span class="off">{copy.transcribing}</span>
         </span>
         <span class="stop">
           <i></i>

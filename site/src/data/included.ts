@@ -6,7 +6,7 @@ export interface IncludedGroup {
   items: string[];
 }
 
-export const included: IncludedGroup[] = [
+const english: IncludedGroup[] = [
   {
     title: "Transcription",
     icon: "wave",
@@ -73,3 +73,73 @@ export const included: IncludedGroup[] = [
     ],
   },
 ];
+
+const italian: IncludedGroup[] = [
+  {
+    title: "Trascrizione",
+    icon: "wave",
+    items: [
+      "File audio e video, uno alla volta o un'intera cartella",
+      "Link da YouTube, Vimeo, SoundCloud e altri siti",
+      "Una coda batch e cartelle monitorate",
+      "Nomi di chi parla e tempi delle parole",
+      "Traduzione, affiancata al testo",
+    ],
+  },
+  {
+    title: "Registrazione",
+    icon: "speaker",
+    items: [
+      "Il microfono o qualsiasi suono del Mac",
+      "Un invito a registrare quando apri Zoom, Teams o Webex",
+      "Sottotitoli in tempo reale in un pannello sempre in primo piano",
+    ],
+  },
+  {
+    title: "Dettatura",
+    icon: "bubble",
+    items: [
+      "Dettatura in qualsiasi app, con il tasto che scegli",
+      "Stili per messaggi, email, note e codice",
+      "Correzioni e snippet che si applicano mentre parli",
+    ],
+  },
+  {
+    title: "Esportazione",
+    icon: "stack",
+    items: [
+      "Tredici formati con anteprima",
+      "Sottotitoli impressi in una copia del video",
+      "Note scritte direttamente in una cartella di Obsidian",
+    ],
+  },
+  {
+    title: "AI",
+    icon: "sparkle",
+    items: [
+      "Riassunti, capitoli e chat",
+      "Diciannove prompt, più i tuoi",
+      "Apple Intelligence, Ollama o la tua chiave",
+    ],
+  },
+  {
+    title: "Automazione",
+    icon: "terminal",
+    items: [
+      "Azioni per Comandi Rapidi e lo schema URL parola://",
+      "Lo strumento da riga di comando parola",
+      "Un server MCP per Claude e altri LLM",
+    ],
+  },
+  {
+    title: "Libreria",
+    icon: "search",
+    items: [
+      "Ricerca in tutte le trascrizioni",
+      "Righe preferite, elementi fissati ed etichette",
+      "Eliminati di recente conserva le trascrizioni per 30 giorni",
+    ],
+  },
+];
+
+export const included = { en: english, it: italian };

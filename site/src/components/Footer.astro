@@ -1,7 +1,14 @@
 ---
 import { links } from "../data/links";
+import { localeOf, pathFor, translator } from "../i18n";
 import BrandIcon from "./BrandIcon.astro";
 
+const locale = localeOf(Astro.currentLocale);
+const t = translator(locale);
+const other = locale === "it" ? "en" : "it";
+const path = Astro.url.pathname;
+const missing = pathFor("en", path).startsWith("/404");
+const switchTo = pathFor(other, missing ? "/" : path);
 const year = new Date().getFullYear();
 ---
 
@@ -10,20 +17,35 @@ const year = new Date().getFullYear();
     <div class="maker">
       <BrandIcon size={40} />
       <p>
-        Made by Stefano Valloncini.
+        {t({ en: "Made by Stefano Valloncini.", it: "Fatto da Stefano Valloncini." })}
         <br />
-        <span>Parola is free software under the MIT license.</span>
+        <span>
+          {t({
+            en: "Parola is free software under the MIT license.",
+            it: "Parola è software libero con licenza MIT.",
+          })}
+        </span>
       </p>
     </div>
-    <nav class="footer-links" aria-label="Footer">
+    <nav class="footer-links" aria-label={t({ en: "Footer", it: "Piè di pagina" })}>
       <a href={links.repository}>GitHub</a>
-      <a href={links.releases}>Releases</a>
-      <a href="/privacy">Privacy</a>
-      <a href={`mailto:${links.feedbackEmail}?subject=Parola`}>Contact</a>
+      <a href={links.releases}>{t({ en: "Releases", it: "Versioni" })}</a>
+      <a href={pathFor(locale, "/privacy/")}>Privacy</a>
+      <a href={`mailto:${links.feedbackEmail}?subject=Parola`}>
+        {t({ en: "Contact", it: "Contatti" })}
+      </a>
+      <a href={switchTo} hreflang={other} lang={other}>
+        {other === "it" ? "Italiano" : "English"}
+      </a>
     </nav>
   </div>
   <div class="container footer-bottom">
-    <p>This website sets no cookies and loads nothing from other servers.</p>
+    <p>
+      {t({
+        en: "This website sets no cookies and loads nothing from other servers.",
+        it: "Questo sito non usa cookie e non carica nulla da altri server.",
+      })}
+    </p>
     <p>&copy; {year} Stefano Valloncini</p>
   </div>
 </footer>

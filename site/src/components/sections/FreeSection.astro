@@ -1,18 +1,40 @@
 ---
-import { included } from "../../data/included";
+import { included as groups } from "../../data/included";
 import { links, requirements } from "../../data/links";
+import { translator } from "../../i18n";
 import BrandIcon from "../BrandIcon.astro";
 import Icon from "../Icon.astro";
 import WaveGlyph from "../WaveGlyph.astro";
+
+const t = translator(Astro.currentLocale);
+const included = t(groups);
+const copy = t({
+  en: {
+    title: "Free and open source.",
+    lead: "Every feature is in the download. There's no paid tier and no account.",
+    price: "Free",
+    license: `MIT license. ${requirements.en}.`,
+    download: "Download for Mac",
+    source: "View on GitHub",
+  },
+  it: {
+    title: "Gratis e open source.",
+    lead: "Ogni funzione è inclusa nel download. Non c'è una versione a pagamento né un account.",
+    price: "Gratis",
+    license: `Licenza MIT. ${requirements.it}.`,
+    download: "Scarica per Mac",
+    source: "Vedi su GitHub",
+  },
+});
 ---
 
 <section class="free section" id="download" aria-labelledby="free-title">
   <div class="narrow">
     <div class="section-head">
       <h2 id="free-title" class="t-section" data-words>
-        Free and open source.
+        {copy.title}
       </h2>
-      <p class="t-lead">Every feature is in the download. There's no paid tier and no account.</p>
+      <p class="t-lead">{copy.lead}</p>
     </div>
 
     <div class="card">
@@ -20,17 +42,17 @@ import WaveGlyph from "../WaveGlyph.astro";
         <BrandIcon size={64} />
         <div>
           <p class="name">Parola</p>
-          <p class="price">Free</p>
-          <p class="note">MIT license. {requirements}.</p>
+          <p class="price">{copy.price}</p>
+          <p class="note">{copy.license}</p>
         </div>
       </div>
       <div class="actions">
         <a class="primary" href={links.download}>
-          Download for Mac
+          {copy.download}
           <WaveGlyph />
         </a>
         <a class="secondary" href={links.repository}>
-          View on GitHub
+          {copy.source}
         </a>
       </div>
     </div>

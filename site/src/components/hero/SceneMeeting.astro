@@ -1,17 +1,25 @@
 ---
+import { translator } from "../../i18n";
 import AppWindow from "../device/AppWindow.astro";
 import BrandIcon from "../BrandIcon.astro";
 
+const t = translator(Astro.currentLocale);
+
 const people = [
-  { name: "Maya", initials: "M", hue: "#6b8a6b", speaking: true },
-  { name: "Tom", initials: "T", hue: "#54739e" },
-  { name: "Aiko", initials: "A", hue: "#a07b5a" },
-  { name: "Sam", initials: "S", hue: "#7b6f95" },
+  {
+    name: t({ en: "Maya", it: "Giulia" }),
+    initials: t({ en: "M", it: "G" }),
+    hue: "#6b8a6b",
+    speaking: true,
+  },
+  { name: t({ en: "Tom", it: "Luca" }), initials: t({ en: "T", it: "L" }), hue: "#54739e" },
+  { name: t({ en: "Aiko", it: "Sara" }), initials: t({ en: "A", it: "S" }), hue: "#a07b5a" },
+  { name: t({ en: "Sam", it: "Marco" }), initials: t({ en: "S", it: "M" }), hue: "#7b6f95" },
 ];
 ---
 
 <div class="scene-meeting">
-  <AppWindow title="Zoom Meeting" tone="dark" class="call">
+  <AppWindow title={t({ en: "Zoom Meeting", it: "Riunione Zoom" })} tone="dark" class="call">
     <div class="grid">
       {people.map((person) => (
         <div class:list={["tile", { speaking: person.speaking }]} style={`--hue: ${person.hue}`}>
@@ -24,18 +32,23 @@ const people = [
       <i></i>
       <i></i>
       <i></i>
-      <b>Leave</b>
+      <b>{t({ en: "Leave", it: "Esci" })}</b>
     </div>
   </AppWindow>
 
   <div class="alert" role="presentation">
     <BrandIcon size={56} class="alert-icon" />
-    <p class="alert-title">Zoom is running</p>
+    <p class="alert-title">{t({ en: "Zoom is running", it: "Zoom è in esecuzione" })}</p>
     <p class="alert-text">
-      Start a system-audio recording? The result lands in your library as a Meeting.
+      {t({
+        en: "Start a system-audio recording? The result lands in your library as a Meeting.",
+        it: "Avviare una registrazione dell'audio di sistema? Il risultato finirà in libreria come una Riunione.",
+      })}
     </p>
-    <span class="alert-button primary">Record This Meeting</span>
-    <span class="alert-button">Not Now</span>
+    <span class="alert-button primary">
+      {t({ en: "Record This Meeting", it: "Registra questa riunione" })}
+    </span>
+    <span class="alert-button">{t({ en: "Not Now", it: "Non ora" })}</span>
   </div>
 </div>
 

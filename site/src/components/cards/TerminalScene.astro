@@ -1,10 +1,33 @@
 ---
-const command = "parola transcribe interview.m4a -f srt";
-const cues = [
-  ["1", "00:00:00,000 --> 00:00:06,480", "Thanks for making time, Maya."],
-  ["2", "00:00:07,020 --> 00:00:14,760", "Sure. It was our Thursday planning call."],
-  ["3", "00:00:15,100 --> 00:00:16,900", "How did that go?"],
-];
+import { translator } from "../../i18n";
+
+const t = translator(Astro.currentLocale);
+const copy = t({
+  en: {
+    folder: "~/Recordings $",
+    command: "parola transcribe interview.m4a -f srt",
+    cues: [
+      ["1", "00:00:00,000 --> 00:00:06,480", "Thanks for making time, Maya."],
+      ["2", "00:00:07,020 --> 00:00:14,760", "Sure. It was our Thursday planning call."],
+      ["3", "00:00:15,100 --> 00:00:16,900", "How did that go?"],
+    ],
+  },
+  it: {
+    folder: "~/Registrazioni $",
+    command: "parola transcribe intervista.m4a -f srt",
+    cues: [
+      ["1", "00:00:00,000 --> 00:00:06,480", "Grazie per il tempo, Giulia."],
+      [
+        "2",
+        "00:00:07,020 --> 00:00:14,760",
+        "Certo. Era la riunione di pianificazione del giovedì.",
+      ],
+      ["3", "00:00:15,100 --> 00:00:16,900", "Com'è andata?"],
+    ],
+  },
+});
+const command = copy.command;
+const cues = copy.cues;
 const steps = [
   [0, "prompt"],
   [300, "typing"],
@@ -28,7 +51,7 @@ const steps = [
   </div>
   <div class="screen">
     <p class="line">
-      <span class="sigil">~/Recordings $</span>
+      <span class="sigil">{copy.folder}</span>
       <span data-type="typing" data-text={command}>
         {command}
       </span>

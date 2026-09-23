@@ -1,23 +1,46 @@
 ---
+import { translator } from "../../i18n";
 import Icon, { type IconName } from "../Icon.astro";
+import Lines from "../Lines.astro";
 
-const points: { icon: IconName; title: string; text: string }[] = [
-  {
-    icon: "chip",
-    title: "On-device engines",
-    text: "Apple Speech, Whisper and Parakeet all run on your Mac's own chips.",
-  },
-  {
-    icon: "offline",
-    title: "Works offline",
-    text: "Once a model is downloaded, transcription needs no connection.",
-  },
-  {
-    icon: "person",
-    title: "No account",
-    text: "Parola has no sign-in and sends no analytics. An AI service you add gets the text, never the audio.",
-  },
-];
+const t = translator(Astro.currentLocale);
+
+const points: { icon: IconName; title: string; text: string }[] = t({
+  en: [
+    {
+      icon: "chip",
+      title: "On-device engines",
+      text: "Apple Speech, Whisper and Parakeet all run on your Mac's own chips.",
+    },
+    {
+      icon: "offline",
+      title: "Works offline",
+      text: "Once a model is downloaded, transcription needs no connection.",
+    },
+    {
+      icon: "person",
+      title: "No account",
+      text: "Parola has no sign-in and sends no analytics. An AI service you add gets the text, never the audio.",
+    },
+  ],
+  it: [
+    {
+      icon: "chip",
+      title: "Motori sul dispositivo",
+      text: "Apple Speech, Whisper e Parakeet girano tutti sui chip del tuo Mac.",
+    },
+    {
+      icon: "offline",
+      title: "Funziona offline",
+      text: "Una volta scaricato un modello, la trascrizione non ha bisogno della rete.",
+    },
+    {
+      icon: "person",
+      title: "Nessun account",
+      text: "Parola non chiede di accedere e non invia statistiche. Un servizio AI che aggiungi riceve il testo, mai l'audio.",
+    },
+  ],
+});
 ---
 
 <section class="privacy section" id="privacy" aria-labelledby="privacy-title">
@@ -27,9 +50,12 @@ const points: { icon: IconName; title: string; text: string }[] = [
         <Icon name="lock" size={34} />
       </span>
       <h2 id="privacy-title" class="t-title" data-words>
-        Your words stay
-        <br />
-        on your Mac.
+        <Lines
+          lines={t({
+            en: ["Your words stay", "on your Mac."],
+            it: ["Le tue parole restano", "sul tuo Mac."],
+          })}
+        />
       </h2>
     </div>
     <ul class="points">

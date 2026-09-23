@@ -1,4 +1,5 @@
 ---
+import { translator } from "../../i18n";
 import AppWindow from "../device/AppWindow.astro";
 
 interface Props {
@@ -6,23 +7,50 @@ interface Props {
 }
 
 const { scene } = Astro.props;
+const t = translator(Astro.currentLocale);
 
-const typed = "Thanks for today. I'll send the notes by Friday and book the review for Tuesday.";
+const mail = t({
+  en: {
+    title: "Re: Launch review",
+    to: "To:",
+    who: "Maya Chen",
+    subjectLabel: "Subject:",
+    subject: "Launch review",
+    hello: "Hi Maya,",
+    typed: "Thanks for today. I'll send the notes by Friday and book the review for Tuesday.",
+    listening: "Listening",
+    partial: "book the review for Tuesday.",
+  },
+  it: {
+    title: "Re: Revisione del lancio",
+    to: "A:",
+    who: "Giulia Ferri",
+    subjectLabel: "Oggetto:",
+    subject: "Revisione del lancio",
+    hello: "Ciao Giulia,",
+    typed: "Grazie per oggi. Ti mando gli appunti entro venerdì e fisso la revisione per martedì.",
+    listening: "In ascolto",
+    partial: "fisso la revisione per martedì.",
+  },
+});
+const typed = mail.typed;
 const levels = [0.35, 0.7, 1, 0.55, 0.85, 0.45, 0.75];
 ---
 
 <div class="scene-dictation" data-typewriter={scene}>
-  <AppWindow title="Re: Launch review" class="editor">
+  <AppWindow title={mail.title} class="editor">
     <div class="fields" aria-hidden="true">
       <p>
-        <span>To:</span> Maya Chen
+        <span>{mail.to}</span>
+        {mail.who}
       </p>
       <p>
-        <span>Subject:</span> Launch review
+        <span>{mail.subjectLabel}</span>
+        {mail.subject}
       </p>
     </div>
     <div class="page">
-      <p>Hi Maya,</p>
+      <p>{mail.hello}</p>
       <p>
         <span data-typed data-text={typed}>
           {typed}
@@ -36,13 +64,13 @@ const levels = [0.35, 0.7, 1, 0.55, 0.85, 0.45, 0.75];
               <i style={`--l: ${level}; --i: ${i}`} />
             ))}
           </span>
-          <span class="label">Listening</span>
+          <span class="label">{mail.listening}</span>
           <span class="stop">
             <i></i>
           </span>
         </span>
         <span class="partial" data-partial>
-          book the review for Tuesday.
+          {mail.partial}
         </span>
       </div>
     </div>

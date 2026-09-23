@@ -1,52 +1,87 @@
 ---
 import { links } from "../../data/links";
+import { translator } from "../../i18n";
 import FeatureCard from "../cards/FeatureCard.astro";
 import McpScene from "../cards/McpScene.astro";
 import TerminalScene from "../cards/TerminalScene.astro";
+import Lines from "../Lines.astro";
 
-const intents = [
-  "Transcribe File",
-  "Start Recording",
-  "Stop Recording",
-  "Start Dictation",
-  "Stop Dictation",
-  "Summarize Last Transcript",
-  "Open Last Transcript",
-];
+const t = translator(Astro.currentLocale);
+
+const copy = t({
+  en: {
+    title: ["Works with Shortcuts,", "the terminal and Claude."],
+    cli: {
+      title: "The parola command",
+      text: "Transcribe and record from the terminal, with the same engines the app uses.",
+    },
+    mcp: {
+      title: "Claude and other LLMs",
+      text: "Parola speaks MCP. Add it to Claude Code, then ask for what you want in plain words.",
+    },
+    shortcuts: "Shortcuts actions",
+    intents: [
+      "Transcribe File",
+      "Start Recording",
+      "Stop Recording",
+      "Start Dictation",
+      "Stop Dictation",
+      "Summarize Last Transcript",
+      "Open Last Transcript",
+    ],
+    setup: "Setup for Claude Desktop and other clients is in the",
+    guide: "MCP guide",
+  },
+  it: {
+    title: ["Funziona con Comandi Rapidi,", "il Terminale e Claude."],
+    cli: {
+      title: "Il comando parola",
+      text: "Trascrivi e registra dal Terminale, con gli stessi motori dell'app.",
+    },
+    mcp: {
+      title: "Claude e altri LLM",
+      text: "Parola parla MCP. Aggiungilo a Claude Code e chiedi quello che ti serve a parole.",
+    },
+    shortcuts: "Azioni per Comandi Rapidi",
+    intents: [
+      "Trascrivi un file",
+      "Avvia registrazione",
+      "Ferma registrazione",
+      "Avvia dettatura",
+      "Ferma dettatura",
+      "Riepiloga ultima trascrizione",
+      "Apri ultima trascrizione",
+    ],
+    setup: "La configurazione per Claude Desktop e gli altri client è nella",
+    guide: "guida MCP (in inglese)",
+  },
+});
 ---
 
 <section class="automation section" aria-labelledby="automation-title">
   <div class="container">
     <div class="section-head">
       <h2 id="automation-title" class="t-section" data-words>
-        Works with Shortcuts,
-        <br />
-        the terminal and Claude.
+        <Lines lines={copy.title} />
       </h2>
     </div>
     <div class="grid">
-      <FeatureCard
-        title="The parola command"
-        text="Transcribe and record from the terminal, with the same engines the app uses."
-      >
+      <FeatureCard title={copy.cli.title} text={copy.cli.text}>
         <TerminalScene />
       </FeatureCard>
-      <FeatureCard
-        title="Claude and other LLMs"
-        text="Parola speaks MCP. Add it to Claude Code, then ask for what you want in plain words."
-      >
+      <FeatureCard title={copy.mcp.title} text={copy.mcp.text}>
         <McpScene />
       </FeatureCard>
     </div>
     <div class="shortcuts">
-      <h3 class="t-row">Shortcuts actions</h3>
+      <h3 class="t-row">{copy.shortcuts}</h3>
       <ul>
-        {intents.map((intent) => (
+        {copy.intents.map((intent) => (
           <li>{intent}</li>
         ))}
       </ul>
       <p class="t-lead">
-        Setup for Claude Desktop and other clients is in the <a href={links.mcpDocs}>MCP guide</a>.
+        {copy.setup} <a href={links.mcpDocs}>{copy.guide}</a>.
       </p>
     </div>
   </div>
