@@ -81,9 +81,9 @@ const copy = t({
         const above = entry ? !entry.isIntersecting && entry.boundingClientRect.top < line : false;
         const stuck = above && getComputedStyle(card).position === "sticky";
         if (stuck === card.classList.contains("is-stuck")) return;
-        const before = card.offsetHeight;
+        const before = card.getBoundingClientRect().height;
         card.classList.toggle("is-stuck", stuck);
-        card.style.marginBottom = stuck ? `${before - card.offsetHeight}px` : "";
+        card.style.marginBottom = stuck ? `${before - card.getBoundingClientRect().height}px` : "";
       },
       { rootMargin: `-${line}px 0px 0px 0px` },
     ).observe(mark);

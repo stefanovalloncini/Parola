@@ -15,7 +15,8 @@ the build and the Playwright tests.
 ## Assets
 
 - `src/assets/shots/` holds captures of the real app, 1180 × 760 pt at 2x. `src/assets/shots/it/`
-  has the same set with the app running in Italian.
+  has the same set with the app running in Italian. Tab shots are cropped in CSS: `crops` in
+  `src/data/shots.ts` gives each one a wide rectangle and a phone close-up, in points.
 - The karaoke card reads the app's own demo clip from
   `ParolaApp/ParolaApp/Resources/Introduction/`, so a new recording there shows up here too.
 - `pnpm brand` redraws `public/favicon.svg` and `public/apple-touch-icon.png` from the icon's bar
