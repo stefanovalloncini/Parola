@@ -1,21 +1,22 @@
 ---
 import { translator } from "../../i18n";
 import Icon from "../Icon.astro";
+import IconTile, { type TileArt } from "../IconTile.astro";
 
 const t = translator(Astro.currentLocale);
 const here = t({ en: "On this Mac", it: "Su questo Mac" });
 const key = t({ en: "Your key", it: "La tua chiave" });
-const providers = [
-  { name: "Apple Intelligence", where: here, local: true },
-  { name: "Ollama", where: here, local: true },
-  { name: "OpenAI", where: key, local: false },
-  { name: "Anthropic", where: key, local: false },
-  { name: "Groq", where: key, local: false },
-  { name: "Cerebras", where: key, local: false },
+const providers: { name: string; where: string; art: TileArt }[] = [
+  { name: "Apple Intelligence", where: here, art: { mark: "intelligence" } },
+  { name: "Ollama", where: here, art: { mark: "ollama" } },
+  { name: "OpenAI", where: key, art: { mark: "openai" } },
+  { name: "Anthropic", where: key, art: { mark: "anthropic" } },
+  { name: "Groq", where: key, art: { mark: "groq" } },
+  { name: "Cerebras", where: key, art: { mark: "cerebras" } },
   {
     name: t({ en: "Custom endpoint", it: "Endpoint personalizzato" }),
     where: t({ en: "OpenAI-compatible", it: "Compatibile con OpenAI" }),
-    local: false,
+    art: { glyph: "plugs", hue: "graphite" },
   },
 ];
 const order = [0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1];
@@ -33,9 +34,7 @@ const steps = order.map((index, i) => [i * 1300, `s${index}`]);
   <ul>
     {providers.map((provider, i) => (
       <li class={`s${i}`}>
-        <span class:list={["tile", { local: provider.local }]}>
-          <Icon name={provider.local ? "cpu" : "globe-simple"} size={22} />
-        </span>
+        <IconTile {...provider.art} size="calc(48 * var(--u))" />
         <span class="text">
           <b>{provider.name}</b>
           <small>{provider.where}</small>
@@ -77,26 +76,6 @@ const steps = order.map((index, i) => [i * 1300, `s${index}`]);
     box-shadow:
       0 0 0 calc(1 * var(--u)) rgb(15 26 20 / 0.06),
       0 calc(6 * var(--u)) calc(14 * var(--u)) rgb(15 26 20 / 0.05);
-  }
-
-  .tile {
-    display: grid;
-    place-items: center;
-    width: calc(48 * var(--u));
-    height: calc(48 * var(--u));
-    border-radius: calc(13 * var(--u));
-    background: #e8edf5;
-    color: var(--slate);
-  }
-
-  .tile.local {
-    background: var(--sage-tint);
-    color: var(--sage-deep);
-  }
-
-  .tile :global(svg) {
-    width: calc(24 * var(--u));
-    height: calc(24 * var(--u));
   }
 
   .text {

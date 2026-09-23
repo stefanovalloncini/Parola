@@ -1,7 +1,6 @@
 import booksFill from "@phosphor-icons/core/fill/books-fill.svg?raw";
 import broomFill from "@phosphor-icons/core/fill/broom-fill.svg?raw";
 import checkBold from "@phosphor-icons/core/bold/check-bold.svg?raw";
-import cpuBold from "@phosphor-icons/core/bold/cpu-bold.svg?raw";
 import exportFill from "@phosphor-icons/core/fill/export-fill.svg?raw";
 import eyeSlashFill from "@phosphor-icons/core/fill/eye-slash-fill.svg?raw";
 import fileAudioFill from "@phosphor-icons/core/fill/file-audio-fill.svg?raw";
@@ -15,6 +14,7 @@ import listChecksBold from "@phosphor-icons/core/bold/list-checks-bold.svg?raw";
 import lockFill from "@phosphor-icons/core/fill/lock-fill.svg?raw";
 import microphoneFill from "@phosphor-icons/core/fill/microphone-fill.svg?raw";
 import microphoneSlashFill from "@phosphor-icons/core/fill/microphone-slash-fill.svg?raw";
+import plugsBold from "@phosphor-icons/core/bold/plugs-bold.svg?raw";
 import questionFill from "@phosphor-icons/core/fill/question-fill.svg?raw";
 import recordFill from "@phosphor-icons/core/fill/record-fill.svg?raw";
 import sparkleFill from "@phosphor-icons/core/fill/sparkle-fill.svg?raw";
@@ -31,7 +31,6 @@ const sources = {
   books: booksFill,
   broom: broomFill,
   check: checkBold,
-  cpu: cpuBold,
   export: exportFill,
   "eye-slash": eyeSlashFill,
   "file-audio": fileAudioFill,
@@ -45,6 +44,7 @@ const sources = {
   lock: lockFill,
   microphone: microphoneFill,
   "microphone-slash": microphoneSlashFill,
+  plugs: plugsBold,
   question: questionFill,
   record: recordFill,
   sparkle: sparkleFill,

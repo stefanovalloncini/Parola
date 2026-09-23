@@ -1,24 +1,37 @@
 ---
 import { hues, type GlyphName, type Hue } from "../data/icons";
+import { marks, type MarkName } from "../data/marks";
 import Icon from "./Icon.astro";
 
-interface Props {
-  glyph: GlyphName;
-  hue: Hue;
-  size: string;
-  class?: string;
-}
+export type TileArt = { glyph: GlyphName; hue: Hue } | { mark: MarkName };
 
-const { glyph, hue, size, class: className } = Astro.props;
+type Props = TileArt & { size: string; class?: string };
+
+const props = Astro.props;
+const style =
+  "mark" in props
+    ? `--size: ${props.size}; --scale: ${marks[props.mark].scale}; background: ${marks[props.mark].background}; color: ${marks[props.mark].color}`
+    : `--size: ${props.size}; --top: ${hues[props.hue].top}; --bottom: ${hues[props.hue].bottom}`;
 ---
 
 <span
-  class:list={["tile", className]}
-  style={`--size: ${size}; --top: ${hues[hue].top}; --bottom: ${hues[hue].bottom}`}
-  data-tile={glyph}
+  class:list={["tile", { mark: "mark" in props }, props.class]}
+  style={style}
+  data-tile={"mark" in props ? props.mark : props.glyph}
   aria-hidden="true"
 >
-  <Icon name={glyph} />
+  {"mark" in props ? (
+    <svg
+      viewBox={marks[props.mark].viewBox}
+      fill="currentColor"
+      fill-rule={marks[props.mark].fillRule}
+      aria-hidden="true"
+      focusable="false"
+      set:html={marks[props.mark].body}
+    />
+  ) : (
+    <Icon name={props.glyph} />
+  )}
 </span>
 
 <style>
@@ -44,6 +57,11 @@ const { glyph, hue, size, class: className } = Astro.props;
     z-index: 1;
     width: 60%;
     height: 60%;
+  }
+
+  .mark > :global(svg) {
+    width: calc(var(--scale) * 100%);
+    height: calc(var(--scale) * 100%);
   }
 
   @supports (corner-shape: squircle) {

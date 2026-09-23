@@ -33,6 +33,7 @@
     "@astrojs/check": "^0.9.10",
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
+    "@lobehub/icons-static-svg": "^1.95.1",
     "@phosphor-icons/core": "^2.1.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^24.13.6",
@@ -43,6 +44,7 @@
     "prettier": "^3.9.8",
     "prettier-plugin-astro": "^1.0.1",
     "sharp": "^0.35.4",
+    "simple-icons": "^16.32.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.1"
   }
