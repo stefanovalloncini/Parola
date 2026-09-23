@@ -18,7 +18,11 @@ interface Props {
 const { name, tabs, label } = Astro.props;
 ---
 
-<div class="shot-tabs" data-tabs style={`--count: ${tabs.length}`}>
+<div
+  class="shot-tabs"
+  data-tabs
+  style={`--count: ${tabs.length}; --columns: ${tabs.length > 3 ? 2 : tabs.length}`}
+>
   <div class="frame">
     {tabs.map((tab, i) => (
       <div
@@ -88,9 +92,13 @@ const { name, tabs, label } = Astro.props;
     display: block;
     visibility: hidden;
     opacity: 0;
+    transition:
+      visibility 0s 0.6s,
+      opacity 0s 0.6s;
   }
 
   .panel:not([hidden]) {
+    z-index: 1;
     animation: shot-in 0.6s var(--ease-out);
   }
 
@@ -159,8 +167,12 @@ const { name, tabs, label } = Astro.props;
 
   @media (max-width: 640px) {
     .list {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(var(--columns), 1fr);
       row-gap: 20px;
+    }
+
+    [role="tab"] {
+      font-size: 16px;
     }
   }
 </style>
