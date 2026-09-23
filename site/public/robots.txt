@@ -1,3 +1,0 @@
-User-agent: *
-Disallow: /og-card
-Disallow: /it/og-card
