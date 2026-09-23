@@ -69,7 +69,7 @@ struct SegmentCard: View {
         })
         // Laid over the tap rather than under it, so a click on the strip runs its own button and never seeks.
         .overlay(alignment: .bottomTrailing) {
-            if hovering && !isEditing {
+            if Self.showsActionStrip(hovering: hovering, timingPopoverOpen: timingPopoverOpen, isEditing: isEditing) {
                 actionStrip(isFavorite: isFavorite)
                     .padding(.bottom, DS.Spacing.snug)
                     .padding(.trailing, DS.Spacing.snug)
@@ -359,6 +359,11 @@ struct SegmentCard: View {
     }
 
     @State private var timingPopoverOpen = false
+
+    /// The strip holds the timing popover's anchor, so it outlives the hover while the popover is open.
+    static func showsActionStrip(hovering: Bool, timingPopoverOpen: Bool, isEditing: Bool) -> Bool {
+        (hovering || timingPopoverOpen) && !isEditing
+    }
 
     private func actionStrip(isFavorite: Bool) -> some View {
         HStack(spacing: 4) {
