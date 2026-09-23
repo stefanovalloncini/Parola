@@ -89,7 +89,7 @@ const copy = t({
       <ul>
         {actions.map((action, i) => (
           <li style={`--hue: ${hues[action.hue].accent}`}>
-            <IconTile glyph={action.glyph} hue={action.hue} size="22px" />
+            <IconTile glyph={action.glyph} hue={action.hue} size="24px" />
             {copy.intents[i]}
           </li>
         ))}
@@ -125,7 +125,7 @@ const copy = t({
     display: flex;
     align-items: center;
     gap: 9px;
-    padding: 10px 16px 10px 10px;
+    padding: 9px 16px 9px 9px;
     border-radius: 999px;
     white-space: nowrap;
     background: color-mix(in srgb, var(--hue) 14%, #fff);

@@ -4,8 +4,8 @@ import chatTeardropDotsFill from "@phosphor-icons/core/fill/chat-teardrop-dots-f
 import checkBold from "@phosphor-icons/core/bold/check-bold.svg?raw";
 import exportFill from "@phosphor-icons/core/fill/export-fill.svg?raw";
 import eyeSlashFill from "@phosphor-icons/core/fill/eye-slash-fill.svg?raw";
-import fileAudioFill from "@phosphor-icons/core/fill/file-audio-fill.svg?raw";
-import fileTextFill from "@phosphor-icons/core/fill/file-text-fill.svg?raw";
+import fileAudioBold from "@phosphor-icons/core/bold/file-audio-bold.svg?raw";
+import fileTextBold from "@phosphor-icons/core/bold/file-text-bold.svg?raw";
 import filmStripFill from "@phosphor-icons/core/fill/film-strip-fill.svg?raw";
 import folderLockFill from "@phosphor-icons/core/fill/folder-lock-fill.svg?raw";
 import globeSimpleBold from "@phosphor-icons/core/bold/globe-simple-bold.svg?raw";
@@ -15,7 +15,7 @@ import lightningFill from "@phosphor-icons/core/fill/lightning-fill.svg?raw";
 import listChecksBold from "@phosphor-icons/core/bold/list-checks-bold.svg?raw";
 import lockFill from "@phosphor-icons/core/fill/lock-fill.svg?raw";
 import microphoneFill from "@phosphor-icons/core/fill/microphone-fill.svg?raw";
-import microphoneSlashFill from "@phosphor-icons/core/fill/microphone-slash-fill.svg?raw";
+import microphoneSlashBold from "@phosphor-icons/core/bold/microphone-slash-bold.svg?raw";
 import musicNotesFill from "@phosphor-icons/core/fill/music-notes-fill.svg?raw";
 import plugsBold from "@phosphor-icons/core/bold/plugs-bold.svg?raw";
 import questionFill from "@phosphor-icons/core/fill/question-fill.svg?raw";
@@ -38,8 +38,8 @@ const sources = {
   check: checkBold,
   export: exportFill,
   "eye-slash": eyeSlashFill,
-  "file-audio": fileAudioFill,
-  "file-text": fileTextFill,
+  "file-audio": fileAudioBold,
+  "file-text": fileTextBold,
   "film-strip": filmStripFill,
   "folder-lock": folderLockFill,
   "globe-simple": globeSimpleBold,
@@ -49,7 +49,7 @@ const sources = {
   "list-checks": listChecksBold,
   lock: lockFill,
   microphone: microphoneFill,
-  "microphone-slash": microphoneSlashFill,
+  "microphone-slash": microphoneSlashBold,
   "music-notes": musicNotesFill,
   plugs: plugsBold,
   question: questionFill,
