@@ -78,6 +78,15 @@ test("tab screenshots fill their crop", async ({ page }) => {
   }
 });
 
+test("every tab screenshot is shown at the same scale", async ({ page }) => {
+  await page.goto("/");
+  const widths = await page
+    .locator("[data-panel] .crop")
+    .evaluateAll((crops) => crops.map((crop) => getComputedStyle(crop).getPropertyValue("--w")));
+  expect(widths.length).toBeGreaterThan(0);
+  expect(new Set(widths)).toEqual(new Set(["936"]));
+});
+
 test.describe("card scenes keep their parts apart", () => {
   test.use({ reducedMotion: "reduce" });
 
