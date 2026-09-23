@@ -2418,7 +2418,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Incolla sottotitoli nel video…"
+            "value": "Imprimi i sottotitoli nel video…"
           }
         }
       }
@@ -12150,7 +12150,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Avviare una registrazione dell'audio di sistema? Il risultato finirà in libreria come una Riunione."
+            "value": "Avviare una registrazione dell'audio di sistema? Finirà in libreria, tra le Riunioni."
           }
         }
       }
@@ -12558,7 +12558,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Riepiloga ultima trascrizione"
+            "value": "Riassumi ultima trascrizione"
           }
         }
       }
@@ -13594,7 +13594,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trascrizione %@…"
+            "value": "Trascrizione di %@…"
           }
         }
       }
