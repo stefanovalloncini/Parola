@@ -1,27 +1,29 @@
 ---
+import { docTypes, type DocExt } from "../data/icons";
+import IconTile from "./IconTile.astro";
+
 interface Props {
-  ext: string;
+  ext: DocExt;
   name?: string;
-  tint?: string;
-  class?: string;
-  style?: string;
 }
 
-const { ext, name, tint = "#6b8a6b", class: className, style } = Astro.props;
+const { ext, name } = Astro.props;
+const type = docTypes[ext];
 ---
 
-<span class:list={["doc", className]} style={`--tint: ${tint}; ${style ?? ""}`} aria-hidden="true">
-  <span class="sheet">
-    <svg viewBox="0 0 48 60" class="glyph">
-      <path d="M14 30v6M19 26v14M24 22v22M29 27v12M34 31v4"></path>
-    </svg>
-    <span class="ext">{ext}</span>
+<span class="doc" aria-hidden="true">
+  <span class="page">
+    <span class="sheet">
+      <IconTile glyph={type.glyph} hue={type.hue} size="calc(30 * var(--unit))" class="badge" />
+      <span class="ext">{ext}</span>
+    </span>
   </span>
   {name && <span class="name">{name}</span>}
 </span>
 
 <style>
   .doc {
+    --unit: var(--doc-unit, 1px);
     display: inline-flex;
     flex-direction: column;
     align-items: center;
@@ -29,16 +31,28 @@ const { ext, name, tint = "#6b8a6b", class: className, style } = Astro.props;
     width: var(--doc-width, 84px);
   }
 
-  .sheet {
+  .page {
     position: relative;
     display: block;
-    width: 64px;
-    height: 80px;
-    border-radius: 6px 16px 6px 6px;
-    background: linear-gradient(180deg, #ffffff, #f6f7f5);
-    box-shadow:
-      0 0 0 0.5px rgb(15 26 20 / 0.14),
-      0 8px 18px -8px rgb(15 26 20 / 0.35);
+    flex: none;
+    width: calc(64 * var(--unit));
+    height: calc(80 * var(--unit));
+    filter: drop-shadow(0 0 0.5px rgb(15 26 20 / 0.4))
+      drop-shadow(0 calc(6 * var(--unit)) calc(8 * var(--unit)) rgb(15 26 20 / 0.16));
+  }
+
+  .sheet {
+    position: absolute;
+    inset: 0;
+    border-radius: calc(5 * var(--unit));
+    background: linear-gradient(180deg, #ffffff 35%, #eef0ed);
+    clip-path: polygon(
+      0 0,
+      calc(100% - 17 * var(--unit)) 0,
+      100% calc(17 * var(--unit)),
+      100% 100%,
+      0 100%
+    );
   }
 
   .sheet::before {
@@ -46,37 +60,32 @@ const { ext, name, tint = "#6b8a6b", class: className, style } = Astro.props;
     position: absolute;
     top: 0;
     right: 0;
-    width: 16px;
-    height: 16px;
-    border-radius: 0 16px 0 6px;
-    background: linear-gradient(225deg, transparent 50%, #e3e7e2 50%);
-    box-shadow: -0.5px 0.5px 0 rgb(15 26 20 / 0.1);
+    width: calc(17 * var(--unit));
+    height: calc(17 * var(--unit));
+    border-bottom-left-radius: calc(3 * var(--unit));
+    background: linear-gradient(225deg, transparent 50%, #dde1dc 50%, #f4f5f3);
+    filter: drop-shadow(
+      calc(-1 * var(--unit)) calc(1.5 * var(--unit)) calc(1.5 * var(--unit)) rgb(15 26 20 / 0.16)
+    );
   }
 
-  .glyph {
+  .sheet :global(.badge) {
     position: absolute;
-    left: 8px;
-    top: 10px;
-    width: 48px;
-    height: 44px;
-    fill: none;
-    stroke: var(--tint);
-    stroke-width: 3;
-    stroke-linecap: round;
+    left: 50%;
+    top: calc(22 * var(--unit));
+    translate: -50% 0;
   }
 
   .ext {
     position: absolute;
-    left: 6px;
-    right: 6px;
-    bottom: 7px;
-    padding: 2px 0;
-    border-radius: 4px;
-    background: color-mix(in srgb, var(--tint) 78%, #000);
-    color: #fff;
-    font-size: 10px;
+    left: 0;
+    right: 0;
+    bottom: calc(8 * var(--unit));
+    color: #8a918c;
+    font-size: calc(9.5 * var(--unit));
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
+    line-height: 1;
     text-align: center;
   }
 

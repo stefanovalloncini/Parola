@@ -1,4 +1,5 @@
 ---
+import type { DocExt } from "../../data/icons";
 import { localeOf, translator } from "../../i18n";
 import DocTile from "../DocTile.astro";
 import Lines from "../Lines.astro";
@@ -7,12 +8,12 @@ import ShotTabs, { type ShotTab } from "../ShotTabs.astro";
 const locale = localeOf(Astro.currentLocale);
 const t = translator(locale);
 
-const fan = [
-  { ext: "MP3", tint: "#3f6048", r: -16, x: -150, y: 26 },
-  { ext: "MP4", tint: "#54739e", r: -8, x: -76, y: 6 },
-  { ext: "M4A", tint: "#6b8a6b", r: 0, x: 0, y: 0 },
-  { ext: "MOV", tint: "#7b6f95", r: 8, x: 76, y: 6 },
-  { ext: "WAV", tint: "#a07b5a", r: 16, x: 150, y: 26 },
+const fan: { ext: DocExt; r: number; x: number; y: number }[] = [
+  { ext: "MP3", r: -16, x: -150, y: 26 },
+  { ext: "MP4", r: -8, x: -76, y: 6 },
+  { ext: "M4A", r: 0, x: 0, y: 0 },
+  { ext: "MOV", r: 8, x: 76, y: 6 },
+  { ext: "WAV", r: 16, x: 150, y: 26 },
 ];
 
 const tabs: ShotTab[] = [
@@ -63,7 +64,7 @@ const tabs: ShotTab[] = [
           class="fan-tile"
           style={`--r: ${tile.r}deg; --x: ${tile.x}px; --y: ${tile.y}px; --i: ${i}`}
         >
-          <DocTile ext={tile.ext} tint={tile.tint} />
+          <DocTile ext={tile.ext} />
         </span>
       ))}
     </div>

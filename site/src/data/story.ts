@@ -1,9 +1,9 @@
 import type { Locale } from "../i18n";
+import type { DocExt } from "./icons";
 
 interface FileProp {
-  ext: string;
+  ext: DocExt;
   name: Record<Locale, string>;
-  tint: string;
   x: number;
   y: number;
   r: number;
@@ -13,7 +13,6 @@ const files: FileProp[] = [
   {
     ext: "M4A",
     name: { en: "Interview.m4a", it: "Intervista.m4a" },
-    tint: "#6b8a6b",
     x: 9,
     y: 16,
     r: -8,
@@ -21,7 +20,6 @@ const files: FileProp[] = [
   {
     ext: "MP4",
     name: { en: "Lecture 4.mp4", it: "Lezione 4.mp4" },
-    tint: "#54739e",
     x: 13,
     y: 45,
     r: 6,
@@ -29,7 +27,6 @@ const files: FileProp[] = [
   {
     ext: "WAV",
     name: { en: "Standup.wav", it: "Riunione.wav" },
-    tint: "#a07b5a",
     x: 8,
     y: 72,
     r: -4,
@@ -37,7 +34,6 @@ const files: FileProp[] = [
   {
     ext: "MOV",
     name: { en: "Keynote.mov", it: "Presentazione.mov" },
-    tint: "#7b6f95",
     x: 13,
     y: 90,
     r: 8,
@@ -45,7 +41,6 @@ const files: FileProp[] = [
   {
     ext: "MP3",
     name: { en: "Episode 31.mp3", it: "Puntata 31.mp3" },
-    tint: "#3f6048",
     x: 91,
     y: 14,
     r: 7,
@@ -53,7 +48,6 @@ const files: FileProp[] = [
   {
     ext: "M4A",
     name: { en: "Memo 12 Sept.m4a", it: "Memo 12 set.m4a" },
-    tint: "#6b8a6b",
     x: 87,
     y: 42,
     r: -6,
@@ -61,7 +55,6 @@ const files: FileProp[] = [
   {
     ext: "MP4",
     name: { en: "Workshop.mp4", it: "Laboratorio.mp4" },
-    tint: "#54739e",
     x: 92,
     y: 70,
     r: 5,
@@ -69,7 +62,6 @@ const files: FileProp[] = [
   {
     ext: "OGG",
     name: { en: "Voice note.ogg", it: "Nota vocale.ogg" },
-    tint: "#a07b5a",
     x: 87,
     y: 89,
     r: -8,

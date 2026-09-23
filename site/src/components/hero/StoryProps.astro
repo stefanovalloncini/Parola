@@ -15,7 +15,7 @@ const bars = Array.from({ length: barCount }, (_, i) => {
   <div class="set files">
     {files.map((file, i) => (
       <span class="prop" style={`--x: ${file.x}; --y: ${file.y}; --r: ${file.r}deg; --i: ${i}`}>
-        <DocTile ext={file.ext} name={file.name} tint={file.tint} />
+        <DocTile ext={file.ext} name={file.name} />
       </span>
     ))}
   </div>
