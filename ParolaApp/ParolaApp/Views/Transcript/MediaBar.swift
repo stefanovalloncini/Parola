@@ -34,9 +34,8 @@ struct MediaBar: View {
                 Image(systemName: "gobackward.15")
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
-                    .frame(width: 30, height: 30)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlyphButtonStyle(side: 30))
             .help("Back 15 seconds")
             .accessibilityLabel("Back 15 seconds")
             .accessibilityIdentifier("transcript.player.skipBack")
@@ -67,6 +66,7 @@ struct MediaBar: View {
                 .background(
                     Capsule().fill(model.skipSilences ? DS.Color.accent.opacity(0.14) : Color.clear)
                 )
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .help(model.skipSilences ? "Skip silences (on)" : "Skip silences")

@@ -37,24 +37,26 @@ struct LabelsSection: View {
     }
 
     private func chip(_ label: String) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 0) {
             Text(label)
                 .font(DS.Font.bodyStrong)
+                .padding(.vertical, DS.Spacing.hair)
+            // No trailing padding: the ✕'s 20 pt target fills the chip's end, top to bottom.
             Button { remove(label) } label: {
                 Image(systemName: "xmark")
                     .font(DS.Font.caption)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlyphButtonStyle(side: 20))
             .accessibilityLabel("Remove label \(label)")
             .axLeaf("Labels.Button.RemoveChip")
         }
         .foregroundStyle(DS.Color.accentText)
-        .padding(.horizontal, DS.Spacing.small)
-        .padding(.vertical, DS.Spacing.hair)
+        .padding(.leading, DS.Spacing.small)
         // The measured fill: a 12% accent over the inspector's material is a pair nothing measures.
         .background(
             Capsule().fill(DS.Color.accentWash)
         )
+        .clipShape(Capsule())
     }
 
     private var composer: some View {

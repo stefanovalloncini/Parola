@@ -28,9 +28,8 @@ struct EntryViewerPlaybackBar: View {
                     Image(systemName: "gobackward.15")
                         .font(DS.Font.heading)
                         .foregroundStyle(DS.Color.primaryText)
-                        .frame(width: 30, height: 30)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GlyphButtonStyle(side: 30))
                 .help("Back 15 seconds")
                 .accessibilityLabel("Back 15 seconds")
                 .axLeaf("Button.SkipBack")

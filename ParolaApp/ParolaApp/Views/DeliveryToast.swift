@@ -28,7 +28,7 @@ struct DeliveryToast: View {
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.secondaryText)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlyphButtonStyle(side: 20))
             .help("Dismiss")
             .axLeaf("Delivery.Button.Dismiss")
         }

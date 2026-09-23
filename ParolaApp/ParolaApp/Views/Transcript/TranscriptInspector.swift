@@ -49,14 +49,9 @@ struct InspectorModeIcon: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(DS.Font.body)
-                .frame(width: 32, height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(isOn ? DS.Color.accent.opacity(0.15) : Color.clear)
-                )
                 .foregroundStyle(isOn ? DS.Color.accent : DS.Color.primaryText)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlyphButtonStyle(width: 32, height: 26, selectedFill: isOn ? DS.Color.accent.opacity(0.15) : nil))
         .accessibilityLabel(label)
         .accessibilityAddTraits(isOn ? .isSelected : [])
         .axLeaf("Inspector.Button.\(systemName.replacingOccurrences(of: ".", with: ""))")

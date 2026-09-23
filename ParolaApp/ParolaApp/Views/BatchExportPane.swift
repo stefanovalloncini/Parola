@@ -56,9 +56,8 @@ struct BatchPresetCard: View {
                 Image(systemName: "xmark")
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.secondaryText)
-                    .frame(width: 20, height: 20)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlyphButtonStyle(side: 20))
             .help("Remove this preset")
             .accessibilityLabel("Remove \(preset.name)")
             .accessibilityIdentifier("batch.preset.\(preset.spec.format.fileExtension).delete")
