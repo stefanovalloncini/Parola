@@ -220,6 +220,17 @@ enum LibraryListContent {
         return filtered.filter(\.pinned) + filtered.filter { !$0.pinned }
     }
 
+    struct OpenRequest: Equatable {
+        let id: LibraryEntry.ID
+        let inNewWindow: Bool
+    }
+
+    /// Double-click and Return open the one row they land on, in its own window with Option; several rows open nothing.
+    static func openRequest(for ids: Set<LibraryEntry.ID>, modifiers: NSEvent.ModifierFlags) -> OpenRequest? {
+        guard ids.count == 1, let id = ids.first else { return nil }
+        return OpenRequest(id: id, inNewWindow: modifiers.contains(.option))
+    }
+
     /// Search results run under one unheadered group; every other order the list shows breaks into days.
     static func groups(
         for rows: [LibraryRowDisplay],
@@ -336,10 +347,10 @@ struct LibraryListView: View {
                 .listStyle(.inset)
                 .tint(DS.Color.accent)
                 .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: entries.map(\.id))
-                .onKeyPress(.return) {
-                    guard selection.count == 1, let id = selection.first else { return .ignored }
-                    model.openEntryFromLibrary(id, inNewWindow: false)
-                    return .handled
+                // Empty on purpose: each row keeps its own context menu, and the list takes only double-click and Return.
+                .contextMenu(forSelectionType: LibraryEntry.ID.self) { _ in
+                } primaryAction: { ids in
+                    openFromList(ids)
                 }
             }
         }
@@ -433,13 +444,6 @@ struct LibraryListView: View {
             .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + SearchResultRow.separatorInset }
             .contentShape(Rectangle())
             .draggable(entry.bundleURL)
-            // SwiftUI's tap gesture doesn't carry the event's modifiers, so Option is read as the tap lands.
-            .onTapGesture(count: 2) {
-                model.openEntryFromLibrary(
-                    entry.id,
-                    inNewWindow: NSEvent.modifierFlags.contains(.option)
-                )
-            }
             .contextMenu {
                 Button("Open") {
                     model.openEntryFromLibrary(entry.id, inNewWindow: false)
@@ -559,6 +563,12 @@ struct LibraryListView: View {
                 }
             }
         )
+    }
+
+    /// The primary action doesn't carry the event's modifiers, so Option is read as it runs.
+    private func openFromList(_ ids: Set<LibraryEntry.ID>) {
+        guard let request = LibraryListContent.openRequest(for: ids, modifiers: NSEvent.modifierFlags) else { return }
+        model.openEntryFromLibrary(request.id, inNewWindow: request.inNewWindow)
     }
 
     private func performBulkDelete() {
