@@ -36,9 +36,13 @@ the same file. The build moves the Italian 404 page to `it/404.html`, where Clou
 The build in `dist/` is plain static files. `wrangler.jsonc` serves it from Cloudflare:
 
 ```sh
-SITE_URL=https://example.com pnpm build
-pnpm dlx wrangler deploy
+SITE_URL=https://parola.stefanovalloncini.com pnpm build
+npx wrangler@4 deploy
 ```
+
+`wrangler.jsonc` attaches the Worker to `parola.stefanovalloncini.com` as a custom domain. Build with `NOINDEX=1`
+to keep search engines out (every page gets `noindex` and `robots.txt` disallows everything) while the repository
+and its releases are still private.
 
 Set `SITE_URL` to the real domain so canonical links and the social card use absolute URLs. The sitemap and
 the `Sitemap:` line in `robots.txt` are only generated when it is set.

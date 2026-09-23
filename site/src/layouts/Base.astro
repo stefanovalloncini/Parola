@@ -13,6 +13,7 @@ interface Props {
 }
 
 const { title, description, indexed = true } = Astro.props;
+const hidden = !indexed || process.env.NOINDEX === "1";
 const locale = localeOf(Astro.currentLocale);
 const t = translator(locale);
 const path = Astro.url.pathname;
@@ -36,7 +37,7 @@ const ogImage = absolute(locale === "it" ? "/og-it.png" : "/og.png");
     <meta name="referrer" content="no-referrer" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    {!indexed && <meta name="robots" content="noindex" />}
+    {hidden && <meta name="robots" content="noindex" />}
     {canonical && <link rel="canonical" href={canonical} />}
     {canonical &&
       locales.map((other) => (
