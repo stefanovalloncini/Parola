@@ -209,7 +209,7 @@ button {
 }
 
 [data-words].is-waiting .word {
-  color: color-mix(in srgb, currentColor 22%, transparent);
+  color: color-mix(in srgb, currentColor 50%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
