@@ -57,6 +57,17 @@ struct SegmentCard: View {
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.regular)
         .background(cardBackground)
+        .contentShape(Rectangle())
+        // simultaneousGesture: .textSelection consumes plain taps, so a card-level .onTapGesture never fires on text.
+        // Skipped while word karaoke shows: its per-word links own the click, and a simultaneous segment seek would race the word seek.
+        // hoveredSpeaker is nil unless the pointer sits on the chip, which is the one place in the
+        // card that opens the popover instead of seeking.
+        .simultaneousGesture(TapGesture().onEnded {
+            if !isEditing, !showsWordKaraoke, hoveredSpeaker.wrappedValue == nil, model.player != nil {
+                model.seek(to: segment)
+            }
+        })
+        // Laid over the tap rather than under it, so a click on the strip runs its own button and never seeks.
         .overlay(alignment: .bottomTrailing) {
             if hovering && !isEditing {
                 actionStrip(isFavorite: isFavorite)
@@ -71,6 +82,7 @@ struct SegmentCard: View {
                     Self.borderColor(isCurrent: isCurrent, hovering: hovering),
                     lineWidth: Self.borderWidth(isCurrent: isCurrent)
                 )
+                .allowsHitTesting(false)
         )
         .overlay(alignment: .leading) {
             if let bucket = confidenceBucket {
@@ -79,6 +91,7 @@ struct SegmentCard: View {
                     .frame(width: 3)
                     .padding(.vertical, DS.Spacing.tight)
                     .accessibilityHidden(true)
+                    .allowsHitTesting(false)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: radius))
@@ -87,15 +100,6 @@ struct SegmentCard: View {
         .contextMenu { assignSegmentMenu }
         .draggable(draggablePayload)
         .onHover { hovering = $0 }
-        // simultaneousGesture: .textSelection consumes plain taps, so a card-level .onTapGesture never fires on text.
-        // Skipped while word karaoke shows: its per-word links own the click, and a simultaneous segment seek would race the word seek.
-        // hoveredSpeaker is nil unless the pointer sits on the chip, which is the one place in the
-        // card that opens the popover instead of seeking.
-        .simultaneousGesture(TapGesture().onEnded {
-            if !isEditing, !showsWordKaraoke, hoveredSpeaker.wrappedValue == nil, model.player != nil {
-                model.seek(to: segment)
-            }
-        })
         .alert("Rename speaker", isPresented: $renamingSpeaker, presenting: segment.speaker) { current in
             TextField("Name", text: $draftSpeakerName)
             Button("Cancel", role: .cancel) {}
