@@ -4,6 +4,8 @@ import openai from "@lobehub/icons-static-svg/icons/openai.svg?raw";
 import sparkle from "@phosphor-icons/core/fill/sparkle-fill.svg?raw";
 import anthropic from "simple-icons/icons/anthropic.svg?raw";
 import ollama from "simple-icons/icons/ollama.svg?raw";
+import webex from "simple-icons/icons/webex.svg?raw";
+import zoom from "simple-icons/icons/zoom.svg?raw";
 import { drawing, type Drawing } from "./svg";
 
 export interface Mark extends Drawing {
@@ -28,6 +30,8 @@ export const marks = {
   anthropic: mark(anthropic, "#f0eee6", "#191919"),
   groq: mark(groq, "#f55036", "#fff"),
   cerebras: mark(cerebras, "#fff", "#1a1a1a", 0.6),
+  zoom: mark(zoom, "#0b5cff", "#fff", 0.74),
+  webex: mark(webex, "#000", "#fff"),
 };
 
 export type MarkName = keyof typeof marks;

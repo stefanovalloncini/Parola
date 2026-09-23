@@ -1,6 +1,7 @@
 ---
 import { translator } from "../../i18n";
 import BrandIcon from "../BrandIcon.astro";
+import IconTile from "../IconTile.astro";
 import CallWindow from "./CallWindow.astro";
 
 const t = translator(Astro.currentLocale);
@@ -37,13 +38,12 @@ const steps = [
     <span class="button">{t({ en: "Not Now", it: "Non ora" })}</span>
   </div>
   <div class="dock">
-    <span class="app"></span>
-    <span class="app"></span>
+    <IconTile mark="zoom" size="calc(34 * var(--u))" class="running" />
+    <IconTile mark="webex" size="calc(34 * var(--u))" />
     <span class="parola">
       <BrandIcon size={34} />
       <b class="badge"></b>
     </span>
-    <span class="app"></span>
   </div>
 </div>
 
@@ -70,19 +70,25 @@ const steps = [
     translate: -50% 0;
   }
 
-  .app,
   .parola :global(svg) {
     width: calc(34 * var(--u));
     height: calc(34 * var(--u));
   }
 
-  .app {
-    border-radius: calc(9 * var(--u));
-    background: linear-gradient(160deg, rgb(255 255 255 / 0.85), rgb(255 255 255 / 0.45));
-  }
-
   .parola {
     position: relative;
+  }
+
+  .dock :global(.running)::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: calc(-5 * var(--u));
+    width: calc(3.5 * var(--u));
+    height: calc(3.5 * var(--u));
+    border-radius: 50%;
+    background: rgb(15 26 20 / 0.55);
+    translate: -50% 0;
   }
 
   .badge {
