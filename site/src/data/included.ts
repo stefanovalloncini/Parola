@@ -81,7 +81,7 @@ const italian: IncludedGroup[] = [
     title: "Trascrizione",
     icon: "wave",
     items: [
-      "File audio e video, uno alla volta o un'intera cartella",
+      "File audio e video, uno alla volta o un’intera cartella",
       "Link da YouTube, Vimeo, SoundCloud e altri siti",
       "Una coda batch e cartelle monitorate",
       "Nomi di chi parla e timestamp di ogni parola",

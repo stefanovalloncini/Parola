@@ -11,7 +11,7 @@ export interface Credit {
 export const credits: Record<"en" | "it", Credit[]> = {
   en: [
     {
-      before: "Runs OpenAI's Whisper as",
+      before: "Runs OpenAI’s Whisper as",
       mark: "Core ML",
       after: " models on Apple Silicon.",
       name: "WhisperKit, by Argmax",
@@ -25,7 +25,7 @@ export const credits: Record<"en" | "it", Credit[]> = {
       href: whisperKit,
     },
     {
-      before: "Runs NVIDIA's Parakeet and the live speaker labels on the",
+      before: "Runs NVIDIA’s Parakeet and the live speaker labels on the",
       mark: "Neural Engine",
       after: ".",
       name: "FluidAudio",
@@ -34,7 +34,7 @@ export const credits: Record<"en" | "it", Credit[]> = {
     {
       before: "The speech engine built into",
       mark: "macOS 26",
-      after: ", so there's nothing to download.",
+      after: ", so there’s nothing to download.",
       name: "Speech framework, by Apple",
     },
     {
@@ -82,7 +82,7 @@ export const credits: Record<"en" | "it", Credit[]> = {
     {
       before: "Il motore vocale integrato in",
       mark: "macOS 26",
-      after: ", quindi non c'è niente da scaricare.",
+      after: ", quindi non c’è niente da scaricare.",
       name: "Framework Speech, di Apple",
     },
     {
@@ -92,7 +92,7 @@ export const credits: Record<"en" | "it", Credit[]> = {
       name: "Apple Intelligence",
     },
     {
-      before: "Scarica l'audio di",
+      before: "Scarica l’audio di",
       mark: "un link",
       after: " che incolli, da YouTube e da molti altri siti.",
       name: "yt-dlp",
@@ -117,8 +117,8 @@ export const openWork = {
     button: "View the source on GitHub",
   },
   it: {
-    title: "Costruito sull'open source.",
-    lead: "Tutto quello che c'è sotto Parola è open source o fa parte di macOS.",
+    title: "Costruito sull’open source.",
+    lead: "Tutto quello che c’è sotto Parola è open source o fa parte di macOS.",
     sourceBefore: "Parola ha licenza MIT.",
     sourceMark: "Leggi ogni riga",
     sourceAfter: ", cambia quello che vuoi.",

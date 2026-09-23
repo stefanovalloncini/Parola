@@ -19,7 +19,7 @@ export const english: Question[] = [
         text: [
           "Yes. Parola is open source under the ",
           { href: links.license, label: "MIT license" },
-          ", and every feature is in the download. There's nothing to buy and no account to make.",
+          ", and every feature is in the download. There’s nothing to buy and no account to make.",
         ],
       },
     ],
@@ -69,7 +69,7 @@ export const english: Question[] = [
     answer: [
       {
         text: [
-          "Parola uses yt-dlp to download the audio, then transcribes it on your Mac. If yt-dlp isn't installed, Parola offers to install it with Homebrew.",
+          "Parola uses yt-dlp to download the audio, then transcribes it on your Mac. If yt-dlp isn’t installed, Parola offers to install it with Homebrew.",
         ],
       },
     ],

@@ -19,7 +19,7 @@ export const italian: Question[] = [
         text: [
           "Sì. Parola è open source con ",
           { href: links.license, label: "licenza MIT" },
-          " e ogni funzione è inclusa nel download. Non c'è niente da comprare e nessun account da creare.",
+          " e ogni funzione è inclusa nel download. Non c’è niente da comprare e nessun account da creare.",
         ],
       },
     ],
@@ -29,7 +29,7 @@ export const italian: Question[] = [
     answer: [
       {
         text: [
-          "No. La trascrizione avviene sul tuo Mac. Parola va online solo per scaricare un modello, recuperare l'audio di un link che incolli o collegarsi a un servizio AI che aggiungi tu. Un servizio AI riceve il testo, mai l'audio, e Parola chiede conferma la prima volta.",
+          "No. La trascrizione avviene sul tuo Mac. Parola va online solo per scaricare un modello, recuperare l’audio di un link che incolli o collegarsi a un servizio AI che aggiungi tu. Un servizio AI riceve il testo, mai l’audio, e Parola chiede conferma la prima volta.",
         ],
       },
     ],
@@ -59,7 +59,7 @@ export const italian: Question[] = [
     answer: [
       {
         text: [
-          "Nell'app puoi scegliere una delle 13 lingue o lasciare che Parola la riconosca. Parakeet v3 copre 25 lingue europee e la riga di comando accetta qualsiasi codice di lingua che Whisper conosce.",
+          "Nell’app puoi scegliere una delle 13 lingue o lasciare che Parola la riconosca. Parakeet v3 copre 25 lingue europee e la riga di comando accetta qualsiasi codice di lingua che Whisper conosce.",
         ],
       },
     ],
@@ -69,7 +69,7 @@ export const italian: Question[] = [
     answer: [
       {
         text: [
-          "Parola usa yt-dlp per scaricare l'audio, poi lo trascrive sul tuo Mac. Se yt-dlp non è installato, Parola propone di installarlo con Homebrew.",
+          "Parola usa yt-dlp per scaricare l’audio, poi lo trascrive sul tuo Mac. Se yt-dlp non è installato, Parola propone di installarlo con Homebrew.",
         ],
       },
     ],
@@ -91,7 +91,7 @@ export const italian: Question[] = [
     answer: [
       {
         text: [
-          "Sì. Parola legge una configurazione gestita, così l'IT può impostare il modello predefinito, limitare i motori e disattivare la dettatura, l'AI nel cloud, i download dei modelli o altre funzioni. La ",
+          "Sì. Parola legge una configurazione gestita, così l’IT può impostare il modello predefinito, limitare i motori e disattivare la dettatura, l’AI nel cloud, i download dei modelli o altre funzioni. La ",
           { href: links.deploymentDocs, label: "guida alla distribuzione" },
           " (in inglese) elenca tutte le chiavi.",
         ],
