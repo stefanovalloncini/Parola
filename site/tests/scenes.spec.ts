@@ -82,6 +82,26 @@ test.describe("card scenes keep their parts apart", () => {
   test.use({ reducedMotion: "reduce" });
 
   for (const path of ["/", "/it/"]) {
+    for (const width of [1440, 390, 360]) {
+      test(`${path} MCP tool pill stays inside the card at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(path);
+        const fit = await page.locator(".mcp").evaluate((scene) => {
+          const top = () => scene.querySelector(".you")?.getBoundingClientRect().top ?? 0;
+          scene.dataset.state = "tool";
+          const edge =
+            scene.getBoundingClientRect().right - parseFloat(getComputedStyle(scene).paddingRight);
+          const room =
+            edge - (scene.querySelector(".tool")?.getBoundingClientRect().right ?? Infinity);
+          const before = top();
+          scene.dataset.state = "answer";
+          return { room, shift: Math.abs(top() - before) };
+        });
+        expect(fit.room).toBeGreaterThan(-0.5);
+        expect(fit.shift).toBeLessThan(0.5);
+      });
+    }
+
     for (const width of [1440, 390]) {
       test(`${path} meeting slide title clears the alert at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
