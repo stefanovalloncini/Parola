@@ -37,38 +37,22 @@ struct TranscriptHeaderBar: View {
 
             Spacer()
 
-            Button { outlineOpen.toggle() } label: {
-                Image(systemName: "list.bullet.rectangle.portrait")
-            }
-            .buttonStyle(.borderless)
-            .help("Outline")
-            .accessibilityLabel("Outline")
-            .popover(isPresented: $outlineOpen, arrowEdge: .bottom) {
-                OutlinePopover { seconds in
-                    model.seekTo(seconds: seconds)
-                    outlineOpen = false
-                }
-                .environment(model)
-            }
-            .axLeaf("HeaderBar.Button.Outline")
+            controls
+        }
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
+        .onAppear { rebuildShareItem() }
+        .onChange(of: model.transcriptVersion) { _, _ in rebuildShareItem() }
+        .onChange(of: title) { _, _ in rebuildShareItem() }
+    }
 
-            Button { jumpOpen.toggle() } label: {
-                Image(systemName: "clock.arrow.circlepath")
+    private var controls: some View {
+        HStack(spacing: controlGap) {
+            glyphGroup {
+                outlineButton
+                jumpButton
+                compactButton
             }
-            .buttonStyle(.borderless)
-            .help("Jump to time")
-            .accessibilityLabel("Jump to time")
-            .popover(isPresented: $jumpOpen, arrowEdge: .bottom) {
-                jumpPopover
-            }
-            .axLeaf("HeaderBar.Button.JumpToTime")
-
-            Button { model.transcriptCompact.toggle() } label: {
-                Image(systemName: model.transcriptCompact ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
-            }
-            .buttonStyle(.borderless)
-            .modifier(CompactHelpModifier(isCompact: model.transcriptCompact))
-            .axLeaf("HeaderBar.Button.ToggleCompact")
 
             if model.features.isEnabled(.ai) {
                 groupDivider
@@ -78,60 +62,122 @@ struct TranscriptHeaderBar: View {
 
             groupDivider
 
-            Button { toggleSpeak() } label: {
-                Image(systemName: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
-            }
-            .buttonStyle(.borderless)
-            .modifier(SpeakHelpModifier(isSpeaking: speaker.isSpeaking))
-            .axLeaf("HeaderBar.Button.Speak")
-
-            Button(action: copyTranscript) {
-                Image(systemName: "doc.on.doc")
-            }
-            .buttonStyle(.borderless)
-            .disabled(model.transcript == nil)
-            .help("Copy transcript")
-            .accessibilityLabel("Copy transcript")
-            .axLeaf("HeaderBar.Button.CopyTranscript")
-
-            if let shareItem {
-                ShareLink(item: shareItem, preview: SharePreview(title)) {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .buttonStyle(.borderless)
-                .help("Share transcript")
-                .accessibilityLabel("Share transcript")
-                .axLeaf("HeaderBar.Button.Share")
+            glyphGroup {
+                speakButton
+                copyButton
+                shareButton
             }
 
             if model.features.isEnabled(.ai) {
                 groupDivider
                 PromptsMenu()
                     .menuStyle(.button)
-                    .buttonStyle(.borderless)
+                    .buttonStyle(GlyphButtonStyle(tinted: true))
                     .fixedSize()
                     .disabled(model.isRunningPrompt)
             }
 
-            Button(action: onAdvance) {
-                Image(systemName: "chevron.right.2")
-                    .font(DS.Font.heading)
-                    .frame(width: 28, height: 22)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(DS.Color.surfaceElevated)
-                    )
-            }
-            .buttonStyle(.plain)
-            .help("Jump to next segment")
-            .accessibilityLabel("Jump to next segment")
-            .axLeaf("HeaderBar.Button.Advance")
+            advanceButton
         }
-        .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, DS.Spacing.small)
-        .onAppear { rebuildShareItem() }
-        .onChange(of: model.transcriptVersion) { _, _ in rebuildShareItem() }
-        .onChange(of: title) { _, _ in rebuildShareItem() }
+    }
+
+    /// Edge-to-edge 24 pt targets would spread the glyphs out; these gaps put each one back within a point or two of where it sat.
+    private var controlGap: CGFloat {
+        model.features.isEnabled(.ai) ? DS.Spacing.snug : DS.Spacing.tight
+    }
+
+    /// The targets reach a point into the bar's padding, so without the 24 pt AI picker the row keeps its 22 pt height.
+    private func glyphGroup<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        HStack(spacing: 0, content: content)
+            .padding(.vertical, -1)
+    }
+
+    private var outlineButton: some View {
+        Button { outlineOpen.toggle() } label: {
+            Image(systemName: "list.bullet.rectangle.portrait")
+        }
+        .buttonStyle(GlyphButtonStyle(tinted: true))
+        .help("Outline")
+        .accessibilityLabel("Outline")
+        .popover(isPresented: $outlineOpen, arrowEdge: .bottom) {
+            OutlinePopover { seconds in
+                model.seekTo(seconds: seconds)
+                outlineOpen = false
+            }
+            .environment(model)
+        }
+        .axLeaf("HeaderBar.Button.Outline")
+    }
+
+    private var jumpButton: some View {
+        Button { jumpOpen.toggle() } label: {
+            Image(systemName: "clock.arrow.circlepath")
+        }
+        .buttonStyle(GlyphButtonStyle(tinted: true))
+        .help("Jump to time")
+        .accessibilityLabel("Jump to time")
+        .popover(isPresented: $jumpOpen, arrowEdge: .bottom) {
+            jumpPopover
+        }
+        .axLeaf("HeaderBar.Button.JumpToTime")
+    }
+
+    private var compactButton: some View {
+        Button { model.transcriptCompact.toggle() } label: {
+            Image(systemName: model.transcriptCompact ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
+        }
+        .buttonStyle(GlyphButtonStyle(tinted: true))
+        .modifier(CompactHelpModifier(isCompact: model.transcriptCompact))
+        .axLeaf("HeaderBar.Button.ToggleCompact")
+    }
+
+    private var speakButton: some View {
+        Button { toggleSpeak() } label: {
+            Image(systemName: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
+        }
+        .buttonStyle(GlyphButtonStyle(tinted: true))
+        .modifier(SpeakHelpModifier(isSpeaking: speaker.isSpeaking))
+        .axLeaf("HeaderBar.Button.Speak")
+    }
+
+    private var copyButton: some View {
+        Button(action: copyTranscript) {
+            Image(systemName: "doc.on.doc")
+        }
+        .buttonStyle(GlyphButtonStyle(tinted: true))
+        .disabled(model.transcript == nil)
+        .help("Copy transcript")
+        .accessibilityLabel("Copy transcript")
+        .axLeaf("HeaderBar.Button.CopyTranscript")
+    }
+
+    @ViewBuilder
+    private var shareButton: some View {
+        if let shareItem {
+            ShareLink(item: shareItem, preview: SharePreview(title)) {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .buttonStyle(GlyphButtonStyle(tinted: true))
+            .help("Share transcript")
+            .accessibilityLabel("Share transcript")
+            .axLeaf("HeaderBar.Button.Share")
+        }
+    }
+
+    private var advanceButton: some View {
+        Button(action: onAdvance) {
+            Image(systemName: "chevron.right.2")
+                .font(DS.Font.heading)
+                .frame(width: 28, height: 22)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(DS.Color.surfaceElevated)
+                )
+        }
+        .buttonStyle(.plain)
+        .help("Jump to next segment")
+        .accessibilityLabel("Jump to next segment")
+        .axLeaf("HeaderBar.Button.Advance")
     }
 
     private var paneModePicker: some View {
@@ -199,7 +245,7 @@ struct TranscriptHeaderBar: View {
             Image(systemName: "sparkles")
         }
         .menuStyle(.button)
-        .buttonStyle(.borderless)
+        .buttonStyle(GlyphButtonStyle(tinted: true))
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Summary, chat, chapters and action items")

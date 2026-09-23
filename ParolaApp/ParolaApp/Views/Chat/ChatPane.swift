@@ -123,7 +123,7 @@ struct ChatPane: View {
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 0) {
             Text("Chat")
                 .font(DS.Font.heading)
             Spacer()
@@ -132,7 +132,7 @@ struct ChatPane: View {
                     .font(DS.Font.bodyStrong)
                     .foregroundStyle(isSearching ? DS.Color.accent : DS.Color.secondaryText)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlyphButtonStyle())
             .help("Search chat (⌘F)")
             .keyboardShortcut("f", modifiers: [.command])
             .accessibilityLabel(isSearching ? "Hide search" : "Search messages")
@@ -142,7 +142,7 @@ struct ChatPane: View {
                 Image(systemName: "arrow.counterclockwise")
                     .font(DS.Font.bodyStrong)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GlyphButtonStyle())
             .foregroundStyle(DS.Color.secondaryText)
             .help("Clear conversation")
             .disabled(displayedHistory.isEmpty || isSending)
@@ -171,7 +171,7 @@ struct ChatPane: View {
                             .font(DS.Font.secondary)
                             .foregroundStyle(DS.Color.secondaryText)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(GlyphButtonStyle())
                     .help("Clear")
                 }
             }

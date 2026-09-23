@@ -89,7 +89,7 @@ struct ModelCardRow: View {
                             Image(systemName: "trash")
                                 .font(DS.Font.bodyStrong)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(GlyphButtonStyle())
                         .foregroundStyle(DS.Color.secondaryText)
                         .help("Delete this model from disk")
                         .accessibilityLabel("Delete \(variant.displayName)")
@@ -127,7 +127,7 @@ struct ModelCardRow: View {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(DS.Color.secondaryText)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(GlyphButtonStyle())
                         .help("Cancel this download")
                         .accessibilityLabel("Cancel download of \(variant.displayName)")
                         .axLeaf("Card.Button.CancelDownload")

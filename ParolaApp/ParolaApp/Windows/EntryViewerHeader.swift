@@ -33,21 +33,23 @@ struct EntryViewerHeader: View {
 
             Spacer(minLength: DS.Spacing.small)
 
-            Button { session.toggleSearch() } label: {
-                Image(systemName: "magnifyingglass")
-            }
-            .buttonStyle(.borderless)
-            .help("Find in this transcript")
-            .accessibilityLabel("Find in this transcript")
-            .axLeaf("Button.Search")
+            HStack(spacing: 0) {
+                Button { session.toggleSearch() } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .buttonStyle(GlyphButtonStyle(tinted: true))
+                .help("Find in this transcript")
+                .accessibilityLabel("Find in this transcript")
+                .axLeaf("Button.Search")
 
-            Button { session.showsInfo.toggle() } label: {
-                Image(systemName: session.showsInfo ? "sidebar.right" : "info.circle")
+                Button { session.showsInfo.toggle() } label: {
+                    Image(systemName: session.showsInfo ? "sidebar.right" : "info.circle")
+                }
+                .buttonStyle(GlyphButtonStyle(tinted: true))
+                .help(session.showsInfo ? "Hide info" : "Show info")
+                .accessibilityLabel("Info")
+                .axLeaf("Toggle.Info")
             }
-            .buttonStyle(.borderless)
-            .help(session.showsInfo ? "Hide info" : "Show info")
-            .accessibilityLabel("Info")
-            .axLeaf("Toggle.Info")
 
             Button("Copy Transcript") { session.copyTranscript() }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))

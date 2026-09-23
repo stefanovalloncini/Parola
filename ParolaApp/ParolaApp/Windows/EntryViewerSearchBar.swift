@@ -25,11 +25,11 @@ struct EntryViewerSearchBar: View {
                 }
             }
 
-            HStack(spacing: 4) {
+            HStack(spacing: 0) {
                 Button { session.goToPreviousMatch() } label: {
                     Image(systemName: "chevron.up")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(GlyphButtonStyle(tinted: true))
                 .disabled(session.matches.isEmpty)
                 .help("Previous match")
                 .accessibilityLabel("Previous match")
@@ -38,7 +38,7 @@ struct EntryViewerSearchBar: View {
                 Button { session.goToNextMatch() } label: {
                     Image(systemName: "chevron.down")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(GlyphButtonStyle(tinted: true))
                 .disabled(session.matches.isEmpty)
                 .help("Next match")
                 .accessibilityLabel("Next match")

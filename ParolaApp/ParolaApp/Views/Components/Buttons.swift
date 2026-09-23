@@ -129,3 +129,83 @@ struct DSIconChipButtonStyle: ButtonStyle {
         private var lit: Bool { configuration.isPressed || (isEnabled && hovering) }
     }
 }
+
+/// A glyph-only button: bare at rest, with a target larger than its glyph that lights on hover and press.
+struct GlyphButtonStyle: ButtonStyle {
+    var width: CGFloat
+    var height: CGFloat
+    /// `.borderless` inks its glyph with the tint, so the buttons that were borderless pass `true` to keep their look.
+    var tinted: Bool
+    /// A toggle that is on rests on this fill and, like a selected row, takes no hover.
+    var selectedFill: Color?
+
+    static let defaultSide: CGFloat = 24
+    static let shape = RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+
+    init(
+        width: CGFloat = GlyphButtonStyle.defaultSide,
+        height: CGFloat = GlyphButtonStyle.defaultSide,
+        tinted: Bool = false,
+        selectedFill: Color? = nil
+    ) {
+        self.width = width
+        self.height = height
+        self.tinted = tinted
+        self.selectedFill = selectedFill
+    }
+
+    init(side: CGFloat, tinted: Bool = false) {
+        self.init(width: side, height: side, tinted: tinted)
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        Chrome(configuration: configuration, style: self)
+    }
+
+    private struct Chrome: View {
+        let configuration: Configuration
+        let style: GlyphButtonStyle
+
+        @Environment(\.isEnabled) private var isEnabled
+        @State private var hovering = false
+
+        var body: some View {
+            let appearance = GlyphButtonAppearance(
+                hovered: hovering,
+                pressed: configuration.isPressed,
+                enabled: isEnabled,
+                selectedFill: style.selectedFill
+            )
+            configuration.label
+                .foregroundStyle(style.tinted ? AnyShapeStyle(.tint) : AnyShapeStyle(.foreground))
+                .frame(width: style.width, height: style.height)
+                .background(GlyphButtonStyle.shape.fill(appearance.fill))
+                .opacity(appearance.opacity)
+                .contentShape(Rectangle())
+                .rowStateAnimation(hovering)
+                .onHover { hovering = $0 }
+        }
+    }
+}
+
+/// What a glyph button draws in one state: a chosen toggle keeps its fill, and a press outranks a hover.
+struct GlyphButtonAppearance: Equatable {
+    var fill: Color
+    var opacity: Double
+
+    static var hoverFill: Color { DS.Palette.surfaceHover }
+    static var pressedFill: Color { DS.Palette.pillFillHover }
+
+    init(hovered: Bool, pressed: Bool, enabled: Bool, selectedFill: Color? = nil) {
+        opacity = enabled ? 1 : DS.Opacity.disabled
+        if let selectedFill {
+            fill = selectedFill
+        } else if !enabled {
+            fill = .clear
+        } else if pressed {
+            fill = Self.pressedFill
+        } else {
+            fill = hovered ? Self.hoverFill : .clear
+        }
+    }
+}
