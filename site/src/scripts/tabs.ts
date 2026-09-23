@@ -12,6 +12,7 @@ export function watchTabs(root: HTMLElement): void {
   let onScreen = false;
   let remaining = dwell;
   let dueAt = 0;
+  let advances = 0;
 
   const select = (index: number, focus = false) => {
     current = (index + tabs.length) % tabs.length;
@@ -32,7 +33,11 @@ export function watchTabs(root: HTMLElement): void {
     root.toggleAttribute("data-held", playing && held);
     if (!playing || held) return;
     dueAt = performance.now() + remaining;
-    timer = window.setTimeout(() => select(current + 1), remaining);
+    timer = window.setTimeout(() => {
+      advances += 1;
+      if (advances >= tabs.length) chosen = true;
+      select(current + 1);
+    }, remaining);
   };
 
   const schedule = () => {

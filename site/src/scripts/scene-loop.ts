@@ -1,4 +1,5 @@
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const cyclesPerVisit = 3;
 
 type Step = [at: number, state: string];
 
@@ -8,6 +9,7 @@ interface Scene {
   duration: number;
   still: string;
   timers: number[];
+  cycles: number;
 }
 
 function typeText(target: HTMLElement, from: number, until: number, scene: Scene): void {
@@ -39,7 +41,10 @@ function play(scene: Scene): void {
       typeText(target, at, next - 120, scene);
     });
   });
-  scene.timers.push(window.setTimeout(() => play(scene), scene.duration));
+  scene.cycles += 1;
+  if (scene.cycles < cyclesPerVisit) {
+    scene.timers.push(window.setTimeout(() => play(scene), scene.duration));
+  }
 }
 
 function stop(scene: Scene): void {
@@ -64,6 +69,7 @@ export function runSceneLoops(): void {
       duration: Number(root.dataset.duration ?? 8000),
       still: root.dataset.still ?? "",
       timers: [],
+      cycles: 0,
     }),
   );
   const byRoot = new Map(scenes.map((scene) => [scene.root, scene]));
@@ -75,8 +81,12 @@ export function runSceneLoops(): void {
       for (const entry of entries) {
         const scene = byRoot.get(entry.target as HTMLElement);
         if (!scene) continue;
-        if (entry.isIntersecting) play(scene);
-        else showStill(scene);
+        if (entry.isIntersecting) {
+          scene.cycles = 0;
+          play(scene);
+        } else {
+          showStill(scene);
+        }
       }
     },
     { threshold: 0.35 },

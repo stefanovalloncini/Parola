@@ -2,6 +2,7 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const levelLagPerBar = 0.05;
 const previewRest = 1.6;
+const previewLoops = 3;
 
 /** Plays the app's demo clip: words light up on their timestamps and the brand bars follow the level envelope. */
 export function watchKaraoke(root: HTMLElement): void {
@@ -54,6 +55,10 @@ export function watchKaraoke(root: HTMLElement): void {
     } else if (onScreen && !reduceMotion.matches) {
       const elapsed = (performance.now() - previewStart) / 1000;
       const loop = duration + previewRest;
+      if (elapsed >= loop * previewLoops) {
+        paint(duration);
+        return;
+      }
       paint(elapsed % loop);
     }
     if (playing || (onScreen && !reduceMotion.matches)) frame = requestAnimationFrame(tick);

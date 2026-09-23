@@ -32,7 +32,7 @@ const { class: className } = Astro.props;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .wave-glyph i {
+    :global(:is(a, button):is(:hover, :focus-visible)) .wave-glyph i {
       animation: breathe 1.6s var(--ease-in-out) infinite;
       animation-delay: calc(var(--i) * -0.18s);
     }
