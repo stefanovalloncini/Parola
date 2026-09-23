@@ -9479,6 +9479,17 @@
         }
       }
     },
+    "Preparing %@…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparazione di %@…"
+          }
+        }
+      }
+    },
     "Preparing the translation…": {
       "extractionState": "manual",
       "localizations": {
@@ -12288,6 +12299,17 @@
         }
       }
     },
+    "Stop Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferma registrazione"
+          }
+        }
+      }
+    },
     "Stop dictation": {
       "extractionState": "manual",
       "localizations": {
@@ -13418,6 +13440,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi di nuovo"
+          }
+        }
+      }
+    },
+    "Transcribe File": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi file"
           }
         }
       }
