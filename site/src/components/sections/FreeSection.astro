@@ -33,7 +33,8 @@ const copy = t({
       <p class="t-lead">{copy.lead}</p>
     </div>
 
-    <div class="card">
+    <div class="mark-line" data-stick-mark aria-hidden="true"></div>
+    <div class="card" data-stick-card>
       <div class="who">
         <BrandIcon size={64} />
         <div>
@@ -70,6 +71,25 @@ const copy = t({
   </div>
 </section>
 
+<script>
+  const card = document.querySelector<HTMLElement>("[data-stick-card]");
+  const mark = document.querySelector<HTMLElement>("[data-stick-mark]");
+  if (card && mark) {
+    const line = parseFloat(getComputedStyle(card).top) || 84;
+    new IntersectionObserver(
+      ([entry]) => {
+        const above = entry ? !entry.isIntersecting && entry.boundingClientRect.top < line : false;
+        const stuck = above && getComputedStyle(card).position === "sticky";
+        if (stuck === card.classList.contains("is-stuck")) return;
+        const before = card.offsetHeight;
+        card.classList.toggle("is-stuck", stuck);
+        card.style.marginBottom = stuck ? `${before - card.offsetHeight}px` : "";
+      },
+      { rootMargin: `-${line}px 0px 0px 0px` },
+    ).observe(mark);
+  }
+</script>
+
 <style>
   .card {
     position: sticky;
@@ -82,9 +102,50 @@ const copy = t({
     gap: 28px;
     padding: 30px 32px;
     border-radius: var(--radius-card);
-    background: rgb(243 245 242 / 0.92);
+    background: var(--mist);
     box-shadow: inset 0 0 0 1px var(--hairline);
-    backdrop-filter: blur(18px) saturate(160%);
+  }
+
+  .mark-line {
+    height: 1px;
+    margin-bottom: -1px;
+  }
+
+  .card.is-stuck {
+    padding-block: 14px;
+    box-shadow:
+      inset 0 0 0 1px var(--hairline),
+      0 -12px 0 0 var(--paper);
+  }
+
+  .card.is-stuck::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: 24px;
+    background: linear-gradient(var(--paper), rgb(255 255 255 / 0));
+    pointer-events: none;
+  }
+
+  .is-stuck .who :global(svg) {
+    width: 44px;
+    height: 44px;
+  }
+
+  .is-stuck .name {
+    font-size: 17px;
+  }
+
+  .is-stuck .price {
+    font-size: 34px;
+  }
+
+  .is-stuck .note {
+    display: none;
+  }
+
+  .is-stuck :global(.buttons) {
+    grid-auto-flow: column;
   }
 
   .who {
@@ -121,7 +182,7 @@ const copy = t({
   }
 
   .groups {
-    margin-top: 28px;
+    padding-top: 28px;
   }
 
   .group {
