@@ -1,5 +1,6 @@
 ---
 import { translator } from "../../i18n";
+import IconTile from "../IconTile.astro";
 
 const t = translator(Astro.currentLocale);
 const copy = t({
@@ -42,17 +43,22 @@ const steps = [
       {ask}
     </span>
   </p>
-  <p class="tool">
-    <span class="dot"></span>
-    <code>parola_transcribe</code>
-    <span class="state">
-      <span class="run">{copy.running}</span>
-      <span class="ok">{copy.done}</span>
-    </span>
-  </p>
-  <p class="bubble reply">
-    {copy.replyBefore} <code>{file}</code> {copy.replyAfter}
-  </p>
+  <div class="turn">
+    <IconTile mark="claude" size="calc(36 * var(--u))" class="avatar" />
+    <div class="steps">
+      <p class="tool">
+        <span class="dot"></span>
+        <code>parola_transcribe</code>
+        <span class="state">
+          <span class="run">{copy.running}</span>
+          <span class="ok">{copy.done}</span>
+        </span>
+      </p>
+      <p class="bubble reply">
+        {copy.replyBefore} <code>{file}</code> {copy.replyAfter}
+      </p>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -62,16 +68,31 @@ const steps = [
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: calc(16 * var(--u));
-    padding: calc(34 * var(--u));
-    font-size: max(11px, calc(15 * var(--u)));
+    gap: calc(24 * var(--u));
+    padding: calc(30 * var(--u));
+    font-size: max(11px, calc(20 * var(--u)));
     line-height: 1.4;
   }
 
   .bubble {
-    max-width: 86%;
-    padding: calc(12 * var(--u)) calc(16 * var(--u));
-    border-radius: calc(18 * var(--u));
+    max-width: 88%;
+    padding: calc(15 * var(--u)) calc(20 * var(--u));
+    border-radius: calc(22 * var(--u));
+  }
+
+  .turn {
+    display: flex;
+    align-items: flex-start;
+    gap: calc(12 * var(--u));
+  }
+
+  .steps {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(14 * var(--u));
   }
 
   .you {
@@ -95,7 +116,6 @@ const steps = [
   }
 
   .reply {
-    align-self: flex-start;
     background: #fff;
     color: var(--ink-body);
     box-shadow: 0 0 0 calc(1 * var(--u)) rgb(15 26 20 / 0.07);
@@ -110,18 +130,18 @@ const steps = [
     display: inline-flex;
     white-space: nowrap;
     align-items: center;
-    align-self: flex-start;
-    gap: calc(8 * var(--u));
-    padding: calc(7 * var(--u)) calc(13 * var(--u));
+    gap: calc(9 * var(--u));
+    min-height: calc(36 * var(--u));
+    padding: calc(7 * var(--u)) calc(16 * var(--u));
     border-radius: 999px;
     background: var(--sage-tint);
     color: var(--sage-deep);
-    font-size: max(11px, calc(13 * var(--u)));
+    font-size: max(11px, calc(16 * var(--u)));
   }
 
   .dot {
-    width: calc(8 * var(--u));
-    height: calc(8 * var(--u));
+    width: calc(9 * var(--u));
+    height: calc(9 * var(--u));
     border-radius: 50%;
     background: var(--sage);
   }
@@ -141,7 +161,8 @@ const steps = [
   }
 
   .tool,
-  .reply {
+  .reply,
+  .turn :global(.avatar) {
     opacity: 0;
     translate: 0 calc(8 * var(--u));
     transition:
@@ -150,6 +171,7 @@ const steps = [
   }
 
   :is([data-state="tool"], [data-state="answer"], [data-state="rest"]) .tool,
+  :is([data-state="tool"], [data-state="answer"], [data-state="rest"]) :global(.avatar),
   :is([data-state="answer"], [data-state="rest"]) .reply {
     opacity: 1;
     translate: 0 0;

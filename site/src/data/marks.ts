@@ -3,6 +3,7 @@ import groq from "@lobehub/icons-static-svg/icons/groq.svg?raw";
 import openai from "@lobehub/icons-static-svg/icons/openai.svg?raw";
 import sparkle from "@phosphor-icons/core/fill/sparkle-fill.svg?raw";
 import anthropic from "simple-icons/icons/anthropic.svg?raw";
+import claude from "simple-icons/icons/claude.svg?raw";
 import ollama from "simple-icons/icons/ollama.svg?raw";
 import soundcloud from "simple-icons/icons/soundcloud.svg?raw";
 import tiktok from "simple-icons/icons/tiktok.svg?raw";
@@ -42,6 +43,7 @@ export const marks = {
   soundcloud: mark(soundcloud, "#ff5500", "#fff", 0.6),
   x: mark(x, "#000", "#fff", 0.5),
   tiktok: mark(tiktok, "#000", "#fff"),
+  claude: mark(claude, "#d97757", "#fff", 0.6),
 };
 
 export type MarkName = keyof typeof marks;
