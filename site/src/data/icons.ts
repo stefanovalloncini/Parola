@@ -10,7 +10,6 @@ import filmStripFill from "@phosphor-icons/core/fill/film-strip-fill.svg?raw";
 import folderLockFill from "@phosphor-icons/core/fill/folder-lock-fill.svg?raw";
 import globeSimpleBold from "@phosphor-icons/core/bold/globe-simple-bold.svg?raw";
 import highlighterFill from "@phosphor-icons/core/fill/highlighter-fill.svg?raw";
-import keyboardFill from "@phosphor-icons/core/fill/keyboard-fill.svg?raw";
 import lightningFill from "@phosphor-icons/core/fill/lightning-fill.svg?raw";
 import listChecksBold from "@phosphor-icons/core/bold/list-checks-bold.svg?raw";
 import lockFill from "@phosphor-icons/core/fill/lock-fill.svg?raw";
@@ -44,7 +43,6 @@ const sources = {
   "folder-lock": folderLockFill,
   "globe-simple": globeSimpleBold,
   highlighter: highlighterFill,
-  keyboard: keyboardFill,
   lightning: lightningFill,
   "list-checks": listChecksBold,
   lock: lockFill,

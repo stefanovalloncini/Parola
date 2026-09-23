@@ -22,7 +22,7 @@ const english: IncludedGroup[] = [
   },
   {
     title: "Recording",
-    glyph: "microphone",
+    glyph: "record",
     hue: "rose",
     items: [
       "The microphone or anything your Mac plays",
@@ -33,7 +33,7 @@ const english: IncludedGroup[] = [
   },
   {
     title: "Dictation",
-    glyph: "keyboard",
+    glyph: "microphone",
     hue: "slate",
     items: [
       "Dictation into any app, on a key you choose",
@@ -99,7 +99,7 @@ const italian: IncludedGroup[] = [
   },
   {
     title: "Registrazione",
-    glyph: "microphone",
+    glyph: "record",
     hue: "rose",
     items: [
       "Il microfono o qualsiasi audio riprodotto dal Mac",
@@ -110,7 +110,7 @@ const italian: IncludedGroup[] = [
   },
   {
     title: "Dettatura",
-    glyph: "keyboard",
+    glyph: "microphone",
     hue: "slate",
     items: [
       "Dettatura in qualsiasi app, con il tasto che scegli",
