@@ -108,8 +108,11 @@ const cards = t({
 });
 ---
 
-<section class="section" aria-label={cards.label}>
+<section class="section" aria-labelledby="more-title">
   <div class="container">
+    <h2 id="more-title" class="visually-hidden">
+      {cards.label}
+    </h2>
     <div class="grid">
       <FeatureCard title={cards.meetings.title} text={cards.meetings.text}>
         <MeetingScene />

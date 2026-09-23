@@ -12,7 +12,8 @@ import StoryProps from "./StoryProps.astro";
 const locale = localeOf(Astro.currentLocale);
 const t = translator(locale);
 const shots = shotsFor(locale);
-const shotSizes = "(min-width: 1600px) 832px, calc(min(860px, 92vw) * 0.8)";
+const shotSizes =
+  "(min-width: 1600px) min(787px, calc(108vh - 441px)), calc(min(860px, 92vw) * 0.757)";
 
 const beats = t({
   en: [
@@ -95,6 +96,7 @@ const beats = t({
               src={shots["hero-window"]}
               alt=""
               formats={["avif", "webp"]}
+              fallbackFormat="webp"
               widths={[720, 1080, 1440, 2160]}
               sizes={shotSizes}
               loading="eager"
@@ -106,6 +108,7 @@ const beats = t({
               src={shots["drop-zone"]}
               alt=""
               formats={["avif", "webp"]}
+              fallbackFormat="webp"
               widths={[720, 1080, 1440, 2160]}
               sizes={shotSizes}
             />
@@ -172,6 +175,26 @@ const beats = t({
 
     .story .track {
       bottom: 132px;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .story {
+      --device-top: clamp(250px, 47vh, 340px);
+    }
+
+    .beat {
+      font-size: min(36px, calc(var(--band) / 2.9));
+    }
+
+    .keep {
+      white-space: normal;
+    }
+
+    .beat .mark {
+      display: inline;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
     }
   }
 

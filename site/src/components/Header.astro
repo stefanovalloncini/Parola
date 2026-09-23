@@ -38,7 +38,7 @@ const anchor = (id: string) => (onHome ? `#${id}` : `${home}#${id}`);
   const header = document.querySelector<HTMLElement>("[data-header]");
   if (header) {
     const onScroll = () => header.toggleAttribute("data-scrolled", window.scrollY > 4);
-    onScroll();
+    requestAnimationFrame(onScroll);
     window.addEventListener("scroll", onScroll, { passive: true });
 
     const bands = document.querySelectorAll<HTMLElement>('[data-theme="dark"]');
@@ -60,7 +60,7 @@ const anchor = (id: string) => (onHome ? `#${id}` : `${home}#${id}`);
       );
       bands.forEach((band) => observer?.observe(band));
     };
-    watch();
+    requestAnimationFrame(watch);
     window.addEventListener("resize", watch);
   }
 </script>

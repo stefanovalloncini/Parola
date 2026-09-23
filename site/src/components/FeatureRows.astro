@@ -9,18 +9,19 @@ export interface FeatureRow {
 
 interface Props {
   rows: FeatureRow[];
+  level?: "h3" | "h4";
 }
 
-const { rows } = Astro.props;
+const { rows, level: Heading = "h3" } = Astro.props;
 ---
 
 <ul class="rows">
   {rows.map((row) => (
     <li>
-      <h3 class="t-row">
+      <Heading class="t-row">
         <Icon name={row.icon} size={26} />
         {row.title}
-      </h3>
+      </Heading>
       <p class="t-lead">{row.text}</p>
     </li>
   ))}
@@ -40,13 +41,13 @@ const { rows } = Astro.props;
     border-bottom: 0.5px solid var(--hairline);
   }
 
-  h3 {
+  .t-row {
     display: flex;
     align-items: center;
     gap: 12px;
   }
 
-  h3 :global(.icon) {
+  .t-row :global(.icon) {
     flex: none;
     color: var(--ink);
   }

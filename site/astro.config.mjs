@@ -26,6 +26,7 @@ const localizedNotFound = {
 export default defineConfig({
   site: process.env.SITE_URL,
   devToolbar: { enabled: false },
+  build: { inlineStylesheets: "always" },
   integrations: [
     croppedShots,
     localizedNotFound,
