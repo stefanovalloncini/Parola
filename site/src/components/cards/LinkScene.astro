@@ -1,5 +1,6 @@
 ---
 import { translator } from "../../i18n";
+import LinkSources from "./LinkSources.astro";
 
 const t = translator(Astro.currentLocale);
 const steps = [
@@ -82,13 +83,14 @@ const lines = copy.lines;
       ))}
     </ol>
   </div>
+  <LinkSources />
 </div>
 
 <style>
   .link {
     position: absolute;
     inset: 0;
-    padding: calc(30 * var(--u)) calc(34 * var(--u));
+    padding: calc(24 * var(--u)) calc(34 * var(--u));
     background: linear-gradient(180deg, #eef2ed, #e3e9e1);
     font-size: max(11px, calc(12.5 * var(--u)));
     color: #1d201e;

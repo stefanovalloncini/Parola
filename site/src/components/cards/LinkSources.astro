@@ -1,0 +1,30 @@
+---
+import type { MarkName } from "../../data/marks";
+import IconTile from "../IconTile.astro";
+
+const sources: MarkName[] = ["youtube", "vimeo", "x", "soundcloud", "tiktok"];
+---
+
+<div class="sources">
+  {sources.map((source) => (
+    <IconTile mark={source} size="calc(30 * var(--u))" />
+  ))}
+</div>
+
+<style>
+  .sources {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(22 * var(--u));
+    display: flex;
+    justify-content: center;
+    gap: calc(12 * var(--u));
+  }
+
+  @container (max-width: 449px) {
+    .sources {
+      display: none;
+    }
+  }
+</style>

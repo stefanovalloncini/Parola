@@ -96,6 +96,26 @@ test.describe("card scenes keep their parts apart", () => {
         });
         expect(gap).toBeGreaterThan(4);
       });
+
+      test(`${path} link sources never cover the link sheet at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(path);
+        const overlaps = await page.locator(".link").evaluate((scene) => {
+          const hit = (a: DOMRect, b: DOMRect) => a.top < b.bottom && a.bottom > b.top;
+          const sources = scene.querySelector(".sources");
+          if (!sources || getComputedStyle(sources).display === "none") return [];
+          return ["empty", "typing", "press", "fetching", "writing", "done"].filter((state) => {
+            scene.dataset.state = state;
+            const row = sources.getBoundingClientRect();
+            return [".sheet", ".result"].some((part) => {
+              const element = scene.querySelector(part);
+              if (!element || getComputedStyle(element).opacity === "0") return false;
+              return hit(row, element.getBoundingClientRect());
+            });
+          });
+        });
+        expect(overlaps).toEqual([]);
+      });
     }
   }
 });
