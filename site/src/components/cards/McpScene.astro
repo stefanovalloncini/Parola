@@ -103,7 +103,7 @@ const steps = [
 
   code {
     font-family: var(--font-mono);
-    font-size: 0.9em;
+    font-size: max(11px, 0.9em);
   }
 
   .tool {
@@ -133,7 +133,7 @@ const steps = [
 
   .state > span {
     grid-area: 1 / 1;
-    transition: opacity 0.2s;
+    transition: opacity 0.12s;
   }
 
   .ok {
@@ -156,10 +156,11 @@ const steps = [
   }
 
   :is([data-state="answer"], [data-state="rest"]) .run {
-    opacity: 0;
+    display: none;
   }
 
   :is([data-state="answer"], [data-state="rest"]) .ok {
     opacity: 1;
+    transition: opacity 0.18s 0.12s;
   }
 </style>

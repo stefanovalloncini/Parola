@@ -31,9 +31,11 @@ const labels = t({
   </div>
   <p class="words">
     {demo.words.map((word) => (
-      <span data-s={word.start} data-e={word.end}>
-        {word.text}{" "}
-      </span>
+      <Fragment>
+        <span data-s={word.start} data-e={word.end}>
+          {word.text}
+        </span>{" "}
+      </Fragment>
     ))}
   </p>
   <button type="button" class="play" data-play>
@@ -89,6 +91,8 @@ const labels = t({
   }
 
   .words span {
+    margin: 0 -0.1em;
+    padding: 0 0.1em;
     color: rgb(252 242 230 / 0.5);
     border-radius: calc(4 * var(--u));
     transition:

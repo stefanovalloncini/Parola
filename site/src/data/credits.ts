@@ -5,6 +5,7 @@ export interface Credit {
   mark: string;
   after: string;
   name: string;
+  maker?: string;
   href?: string;
 }
 
@@ -14,14 +15,16 @@ export const credits: Record<"en" | "it", Credit[]> = {
       before: "Runs OpenAI’s Whisper as",
       mark: "Core ML",
       after: " models on Apple Silicon.",
-      name: "WhisperKit, by Argmax",
+      name: "WhisperKit",
+      maker: "Argmax",
       href: whisperKit,
     },
     {
       before: "Tells the voices in a recorded file",
       mark: "apart",
       after: ", so each line gets a speaker.",
-      name: "SpeakerKit, by Argmax",
+      name: "SpeakerKit",
+      maker: "Argmax",
       href: whisperKit,
     },
     {
@@ -29,19 +32,22 @@ export const credits: Record<"en" | "it", Credit[]> = {
       mark: "Neural Engine",
       after: ".",
       name: "FluidAudio",
+      maker: "FluidInference",
       href: "https://github.com/FluidInference/FluidAudio",
     },
     {
       before: "The speech engine built into",
       mark: "macOS 26",
       after: ", so there’s nothing to download.",
-      name: "Speech framework, by Apple",
+      name: "Speech framework",
+      maker: "Apple",
     },
     {
       before: "Summaries, chapters and titles, written",
-      mark: "on your Mac",
+      mark: "on device",
       after: ".",
       name: "Apple Intelligence",
+      maker: "Apple",
     },
     {
       before: "Fetches the audio behind",
@@ -54,7 +60,8 @@ export const credits: Record<"en" | "it", Credit[]> = {
       before: "Translates a finished transcript",
       mark: "on device",
       after: ", into the languages your Mac offers.",
-      name: "Translation framework, by Apple",
+      name: "Translation framework",
+      maker: "Apple",
     },
   ],
   it: [
@@ -62,14 +69,16 @@ export const credits: Record<"en" | "it", Credit[]> = {
       before: "Esegue Whisper di OpenAI come modelli",
       mark: "Core ML",
       after: " su Apple Silicon.",
-      name: "WhisperKit, di Argmax",
+      name: "WhisperKit",
+      maker: "Argmax",
       href: whisperKit,
     },
     {
       before: "Distingue",
       mark: "le voci",
       after: " di un file registrato, così ogni riga indica chi parla.",
-      name: "SpeakerKit, di Argmax",
+      name: "SpeakerKit",
+      maker: "Argmax",
       href: whisperKit,
     },
     {
@@ -77,19 +86,22 @@ export const credits: Record<"en" | "it", Credit[]> = {
       mark: "Neural Engine",
       after: ".",
       name: "FluidAudio",
+      maker: "FluidInference",
       href: "https://github.com/FluidInference/FluidAudio",
     },
     {
       before: "Il motore vocale integrato in",
       mark: "macOS 26",
       after: ", quindi non c’è niente da scaricare.",
-      name: "Framework Speech, di Apple",
+      name: "Framework Speech",
+      maker: "Apple",
     },
     {
       before: "Riassunti, capitoli e titoli, scritti",
-      mark: "sul tuo Mac",
+      mark: "sul dispositivo",
       after: ".",
       name: "Apple Intelligence",
+      maker: "Apple",
     },
     {
       before: "Scarica l’audio di",
@@ -102,7 +114,8 @@ export const credits: Record<"en" | "it", Credit[]> = {
       before: "Traduce una trascrizione finita",
       mark: "sul dispositivo",
       after: ", nelle lingue disponibili sul tuo Mac.",
-      name: "Framework Translation, di Apple",
+      name: "Framework Translation",
+      maker: "Apple",
     },
   ],
 };
@@ -114,7 +127,7 @@ export const openWork = {
     sourceBefore: "Parola itself is MIT licensed.",
     sourceMark: "Read every line",
     sourceAfter: ", change what you like.",
-    button: "View the source on GitHub",
+    button: "Source on GitHub",
   },
   it: {
     title: "Costruito sull’open source.",
@@ -122,6 +135,6 @@ export const openWork = {
     sourceBefore: "Parola ha licenza MIT.",
     sourceMark: "Leggi ogni riga",
     sourceAfter: ", cambia quello che vuoi.",
-    button: "Vedi il codice su GitHub",
+    button: "Codice su GitHub",
   },
 };

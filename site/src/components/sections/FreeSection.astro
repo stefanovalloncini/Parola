@@ -34,17 +34,19 @@ const copy = t({
     </div>
 
     <div class="mark-line" data-stick-mark aria-hidden="true"></div>
-    <div class="card" data-stick-card>
-      <div class="who">
-        <BrandIcon size={64} />
-        <div>
-          <p class="name">Parola</p>
-          <p class="price">{copy.price}</p>
-          <p class="note">{copy.license}</p>
+    <div class="dock" data-stick-card>
+      <div class="card">
+        <div class="who">
+          <BrandIcon size={64} />
+          <div>
+            <p class="name">Parola</p>
+            <p class="price">{copy.price}</p>
+            <p class="note">{copy.license}</p>
+          </div>
         </div>
-      </div>
-      <div class="actions">
-        <DownloadButtons stacked />
+        <div class="actions">
+          <DownloadButtons stacked />
+        </div>
       </div>
     </div>
 
@@ -72,31 +74,58 @@ const copy = t({
 </section>
 
 <script>
-  const card = document.querySelector<HTMLElement>("[data-stick-card]");
+  const dock = document.querySelector<HTMLElement>("[data-stick-card]");
   const mark = document.querySelector<HTMLElement>("[data-stick-mark]");
-  if (card && mark) {
-    const line = parseFloat(getComputedStyle(card).top) || 84;
-    new IntersectionObserver(
-      ([entry]) => {
-        const above = entry ? !entry.isIntersecting && entry.boundingClientRect.top < line : false;
-        const stuck = above && getComputedStyle(card).position === "sticky";
-        if (stuck === card.classList.contains("is-stuck")) return;
-        const before = card.getBoundingClientRect().height;
-        card.classList.toggle("is-stuck", stuck);
-        card.style.marginBottom = stuck ? `${before - card.getBoundingClientRect().height}px` : "";
-      },
-      { rootMargin: `-${line}px 0px 0px 0px` },
-    ).observe(mark);
+  const section = document.querySelector<HTMLElement>("#download");
+  if (dock && mark && section) {
+    const line = parseFloat(getComputedStyle(dock).top) || 84;
+    let above = false;
+    let inSection = false;
+    const apply = () => {
+      const stuck = above && inSection && getComputedStyle(dock).position === "sticky";
+      if (stuck === dock.classList.contains("is-stuck")) return;
+      const before = dock.getBoundingClientRect().height;
+      dock.classList.toggle("is-stuck", stuck);
+      dock.style.marginBottom = stuck ? `${before - dock.getBoundingClientRect().height}px` : "";
+    };
+    const options = { rootMargin: `-${line}px 0px 0px 0px` };
+    new IntersectionObserver(([entry]) => {
+      above = entry ? !entry.isIntersecting && entry.boundingClientRect.top < line : false;
+      apply();
+    }, options).observe(mark);
+    new IntersectionObserver(([entry]) => {
+      inSection = entry?.isIntersecting ?? false;
+      apply();
+    }, options).observe(section);
   }
 </script>
 
 <style>
-  .card {
-    max-width: var(--narrow);
-    margin-inline: auto;
+  .dock {
     position: sticky;
     top: calc(var(--header-height) + 12px);
     z-index: 5;
+    margin-inline: calc(50% - 50vw);
+    padding-inline: calc(50vw - 50%);
+  }
+
+  .dock.is-stuck {
+    background: var(--paper);
+    box-shadow: 0 -12px 0 0 var(--paper);
+  }
+
+  .dock.is-stuck::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: 24px;
+    background: linear-gradient(var(--paper), rgb(255 255 255 / 0));
+    pointer-events: none;
+  }
+
+  .card {
+    max-width: var(--narrow);
+    margin-inline: auto;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -113,20 +142,8 @@ const copy = t({
     margin-bottom: -1px;
   }
 
-  .card.is-stuck {
+  .is-stuck .card {
     padding-block: 14px;
-    box-shadow:
-      inset 0 0 0 1px var(--hairline),
-      0 -12px 0 0 var(--paper);
-  }
-
-  .card.is-stuck::after {
-    content: "";
-    position: absolute;
-    inset: 100% 0 auto;
-    height: 24px;
-    background: linear-gradient(var(--paper), rgb(255 255 255 / 0));
-    pointer-events: none;
   }
 
   .is-stuck .who :global(svg) {
@@ -248,8 +265,11 @@ const copy = t({
   }
 
   @media (max-width: 720px) {
-    .card {
+    .dock {
       position: static;
+    }
+
+    .card {
       padding: 26px 22px;
     }
 

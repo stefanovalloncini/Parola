@@ -35,9 +35,9 @@ const copy = t({
 });
 const steps = [
   [0, "online"],
-  [1100, "off"],
-  [2000, "working"],
-  [5600, "done"],
+  [900, "off"],
+  [1500, "working"],
+  [5100, "done"],
 ];
 ---
 
@@ -96,6 +96,20 @@ const steps = [
     background: #fbfbfa;
     box-shadow: 0 calc(18 * var(--u)) calc(40 * var(--u)) rgb(0 0 0 / 0.28);
     color: #1d201e;
+    opacity: 0;
+    translate: 0 calc(10 * var(--u));
+    transition:
+      opacity 0.35s var(--ease-out),
+      translate 0.45s var(--ease-out);
+  }
+
+  :is([data-state="working"], [data-state="done"]) .panel {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  [data-state="online"] .panel {
+    transition: none;
   }
 
   .head {
@@ -117,7 +131,7 @@ const steps = [
 
   .title > span {
     grid-area: 1 / 1;
-    transition: opacity 0.25s;
+    transition: opacity 0.12s;
   }
 
   .track {
@@ -156,7 +170,7 @@ const steps = [
     padding-top: calc(2 * var(--u));
     color: #54739e;
     font-family: var(--font-mono);
-    font-size: max(10px, calc(11 * var(--u)));
+    font-size: max(11px, calc(11 * var(--u)));
   }
 
   .done {
@@ -187,6 +201,7 @@ const steps = [
 
   [data-state="done"] .done {
     opacity: 1;
+    transition: opacity 0.18s 0.12s;
   }
 
   @container (max-width: 699px) {

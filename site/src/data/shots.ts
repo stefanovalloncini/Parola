@@ -10,7 +10,6 @@ const names = [
   "lecture",
   "export",
   "dark-speakers",
-  "dark-karaoke",
   "dark-translation",
   "ai-summary",
   "ai-chat",

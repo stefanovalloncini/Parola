@@ -65,7 +65,7 @@ const { label, network, off } = Astro.props;
   .state {
     display: grid;
     color: #6b716d;
-    font-size: max(10px, calc(11.5 * var(--u)));
+    font-size: max(11px, calc(11.5 * var(--u)));
   }
   .state > span {
     grid-area: 1 / 1;
@@ -94,6 +94,8 @@ const { label, network, off } = Astro.props;
 
   .off {
     opacity: 0;
+    color: #1d201e;
+    font-weight: 600;
   }
 
   :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .glyph,

@@ -22,15 +22,6 @@ const tabs: ShotTab[] = [
     }),
   },
   {
-    id: "timing",
-    label: t({ en: "Word timing", it: "Timestamp" }),
-    shot: "dark-karaoke",
-    alt: t({
-      en: "A transcript playing back in dark mode, with the word being spoken highlighted.",
-      it: "Una trascrizione in riproduzione in modalità scura, con la parola pronunciata evidenziata.",
-    }),
-  },
-  {
     id: "translation",
     label: t({ en: "Translation", it: "Traduzione" }),
     shot: "dark-translation",
@@ -88,13 +79,13 @@ const copy = t({
   en: {
     title: ["Who said what,", "and when."],
     lead: "Turn on Diarize and every line gets a speaker. Name them, and a person keeps their name and color in every transcript you add them to.",
-    engines: "Three engines. Pick the one that fits.",
+    engines: ["Three engines.", "Pick the one that fits."],
     enginesLead:
       "Apple Speech works the moment you open Parola. Whisper and Parakeet download once, then run offline.",
     tabs: "Transcript views",
     words: {
       title: "Word by word",
-      text: "The word being spoken lights up as you listen. Click a line to jump straight to it.",
+      text: "The word being spoken lights up as you listen. Press play to hear this one.",
     },
     formats: {
       title: "Thirteen formats",
@@ -108,13 +99,13 @@ const copy = t({
   it: {
     title: ["Chi ha detto cosa,", "e quando."],
     lead: "Attiva Diarizza e ogni riga indica chi parla. Dai un nome alle persone: nome e colore le seguono in ogni trascrizione a cui le aggiungi.",
-    engines: "Tre motori. Scegli quello che fa per te.",
+    engines: ["Tre motori.", "Scegli quello che fa per\u00a0te."],
     enginesLead:
       "Apple Speech funziona appena apri Parola. Whisper e Parakeet si scaricano una volta sola, poi funzionano offline.",
     tabs: "Viste della trascrizione",
     words: {
       title: "Parola per parola",
-      text: "La parola pronunciata si illumina mentre ascolti. Fai clic su una riga per saltare a quel punto.",
+      text: "La parola pronunciata si illumina mentre ascolti. Premi play e ascolta.",
     },
     formats: {
       title: "Tredici formati",
@@ -150,7 +141,9 @@ const copy = t({
       </FeatureCard>
     </div>
     <div class="engines-head">
-      <h3 class="t-title">{copy.engines}</h3>
+      <h3 class="t-title">
+        <Lines lines={copy.engines} />
+      </h3>
       <p class="t-lead">{copy.enginesLead}</p>
     </div>
     <ul class="engine-list">

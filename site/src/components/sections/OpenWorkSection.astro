@@ -2,7 +2,6 @@
 import { credits as creditCopy, openWork } from "../../data/credits";
 import { links } from "../../data/links";
 import { translator } from "../../i18n";
-import BrandIcon from "../BrandIcon.astro";
 
 const t = translator(Astro.currentLocale);
 const credits = t(creditCopy);
@@ -23,11 +22,11 @@ const copy = t(openWork);
           <h3 class="name">
             {credit.href ? <a href={credit.href}>{credit.name}</a> : credit.name}
           </h3>
+          {credit.maker && <p class="maker">{credit.maker}</p>}
           <p class="quote">{`${credit.before} ${credit.mark}${credit.after}`}</p>
         </li>
       ))}
       <li class="source">
-        <BrandIcon size={44} />
         <p class="quote">
           {copy.sourceBefore} <span class="hl">{copy.sourceMark}</span>
           {copy.sourceAfter}
@@ -77,6 +76,12 @@ const copy = t(openWork);
     color: var(--sage-deep);
   }
 
+  .maker {
+    margin-top: -6px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
   .quote {
     font-size: 15px;
     line-height: 1.45;
@@ -92,9 +97,9 @@ const copy = t(openWork);
 
   .source .quote {
     font-family: var(--font-display);
-    font-size: 19px;
+    font-size: 17px;
     font-weight: 650;
-    line-height: 1.25;
+    line-height: 1.3;
     letter-spacing: -0.015em;
     color: var(--cream);
   }
@@ -110,6 +115,7 @@ const copy = t(openWork);
 
   .button {
     justify-self: start;
+    white-space: nowrap;
     padding: 12px 20px;
     border-radius: var(--radius-control);
     background: var(--cream);
@@ -131,6 +137,19 @@ const copy = t(openWork);
   @media (max-width: 560px) {
     .wall {
       grid-template-columns: 1fr;
+      gap: 0;
+    }
+
+    li:not(.source) {
+      padding: 16px 0;
+      border-radius: 0;
+      background: none;
+      box-shadow: none;
+      border-top: 0.5px solid var(--hairline);
+    }
+
+    .source {
+      margin-top: 16px;
     }
   }
 </style>

@@ -39,7 +39,7 @@ const files: FileProp[] = [
     name: { en: "Keynote.mov", it: "Presentazione.mov" },
     tint: "#7b6f95",
     x: 13,
-    y: 96,
+    y: 90,
     r: 8,
   },
   {
@@ -71,7 +71,7 @@ const files: FileProp[] = [
     name: { en: "Voice note.ogg", it: "Nota vocale.ogg" },
     tint: "#a07b5a",
     x: 87,
-    y: 95,
+    y: 89,
     r: -8,
   },
 ];
@@ -144,7 +144,7 @@ export const storyBeats: Record<Locale, Beat[]> = {
       after: "Nessun bot in chiamata.",
     },
     {
-      before: "Tieni premuto un tasto e",
+      before: "Tieni premuto F5 e",
       mark: "parla",
       punct: ".",
       after: "Il testo arriva dove scrivi.",

@@ -181,7 +181,7 @@ const lines = copy.lines;
 
   .status > span {
     grid-area: 1 / 1;
-    transition: opacity 0.2s;
+    transition: opacity 0.12s;
   }
 
   .write {
@@ -248,6 +248,7 @@ const lines = copy.lines;
 
   :is([data-state="writing"], [data-state="done"]) .write {
     opacity: 1;
+    transition: opacity 0.18s 0.12s;
   }
 
   :is([data-state="writing"], [data-state="done"]) .lines li {

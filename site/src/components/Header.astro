@@ -24,8 +24,9 @@ const other = locale === "it" ? "en" : "it";
       <a href={anchor("faq")}>{t({ en: "FAQ", it: "Domande" })}</a>
     </nav>
     <div class="actions">
-      <a class="github" href={switchPath(other, Astro.url.pathname)} hreflang={other} lang={other}>
-        {other === "it" ? "Italiano" : "English"}
+      <a class="lang" href={switchPath(other, Astro.url.pathname)} hreflang={other} lang={other}>
+        <span class="long">{other === "it" ? "Italiano" : "English"}</span>
+        <span class="short">{other === "it" ? "IT" : "EN"}</span>
       </a>
       <a class="github" href={links.repository}>
         GitHub
@@ -129,7 +130,8 @@ const other = locale === "it" ? "en" : "it";
   }
 
   .nav a,
-  .github {
+  .github,
+  .lang {
     font-size: 15px;
     font-weight: 500;
     letter-spacing: -0.01em;
@@ -138,7 +140,8 @@ const other = locale === "it" ? "en" : "it";
   }
 
   .nav a:hover,
-  .github:hover {
+  .github:hover,
+  .lang:hover {
     color: var(--ink);
   }
 
@@ -186,10 +189,19 @@ const other = locale === "it" ? "en" : "it";
       0 14px 28px -10px rgb(15 26 20 / 0.75);
   }
 
+  .short {
+    display: none;
+  }
+
   @media (max-width: 860px) {
     .nav,
-    .github {
+    .github,
+    .long {
       display: none;
+    }
+
+    .short {
+      display: inline;
     }
 
     .header-inner {

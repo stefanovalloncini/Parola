@@ -30,7 +30,7 @@ const beats = t(storyBeats);
             <span class="mark">{beat.mark}</span>
             {beat.punct}
           </span>{" "}
-          {beat.ownLine ? <span class="own-line">{beat.after}</span> : beat.after}
+          <span class:list={["then", { always: beat.ownLine }]}>{beat.after}</span>
         </Tag>
       );
     })}
@@ -115,8 +115,14 @@ const beats = t(storyBeats);
     white-space: nowrap;
   }
 
-  .own-line {
+  .then.always {
     display: block;
+  }
+
+  @media (min-width: 721px) {
+    .then {
+      display: block;
+    }
   }
 
   @media (min-width: 721px) {
@@ -189,6 +195,15 @@ const beats = t(storyBeats);
     top: var(--device-top);
     margin-top: calc(var(--device-top) - var(--header-height) - var(--fade));
     background: var(--paper);
+  }
+
+  .device::before {
+    content: "";
+    position: absolute;
+    inset: auto 0 100%;
+    height: var(--fade);
+    background: linear-gradient(rgb(255 255 255 / 0), var(--paper));
+    pointer-events: none;
   }
 
   .device::after {

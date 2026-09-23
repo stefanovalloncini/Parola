@@ -238,3 +238,9 @@ summary,
 .section-head .t-lead {
   text-wrap: balance;
 }
+
+@media (max-width: 720px) {
+  br.loose {
+    display: none;
+  }
+}

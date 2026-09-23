@@ -1,9 +1,10 @@
 ---
 interface Props {
   lines: string[];
+  loose?: boolean;
 }
 
-const { lines } = Astro.props;
+const { lines, loose = false } = Astro.props;
 const last = lines.length - 1;
 ---
 
@@ -11,6 +12,6 @@ const last = lines.length - 1;
   <Fragment>
     {line}
     {index < last && " "}
-    {index < last && <br />}
+    {index < last && <br class:list={{ loose }} />}
   </Fragment>
 ))}
