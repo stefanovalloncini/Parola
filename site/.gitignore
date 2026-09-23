@@ -4,3 +4,4 @@ dist/
 test-results/
 playwright-report/
 src/assets/shots/_dev/
+src/assets/crops/

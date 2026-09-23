@@ -1,6 +1,7 @@
 ---
-import { Picture } from "astro:assets";
-import { crops, shotsFor, type TabShot } from "../data/shots";
+import { getImage } from "astro:assets";
+import { cropOf, type TabShot } from "../data/crops";
+import { tabShotFor } from "../data/shots";
 import { localeOf } from "../i18n";
 
 export interface ShotTab {
@@ -17,23 +18,35 @@ interface Props {
 }
 
 const { name, tabs, label } = Astro.props;
-const shots = shotsFor(localeOf(Astro.currentLocale));
-const zoom = (width: number) => (1180 / width).toFixed(3);
-const cropStyle = (shot: TabShot) => {
-  const { wide, narrow } = crops[shot];
-  return [
-    `--x: ${wide[0]}; --y: ${wide[1]}; --w: ${wide[2]}; --h: ${wide[3]}`,
-    `--nx: ${narrow[0]}; --ny: ${narrow[1]}; --nw: ${narrow[2]}; --nh: ${narrow[3]}`,
-  ].join("; ");
-};
-const sizesFor = (shot: TabShot) => {
-  const { wide, narrow } = crops[shot];
-  return [
-    `(max-width: 640px) calc((100vw - 32px) * ${zoom(narrow[2])})`,
-    `(max-width: 1088px) calc((100vw - 32px) * ${zoom(wide[2])})`,
-    `${Math.round((1040 * 1180) / wide[2])}px`,
-  ].join(", ");
-};
+const locale = localeOf(Astro.currentLocale);
+const phone = "(max-width: 640px)";
+const phoneSizes = "calc(100vw - 32px)";
+const wideSizes =
+  "(max-width: 720px) calc(100vw - 32px), (max-width: 1088px) calc(100vw - 48px), 1040px";
+
+const pictures = await Promise.all(
+  tabs.map(async (tab) => {
+    const { wide, narrow } = tabShotFor(locale, tab.shot);
+    const variants = (image: typeof wide, widths: number[]) =>
+      Promise.all(
+        (["avif", "webp"] as const).map((format) =>
+          getImage({ src: image, format, widths: widths.filter((width) => width <= image.width) }),
+        ),
+      );
+    const [wideSets, narrowSets] = await Promise.all([
+      variants(wide, [960, 1440, wide.width]),
+      variants(narrow, [400, narrow.width]),
+    ]);
+    const [, , width, height] = cropOf(tab.shot).wide;
+    const [, , narrowWidth, narrowHeight] = cropOf(tab.shot).narrow;
+    return {
+      wide,
+      wideSets,
+      narrowSets,
+      style: `--w: ${width}; --h: ${height}; --nw: ${narrowWidth}; --nh: ${narrowHeight}`,
+    };
+  }),
+);
 ---
 
 <div
@@ -52,15 +65,32 @@ const sizesFor = (shot: TabShot) => {
         data-panel
         hidden={i !== 0}
       >
-        <div class="crop" style={cropStyle(tab.shot)} data-fade={crops[tab.shot].fade}>
-          <Picture
-            src={shots[tab.shot]}
-            alt={tab.alt}
-            formats={["avif", "webp"]}
-            widths={[800, 1300, 1800, 2360]}
-            sizes={sizesFor(tab.shot)}
-            loading="lazy"
-          />
+        <div class="crop" style={pictures[i]?.style} data-fade={cropOf(tab.shot).fade}>
+          <picture>
+            {pictures[i]?.narrowSets.map((set) => (
+              <source
+                media={phone}
+                type={`image/${set.options.format}`}
+                srcset={set.srcSet.attribute}
+                sizes={phoneSizes}
+              />
+            ))}
+            {pictures[i]?.wideSets.map((set) => (
+              <source
+                type={`image/${set.options.format}`}
+                srcset={set.srcSet.attribute}
+                sizes={wideSizes}
+              />
+            ))}
+            <img
+              src={pictures[i]?.wideSets[1]?.src}
+              width={pictures[i]?.wide.width}
+              height={pictures[i]?.wide.height}
+              alt={tab.alt}
+              loading="lazy"
+              decoding="async"
+            />
+          </picture>
         </div>
       </div>
     ))}
@@ -104,12 +134,8 @@ const sizesFor = (shot: TabShot) => {
   }
 
   .crop {
-    --cx: var(--x);
-    --cy: var(--y);
-    --cw: var(--w);
-    --ch: var(--h);
     position: relative;
-    aspect-ratio: var(--cw) / var(--ch);
+    aspect-ratio: var(--w) / var(--h);
     overflow: hidden;
     border-radius: 14px;
     box-shadow:
@@ -123,13 +149,11 @@ const sizesFor = (shot: TabShot) => {
       0 24px 44px -18px rgb(0 0 0 / 0.6);
   }
 
-  .crop :global(img) {
-    position: absolute;
-    left: calc(var(--cx) / var(--cw) * -100%);
-    top: calc(var(--cy) / var(--ch) * -100%);
-    width: calc(1180 / var(--cw) * 100%);
-    max-width: none;
-    height: auto;
+  .crop img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .panel[hidden] {
@@ -219,10 +243,7 @@ const sizesFor = (shot: TabShot) => {
 
   @media (max-width: 640px) {
     .crop {
-      --cx: var(--nx);
-      --cy: var(--ny);
-      --cw: var(--nw);
-      --ch: var(--nh);
+      aspect-ratio: var(--nw) / var(--nh);
       mask-image: linear-gradient(90deg, #000 78%, transparent);
     }
 
