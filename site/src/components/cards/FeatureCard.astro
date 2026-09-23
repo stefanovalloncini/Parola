@@ -3,13 +3,14 @@ interface Props {
   title: string;
   text: string;
   note?: string;
+  wide?: boolean;
   class?: string;
 }
 
-const { title, text, note, class: className } = Astro.props;
+const { title, text, note, wide = false, class: className } = Astro.props;
 ---
 
-<article class:list={["feature", className]}>
+<article class:list={["feature", { wide }, className]}>
   <h3 class="t-card">{title}</h3>
   <p class="t-lead">{text}</p>
   <div class="visual">
@@ -47,6 +48,24 @@ const { title, text, note, class: className } = Astro.props;
 
   .stage > :global(*) {
     --u: calc(100cqw / 500);
+  }
+
+  @media (min-width: 821px) {
+    .wide {
+      grid-column: 1 / -1;
+    }
+
+    .wide .t-lead {
+      max-width: 36em;
+    }
+
+    .wide .stage {
+      aspect-ratio: 936 / 380;
+    }
+
+    .wide .stage > :global(*) {
+      --u: calc(100cqw / 936);
+    }
   }
 
   .note {

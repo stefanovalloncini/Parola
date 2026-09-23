@@ -18,7 +18,6 @@ export const crops = {
   "dark-translation": { wide: pane, narrow: [480, 140, 400, 340], fade: "both" },
   "ai-summary": { wide: pane, narrow: [248, 96, 400, 340] },
   "ai-chat": { wide: pane, narrow: [252, 96, 400, 340] },
-  "ai-prompts": { wide: [244, 64, 936, 632], narrow: [476, 60, 400, 340] },
 } satisfies Record<string, Crop>;
 
 export type TabShot = keyof typeof crops;

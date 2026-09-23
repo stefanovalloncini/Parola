@@ -53,7 +53,6 @@ const labels = t({
 
 <style>
   .karaoke {
-    --u: calc(100cqw / 500);
     position: absolute;
     inset: 0;
     display: flex;
@@ -140,5 +139,40 @@ const labels = t({
 
   :global([data-audible]) .glyph-pause {
     display: inline;
+  }
+
+  @container (min-width: 700px) {
+    .karaoke {
+      display: grid;
+      grid-template-columns: calc(280 * var(--u)) 1fr;
+      grid-template-rows: 1fr auto;
+      column-gap: calc(64 * var(--u));
+      align-items: center;
+      padding: calc(48 * var(--u)) calc(64 * var(--u));
+    }
+
+    .meter {
+      grid-area: 1 / 1;
+      justify-content: center;
+      gap: calc(12 * var(--u));
+      height: calc(120 * var(--u));
+      margin: 0;
+    }
+
+    .meter i {
+      width: calc(14 * var(--u));
+      border-radius: calc(7 * var(--u));
+    }
+
+    .words {
+      grid-area: 1 / 2 / span 2;
+      font-size: calc(34 * var(--u));
+    }
+
+    .play {
+      grid-area: 2 / 1;
+      justify-self: center;
+      margin: 0;
+    }
   }
 </style>

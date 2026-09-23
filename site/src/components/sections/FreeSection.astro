@@ -25,7 +25,7 @@ const copy = t({
 ---
 
 <section class="free section" id="download" aria-labelledby="free-title">
-  <div class="narrow">
+  <div class="container">
     <div class="section-head">
       <h2 id="free-title" class="t-section minor" data-words>
         {copy.title}
@@ -92,6 +92,8 @@ const copy = t({
 
 <style>
   .card {
+    max-width: var(--narrow);
+    margin-inline: auto;
     position: sticky;
     top: calc(var(--header-height) + 12px);
     z-index: 5;
@@ -182,24 +184,24 @@ const copy = t({
   }
 
   .groups {
-    padding-top: 28px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 44px 32px;
+    padding-top: 64px;
   }
 
   .group {
     display: grid;
-    grid-template-columns: 220px 1fr;
-    gap: 16px 24px;
-    padding: 30px 8px;
-    border-bottom: 0.5px solid var(--hairline);
+    align-content: start;
+    gap: 16px;
   }
 
   h3 {
     display: flex;
     align-items: center;
     gap: 10px;
-    align-self: start;
     font-family: var(--font-display);
-    font-size: 21px;
+    font-size: 19px;
     font-weight: 650;
     letter-spacing: -0.015em;
     color: var(--ink);
@@ -207,13 +209,13 @@ const copy = t({
 
   ul {
     display: grid;
-    gap: 14px;
+    gap: 10px;
   }
 
   li {
     display: flex;
-    gap: 12px;
-    font-size: 17px;
+    gap: 10px;
+    font-size: 15px;
     color: var(--ink-body);
   }
 
@@ -221,9 +223,9 @@ const copy = t({
     flex: none;
     display: grid;
     place-items: center;
-    width: 20px;
-    height: 20px;
-    margin-top: 2px;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
     border-radius: 50%;
     background: var(--sage-deep);
     color: #fff;
@@ -231,6 +233,18 @@ const copy = t({
 
   .tick :global(svg) {
     stroke-width: 2.6;
+  }
+
+  @media (max-width: 1000px) {
+    .groups {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 560px) {
+    .groups {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 720px) {
@@ -241,11 +255,6 @@ const copy = t({
 
     .actions {
       width: 100%;
-    }
-
-    .group {
-      grid-template-columns: 1fr;
-      padding-inline: 0;
     }
   }
 </style>

@@ -89,14 +89,14 @@ const levels = [0.4, 0.75, 1, 0.6, 0.85, 0.5, 0.7];
     box-shadow:
       0 0 0 calc(0.6 * var(--u)) rgb(15 26 20 / 0.1),
       0 calc(16 * var(--u)) calc(36 * var(--u)) rgb(15 26 20 / 0.16);
-    font-size: calc(13.5 * var(--u));
+    font-size: max(11px, calc(13.5 * var(--u)));
     line-height: 1.35;
   }
 
   .who {
     margin-bottom: calc(16 * var(--u));
     text-align: center;
-    font-size: calc(11.5 * var(--u));
+    font-size: max(11px, calc(11.5 * var(--u)));
     font-weight: 600;
     color: var(--muted);
   }
@@ -151,7 +151,7 @@ const levels = [0.4, 0.75, 1, 0.6, 0.85, 0.5, 0.7];
     border-radius: calc(14 * var(--u));
     background: rgb(0 0 0 / 0.88);
     color: rgb(255 255 255 / 0.9);
-    font-size: calc(11.5 * var(--u));
+    font-size: max(11px, calc(11.5 * var(--u)));
     box-shadow: 0 calc(10 * var(--u)) calc(22 * var(--u)) rgb(0 0 0 / 0.25);
     opacity: 0;
     translate: 0 calc(6 * var(--u));
@@ -227,7 +227,7 @@ const levels = [0.4, 0.75, 1, 0.6, 0.85, 0.5, 0.7];
       0 calc(4 * var(--u)) 0 #cfd5cd,
       0 calc(10 * var(--u)) calc(18 * var(--u)) rgb(15 26 20 / 0.2);
     color: var(--ink-body);
-    font-size: calc(13 * var(--u));
+    font-size: max(11px, calc(13 * var(--u)));
     font-weight: 600;
     transition:
       translate 0.15s,

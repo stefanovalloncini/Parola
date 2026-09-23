@@ -4,8 +4,7 @@ import FeatureCard from "../cards/FeatureCard.astro";
 import FormatsScene from "../dark/FormatsScene.astro";
 import Karaoke from "../dark/Karaoke.astro";
 import LanguagesScene from "../dark/LanguagesScene.astro";
-import SpeakersScene from "../dark/SpeakersScene.astro";
-import FeatureRows, { type FeatureRow } from "../FeatureRows.astro";
+import Icon from "../Icon.astro";
 import Lines from "../Lines.astro";
 import ShotTabs, { type ShotTab } from "../ShotTabs.astro";
 
@@ -42,55 +41,57 @@ const tabs: ShotTab[] = [
   },
 ];
 
-const rows: FeatureRow[] = t({
+const engines = t({
   en: [
     {
       icon: "wave",
       title: "Apple Speech",
-      text: "It's built into macOS, so it works the moment you open Parola. There's nothing to download.",
+      chip: "Ready now",
+      text: "Built into macOS, so there's nothing to download.",
     },
     {
       icon: "bubble",
       title: "Whisper",
+      chip: "1.6 GB, once",
       text: "OpenAI's speech model, compiled for Apple Silicon. Large v3 Turbo is the best balance for most people.",
     },
     {
       icon: "bolt",
       title: "Parakeet",
-      text: "NVIDIA's model, running through FluidAudio. It's the fastest multilingual option on Apple Silicon.",
+      chip: "Fastest",
+      text: "NVIDIA's model, running through FluidAudio. It covers 25 European languages.",
     },
   ],
   it: [
     {
       icon: "wave",
       title: "Apple Speech",
-      text: "È integrato in macOS, quindi funziona appena apri Parola. Non c'è niente da scaricare.",
+      chip: "Pronto subito",
+      text: "Integrato in macOS, quindi non c'è niente da scaricare.",
     },
     {
       icon: "bubble",
       title: "Whisper",
+      chip: "1,6 GB, una volta",
       text: "Il modello vocale di OpenAI, compilato per Apple Silicon. Large v3 Turbo è il compromesso migliore per quasi tutti.",
     },
     {
       icon: "bolt",
       title: "Parakeet",
-      text: "Il modello di NVIDIA, eseguito tramite FluidAudio. È l'opzione multilingue più veloce su Apple Silicon.",
+      chip: "Il più veloce",
+      text: "Il modello di NVIDIA, eseguito tramite FluidAudio. Copre 25 lingue europee.",
     },
   ],
-});
+} as const);
 
 const copy = t({
   en: {
     title: ["Who said what,", "and when."],
-    lead: "Speaker labels and word timings come from models running on your Mac.",
+    lead: "Turn on Diarize and every line gets a speaker. Name them, and a person keeps their name and color in every transcript you add them to.",
     engines: "Three engines. Pick the one that fits.",
     enginesLead:
       "Apple Speech works the moment you open Parola. Whisper and Parakeet download once, then run offline.",
     tabs: "Transcript views",
-    speakers: {
-      title: "A name for every voice",
-      text: "Turn on Diarize and every line gets a speaker. Name them, and a person keeps their name and color in every transcript you add them to.",
-    },
     words: {
       title: "Word by word",
       text: "The word being spoken lights up as you listen. Click a line to jump straight to it.",
@@ -106,15 +107,11 @@ const copy = t({
   },
   it: {
     title: ["Chi ha detto cosa,", "e quando."],
-    lead: "I nomi di chi parla e i timestamp di ogni parola vengono da modelli che girano sul tuo Mac.",
+    lead: "Attiva Diarizza e ogni riga indica chi parla. Dai un nome alle persone: nome e colore le seguono in ogni trascrizione a cui le aggiungi.",
     engines: "Tre motori. Scegli quello che fa per te.",
     enginesLead:
       "Apple Speech funziona appena apri Parola. Whisper e Parakeet si scaricano una volta sola, poi funzionano offline.",
     tabs: "Viste della trascrizione",
-    speakers: {
-      title: "Un nome per ogni voce",
-      text: "Attiva Diarizza e ogni riga indica chi parla. Dai un nome alle persone: nome e colore le seguono in ogni trascrizione a cui le aggiungi.",
-    },
     words: {
       title: "Parola per parola",
       text: "La parola pronunciata si illumina mentre ascolti. Fai clic su una riga per saltare a quel punto.",
@@ -142,10 +139,7 @@ const copy = t({
     <ShotTabs name="engines" tabs={tabs} label={copy.tabs} />
 
     <div class="grid">
-      <FeatureCard title={copy.speakers.title} text={copy.speakers.text}>
-        <SpeakersScene />
-      </FeatureCard>
-      <FeatureCard title={copy.words.title} text={copy.words.text}>
+      <FeatureCard title={copy.words.title} text={copy.words.text} wide>
         <Karaoke />
       </FeatureCard>
       <FeatureCard title={copy.formats.title} text={copy.formats.text}>
@@ -159,13 +153,25 @@ const copy = t({
       <h3 class="t-title">{copy.engines}</h3>
       <p class="t-lead">{copy.enginesLead}</p>
     </div>
-    <FeatureRows rows={rows} level="h4" />
+    <ul class="engine-list">
+      {engines.map((engine) => (
+        <li>
+          <span class="chip">{engine.chip}</span>
+          <h4 class="t-row">
+            <Icon name={engine.icon} size={26} />
+            {engine.title}
+          </h4>
+          <p>{engine.text}</p>
+        </li>
+      ))}
+    </ul>
   </div>
 </section>
 
 <style>
   .engines {
     position: relative;
+    padding-bottom: clamp(88px, 9vw, 120px);
     background:
       radial-gradient(90% 55% at 50% 0%, rgb(63 96 72 / 0.55), transparent 70%),
       linear-gradient(180deg, var(--night) 0%, var(--night-deep) 100%);
@@ -191,8 +197,41 @@ const copy = t({
     max-width: 30em;
   }
 
-  .engines-head + :global(.rows) {
+  .engine-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
     margin-top: 36px;
+  }
+
+  .engine-list li {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    padding: 28px;
+    border-radius: var(--radius-card);
+    background: rgb(255 255 255 / 0.035);
+    box-shadow: inset 0 0 0 1px rgb(252 242 230 / 0.06);
+  }
+
+  .engine-list h4 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .engine-list p {
+    color: var(--ink-body);
+  }
+
+  .chip {
+    justify-self: start;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgb(169 194 166 / 0.16);
+    color: var(--sage-deep);
+    font-size: 13px;
+    font-weight: 600;
   }
 
   .engines :global(.stage) {
@@ -202,7 +241,8 @@ const copy = t({
 
   @media (max-width: 820px) {
     .grid,
-    .engines-head {
+    .engines-head,
+    .engine-list {
       grid-template-columns: 1fr;
     }
   }

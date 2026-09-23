@@ -24,6 +24,7 @@ const english: IncludedGroup[] = [
     items: [
       "The microphone or anything your Mac plays",
       "A recording prompt when Zoom, Teams or Webex opens",
+      "A timer that ends a recording on its own",
       "Live captions in a panel that stays on top",
     ],
   },
@@ -68,6 +69,7 @@ const english: IncludedGroup[] = [
     icon: "search",
     items: [
       "Search across every transcript",
+      "Edit any line, and fix a name everywhere with find and replace",
       "Favorite lines, pins and labels",
       "Recently Deleted keeps transcripts for 30 days",
     ],
@@ -92,6 +94,7 @@ const italian: IncludedGroup[] = [
     items: [
       "Il microfono o qualsiasi audio riprodotto dal Mac",
       "Un invito a registrare quando apri Zoom, Teams o Webex",
+      "Un timer che ferma la registrazione da solo",
       "Sottotitoli in tempo reale in un pannello sempre in primo piano",
     ],
   },
@@ -136,6 +139,7 @@ const italian: IncludedGroup[] = [
     icon: "search",
     items: [
       "Ricerca in tutte le trascrizioni",
+      "Modifica qualsiasi riga e correggi un nome ovunque con Trova e sostituisci",
       "Righe preferite, trascrizioni fissate in alto ed etichette",
       "Eliminati di recente conserva le trascrizioni per 30 giorni",
     ],

@@ -90,7 +90,7 @@ const lines = copy.lines;
     inset: 0;
     padding: calc(30 * var(--u)) calc(34 * var(--u));
     background: linear-gradient(180deg, #eef2ed, #e3e9e1);
-    font-size: calc(12.5 * var(--u));
+    font-size: max(11px, calc(12.5 * var(--u)));
     color: #1d201e;
   }
 
@@ -108,14 +108,14 @@ const lines = copy.lines;
   }
 
   .title {
-    font-size: calc(14 * var(--u));
+    font-size: max(11px, calc(14 * var(--u)));
     font-weight: 700;
   }
 
   .hint {
     margin: calc(4 * var(--u)) 0 calc(12 * var(--u));
     color: var(--muted);
-    font-size: calc(11 * var(--u));
+    font-size: max(11px, calc(11 * var(--u)));
     line-height: 1.35;
   }
 
@@ -125,7 +125,7 @@ const lines = copy.lines;
     border-radius: calc(8 * var(--u));
     box-shadow: inset 0 0 0 calc(1 * var(--u)) rgb(15 26 20 / 0.18);
     font-family: var(--font-mono);
-    font-size: calc(11.5 * var(--u));
+    font-size: max(11px, calc(11.5 * var(--u)));
     white-space: nowrap;
     overflow: hidden;
   }
@@ -141,7 +141,7 @@ const lines = copy.lines;
     padding: calc(5 * var(--u)) calc(12 * var(--u));
     border-radius: calc(8 * var(--u));
     background: rgb(0 0 0 / 0.07);
-    font-size: calc(11.5 * var(--u));
+    font-size: max(11px, calc(11.5 * var(--u)));
     font-weight: 500;
     transition:
       scale 0.15s,
@@ -171,7 +171,7 @@ const lines = copy.lines;
   .progress {
     display: grid;
     gap: calc(6 * var(--u));
-    font-size: calc(11 * var(--u));
+    font-size: max(11px, calc(11 * var(--u)));
     color: var(--muted);
   }
 
@@ -209,13 +209,13 @@ const lines = copy.lines;
     gap: calc(8 * var(--u));
     margin-top: calc(12 * var(--u));
     font-family: var(--font-serif);
-    font-size: calc(13.5 * var(--u));
+    font-size: max(11px, calc(13.5 * var(--u)));
     line-height: 1.35;
   }
 
   .lines li {
     display: grid;
-    grid-template-columns: calc(40 * var(--u)) 1fr;
+    grid-template-columns: max(38px, calc(40 * var(--u))) 1fr;
     gap: calc(8 * var(--u));
     opacity: 0;
     transition: opacity 0.4s var(--ease-out);
@@ -224,7 +224,7 @@ const lines = copy.lines;
 
   .lines time {
     font-family: var(--font-mono);
-    font-size: calc(10.5 * var(--u));
+    font-size: max(11px, calc(10.5 * var(--u)));
     color: #54739e;
     padding-top: calc(2 * var(--u));
   }

@@ -64,7 +64,7 @@ const steps = [
     justify-content: center;
     gap: calc(16 * var(--u));
     padding: calc(34 * var(--u));
-    font-size: calc(15 * var(--u));
+    font-size: max(11px, calc(15 * var(--u)));
     line-height: 1.4;
   }
 
@@ -108,6 +108,7 @@ const steps = [
 
   .tool {
     display: inline-flex;
+    white-space: nowrap;
     align-items: center;
     align-self: flex-start;
     gap: calc(8 * var(--u));
@@ -115,7 +116,7 @@ const steps = [
     border-radius: 999px;
     background: var(--sage-tint);
     color: var(--sage-deep);
-    font-size: calc(13 * var(--u));
+    font-size: max(11px, calc(13 * var(--u)));
   }
 
   .dot {

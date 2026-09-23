@@ -14,7 +14,6 @@ const names = [
   "dark-translation",
   "ai-summary",
   "ai-chat",
-  "ai-prompts",
 ] as const;
 
 export type ShotName = (typeof names)[number];

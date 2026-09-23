@@ -5,66 +5,8 @@ import FeatureCard from "../cards/FeatureCard.astro";
 import LinkScene from "../cards/LinkScene.astro";
 import MeetingScene from "../cards/MeetingScene.astro";
 import { translator } from "../../i18n";
-import FeatureRows, { type FeatureRow } from "../FeatureRows.astro";
 
 const t = translator(Astro.currentLocale);
-
-const rows: FeatureRow[] = t({
-  en: [
-    {
-      icon: "speaker",
-      title: "Your Mac's audio",
-      text: "Record the microphone or anything your Mac plays. Set a timer and the recording stops on its own.",
-    },
-    {
-      icon: "stack",
-      title: "Batch",
-      text: "Queue a folder of files. They run one after another and skip anything already in your library.",
-    },
-    {
-      icon: "folder",
-      title: "Watched folders",
-      text: "Pick a folder and every new file that lands in it gets transcribed.",
-    },
-    {
-      icon: "search",
-      title: "Search everything",
-      text: "Find a word across every transcript, summary and speaker name in your library.",
-    },
-    {
-      icon: "pencil",
-      title: "Edit and fix",
-      text: "Edit any line, or split and merge segments. Find and replace fixes a name everywhere at once.",
-    },
-  ],
-  it: [
-    {
-      icon: "speaker",
-      title: "L'audio del tuo Mac",
-      text: "Registra il microfono o qualsiasi audio riprodotto dal Mac. Imposta un timer e la registrazione si ferma da sola.",
-    },
-    {
-      icon: "stack",
-      title: "Batch",
-      text: "Metti in coda una cartella di file. Parola li trascrive uno dopo l'altro e salta quelli già in libreria.",
-    },
-    {
-      icon: "folder",
-      title: "Cartelle monitorate",
-      text: "Scegli una cartella: ogni nuovo file che ci finisce dentro viene trascritto.",
-    },
-    {
-      icon: "search",
-      title: "Cerca ovunque",
-      text: "Trova una parola in tutta la libreria: trascrizioni, riassunti e nomi di chi parla.",
-    },
-    {
-      icon: "pencil",
-      title: "Modifica e correggi",
-      text: "Modifica qualsiasi riga, oppure dividi e unisci i segmenti. Con Trova e sostituisci correggi un nome ovunque in un colpo solo.",
-    },
-  ],
-});
 
 const cards = t({
   en: {
@@ -127,7 +69,6 @@ const cards = t({
         <LinkScene />
       </FeatureCard>
     </div>
-    <FeatureRows rows={rows} />
   </div>
 </section>
 
