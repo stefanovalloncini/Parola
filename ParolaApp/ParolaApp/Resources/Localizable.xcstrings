@@ -6647,6 +6647,17 @@
         }
       }
     },
+    "List density": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Densità elenco"
+          }
+        }
+      }
+    },
     "Listening": {
       "comment": "A placeholder text displayed when the user is not speaking.",
       "extractionState": "manual",
@@ -10657,6 +10668,17 @@
         }
       }
     },
+    "Row spacing in the library list and on Home.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spaziatura delle righe nell'elenco della libreria e nella Home."
+          }
+        }
+      }
+    },
     "Rules that write a transcript to disk as soon as it's ready.": {
       "extractionState": "manual",
       "localizations": {
@@ -11664,17 +11686,6 @@
         }
       }
     },
-    "Sidebar density": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Densità sidebar"
-          }
-        }
-      }
-    },
     "Sidecar presets": {
       "extractionState": "manual",
       "localizations": {
@@ -11924,17 +11935,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Origine: %@"
-          }
-        }
-      }
-    },
-    "Spacing in the library sidebar.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spaziatura nella sidebar della libreria."
           }
         }
       }
