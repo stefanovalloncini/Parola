@@ -217,6 +217,47 @@ struct YtDlpUpdateTests {
         #expect(YtDlpInstaller.updateRoute(ytDlpPath: root.path("bin/missing")) == .manual)
     }
 
+    private static let failedUpgradeOutput = """
+        ==> Auto-updating Homebrew...
+        Adjust how often this is run with HOMEBREW_AUTO_UPDATE_SECS or disable with
+        HOMEBREW_NO_AUTO_UPDATE. Hide these hints with HOMEBREW_NO_ENV_HINTS (see `man brew`).
+        ==> Updated Homebrew from 4.6.1 to 4.6.12.
+        ==> New Formulae
+        aaa
+        zzz
+        You have 12 outdated formulae installed.
+        ==> Upgrading 1 outdated package:
+        yt-dlp 2026.3.17_2 -> 2026.9.20
+        ==> Fetching yt-dlp
+        Error: yt-dlp: Failed to download resource "yt-dlp_bottle_manifest"
+        Download failed: https://ghcr.io/v2/homebrew/core/yt-dlp/manifests/2026.9.20
+        """
+
+    @Test("a failed upgrade shows only brew's Error line")
+    func errorSummaryKeepsOnlyErrors() {
+        #expect(YtDlpInstaller.errorSummary(of: Self.failedUpgradeOutput) == "yt-dlp: Failed to download resource \"yt-dlp_bottle_manifest\"")
+        #expect(YtDlpInstaller.errorSummary(of: "==> Fetching yt-dlp\nWarning: something\n") == nil)
+        #expect(YtDlpInstaller.errorSummary(of: "Error: one\nError: two\nError: three\n") == "two\nthree")
+    }
+
+    @Test("a failure is logged by kind", arguments: [
+        ("yt-dlp: Failed to download resource \"yt-dlp\"", YtDlpInstaller.BrewFailureKind.download),
+        ("Another active Homebrew update process is already in progress.", .locked),
+        ("yt-dlp not installed", .notInstalled),
+        ("Permission denied @ apply2files - /opt/homebrew/bin/yt-dlp", .permission),
+        ("Something unexpected", .other),
+    ])
+    func failureKinds(summary: String, kind: YtDlpInstaller.BrewFailureKind) {
+        #expect(YtDlpInstaller.failureKind(of: summary) == kind)
+    }
+
+    @Test("brew runs without its hints and new-formula lists")
+    func quieterBrew() {
+        let env = YtDlpInstaller.brewEnvironment(autoUpdate: true)
+        #expect(env["HOMEBREW_NO_ENV_HINTS"] == "1")
+        #expect(env["HOMEBREW_NO_UPDATE_REPORT_NEW"] == "1")
+    }
+
     @Test("an upgrade lets brew refresh its formulae, an install doesn't")
     func autoUpdate() {
         #expect(YtDlpInstaller.brewEnvironment(autoUpdate: true)["HOMEBREW_NO_AUTO_UPDATE"] == nil)
@@ -253,7 +294,7 @@ struct YtDlpUpdateTests {
             Issue.record("expected the upgrade to fail, got \(outcome)")
             return
         }
-        #expect(message == "Error: yt-dlp not installed")
+        #expect(message == "yt-dlp not installed")
     }
 
     @MainActor

@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 /// Locates `yt-dlp`/`brew` on disk and drives `brew install` and `brew upgrade`, off the AppModel.
 enum YtDlpInstaller {
@@ -103,12 +104,49 @@ enum YtDlpInstaller {
         return "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
+    enum BrewCommand: String, LogSafe {
+        case install
+        case upgrade
+
+        var logToken: String { rawValue }
+    }
+
+    enum BrewFailureKind: String, LogSafe {
+        case download
+        case locked
+        case notInstalled
+        case permission
+        case other
+
+        var logToken: String { rawValue }
+    }
+
     static func install(formula: String, brewPath: String) async -> Outcome {
-        await runBrew(["install", formula], brewPath: brewPath, autoUpdate: false, deadline: nil)
+        await runBrew(.install, formula: formula, brewPath: brewPath, autoUpdate: false, deadline: nil)
     }
 
     static func upgrade(formula: String, brewPath: String, deadline: Duration = upgradeDeadline) async -> Outcome {
-        await runBrew(["upgrade", formula], brewPath: brewPath, autoUpdate: true, deadline: deadline)
+        await runBrew(.upgrade, formula: formula, brewPath: brewPath, autoUpdate: true, deadline: deadline)
+    }
+
+    /// brew's own `Error:` lines, at most the last two; auto-update reports and hints never reach the UI.
+    static func errorSummary(of output: String) -> String? {
+        let errors = output.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.hasPrefix("Error:") }
+            .map { $0.dropFirst("Error:".count).trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        return errors.isEmpty ? nil : errors.suffix(2).joined(separator: "\n")
+    }
+
+    static func failureKind(of summary: String?) -> BrewFailureKind {
+        let text = summary?.lowercased() ?? ""
+        func mentions(_ needles: [String]) -> Bool { needles.contains { text.contains($0) } }
+        if mentions(["failed to download", "download failed", "curl:", "could not resolve", "timed out"]) { return .download }
+        if mentions(["already in progress", "is locked", "another active homebrew"]) { return .locked }
+        if mentions(["not installed", "no such keg", "no available formula"]) { return .notInstalled }
+        if mentions(["permission denied", "not writable", "operation not permitted"]) { return .permission }
+        return .other
     }
 
     static func brewEnvironment(autoUpdate: Bool) -> [String: String] {
@@ -116,15 +154,17 @@ enum YtDlpInstaller {
         // An upgrade needs brew's auto-update: without it brew only knows the versions it fetched last time.
         env["HOMEBREW_NO_AUTO_UPDATE"] = autoUpdate ? nil : "1"
         env["HOMEBREW_NO_ANALYTICS"] = "1"
+        env["HOMEBREW_NO_ENV_HINTS"] = "1"
+        env["HOMEBREW_NO_UPDATE_REPORT_NEW"] = "1"
         return env
     }
 
     private static func runBrew(
-        _ arguments: [String], brewPath: String, autoUpdate: Bool, deadline: Duration?
+        _ command: BrewCommand, formula: String, brewPath: String, autoUpdate: Bool, deadline: Duration?
     ) async -> Outcome {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: brewPath)
-        proc.arguments = arguments
+        proc.arguments = [command.rawValue, formula]
         proc.environment = brewEnvironment(autoUpdate: autoUpdate)
         let pipe = Pipe()
         proc.standardOutput = pipe
@@ -156,19 +196,32 @@ enum YtDlpInstaller {
             chunkContinuation.finish()
             return .failure("Could not launch brew: \(error.localizedDescription)")
         }
+        let started = ContinuousClock.now
         let ending = await waitForExit(proc, deadline: deadline)
         pipe.fileHandleForReading.readabilityHandler = nil
         chunkContinuation.finish()
         let output = await bufferTask.value
+        let elapsed = LogValue.duration(started.duration(to: .now))
         switch ending {
         case .timedOut:
+            ParolaLog.error(.youtube, "brew \(command) hit its deadline", [.elapsed: elapsed])
             return .timedOut
         case .cancelled:
+            ParolaLog.notice(.youtube, "brew \(command) cancelled", [.elapsed: elapsed])
             return .cancelled
         case .exited:
-            if proc.terminationStatus == 0 { return .success }
-            let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
-            return .failure(detail.isEmpty ? "brew exited with status \(proc.terminationStatus)." : detail)
+            let status = Int(proc.terminationStatus)
+            if status == 0 {
+                ParolaLog.info(.youtube, "brew \(command) finished", [.elapsed: elapsed])
+                return .success
+            }
+            let summary = errorSummary(of: output)
+            let lines = output.split(whereSeparator: \.isNewline).count
+            ParolaLog.error(
+                .youtube, "brew \(command) exited with status \(status)",
+                [.error: .safe(failureKind(of: summary)), .count: .int(lines), .elapsed: elapsed]
+            )
+            return .failure(summary ?? "brew exited with status \(status).")
         }
     }
 

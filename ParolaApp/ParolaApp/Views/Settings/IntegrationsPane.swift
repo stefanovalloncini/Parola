@@ -94,7 +94,10 @@ private struct ToolStatusRow: View {
                     Text(error)
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.dangerText)
+                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                        .help(error)
                         .axLeaf("Integrations.Text.Error.\(name)")
                 }
             }
@@ -177,6 +180,8 @@ struct YtDlpManualUpdate: View {
             HStack(spacing: DS.Spacing.small) {
                 Text(verbatim: command)
                     .font(DS.Font.mono)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
                     .textSelection(.enabled)
                     .axLeaf("\(axPrefix).Text.YtDlpUpdateCommand")
                 Button("Copy Command") {
