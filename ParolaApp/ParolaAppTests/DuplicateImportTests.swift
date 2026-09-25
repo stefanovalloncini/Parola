@@ -193,6 +193,57 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("only Transcribe it again keeps a known file in a batch", arguments: [
+            (DuplicateImportPolicy.alwaysAsk, true),
+            (DuplicateImportPolicy.openExisting, true),
+            (DuplicateImportPolicy.transcribeAgain, false),
+        ])
+        func batchSkipDecision(policy: DuplicateImportPolicy, skips: Bool) {
+            #expect(policy.batchSkipsDuplicates == skips)
+        }
+
+        @Test("with Transcribe it again a batch queues the files the library already has")
+        func batchTranscribesDuplicatesAgain() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "again")]
+                ))
+                let model = makeModel()
+                model.duplicateImportPolicy = .transcribeAgain
+                let known = try makeWAV("batch-again-known")
+                let fresh = try makeWAV("batch-again-fresh", seconds: 0.4)
+                defer {
+                    try? FileManager.default.removeItem(at: known)
+                    try? FileManager.default.removeItem(at: fresh)
+                }
+                _ = try await seedLibrary(model, with: known)
+
+                model.importBatchFiles([known, fresh])
+                await model.awaitBatchImport()
+
+                #expect(model.batchJobs.map(\.url) == [known, fresh])
+                #expect(model.batchDuplicatesSkipped == 0)
+                #expect(model.batchDuplicateNotice == nil)
+                model.clearBatch()
+            }
+        }
+
+        @Test("with Open the one I have a batch skips the known file and counts it")
+        func batchSkipsDuplicatesUnderOpenExisting() async throws {
+            let model = makeModel()
+            model.duplicateImportPolicy = .openExisting
+            let known = try makeWAV("batch-open-known")
+            defer { try? FileManager.default.removeItem(at: known) }
+            _ = try await seedLibrary(model, with: known)
+
+            model.importBatchFiles([known])
+            await model.awaitBatchImport()
+
+            #expect(model.batchJobs.isEmpty)
+            #expect(model.batchDuplicateNotice == "1 already in your library")
+            #expect(model.duplicateImport == nil)
+        }
+
         @Test("a batch of nothing but duplicates shows the page and the count")
         func batchOfOnlyDuplicates() async throws {
             let model = makeModel()

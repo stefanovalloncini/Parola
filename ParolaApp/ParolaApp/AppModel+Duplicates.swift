@@ -91,8 +91,8 @@ extension AppModel {
         duplicateImport = nil
     }
 
-    /// Batch imports never prompt. Files the library already holds are dropped and counted, and
-    /// the batch page says how many.
+    /// Batch imports never prompt. Unless the policy is Transcribe it again, files the library
+    /// already holds are dropped and counted, and the batch page says how many.
     func importBatchFiles(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
         batchDuplicatesSkipped = 0
@@ -100,13 +100,15 @@ extension AppModel {
         // notice reading whichever hash finished last.
         let previous = batchImportTask
         let deadline = fileReadDeadline
+        let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
         batchImportTask = Task { [weak self] in
             await previous?.value
             guard let self else { return }
             var keep: [URL] = []
             var skipped = 0
             for url in urls {
-                guard let digest = await SourceDigest.digest(of: url, deadline: deadline),
+                guard skipsDuplicates,
+                      let digest = await SourceDigest.digest(of: url, deadline: deadline),
                       await self.library.findEntry(digest: digest) != nil
                 else {
                     keep.append(url)

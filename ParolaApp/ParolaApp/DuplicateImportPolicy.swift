@@ -8,6 +8,9 @@ enum DuplicateImportPolicy: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// A batch never prompts, so Ask me drops a known file the way Open the one I have does.
+    var batchSkipsDuplicates: Bool { self != .transcribeAgain }
+
     var label: String {
         switch self {
         case .alwaysAsk: return String(localized: "Ask me")

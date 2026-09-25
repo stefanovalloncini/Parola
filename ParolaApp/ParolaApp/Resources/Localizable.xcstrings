@@ -9020,13 +9020,13 @@
         }
       }
     },
-    "Parola recognises a file by its contents, so a renamed copy counts as the same recording.": {
+    "Parola recognises a file by its contents, so a renamed copy counts as the same recording. In a batch, “Ask me” skips the file.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parola riconosce un file dal contenuto, quindi una copia rinominata conta come la stessa registrazione."
+            "value": "Parola riconosce un file dal contenuto, quindi una copia rinominata conta come la stessa registrazione. In un batch, con “Chiedimelo” il file viene saltato."
           }
         }
       }

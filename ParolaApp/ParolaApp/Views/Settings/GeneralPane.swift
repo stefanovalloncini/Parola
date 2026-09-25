@@ -49,7 +49,7 @@ struct GeneralPane: View {
 
             SettingsSection("Files you add") {
                 SettingRow("When a file was already transcribed",
-                           description: "Parola recognises a file by its contents, so a renamed copy counts as the same recording.",
+                           description: "Parola recognises a file by its contents, so a renamed copy counts as the same recording. In a batch, “Ask me” skips the file.",
                            isFirst: true) {
                     Picker("", selection: $model.duplicateImportPolicy) {
                         ForEach(DuplicateImportPolicy.allCases) { policy in
