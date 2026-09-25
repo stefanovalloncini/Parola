@@ -330,7 +330,6 @@ struct ParolaApp: App {
 
         Settings {
             SettingsView()
-                .id(model.themeRevision)
                 .tint(DS.Color.accent)
                 .environment(model)
                 .environment(liveCaptions)

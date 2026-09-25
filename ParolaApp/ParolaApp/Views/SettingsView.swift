@@ -175,6 +175,7 @@ private struct SettingsSidebar: View {
     @Binding var route: SettingsRoute
     @Binding var search: String
     let features: FeatureSet
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         VStack(spacing: 0) {
@@ -209,6 +210,7 @@ private struct SettingsSidebar: View {
                     }
                 }
                 .padding(.bottom, DS.Spacing.medium)
+                .id(model.themeRevision)
             }
         }
         .background(DS.Palette.canvas)
@@ -242,6 +244,7 @@ private struct SettingsDetail: View {
             }
             .padding(.horizontal, DS.Spacing.large)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .id(model.themeRevision)
         }
         .background(DS.Palette.surface)
     }
