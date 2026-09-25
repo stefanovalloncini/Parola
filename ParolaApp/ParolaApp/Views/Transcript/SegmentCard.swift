@@ -442,6 +442,10 @@ struct SegmentCard: View {
             SegmentTimingPopover(segment: segment)
                 .environment(model)
         }
+        // A popover follows its anchor out of the scroll view and past the window's edge.
+        .onScrollVisibilityChange { visible in
+            if !visible { timingPopoverOpen = false }
+        }
     }
 
     private func cardButton(systemName: String, help: String, tint: Color = DS.Color.secondaryText, action: @escaping () -> Void) -> some View {
