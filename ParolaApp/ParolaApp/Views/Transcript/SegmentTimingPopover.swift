@@ -18,10 +18,10 @@ struct SegmentTimingPopover: View {
                 fpsStepper
             }
             Divider()
-            timingRow(label: "Start", value: current?.start ?? segment.start) { delta in
+            timingRow(.start, value: current?.start ?? segment.start) { delta in
                 model.nudgeSegmentStart(id: segment.id, frames: delta)
             }
-            timingRow(label: "End", value: current?.end ?? segment.end) { delta in
+            timingRow(.end, value: current?.end ?? segment.end) { delta in
                 model.nudgeSegmentEnd(id: segment.id, frames: delta)
             }
         }
@@ -30,21 +30,36 @@ struct SegmentTimingPopover: View {
         .closesOnEscape()
     }
 
-    private func timingRow(label: String, value: Double, nudge: @escaping (Int) -> Void) -> some View {
+    private enum Bound: String {
+        case start = "Start"
+        case end = "End"
+
+        var minusLabel: LocalizedStringKey { self == .start ? "Start −1 frame" : "End −1 frame" }
+        var plusLabel: LocalizedStringKey { self == .start ? "Start +1 frame" : "End +1 frame" }
+    }
+
+    private func timingRow(_ bound: Bound, value: Double, nudge: @escaping (Int) -> Void) -> some View {
         HStack(spacing: 8) {
-            Text(label)
+            Text(bound.rawValue)
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.secondaryText)
                 .frame(width: 36, alignment: .leading)
-            nudgeButton(systemName: "minus", help: "−1 frame") { nudge(-1) }
+            nudgeButton(systemName: "minus", help: "−1 frame", label: bound.minusLabel) { nudge(-1) }
+                .axLeaf("Timing.Button.Nudge.\(bound.rawValue).minus")
             Text(Self.format(value))
                 .font(DS.Font.mono)
                 .frame(maxWidth: .infinity)
-            nudgeButton(systemName: "plus", help: "+1 frame") { nudge(1) }
+            nudgeButton(systemName: "plus", help: "+1 frame", label: bound.plusLabel) { nudge(1) }
+                .axLeaf("Timing.Button.Nudge.\(bound.rawValue).plus")
         }
     }
 
-    private func nudgeButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
+    private func nudgeButton(
+        systemName: String,
+        help: LocalizedStringKey,
+        label: LocalizedStringKey,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(DS.Font.bodyStrong)
@@ -57,7 +72,7 @@ struct SegmentTimingPopover: View {
         }
         .buttonStyle(.plain)
         .help(help)
-        .axLeaf("Timing.Button.Nudge.\(systemName)")
+        .accessibilityLabel(label)
     }
 
     // A menu picker here loses mouse picks: the transient popover closes on the click in the menu's own window.

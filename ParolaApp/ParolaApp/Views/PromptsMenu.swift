@@ -55,6 +55,7 @@ struct PromptsMenu: View {
             isRunning: model.isRunningPrompt,
             unavailableReason: model.isAIAvailable(for: .prompts) ? nil : model.aiUnavailableReason
         ))
+        .accessibilityLabel("Prompts")
         .accessibilityIdentifier("toolbar.prompts")
         .axLeaf("HeaderBar.Menu.Prompts")
         .task {

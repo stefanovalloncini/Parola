@@ -620,6 +620,17 @@
         }
       }
     },
+    "+1 frame": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+1 fotogramma"
+          }
+        }
+      }
+    },
     ".%@": {
       "comment": "A chip displaying a file format extension. The argument is the file extension.",
       "extractionState": "manual",
@@ -1451,6 +1462,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi etichetta"
+          }
+        }
+      }
+    },
+    "Add note": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi nota"
           }
         }
       }
@@ -4545,6 +4567,17 @@
         }
       }
     },
+    "Edit": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifica"
+          }
+        }
+      }
+    },
     "Edit Destination": {
       "extractionState": "manual",
       "localizations": {
@@ -4661,6 +4694,17 @@
         }
       }
     },
+    "End +1 frame": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fine +1 fotogramma"
+          }
+        }
+      }
+    },
     "End times": {
       "extractionState": "manual",
       "localizations": {
@@ -4668,6 +4712,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ora di fine"
+          }
+        }
+      }
+    },
+    "End −1 frame": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fine −1 fotogramma"
           }
         }
       }
@@ -12264,6 +12319,17 @@
         }
       }
     },
+    "Start +1 frame": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inizio +1 fotogramma"
+          }
+        }
+      }
+    },
     "Start Dictation": {
       "extractionState": "manual",
       "localizations": {
@@ -12338,6 +12404,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Avvia o ferma la registrazione del microfono da qualsiasi punto. Disattivato per default."
+          }
+        }
+      }
+    },
+    "Start −1 frame": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inizio −1 fotogramma"
           }
         }
       }
@@ -15742,6 +15819,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "⇧⌘L"
+          }
+        }
+      }
+    },
+    "−1 frame": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "−1 fotogramma"
           }
         }
       }
