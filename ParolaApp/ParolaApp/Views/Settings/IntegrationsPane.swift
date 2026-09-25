@@ -19,7 +19,8 @@ struct IntegrationsPane: View {
                     error: model.ytDlpInstallError ?? model.ytDlpUpdateError,
                     isFirst: true,
                     install: { model.installYtDlpViaBrew() },
-                    update: { model.updateYtDlpViaBrew() }
+                    update: { model.updateYtDlpViaBrew() },
+                    cancelUpdate: { model.cancelYtDlpUpdate() }
                 )
             }
             SettingHelper(text: "Parola only uses these tools when you ask it to.")
@@ -41,6 +42,7 @@ private struct ToolStatusRow: View {
     let isFirst: Bool
     let install: () -> Void
     let update: () -> Void
+    let cancelUpdate: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,6 +61,11 @@ private struct ToolStatusRow: View {
                         installButton
                     } else if isStale, case .homebrew? = updateRoute {
                         updateButton
+                        if updating {
+                            Button("Cancel", action: cancelUpdate)
+                                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                                .axLeaf("Integrations.Button.CancelUpdate.\(name)")
+                        }
                     }
                 }
                 Text(description)

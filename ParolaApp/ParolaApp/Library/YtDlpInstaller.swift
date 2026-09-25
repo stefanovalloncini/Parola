@@ -2,10 +2,14 @@ import Foundation
 
 /// Locates `yt-dlp`/`brew` on disk and drives `brew install` and `brew upgrade`, off the AppModel.
 enum YtDlpInstaller {
-    enum Outcome: Sendable {
+    enum Outcome: Equatable, Sendable {
         case success
         case failure(String)
+        case timedOut
+        case cancelled
     }
+
+    static let upgradeDeadline: Duration = .seconds(600)
 
     enum UpdateRoute: Equatable, Sendable {
         case homebrew(brewPath: String)
@@ -46,11 +50,11 @@ enum YtDlpInstaller {
     }
 
     static func install(formula: String, brewPath: String) async -> Outcome {
-        await runBrew(["install", formula], brewPath: brewPath, autoUpdate: false)
+        await runBrew(["install", formula], brewPath: brewPath, autoUpdate: false, deadline: nil)
     }
 
-    static func upgrade(formula: String, brewPath: String) async -> Outcome {
-        await runBrew(["upgrade", formula], brewPath: brewPath, autoUpdate: true)
+    static func upgrade(formula: String, brewPath: String, deadline: Duration = upgradeDeadline) async -> Outcome {
+        await runBrew(["upgrade", formula], brewPath: brewPath, autoUpdate: true, deadline: deadline)
     }
 
     static func brewEnvironment(autoUpdate: Bool) -> [String: String] {
@@ -61,7 +65,9 @@ enum YtDlpInstaller {
         return env
     }
 
-    private static func runBrew(_ arguments: [String], brewPath: String, autoUpdate: Bool) async -> Outcome {
+    private static func runBrew(
+        _ arguments: [String], brewPath: String, autoUpdate: Bool, deadline: Duration?
+    ) async -> Outcome {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: brewPath)
         proc.arguments = arguments
@@ -96,20 +102,59 @@ enum YtDlpInstaller {
             chunkContinuation.finish()
             return .failure("Could not launch brew: \(error.localizedDescription)")
         }
-        return await withCheckedContinuation { cont in
-            proc.terminationHandler = { p in
-                pipe.fileHandleForReading.readabilityHandler = nil
-                chunkContinuation.finish()
-                Task {
-                    let output = await bufferTask.value
-                    if p.terminationStatus == 0 {
-                        cont.resume(returning: .success)
-                    } else {
-                        let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                        cont.resume(returning: .failure(detail.isEmpty ? "brew exited with status \(p.terminationStatus)." : detail))
-                    }
+        let ending = await waitForExit(proc, deadline: deadline)
+        pipe.fileHandleForReading.readabilityHandler = nil
+        chunkContinuation.finish()
+        let output = await bufferTask.value
+        switch ending {
+        case .timedOut:
+            return .timedOut
+        case .cancelled:
+            return .cancelled
+        case .exited:
+            if proc.terminationStatus == 0 { return .success }
+            let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            return .failure(detail.isEmpty ? "brew exited with status \(proc.terminationStatus)." : detail)
+        }
+    }
+
+    private enum Ending: Sendable {
+        case exited
+        case timedOut
+        case cancelled
+    }
+
+    private static func waitForExit(_ proc: Process, deadline: Duration?) async -> Ending {
+        let exit = Task.detached(priority: .utility) { proc.waitUntilExit() }
+        return await withTaskGroup(of: Ending.self) { group in
+            group.addTask {
+                await withTaskCancellationHandler {
+                    await exit.value
+                } onCancel: {
+                    stop(proc)
+                }
+                return Task.isCancelled ? .cancelled : .exited
+            }
+            if let deadline {
+                group.addTask {
+                    guard (try? await Task.sleep(for: deadline)) != nil else { return .cancelled }
+                    stop(proc)
+                    return .timedOut
                 }
             }
+            let first = await group.next() ?? .exited
+            group.cancelAll()
+            return first
+        }
+    }
+
+    /// SIGTERM lets brew release its lock; SIGKILL follows if it's still running after the grace period.
+    private static func stop(_ proc: Process) {
+        guard proc.isRunning else { return }
+        proc.terminate()
+        let pid = proc.processIdentifier
+        DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(10)) {
+            if proc.isRunning { kill(pid, SIGKILL) }
         }
     }
 }

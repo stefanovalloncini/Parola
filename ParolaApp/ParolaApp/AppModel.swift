@@ -2293,6 +2293,8 @@ final class AppModel {
     var ytDlpUpdating: Bool = false
     var ytDlpUpdateError: String?
     @ObservationIgnored var ytDlpVersionTask: Task<Void, Never>?
+    @ObservationIgnored var ytDlpUpdateTask: Task<Void, Never>?
+    @ObservationIgnored var ytDlpUpdateDeadline: Duration = YtDlpInstaller.upgradeDeadline
 
     var ytDlpIsStale: Bool {
         ytDlpVersion?.isStale(asOf: Date()) ?? false
@@ -2325,11 +2327,13 @@ final class AppModel {
         ytDlpUpdating = true
         ytDlpUpdateError = nil
         ytDlpVersionTask?.cancel()
-        Task { [weak self] in
-            let outcome = await YtDlpInstaller.upgrade(formula: "yt-dlp", brewPath: brew)
-            let version = await YtDlpVersion.installed(at: path)
+        let deadline = ytDlpUpdateDeadline
+        ytDlpUpdateTask = Task { [weak self] in
+            let outcome = await YtDlpInstaller.upgrade(formula: "yt-dlp", brewPath: brew, deadline: deadline)
+            let version = outcome == .cancelled ? nil : await YtDlpVersion.installed(at: path)
             guard let self else { return }
-            self.ytDlpVersion = version
+            self.ytDlpUpdateTask = nil
+            if outcome != .cancelled { self.ytDlpVersion = version }
             self.ytDlpUpdating = false
             switch outcome {
             case .success:
@@ -2338,8 +2342,21 @@ final class AppModel {
                 }
             case .failure(let message):
                 self.ytDlpUpdateError = message
+            case .timedOut:
+                self.ytDlpUpdateError = Self.ytDlpUpdateTimedOutMessage(deadline)
+            case .cancelled:
+                self.refreshYtDlpStatus()
             }
         }
+    }
+
+    func cancelYtDlpUpdate() {
+        ytDlpUpdateTask?.cancel()
+    }
+
+    nonisolated static func ytDlpUpdateTimedOutMessage(_ deadline: Duration, bundle: Bundle = .main) -> String {
+        let minutes = Int(deadline.components.seconds / 60)
+        return String(localized: "Homebrew didn't finish within \(minutes) minutes, so Parola stopped the update.", bundle: bundle)
     }
 
     func installYtDlpViaBrew() {
@@ -2362,6 +2379,8 @@ final class AppModel {
                 }
             case .failure(let message):
                 self.ytDlpInstallError = message
+            case .timedOut, .cancelled:
+                break
             }
         }
     }
@@ -2599,6 +2618,7 @@ final class AppModel {
     }
 
     func dismissError() {
+        if ytDlpUpdateOffer == .updating { cancelYtDlpUpdate() }
         // Back to the transcript when one is loaded: a failed export or prompt shouldn't cost the user their place.
         phase = transcript == nil ? .idle : .ready
     }

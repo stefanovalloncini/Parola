@@ -4,8 +4,93 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
-@Suite("yt-dlp update")
+@Suite("yt-dlp update", .timeLimit(.minutes(1)))
 struct YtDlpUpdateTests {
+    @MainActor
+    private func makeModel() -> AppModel {
+        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("ytdlp-update"))
+    }
+
+    private func italianBundle() throws -> Bundle {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        return try #require(Bundle(path: path))
+    }
+
+    @Test("an upgrade that runs past its deadline is stopped")
+    func upgradeDeadline() async throws {
+        let brew = try script("exec sleep 30")
+        defer { try? FileManager.default.removeItem(at: brew) }
+        let started = ContinuousClock.now
+
+        let outcome = await YtDlpInstaller.upgrade(formula: "yt-dlp", brewPath: brew.path, deadline: .milliseconds(200))
+
+        #expect(outcome == .timedOut)
+        #expect(started.duration(to: .now) < .seconds(10))
+    }
+
+    @Test("cancelling an upgrade stops brew")
+    func upgradeCancel() async throws {
+        let brew = try script("exec sleep 30")
+        defer { try? FileManager.default.removeItem(at: brew) }
+        let upgrade = Task { await YtDlpInstaller.upgrade(formula: "yt-dlp", brewPath: brew.path) }
+        try await Task.sleep(for: .milliseconds(200))
+
+        upgrade.cancel()
+
+        #expect(await upgrade.value == .cancelled)
+    }
+
+    @Test("the deadline message names the minutes, in English and Italian")
+    func deadlineMessage() throws {
+        #expect(AppModel.ytDlpUpdateTimedOutMessage(YtDlpInstaller.upgradeDeadline)
+            == "Homebrew didn't finish within 10 minutes, so Parola stopped the update.")
+        #expect(AppModel.ytDlpUpdateTimedOutMessage(YtDlpInstaller.upgradeDeadline, bundle: try italianBundle())
+            == "Homebrew non ha terminato entro 10 minuti, quindi Parola ha interrotto l'aggiornamento.")
+    }
+
+    @MainActor
+    @Test("an update that overruns its deadline stops and says so")
+    func updateDeadline() async throws {
+        let brew = try script("exec sleep 30")
+        let ytDlp = try script("echo 2026.03.17")
+        defer {
+            try? FileManager.default.removeItem(at: brew)
+            try? FileManager.default.removeItem(at: ytDlp)
+        }
+        let model = makeModel()
+        model.ytDlpPath = ytDlp.path
+        model.ytDlpVersion = YtDlpVersion("2026.03.17")
+        model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
+        model.ytDlpUpdateDeadline = .milliseconds(200)
+
+        model.updateYtDlpViaBrew()
+
+        await waitUntil { !model.ytDlpUpdating }
+        #expect(model.ytDlpUpdateError == AppModel.ytDlpUpdateTimedOutMessage(.milliseconds(200)))
+    }
+
+    @MainActor
+    @Test("Cancel ends a running update without an error")
+    func cancelEndsTheUpdate() async throws {
+        let brew = try script("exec sleep 30")
+        let ytDlp = try script("echo 2026.03.17")
+        defer {
+            try? FileManager.default.removeItem(at: brew)
+            try? FileManager.default.removeItem(at: ytDlp)
+        }
+        let model = makeModel()
+        model.ytDlpPath = ytDlp.path
+        model.ytDlpVersion = YtDlpVersion("2026.03.17")
+        model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
+
+        model.updateYtDlpViaBrew()
+        #expect(model.ytDlpUpdating)
+        model.cancelYtDlpUpdate()
+
+        await waitUntil { !model.ytDlpUpdating }
+        #expect(model.ytDlpUpdateError == nil)
+    }
+
     private func script(_ body: String) throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-fake-tool-\(UUID().uuidString)")
         try "#!/bin/sh\n\(body)\n".write(to: url, atomically: true, encoding: .utf8)
@@ -79,7 +164,7 @@ struct YtDlpUpdateTests {
             try? FileManager.default.removeItem(at: brew)
             try? FileManager.default.removeItem(at: ytDlp)
         }
-        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("ytdlp-update"))
+        let model = makeModel()
         model.ytDlpPath = ytDlp.path
         model.ytDlpVersion = YtDlpVersion("2026.03.17")
         model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
@@ -103,7 +188,7 @@ struct YtDlpUpdateTests {
             try? FileManager.default.removeItem(at: brew)
             try? FileManager.default.removeItem(at: ytDlp)
         }
-        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("ytdlp-update"))
+        let model = makeModel()
         model.ytDlpPath = ytDlp.path
         model.ytDlpVersion = YtDlpVersion("2026.03.17")
         model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
@@ -118,7 +203,7 @@ struct YtDlpUpdateTests {
     @MainActor
     @Test("a yt-dlp Homebrew doesn't own is never handed to brew")
     func commandRouteHasNoButtonAction() {
-        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("ytdlp-update"))
+        let model = makeModel()
         model.ytDlpPath = "/usr/local/bin/yt-dlp"
         model.ytDlpVersion = YtDlpVersion("2026.03.17")
         model.ytDlpUpdateRoute = .command("/usr/local/bin/yt-dlp -U")

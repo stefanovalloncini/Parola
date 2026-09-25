@@ -56,7 +56,7 @@ struct YtDlpUpdateOfferTests {
 
 extension TranscriberMockSuites {
     @MainActor
-    @Suite("Link failure banner")
+    @Suite("Link failure banner", .timeLimit(.minutes(1)))
     struct LinkFailureBannerTests {
         private static let link = "https://www.youtube.com/watch?v=9XUo28kxQt4&t=41s"
 
@@ -135,6 +135,31 @@ extension TranscriberMockSuites {
             #expect(model.ytDlpUpdateOffer == .updated("2099.01.01"))
             #expect(model.canRetryFailedTranscription)
             #expect(model.phase == .failed(message: staleRefusalMessage))
+        }
+
+        @Test("Dismiss on a banner that is updating yt-dlp stops the update")
+        func dismissStopsTheUpdate() async throws {
+            MockMediaFetcherRegistry.shared.installFailure(staleRefusal)
+            defer { MockMediaFetcherRegistry.shared.clear() }
+            let brew = try fakeTool("exec sleep 30")
+            let ytDlp = try fakeTool("echo 2026.03.17")
+            defer {
+                try? FileManager.default.removeItem(at: brew)
+                try? FileManager.default.removeItem(at: ytDlp)
+            }
+            let model = makeModel()
+            model.transcribeYouTube(urlString: Self.link)
+            await waitUntil { model.phase == .failed(message: staleRefusalMessage) }
+            model.ytDlpPath = ytDlp.path
+            model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
+            model.updateYtDlpViaBrew()
+            #expect(model.ytDlpUpdateOffer == .updating)
+
+            model.dismissError()
+
+            #expect(model.phase == .idle)
+            await waitUntil { !model.ytDlpUpdating }
+            #expect(model.ytDlpUpdateError == nil)
         }
 
         @Test("a fresh yt-dlp's failure offers only Retry")

@@ -5801,6 +5801,17 @@
         }
       }
     },
+    "Homebrew didn't finish within %lld minutes, so Parola stopped the update.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homebrew non ha terminato entro %lld minuti, quindi Parola ha interrotto l'aggiornamento."
+          }
+        }
+      }
+    },
     "Homebrew finished, but yt-dlp is still out of date.": {
       "extractionState": "manual",
       "localizations": {
