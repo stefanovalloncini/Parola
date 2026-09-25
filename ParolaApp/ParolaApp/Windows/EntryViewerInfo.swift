@@ -3,6 +3,7 @@ import ParolaCore
 
 struct EntryViewerInfo: View {
     let session: EntryWindowSession
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         ScrollView {
@@ -63,6 +64,7 @@ struct EntryViewerInfo: View {
             }
             .padding(DS.Spacing.regular)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .id(model.themeRevision)
         }
         .inspectorPanel()
         .axLeaf("Panel.Info")

@@ -26,6 +26,7 @@ struct EntryViewerSegments: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        let themeRevision = model.themeRevision
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -40,6 +41,7 @@ struct EntryViewerSegments: View {
                             matches: session.matches(in: segment.id),
                             currentMatchID: session.currentMatch?.id,
                             monospacedTimestamps: model.monospacedTimestamps,
+                            themeRevision: themeRevision,
                             onSeek: { session.seek(toSegment: segment.id) },
                             onEditAttempt: onEditAttempt
                         )
@@ -74,6 +76,8 @@ private struct EntryViewerSegmentRow: View {
     let matches: [TranscriptMatch]
     let currentMatchID: TranscriptMatch.ID?
     let monospacedTimestamps: Bool
+    /// Unread: the row paints with DS colours, so a theme change reaches it as a changed input and keeps the scroll.
+    let themeRevision: Int
     let onSeek: () -> Void
     let onEditAttempt: () -> Void
 

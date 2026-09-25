@@ -22,6 +22,7 @@ struct EntryWindowView: View {
                     icon: "doc.text.magnifyingglass",
                     message: "This transcript is no longer in your library."
                 )
+                .id(model.themeRevision)
             }
         }
         .frame(minWidth: 520, minHeight: 380)
@@ -43,23 +44,15 @@ struct EntryWindowView: View {
         }
     }
 
+    /// The chrome is rebuilt for a theme change; the transcript column repaints in place so it keeps its scroll.
     private func loaded(entryID: LibraryEntry.ID, session: EntryWindowSession) -> some View {
-        // Rebuilt inside the stack: an id on the Group's own child would fire the onDisappear that releases the session.
-        ZStack {
-            viewer(session).id(model.themeRevision)
-        }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: showsEditHint)
-        .navigationTitle(session.title)
-        .background(WindowCloseReporter { model.releaseEntryWindow(session) })
-        .axBranch("EntryWindow.\(entryID)")
-    }
-
-    private func viewer(_ session: EntryWindowSession) -> some View {
         VStack(spacing: 0) {
             EntryViewerHeader(session: session)
+                .id(model.themeRevision)
             Divider()
             if session.searchIsOpen {
                 EntryViewerSearchBar(session: session)
+                    .id(model.themeRevision)
                 Divider()
             }
             HStack(spacing: 0) {
@@ -84,8 +77,13 @@ struct EntryWindowView: View {
             if session.player != nil {
                 Divider()
                 EntryViewerPlaybackBar(session: session)
+                    .id(model.themeRevision)
             }
         }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: showsEditHint)
+        .navigationTitle(session.title)
+        .background(WindowCloseReporter { model.releaseEntryWindow(session) })
+        .axBranch("EntryWindow.\(entryID)")
     }
 
     @ViewBuilder
@@ -99,8 +97,10 @@ struct EntryWindowView: View {
                 icon: "exclamationmark.triangle",
                 message: "This transcript is no longer in your library."
             )
+            .id(model.themeRevision)
         } else if session.transcript?.segments.isEmpty ?? true {
             EntryViewerNotice(icon: "text.alignleft", message: "This transcript has no text.")
+                .id(model.themeRevision)
         } else {
             EntryViewerTranscript(session: session, onEditAttempt: flashEditHint)
         }

@@ -42,6 +42,8 @@ struct EntryViewerContinuous: View {
             })
             .onAppear { rebuild() }
             .onChange(of: contentSignature) { _, _ in rebuild() }
+            // The chunks cache resolved colours, so a theme change has to rebuild them.
+            .onChange(of: model.themeRevision) { _, _ in rebuild(force: true) }
             .onDisappear { buildTask?.cancel() }
             .onChange(of: session.currentSegmentID) { _, id in
                 applyHighlight()
@@ -116,7 +118,7 @@ struct EntryViewerContinuous: View {
 
     private var contentSignature: Int { Self.contentSignature(for: session) }
 
-    private func rebuild() {
+    private func rebuild(force: Bool = false) {
         buildTask?.cancel()
         guard let transcript = session.transcript else {
             chunks = []
@@ -126,7 +128,7 @@ struct EntryViewerContinuous: View {
             return
         }
         let signature = contentSignature
-        guard signature != appliedSignature else { return }
+        guard force || signature != appliedSignature else { return }
         let useSpeakerColor = session.speakers.count >= 2
         let segments = transcript.segments
         let colors = useSpeakerColor ? session.speakerColorIndices : [:]
