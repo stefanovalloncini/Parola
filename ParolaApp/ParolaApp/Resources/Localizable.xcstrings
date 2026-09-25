@@ -13748,6 +13748,17 @@
         }
       }
     },
+    "Transcription settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impostazioni di trascrizione"
+          }
+        }
+      }
+    },
     "Transcriptions": {
       "extractionState": "manual",
       "localizations": {

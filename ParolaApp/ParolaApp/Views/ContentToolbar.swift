@@ -59,6 +59,9 @@ struct ContentToolbar: ToolbarContent {
             optionsSegment
         }
         .toolbarCapsule()
+        // A container, so a label the toolbar puts on the item's root stays on the group instead of reaching every pill.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Transcription settings")
     }
 
     private var segmentDivider: some View {
@@ -83,6 +86,7 @@ struct ContentToolbar: ToolbarContent {
                 }
         }
         .help("Transcription options")
+        .accessibilityLabel("Transcription options")
         .accessibilityIdentifier("toolbar.options")
         .axLeaf("Toolbar.Menu.Options")
         .popover(isPresented: $optionsOpen, arrowEdge: .bottom) {
