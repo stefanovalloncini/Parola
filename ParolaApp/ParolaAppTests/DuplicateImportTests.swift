@@ -244,6 +244,77 @@ extension TranscriberMockSuites {
             #expect(model.duplicateImport == nil)
         }
 
+        @Test("a watched-folder copy of a known file is skipped and counted, idle or busy, without a sheet",
+              arguments: [DuplicateImportPolicy.alwaysAsk, DuplicateImportPolicy.openExisting], [false, true])
+        func watchedDuplicateIsSkipped(policy: DuplicateImportPolicy, busy: Bool) async throws {
+            let model = makeModel()
+            model.duplicateImportPolicy = policy
+            let wav = try makeWAV("watched-\(policy.rawValue)-\(busy)")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            _ = try await seedLibrary(model, with: wav)
+            let route = model.route
+            let selection = model.selectedEntryID
+            if busy { model.fileTranscribeTask = Task {} }
+
+            model.handleWatchedArrival(wav)
+            await model.awaitWatchedImport()
+
+            #expect(model.duplicateImport == nil)
+            #expect(model.selectedEntryID == selection)
+            #expect(model.route == route)
+            #expect(model.deferredArrivals.isEmpty)
+            #expect(model.batchDuplicateNotice == "1 already in your library")
+            if busy {
+                model.fileTranscribeTask?.cancel()
+                model.fileTranscribeTask = nil
+            } else {
+                #expect(model.fileTranscribeTask == nil)
+            }
+        }
+
+        @Test("with Transcribe it again a watched-folder copy of a known file is transcribed")
+        func watchedDuplicateTranscribesAgain() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "watched")], delayMs: 500
+                ))
+                let model = makeModel()
+                model.duplicateImportPolicy = .transcribeAgain
+                let wav = try makeWAV("watched-again")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                _ = try await seedLibrary(model, with: wav)
+
+                model.handleWatchedArrival(wav)
+                await model.awaitWatchedImport()
+
+                #expect(model.duplicateImport == nil)
+                #expect(model.fileTranscribeTask != nil)
+                #expect(model.sourceFileURL == wav)
+                #expect(model.batchDuplicatesSkipped == 0)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("a watched-folder file the library has never seen starts its run")
+        func watchedFreshFileRuns() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "fresh")], delayMs: 500
+                ))
+                let model = makeModel()
+                let wav = try makeWAV("watched-fresh")
+                defer { try? FileManager.default.removeItem(at: wav) }
+
+                model.handleWatchedArrival(wav)
+                await model.awaitWatchedImport()
+
+                #expect(model.duplicateImport == nil)
+                #expect(model.fileTranscribeTask != nil)
+                #expect(model.batchDuplicatesSkipped == 0)
+                model.cancelCurrentWork()
+            }
+        }
+
         @Test("a batch of nothing but duplicates shows the page and the count")
         func batchOfOnlyDuplicates() async throws {
             let model = makeModel()

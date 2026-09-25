@@ -638,12 +638,13 @@ struct AppModelBatchTests {
     }
 
     @Test("watched-folder arrivals defer while a file transcription is running")
-    func watchedArrivalDefersDuringFileTranscription() {
+    func watchedArrivalDefersDuringFileTranscription() async {
         let model = makeModel()
         model.fileTranscribeTask = Task {}
         let url = URL(fileURLWithPath: "/tmp/watched.wav")
 
         model.handleWatchedArrival(url)
+        await model.awaitWatchedImport()
 
         #expect(model.deferredArrivals == [url])
         model.fileTranscribeTask?.cancel()

@@ -114,6 +114,7 @@ final class AppModel {
     var batchDuplicatesSkipped: Int = 0
     @ObservationIgnored var duplicateCheckTask: Task<Void, Never>?
     @ObservationIgnored var batchImportTask: Task<Void, Never>?
+    @ObservationIgnored var watchedImportTask: Task<Void, Never>?
     /// A run the user stopped does not ring when its queue unwinds. Cleared when a wave starts.
     @ObservationIgnored var batchRunCancelled = false
     var currentSegmentID: TranscriptSegment.ID?
@@ -580,14 +581,47 @@ final class AppModel {
         self?.handleWatchedArrival(url)
     }
 
+    /// Nobody opened this file, so a copy the library holds follows the batch rule whether Parola is idle
+    /// or busy: skipped and counted with the batch's duplicates, never a sheet or a jump to the stored entry.
+    func handleWatchedArrival(_ url: URL) {
+        let previous = watchedImportTask
+        let deadline = fileReadDeadline
+        let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
+        watchedImportTask = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            var digest: String?
+            if skipsDuplicates {
+                digest = await SourceDigest.digest(of: url, deadline: deadline)
+            }
+            if let digest, await self.library.findEntry(digest: digest) != nil {
+                guard !Task.isCancelled else { return }
+                self.batchDuplicatesSkipped += 1
+                ParolaLog.info(.library, "skipped a watched-folder file the library already holds")
+                return
+            }
+            guard !Task.isCancelled else { return }
+            self.startWatchedArrival(url, sourceDigest: digest)
+        }
+    }
+
     // A user opening a file replaces the current run, but folder arrivals must not: two files
     // landing together would cancel each other and only the last one would be transcribed.
-    func handleWatchedArrival(_ url: URL) {
+    private func startWatchedArrival(_ url: URL, sourceDigest: String?) {
         if transcribeTaskRunning || phaseDefersArrivals || batchIsRunning {
             deferredArrivals.append(url)
             return
         }
-        transcribe(fileURL: url)
+        introduction.defer()
+        beginFileTranscription(fileURL: url, translateOverride: nil, sourceDigest: sourceDigest)
+    }
+
+    /// Waits for the duplicate check a watched arrival goes through before it runs or waits its turn.
+    func awaitWatchedImport() async {
+        while let task = watchedImportTask {
+            await task.value
+            if watchedImportTask == task { watchedImportTask = nil }
+        }
     }
 
     // MARK: - Live captions
