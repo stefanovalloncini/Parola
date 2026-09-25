@@ -51,6 +51,7 @@ test.describe("dark scheme", () => {
       const style = getComputedStyle(link);
       return [style.color, style.backgroundColor];
     });
+    expect(luminance(background ?? "")).toBeGreaterThan(0.5);
     expect(contrast(color ?? "", background ?? "")).toBeGreaterThanOrEqual(4.5);
   });
 
