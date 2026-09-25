@@ -18,10 +18,11 @@ export interface Mark extends Drawing {
   background: string;
   color: string;
   scale: number;
+  edge: boolean;
 }
 
 function mark(svg: string, background: string, color: string, scale = 0.55): Mark {
-  return { ...drawing(svg), background, color, scale };
+  return { ...drawing(svg), background, color, scale, edge: background === "#000" };
 }
 
 const intelligence = sparkle.replace(

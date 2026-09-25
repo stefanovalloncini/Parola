@@ -12,12 +12,14 @@ const style =
   "mark" in props
     ? `--size: ${props.size}; --scale: ${marks[props.mark].scale}; background: ${marks[props.mark].background}; color: ${marks[props.mark].color}`
     : `--size: ${props.size}; --top: ${hues[props.hue].top}; --bottom: ${hues[props.hue].bottom}`;
+const edge = "mark" in props && marks[props.mark].edge;
 ---
 
 <span
   class:list={["tile", { mark: "mark" in props }, props.class]}
   style={style}
   data-tile={"mark" in props ? props.mark : props.glyph}
+  data-edge={edge ? "" : undefined}
   aria-hidden="true"
 >
   {"mark" in props ? (
@@ -64,6 +66,14 @@ const style =
     .tile {
       corner-shape: squircle;
       border-radius: calc(var(--size) * 0.36);
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .tile[data-edge] {
+      box-shadow:
+        var(--tile-shadow),
+        inset 0 0 0 1px rgb(255 255 255 / 0.16);
     }
   }
 </style>
