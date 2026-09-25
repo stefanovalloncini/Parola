@@ -9,6 +9,8 @@ struct SearchPill: View {
     var leaf: String
     /// A field the user reached by opening something takes the keyboard; one that is just there does not.
     var focusesOnAppear: Bool
+    /// An input rather than a read of DS, so a parent redrawn for a theme change repaints the icons and the field keeps its focus.
+    var iconColor: Color
 
     @FocusState private var focused: Bool
 
@@ -18,7 +20,8 @@ struct SearchPill: View {
         prompt: String? = nil,
         clearsOnEscape: Bool = false,
         leaf: String = "TextField.Search",
-        focusesOnAppear: Bool = false
+        focusesOnAppear: Bool = false,
+        iconColor: Color = DS.Color.secondaryText
     ) {
         self._text = text
         self.placeholder = placeholder
@@ -26,6 +29,7 @@ struct SearchPill: View {
         self.clearsOnEscape = clearsOnEscape
         self.leaf = leaf
         self.focusesOnAppear = focusesOnAppear
+        self.iconColor = iconColor
     }
 
     /// Esc has to keep reaching the sheet or window unless a screen asked for it and has text.
@@ -42,7 +46,7 @@ struct SearchPill: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.secondaryText)
+                .foregroundStyle(iconColor)
             TextField(placeholder, text: $text, prompt: prompt.map(Text.init))
                 .textFieldStyle(.plain)
                 .font(DS.Font.secondary)
@@ -60,7 +64,7 @@ struct SearchPill: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
+                        .foregroundStyle(iconColor)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
