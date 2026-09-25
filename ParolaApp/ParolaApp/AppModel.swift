@@ -2295,13 +2295,14 @@ final class AppModel {
     @ObservationIgnored var ytDlpVersionTask: Task<Void, Never>?
     @ObservationIgnored var ytDlpUpdateTask: Task<Void, Never>?
     @ObservationIgnored var ytDlpUpdateDeadline: Duration = YtDlpInstaller.upgradeDeadline
+    @ObservationIgnored var ytDlpLocator: () -> String? = { YtDlpInstaller.locate() }
 
     var ytDlpIsStale: Bool {
         ytDlpVersion?.isStale(asOf: Date()) ?? false
     }
 
     func refreshYtDlpAvailability() {
-        let path = YtDlpInstaller.locate()
+        let path = ytDlpLocator()
         ytDlpPath = path
         ytDlpAvailable = path != nil
         if ytDlpAvailable { ytDlpInstallError = nil }
@@ -2319,6 +2320,7 @@ final class AppModel {
             let version = await YtDlpVersion.installed(at: path)
             guard !Task.isCancelled, let self, !self.ytDlpUpdating else { return }
             if version != self.ytDlpVersion { self.ytDlpVersion = version }
+            if let version, !version.isStale(asOf: Date()), self.ytDlpUpdateError != nil { self.ytDlpUpdateError = nil }
         }
     }
 

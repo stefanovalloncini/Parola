@@ -126,6 +126,7 @@ extension TranscriberMockSuites {
             model.transcribeYouTube(urlString: Self.link)
             await waitUntil { model.phase == .failed(message: staleRefusalMessage) }
             model.ytDlpPath = ytDlp.path
+            model.ytDlpLocator = { ytDlp.path }
             model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
             #expect(model.ytDlpUpdateOffer == .update)
 
@@ -152,6 +153,7 @@ extension TranscriberMockSuites {
             model.transcribeYouTube(urlString: Self.link)
             await waitUntil { model.phase == .failed(message: staleRefusalMessage) }
             model.ytDlpPath = ytDlp.path
+            model.ytDlpLocator = { ytDlp.path }
             model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
             model.updateYtDlpViaBrew()
             #expect(model.ytDlpUpdateOffer == .updating)

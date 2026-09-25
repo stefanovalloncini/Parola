@@ -59,6 +59,7 @@ struct YtDlpUpdateTests {
         }
         let model = makeModel()
         model.ytDlpPath = ytDlp.path
+        model.ytDlpLocator = { ytDlp.path }
         model.ytDlpVersion = YtDlpVersion("2026.03.17")
         model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
         model.ytDlpUpdateDeadline = .milliseconds(200)
@@ -80,6 +81,7 @@ struct YtDlpUpdateTests {
         }
         let model = makeModel()
         model.ytDlpPath = ytDlp.path
+        model.ytDlpLocator = { ytDlp.path }
         model.ytDlpVersion = YtDlpVersion("2026.03.17")
         model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
 
@@ -330,6 +332,7 @@ struct YtDlpUpdateTests {
         }
         let model = makeModel()
         model.ytDlpPath = ytDlp.path
+        model.ytDlpLocator = { ytDlp.path }
         model.ytDlpVersion = YtDlpVersion("2026.03.17")
         model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
         #expect(model.ytDlpIsStale)
@@ -354,6 +357,7 @@ struct YtDlpUpdateTests {
         }
         let model = makeModel()
         model.ytDlpPath = ytDlp.path
+        model.ytDlpLocator = { ytDlp.path }
         model.ytDlpVersion = YtDlpVersion("2026.03.17")
         model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
 
@@ -362,6 +366,36 @@ struct YtDlpUpdateTests {
         await waitUntil { !model.ytDlpUpdating }
         #expect(model.ytDlpIsStale)
         #expect(model.ytDlpUpdateError == "Homebrew finished, but yt-dlp is still out of date.")
+    }
+
+    @MainActor
+    @Test("a fresh yt-dlp clears the last update's error")
+    func freshVersionClearsTheError() async throws {
+        let ytDlp = try script("echo 2099.01.01")
+        defer { try? FileManager.default.removeItem(at: ytDlp) }
+        let model = makeModel()
+        model.ytDlpLocator = { ytDlp.path }
+        model.ytDlpUpdateError = "yt-dlp: Failed to download resource"
+
+        model.refreshYtDlpStatus()
+
+        await waitUntil { model.ytDlpVersion?.text == "2099.01.01" }
+        #expect(model.ytDlpUpdateError == nil)
+    }
+
+    @MainActor
+    @Test("a yt-dlp that is still out of date keeps the last update's error")
+    func staleVersionKeepsTheError() async throws {
+        let ytDlp = try script("echo 2026.03.17")
+        defer { try? FileManager.default.removeItem(at: ytDlp) }
+        let model = makeModel()
+        model.ytDlpLocator = { ytDlp.path }
+        model.ytDlpUpdateError = "yt-dlp: Failed to download resource"
+
+        model.refreshYtDlpStatus()
+
+        await waitUntil { model.ytDlpVersion?.text == "2026.03.17" }
+        #expect(model.ytDlpUpdateError == "yt-dlp: Failed to download resource")
     }
 
     @MainActor
