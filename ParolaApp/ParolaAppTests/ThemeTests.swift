@@ -202,20 +202,17 @@ struct ThemePaletteTests {
         #expect(edited.accent == palette.accent)
     }
 
-    @Test("the divider and primary text are the only editable tokens a preset draws translucent")
-    func translucentEditableTokens() {
-        let editable: [(name: String, keyPath: KeyPath<ThemePalette, ThemeColor>)] = [
-            ("accent", \.accent), ("canvas", \.canvas), ("surface", \.surface),
-            ("surfaceElevated", \.surfaceElevated), ("divider", \.divider),
-            ("textPrimary", \.textPrimary), ("textSecondary", \.textSecondary)
-        ]
-        for preset in ThemePreset.allCases {
-            for token in editable {
-                let variants = preset.palette[keyPath: token.keyPath].appearanceVariants
-                let translucent = variants.light.a < 1 || variants.dark.a < 1
-                #expect(translucent == ["divider", "textPrimary"].contains(token.name), "\(preset.rawValue).\(token.name)")
+    @Test("a colour well edits opacity exactly when a preset draws its token translucent")
+    @MainActor
+    func wellsEditOpacityWhereTokensAreTranslucent() {
+        for well in CustomPaletteWell.all {
+            let translucent = ThemePreset.allCases.contains { preset in
+                let variants = preset.palette[keyPath: well.keyPath].appearanceVariants
+                return variants.light.a < 1 || variants.dark.a < 1
             }
+            #expect(well.supportsOpacity == translucent, "\(well.label)")
         }
+        #expect(CustomPaletteWell.all.filter(\.supportsOpacity).map(\.label) == ["Divider", "Primary text"])
     }
 
     @Test("selection resolves a preset case to that preset's palette")

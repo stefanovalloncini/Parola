@@ -119,18 +119,40 @@ private struct ThemePresetGallery: View {
     }
 }
 
+/// One colour well of the custom palette editor, and the binding it edits the palette through.
+struct CustomPaletteWell {
+    let label: String
+    let keyPath: WritableKeyPath<ThemePalette, ThemeColor>
+    /// On for the tokens a preset draws translucent: an opaque well stores alpha 1 on the first edit.
+    let supportsOpacity: Bool
+
+    @MainActor static let all: [CustomPaletteWell] = [
+        CustomPaletteWell(label: "Accent", keyPath: \.accent, supportsOpacity: false),
+        CustomPaletteWell(label: "Background", keyPath: \.canvas, supportsOpacity: false),
+        CustomPaletteWell(label: "Surface", keyPath: \.surface, supportsOpacity: false),
+        CustomPaletteWell(label: "Elevated surface", keyPath: \.surfaceElevated, supportsOpacity: false),
+        CustomPaletteWell(label: "Divider", keyPath: \.divider, supportsOpacity: true),
+        CustomPaletteWell(label: "Primary text", keyPath: \.textPrimary, supportsOpacity: true),
+        CustomPaletteWell(label: "Secondary text", keyPath: \.textSecondary, supportsOpacity: false),
+    ]
+
+    @MainActor
+    func binding(_ model: AppModel) -> Binding<Color> {
+        Binding(
+            get: { model.editablePalette[keyPath: keyPath].editableColor },
+            set: { model.previewCustomPalette(model.editablePalette.setting(keyPath, to: $0)) }
+        )
+    }
+}
+
 private struct CustomThemeEditor: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         VStack(spacing: 0) {
-            colorRow("Accent", \.accent, isFirst: true)
-            colorRow("Background", \.canvas)
-            colorRow("Surface", \.surface)
-            colorRow("Elevated surface", \.surfaceElevated)
-            colorRow("Divider", \.divider, supportsOpacity: true)
-            colorRow("Primary text", \.textPrimary, supportsOpacity: true)
-            colorRow("Secondary text", \.textSecondary)
+            ForEach(CustomPaletteWell.all, id: \.label) { well in
+                colorRow(well, isFirst: well.label == CustomPaletteWell.all.first?.label)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
             if note.object is NSColorPanel { model.commitPaletteDraft() }
@@ -138,20 +160,11 @@ private struct CustomThemeEditor: View {
         .onDisappear { model.commitPaletteDraft() }
     }
 
-    private func colorRow(
-        _ label: String, _ keyPath: WritableKeyPath<ThemePalette, ThemeColor>, isFirst: Bool = false, supportsOpacity: Bool = false
-    ) -> some View {
-        SettingRow(LocalizedStringKey(label), isFirst: isFirst) {
-            ColorPicker("", selection: binding(keyPath), supportsOpacity: supportsOpacity)
+    private func colorRow(_ well: CustomPaletteWell, isFirst: Bool) -> some View {
+        SettingRow(LocalizedStringKey(well.label), isFirst: isFirst) {
+            ColorPicker("", selection: well.binding(model), supportsOpacity: well.supportsOpacity)
                 .labelsHidden()
-                .axLeaf("Customization.ColorPicker.\(label.replacingOccurrences(of: " ", with: ""))")
+                .axLeaf("Customization.ColorPicker.\(well.label.replacingOccurrences(of: " ", with: ""))")
         }
-    }
-
-    private func binding(_ keyPath: WritableKeyPath<ThemePalette, ThemeColor>) -> Binding<Color> {
-        Binding(
-            get: { model.editablePalette[keyPath: keyPath].editableColor },
-            set: { model.previewCustomPalette(model.editablePalette.setting(keyPath, to: $0)) }
-        )
     }
 }

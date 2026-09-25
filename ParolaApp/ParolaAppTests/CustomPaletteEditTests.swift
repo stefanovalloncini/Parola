@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaTestSupport
@@ -75,6 +77,28 @@ struct CustomPaletteEditTests {
         #expect(model.paletteDraft == nil)
         #expect(model.editablePalette == ThemePreset.teal.palette)
         #expect(DS.theme == ThemePreset.teal.palette)
+    }
+
+    @Test("the translucent tokens' wells show their alpha and keep a picked one")
+    func translucentWellsKeepAlpha() throws {
+        let previous = DS.theme
+        defer { DS.theme = previous }
+        let model = makeModel()
+        model.applyCustomPalette(ThemePreset.slate.palette)
+        let divider = try #require(CustomPaletteWell.all.first { $0.keyPath == \ThemePalette.divider })
+        #expect(abs(RGBA(divider.binding(model).wrappedValue).a - 0.08) < 0.001)
+
+        let picked = Color(nsColor: NSColor(srgbRed: 0.2, green: 0.4, blue: 0.6, alpha: 0.3))
+        for well in CustomPaletteWell.all where well.supportsOpacity {
+            well.binding(model).wrappedValue = picked
+            let stored = model.editablePalette[keyPath: well.keyPath].appearanceVariants
+            #expect(abs(stored.light.a - 0.3) < 0.001, "\(well.label)")
+            #expect(abs(stored.dark.a - 0.3) < 0.001, "\(well.label)")
+        }
+        model.commitPaletteDraft()
+
+        #expect(abs(DS.theme.divider.appearanceVariants.dark.a - 0.3) < 0.001)
+        #expect(abs(DS.theme.textPrimary.appearanceVariants.dark.a - 0.3) < 0.001)
     }
 
     @Test("an edit made with no colour panel open lands on its own")
