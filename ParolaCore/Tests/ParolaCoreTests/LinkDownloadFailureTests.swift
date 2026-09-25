@@ -283,11 +283,11 @@ struct YtDlpProcessTests {
         process.arguments = ["5"]
         process.standardOutput = Pipe()
         process.standardError = Pipe()
-        try process.run()
+        let exit = try YouTubeProcess.start(process)
 
         do {
             try await YouTubeProcess.waitForDownload(
-                process, seconds: 0, run: .download, ytDlpPath: "/nonexistent/yt-dlp", site: "YouTube"
+                process, exit: exit, seconds: 0, run: .download, ytDlpPath: "/nonexistent/yt-dlp", site: "YouTube"
             )
             Issue.record("expected the wait to time out")
         } catch ParolaError.linkDownloadFailed(let failure) {

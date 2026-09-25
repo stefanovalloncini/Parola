@@ -52,11 +52,14 @@ public enum YouTubeSubsFetcher {
         let outDrain = PipeDrain(pipe: stdout)
         let errDrain = PipeDrain(pipe: stderr)
 
-        do { try process.run() } catch {
+        let exit: ExitSignal
+        do { exit = try YouTubeProcess.start(process) } catch {
             ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolFailedToStart, site: site))
         }
-        try await YouTubeProcess.waitForDownload(process, seconds: 120, run: .captions, ytDlpPath: ytDlp, site: site)
+        try await YouTubeProcess.waitForDownload(
+            process, exit: exit, seconds: 120, run: .captions, ytDlpPath: ytDlp, site: site
+        )
         try Task.checkCancellation()
 
         let stdoutText = String(decoding: outDrain.data(), as: UTF8.self)

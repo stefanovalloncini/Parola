@@ -1,5 +1,6 @@
 #if os(macOS)
 import Foundation
+import os
 
 /// What a yt-dlp run is for, so a timeout in the log says which one stalled.
 enum YtDlpRun: String, LogSafe {
@@ -12,15 +13,24 @@ enum YtDlpRun: String, LogSafe {
 }
 
 enum YouTubeProcess {
+    /// Launches `process` with its exit signal wired up first, so a quick exit can't slip past the wait.
+    static func start(_ process: Process) throws -> ExitSignal {
+        let exit = ExitSignal()
+        process.terminationHandler = { _ in exit.fire() }
+        try process.run()
+        return exit
+    }
+
     static func waitWithTimeout(
         _ process: Process,
+        exit: ExitSignal,
         seconds: Int,
         run: YtDlpRun,
         clock: any Clock<Duration> = ContinuousClock()
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
-                await waitForExit(process)
+                await waitForExit(process, exit: exit)
             }
             group.addTask {
                 try await Task.sleep(for: .seconds(seconds), clock: clock)
@@ -33,15 +43,10 @@ enum YouTubeProcess {
         }
     }
 
-    /// `Process.waitUntilExit()` is blocking. Running it on a detached task moves the block
-    /// off the cooperative pool. Cancellation is honoured by the surrounding task group:
-    /// the timeout branch calls `terminate()` which unblocks `waitUntilExit()`.
-    private static func waitForExit(_ process: Process) async {
-        let task = Task.detached(priority: .utility) {
-            process.waitUntilExit()
-        }
+    /// `waitUntilExit()` can miss an exit and block for good, so this waits on the handler `start` installed.
+    private static func waitForExit(_ process: Process, exit: ExitSignal) async {
         await withTaskCancellationHandler {
-            await task.value
+            await exit.wait()
         } onCancel: {
             if process.isRunning { process.terminate() }
         }
@@ -74,10 +79,10 @@ enum YouTubeProcess {
 
     /// Waits out a download; a timeout comes back with the site and the installed version folded in.
     static func waitForDownload(
-        _ process: Process, seconds: Int, run: YtDlpRun, ytDlpPath: String, site: String?
+        _ process: Process, exit: ExitSignal, seconds: Int, run: YtDlpRun, ytDlpPath: String, site: String?
     ) async throws {
         do {
-            try await waitWithTimeout(process, seconds: seconds, run: run)
+            try await waitWithTimeout(process, exit: exit, seconds: seconds, run: run)
         } catch ParolaError.linkDownloadFailed(var failure) {
             failure.site = site
             let version = await YtDlpVersion.installed(at: ytDlpPath)
@@ -116,10 +121,43 @@ extension YtDlpVersion {
         process.standardOutput = stdout
         process.standardError = FileHandle.nullDevice
         let drain = PipeDrain(pipe: stdout)
-        do { try process.run() } catch { return nil }
-        do { try await YouTubeProcess.waitWithTimeout(process, seconds: timeoutSeconds, run: .versionCheck) } catch { return nil }
+        guard let exit = try? YouTubeProcess.start(process) else { return nil }
+        do {
+            try await YouTubeProcess.waitWithTimeout(process, exit: exit, seconds: timeoutSeconds, run: .versionCheck)
+        } catch {
+            return nil
+        }
         guard process.terminationStatus == 0 else { return nil }
         return YtDlpVersion(String(decoding: drain.data(), as: UTF8.self))
+    }
+}
+
+/// Fired by the termination handler `YouTubeProcess.start` installs; waiters that arrive late return at once.
+final class ExitSignal: Sendable {
+    private struct State {
+        var exited = false
+        var waiters: [CheckedContinuation<Void, Never>] = []
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    func fire() {
+        let waiters = state.withLock { state in
+            state.exited = true
+            defer { state.waiters = [] }
+            return state.waiters
+        }
+        for waiter in waiters { waiter.resume() }
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let exited = state.withLock { state in
+                if !state.exited { state.waiters.append(continuation) }
+                return state.exited
+            }
+            if exited { continuation.resume() }
+        }
     }
 }
 

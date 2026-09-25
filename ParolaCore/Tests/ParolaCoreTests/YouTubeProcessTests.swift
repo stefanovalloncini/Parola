@@ -13,10 +13,10 @@ struct YouTubeProcessTests {
         process.arguments = ["0.1"]
         process.standardOutput = Pipe()
         process.standardError = Pipe()
-        try process.run()
+        let exit = try YouTubeProcess.start(process)
         // A clock nobody advances can never reach the deadline, so returning at all proves the
         // process exited on its own.
-        try await YouTubeProcess.waitWithTimeout(process, seconds: 5, run: .download, clock: TestClock())
+        try await YouTubeProcess.waitWithTimeout(process, exit: exit, seconds: 5, run: .download, clock: TestClock())
         #expect(process.terminationReason == .exit)
         #expect(process.terminationStatus == 0)
     }
@@ -28,9 +28,9 @@ struct YouTubeProcessTests {
         process.arguments = ["10"]
         process.standardOutput = Pipe()
         process.standardError = Pipe()
-        try process.run()
+        let exit = try YouTubeProcess.start(process)
         await #expect(throws: ParolaError.self) {
-            try await YouTubeProcess.waitWithTimeout(process, seconds: 1, run: .download)
+            try await YouTubeProcess.waitWithTimeout(process, exit: exit, seconds: 1, run: .download)
         }
         #expect(process.isRunning == false)
     }
@@ -41,10 +41,10 @@ struct YouTubeProcessTests {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/true")
         process.standardOutput = Pipe()
         process.standardError = Pipe()
-        try process.run()
+        let exit = try YouTubeProcess.start(process)
         // Give the process a moment to exit before we start waiting.
         try await Task.sleep(for: .milliseconds(150))
-        try await YouTubeProcess.waitWithTimeout(process, seconds: 5, run: .download, clock: TestClock())
+        try await YouTubeProcess.waitWithTimeout(process, exit: exit, seconds: 5, run: .download, clock: TestClock())
         #expect(process.terminationReason == .exit)
         #expect(process.terminationStatus == 0)
     }
@@ -59,8 +59,8 @@ struct YouTubeProcessTests {
         process.standardOutput = stdout
         process.standardError = Pipe()
         let drain = PipeDrain(pipe: stdout)
-        try process.run()
-        try await YouTubeProcess.waitWithTimeout(process, seconds: 10, run: .download, clock: TestClock())
+        let exit = try YouTubeProcess.start(process)
+        try await YouTubeProcess.waitWithTimeout(process, exit: exit, seconds: 10, run: .download, clock: TestClock())
         let collected = drain.data()
         #expect(collected.count > 100_000)
         #expect(process.terminationReason == .exit)

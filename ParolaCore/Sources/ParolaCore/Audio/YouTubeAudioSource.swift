@@ -98,8 +98,8 @@ public actor YouTubeAudioSource: AudioSource {
         process.standardOutput = stdout
         process.standardError = Pipe()
         let drain = PipeDrain(pipe: stdout)
-        do { try process.run() } catch { return nil }
-        try? await YouTubeProcess.waitWithTimeout(process, seconds: 20, run: .durationProbe)
+        guard let exit = try? YouTubeProcess.start(process) else { return nil }
+        try? await YouTubeProcess.waitWithTimeout(process, exit: exit, seconds: 20, run: .durationProbe)
         guard process.terminationStatus == 0 else { return nil }
         let raw = String(decoding: drain.data(), as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -129,8 +129,9 @@ public actor YouTubeAudioSource: AudioSource {
         let outDrain = PipeDrain(pipe: stdout)
         let errDrain = PipeDrain(pipe: stderr)
 
+        let exit: ExitSignal
         do {
-            try process.run()
+            exit = try YouTubeProcess.start(process)
         } catch {
             ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolFailedToStart, site: site))
@@ -139,7 +140,7 @@ public actor YouTubeAudioSource: AudioSource {
         defer { runningProcess = nil }
 
         try await YouTubeProcess.waitForDownload(
-            process, seconds: timeoutSeconds, run: .download, ytDlpPath: ytDlpPath, site: site
+            process, exit: exit, seconds: timeoutSeconds, run: .download, ytDlpPath: ytDlpPath, site: site
         )
         try Task.checkCancellation()
 

@@ -65,12 +65,12 @@ struct YouTubeAndAILoggingTests {
             process.arguments = ["5"]
             process.standardOutput = Pipe()
             process.standardError = Pipe()
-            try process.run()
+            let exit = try YouTubeProcess.start(process)
 
             // A zero timeout fires at once, so the blocking wait behind it never holds a
             // cooperative thread long enough to slow the suites running beside this one.
             await #expect(throws: ParolaError.self) {
-                try await YouTubeProcess.waitWithTimeout(process, seconds: 0, run: .download)
+                try await YouTubeProcess.waitWithTimeout(process, exit: exit, seconds: 0, run: .download)
             }
 
             let record = try #require(
