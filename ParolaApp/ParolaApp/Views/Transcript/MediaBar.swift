@@ -63,12 +63,8 @@ struct MediaBar: View {
                 .foregroundStyle(model.skipSilences ? DS.Color.accent : .secondary)
                 .padding(.horizontal, DS.Spacing.small)
                 .padding(.vertical, DS.Spacing.tight)
-                .background(
-                    Capsule().fill(model.skipSilences ? DS.Color.accent.opacity(0.14) : Color.clear)
-                )
-                .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SkipSilencesButtonStyle(isOn: model.skipSilences))
         .help(model.skipSilences ? "Skip silences (on)" : "Skip silences")
         .accessibilityLabel("Skip silences")
         .accessibilityValue(model.skipSilences ? "On" : "Off")
@@ -155,6 +151,38 @@ private struct SpeedPillStyle: ButtonStyle {
             .overlay(Capsule().strokeBorder(DS.Color.accent.opacity(0.35), lineWidth: 1))
             .opacity(configuration.isPressed ? 0.85 : 1)
             .contentShape(Capsule())
+    }
+}
+
+/// The capsule twin of `GlyphButtonStyle`: same hover wash and press fill, shaped to match the toggle's pill.
+private struct SkipSilencesButtonStyle: ButtonStyle {
+    let isOn: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        Chrome(configuration: configuration, isOn: isOn)
+    }
+
+    private struct Chrome: View {
+        let configuration: Configuration
+        let isOn: Bool
+
+        @Environment(\.isEnabled) private var isEnabled
+        @State private var hovering = false
+
+        var body: some View {
+            let appearance = GlyphButtonAppearance(
+                hovered: hovering,
+                pressed: configuration.isPressed,
+                enabled: isEnabled,
+                selectedFill: isOn ? DS.Color.accent.opacity(0.14) : nil
+            )
+            configuration.label
+                .background(Capsule().fill(appearance.fill))
+                .opacity(appearance.opacity)
+                .contentShape(Capsule())
+                .rowStateAnimation(hovering)
+                .onHover { hovering = $0 }
+        }
     }
 }
 
