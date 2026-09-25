@@ -61,6 +61,9 @@ struct LinkDownloadFailureTests {
         ("ERROR: [youtube] 9XUo28kxQt4: Join this channel to get access to members-only content like this video, and other exclusive perks.", .unavailable(.membersOnly)),
         ("ERROR: [youtube] 9XUo28kxQt4: Sign in to confirm your age. This video may be inappropriate for some users. Use --cookies-from-browser or --cookies for the authentication.", .unavailable(.ageRestricted)),
         ("ERROR: [youtube] 9XUo28kxQt4: The uploader has not made this video available in your country", .unavailable(.regionLocked)),
+        ("ERROR: [youtube] 9XUo28kxQt4: Video unavailable. This video contains content from SME, who has blocked it in your country on copyright grounds", .unavailable(.regionLocked)),
+        ("ERROR: [youtube] 9XUo28kxQt4: Video unavailable. This video contains content from SME, who has blocked it on copyright grounds", .unavailable(.blocked)),
+        ("ERROR: [youtube] 9XUo28kxQt4: Video unavailable. This video is no longer available due to a copyright claim by SME", .unavailable(.blocked)),
         ("ERROR: [vimeo] 76979871: Unable to download JSON metadata: HTTP Error 404: Not Found", .unavailable(.removed)),
         ("ERROR: [youtube] 9XUo28kxQt4: Unable to download API page: <urlopen error [Errno 8] nodename nor servname provided, or not known> (caused by TransportError('<urlopen error [Errno 8] nodename nor servname provided, or not known>'))", .unreachable),
         ("ERROR: [youtube] 9XUo28kxQt4: Unable to download webpage: HTTPSConnectionPool(host='www.youtube.com', port=443): Max retries exceeded with url: /watch?v=9XUo28kxQt4 (Caused by NameResolutionError(\"Failed to resolve 'www.youtube.com'\"))", .unreachable),
@@ -140,6 +143,7 @@ struct LinkDownloadFailureTests {
         (.unavailable(.membersOnly), false),
         (.unavailable(.ageRestricted), false),
         (.unavailable(.regionLocked), false),
+        (.unavailable(.blocked), false),
         (.noCaptions, false),
         (.unsupportedLink, false),
     ])

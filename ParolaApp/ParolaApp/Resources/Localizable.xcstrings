@@ -13405,6 +13405,17 @@
         }
       }
     },
+    "This video can't be downloaded because it's blocked on copyright grounds.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è possibile scaricare questo video perché è bloccato per motivi di copyright."
+          }
+        }
+      }
+    },
     "This video can't be downloaded because it's for channel members only.": {
       "extractionState": "manual",
       "localizations": {

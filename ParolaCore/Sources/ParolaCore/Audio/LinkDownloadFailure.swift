@@ -24,6 +24,7 @@ public struct LinkDownloadFailure: Sendable, Equatable {
         case membersOnly
         case ageRestricted
         case regionLocked
+        case blocked
     }
 
     public var reason: Reason
@@ -104,6 +105,8 @@ public struct LinkDownloadFailure: Sendable, Equatable {
             return "This video can't be downloaded because it's age-restricted."
         case .unavailable(.regionLocked):
             return "This video can't be downloaded because it isn't available in your country."
+        case .unavailable(.blocked):
+            return "This video can't be downloaded because it's blocked on copyright grounds."
         case .unreachable:
             return site.map { "Couldn't reach \($0)." } ?? "Couldn't reach the site."
         case .timedOut(let seconds):
@@ -149,9 +152,10 @@ extension LinkDownloadFailure {
         if mentions(["confirm your age", "age-restricted", "age restricted", "inappropriate for some users"]) {
             return .unavailable(.ageRestricted)
         }
-        if mentions(["available in your country", "from your location", "geo restriction", "geo-restricted"]) {
+        if mentions(["in your country", "from your location", "geo restriction", "geo-restricted"]) {
             return .unavailable(.regionLocked)
         }
+        if mentions(["copyright grounds", "copyright claim"]) { return .unavailable(.blocked) }
         let status = httpStatus(in: detail)
         if mentions([
             "not a bot", "captcha", "requested format is not available", "rate-limited",

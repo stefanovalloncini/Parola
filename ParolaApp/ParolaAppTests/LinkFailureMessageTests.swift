@@ -38,6 +38,7 @@ struct LinkFailureMessageTests {
         LinkDownloadFailure(reason: .unavailable(.membersOnly), site: "YouTube"),
         LinkDownloadFailure(reason: .unavailable(.ageRestricted), site: "YouTube"),
         LinkDownloadFailure(reason: .unavailable(.regionLocked), site: "YouTube"),
+        LinkDownloadFailure(reason: .unavailable(.blocked), site: "YouTube"),
         LinkDownloadFailure(reason: .unreachable, site: "vimeo.com"),
         LinkDownloadFailure(reason: .unreachable),
         LinkDownloadFailure(reason: .timedOut(seconds: 120), site: "YouTube"),

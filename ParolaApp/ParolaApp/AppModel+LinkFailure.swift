@@ -73,6 +73,8 @@ extension AppModel {
             return String(localized: "This video can't be downloaded because it's age-restricted.", bundle: bundle)
         case .unavailable(.regionLocked):
             return String(localized: "This video can't be downloaded because it isn't available in your country.", bundle: bundle)
+        case .unavailable(.blocked):
+            return String(localized: "This video can't be downloaded because it's blocked on copyright grounds.", bundle: bundle)
         case .unreachable:
             guard let site = failure.site else { return String(localized: "Couldn't reach the site.", bundle: bundle) }
             return String(localized: "Couldn't reach \(site).", bundle: bundle)
