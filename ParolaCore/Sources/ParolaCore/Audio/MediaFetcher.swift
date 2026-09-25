@@ -8,6 +8,9 @@ public protocol MediaFetcher: Sendable {
 
 public enum MediaFetcherFactory {
     public static func make() -> any MediaFetcher {
+        if let failure = MockMediaFetcherRegistry.shared.resolveFailure() {
+            return MockMediaFetcher(failure: failure)
+        }
         if let url = MockMediaFetcherRegistry.shared.resolve() {
             return MockMediaFetcher(fixtureURL: url)
         }

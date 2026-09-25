@@ -3,6 +3,44 @@ import ParolaCore
 
 extension AppModel {
 
+    enum YtDlpUpdateOffer: Equatable {
+        case none
+        case update
+        case updating
+        case command(String)
+        case updated(String)
+    }
+
+    var ytDlpUpdateOffer: YtDlpUpdateOffer {
+        Self.ytDlpUpdateOffer(
+            for: failedLinkDownload, route: ytDlpUpdateRoute, installed: ytDlpVersion, updating: ytDlpUpdating, now: Date()
+        )
+    }
+
+    nonisolated static func ytDlpUpdateOffer(
+        for failure: LinkDownloadFailure?,
+        route: YtDlpInstaller.UpdateRoute?,
+        installed: YtDlpVersion?,
+        updating: Bool,
+        now: Date
+    ) -> YtDlpUpdateOffer {
+        guard let failure, failure.ytDlpIsStale, let route else { return .none }
+        if updating { return .updating }
+        if let installed, !installed.isStale(asOf: now) { return .updated(installed.text) }
+        switch route {
+        case .homebrew: return .update
+        case .command(let command): return .command(command)
+        }
+    }
+
+    /// A failed run has just asked yt-dlp for its version, which is newer news than the last Settings visit.
+    func noteYtDlp(from failure: LinkDownloadFailure) {
+        refreshYtDlpAvailability()
+        guard !ytDlpUpdating else { return }
+        if let version = failure.ytDlpVersion, version != ytDlpVersion { ytDlpVersion = version }
+        if failure.ytDlpIsStale { ytDlpUpdateError = nil }
+    }
+
     nonisolated static func linkFailureMessage(_ failure: LinkDownloadFailure, bundle: Bundle = .main) -> String {
         let hint = failure.ytDlpIsStale
             ? staleYtDlpSentence(failure.ytDlpVersion, bundle: bundle)

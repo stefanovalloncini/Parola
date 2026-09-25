@@ -37,6 +37,24 @@ struct MediaFetcherTests {
 
         MockMediaFetcherRegistry.shared.clear()
     }
+
+    @Test("a canned link failure is what the mock fetcher throws, and clear drops it")
+    func cannedFailure() async throws {
+        let reg = MockMediaFetcherRegistry()
+        let failure = LinkDownloadFailure(reason: .refused(httpStatus: 403), site: "YouTube")
+        reg.installFailure(failure)
+        #expect(reg.resolveFailure() == failure)
+
+        do {
+            _ = try await MockMediaFetcher(failure: failure).prepare(url: fixtureB)
+            Issue.record("expected the canned failure")
+        } catch ParolaError.linkDownloadFailed(let thrown) {
+            #expect(thrown == failure)
+        }
+
+        reg.clear()
+        #expect(reg.resolveFailure() == nil)
+    }
 }
 
 #endif

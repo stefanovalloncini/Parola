@@ -14323,6 +14323,17 @@
         }
       }
     },
+    "Update yt-dlp": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna yt-dlp"
+          }
+        }
+      }
+    },
     "Updated": {
       "extractionState": "manual",
       "localizations": {
@@ -14330,6 +14341,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aggiornato"
+          }
+        }
+      }
+    },
+    "Updated yt-dlp to %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp aggiornato alla versione %@."
           }
         }
       }
@@ -14352,6 +14374,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gli aggiornamenti sono firmati e verificati con le chiavi EdDSA di Sparkle prima dell'installazione."
+          }
+        }
+      }
+    },
+    "Updating yt-dlp…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornamento di yt-dlp…"
           }
         }
       }

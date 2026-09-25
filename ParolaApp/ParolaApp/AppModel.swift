@@ -318,6 +318,8 @@ final class AppModel {
     var failedFileURL: URL?
     /// The translate setting the failed run used, so Retry repeats it rather than the current toggle.
     var failedTranslateOverride: Bool?
+    var failedLink: DeferredLink?
+    var failedLinkDownload: LinkDownloadFailure?
     @ObservationIgnored var failedTakeTitle: String?
     @ObservationIgnored var failedTakeCategory: EntryCategory?
     @ObservationIgnored var failedTakeSource: EntrySource?
@@ -2423,7 +2425,7 @@ final class AppModel {
                     title: LibraryEntryDisplay.webVideoTitle(createdAt: Date())
                 )
             } catch {
-                if !Task.isCancelled { applyTranscriptionError(error) }
+                if !Task.isCancelled { applyTranscriptionError(error, link: .transcribe(url.absoluteString)) }
             }
             if !Task.isCancelled {
                 self.youtubeTranscribeTask = nil
@@ -2464,7 +2466,7 @@ final class AppModel {
                     playsCompletionSound: false
                 )
             } catch {
-                if !Task.isCancelled { applyTranscriptionError(error) }
+                if !Task.isCancelled { applyTranscriptionError(error, link: .subtitles(url.absoluteString)) }
             }
             if !Task.isCancelled {
                 self.youtubeSubsTask = nil
@@ -2489,7 +2491,9 @@ final class AppModel {
         return url
     }
 
-    func applyTranscriptionError(_ error: Error, source: URL? = nil, translateOverride: Bool? = nil) {
+    func applyTranscriptionError(
+        _ error: Error, source: URL? = nil, translateOverride: Bool? = nil, link: DeferredLink? = nil
+    ) {
         if error is CancellationError || Task.isCancelled {
             phase = .idle
         } else {
@@ -2498,6 +2502,11 @@ final class AppModel {
             failureKind = .transcription
             failedFileURL = source
             failedTranslateOverride = translateOverride
+            failedLink = link
+            if case ParolaError.linkDownloadFailed(let failure) = error {
+                failedLinkDownload = failure
+                noteYtDlp(from: failure)
+            }
         }
     }
 
@@ -3102,6 +3111,8 @@ final class AppModel {
         if failureKind != .other { failureKind = .other }
         if failedFileURL != nil { failedFileURL = nil }
         if failedTranslateOverride != nil { failedTranslateOverride = nil }
+        if failedLink != nil { failedLink = nil }
+        if failedLinkDownload != nil { failedLinkDownload = nil }
         if failedTakeAudioURL != nil { failedTakeAudioURL = nil }
         failedTakeTitle = nil
         failedTakeCategory = nil
@@ -3109,7 +3120,7 @@ final class AppModel {
     }
 
     var canRetryFailedTranscription: Bool {
-        failureKind == .transcription && (failedTakeAudioURL != nil || failedFileURL != nil)
+        failureKind == .transcription && (failedTakeAudioURL != nil || failedFileURL != nil || failedLink != nil)
     }
 
     /// What the error card names: a recorded take by its title, an opened file by its file name.
@@ -3122,6 +3133,13 @@ final class AppModel {
     func retryFailedTranscription() {
         if failedTakeAudioURL != nil {
             retryFailedTake()
+            return
+        }
+        if let link = failedLink {
+            switch link {
+            case .transcribe(let urlString): transcribeYouTube(urlString: urlString)
+            case .subtitles(let urlString): fetchYouTubeSubs(urlString: urlString)
+            }
             return
         }
         guard let url = failedFileURL else { return }
