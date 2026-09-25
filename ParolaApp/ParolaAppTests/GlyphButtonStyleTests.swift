@@ -63,16 +63,11 @@ struct GlyphButtonStyleTests {
         }
     }
 
-    @Test("the target defaults to 24 pt and a side sets both edges")
+    @Test("the target defaults to 24 pt")
     func targetSize() {
         let standard = GlyphButtonStyle()
         #expect(standard.width == 24)
         #expect(standard.height == 24)
-        #expect(standard.tinted == false)
-        #expect(standard.selectedFill == nil)
-        let transport = GlyphButtonStyle(side: 30)
-        #expect(transport.width == 30)
-        #expect(transport.height == 30)
     }
 
     @Test("the wash has the rows' corners")

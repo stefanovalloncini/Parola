@@ -11,7 +11,7 @@ struct SegmentCard: View {
 
     @Environment(AppModel.self) private var model
     @State private var hovering: Bool = false
-    @State private var isEditing: Bool = false
+    @State private var inlineEdit = InlineEdit()
     @State private var draftText: String = ""
     @State private var renamingSpeaker: Bool = false
     @State private var draftSpeakerName: String = ""
@@ -26,6 +26,7 @@ struct SegmentCard: View {
 
     /// Read here rather than passed in: the scroll's ForEach would otherwise re-walk every segment on each playback tick.
     private var isCurrent: Bool { model.currentSegmentID == segment.id }
+    private var isEditing: Bool { inlineEdit.isEditing }
 
     var body: some View {
         // Read once: the star shows in the meta cluster, the action strip and the ••• menu.
@@ -516,7 +517,7 @@ struct SegmentCard: View {
 
     private func beginEditing() {
         draftText = segment.text
-        isEditing = true
+        inlineEdit.begin()
         Task { @MainActor in editingFocus = true }
     }
 
@@ -532,13 +533,25 @@ struct SegmentCard: View {
         }
     }
 
-    /// Runs once per edit: the field losing focus as it leaves after Return or Escape finds the edit already over.
+    /// Tracks whether an edit is open, so the focus loss that follows Return or Escape writes nothing the second time.
+    struct InlineEdit {
+        private(set) var isEditing = false
+
+        mutating func begin() {
+            isEditing = true
+        }
+
+        mutating func end(_ ending: EditEnding, draft: String, original: String) -> String? {
+            guard isEditing else { return nil }
+            isEditing = false
+            return ending.textToWrite(draft: draft, original: original)
+        }
+    }
+
     private func endEditing(_ ending: EditEnding) {
-        guard isEditing else { return }
-        if let text = ending.textToWrite(draft: draftText, original: segment.text) {
+        if let text = inlineEdit.end(ending, draft: draftText, original: segment.text) {
             model.editSegment(id: segment.id, newText: text)
         }
-        isEditing = false
     }
 
     nonisolated static func syntheticKaraokeTokens(_ text: String) -> [String] {
