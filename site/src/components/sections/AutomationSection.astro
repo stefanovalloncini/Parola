@@ -109,6 +109,8 @@ const copy = t({
   }
 
   .shortcuts {
+    --tint: 14%;
+    --tone: 70%;
     margin-top: clamp(64px, 8vw, 104px);
     padding-top: 30px;
     border-top: 0.5px solid var(--hairline);
@@ -128,8 +130,8 @@ const copy = t({
     padding: 9px 16px 9px 9px;
     border-radius: 999px;
     white-space: nowrap;
-    background: color-mix(in srgb, var(--hue) 14%, #fff);
-    color: color-mix(in srgb, var(--hue) 70%, #000);
+    background: color-mix(in srgb, var(--hue) var(--tint), var(--paper));
+    color: color-mix(in srgb, var(--hue) var(--tone), var(--mix-ink));
     font-size: 15px;
     font-weight: 600;
   }

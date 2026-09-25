@@ -84,7 +84,7 @@ const other = locale === "it" ? "en" : "it";
 
   :global(html:not(.js)) .site-header,
   .site-header[data-scrolled] {
-    background: rgb(255 255 255 / 0.88);
+    background: var(--header-glass);
     box-shadow: 0 0.5px 0 var(--hairline);
     backdrop-filter: saturate(180%) blur(20px);
   }
@@ -160,7 +160,7 @@ const other = locale === "it" ? "en" : "it";
     padding: 0 18px 0 20px;
     border-radius: 999px;
     background: var(--ink);
-    color: var(--cream);
+    color: var(--on-ink);
     font-size: 15px;
     font-weight: 550;
     letter-spacing: -0.01em;
@@ -179,7 +179,7 @@ const other = locale === "it" ? "en" : "it";
   }
 
   .download :global(.wave-glyph) {
-    color: var(--sage-soft);
+    color: var(--download-glyph);
   }
 
   .download:hover {
