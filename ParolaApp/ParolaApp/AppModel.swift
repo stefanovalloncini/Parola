@@ -2325,30 +2325,44 @@ final class AppModel {
     }
 
     func updateYtDlpViaBrew() {
-        guard !ytDlpUpdating, case .homebrew(let brew)? = ytDlpUpdateRoute, let path = ytDlpPath else { return }
+        guard !ytDlpUpdating, case .homebrew(let brew)? = ytDlpUpdateRoute else { return }
         ytDlpUpdating = true
         ytDlpUpdateError = nil
         ytDlpVersionTask?.cancel()
         let deadline = ytDlpUpdateDeadline
         ytDlpUpdateTask = Task { [weak self] in
             let outcome = await YtDlpInstaller.upgrade(formula: "yt-dlp", brewPath: brew, deadline: deadline)
-            let version = outcome == .cancelled ? nil : await YtDlpVersion.installed(at: path)
             guard let self else { return }
-            self.ytDlpUpdateTask = nil
-            if outcome != .cancelled { self.ytDlpVersion = version }
-            self.ytDlpUpdating = false
-            switch outcome {
-            case .success:
-                if self.ytDlpIsStale {
-                    self.ytDlpUpdateError = String(localized: "Homebrew finished, but yt-dlp is still out of date.")
-                }
-            case .failure(let message):
-                self.ytDlpUpdateError = message
-            case .timedOut:
-                self.ytDlpUpdateError = Self.ytDlpUpdateTimedOutMessage(deadline)
-            case .cancelled:
+            guard outcome != .cancelled else {
+                self.ytDlpUpdateTask = nil
+                self.ytDlpUpdating = false
                 self.refreshYtDlpStatus()
+                return
             }
+            self.refreshYtDlpAvailability()
+            var version: YtDlpVersion?
+            if let path = self.ytDlpPath { version = await YtDlpVersion.installed(at: path) }
+            self.ytDlpUpdateTask = nil
+            self.ytDlpVersion = version
+            self.ytDlpUpdating = false
+            self.ytDlpUpdateError = self.ytDlpUpdateProblem(after: outcome, deadline: deadline)
+        }
+    }
+
+    private func ytDlpUpdateProblem(after outcome: YtDlpInstaller.Outcome, deadline: Duration) -> String? {
+        switch outcome {
+        case .success where !ytDlpAvailable:
+            return String(localized: "Homebrew finished, but yt-dlp still isn't on the expected path.")
+        case .success where ytDlpVersion == nil:
+            return String(localized: "Homebrew finished, but Parola couldn't read yt-dlp's version.")
+        case .success where ytDlpIsStale:
+            return String(localized: "Homebrew finished, but yt-dlp is still out of date.")
+        case .success, .cancelled:
+            return nil
+        case .failure(let message):
+            return message
+        case .timedOut:
+            return Self.ytDlpUpdateTimedOutMessage(deadline)
         }
     }
 

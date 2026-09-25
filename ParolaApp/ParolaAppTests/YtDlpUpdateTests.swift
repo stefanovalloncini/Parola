@@ -344,6 +344,53 @@ struct YtDlpUpdateTests {
         #expect(model.ytDlpVersion?.text == "2099.01.01")
         #expect(!model.ytDlpIsStale)
         #expect(model.ytDlpUpdateError == nil)
+        #expect(model.ytDlpAvailable)
+    }
+
+    @MainActor
+    @Test("an update that leaves no yt-dlp behind shows it as missing")
+    func updateThatRemovesTheBinary() async throws {
+        let ytDlp = try script("echo 2026.03.17")
+        let brew = try script("rm -f '\(ytDlp.path)'\necho 'Error: yt-dlp: Failed to download resource' >&2\nexit 1")
+        defer {
+            try? FileManager.default.removeItem(at: brew)
+            try? FileManager.default.removeItem(at: ytDlp)
+        }
+        let model = makeModel()
+        model.ytDlpPath = ytDlp.path
+        model.ytDlpLocator = { FileManager.default.isExecutableFile(atPath: ytDlp.path) ? ytDlp.path : nil }
+        model.ytDlpAvailable = true
+        model.ytDlpVersion = YtDlpVersion("2026.03.17")
+        model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
+
+        model.updateYtDlpViaBrew()
+
+        await waitUntil { !model.ytDlpUpdating }
+        #expect(!model.ytDlpAvailable)
+        #expect(model.ytDlpVersion == nil)
+        #expect(model.ytDlpUpdateError == "yt-dlp: Failed to download resource")
+    }
+
+    @MainActor
+    @Test("an update after which yt-dlp's version can't be read says so")
+    func unreadableVersionAfterUpdate() async throws {
+        let brew = try script("exit 0")
+        let ytDlp = try script("echo 'Traceback (most recent call last):'")
+        defer {
+            try? FileManager.default.removeItem(at: brew)
+            try? FileManager.default.removeItem(at: ytDlp)
+        }
+        let model = makeModel()
+        model.ytDlpPath = ytDlp.path
+        model.ytDlpLocator = { ytDlp.path }
+        model.ytDlpVersion = YtDlpVersion("2026.03.17")
+        model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
+
+        model.updateYtDlpViaBrew()
+
+        await waitUntil { !model.ytDlpUpdating }
+        #expect(model.ytDlpVersion == nil)
+        #expect(model.ytDlpUpdateError == "Homebrew finished, but Parola couldn't read yt-dlp's version.")
     }
 
     @MainActor

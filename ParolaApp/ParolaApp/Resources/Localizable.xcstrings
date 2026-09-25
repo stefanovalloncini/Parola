@@ -5812,6 +5812,17 @@
         }
       }
     },
+    "Homebrew finished, but Parola couldn't read yt-dlp's version.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homebrew ha terminato, ma Parola non è riuscita a leggere la versione di yt-dlp."
+          }
+        }
+      }
+    },
     "Homebrew finished, but yt-dlp is still out of date.": {
       "extractionState": "manual",
       "localizations": {
@@ -5819,6 +5830,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Homebrew ha terminato, ma yt-dlp non è ancora aggiornato."
+          }
+        }
+      }
+    },
+    "Homebrew finished, but yt-dlp still isn't on the expected path.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homebrew ha terminato, ma yt-dlp non si trova ancora nel percorso previsto."
           }
         }
       }
