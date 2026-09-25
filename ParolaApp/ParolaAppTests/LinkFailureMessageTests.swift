@@ -49,6 +49,8 @@ struct LinkFailureMessageTests {
         LinkDownloadFailure(reason: .toolError("Unable to extract uploader id."), site: "YouTube"),
         LinkDownloadFailure(reason: .toolExited(status: 9), site: "YouTube"),
         LinkDownloadFailure(reason: .timedOut(seconds: 120), site: "YouTube", ytDlpIsStale: true),
+        LinkDownloadFailure(reason: .unavailable(.privateVideo), site: "YouTube", ytDlpVersion: YtDlpVersion("2026.03.17"), ytDlpIsStale: true),
+        LinkDownloadFailure(reason: .noCaptions, site: "YouTube", ytDlpIsStale: true),
         staleRefusal,
     ]
 
@@ -74,6 +76,16 @@ struct LinkFailureMessageTests {
     @Test("the English banner says what the CLI says", arguments: everyReason)
     func englishMatchesTheCLI(failure: LinkDownloadFailure) {
         #expect(AppModel.linkFailureMessage(failure) == failure.message)
+    }
+
+    @Test("a private video on an old yt-dlp reads in Italian without asking to try again")
+    func stalePrivateVideoInItalian() throws {
+        let failure = LinkDownloadFailure(
+            reason: .unavailable(.privateVideo), site: "YouTube", ytDlpVersion: YtDlpVersion("2026.03.17"), ytDlpIsStale: true
+        )
+
+        #expect(AppModel.linkFailureMessage(failure, bundle: try italianBundle())
+            == "Non è possibile scaricare questo video perché è privato. Anche la tua versione di yt-dlp (2026.03.17) non è aggiornata.")
     }
 
     @Test("a missing yt-dlp points at Settings instead of a Terminal command")

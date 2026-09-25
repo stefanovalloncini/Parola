@@ -137,8 +137,12 @@ public struct LinkDownloadFailure: Sendable, Equatable {
     }
 
     private var staleSentence: String {
-        guard let ytDlpVersion else { return "Your yt-dlp is out of date — update it and try again." }
-        return "Your yt-dlp (\(ytDlpVersion.text)) is out of date — update it and try again."
+        switch (ytDlpVersion, isWorthRetrying) {
+        case (let version?, true): return "Your yt-dlp (\(version.text)) is out of date — update it and try again."
+        case (nil, true): return "Your yt-dlp is out of date — update it and try again."
+        case (let version?, false): return "Your yt-dlp (\(version.text)) is also out of date."
+        case (nil, false): return "Your yt-dlp is also out of date."
+        }
     }
 }
 

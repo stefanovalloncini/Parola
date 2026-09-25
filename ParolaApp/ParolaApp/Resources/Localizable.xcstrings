@@ -15283,6 +15283,17 @@
         }
       }
     },
+    "Your yt-dlp (%@) is also out of date.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anche la tua versione di yt-dlp (%@) non è aggiornata."
+          }
+        }
+      }
+    },
     "Your yt-dlp (%@) is out of date — update it and try again.": {
       "extractionState": "manual",
       "localizations": {
@@ -15290,6 +15301,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La tua versione di yt-dlp (%@) non è aggiornata: aggiornala e riprova."
+          }
+        }
+      }
+    },
+    "Your yt-dlp is also out of date.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anche la tua versione di yt-dlp non è aggiornata."
           }
         }
       }

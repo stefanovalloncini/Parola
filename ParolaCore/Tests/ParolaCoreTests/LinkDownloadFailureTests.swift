@@ -151,6 +151,19 @@ struct LinkDownloadFailureTests {
         #expect(LinkDownloadFailure(reason: reason, site: "YouTube").isWorthRetrying == expected)
     }
 
+    @Test("a video an update can't unlock doesn't ask for one")
+    func staleButNotWorthRetrying() {
+        let failure = read(
+            "ERROR: [youtube] 9XUo28kxQt4: Private video. Sign in if you've been granted access to this video",
+            installedVersion: "2026.03.17"
+        )
+
+        #expect(failure.ytDlpIsStale)
+        #expect(failure.message == "This video can't be downloaded because it's private. Your yt-dlp (2026.03.17) is also out of date.")
+        #expect(LinkDownloadFailure(reason: .noCaptions, ytDlpIsStale: true).message
+            == "This video has no captions. Transcribe it instead. Your yt-dlp is also out of date.")
+    }
+
     @Test("a timeout folds in the site and the installed version")
     func timeoutNotesVersion() {
         let failure = LinkDownloadFailure(reason: .timedOut(seconds: 120), site: "YouTube")

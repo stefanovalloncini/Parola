@@ -45,7 +45,7 @@ extension AppModel {
 
     nonisolated static func linkFailureMessage(_ failure: LinkDownloadFailure, bundle: Bundle = .main) -> String {
         let hint = failure.ytDlpIsStale
-            ? staleYtDlpSentence(failure.ytDlpVersion, bundle: bundle)
+            ? staleYtDlpSentence(failure.ytDlpVersion, worthRetrying: failure.isWorthRetrying, bundle: bundle)
             : linkFailureHint(failure.reason, bundle: bundle)
         return [linkFailureHeadline(failure, bundle: bundle), hint].compactMap { $0 }.joined(separator: " ")
     }
@@ -108,10 +108,16 @@ extension AppModel {
         }
     }
 
-    private nonisolated static func staleYtDlpSentence(_ version: YtDlpVersion?, bundle: Bundle) -> String {
-        guard let version else {
+    private nonisolated static func staleYtDlpSentence(_ version: YtDlpVersion?, worthRetrying: Bool, bundle: Bundle) -> String {
+        switch (version, worthRetrying) {
+        case (let version?, true):
+            return String(localized: "Your yt-dlp (\(version.text)) is out of date — update it and try again.", bundle: bundle)
+        case (nil, true):
             return String(localized: "Your yt-dlp is out of date — update it and try again.", bundle: bundle)
+        case (let version?, false):
+            return String(localized: "Your yt-dlp (\(version.text)) is also out of date.", bundle: bundle)
+        case (nil, false):
+            return String(localized: "Your yt-dlp is also out of date.", bundle: bundle)
         }
-        return String(localized: "Your yt-dlp (\(version.text)) is out of date — update it and try again.", bundle: bundle)
     }
 }
