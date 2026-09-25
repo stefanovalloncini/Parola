@@ -8,8 +8,15 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: `http://127.0.0.1:${port}`,
-    ...devices["Desktop Chrome"],
   },
+  projects: [
+    { name: "light", use: { ...devices["Desktop Chrome"], colorScheme: "light" } },
+    {
+      name: "dark",
+      use: { ...devices["Desktop Chrome"], colorScheme: "dark" },
+      testMatch: /(smoke|a11y|scenes|icons)\.spec\.ts/,
+    },
+  ],
   webServer: {
     command: `pnpm exec astro preview --port ${port} --host 127.0.0.1 --ignore-lock`,
     url: `http://127.0.0.1:${port}`,

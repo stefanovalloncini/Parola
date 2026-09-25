@@ -48,6 +48,13 @@ const steps = prompts.map((_, i) => [i * 1300, `p${i}`]);
     width: calc(380 * var(--u));
   }
 
+  @media (prefers-color-scheme: dark) {
+    .prompts {
+      --tint: 16%;
+      --tone: 38%;
+    }
+  }
+
   li {
     display: flex;
     align-items: center;

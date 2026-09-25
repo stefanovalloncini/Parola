@@ -133,3 +133,72 @@
   --tile-shadow: var(--night-tile-shadow);
   color: var(--ink-body);
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: var(--cream);
+    --ink-body: var(--night-ink-body);
+    --muted: var(--night-muted);
+    --hairline: var(--night-hairline);
+    --paper: #0a110d;
+    --paper-clear: rgb(10 17 13 / 0);
+    --mist: var(--night-mist);
+    --mist-deep: var(--night-mist-deep);
+    --card: rgb(255 255 255 / 0.05);
+    --card-edge: var(--night-card-edge);
+    --sage-deep: var(--night-sage-deep);
+    --sage-tint: var(--night-sage-tint);
+    --accent-fill: #5a7a5c;
+    --on-ink: #0f1a14;
+    --mix-ink: #ffffff;
+
+    --header-glass: rgb(8 17 12 / 0.72);
+    --download-glyph: var(--sage);
+    --shot-shadow: var(--night-shot-shadow);
+    --tile-shadow: var(--night-tile-shadow);
+    --drop-glow: #0f1a14;
+    --ai-wash: #0f1a14;
+
+    --mac-window: #202222;
+    --mac-window-edge: rgb(0 0 0 / 0.6);
+    --mac-window-rim: rgb(255 255 255 / 0.1);
+    --mac-window-drop: rgb(0 0 0 / 0.4);
+    --mac-sheet: #232624;
+    --mac-alert: #2a2c2b;
+    --mac-alert-glass: rgb(42 44 43 / 0.94);
+    --mac-module: rgb(42 44 43 / 0.94);
+    --mac-bubble: #2d302e;
+    --mac-ink: #eceeed;
+    --mac-ink-secondary: #a3a8a5;
+    --mac-edge: 255 255 255;
+    --mac-edge-neutral: 255 255 255;
+    --mac-control: rgb(255 255 255 / 0.1);
+    --mac-track: rgb(255 255 255 / 0.1);
+    --mac-toggle-off: #4a4d4b;
+    --mac-accent-ink: #9fb8d6;
+    --mac-menubar: rgb(0 0 0 / 0.3);
+    --scene-tint: linear-gradient(180deg, var(--night-mist), var(--night-mist-deep));
+    --key-cap: linear-gradient(180deg, #3a3c3b, #2b2d2c);
+    --key-side: #121313;
+    --dock-glass: rgb(0 0 0 / 0.28);
+    --dock-rim: rgb(255 255 255 / 0.16);
+    --dock-dot: rgb(255 255 255 / 0.6);
+    --lid-edge: rgb(255 255 255 / 0.12);
+    --desktop-wall:
+      radial-gradient(70% 60% at 88% 0%, rgb(252 242 230 / 0.28), rgb(252 242 230 / 0) 70%),
+      radial-gradient(55% 60% at 0% 100%, rgb(20 36 26 / 0.9), rgb(20 36 26 / 0) 70%),
+      radial-gradient(55% 55% at 22% 28%, rgb(107 138 107 / 0.55), rgb(107 138 107 / 0) 70%),
+      radial-gradient(50% 45% at 78% 88%, rgb(84 115 158 / 0.35), rgb(84 115 158 / 0) 70%),
+      linear-gradient(160deg, #4d6650 0%, #2c4133 48%, #15231a 100%);
+    --desktop-menubar: rgb(0 0 0 / 0.22);
+    --desktop-menubar-ink: rgb(255 255 255 / 0.9);
+    --meeting-wall:
+      radial-gradient(70% 70% at 90% 0%, rgb(252 242 230 / 0.22), transparent 70%),
+      radial-gradient(80% 80% at 0% 100%, #14241a, transparent 70%),
+      linear-gradient(160deg, #4d6650, #2c4133 60%, #15231a);
+    --offline-wall:
+      radial-gradient(70% 80% at 85% 0%, rgb(252 242 230 / 0.22), transparent 70%),
+      radial-gradient(80% 90% at 0% 100%, #14241a, transparent 70%),
+      linear-gradient(160deg, #4d6650, #2c4133 60%, #15231a);
+  }
+}

@@ -9,6 +9,7 @@ const browser = await chromium.launch();
 const page = await browser.newPage({
   viewport: { width: 1200, height: 630 },
   deviceScaleFactor: 1,
+  colorScheme: "light",
 });
 for (const card of cards) {
   await page.goto(`${base}${card.path}`);
