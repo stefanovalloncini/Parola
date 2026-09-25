@@ -29,6 +29,14 @@ test.describe("light scheme", () => {
       expect(background).toBe("rgb(255, 255, 255)");
     });
   }
+
+  test("an open page turns dark when the Mac does", async ({ page }) => {
+    await page.goto("/");
+    const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    expect(await background()).toBe("rgb(255, 255, 255)");
+    await page.emulateMedia({ colorScheme: "dark" });
+    await expect.poll(background).toBe("rgb(10, 17, 13)");
+  });
 });
 
 test.describe("dark scheme", () => {
