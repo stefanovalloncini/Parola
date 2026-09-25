@@ -145,4 +145,11 @@ const copy = t({
       grid-template-columns: 1fr;
     }
   }
+
+  @media (prefers-color-scheme: dark) {
+    .shortcuts li {
+      background: var(--mist-deep);
+      color: var(--ink);
+    }
+  }
 </style>

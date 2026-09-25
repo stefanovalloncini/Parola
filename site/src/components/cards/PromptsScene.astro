@@ -113,6 +113,12 @@ const steps = prompts.map((_, i) => [i * 1300, `p${i}`]);
   }
 
   @media (prefers-color-scheme: dark) {
+    li {
+      background: var(--mac-sheet);
+      color: var(--mac-ink);
+      box-shadow: inset 0 0 0 calc(1 * var(--u)) rgb(255 255 255 / 0.08);
+    }
+
     [data-state="p0"] .p0,
     [data-state="p1"] .p1,
     [data-state="p2"] .p2,
