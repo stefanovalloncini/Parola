@@ -55,7 +55,7 @@ struct MiniPlayerWindow: View {
             .accessibilityLabel("Previous segment")
             .axLeaf("MiniPlayer.Button.Previous")
 
-            Button(action: togglePlayPause) {
+            Button { model.togglePlayPause() } label: {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.onAccent)
@@ -81,11 +81,6 @@ struct MiniPlayerWindow: View {
 
             MiniPlayerTimeLabel()
         }
-    }
-
-    private func togglePlayPause() {
-        guard let player = model.player else { return }
-        if player.timeControlStatus == .playing { player.pause() } else { player.play() }
     }
 
     private func previous() {

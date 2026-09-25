@@ -224,7 +224,7 @@ final class EntryWindowSession {
             player.pause()
             return
         }
-        if durationSeconds > 0, currentTime >= durationSeconds - 0.05 { scrub(to: 0) }
+        if AppModel.playbackIsAtEnd(current: currentTime, duration: durationSeconds) { scrub(to: 0) }
         player.play()
         player.rate = Float(rate)
     }

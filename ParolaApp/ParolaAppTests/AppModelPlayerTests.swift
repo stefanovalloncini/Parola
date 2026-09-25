@@ -401,6 +401,46 @@ struct AppModelPlayerTests {
         #expect(AppModel.skipTarget(current: 10, by: -5) == 5)
     }
 
+    @Test("Play counts as at the end once the time label reads the total")
+    func playbackAtEndFollowsTheLabel() {
+        #expect(AppModel.playbackIsAtEnd(current: 159.5, duration: 160))
+        #expect(AppModel.playbackIsAtEnd(current: 159.7, duration: 160))
+        #expect(AppModel.playbackIsAtEnd(current: 160, duration: 160))
+        #expect(AppModel.playbackIsAtEnd(current: 175, duration: 160))
+        #expect(!AppModel.playbackIsAtEnd(current: 159.4, duration: 160))
+        #expect(!AppModel.playbackIsAtEnd(current: 0, duration: 160))
+    }
+
+    @Test("Play counts as at the end within 0.05 s of a length the label hasn't rounded up to")
+    func playbackAtEndNearTheRealEnd() {
+        #expect(AppModel.playbackIsAtEnd(current: 159.48, duration: 159.52))
+        #expect(!AppModel.playbackIsAtEnd(current: 159.3, duration: 159.52))
+    }
+
+    @Test("without a known length Play never counts as at the end")
+    func playbackAtEndNeedsALength() {
+        #expect(!AppModel.playbackIsAtEnd(current: 12, duration: 0))
+    }
+
+    @Test("togglePlayPause from the end seeks back to the start, and from mid-way stays put")
+    func togglePlayPauseRestartsAtTheEnd() {
+        let model = makeModel()
+        var transcript = Self.makeTranscript([(0, 0, 150)])
+        transcript.durationSeconds = 160
+        model.transcript = transcript
+        model.installPlayer(for: Self.makeURL())
+
+        model.currentTimeSeconds = 80
+        model.togglePlayPause()
+        #expect(model.currentTimeSeconds == 80)
+        model.player?.pause()
+
+        model.currentTimeSeconds = 159.7
+        model.togglePlayPause()
+        #expect(model.currentTimeSeconds == 0)
+        model.player?.pause()
+    }
+
     @Test("seekToSegment without a player is a no-op")
     func testSeekToSegmentWithoutPlayer() {
         let model = makeModel()

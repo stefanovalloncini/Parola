@@ -231,7 +231,20 @@ extension AppModel {
 
     func togglePlayPause() {
         guard let player else { return }
-        if player.timeControlStatus == .playing { player.pause() } else { player.play() }
+        if player.timeControlStatus == .playing {
+            player.pause()
+            return
+        }
+        if Self.playbackIsAtEnd(current: currentTimeSeconds, duration: transcript?.durationSeconds ?? 0) {
+            seekPlayer(to: 0, precise: false)
+        }
+        player.play()
+    }
+
+    // The time label rounds to whole seconds, so it reads the end from half a second before the real end.
+    static func playbackIsAtEnd(current: Double, duration: Double) -> Bool {
+        guard duration > 0 else { return false }
+        return current >= duration - 0.05 || current.rounded() >= duration.rounded()
     }
 
     func skip(by seconds: Double) {
