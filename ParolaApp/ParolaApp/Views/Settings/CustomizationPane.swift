@@ -104,13 +104,15 @@ private struct ThemePresetGallery: View {
                         if isActive {
                             Circle()
                                 .strokeBorder(Color.primary.opacity(0.6), lineWidth: 2)
-                                .frame(width: 26, height: 26)
                         }
                     }
-                    .padding(DS.Spacing.hair)
+                    .frame(width: 26, height: 26)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help(preset.localizedLabel)
+                .accessibilityLabel(preset.localizedLabel)
+                .accessibilityAddTraits(isActive ? .isSelected : [])
                 .axLeaf("Customization.Button.Theme.\(preset.rawValue)")
             }
         }
