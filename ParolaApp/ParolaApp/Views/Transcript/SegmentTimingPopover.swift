@@ -27,6 +27,7 @@ struct SegmentTimingPopover: View {
         }
         .padding(DS.Spacing.regular)
         .frame(width: 260)
+        .closesOnEscape()
     }
 
     private func timingRow(label: String, value: Double, nudge: @escaping (Int) -> Void) -> some View {

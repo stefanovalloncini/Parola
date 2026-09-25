@@ -29,6 +29,7 @@ struct OutlinePopover: View {
             }
         }
         .frame(minWidth: 280, idealWidth: 320)
+        .closesOnEscape()
     }
 
     private var header: some View {

@@ -43,6 +43,7 @@ struct AssignSpeakerPopover: View {
             footer
         }
         .frame(width: 280)
+        .closesOnEscape()
     }
 
     private var header: some View {
