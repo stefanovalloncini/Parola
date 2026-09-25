@@ -171,6 +171,19 @@ struct FindAndReplaceTests {
         #expect(model.findFocusRequests == before &+ 2)
     }
 
+    @Test("every replacement tells the find bar to let go of its field")
+    func replacementsAreCounted() {
+        openFind(query: "world")
+        model.findReplacement = "earth"
+        let before = model.findReplacements
+
+        model.replaceCurrentMatch()
+        #expect(model.findReplacements == before &+ 1)
+
+        model.replaceAllMatches()
+        #expect(model.findReplacements == before &+ 2)
+    }
+
     @Test("match(in:) groups matches by segment")
     func matchesPerSegment() {
         model.transcript = Self.makeTranscript(["abc abc", "abc"])

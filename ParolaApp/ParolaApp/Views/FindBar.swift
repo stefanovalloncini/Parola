@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ParolaCore
 
@@ -22,6 +23,13 @@ struct FindBar: View {
         .padding(.top, DS.Spacing.small)
         .padding(.bottom, DS.Spacing.tight)
         .task(id: model.findFocusRequests) { await focusQuery() }
+        .onChange(of: model.findReplacements) { _, _ in endFieldEditing() }
+    }
+
+    /// A field still editing answers ⌘Z with its own typing, so the replacement it just made would need Escape first.
+    private func endFieldEditing() {
+        guard let window = NSApp.keyWindow, (window.firstResponder as? NSTextView)?.isFieldEditor == true else { return }
+        if !window.makeFirstResponder(window.contentView) { window.makeFirstResponder(nil) }
     }
 
     /// Asked while the bar is still being built, focus lands on another field of the window, so the ask waits a frame and repeats until it holds.

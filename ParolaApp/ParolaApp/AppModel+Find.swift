@@ -103,6 +103,7 @@ extension AppModel {
             actionName: String(localized: "Replace")
         )
         recomputeMatches()
+        findReplacements &+= 1
     }
 
     func replaceAllMatches() {
@@ -112,6 +113,7 @@ extension AppModel {
             actionName: String(localized: "Replace All")
         )
         recomputeMatches()
+        findReplacements &+= 1
     }
 
     private func snapToCurrentMatch() {
