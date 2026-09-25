@@ -8,7 +8,6 @@
   --mist: #f3f5f2;
   --mist-deep: #e9ede8;
   --card: #ffffff;
-  --card-edge: rgb(252 242 230 / 0);
   --sage: #6b8a6b;
   --sage-deep: #3f6048;
   --sage-soft: #a9c2a6;
@@ -28,7 +27,6 @@
   --night-hairline: rgb(252 242 230 / 0.1);
   --night-mist: rgb(255 255 255 / 0.035);
   --night-mist-deep: rgb(255 255 255 / 0.07);
-  --night-card-edge: rgb(252 242 230 / 0.06);
   --night-sage-deep: #b8d2b3;
   --night-sage-tint: rgb(169 194 166 / 0.16);
   --night-shot-shadow: 0 0 0 1px rgb(252 242 230 / 0.1), 0 24px 44px -18px rgb(0 0 0 / 0.6);
@@ -108,13 +106,12 @@
     --hairline: var(--night-hairline);
     --paper: #0a110d;
     --paper-clear: rgb(10 17 13 / 0);
-    --mist: var(--night-mist);
-    --mist-deep: var(--night-mist-deep);
-    --card: rgb(255 255 255 / 0.05);
-    --card-edge: var(--night-card-edge);
+    --mist: #111915;
+    --mist-deep: #18211b;
+    --card: var(--paper);
     --sage-deep: var(--night-sage-deep);
     --sage-tint: var(--night-sage-tint);
-    --accent-fill: #5a7a5c;
+    --accent-fill: #4f6f52;
     --on-ink: #0f1a14;
 
     --shot-shadow: var(--night-shot-shadow);
@@ -131,6 +128,6 @@
     --mac-control: rgb(255 255 255 / 0.1);
     --mac-track: rgb(255 255 255 / 0.1);
     --mac-accent-ink: #9fb8d6;
-    --scene-tint: linear-gradient(180deg, var(--night-mist), var(--night-mist-deep));
+    --scene-tint: linear-gradient(180deg, var(--mist), var(--mist-deep));
   }
 }

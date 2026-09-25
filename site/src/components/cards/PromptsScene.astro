@@ -111,4 +111,15 @@ const steps = prompts.map((_, i) => [i * 1300, `p${i}`]);
   [data-state="p5"] .p5 :global(.tile)::after {
     opacity: 1;
   }
+
+  @media (prefers-color-scheme: dark) {
+    [data-state="p0"] .p0,
+    [data-state="p1"] .p1,
+    [data-state="p2"] .p2,
+    [data-state="p3"] .p3,
+    [data-state="p4"] .p4,
+    [data-state="p5"] .p5 {
+      box-shadow: none;
+    }
+  }
 </style>

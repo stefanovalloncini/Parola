@@ -80,4 +80,11 @@ const t = translator(Astro.currentLocale);
       width: min(100%, 340px);
     }
   }
+
+  @media (prefers-color-scheme: dark) {
+    .primary {
+      background: var(--accent-fill);
+      box-shadow: none;
+    }
+  }
 </style>
