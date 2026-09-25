@@ -99,7 +99,7 @@ const steps = [
     align-self: flex-end;
     transition: opacity 0.2s;
     background: var(--ink);
-    color: var(--cream);
+    color: var(--on-ink);
   }
 
   .you > span {
@@ -115,9 +115,9 @@ const steps = [
   }
 
   .reply {
-    background: #fff;
+    background: var(--mac-sheet);
     color: var(--ink-body);
-    box-shadow: 0 0 0 calc(1 * var(--u)) rgb(15 26 20 / 0.07);
+    box-shadow: 0 0 0 calc(1 * var(--u)) rgb(var(--mac-edge) / 0.07);
   }
 
   code {

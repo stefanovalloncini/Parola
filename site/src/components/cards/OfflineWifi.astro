@@ -37,9 +37,9 @@ const { label, network, off } = Astro.props;
     width: calc(250 * var(--u));
     padding: calc(12 * var(--u)) calc(14 * var(--u));
     border-radius: calc(18 * var(--u));
-    background: rgb(246 246 244 / 0.94);
+    background: var(--mac-module);
     box-shadow: 0 calc(12 * var(--u)) calc(30 * var(--u)) rgb(0 0 0 / 0.22);
-    color: #1d201e;
+    color: var(--mac-ink);
   }
   .glyph {
     display: grid;
@@ -62,7 +62,7 @@ const { label, network, off } = Astro.props;
   }
   .state {
     display: grid;
-    color: #6b716d;
+    color: var(--mac-ink-secondary);
     font-size: max(11px, calc(11.5 * var(--u)));
   }
   .state > span {
@@ -92,13 +92,13 @@ const { label, network, off } = Astro.props;
 
   .off {
     opacity: 0;
-    color: #1d201e;
+    color: var(--mac-ink);
     font-weight: 600;
   }
 
   :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .glyph,
   :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .toggle {
-    background: #c9ccc9;
+    background: var(--mac-toggle-off);
   }
 
   :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .toggle i {

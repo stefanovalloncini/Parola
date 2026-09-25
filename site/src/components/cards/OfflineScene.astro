@@ -79,10 +79,7 @@ const steps = [
     position: absolute;
     inset: 0;
     overflow: hidden;
-    background:
-      radial-gradient(70% 80% at 85% 0%, rgb(252 242 230 / 0.85), transparent 70%),
-      radial-gradient(80% 90% at 0% 100%, #365342, transparent 70%),
-      linear-gradient(160deg, #b9cfb5, #6f8f6e 60%, #4a6b51);
+    background: var(--offline-wall);
     font-size: max(11px, calc(13 * var(--u)));
   }
 
@@ -93,9 +90,9 @@ const steps = [
     width: calc(540 * var(--u));
     padding: calc(18 * var(--u)) calc(20 * var(--u)) calc(20 * var(--u));
     border-radius: calc(16 * var(--u));
-    background: #fbfbfa;
+    background: var(--mac-window);
     box-shadow: 0 calc(18 * var(--u)) calc(40 * var(--u)) rgb(0 0 0 / 0.28);
-    color: #1d201e;
+    color: var(--mac-ink);
     opacity: 0;
     translate: 0 calc(10 * var(--u));
     transition:
@@ -139,7 +136,7 @@ const steps = [
     height: calc(4 * var(--u));
     margin: calc(14 * var(--u)) 0 calc(12 * var(--u));
     border-radius: 999px;
-    background: rgb(15 26 20 / 0.08);
+    background: var(--mac-track);
     overflow: hidden;
     transition: opacity 0.3s;
   }
@@ -168,7 +165,7 @@ const steps = [
 
   .lines time {
     padding-top: calc(2 * var(--u));
-    color: #54739e;
+    color: var(--mac-accent-ink);
     font-family: var(--font-mono);
     font-size: max(11px, calc(11 * var(--u)));
   }

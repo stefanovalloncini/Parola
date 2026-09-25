@@ -72,9 +72,9 @@ const steps = order.map((index, i) => [i * 1300, `s${index}`]);
     height: calc(76 * var(--u));
     padding-inline: calc(18 * var(--u));
     border-radius: calc(18 * var(--u));
-    background: #fff;
+    background: var(--mac-sheet);
     box-shadow:
-      0 0 0 calc(1 * var(--u)) rgb(15 26 20 / 0.06),
+      0 0 0 calc(1 * var(--u)) rgb(var(--mac-edge) / 0.06),
       0 calc(6 * var(--u)) calc(14 * var(--u)) rgb(15 26 20 / 0.05);
   }
 
@@ -103,7 +103,7 @@ const steps = order.map((index, i) => [i * 1300, `s${index}`]);
     width: calc(26 * var(--u));
     height: calc(26 * var(--u));
     border-radius: 50%;
-    background: var(--sage-deep);
+    background: var(--accent-fill);
     color: #fff;
     opacity: 0;
     scale: 0.5;
