@@ -1,4 +1,5 @@
 import Foundation
+import os
 import ParolaCore
 
 /// Locates `yt-dlp`/`brew` on disk and drives `brew install` and `brew upgrade`, off the AppModel.
@@ -189,6 +190,9 @@ enum YtDlpInstaller {
             }
         }
 
+        let exitSignal = ExitSignal()
+        proc.terminationHandler = { _ in exitSignal.fire() }
+
         let bufferTask = Task<String, Never> {
             var data = Data()
             for await chunk in chunkStream {
@@ -205,7 +209,7 @@ enum YtDlpInstaller {
             return .failure(launchFailureMessage(error.localizedDescription))
         }
         let started = ContinuousClock.now
-        let ending = await waitForExit(proc, deadline: deadline)
+        let ending = await waitForExit(proc, exited: exitSignal, deadline: deadline)
         // brew's Error line is usually its last, so wait for the pipe's end; a child still holding it gets two seconds.
         await withTaskGroup(of: Bool.self) { group in
             group.addTask { _ = await bufferTask.value; return true }
@@ -250,12 +254,11 @@ enum YtDlpInstaller {
         case cancelled
     }
 
-    private static func waitForExit(_ proc: Process, deadline: Duration?) async -> Ending {
-        let exit = Task.detached(priority: .utility) { proc.waitUntilExit() }
-        return await withTaskGroup(of: Ending.self) { group in
+    private static func waitForExit(_ proc: Process, exited: ExitSignal, deadline: Duration?) async -> Ending {
+        await withTaskGroup(of: Ending.self) { group in
             group.addTask {
                 await withTaskCancellationHandler {
-                    await exit.value
+                    await exited.wait()
                 } onCancel: {
                     stop(proc)
                 }
@@ -281,6 +284,35 @@ enum YtDlpInstaller {
         let pid = proc.processIdentifier
         DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(10)) {
             if proc.isRunning { kill(pid, SIGKILL) }
+        }
+    }
+}
+
+/// Fired by a termination handler set before `run()`, so brew's exit is never missed and no thread blocks waiting for it.
+private final class ExitSignal: Sendable {
+    private struct State {
+        var exited = false
+        var waiters: [CheckedContinuation<Void, Never>] = []
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    func fire() {
+        let waiters = state.withLock { state in
+            state.exited = true
+            defer { state.waiters = [] }
+            return state.waiters
+        }
+        for waiter in waiters { waiter.resume() }
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let exited = state.withLock { state in
+                if !state.exited { state.waiters.append(continuation) }
+                return state.exited
+            }
+            if exited { continuation.resume() }
         }
     }
 }
