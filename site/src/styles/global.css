@@ -196,18 +196,6 @@ button {
   margin: 20px auto 0;
 }
 
-[data-theme="dark"] {
-  --ink: var(--cream);
-  --ink-body: rgb(252 242 230 / 0.86);
-  --muted: rgb(252 242 230 / 0.6);
-  --hairline: rgb(252 242 230 / 0.1);
-  --mist: rgb(255 255 255 / 0.035);
-  --mist-deep: rgb(255 255 255 / 0.07);
-  --sage-deep: #b8d2b3;
-  --sage-tint: rgb(169 194 166 / 0.16);
-  color: var(--ink-body);
-}
-
 [data-words] .word {
   transition: color 0.5s var(--ease-out);
   transition-delay: calc(var(--i, 0) * 45ms);

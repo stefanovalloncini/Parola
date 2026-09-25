@@ -4,19 +4,89 @@
   --muted: #5c665f;
   --hairline: rgb(15 26 20 / 0.09);
   --paper: #ffffff;
+  --paper-clear: rgb(255 255 255 / 0);
   --mist: #f3f5f2;
   --mist-deep: #e9ede8;
+  --card: #ffffff;
+  --card-edge: rgb(252 242 230 / 0);
   --sage: #6b8a6b;
   --sage-deep: #3f6048;
   --sage-soft: #a9c2a6;
   --sage-tint: rgb(107 138 107 / 0.15);
+  --accent-fill: #3f6048;
   --cream: #fcf2e6;
   --cream-muted: rgb(252 242 230 / 0.62);
+  --on-ink: #fcf2e6;
+  --mix-ink: #000000;
   --night: #08110c;
   --night-deep: #030504;
   --slate: #54739e;
   --slate-soft: #85a3cc;
   --record: #e5484d;
+
+  --night-ink-body: rgb(252 242 230 / 0.86);
+  --night-muted: rgb(252 242 230 / 0.6);
+  --night-hairline: rgb(252 242 230 / 0.1);
+  --night-mist: rgb(255 255 255 / 0.035);
+  --night-mist-deep: rgb(255 255 255 / 0.07);
+  --night-card-edge: rgb(252 242 230 / 0.06);
+  --night-sage-deep: #b8d2b3;
+  --night-sage-tint: rgb(169 194 166 / 0.16);
+  --night-shot-shadow: 0 0 0 1px rgb(252 242 230 / 0.1), 0 24px 44px -18px rgb(0 0 0 / 0.6);
+  --night-tile-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.32), inset 0 0 0 0.5px rgb(255 255 255 / 0.1),
+    0 0 0 0.5px rgb(0 0 0 / 0.5), 0 4px 12px -4px rgb(0 0 0 / 0.8);
+
+  --header-glass: rgb(255 255 255 / 0.88);
+  --download-glyph: #a9c2a6;
+  --shot-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.22), 0 22px 40px -16px rgb(15 26 20 / 0.32);
+  --tile-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.28), inset 0 0 0 0.5px rgb(0 0 0 / 0.12),
+    0 1px 2px rgb(15 26 20 / 0.14), 0 2px 6px -2px rgb(15 26 20 / 0.2);
+  --drop-glow: #e6eee4;
+  --ai-wash: #f6f8f5;
+
+  --mac-window: #fbfbfa;
+  --mac-window-edge: rgb(0 0 0 / 0.18);
+  --mac-window-rim: rgb(255 255 255 / 0);
+  --mac-window-drop: rgb(0 0 0 / 0.3);
+  --mac-sheet: #ffffff;
+  --mac-alert: #f4f5f3;
+  --mac-alert-glass: rgb(244 245 243 / 0.94);
+  --mac-module: rgb(246 246 244 / 0.94);
+  --mac-bubble: #eceeec;
+  --mac-ink: #1d201e;
+  --mac-ink-secondary: #6b716d;
+  --mac-edge: 15 26 20;
+  --mac-edge-neutral: 0 0 0;
+  --mac-control: rgb(0 0 0 / 0.07);
+  --mac-track: rgb(15 26 20 / 0.08);
+  --mac-toggle-off: #c9ccc9;
+  --mac-accent-ink: #54739e;
+  --mac-menubar: rgb(255 255 255 / 0.55);
+  --scene-tint: linear-gradient(180deg, #eef2ed, #e3e9e1);
+  --key-cap: linear-gradient(180deg, #fdfdfc, #eceeea);
+  --key-side: #cfd5cd;
+  --dock-glass: rgb(255 255 255 / 0.32);
+  --dock-rim: rgb(255 255 255 / 0.5);
+  --dock-dot: rgb(15 26 20 / 0.55);
+  --lid-edge: rgb(0 0 0 / 0.55);
+  --desktop-wall:
+    radial-gradient(70% 60% at 88% 0%, rgb(252 242 230 / 0.95), rgb(252 242 230 / 0) 70%),
+    radial-gradient(55% 60% at 0% 100%, rgb(63 96 72 / 0.75), rgb(63 96 72 / 0) 70%),
+    radial-gradient(55% 55% at 22% 28%, rgb(169 194 166 / 0.9), rgb(169 194 166 / 0) 70%),
+    radial-gradient(50% 45% at 78% 88%, rgb(133 163 204 / 0.5), rgb(133 163 204 / 0) 70%),
+    linear-gradient(160deg, #c3d6bf 0%, #8faa8c 48%, #62826a 100%);
+  --desktop-menubar: rgb(255 255 255 / 0.18);
+  --desktop-menubar-ink: rgb(15 26 20 / 0.86);
+  --meeting-wall:
+    radial-gradient(70% 70% at 90% 0%, rgb(252 242 230 / 0.9), transparent 70%),
+    radial-gradient(80% 80% at 0% 100%, #365342, transparent 70%),
+    linear-gradient(160deg, #b9cfb5, #6f8f6e 60%, #4a6b51);
+  --offline-wall:
+    radial-gradient(70% 80% at 85% 0%, rgb(252 242 230 / 0.85), transparent 70%),
+    radial-gradient(80% 90% at 0% 100%, #365342, transparent 70%),
+    linear-gradient(160deg, #b9cfb5, #6f8f6e 60%, #4a6b51);
 
   --font-sans:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter Variable", "Segoe UI", Roboto,
@@ -48,4 +118,18 @@
     --gutter: 16px;
     --header-height: 60px;
   }
+}
+
+[data-theme="dark"] {
+  --ink: var(--cream);
+  --ink-body: var(--night-ink-body);
+  --muted: var(--night-muted);
+  --hairline: var(--night-hairline);
+  --mist: var(--night-mist);
+  --mist-deep: var(--night-mist-deep);
+  --sage-deep: var(--night-sage-deep);
+  --sage-tint: var(--night-sage-tint);
+  --shot-shadow: var(--night-shot-shadow);
+  --tile-shadow: var(--night-tile-shadow);
+  color: var(--ink-body);
 }
