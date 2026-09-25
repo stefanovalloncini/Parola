@@ -50,9 +50,9 @@ struct ContentToolbar: ToolbarContent {
 
     private var intakeCapsule: some View {
         HStack(spacing: 0) {
-            ModelPickerView(shell: .segment, leaf: nil)
+            ModelPickerView(shell: .segment, leaf: "Pill.Button.Model")
             segmentDivider
-            LanguagePickerView()
+            LanguagePickerView(leaf: "Pill.Button.Language")
                 .disabled(selectedModelIsEnglishOnly)
                 .modifier(LanguageNoticeHelpModifier(notice: languageControlNotice))
             segmentDivider

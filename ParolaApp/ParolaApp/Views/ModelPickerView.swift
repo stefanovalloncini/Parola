@@ -10,7 +10,7 @@ struct ModelPickerView: View {
     @State private var installedOnly = false
 
     var body: some View {
-        PillPickerButton(icon: "cpu", caption: "Model", value: currentLabel, shell: shell, popoverWidth: 400, leaf: leaf) {
+        PillPickerButton(icon: "cpu", caption: String(localized: "Model"), value: currentLabel, shell: shell, popoverWidth: 400, leaf: leaf) {
             ModelPickerPopover(searchText: $searchText, installedOnly: $installedOnly, offersDownloads: shell == .segment)
         }
         .help(shell == .segment ? "Active model. Models are downloaded on demand." : "Default model. Installed models only.")
