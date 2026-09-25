@@ -192,18 +192,31 @@ extension AppModel {
               let player,
               player.timeControlStatus == .playing,
               let segments = transcript?.segments,
-              !segments.isEmpty else {
+              let target = Self.silenceSkipTarget(at: currentTime, in: segments) else {
             return
         }
-        guard let currentIndex = cachedOrSearchedIndex(in: segments, coveringTime: currentTime),
-              case let currentSegment = segments[currentIndex],
-              let nextSegment = segments.firstSegment(startingAfter: currentSegment.end + 0.4) else {
-            return
+        seekPlayer(to: target)
+    }
+
+    /// Just before the next segment when the playhead sits in a gap of at least `minimumGap`, the lead-in included; nil inside speech or after the last segment.
+    static func silenceSkipTarget(
+        at time: Double,
+        in segments: [TranscriptSegment],
+        minimumGap: Double = 0.5,
+        lead: Double = 0.1
+    ) -> Double? {
+        var spokenUntil: Double?
+        for segment in segments {
+            guard segment.start <= time else {
+                if let spokenUntil, spokenUntil >= time { return nil }
+                let silenceStart = spokenUntil ?? 0
+                guard segment.start - silenceStart >= minimumGap else { return nil }
+                let target = max(silenceStart, segment.start - lead)
+                return target - time > 0.05 ? target : nil
+            }
+            spokenUntil = max(spokenUntil ?? segment.end, segment.end)
         }
-        let gap = nextSegment.start - currentSegment.end
-        guard gap >= 0.5 else { return }
-        let target = CMTime(seconds: nextSegment.start, preferredTimescale: 600)
-        player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+        return nil
     }
 
     func seekTo(seconds: Double) {

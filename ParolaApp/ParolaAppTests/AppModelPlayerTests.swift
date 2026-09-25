@@ -196,6 +196,59 @@ struct AppModelPlayerTests {
         #expect(model.player == nil)
     }
 
+    @Test("Skip silences never seeks while a segment covers the playhead, even just before its end")
+    func silenceSkipInsideSpeech() {
+        let segments = Self.makeSegments([(0, 39, 42), (1, 46, 50)])
+
+        #expect(AppModel.silenceSkipTarget(at: 39.5, in: segments) == nil)
+        #expect(AppModel.silenceSkipTarget(at: 41.95, in: segments) == nil)
+        #expect(AppModel.silenceSkipTarget(at: 42, in: segments) == nil)
+    }
+
+    @Test("Skip silences jumps from a long gap to just before the next segment")
+    func silenceSkipLongGap() {
+        let segments = Self.makeSegments([(0, 39, 42), (1, 46, 50), (2, 50, 54)])
+
+        #expect(AppModel.silenceSkipTarget(at: 42.1, in: segments) == 46 - 0.1)
+        #expect(AppModel.silenceSkipTarget(at: 44, in: segments) == 46 - 0.1)
+    }
+
+    @Test("Skip silences leaves back-to-back segments and short gaps alone")
+    func silenceSkipBackToBackAndShortGaps() {
+        let segments = Self.makeSegments([(0, 10, 12), (1, 12, 15), (2, 15.2, 18), (3, 18.4, 20)])
+
+        #expect(AppModel.silenceSkipTarget(at: 12, in: segments) == nil)
+        #expect(AppModel.silenceSkipTarget(at: 15.1, in: segments) == nil)
+        #expect(AppModel.silenceSkipTarget(at: 18.2, in: segments) == nil)
+    }
+
+    @Test("Skip silences treats speech from an earlier, longer segment as covering the playhead")
+    func silenceSkipOverlappingSegments() {
+        let segments = Self.makeSegments([(0, 10, 20), (1, 12, 14), (2, 25, 30)])
+
+        #expect(AppModel.silenceSkipTarget(at: 16, in: segments) == nil)
+        #expect(AppModel.silenceSkipTarget(at: 21, in: segments) == 25 - 0.1)
+    }
+
+    @Test("Skip silences skips the lead-in before the first segment and lets the tail play out")
+    func silenceSkipLeadInAndTail() {
+        let late = Self.makeSegments([(0, 5, 8)])
+        let early = Self.makeSegments([(0, 0.3, 8)])
+
+        #expect(AppModel.silenceSkipTarget(at: 0, in: late) == 5 - 0.1)
+        #expect(AppModel.silenceSkipTarget(at: 0.1, in: early) == nil)
+        #expect(AppModel.silenceSkipTarget(at: 9, in: late) == nil)
+        #expect(AppModel.silenceSkipTarget(at: 3, in: []) == nil)
+    }
+
+    @Test("Skip silences doesn't seek again once the playhead reached the lead")
+    func silenceSkipAlreadyAtTarget() {
+        let segments = Self.makeSegments([(0, 0, 2), (1, 6, 8)])
+
+        #expect(AppModel.silenceSkipTarget(at: 6 - 0.1, in: segments) == nil)
+        #expect(AppModel.silenceSkipTarget(at: 5.88, in: segments) == nil)
+    }
+
     @Test("handleAppResignedActive does nothing when pause-on-hide is off")
     func handleResignedDisabled() {
         let model = makeModel()
