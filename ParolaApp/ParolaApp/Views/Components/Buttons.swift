@@ -134,7 +134,7 @@ struct DSIconChipButtonStyle: ButtonStyle {
 struct GlyphButtonStyle: ButtonStyle {
     var width: CGFloat
     var height: CGFloat
-    /// `.borderless` inks its glyph with the tint, so the buttons that were borderless pass `true` to keep their look.
+    /// Inks the glyph with the environment tint, as `.borderless` does.
     var tinted: Bool
     /// A toggle that is on rests on this fill and, like a selected row, takes no hover.
     var selectedFill: Color?

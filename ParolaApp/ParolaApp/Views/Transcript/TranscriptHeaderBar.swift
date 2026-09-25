@@ -81,7 +81,7 @@ struct TranscriptHeaderBar: View {
         }
     }
 
-    /// Edge-to-edge 24 pt targets would spread the glyphs out; these gaps put each one back within a point or two of where it sat.
+    /// Gaps that keep the 24 pt targets on the glyphs' 24 pt pitch.
     private var controlGap: CGFloat {
         model.features.isEnabled(.ai) ? DS.Spacing.snug : DS.Spacing.tight
     }
