@@ -158,6 +158,19 @@ struct FindAndReplaceTests {
         #expect(model.currentMatchIndex == 0)
     }
 
+    @Test("Find… opens the bar once and asks for the query field every time")
+    func beginFindAsksForTheQueryField() {
+        let before = model.findFocusRequests
+
+        model.beginFind()
+        #expect(model.findIsOpen)
+        #expect(model.findFocusRequests == before &+ 1)
+
+        model.beginFind()
+        #expect(model.findIsOpen)
+        #expect(model.findFocusRequests == before &+ 2)
+    }
+
     @Test("match(in:) groups matches by segment")
     func matchesPerSegment() {
         model.transcript = Self.makeTranscript(["abc abc", "abc"])

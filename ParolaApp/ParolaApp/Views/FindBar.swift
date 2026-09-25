@@ -21,7 +21,16 @@ struct FindBar: View {
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.top, DS.Spacing.small)
         .padding(.bottom, DS.Spacing.tight)
-        .onAppear { queryFocused = true }
+        .task(id: model.findFocusRequests) { await focusQuery() }
+    }
+
+    /// Asked while the bar is still being built, focus lands on another field of the window, so the ask waits a frame and repeats until it holds.
+    private func focusQuery() async {
+        for _ in 0..<10 {
+            try? await Task.sleep(for: .milliseconds(20))
+            if Task.isCancelled || queryFocused { return }
+            queryFocused = true
+        }
     }
 
     private var searchRow: some View {

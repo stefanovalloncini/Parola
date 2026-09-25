@@ -69,7 +69,8 @@ extension AppModel {
         if let session = keyViewerSession {
             session.toggleSearch()
         } else {
-            toggleFind()
+            if !findIsOpen { toggleFind() }
+            findFocusRequests &+= 1
         }
     }
 

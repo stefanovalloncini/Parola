@@ -349,6 +349,8 @@ final class AppModel {
     var batchExportPresetIDs: [UUID] = [] { didSet { writeJSON(batchExportPresetIDs, forKey: "batchExportPresets") } }
 
     var findIsOpen: Bool = false
+    /// Bumped by Edit › Find…; the find bar watches the count, so a second ⌘F puts the caret back too.
+    var findFocusRequests: Int = 0
     var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }
     var findCaseSensitive: Bool = false { didSet { scheduleRecomputeMatches() } }
     var findReplacement: String = ""
