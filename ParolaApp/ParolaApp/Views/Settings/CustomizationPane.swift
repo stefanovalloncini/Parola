@@ -130,6 +130,10 @@ private struct CustomThemeEditor: View {
             colorRow("Primary text", \.textPrimary)
             colorRow("Secondary text", \.textSecondary)
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
+            if note.object is NSColorPanel { model.commitPaletteDraft() }
+        }
+        .onDisappear { model.commitPaletteDraft() }
     }
 
     private func colorRow(_ label: String, _ keyPath: WritableKeyPath<ThemePalette, ThemeColor>, isFirst: Bool = false) -> some View {
@@ -142,9 +146,9 @@ private struct CustomThemeEditor: View {
 
     private func binding(_ keyPath: WritableKeyPath<ThemePalette, ThemeColor>) -> Binding<Color> {
         Binding(
-            get: { DS.theme[keyPath: keyPath].editableColor },
+            get: { model.editablePalette[keyPath: keyPath].editableColor },
             set: { newColor in
-                var palette = DS.theme
+                var palette = model.editablePalette
                 palette[keyPath: keyPath] = .uniform(RGBA(newColor))
                 model.previewCustomPalette(palette)
             }

@@ -43,8 +43,18 @@ struct EntryWindowView: View {
         }
     }
 
-    @ViewBuilder
     private func loaded(entryID: LibraryEntry.ID, session: EntryWindowSession) -> some View {
+        // Rebuilt inside the stack: an id on the Group's own child would fire the onDisappear that releases the session.
+        ZStack {
+            viewer(session).id(model.themeRevision)
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: showsEditHint)
+        .navigationTitle(session.title)
+        .background(WindowCloseReporter { model.releaseEntryWindow(session) })
+        .axBranch("EntryWindow.\(entryID)")
+    }
+
+    private func viewer(_ session: EntryWindowSession) -> some View {
         VStack(spacing: 0) {
             EntryViewerHeader(session: session)
             Divider()
@@ -76,10 +86,6 @@ struct EntryWindowView: View {
                 EntryViewerPlaybackBar(session: session)
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: showsEditHint)
-        .navigationTitle(session.title)
-        .background(WindowCloseReporter { model.releaseEntryWindow(session) })
-        .axBranch("EntryWindow.\(entryID)")
     }
 
     @ViewBuilder

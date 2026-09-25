@@ -806,8 +806,7 @@ final class AppModel {
         refreshModelList()
         Task { await refreshPeople() }
         if themeKeySnapshot() != themeBefore {
-            applyTheme()
-            themeRevision &+= 1
+            repaintTheme()
         }
         // Re-apply only the side effects this launch actually wired (skipped under skipBootstrap tests).
         if activeSideEffects.contains(.dictationHotkey) {
@@ -851,6 +850,12 @@ final class AppModel {
     /// most leaf views read DS.Color.* statically and would not otherwise re-render on a palette swap.
     private(set) var themeRevision: Int = 0
 
+    /// What the colour wells are showing while an edit is still going; the rest of the app waits for it.
+    private(set) var paletteDraft: ThemePalette?
+    @ObservationIgnored private var paletteDraftTask: Task<Void, Never>?
+
+    var editablePalette: ThemePalette { paletteDraft ?? DS.theme }
+
     var themeSelection: ThemeSelection {
         if themeIsCustom, let palette = decodedCustomPalette() {
             return .custom(palette)
@@ -869,8 +874,7 @@ final class AppModel {
     func selectThemePreset(_ raw: String) {
         appAccentRaw = raw
         themeIsCustom = false
-        applyTheme()
-        themeRevision &+= 1
+        repaintTheme()
     }
 
     func applyCustomPalette(_ palette: ThemePalette) {
@@ -878,14 +882,12 @@ final class AppModel {
               let json = String(data: data, encoding: .utf8) else { return }
         themeCustomPaletteJSON = json
         themeIsCustom = true
-        applyTheme()
-        themeRevision &+= 1
+        repaintTheme()
     }
 
     func resetToPresetTheme() {
         themeIsCustom = false
-        applyTheme()
-        themeRevision &+= 1
+        repaintTheme()
     }
 
     /// Re-enables custom colors with the saved palette. Returns false when nothing
@@ -893,21 +895,46 @@ final class AppModel {
     func resumeCustomPalette() -> Bool {
         guard decodedCustomPalette() != nil else { return false }
         themeIsCustom = true
-        applyTheme()
-        themeRevision &+= 1
+        repaintTheme()
         return true
     }
 
-    /// Live edit of the custom palette from the color editor. Updates DS.theme and persists, but
-    /// does NOT bump themeRevision — a full `.id` rebuild would dismiss the open color picker. The
-    /// rest of the app repaints with the new palette on its next render (e.g. when Settings closes).
+    /// Saved at once but painted only when the edit ends: repainting mid-edit pulls the well from under the open colour panel.
     func previewCustomPalette(_ palette: ThemePalette) {
         guard let data = try? JSONEncoder().encode(palette),
               let json = String(data: data, encoding: .utf8) else { return }
         themeCustomPaletteJSON = json
         themeIsCustom = true
-        DS.theme = palette
-        DockIcon.refresh()
+        paletteDraft = palette
+        paletteDraftTask?.cancel()
+        paletteDraftTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, !Self.colorPanelIsVisible else { return }
+            self?.commitPaletteDraft()
+        }
+    }
+
+    /// Repaints the app with the wells' palette once the colour panel closes or the wells go away.
+    func commitPaletteDraft() {
+        guard paletteDraft != nil else { return }
+        repaintTheme()
+    }
+
+    /// Waits for the check that lands an edit made without the colour panel open.
+    func awaitPaletteDraft() async {
+        await paletteDraftTask?.value
+    }
+
+    private func repaintTheme() {
+        paletteDraftTask?.cancel()
+        paletteDraftTask = nil
+        paletteDraft = nil
+        applyTheme()
+        themeRevision &+= 1
+    }
+
+    private static var colorPanelIsVisible: Bool {
+        NSColorPanel.sharedColorPanelExists && NSColorPanel.shared.isVisible
     }
 
     private func decodedCustomPalette() -> ThemePalette? {
