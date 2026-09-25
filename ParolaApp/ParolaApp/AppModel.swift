@@ -123,6 +123,7 @@ final class AppModel {
     /// `currentSegmentID`; it holds the selection against the player's ticks until playback starts.
     var pendingRevealSegmentID: TranscriptSegment.ID?
     var currentWordID: WordTiming.ID?
+    var editingSegmentNote: SegmentNoteTarget?
     // Playback-tick cache: index of currentSegmentID in transcript.segments, so the 5 Hz tick
     // validates in O(1) instead of scanning. Nil'd whenever the transcript is replaced.
     @ObservationIgnored var currentSegmentIndex: Int?

@@ -18,8 +18,6 @@ struct SegmentCard: View {
     @State private var assigningSpeaker: Bool = false
     @State private var assigningPerson: Bool = false
     @State private var draftAssignSpeakerName: String = ""
-    @State private var editingNote: Bool = false
-    @State private var draftNote: String = ""
     @State private var copied = false
     @State private var copiedReset: Task<Void, Never>?
     @FocusState private var editingFocus: Bool
@@ -112,19 +110,6 @@ struct SegmentCard: View {
             Button("Assign") {
                 let trimmed = draftAssignSpeakerName.trimmingCharacters(in: .whitespacesAndNewlines)
                 Task { await model.assignSegment(segment.id, toNewPersonNamed: trimmed) }
-            }
-        }
-        .alert("Segment note", isPresented: $editingNote) {
-            TextField("Note", text: $draftNote)
-                .writingToolsBehavior(.complete)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") {
-                model.setSegmentNote(draftNote, segmentID: segment.id)
-            }
-            if model.currentSegmentNote(for: segment.id) != nil {
-                Button("Delete", role: .destructive) {
-                    model.setSegmentNote(nil, segmentID: segment.id)
-                }
             }
         }
     }
@@ -230,11 +215,6 @@ struct SegmentCard: View {
             assignSpeakerMenu
         }
         .axLeaf("Card.Button.Speaker")
-    }
-
-    private func beginEditingNote() {
-        draftNote = model.currentSegmentNote(for: segment.id) ?? ""
-        editingNote = true
     }
 
     @ViewBuilder
@@ -385,7 +365,7 @@ struct SegmentCard: View {
             .axLeaf("Card.Button.Favorite")
             cardButton(systemName: "pencil", help: "Edit") { beginEditing() }
                 .axLeaf("Card.Button.Edit")
-            cardButton(systemName: "note.text", help: "Add note") { beginEditingNote() }
+            cardButton(systemName: "note.text", help: "Add note") { model.beginEditingNote(for: segment) }
                 .axLeaf("Card.Button.Note")
             if model.player != nil {
                 cardButton(systemName: "play.fill", help: "Play from here") {

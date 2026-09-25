@@ -90,6 +90,7 @@ extension AppModel {
         undoManager?.removeAllActions()
         // Segment ids are positions, not identities, so a reveal left over from the last transcript would hold an unrelated line in the next one.
         pendingRevealSegmentID = nil
+        if editingSegmentNote != nil { editingSegmentNote = nil }
         derivedArtifactsGeneration &+= 1
         if promptOutput != nil { promptOutput = nil }
         if !actionItems.isEmpty { actionItems = [] }

@@ -20,6 +20,9 @@ struct ContentSheetsModifier: ViewModifier {
                     SpeakersSheet(transcript: transcript)
                 }
             }
+            .sheet(item: $model.editingSegmentNote) { target in
+                SegmentNoteSheet(target: target)
+            }
             .sheet(isPresented: $model.showingPeopleSheet) { ManagePeopleSheet() }
             .sheet(isPresented: $model.exportSheetOpen) { ExportSheet() }
             .sheet(isPresented: $model.burnSheetOpen) { BurnStyleSheet() }

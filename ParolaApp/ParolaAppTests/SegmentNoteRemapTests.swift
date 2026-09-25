@@ -59,6 +59,23 @@ struct SegmentNoteEditTests {
         #expect(await waitUntil { model.currentSegmentNote(for: segmentID) == text })
     }
 
+    @Test("every opening of the note editor starts from the stored note")
+    func editorStartsFromTheStoredNote() async throws {
+        let model = try await loadedModel()
+        let segment = try #require(model.transcript?.segments.first)
+        await note(model, "first thought", on: 0)
+
+        model.beginEditingNote(for: segment)
+        let first = try #require(model.editingSegmentNote)
+        model.editingSegmentNote = nil
+        model.beginEditingNote(for: segment)
+        let second = try #require(model.editingSegmentNote)
+
+        #expect(first.note == "first thought")
+        #expect(second.note == "first thought")
+        #expect(first.id != second.id)
+    }
+
     @Test("splitting moves the note to the first half, and undo and redo carry it")
     func splitCarriesTheNote() async throws {
         let model = try await loadedModel()

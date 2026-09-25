@@ -277,6 +277,13 @@ extension AppModel {
         }
     }
 
+    func beginEditingNote(for segment: TranscriptSegment) {
+        guard let entryID = selectedEntryID else { return }
+        editingSegmentNote = SegmentNoteTarget(
+            entryID: entryID, segment: segment, note: currentSegmentNote(for: segment.id)
+        )
+    }
+
     func setSegmentNote(_ note: String?, segmentID: Int) {
         guard let entryID = selectedEntryID else { return }
         Task { [weak self] in
