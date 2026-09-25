@@ -173,6 +173,51 @@ struct ThemePaletteTests {
         #expect(palette.danger == ThemePalette.sharedNeutrals.danger)
     }
 
+    @Test("a custom palette seeded from a preset keeps the divider's and primary text's transparency")
+    func seededPaletteKeepsAlpha() {
+        let preset = ThemePreset.slate.palette
+        let palette = ThemePalette.custom(
+            accent: .red, canvas: .white, surface: .white, surfaceElevated: .gray,
+            divider: preset.divider.editableColor(dark: true),
+            textPrimary: preset.textPrimary.editableColor(dark: true),
+            textSecondary: .gray
+        )
+        #expect(abs(palette.divider.appearanceVariants.dark.a - 0.08) < 0.001)
+        #expect(palette.textPrimary.appearanceVariants.dark.a < 0.9)
+    }
+
+    @Test("an editor well's colour round-trips with its transparency")
+    func wellRoundTripKeepsAlpha() {
+        var palette = ThemePreset.slate.palette
+        palette.divider = .uniform(RGBA(1, 1, 1, 0.08))
+
+        let unchanged = palette.setting(\.divider, to: palette.divider.editableColor)
+        #expect(abs(unchanged.divider.appearanceVariants.light.a - 0.08) < 0.001)
+        #expect(abs(unchanged.divider.appearanceVariants.dark.a - 0.08) < 0.001)
+
+        let picked = Color(nsColor: NSColor(srgbRed: 0.2, green: 0.4, blue: 0.6, alpha: 0.3))
+        let edited = palette.setting(\.divider, to: picked)
+        #expect(abs(edited.divider.appearanceVariants.light.a - 0.3) < 0.001)
+        #expect(edited.divider.appearanceVariants.light.hex == RGBA(0.2, 0.4, 0.6).hex)
+        #expect(edited.accent == palette.accent)
+    }
+
+    @Test("the divider and primary text are the only editable tokens a preset draws translucent")
+    func translucentEditableTokens() {
+        let editable: [(name: String, keyPath: KeyPath<ThemePalette, ThemeColor>)] = [
+            ("accent", \.accent), ("canvas", \.canvas), ("surface", \.surface),
+            ("surfaceElevated", \.surfaceElevated), ("divider", \.divider),
+            ("textPrimary", \.textPrimary), ("textSecondary", \.textSecondary)
+        ]
+        for preset in ThemePreset.allCases {
+            for token in editable {
+                let variants = preset.palette[keyPath: token.keyPath].appearanceVariants
+                let translucent = variants.light.a < 1 || variants.dark.a < 1
+                #expect(translucent == ["divider", "textPrimary"].contains(token.name), "\(preset.rawValue).\(token.name)")
+            }
+        }
+    }
+
     @Test("selection resolves a preset case to that preset's palette")
     func selectionPreset() {
         let selection = ThemeSelection.preset(.mint)

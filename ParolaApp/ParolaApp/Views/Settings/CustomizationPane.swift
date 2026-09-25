@@ -126,8 +126,8 @@ private struct CustomThemeEditor: View {
             colorRow("Background", \.canvas)
             colorRow("Surface", \.surface)
             colorRow("Elevated surface", \.surfaceElevated)
-            colorRow("Divider", \.divider)
-            colorRow("Primary text", \.textPrimary)
+            colorRow("Divider", \.divider, supportsOpacity: true)
+            colorRow("Primary text", \.textPrimary, supportsOpacity: true)
             colorRow("Secondary text", \.textSecondary)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
@@ -136,9 +136,11 @@ private struct CustomThemeEditor: View {
         .onDisappear { model.commitPaletteDraft() }
     }
 
-    private func colorRow(_ label: String, _ keyPath: WritableKeyPath<ThemePalette, ThemeColor>, isFirst: Bool = false) -> some View {
+    private func colorRow(
+        _ label: String, _ keyPath: WritableKeyPath<ThemePalette, ThemeColor>, isFirst: Bool = false, supportsOpacity: Bool = false
+    ) -> some View {
         SettingRow(LocalizedStringKey(label), isFirst: isFirst) {
-            ColorPicker("", selection: binding(keyPath), supportsOpacity: false)
+            ColorPicker("", selection: binding(keyPath), supportsOpacity: supportsOpacity)
                 .labelsHidden()
                 .axLeaf("Customization.ColorPicker.\(label.replacingOccurrences(of: " ", with: ""))")
         }
@@ -147,11 +149,7 @@ private struct CustomThemeEditor: View {
     private func binding(_ keyPath: WritableKeyPath<ThemePalette, ThemeColor>) -> Binding<Color> {
         Binding(
             get: { model.editablePalette[keyPath: keyPath].editableColor },
-            set: { newColor in
-                var palette = model.editablePalette
-                palette[keyPath: keyPath] = .uniform(RGBA(newColor))
-                model.previewCustomPalette(palette)
-            }
+            set: { model.previewCustomPalette(model.editablePalette.setting(keyPath, to: $0)) }
         )
     }
 }

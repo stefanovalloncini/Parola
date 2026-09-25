@@ -367,6 +367,13 @@ extension ThemeColor {
 }
 
 extension ThemePalette {
+    /// The palette with one token set from an editor well, alpha included, for both appearances.
+    func setting(_ keyPath: WritableKeyPath<ThemePalette, ThemeColor>, to color: Color) -> ThemePalette {
+        var palette = self
+        palette[keyPath: keyPath] = .uniform(RGBA(color))
+        return palette
+    }
+
     /// A custom palette from flat editable colors. Each token applies to both appearances;
     /// success/warning/danger keep the shared semantic defaults.
     static func custom(
