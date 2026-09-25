@@ -11,6 +11,7 @@ struct MiniPlayerWindow: View {
             currentSegmentText
             controls
         }
+        .id(model.themeRevision)
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
         .frame(minWidth: 320, idealWidth: 360, maxWidth: 520)
