@@ -106,7 +106,7 @@ struct ErrorBanner: View {
     private func updateButton(updating: Bool) -> some View {
         Button { model.updateYtDlpViaBrew() } label: {
             if updating {
-                HStack(spacing: 6) {
+                HStack(spacing: DS.Spacing.snug) {
                     ProgressView().controlSize(.small)
                     Text("Updating yt-dlp…")
                 }

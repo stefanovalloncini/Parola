@@ -126,7 +126,7 @@ private struct ToolStatusRow: View {
     private var installButton: some View {
         Button(action: install) {
             if installing {
-                HStack(spacing: 6) {
+                HStack(spacing: DS.Spacing.snug) {
                     ProgressView().controlSize(.small)
                     Text("Installing…")
                 }
@@ -142,7 +142,7 @@ private struct ToolStatusRow: View {
     private var updateButton: some View {
         Button(action: update) {
             if updating {
-                HStack(spacing: 6) {
+                HStack(spacing: DS.Spacing.snug) {
                     ProgressView().controlSize(.small)
                     Text("Updating…")
                 }
