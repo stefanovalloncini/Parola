@@ -79,7 +79,9 @@ struct ErrorBanner: View {
             .foregroundStyle(DS.Color.secondaryText)
             .axLeaf("Error.Label.YtDlpUpdated")
         case .command(let command):
-            YtDlpUpdateCommand(command: command, axPrefix: "Error")
+            YtDlpManualUpdate(command: command, axPrefix: "Error")
+        case .manual:
+            YtDlpManualUpdate(command: nil, axPrefix: "Error")
         case .update:
             if let error = model.ytDlpUpdateError {
                 Text(error)

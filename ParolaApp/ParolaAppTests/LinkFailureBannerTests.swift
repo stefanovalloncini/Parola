@@ -43,6 +43,7 @@ struct YtDlpUpdateOfferTests {
         #expect(offer(staleRefusal, installed: nil) == .update)
         #expect(offer(staleRefusal, updating: true) == .updating)
         #expect(offer(staleRefusal, route: .command("/usr/local/bin/yt-dlp -U")) == .command("/usr/local/bin/yt-dlp -U"))
+        #expect(offer(staleRefusal, route: .manual) == .manual)
         #expect(offer(staleRefusal, installed: "2026.09.20") == .updated("2026.09.20"))
     }
 

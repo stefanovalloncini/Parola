@@ -14345,6 +14345,17 @@
         }
       }
     },
+    "Update yt-dlp with the tool you installed it with.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna yt-dlp con lo strumento che hai usato per installarlo."
+          }
+        }
+      }
+    },
     "Updated": {
       "extractionState": "manual",
       "localizations": {

@@ -81,8 +81,13 @@ private struct ToolStatusRow: View {
                     .foregroundStyle(DS.Color.warningText)
                     .fixedSize(horizontal: false, vertical: true)
                     .axLeaf("Integrations.Label.StaleWarning.\(name)")
-                    if case .command(let command)? = updateRoute {
-                        YtDlpUpdateCommand(command: command, axPrefix: "Integrations")
+                    switch updateRoute {
+                    case .command(let command)?:
+                        YtDlpManualUpdate(command: command, axPrefix: "Integrations")
+                    case .manual?:
+                        YtDlpManualUpdate(command: nil, axPrefix: "Integrations")
+                    case .homebrew?, nil:
+                        EmptyView()
                     }
                 }
                 if let error {
@@ -148,11 +153,23 @@ private struct ToolStatusRow: View {
     }
 }
 
-struct YtDlpUpdateCommand: View {
-    let command: String
+struct YtDlpManualUpdate: View {
+    let command: String?
     let axPrefix: String
 
     var body: some View {
+        if let command {
+            commandBlock(command)
+        } else {
+            Text("Update yt-dlp with the tool you installed it with.")
+                .font(DS.Font.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+                .axLeaf("\(axPrefix).Text.YtDlpUpdateManual")
+        }
+    }
+
+    private func commandBlock(_ command: String) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.tight) {
             Text("Update it in Terminal with this command:")
                 .font(DS.Font.secondary)

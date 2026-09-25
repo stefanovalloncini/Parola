@@ -2305,7 +2305,7 @@ final class AppModel {
         ytDlpPath = path
         ytDlpAvailable = path != nil
         if ytDlpAvailable { ytDlpInstallError = nil }
-        let route = path.map { YtDlpInstaller.updateRoute(ytDlpPath: $0, brewPath: YtDlpInstaller.locateBrew()) }
+        let route = path.map { YtDlpInstaller.updateRoute(ytDlpPath: $0) }
         if route != ytDlpUpdateRoute { ytDlpUpdateRoute = route }
         if path == nil, ytDlpVersion != nil { ytDlpVersion = nil }
     }

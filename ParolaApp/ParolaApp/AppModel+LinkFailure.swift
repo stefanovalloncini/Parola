@@ -8,6 +8,7 @@ extension AppModel {
         case update
         case updating
         case command(String)
+        case manual
         case updated(String)
     }
 
@@ -30,6 +31,7 @@ extension AppModel {
         switch route {
         case .homebrew: return .update
         case .command(let command): return .command(command)
+        case .manual: return .manual
         }
     }
 
