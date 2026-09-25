@@ -148,7 +148,7 @@ const people = [
     align-items: center;
     padding: calc(26 * var(--pt)) calc(20 * var(--pt)) calc(20 * var(--pt));
     border-radius: calc(30 * var(--pt));
-    background: var(--mac-alert-glass);
+    background: rgb(244 245 243 / 0.94);
     color: var(--mac-ink);
     text-align: center;
     box-shadow:
@@ -205,5 +205,11 @@ const people = [
     margin-bottom: calc(8 * var(--pt));
     background: #54739e;
     color: #fff;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .alert {
+      background: rgb(42 44 43 / 0.94);
+    }
   }
 </style>

@@ -94,7 +94,7 @@ const tabs: ShotTab[] = [
 
 <style>
   .drop {
-    background: linear-gradient(180deg, var(--paper) 20%, var(--drop-glow) 65%, var(--paper) 100%);
+    background: linear-gradient(180deg, var(--paper) 20%, #e6eee4 65%, var(--paper) 100%);
   }
 
   @media (max-width: 720px) {
@@ -135,5 +135,11 @@ const tabs: ShotTab[] = [
   :global(.js) .fan:not([data-seen]) .fan-tile {
     translate: -50% 18px;
     rotate: 0deg;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .drop {
+      background: linear-gradient(180deg, var(--paper) 20%, #0f1a14 65%, var(--paper) 100%);
+    }
   }
 </style>

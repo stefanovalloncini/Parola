@@ -89,7 +89,7 @@ const copy = t({
     background:
       radial-gradient(60% 40% at 18% 8%, rgb(107 138 107 / 0.16), transparent 70%),
       radial-gradient(50% 36% at 85% 4%, rgb(84 115 158 / 0.13), transparent 70%),
-      linear-gradient(180deg, var(--ai-wash) 0%, var(--paper) 42%);
+      linear-gradient(180deg, #f6f8f5 0%, var(--paper) 42%);
   }
 
   .grid {
@@ -102,6 +102,15 @@ const copy = t({
   @media (max-width: 820px) {
     .grid {
       grid-template-columns: 1fr;
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .ai {
+      background:
+        radial-gradient(60% 40% at 18% 8%, rgb(107 138 107 / 0.16), transparent 70%),
+        radial-gradient(50% 36% at 85% 4%, rgb(84 115 158 / 0.13), transparent 70%),
+        linear-gradient(180deg, #0f1a14 0%, var(--paper) 42%);
     }
   }
 </style>

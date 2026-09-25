@@ -34,7 +34,7 @@ const { class: className } = Astro.props;
     box-shadow:
       inset 0 0 0 1px #8e8f94,
       inset 0 0 0 2.5px #121315,
-      0 0 0 0.5px var(--lid-edge);
+      0 0 0 0.5px rgb(0 0 0 / 0.55);
   }
 
   .screen {
@@ -130,5 +130,14 @@ const { class: className } = Astro.props;
 
   .foot.right {
     right: 9%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .lid {
+      box-shadow:
+        inset 0 0 0 1px #8e8f94,
+        inset 0 0 0 2.5px #121315,
+        0 0 0 0.5px rgb(255 255 255 / 0.12);
+    }
   }
 </style>

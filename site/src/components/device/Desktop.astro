@@ -64,7 +64,12 @@ const {
   .wallpaper {
     position: absolute;
     inset: 0;
-    background: var(--desktop-wall);
+    background:
+      radial-gradient(70% 60% at 88% 0%, rgb(252 242 230 / 0.95), rgb(252 242 230 / 0) 70%),
+      radial-gradient(55% 60% at 0% 100%, rgb(63 96 72 / 0.75), rgb(63 96 72 / 0) 70%),
+      radial-gradient(55% 55% at 22% 28%, rgb(169 194 166 / 0.9), rgb(169 194 166 / 0) 70%),
+      radial-gradient(50% 45% at 78% 88%, rgb(133 163 204 / 0.5), rgb(133 163 204 / 0) 70%),
+      linear-gradient(160deg, #c3d6bf 0%, #8faa8c 48%, #62826a 100%);
   }
 
   .wallpaper::after {
@@ -83,8 +88,8 @@ const {
     justify-content: space-between;
     padding-inline: calc(18 * var(--pt));
     font-size: calc(13 * var(--pt));
-    color: var(--desktop-menubar-ink);
-    background: var(--desktop-menubar);
+    color: rgb(15 26 20 / 0.86);
+    background: rgb(255 255 255 / 0.18);
     backdrop-filter: blur(12px);
   }
 
@@ -130,5 +135,21 @@ const {
     height: 100%;
     border-radius: calc(1.5 * var(--pt));
     background: currentColor;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .wallpaper {
+      background:
+        radial-gradient(70% 60% at 88% 0%, rgb(252 242 230 / 0.28), rgb(252 242 230 / 0) 70%),
+        radial-gradient(55% 60% at 0% 100%, rgb(20 36 26 / 0.9), rgb(20 36 26 / 0) 70%),
+        radial-gradient(55% 55% at 22% 28%, rgb(107 138 107 / 0.55), rgb(107 138 107 / 0) 70%),
+        radial-gradient(50% 45% at 78% 88%, rgb(84 115 158 / 0.35), rgb(84 115 158 / 0) 70%),
+        linear-gradient(160deg, #4d6650 0%, #2c4133 48%, #15231a 100%);
+    }
+
+    .menubar {
+      color: rgb(255 255 255 / 0.9);
+      background: rgb(0 0 0 / 0.22);
+    }
   }
 </style>

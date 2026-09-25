@@ -84,7 +84,7 @@ const other = locale === "it" ? "en" : "it";
 
   :global(html:not(.js)) .site-header,
   .site-header[data-scrolled] {
-    background: var(--header-glass);
+    background: rgb(255 255 255 / 0.88);
     box-shadow: 0 0.5px 0 var(--hairline);
     backdrop-filter: saturate(180%) blur(20px);
   }
@@ -179,7 +179,7 @@ const other = locale === "it" ? "en" : "it";
   }
 
   .download :global(.wave-glyph) {
-    color: var(--download-glyph);
+    color: var(--sage-soft);
   }
 
   .download:hover {
@@ -213,6 +213,17 @@ const other = locale === "it" ? "en" : "it";
     .download {
       height: 44px;
       padding: 0 16px 0 18px;
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(html:not(.js)) .site-header,
+    .site-header[data-scrolled] {
+      background: rgb(8 17 12 / 0.72);
+    }
+
+    .download :global(.wave-glyph) {
+      color: var(--sage);
     }
   }
 </style>

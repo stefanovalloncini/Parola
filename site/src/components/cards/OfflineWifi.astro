@@ -37,7 +37,7 @@ const { label, network, off } = Astro.props;
     width: calc(250 * var(--u));
     padding: calc(12 * var(--u)) calc(14 * var(--u));
     border-radius: calc(18 * var(--u));
-    background: var(--mac-module);
+    background: rgb(246 246 244 / 0.94);
     box-shadow: 0 calc(12 * var(--u)) calc(30 * var(--u)) rgb(0 0 0 / 0.22);
     color: var(--mac-ink);
   }
@@ -62,7 +62,7 @@ const { label, network, off } = Astro.props;
   }
   .state {
     display: grid;
-    color: var(--mac-ink-secondary);
+    color: #6b716d;
     font-size: max(11px, calc(11.5 * var(--u)));
   }
   .state > span {
@@ -98,7 +98,7 @@ const { label, network, off } = Astro.props;
 
   :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .glyph,
   :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .toggle {
-    background: var(--mac-toggle-off);
+    background: #c9ccc9;
   }
 
   :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .toggle i {
@@ -116,6 +116,21 @@ const { label, network, off } = Astro.props;
   @container (max-width: 699px) {
     .control {
       width: calc(260 * var(--u));
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .control {
+      background: rgb(42 44 43 / 0.94);
+    }
+
+    .state {
+      color: #a3a8a5;
+    }
+
+    :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .glyph,
+    :global(:is([data-state="off"], [data-state="working"], [data-state="done"])) .toggle {
+      background: #4a4d4b;
     }
   }
 </style>
