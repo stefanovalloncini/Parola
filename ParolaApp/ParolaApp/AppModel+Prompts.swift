@@ -114,15 +114,18 @@ extension AppModel {
 
     /// Call after the transcript installs — `clearDerivedArtifacts()` runs before it, and Chapters reads runtime state only.
     func adoptSavedChapters() {
-        let saved = transcript?.summary?.chapters ?? []
+        let saved = transcript.map { $0.chapters ?? $0.summary?.chapters ?? [] } ?? []
         if smartChapters != saved { smartChapters = saved }
     }
 
-    /// Keeps a saved summary's chapters in step with the runtime list; unsaved entries keep theirs in memory only.
+    /// Chapters keep a place of their own, so an entry without a summary keeps them; a summary gets a copy, where exports read them.
     func persistChapters(_ chapters: [Chapter]) {
-        guard transcript?.summary != nil, transcript?.summary?.chapters != chapters else { return }
-        transcript?.summary?.chapters = chapters
-        guard let entryID = selectedEntryID, let updated = transcript else { return }
+        guard var updated = transcript else { return }
+        updated.chapters = chapters
+        updated.summary?.chapters = chapters
+        guard updated != transcript else { return }
+        transcript = updated
+        guard let entryID = selectedEntryID else { return }
         Task { [library] in
             try? await library.updateTranscript(updated, for: entryID, reindex: false)
         }

@@ -74,6 +74,9 @@ public struct Transcript: Codable, Hashable, Sendable {
     /// transcription: imported subtitles, captions, dictation, live takes.
     public var transcriptionSeconds: Double?
     public var summary: Summary?
+    /// Chapters generated on their own, kept whether or not there is a summary. Nil in bundles written before
+    /// they had a place here, where the summary's chapters stand in.
+    public var chapters: [Chapter]?
     public var chatHistory: [ChatMessage]?
 
     /// Set only when the caller left the language unset and the engine has something to say about
@@ -93,6 +96,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         durationSeconds: Double? = nil,
         transcriptionSeconds: Double? = nil,
         summary: Summary? = nil,
+        chapters: [Chapter]? = nil,
         chatHistory: [ChatMessage]? = nil,
         languageDetection: LanguageDetection? = nil,
         translation: TranscriptTranslation? = nil
@@ -105,6 +109,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.durationSeconds = durationSeconds
         self.transcriptionSeconds = transcriptionSeconds
         self.summary = summary
+        self.chapters = chapters
         self.chatHistory = chatHistory
         self.languageDetection = languageDetection
         self.translation = translation
@@ -120,6 +125,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds)
         transcriptionSeconds = try c.decodeIfPresent(Double.self, forKey: .transcriptionSeconds)
         summary = try c.decodeIfPresent(Summary.self, forKey: .summary)
+        chapters = try c.decodeIfPresent([Chapter].self, forKey: .chapters)
         chatHistory = try c.decodeIfPresent([ChatMessage].self, forKey: .chatHistory)
         languageDetection = try c.decodeIfPresent(LanguageDetection.self, forKey: .languageDetection)
         translation = try c.decodeIfPresent(TranscriptTranslation.self, forKey: .translation)

@@ -135,14 +135,15 @@ struct AppModelAIFailureTests {
         #expect(model.transcript?.summary?.text == "saved recap")
     }
 
-    @Test("an entry with no saved summary keeps its generated chapters in memory")
-    func generatedChaptersWithoutASummaryStayInMemory() async {
+    @Test("an entry with no saved summary keeps its generated chapters without growing a summary")
+    func generatedChaptersWithoutASummaryAreKept() async {
         await withOnDeviceMock(MockLanguageModelResponse(text: "00:00 Fresh opening")) {
             let model = makeModel()
 
             model.extractSmartChapters()
 
             #expect(await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening"] })
+            #expect(model.transcript?.chapters?.map(\.title) == ["Fresh opening"])
             #expect(model.transcript?.summary == nil)
         }
     }

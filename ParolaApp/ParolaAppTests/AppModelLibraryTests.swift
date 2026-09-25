@@ -306,6 +306,37 @@ struct AppModelLibraryTests {
         #expect(model.smartChapters.isEmpty)
     }
 
+    @Test("chapters generated on an entry with no summary are still there after a reload")
+    func chaptersWithoutASummarySurviveReload() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 60, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.loadEntry(seeded.id)
+        #expect(await waitUntil { model.selectedEntryID == seeded.id && model.transcript != nil })
+
+        let chapters = [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 30)]
+        model.smartChapters = chapters
+        model.persistChapters(chapters)
+        #expect(await waitUntil {
+            (try? await model.library.load(seeded.id).document.transcript.chapters) == chapters
+        })
+
+        model.clearLoadedEntry()
+        #expect(model.smartChapters.isEmpty)
+        model.loadEntry(seeded.id)
+
+        #expect(await waitUntil { model.smartChapters == chapters })
+        #expect(model.transcript?.summary == nil)
+    }
+
     @Test("summarizing the latest entry adopts its chapters, not the previous entry's")
     func summarizeLatestEntryAdoptsItsOwnChapters() async throws {
         // Seed before the model exists: its init primes the store's list cache, and an empty one never refills.

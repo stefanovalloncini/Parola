@@ -369,6 +369,22 @@ struct SummaryServiceTests {
         #expect(decoded.summary?.text == "Greeting.")
         #expect(decoded.summary?.chapters.first?.title == "Hello")
     }
+
+    @Test("Transcript keeps chapters of its own through Codable, and older JSON without them still decodes")
+    func transcriptChaptersRoundTrip() throws {
+        let t = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hi")],
+            language: "en",
+            modelName: "tiny",
+            chapters: [Chapter(title: "Hello", start: 0)]
+        )
+        let decoded = try JSONDecoder().decode(Transcript.self, from: JSONEncoder().encode(t))
+        #expect(decoded.chapters?.map(\.title) == ["Hello"])
+        #expect(decoded.summary == nil)
+
+        let older = Data(#"{"segments":[],"language":"en","modelName":"tiny"}"#.utf8)
+        #expect(try JSONDecoder().decode(Transcript.self, from: older).chapters == nil)
+    }
 }
 
 private actor InstructionRecorder {
