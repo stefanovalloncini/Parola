@@ -89,13 +89,12 @@ extension AppModel {
     }
 
     func assignSpeaker(_ name: String?, toSegmentID id: TranscriptSegment.ID) {
-        guard let speaker = applySegmentSpeaker(name, toSegmentID: id) else { return }
         // Only a name the directory already knows: picking a raw diarizer label off the submenu
         // must not mint a person out of "SPEAKER_01".
+        let known = name.flatMap { person(named: $0) }
+        guard applySegmentSpeaker(name, toSegmentID: id, recording: known) != nil, let known else { return }
         Task { [peopleStore] in
-            guard await peopleStore.person(named: speaker) != nil else { return }
-            let person = await peopleStore.recordUsage(name: speaker)
-            await recordSpeakerAssignment(label: speaker, person: person)
+            _ = await peopleStore.recordUsage(name: known.name)
             await refreshPeople()
         }
     }
@@ -103,7 +102,11 @@ extension AppModel {
     /// Writes one segment's speaker, and its words'. Returns the new name when it changed, so the
     /// caller decides what the people directory should make of it.
     @discardableResult
-    func applySegmentSpeaker(_ name: String?, toSegmentID id: TranscriptSegment.ID) -> String? {
+    func applySegmentSpeaker(
+        _ name: String?,
+        toSegmentID id: TranscriptSegment.ID,
+        recording person: Person? = nil
+    ) -> String? {
         guard var t = transcript, let idx = t.segments.firstIndex(where: { $0.id == id }) else { return nil }
         let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         let speaker = (trimmed?.isEmpty ?? true) ? nil : trimmed
@@ -113,7 +116,17 @@ extension AppModel {
             for j in words.indices { words[j].speaker = speaker }
             t.segments[idx].words = words
         }
-        applyTranscriptEdit(t, actionName: String(localized: "Assign Speaker"), textChanged: false)
+        var assignment: SpeakerAssignmentEdit?
+        if let speaker, let person, speakerAssignments[speaker] != person.id {
+            assignment = SpeakerAssignmentEdit(assign: [speaker: person.id])
+        }
+        if t == transcript {
+            if let assignment { applySpeakerAssignmentEdit(assignment) }
+        } else {
+            applyTranscriptEdit(
+                t, actionName: String(localized: "Assign Speaker"), textChanged: false, assignments: assignment
+            )
+        }
         guard let speaker, speaker != previous else { return nil }
         return speaker
     }

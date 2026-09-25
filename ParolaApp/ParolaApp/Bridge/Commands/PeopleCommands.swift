@@ -34,7 +34,7 @@ extension ParolaAutomationServer {
                     }
                     return .object([
                         "speakerLabel": .string(person.name),
-                        "person": Self.personState(person),
+                        "person": Self.personState(person, usageCount: ctx.model.usageCount(of: person)),
                         "speakerAssignments": Self.speakerAssignmentsState(ctx.model),
                     ])
                 }
@@ -79,17 +79,17 @@ extension ParolaAutomationServer {
         ]
     }
 
-    static func personState(_ person: Person) -> AutomationValue {
+    static func personState(_ person: Person, usageCount: Int) -> AutomationValue {
         .object([
             "id": .string(person.id.uuidString),
             "name": .string(person.name),
-            "usageCount": .int(person.usageCount),
+            "usageCount": .int(usageCount),
             "colorIndex": .int(person.colorIndex),
         ])
     }
 
     static func peopleState(_ model: AppModel) -> AutomationValue {
-        .array(model.peopleByUse.map { personState($0) })
+        .array(model.peopleByUse.map { personState($0, usageCount: model.usageCount(of: $0)) })
     }
 
     /// The open entry's map, as label → person id.

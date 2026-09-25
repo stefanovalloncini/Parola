@@ -1093,8 +1093,12 @@ final class AppModel {
         didSet {
             rebuildLibraryIndex()
             libraryVersion &+= 1
+            let counts = Self.personUsageCounts(in: libraryEntries)
+            if counts != personUsageCounts { personUsageCounts = counts }
         }
     }
+    /// How many speaker labels across the library stand for each person. Read off the maps, so an assignment an undo takes back stops counting.
+    private(set) var personUsageCounts: [UUID: Int] = [:]
     private(set) var libraryVersion: Int = 0
     var deletedEntries: [LibraryEntry] = []
     /// What Recently Deleted's bulk actions act on. It lives here so the page's header and the bridge read one selection.

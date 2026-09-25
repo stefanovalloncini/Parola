@@ -354,11 +354,71 @@ struct AssignSpeakerPeopleTests {
         await model.addPerson(named: "Grace")
 
         model.assignSpeaker("Grace", toSegmentID: 1)
-        await waitUntil(timeoutMs: 3000) { model.speakerAssignments["Grace"] != nil }
+        await waitUntil(timeoutMs: 3000) { model.person(forSpeaker: "Grace")?.usageCount == 2 }
 
         let grace = try #require(model.person(forSpeaker: "Grace"))
         #expect(grace.usageCount == 2)
         #expect(model.people.map(\.name) == ["Grace"])
+    }
+
+    @Test("undoing a per-segment new person takes its assignment back and keeps the person")
+    func perSegmentNewPersonUndoes() async throws {
+        let model = PeopleTestSupport.makeModel("assignsegmentundo")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+
+        await model.assignSegment(1, toNewPersonNamed: "Grace")
+        let grace = try #require(model.person(forSpeaker: "Grace"))
+        #expect(model.usageCount(of: grace) == 1)
+
+        undo.undo()
+        #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_00", "SPEAKER_01", "SPEAKER_00"])
+        #expect(model.speakerAssignments.isEmpty)
+        #expect(model.usageCount(of: grace) == 0)
+        #expect(model.people.map(\.name) == ["Grace"])
+
+        undo.redo()
+        #expect(model.speakerAssignments == ["Grace": grace.id])
+        #expect(model.usageCount(of: grace) == 1)
+    }
+
+    @Test("undoing a per-segment pick of a known person takes its assignment back")
+    func perSegmentKnownPersonUndoes() async throws {
+        let model = PeopleTestSupport.makeModel("assignknownundo")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+        await model.addPerson(named: "Grace")
+        let grace = try #require(model.person(named: "Grace"))
+
+        model.assignSpeaker("Grace", toSegmentID: 1)
+        #expect(model.speakerAssignments == ["Grace": grace.id])
+
+        undo.undo()
+        #expect(model.speakerAssignments.isEmpty)
+        #expect(model.usageCount(of: grace) == 0)
+    }
+
+    @Test("a person's count is the labels standing for them, so undoing an assignment lowers it")
+    func usageCountFollowsTheMaps() async throws {
+        let model = PeopleTestSupport.makeModel("assigncountundo")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+        await model.addPerson(named: "Ada")
+        let ada = try #require(model.person(named: "Ada"))
+        #expect(model.usageCount(of: ada) == 0)
+
+        await model.assignSpeaker(label: "SPEAKER_00", to: ada)
+        #expect(model.usageCount(of: ada) == 1)
+
+        undo.undo()
+        #expect(model.speakerAssignments.isEmpty)
+        #expect(model.usageCount(of: ada) == 0)
     }
 
     @Test("the pill names the person only when the label differs")

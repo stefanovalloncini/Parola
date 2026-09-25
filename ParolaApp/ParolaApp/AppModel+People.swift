@@ -49,9 +49,25 @@ extension AppModel {
 
     /// The directory in the order every list shows it: most assigned, then most recently used.
     var peopleByUse: [Person] {
-        people.sorted {
-            $0.usageCount == $1.usageCount ? $0.lastUsedAt > $1.lastUsedAt : $0.usageCount > $1.usageCount
+        let counts = personUsageCounts
+        return people.sorted {
+            let left = counts[$0.id] ?? 0
+            let right = counts[$1.id] ?? 0
+            return left == right ? $0.lastUsedAt > $1.lastUsedAt : left > right
         }
+    }
+
+    /// The labels that stand for this person right now, rather than every assignment ever made.
+    func usageCount(of person: Person) -> Int {
+        personUsageCounts[person.id] ?? 0
+    }
+
+    static func personUsageCounts(in entries: [LibraryEntry]) -> [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for entry in entries {
+            for id in entry.speakerAssignments.values { counts[id, default: 0] += 1 }
+        }
+        return counts
     }
 
     func mostUsedPeople(limit: Int) -> [Person] {
@@ -123,8 +139,8 @@ extension AppModel {
         guard !personName.isEmpty else { return }
         let person = await peopleStore.recordUsage(name: personName)
         await refreshPeople()
-        applySegmentSpeaker(personName, toSegmentID: id)
-        await recordSpeakerAssignment(label: personName, person: person)
+        applySegmentSpeaker(personName, toSegmentID: id, recording: person)
+        await awaitSpeakerAssignmentWrites()
     }
 
     @discardableResult
@@ -199,14 +215,6 @@ extension AppModel {
             actionName: String(localized: "Clear Speaker"),
             assignments: SpeakerAssignmentEdit(clear: [trimmed])
         )
-        await awaitSpeakerAssignmentWrites()
-    }
-
-    /// Records who a name stands for without touching the transcript — what a per-segment assign
-    /// leaves behind once the label matches a person.
-    func recordSpeakerAssignment(label: String, person: Person) async {
-        guard speakerAssignments[label] != person.id else { return }
-        applySpeakerAssignmentEdit(SpeakerAssignmentEdit(assign: [label: person.id]))
         await awaitSpeakerAssignmentWrites()
     }
 

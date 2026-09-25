@@ -146,14 +146,19 @@ struct PersonFilterTests {
     func sidebarOrder() async {
         let model = await makeModel()
         let base = Date(timeIntervalSince1970: 1_700_000_000)
-        model.people = [
-            Person(name: "One", lastUsedAt: base, usageCount: 1),
-            Person(name: "Six", lastUsedAt: base.addingTimeInterval(60), usageCount: 1),
-            Person(name: "Nine", lastUsedAt: base, usageCount: 9),
-            Person(name: "Five", lastUsedAt: base, usageCount: 5),
-            Person(name: "Seven", lastUsedAt: base, usageCount: 7),
-            Person(name: "Three", lastUsedAt: base, usageCount: 3),
+        let uses: [(person: Person, labels: Int)] = [
+            (Person(name: "One", lastUsedAt: base), 1),
+            (Person(name: "Six", lastUsedAt: base.addingTimeInterval(60)), 1),
+            (Person(name: "Nine", lastUsedAt: base), 9),
+            (Person(name: "Five", lastUsedAt: base), 5),
+            (Person(name: "Seven", lastUsedAt: base), 7),
+            (Person(name: "Three", lastUsedAt: base), 3),
         ]
+        model.people = uses.map(\.person)
+        model.libraryEntries = uses.map { use in
+            let labels = (0..<use.labels).map { ("\(use.person.name) \($0)", use.person.id) }
+            return entry(id: use.person.name, offset: 0, assignments: Dictionary(uniqueKeysWithValues: labels))
+        }
 
         let rows = model.mostUsedPeople(limit: PeopleSidebarSection.rowLimit)
         #expect(rows.map(\.name) == ["Nine", "Seven", "Five", "Three", "Six"])

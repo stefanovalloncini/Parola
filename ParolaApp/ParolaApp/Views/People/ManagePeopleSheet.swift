@@ -108,7 +108,7 @@ struct PeopleDirectoryList: View {
                 .font(DS.Font.body)
                 .lineLimit(1)
             Spacer(minLength: DS.Spacing.small)
-            Text(verbatim: SegmentCount.assignments(person.usageCount))
+            Text(verbatim: SegmentCount.assignments(model.usageCount(of: person)))
                 .font(DS.Font.caption)
                 .monospacedDigit()
                 .foregroundStyle(DS.Color.secondaryText)

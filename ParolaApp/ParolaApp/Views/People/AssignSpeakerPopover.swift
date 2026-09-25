@@ -78,7 +78,7 @@ struct AssignSpeakerPopover: View {
                     .font(DS.Font.secondary)
                     .lineLimit(1)
                 Spacer(minLength: DS.Spacing.small)
-                Text(verbatim: "\(person.usageCount)")
+                Text(verbatim: "\(model.usageCount(of: person))")
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.secondaryText)
             }
