@@ -2539,6 +2539,7 @@ final class AppModel {
             failedTranslateOverride = translateOverride
             failedLink = link
             if case ParolaError.linkDownloadFailed(let failure) = error {
+                if !failure.isWorthRetrying { failedLink = nil }
                 failedLinkDownload = failure
                 noteYtDlp(from: failure)
             }

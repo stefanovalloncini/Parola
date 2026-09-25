@@ -127,6 +127,26 @@ struct LinkDownloadFailureTests {
         #expect(read(stderr, installedVersion: "2026.03.17", now: Self.utcDate(2026, 6, 16)).ytDlpIsStale)
     }
 
+    @Test("only failures a second try could change are worth retrying", arguments: [
+        (LinkDownloadFailure.Reason.refused(httpStatus: 403), true),
+        (.unreachable, true),
+        (.timedOut(seconds: 120), true),
+        (.toolError("Unable to extract uploader id."), true),
+        (.toolExited(status: 9), true),
+        (.toolMissing, true),
+        (.noAudio, true),
+        (.unavailable(.removed), false),
+        (.unavailable(.privateVideo), false),
+        (.unavailable(.membersOnly), false),
+        (.unavailable(.ageRestricted), false),
+        (.unavailable(.regionLocked), false),
+        (.noCaptions, false),
+        (.unsupportedLink, false),
+    ])
+    func worthRetrying(reason: LinkDownloadFailure.Reason, expected: Bool) {
+        #expect(LinkDownloadFailure(reason: reason, site: "YouTube").isWorthRetrying == expected)
+    }
+
     @Test("a timeout folds in the site and the installed version")
     func timeoutNotesVersion() {
         let failure = LinkDownloadFailure(reason: .timedOut(seconds: 120), site: "YouTube")

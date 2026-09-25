@@ -165,6 +165,35 @@ extension TranscriberMockSuites {
             #expect(model.ytDlpUpdateError == nil)
         }
 
+        @Test("a video that can't be downloaded offers no Retry", arguments: [
+            LinkDownloadFailure(reason: .unavailable(.privateVideo), site: "YouTube"),
+            LinkDownloadFailure(reason: .unavailable(.ageRestricted), site: "YouTube", ytDlpVersion: YtDlpVersion("2026.03.17"), ytDlpIsStale: true),
+        ])
+        func noRetryForUnavailableVideos(failure: LinkDownloadFailure) async {
+            MockMediaFetcherRegistry.shared.installFailure(failure)
+            defer { MockMediaFetcherRegistry.shared.clear() }
+            let model = makeModel()
+
+            model.transcribeYouTube(urlString: Self.link)
+
+            await waitUntil { model.phase == .failed(message: AppModel.linkFailureMessage(failure)) }
+            #expect(model.failedLink == nil)
+            #expect(!model.canRetryFailedTranscription)
+        }
+
+        @Test("missing captions offer no Retry")
+        func noRetryForMissingCaptions() {
+            let model = makeModel()
+
+            model.applyTranscriptionError(
+                ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noCaptions, site: "YouTube")),
+                link: .subtitles(Self.link)
+            )
+
+            #expect(model.phase == .failed(message: "This video has no captions. Transcribe it instead."))
+            #expect(!model.canRetryFailedTranscription)
+        }
+
         @Test("a fresh yt-dlp's failure offers only Retry")
         func freshFailureOffersOnlyRetry() async {
             let fresh = LinkDownloadFailure(reason: .refused(httpStatus: 403), site: "YouTube", ytDlpVersion: YtDlpVersion("2099.01.01"))

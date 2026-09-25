@@ -65,6 +65,14 @@ public struct LinkDownloadFailure: Sendable, Equatable {
         return noted
     }
 
+    /// False when a second try can't change the answer: the video itself is off limits, or it has no captions.
+    public var isWorthRetrying: Bool {
+        switch reason {
+        case .unavailable, .noCaptions, .unsupportedLink: return false
+        default: return true
+        }
+    }
+
     public static func site(for url: URL) -> String? {
         if url.isYouTubeVideo { return "YouTube" }
         guard var host = url.host?.lowercased(), !host.isEmpty else { return nil }
