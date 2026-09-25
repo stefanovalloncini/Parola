@@ -1675,6 +1675,39 @@
         }
       }
     },
+    "Already at the end of the previous segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Già alla fine del segmento precedente"
+          }
+        }
+      }
+    },
+    "Already at the start of the next segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Già all'inizio del segmento successivo"
+          }
+        }
+      }
+    },
+    "Already at the start of the recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Già all'inizio della registrazione"
+          }
+        }
+      }
+    },
     "Already in your library": {
       "extractionState": "manual",
       "localizations": {
@@ -13181,6 +13214,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La libreria di prompt dietro la pulizia della dettatura e il menu Trascrizione."
+          }
+        }
+      }
+    },
+    "The segment can't get any shorter": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il segmento non può essere più corto"
           }
         }
       }

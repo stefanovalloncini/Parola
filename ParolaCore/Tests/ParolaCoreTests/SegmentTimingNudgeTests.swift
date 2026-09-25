@@ -63,6 +63,30 @@ struct SegmentTimingNudgeTests {
         #expect(result[1].start == 0.96)
     }
 
+    @Test("the first segment's start stops at the recording's start")
+    func nudgeStartStopsAtZero() {
+        let segments = [makeSegment(1, start: 0, end: 1)]
+        #expect(SegmentTimingNudge.nudgedStart(segments: segments, id: 1, frameDelta: -1, fps: 25) == 0)
+        #expect(SegmentTimingNudge.nudgeStart(segments: segments, id: 1, frameDelta: -1, fps: 25) == segments)
+    }
+
+    @Test("a bound at its limit reports where it already is, so the control can tell it won't move")
+    func nudgedAtTheLimitStaysPut() {
+        let segments = [makeSegment(1, start: 0, end: 1), makeSegment(2, start: 1, end: 2)]
+        #expect(SegmentTimingNudge.nudgedEnd(segments: segments, id: 1, frameDelta: 1, fps: 30) == 1)
+        #expect(SegmentTimingNudge.nudgedStart(segments: segments, id: 2, frameDelta: -1, fps: 30) == 1)
+        #expect(SegmentTimingNudge.nudgedEnd(segments: segments, id: 2, frameDelta: 1, fps: 30) == 2 + 1.0 / 30)
+        #expect(SegmentTimingNudge.nudgedStart(segments: segments, id: 1, frameDelta: 1, fps: 0) == nil)
+        #expect(SegmentTimingNudge.nudgedStart(segments: segments, id: 99, frameDelta: 1, fps: 30) == nil)
+    }
+
+    @Test("overlapping neighbours never make a nudge jump the other way")
+    func overlapStaysPut() {
+        let segments = [makeSegment(1, start: 0, end: 1.5), makeSegment(2, start: 1, end: 2)]
+        #expect(SegmentTimingNudge.nudgedStart(segments: segments, id: 2, frameDelta: -1, fps: 25) == 1)
+        #expect(SegmentTimingNudge.nudgedEnd(segments: segments, id: 1, frameDelta: 1, fps: 25) == 1.5)
+    }
+
     @Test("nudging an unknown id leaves segments unchanged")
     func unknownId() {
         let segments = [makeSegment(1, start: 0, end: 1)]

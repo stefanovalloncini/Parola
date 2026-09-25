@@ -53,23 +53,26 @@ struct SegmentTimingPopover: View {
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.secondaryText)
                 .frame(width: 36, alignment: .leading)
-            nudgeButton(systemName: "minus", help: "−1 frame", label: bound.minusLabel) { nudge(-1) }
+            nudgeButton(bound, by: -1, systemName: "minus", help: "−1 frame", label: bound.minusLabel) { nudge(-1) }
                 .axLeaf("Timing.Button.Nudge.\(bound.rawValue).minus")
             Text(Self.format(value))
                 .font(DS.Font.mono)
                 .frame(maxWidth: .infinity)
-            nudgeButton(systemName: "plus", help: "+1 frame", label: bound.plusLabel) { nudge(1) }
+            nudgeButton(bound, by: 1, systemName: "plus", help: "+1 frame", label: bound.plusLabel) { nudge(1) }
                 .axLeaf("Timing.Button.Nudge.\(bound.rawValue).plus")
         }
     }
 
     private func nudgeButton(
+        _ bound: Bound,
+        by delta: Int,
         systemName: String,
         help: LocalizedStringKey,
         label: LocalizedStringKey,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        let enabled = canNudge(bound, by: delta)
+        return Button(action: action) {
             Image(systemName: systemName)
                 .font(DS.Font.bodyStrong)
                 .frame(width: 26, height: 22)
@@ -78,10 +81,37 @@ struct SegmentTimingPopover: View {
                         .fill(Color.primary.opacity(0.08))
                 )
                 .contentShape(Rectangle())
+                .opacity(enabled ? 1 : DS.Opacity.disabled)
         }
         .buttonStyle(.plain)
-        .help(help)
+        .disabled(!enabled)
+        .help(enabled ? help : limitHelp(bound, by: delta))
         .accessibilityLabel(label)
+    }
+
+    private func canNudge(_ bound: Bound, by delta: Int) -> Bool {
+        guard let segments = model.transcript?.segments, let current else { return false }
+        let fps = model.subtitleFPS
+        switch bound {
+        case .start:
+            let target = SegmentTimingNudge.nudgedStart(segments: segments, id: segment.id, frameDelta: delta, fps: fps)
+            return target.map { $0 != current.start } ?? false
+        case .end:
+            let target = SegmentTimingNudge.nudgedEnd(segments: segments, id: segment.id, frameDelta: delta, fps: fps)
+            return target.map { $0 != current.end } ?? false
+        }
+    }
+
+    private func limitHelp(_ bound: Bound, by delta: Int) -> LocalizedStringKey {
+        switch (bound, delta < 0) {
+        case (.start, true):
+            let isFirst = model.transcript?.segments.first?.id == segment.id
+            return isFirst ? "Already at the start of the recording" : "Already at the end of the previous segment"
+        case (.end, false):
+            return "Already at the start of the next segment"
+        default:
+            return "The segment can't get any shorter"
+        }
     }
 
     private static let fpsOptions: [Double] = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60]
