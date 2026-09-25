@@ -79,4 +79,8 @@ private final class EscapeKeyMonitor {
         if let token { NSEvent.removeMonitor(token) }
         token = nil
     }
+
+    isolated deinit {
+        stop()
+    }
 }
