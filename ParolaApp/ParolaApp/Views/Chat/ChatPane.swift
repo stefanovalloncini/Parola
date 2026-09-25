@@ -127,27 +127,30 @@ struct ChatPane: View {
             Text("Chat")
                 .font(DS.Font.heading)
             Spacer()
-            Button(action: toggleSearch) {
-                Image(systemName: "magnifyingglass")
-                    .font(DS.Font.bodyStrong)
-                    .foregroundStyle(isSearching ? DS.Color.accent : DS.Color.secondaryText)
-            }
-            .buttonStyle(GlyphButtonStyle())
-            .help("Search chat (⌘F)")
-            .keyboardShortcut("f", modifiers: [.command])
-            .accessibilityLabel(isSearching ? "Hide search" : "Search messages")
-            .axLeaf("Header.Button.ToggleSearch")
+            HStack(spacing: 0) {
+                Button(action: toggleSearch) {
+                    Image(systemName: "magnifyingglass")
+                        .font(DS.Font.bodyStrong)
+                        .foregroundStyle(isSearching ? DS.Color.accent : DS.Color.secondaryText)
+                }
+                .buttonStyle(GlyphButtonStyle())
+                .help("Search chat (⌘F)")
+                .keyboardShortcut("f", modifiers: [.command])
+                .accessibilityLabel(isSearching ? "Hide search" : "Search messages")
+                .axLeaf("Header.Button.ToggleSearch")
 
-            Button(role: .destructive, action: resetConversation) {
-                Image(systemName: "arrow.counterclockwise")
-                    .font(DS.Font.bodyStrong)
+                Button(role: .destructive, action: resetConversation) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(DS.Font.bodyStrong)
+                }
+                .buttonStyle(GlyphButtonStyle())
+                .foregroundStyle(DS.Color.secondaryText)
+                .help("Clear conversation")
+                .disabled(displayedHistory.isEmpty || isSending)
+                .accessibilityLabel("Clear conversation")
+                .axLeaf("Header.Button.Reset")
             }
-            .buttonStyle(GlyphButtonStyle())
-            .foregroundStyle(DS.Color.secondaryText)
-            .help("Clear conversation")
-            .disabled(displayedHistory.isEmpty || isSending)
-            .accessibilityLabel("Clear conversation")
-            .axLeaf("Header.Button.Reset")
+            .padding(.vertical, -3)
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.vertical, DS.Spacing.regular)
