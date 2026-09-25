@@ -232,6 +232,17 @@
         }
       }
     },
+    "%@ — out of date": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — non aggiornato"
+          }
+        }
+      }
+    },
     "%@%%": {
       "extractionState": "manual",
       "localizations": {
@@ -5786,6 +5797,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Home"
+          }
+        }
+      }
+    },
+    "Homebrew finished, but yt-dlp is still out of date.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homebrew ha terminato, ma yt-dlp non è ancora aggiornato."
           }
         }
       }
@@ -13295,6 +13317,17 @@
         }
       }
     },
+    "This version is more than 90 days old. Downloads from YouTube and other sites may fail until you update it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa versione ha più di 90 giorni. I download da YouTube e da altri siti potrebbero non riuscire finché non la aggiorni."
+          }
+        }
+      }
+    },
     "This video can't be downloaded because it isn't available in your country.": {
       "extractionState": "manual",
       "localizations": {
@@ -14268,6 +14301,28 @@
         }
       }
     },
+    "Update it in Terminal with this command:": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornalo dal Terminale con questo comando:"
+          }
+        }
+      }
+    },
+    "Update with Homebrew": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna con Homebrew"
+          }
+        }
+      }
+    },
     "Updated": {
       "extractionState": "manual",
       "localizations": {
@@ -14297,6 +14352,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gli aggiornamenti sono firmati e verificati con le chiavi EdDSA di Sparkle prima dell'installazione."
+          }
+        }
+      }
+    },
+    "Updating…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornamento in corso…"
           }
         }
       }

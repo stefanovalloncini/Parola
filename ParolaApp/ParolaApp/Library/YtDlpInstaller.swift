@@ -1,10 +1,15 @@
 import Foundation
 
-/// Locates `yt-dlp`/`brew` on disk and drives a `brew install`, off the AppModel.
+/// Locates `yt-dlp`/`brew` on disk and drives `brew install` and `brew upgrade`, off the AppModel.
 enum YtDlpInstaller {
     enum Outcome: Sendable {
         case success
         case failure(String)
+    }
+
+    enum UpdateRoute: Equatable, Sendable {
+        case homebrew(brewPath: String)
+        case command(String)
     }
 
     static func locate() -> String? {
@@ -26,14 +31,41 @@ enum YtDlpInstaller {
         return nil
     }
 
+    static func updateRoute(ytDlpPath: String, brewPath: String?) -> UpdateRoute {
+        let resolved = URL(fileURLWithPath: ytDlpPath).resolvingSymlinksInPath().path
+        return updateRoute(ytDlpPath: ytDlpPath, resolvedPath: resolved, brewPath: brewPath)
+    }
+
+    /// Homebrew owns yt-dlp only when the binary resolves into that brew's Cellar; any other install gets yt-dlp's own updater.
+    static func updateRoute(ytDlpPath: String, resolvedPath: String, brewPath: String?) -> UpdateRoute {
+        if let brewPath {
+            let prefix = URL(fileURLWithPath: brewPath).deletingLastPathComponent().deletingLastPathComponent().path
+            if resolvedPath.hasPrefix(prefix + "/Cellar/yt-dlp/") { return .homebrew(brewPath: brewPath) }
+        }
+        return .command("\(ytDlpPath) -U")
+    }
+
     static func install(formula: String, brewPath: String) async -> Outcome {
+        await runBrew(["install", formula], brewPath: brewPath, autoUpdate: false)
+    }
+
+    static func upgrade(formula: String, brewPath: String) async -> Outcome {
+        await runBrew(["upgrade", formula], brewPath: brewPath, autoUpdate: true)
+    }
+
+    static func brewEnvironment(autoUpdate: Bool) -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        // An upgrade needs brew's auto-update: without it brew only knows the versions it fetched last time.
+        env["HOMEBREW_NO_AUTO_UPDATE"] = autoUpdate ? nil : "1"
+        env["HOMEBREW_NO_ANALYTICS"] = "1"
+        return env
+    }
+
+    private static func runBrew(_ arguments: [String], brewPath: String, autoUpdate: Bool) async -> Outcome {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: brewPath)
-        proc.arguments = ["install", formula]
-        var env = ProcessInfo.processInfo.environment
-        env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
-        env["HOMEBREW_NO_ANALYTICS"] = "1"
-        proc.environment = env
+        proc.arguments = arguments
+        proc.environment = brewEnvironment(autoUpdate: autoUpdate)
         let pipe = Pipe()
         proc.standardOutput = pipe
         proc.standardError = pipe

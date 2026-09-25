@@ -2285,10 +2285,59 @@ final class AppModel {
     var ytDlpAvailable: Bool = false
     var ytDlpInstalling: Bool = false
     var ytDlpInstallError: String?
+    @ObservationIgnored var ytDlpPath: String?
+    var ytDlpVersion: YtDlpVersion?
+    var ytDlpUpdateRoute: YtDlpInstaller.UpdateRoute?
+    var ytDlpUpdating: Bool = false
+    var ytDlpUpdateError: String?
+    @ObservationIgnored var ytDlpVersionTask: Task<Void, Never>?
+
+    var ytDlpIsStale: Bool {
+        ytDlpVersion?.isStale(asOf: Date()) ?? false
+    }
 
     func refreshYtDlpAvailability() {
-        ytDlpAvailable = YtDlpInstaller.locate() != nil
+        let path = YtDlpInstaller.locate()
+        ytDlpPath = path
+        ytDlpAvailable = path != nil
         if ytDlpAvailable { ytDlpInstallError = nil }
+        let route = path.map { YtDlpInstaller.updateRoute(ytDlpPath: $0, brewPath: YtDlpInstaller.locateBrew()) }
+        if route != ytDlpUpdateRoute { ytDlpUpdateRoute = route }
+        if path == nil, ytDlpVersion != nil { ytDlpVersion = nil }
+    }
+
+    /// Availability plus `yt-dlp --version`, which costs a Python start-up, so only the Integrations pane asks for it.
+    func refreshYtDlpStatus() {
+        refreshYtDlpAvailability()
+        guard let path = ytDlpPath, !ytDlpUpdating else { return }
+        ytDlpVersionTask?.cancel()
+        ytDlpVersionTask = Task { [weak self] in
+            let version = await YtDlpVersion.installed(at: path)
+            guard !Task.isCancelled, let self, !self.ytDlpUpdating else { return }
+            if version != self.ytDlpVersion { self.ytDlpVersion = version }
+        }
+    }
+
+    func updateYtDlpViaBrew() {
+        guard !ytDlpUpdating, case .homebrew(let brew)? = ytDlpUpdateRoute, let path = ytDlpPath else { return }
+        ytDlpUpdating = true
+        ytDlpUpdateError = nil
+        ytDlpVersionTask?.cancel()
+        Task { [weak self] in
+            let outcome = await YtDlpInstaller.upgrade(formula: "yt-dlp", brewPath: brew)
+            let version = await YtDlpVersion.installed(at: path)
+            guard let self else { return }
+            self.ytDlpVersion = version
+            self.ytDlpUpdating = false
+            switch outcome {
+            case .success:
+                if self.ytDlpIsStale {
+                    self.ytDlpUpdateError = String(localized: "Homebrew finished, but yt-dlp is still out of date.")
+                }
+            case .failure(let message):
+                self.ytDlpUpdateError = message
+            }
+        }
     }
 
     func installYtDlpViaBrew() {
@@ -2305,7 +2354,7 @@ final class AppModel {
             self.ytDlpInstalling = false
             switch outcome {
             case .success:
-                self.refreshYtDlpAvailability()
+                self.refreshYtDlpStatus()
                 if !self.ytDlpAvailable {
                     self.ytDlpInstallError = "Homebrew finished, but yt-dlp still isn't on the expected path."
                 }
