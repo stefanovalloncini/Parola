@@ -70,14 +70,29 @@ struct YouTubeAndAILoggingTests {
             // A zero timeout fires at once, so the blocking wait behind it never holds a
             // cooperative thread long enough to slow the suites running beside this one.
             await #expect(throws: ParolaError.self) {
-                try await YouTubeProcess.waitWithTimeout(process, seconds: 0)
+                try await YouTubeProcess.waitWithTimeout(process, seconds: 0, run: .download)
             }
 
             let record = try #require(
-                records(sink, .youtube, message: "yt-dlp timed out after 0s").first
+                records(sink, .youtube, message: "yt-dlp download timed out after 0s").first
             )
             #expect(record.level == .error)
             #expect(process.isRunning == false)
+        }
+    }
+
+    @Test("a version check that stalls is logged as a version check, not a download")
+    func versionCheckTimeoutLogged() async throws {
+        try await withSink { sink in
+            let fake = FileManager.default.temporaryDirectory.appendingPathComponent("parola-fake-yt-dlp-\(UUID().uuidString)")
+            try "#!/bin/sh\nexec sleep 5\n".write(to: fake, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+            defer { try? FileManager.default.removeItem(at: fake) }
+
+            #expect(await YtDlpVersion.installed(at: fake.path, timeoutSeconds: 0) == nil)
+
+            #expect(records(sink, .youtube, message: "yt-dlp versionCheck timed out after 0s").count == 1)
+            #expect(records(sink, .youtube, message: "yt-dlp download timed out after 0s").isEmpty)
         }
     }
 

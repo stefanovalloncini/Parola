@@ -99,7 +99,7 @@ public actor YouTubeAudioSource: AudioSource {
         process.standardError = Pipe()
         let drain = PipeDrain(pipe: stdout)
         do { try process.run() } catch { return nil }
-        try? await YouTubeProcess.waitWithTimeout(process, seconds: 20)
+        try? await YouTubeProcess.waitWithTimeout(process, seconds: 20, run: .durationProbe)
         guard process.terminationStatus == 0 else { return nil }
         let raw = String(decoding: drain.data(), as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -138,7 +138,9 @@ public actor YouTubeAudioSource: AudioSource {
         runningProcess = process
         defer { runningProcess = nil }
 
-        try await YouTubeProcess.waitForDownload(process, seconds: timeoutSeconds, ytDlpPath: ytDlpPath, site: site)
+        try await YouTubeProcess.waitForDownload(
+            process, seconds: timeoutSeconds, run: .download, ytDlpPath: ytDlpPath, site: site
+        )
         try Task.checkCancellation()
 
         let outText = String(decoding: outDrain.data(), as: UTF8.self)

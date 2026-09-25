@@ -1,10 +1,21 @@
 #if os(macOS)
 import Foundation
 
+/// What a yt-dlp run is for, so a timeout in the log says which one stalled.
+enum YtDlpRun: String, LogSafe {
+    case download
+    case captions
+    case durationProbe
+    case versionCheck
+
+    var logToken: String { rawValue }
+}
+
 enum YouTubeProcess {
     static func waitWithTimeout(
         _ process: Process,
         seconds: Int,
+        run: YtDlpRun,
         clock: any Clock<Duration> = ContinuousClock()
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -14,7 +25,7 @@ enum YouTubeProcess {
             group.addTask {
                 try await Task.sleep(for: .seconds(seconds), clock: clock)
                 if process.isRunning { process.terminate() }
-                ParolaLog.error(.youtube, "yt-dlp timed out after \(seconds)s")
+                ParolaLog.error(.youtube, "yt-dlp \(run) timed out after \(seconds)s")
                 throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .timedOut(seconds: seconds)))
             }
             try await group.next()
@@ -62,9 +73,11 @@ enum YouTubeProcess {
     }
 
     /// Waits out a download; a timeout comes back with the site and the installed version folded in.
-    static func waitForDownload(_ process: Process, seconds: Int, ytDlpPath: String, site: String?) async throws {
+    static func waitForDownload(
+        _ process: Process, seconds: Int, run: YtDlpRun, ytDlpPath: String, site: String?
+    ) async throws {
         do {
-            try await waitWithTimeout(process, seconds: seconds)
+            try await waitWithTimeout(process, seconds: seconds, run: run)
         } catch ParolaError.linkDownloadFailed(var failure) {
             failure.site = site
             let version = await YtDlpVersion.installed(at: ytDlpPath)
@@ -94,7 +107,7 @@ enum YouTubeProcess {
 
 extension YtDlpVersion {
     /// Runs `yt-dlp --version`. Nil when it can't run, fails, or prints something that isn't a version.
-    public static func installed(at path: String) async -> YtDlpVersion? {
+    public static func installed(at path: String, timeoutSeconds: Int = 10) async -> YtDlpVersion? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = ["--version"]
@@ -104,7 +117,7 @@ extension YtDlpVersion {
         process.standardError = FileHandle.nullDevice
         let drain = PipeDrain(pipe: stdout)
         do { try process.run() } catch { return nil }
-        do { try await YouTubeProcess.waitWithTimeout(process, seconds: 10) } catch { return nil }
+        do { try await YouTubeProcess.waitWithTimeout(process, seconds: timeoutSeconds, run: .versionCheck) } catch { return nil }
         guard process.terminationStatus == 0 else { return nil }
         return YtDlpVersion(String(decoding: drain.data(), as: UTF8.self))
     }
