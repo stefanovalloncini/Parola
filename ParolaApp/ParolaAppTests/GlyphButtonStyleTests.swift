@@ -76,3 +76,14 @@ struct GlyphButtonStyleTests {
         #expect(GlyphButtonStyle.shape.style == .continuous)
     }
 }
+
+@Suite("Icon chip button style")
+@MainActor
+struct DSIconChipButtonStyleTests {
+    @Test("a press dims the chip that hover already lit, and a disabled chip stays at the disabled dim")
+    func pressDimsTheChip() {
+        #expect(DSIconChipButtonStyle.opacity(enabled: true, pressed: false) == 1)
+        #expect(DSIconChipButtonStyle.opacity(enabled: true, pressed: true) < 1)
+        #expect(DSIconChipButtonStyle.opacity(enabled: false, pressed: true) == DS.Opacity.disabled)
+    }
+}

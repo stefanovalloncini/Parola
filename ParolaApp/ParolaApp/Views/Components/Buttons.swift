@@ -102,6 +102,12 @@ struct DSIconChipButtonStyle: ButtonStyle {
         Chrome(configuration: configuration, side: side, fitsLabel: fitsLabel)
     }
 
+    /// The pointer already lights the chip, so a press dims it: a click whose result paints late still shows it landed.
+    static func opacity(enabled: Bool, pressed: Bool) -> Double {
+        guard enabled else { return DS.Opacity.disabled }
+        return pressed ? 0.85 : 1
+    }
+
     private struct Chrome: View {
         let configuration: Configuration
         let side: CGFloat
@@ -120,7 +126,7 @@ struct DSIconChipButtonStyle: ButtonStyle {
                     RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                         .fill(lit ? DS.Palette.pillFillHover : DS.Color.surfaceElevated)
                 )
-                .opacity(isEnabled ? 1 : DS.Opacity.disabled)
+                .opacity(DSIconChipButtonStyle.opacity(enabled: isEnabled, pressed: configuration.isPressed))
                 .contentShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
                 .rowStateAnimation(hovering)
                 .onHover { hovering = $0 }
