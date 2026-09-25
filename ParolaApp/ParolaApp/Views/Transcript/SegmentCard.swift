@@ -59,15 +59,10 @@ struct SegmentCard: View {
         .padding(.vertical, DS.Spacing.regular)
         .background(cardBackground)
         .contentShape(Rectangle())
-        // simultaneousGesture: .textSelection consumes plain taps, so a card-level .onTapGesture never fires on text.
-        // Skipped while word karaoke shows: its per-word links own the click, and a simultaneous segment seek would race the word seek.
-        // hoveredSpeaker is nil unless the pointer sits on the chip, which is the one place in the
-        // card that opens the popover instead of seeking.
-        .simultaneousGesture(TapGesture().onEnded {
-            if !isEditing, !showsWordKaraoke, hoveredSpeaker.wrappedValue == nil, model.player != nil {
-                model.seek(to: segment)
-            }
-        })
+        // .textSelection consumes plain taps, so only a simultaneous tap also seeks from clicks on the text.
+        .simultaneousGesture(TapGesture().onEnded(seekFromCard), including: showsWordKaraoke ? .subviews : .all)
+        // Under word karaoke the text keeps its clicks for the word links, which a card seek would race; the rest replays.
+        .gesture(TapGesture().onEnded(seekFromCard), including: showsWordKaraoke ? .all : .subviews)
         // Laid over the tap rather than under it, so a click on the strip runs its own button and never seeks.
         .overlay(alignment: .bottomTrailing) {
             if Self.showsActionStrip(hovering: hovering, timingPopoverOpen: timingPopoverOpen, isEditing: isEditing) {
@@ -327,6 +322,12 @@ struct SegmentCard: View {
                 .lineSpacing(DS.Spacing.transcriptLeading)
                 .textSelection(.enabled)
         }
+    }
+
+    private func seekFromCard() {
+        // hoveredSpeaker is set only while the pointer sits on the chip, which opens its popover instead.
+        guard !isEditing, hoveredSpeaker.wrappedValue == nil, model.player != nil else { return }
+        model.seek(to: segment)
     }
 
     private var showsWordKaraoke: Bool {
