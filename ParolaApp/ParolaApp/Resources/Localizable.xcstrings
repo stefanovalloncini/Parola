@@ -144,6 +144,28 @@
         }
       }
     },
+    "%@ refused the download (HTTP %lld).": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha rifiutato il download (HTTP %lld)."
+          }
+        }
+      }
+    },
+    "%@ refused the download.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha rifiutato il download."
+          }
+        }
+      }
+    },
     "%@ rewrite preset": {
       "extractionState": "manual",
       "localizations": {
@@ -2780,6 +2802,17 @@
         }
       }
     },
+    "Check your internet connection and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controlla la connessione a Internet e riprova."
+          }
+        }
+      }
+    },
     "Checking…": {
       "extractionState": "manual",
       "localizations": {
@@ -3467,6 +3500,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile aprire il microfono"
+          }
+        }
+      }
+    },
+    "Couldn't reach %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile raggiungere %@."
+          }
+        }
+      }
+    },
+    "Couldn't reach the site.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile raggiungere il sito."
           }
         }
       }
@@ -8998,6 +9053,17 @@
         }
       }
     },
+    "Parola couldn't start yt-dlp.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non è riuscita ad avviare yt-dlp."
+          }
+        }
+      }
+    },
     "Parola didn't find any speech in this audio.": {
       "extractionState": "manual",
       "localizations": {
@@ -12822,6 +12888,17 @@
         }
       }
     },
+    "The download didn't finish within %lld seconds.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il download non è terminato entro %lld secondi."
+          }
+        }
+      }
+    },
     "The hotkey that turns speech into text in any app.": {
       "extractionState": "manual",
       "localizations": {
@@ -12917,6 +12994,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "La libreria di prompt dietro la pulizia della dettatura e il menu Trascrizione."
+          }
+        }
+      }
+    },
+    "The site refused the download (HTTP %lld).": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il sito ha rifiutato il download (HTTP %lld)."
+          }
+        }
+      }
+    },
+    "The site refused the download.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il sito ha rifiutato il download."
           }
         }
       }
@@ -13192,6 +13291,72 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il modello di questa trascrizione non è disponibile, quindi Parola userà %@."
+          }
+        }
+      }
+    },
+    "This video can't be downloaded because it isn't available in your country.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è possibile scaricare questo video perché non è disponibile nel tuo paese."
+          }
+        }
+      }
+    },
+    "This video can't be downloaded because it's age-restricted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è possibile scaricare questo video perché ha limiti di età."
+          }
+        }
+      }
+    },
+    "This video can't be downloaded because it's for channel members only.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è possibile scaricare questo video perché è riservato ai membri del canale."
+          }
+        }
+      }
+    },
+    "This video can't be downloaded because it's private.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è possibile scaricare questo video perché è privato."
+          }
+        }
+      }
+    },
+    "This video can't be downloaded. It may have been removed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è possibile scaricare questo video. Potrebbe essere stato rimosso."
+          }
+        }
+      }
+    },
+    "This video has no captions. Transcribe it instead.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo video non ha sottotitoli. Puoi trascriverlo."
           }
         }
       }
@@ -13989,6 +14154,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riprova"
+          }
+        }
+      }
+    },
+    "Try again later.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprova più tardi."
           }
         }
       }
@@ -14931,6 +15107,28 @@
         }
       }
     },
+    "Your yt-dlp (%@) is out of date — update it and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La tua versione di yt-dlp (%@) non è aggiornata: aggiornala e riprova."
+          }
+        }
+      }
+    },
+    "Your yt-dlp is out of date — update it and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La tua versione di yt-dlp non è aggiornata: aggiornala e riprova."
+          }
+        }
+      }
+    },
     "any": {
       "extractionState": "manual",
       "localizations": {
@@ -15217,6 +15415,39 @@
         }
       }
     },
+    "yt-dlp can't download from this site.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp non può scaricare da questo sito."
+          }
+        }
+      }
+    },
+    "yt-dlp failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Errore di yt-dlp: %@"
+          }
+        }
+      }
+    },
+    "yt-dlp finished without saving any audio.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp ha terminato senza salvare l'audio."
+          }
+        }
+      }
+    },
     "yt-dlp isn't installed": {
       "comment": "A title for a warning banner that instructs the user to install yt-dlp.",
       "isCommentAutoGenerated": true,
@@ -15225,6 +15456,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "yt-dlp non è installato"
+          }
+        }
+      }
+    },
+    "yt-dlp isn't installed. Install it in Settings › Integrations.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp non è installato. Installalo da Impostazioni › Integrazioni."
+          }
+        }
+      }
+    },
+    "yt-dlp stopped with exit status %lld.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp si è interrotto con codice di uscita %lld."
           }
         }
       }

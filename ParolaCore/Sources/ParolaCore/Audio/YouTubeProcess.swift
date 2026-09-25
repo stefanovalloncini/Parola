@@ -15,7 +15,7 @@ enum YouTubeProcess {
                 try await Task.sleep(for: .seconds(seconds), clock: clock)
                 if process.isRunning { process.terminate() }
                 ParolaLog.error(.youtube, "yt-dlp timed out after \(seconds)s")
-                throw ParolaError.captureUnavailable("yt-dlp exceeded \(seconds)s timeout")
+                throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .timedOut(seconds: seconds)))
             }
             try await group.next()
             group.cancelAll()
@@ -59,6 +59,54 @@ enum YouTubeProcess {
         let existing = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/opt/local/bin:\(existing)"
         return env
+    }
+
+    /// Waits out a download; a timeout comes back with the site and the installed version folded in.
+    static func waitForDownload(_ process: Process, seconds: Int, ytDlpPath: String, site: String?) async throws {
+        do {
+            try await waitWithTimeout(process, seconds: seconds)
+        } catch ParolaError.linkDownloadFailed(var failure) {
+            failure.site = site
+            let version = await YtDlpVersion.installed(at: ytDlpPath)
+            throw ParolaError.linkDownloadFailed(failure.noting(installedVersion: version, now: Date()))
+        }
+    }
+
+    /// Asks the installed yt-dlp for its version only once a run has failed, so a clean run pays nothing for it.
+    static func failure(
+        exitStatus: Int32,
+        stderr: String,
+        stdout: String,
+        ytDlpPath: String,
+        site: String?
+    ) async -> LinkDownloadFailure {
+        let version = await YtDlpVersion.installed(at: ytDlpPath)
+        return LinkDownloadFailure(
+            exitStatus: exitStatus,
+            stderr: stderr,
+            stdout: stdout,
+            installedVersion: version?.text,
+            site: site,
+            now: Date()
+        )
+    }
+}
+
+extension YtDlpVersion {
+    /// Runs `yt-dlp --version`. Nil when it can't run, fails, or prints something that isn't a version.
+    public static func installed(at path: String) async -> YtDlpVersion? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = ["--version"]
+        process.environment = YouTubeProcess.augmentedEnvironment()
+        let stdout = Pipe()
+        process.standardOutput = stdout
+        process.standardError = FileHandle.nullDevice
+        let drain = PipeDrain(pipe: stdout)
+        do { try process.run() } catch { return nil }
+        do { try await YouTubeProcess.waitWithTimeout(process, seconds: 10) } catch { return nil }
+        guard process.terminationStatus == 0 else { return nil }
+        return YtDlpVersion(String(decoding: drain.data(), as: UTF8.self))
     }
 }
 

@@ -16,10 +16,9 @@ public enum YouTubeSubsFetcher {
     }
 
     public static func fetchWithTitle(url: URL, preferLanguage: String? = nil) async throws -> YouTubeSubsResult {
+        let site = LinkDownloadFailure.site(for: url)
         guard let ytDlp = YouTubeProcess.findYtDlp() else {
-            throw ParolaError.captureUnavailable(
-                "yt-dlp not found on PATH. install with: brew install yt-dlp"
-            )
+            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolMissing, site: site))
         }
 
         let workingDir = FileManager.default.temporaryDirectory
@@ -54,23 +53,32 @@ public enum YouTubeSubsFetcher {
         let errDrain = PipeDrain(pipe: stderr)
 
         do { try process.run() } catch {
-            throw ParolaError.captureUnavailable("could not launch yt-dlp: \(error.localizedDescription)")
+            ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])
+            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolFailedToStart, site: site))
         }
-        try await YouTubeProcess.waitWithTimeout(process, seconds: 120)
+        try await YouTubeProcess.waitForDownload(process, seconds: 120, ytDlpPath: ytDlp, site: site)
+        try Task.checkCancellation()
 
         let stdoutText = String(decoding: outDrain.data(), as: UTF8.self)
 
         if process.terminationStatus != 0 {
-            let detail = String(decoding: errDrain.data(), as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            throw ParolaError.captureUnavailable("yt-dlp failed: \(detail)")
+            let failure = await YouTubeProcess.failure(
+                exitStatus: process.terminationStatus,
+                stderr: String(decoding: errDrain.data(), as: UTF8.self),
+                stdout: "",
+                ytDlpPath: ytDlp,
+                site: site
+            )
+            let error = ParolaError.linkDownloadFailed(failure)
+            ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(process.terminationStatus))", [.error: .error(error)])
+            throw error
         }
 
         let videoTitle = parseTitle(from: stdoutText)
 
         let vttFiles = (try? FileManager.default.contentsOfDirectory(at: workingDir, includingPropertiesForKeys: nil)) ?? []
         guard let chosen = pickVtt(from: vttFiles, preferLanguage: preferLanguage) else {
-            throw ParolaError.captureUnavailable("no subtitles available for this video; transcribe with Whisper")
+            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noCaptions, site: site))
         }
 
         let isAuto = chosen.lastPathComponent.contains(".auto.")

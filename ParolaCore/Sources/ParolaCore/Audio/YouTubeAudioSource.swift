@@ -51,7 +51,7 @@ public actor YouTubeAudioSource: AudioSource {
         try features.require(.youtube)
         guard url.isYtDlpSupported else {
             ParolaLog.notice(.youtube, "URL is not on a host yt-dlp can fetch from")
-            throw ParolaError.captureUnavailable("URL not supported by yt-dlp: \(url.absoluteString)")
+            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .unsupportedLink))
         }
         self.url = url
         self.timeoutSeconds = timeoutSeconds
@@ -63,9 +63,7 @@ public actor YouTubeAudioSource: AudioSource {
         if let downloadedURL { return downloadedURL }
 
         guard let ytDlp = YouTubeProcess.findYtDlp() else {
-            throw ParolaError.captureUnavailable(
-                "yt-dlp not found on PATH. install with: brew install yt-dlp"
-            )
+            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolMissing, site: site))
         }
 
         try FileManager.default.createDirectory(at: workingDir, withIntermediateDirectories: true)
@@ -135,12 +133,13 @@ public actor YouTubeAudioSource: AudioSource {
             try process.run()
         } catch {
             ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])
-            throw ParolaError.captureUnavailable("could not launch yt-dlp: \(error.localizedDescription)")
+            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolFailedToStart, site: site))
         }
         runningProcess = process
         defer { runningProcess = nil }
 
-        try await YouTubeProcess.waitWithTimeout(process, seconds: timeoutSeconds)
+        try await YouTubeProcess.waitForDownload(process, seconds: timeoutSeconds, ytDlpPath: ytDlpPath, site: site)
+        try Task.checkCancellation()
 
         let outText = String(decoding: outDrain.data(), as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -148,16 +147,22 @@ public actor YouTubeAudioSource: AudioSource {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard process.terminationStatus == 0 else {
-            ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(process.terminationStatus))")
-            throw ParolaError.captureUnavailable("yt-dlp failed: \(errText.isEmpty ? outText : errText)")
+            let failure = await YouTubeProcess.failure(
+                exitStatus: process.terminationStatus, stderr: errText, stdout: outText, ytDlpPath: ytDlpPath, site: site
+            )
+            let error = ParolaError.linkDownloadFailed(failure)
+            ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(process.terminationStatus))", [.error: .error(error)])
+            throw error
         }
 
         let path = outText.components(separatedBy: "\n").last ?? outText
         guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else {
-            throw ParolaError.captureUnavailable("yt-dlp didn't report a usable file path")
+            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noAudio, site: site))
         }
         return URL(fileURLWithPath: path)
     }
+
+    private var site: String? { LinkDownloadFailure.site(for: url) }
 
 }
 

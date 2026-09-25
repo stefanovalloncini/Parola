@@ -146,13 +146,15 @@ struct YouTubeAndAILoggingTests {
     /// The remaining sites need `yt-dlp`, an unreachable Apple Intelligence state, or a refusing keychain — pinned in source.
     @Test("the sites that cannot be driven here are still present and still safe")
     func pinnedSites() throws {
-        let youtube = try coreSource("Audio/YouTubeAudioSource")
-        #expect(youtube.contains(
-            #"ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])"#
-        ))
-        #expect(youtube.contains(
-            #"ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(process.terminationStatus))")"#
-        ))
+        for name in ["Audio/YouTubeAudioSource", "Audio/YouTubeSubsFetcher"] {
+            let youtube = try coreSource(name)
+            #expect(youtube.contains(
+                #"ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])"#
+            ))
+            #expect(youtube.contains(
+                #"ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(process.terminationStatus))", [.error: .error(error)])"#
+            ))
+        }
 
         let factory = try coreSource("LLM/LanguageModelFactory")
         #expect(factory.contains(
@@ -170,7 +172,7 @@ struct YouTubeAndAILoggingTests {
         }
 
         for name in [
-            "Audio/YouTubeAudioSource", "Audio/YouTubeProcess", "LLM/LanguageModelFactory",
+            "Audio/YouTubeAudioSource", "Audio/YouTubeSubsFetcher", "Audio/YouTubeProcess", "LLM/LanguageModelFactory",
             "LLM/Cloud/CloudLanguageModel", "LLM/SummaryService", "LLM/Cloud/APIKeyStore",
         ] {
             for chunk in try coreSource(name).components(separatedBy: "ParolaLog.").dropFirst() {

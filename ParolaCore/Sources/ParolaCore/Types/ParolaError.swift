@@ -17,6 +17,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     case fileReadTimedOut(name: String)
     case unsupportedAudioFormat(String)
     case captureUnavailable(String)
+    /// A link yt-dlp couldn't fetch; kept apart from `captureUnavailable` so it never reads as a capture failure.
+    case linkDownloadFailed(LinkDownloadFailure)
     case invalidLanguage(String)
     case ioError(String)
     case engineNotRegistered(String)
@@ -52,6 +54,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
             return "Unsupported audio format: \(detail)"
         case .captureUnavailable(let reason):
             return "Audio capture unavailable: \(reason)"
+        case .linkDownloadFailed(let failure):
+            return failure.message
         case .invalidLanguage(let code):
             return "Invalid language code: \(code)"
         case .ioError(let reason):
@@ -94,6 +98,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
             return "ParolaError.unsupportedAudioFormat"
         case .captureUnavailable:
             return "ParolaError.captureUnavailable"
+        case .linkDownloadFailed(let failure):
+            return "ParolaError.linkDownloadFailed(\(failure.logToken))"
         case .invalidLanguage(let code):
             return "ParolaError.invalidLanguage(\(LogAllowlist.languageCode(code)))"
         case .ioError:
