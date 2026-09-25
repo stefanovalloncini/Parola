@@ -307,6 +307,27 @@ struct YtDlpUpdateTests {
         #expect(started.duration(to: .now) < .seconds(10))
     }
 
+    @Test("brew's own failures read in English and Italian")
+    func brewMessagesAreLocalized() throws {
+        let italian = try italianBundle()
+
+        #expect(YtDlpInstaller.exitStatusMessage(3) == "brew exited with status 3.")
+        #expect(YtDlpInstaller.exitStatusMessage(3, bundle: italian) == "brew è terminato con codice di uscita 3.")
+        #expect(YtDlpInstaller.launchFailureMessage("no such file") == "Could not launch brew: no such file")
+        #expect(YtDlpInstaller.launchFailureMessage("no such file", bundle: italian) == "Impossibile avviare brew: no such file")
+    }
+
+    @Test("a brew that can't start says so")
+    func brewThatCantStart() async {
+        let outcome = await YtDlpInstaller.upgrade(formula: "yt-dlp", brewPath: "/nonexistent/brew")
+
+        guard case .failure(let message) = outcome else {
+            Issue.record("expected a failure, got \(outcome)")
+            return
+        }
+        #expect(message.hasPrefix("Could not launch brew: "))
+    }
+
     @Test("a failed upgrade reports what brew printed")
     func failedUpgradeReportsOutput() async throws {
         let brew = try script("echo 'Error: yt-dlp not installed' >&2; exit 1")

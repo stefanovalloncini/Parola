@@ -3438,6 +3438,17 @@
         }
       }
     },
+    "Could not launch brew: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile avviare brew: %@"
+          }
+        }
+      }
+    },
     "Couldn't Generate a Summary": {
       "extractionState": "manual",
       "localizations": {
@@ -5841,6 +5852,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Homebrew ha terminato, ma yt-dlp non si trova ancora nel percorso previsto."
+          }
+        }
+      }
+    },
+    "Homebrew isn't installed. Install it from https://brew.sh, then try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homebrew non è installato. Installalo da https://brew.sh e riprova."
           }
         }
       }
@@ -15279,6 +15301,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "qualsiasi"
+          }
+        }
+      }
+    },
+    "brew exited with status %lld.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "brew è terminato con codice di uscita %lld."
           }
         }
       }

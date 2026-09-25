@@ -2378,7 +2378,7 @@ final class AppModel {
     func installYtDlpViaBrew() {
         guard !ytDlpInstalling else { return }
         guard let brew = YtDlpInstaller.locateBrew() else {
-            ytDlpInstallError = "Homebrew isn't installed. Install it from https://brew.sh, then try again."
+            ytDlpInstallError = String(localized: "Homebrew isn't installed. Install it from https://brew.sh, then try again.")
             return
         }
         ytDlpInstalling = true
@@ -2391,7 +2391,7 @@ final class AppModel {
             case .success:
                 self.refreshYtDlpStatus()
                 if !self.ytDlpAvailable {
-                    self.ytDlpInstallError = "Homebrew finished, but yt-dlp still isn't on the expected path."
+                    self.ytDlpInstallError = String(localized: "Homebrew finished, but yt-dlp still isn't on the expected path.")
                 }
             case .failure(let message):
                 self.ytDlpInstallError = message

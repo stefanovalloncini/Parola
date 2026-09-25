@@ -139,6 +139,14 @@ enum YtDlpInstaller {
         return errors.isEmpty ? nil : errors.suffix(2).joined(separator: "\n")
     }
 
+    static func launchFailureMessage(_ detail: String, bundle: Bundle = .main) -> String {
+        String(localized: "Could not launch brew: \(detail)", bundle: bundle)
+    }
+
+    static func exitStatusMessage(_ status: Int, bundle: Bundle = .main) -> String {
+        String(localized: "brew exited with status \(status).", bundle: bundle)
+    }
+
     static func failureKind(of summary: String?) -> BrewFailureKind {
         let text = summary?.lowercased() ?? ""
         func mentions(_ needles: [String]) -> Bool { needles.contains { text.contains($0) } }
@@ -194,7 +202,7 @@ enum YtDlpInstaller {
         } catch {
             pipe.fileHandleForReading.readabilityHandler = nil
             chunkContinuation.finish()
-            return .failure("Could not launch brew: \(error.localizedDescription)")
+            return .failure(launchFailureMessage(error.localizedDescription))
         }
         let started = ContinuousClock.now
         let ending = await waitForExit(proc, deadline: deadline)
@@ -232,7 +240,7 @@ enum YtDlpInstaller {
                 .youtube, "brew \(command) exited with status \(status)",
                 [.error: .safe(failureKind(of: summary)), .count: .int(lines), .elapsed: elapsed]
             )
-            return .failure(summary ?? "brew exited with status \(status).")
+            return .failure(summary ?? exitStatusMessage(status))
         }
     }
 
