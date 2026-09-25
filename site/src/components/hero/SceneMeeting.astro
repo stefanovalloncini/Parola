@@ -148,11 +148,11 @@ const people = [
     align-items: center;
     padding: calc(26 * var(--pt)) calc(20 * var(--pt)) calc(20 * var(--pt));
     border-radius: calc(30 * var(--pt));
-    background: rgb(244 245 243 / 0.94);
-    color: #1d201e;
+    background: var(--mac-alert-glass);
+    color: var(--mac-ink);
     text-align: center;
     box-shadow:
-      0 0 0 calc(0.6 * var(--pt)) rgb(0 0 0 / 0.14),
+      0 0 0 calc(0.6 * var(--pt)) rgb(var(--mac-edge-neutral) / 0.14),
       0 calc(20 * var(--pt)) calc(60 * var(--pt)) rgb(0 0 0 / 0.35);
     backdrop-filter: blur(20px);
     translate: -50% 0;
@@ -196,7 +196,7 @@ const people = [
     width: 100%;
     padding: calc(9 * var(--pt)) 0;
     border-radius: calc(15 * var(--pt));
-    background: rgb(0 0 0 / 0.07);
+    background: var(--mac-control);
     font-size: calc(16 * var(--pt));
     font-weight: 500;
   }

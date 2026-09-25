@@ -30,20 +30,20 @@ const { title, tone = "light", class: className } = Astro.props;
     flex-direction: column;
     overflow: hidden;
     border-radius: calc(14 * var(--pt));
-    background: #fbfbfa;
-    color: #1d201e;
+    background: var(--mac-window);
+    color: var(--mac-ink);
     box-shadow:
-      0 0 0 calc(0.6 * var(--pt)) rgb(0 0 0 / 0.18),
-      0 calc(10 * var(--pt)) calc(40 * var(--pt)) rgb(0 0 0 / 0.3);
+      0 0 0 calc(0.6 * var(--pt)) var(--mac-window-edge),
+      inset 0 0 0 calc(0.6 * var(--pt)) var(--mac-window-rim),
+      0 calc(10 * var(--pt)) calc(40 * var(--pt)) var(--mac-window-drop);
   }
 
   .app-window[data-tone="dark"] {
-    background: #202222;
-    color: #eceeed;
-    box-shadow:
-      0 0 0 calc(0.6 * var(--pt)) rgb(0 0 0 / 0.6),
-      inset 0 0 0 calc(0.6 * var(--pt)) rgb(255 255 255 / 0.1),
-      0 calc(10 * var(--pt)) calc(40 * var(--pt)) rgb(0 0 0 / 0.4);
+    --mac-window: #202222;
+    --mac-ink: #eceeed;
+    --mac-window-edge: rgb(0 0 0 / 0.6);
+    --mac-window-rim: rgb(255 255 255 / 0.1);
+    --mac-window-drop: rgb(0 0 0 / 0.4);
   }
 
   .titlebar {
