@@ -192,31 +192,47 @@ extension AppModel {
               let player,
               player.timeControlStatus == .playing,
               let segments = transcript?.segments,
-              let target = Self.silenceSkipTarget(at: currentTime, in: segments) else {
+              let target = Self.silenceSkipTarget(
+                  at: currentTime,
+                  in: segments,
+                  duration: transcript?.durationSeconds ?? 0
+              ) else {
             return
         }
         seekPlayer(to: target)
     }
 
-    /// Just before the next segment when the playhead sits in a gap of at least `minimumGap`, the lead-in included; nil inside speech or after the last segment.
+    /// Where Skip silences seeks from a gap of at least `minimumGap`: just before the next segment, or the end after the last; nil inside speech.
     static func silenceSkipTarget(
         at time: Double,
         in segments: [TranscriptSegment],
+        duration: Double,
         minimumGap: Double = 0.5,
         lead: Double = 0.1
     ) -> Double? {
         var spokenUntil: Double?
+        var next: TranscriptSegment?
         for segment in segments {
-            guard segment.start <= time else {
-                if let spokenUntil, spokenUntil >= time { return nil }
-                let silenceStart = spokenUntil ?? 0
-                guard segment.start - silenceStart >= minimumGap else { return nil }
-                let target = max(silenceStart, segment.start - lead)
-                return target - time > 0.05 ? target : nil
+            if segment.start > time {
+                next = segment
+                break
             }
             spokenUntil = max(spokenUntil ?? segment.end, segment.end)
         }
-        return nil
+        if let spokenUntil, spokenUntil >= time { return nil }
+        let silenceStart = spokenUntil ?? 0
+        let silenceEnd: Double
+        let target: Double
+        if let next {
+            silenceEnd = next.start
+            target = max(silenceStart, next.start - lead)
+        } else {
+            guard spokenUntil != nil, duration > 0 else { return nil }
+            silenceEnd = duration
+            target = duration
+        }
+        guard silenceEnd - silenceStart >= minimumGap, target - time > 0.05 else { return nil }
+        return target
     }
 
     func seekTo(seconds: Double) {
