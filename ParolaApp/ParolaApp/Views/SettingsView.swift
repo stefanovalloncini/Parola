@@ -11,7 +11,11 @@ struct SettingsView: View {
                 let stored = SettingsRoute(rawValue: model.settingsPane) ?? .general
                 return stored.isVisible(features: model.features) ? stored : .general
             },
-            set: { model.settingsPane = $0.rawValue }
+            set: {
+                // In the same update as the switch: the editor's onDisappear would repaint after the next pane appeared.
+                model.commitPaletteDraft()
+                model.settingsPane = $0.rawValue
+            }
         )
     }
 

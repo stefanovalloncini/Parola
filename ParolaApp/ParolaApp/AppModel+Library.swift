@@ -629,6 +629,7 @@ extension AppModel {
 
     /// Opens the settings window on a specific pane — the one place a route is picked before the window opens.
     func openSettings(route: SettingsRoute) {
+        commitPaletteDraft()
         settingsPane = route.rawValue
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
