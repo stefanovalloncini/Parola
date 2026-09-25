@@ -5520,6 +5520,17 @@
         }
       }
     },
+    "Frame rate": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frequenza fotogrammi"
+          }
+        }
+      }
+    },
     "Frontmatter": {
       "extractionState": "manual",
       "localizations": {
