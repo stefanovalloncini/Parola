@@ -3394,6 +3394,17 @@
         }
       }
     },
+    "Copy segment with timestamp": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia il segmento con il timestamp"
+          }
+        }
+      }
+    },
     "Copy to Clipboard": {
       "extractionState": "manual",
       "localizations": {

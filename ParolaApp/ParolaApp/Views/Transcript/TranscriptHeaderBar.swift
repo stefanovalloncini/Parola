@@ -11,6 +11,8 @@ struct TranscriptHeaderBar: View {
     @State private var jumpOpen = false
     @State private var jumpDraft = ""
     @FocusState private var jumpFocused: Bool
+    @State private var copied = false
+    @State private var copiedReset: Task<Void, Never>?
     // Cached so the header doesn't rebuild `transcript.text`, a full-segment join, on every re-render.
     @State private var shareItem: TranscriptShareFile?
 
@@ -142,12 +144,12 @@ struct TranscriptHeaderBar: View {
 
     private var copyButton: some View {
         Button(action: copyTranscript) {
-            Image(systemName: "doc.on.doc")
+            Image(systemName: copied ? "checkmark" : "doc.on.doc")
         }
         .buttonStyle(GlyphButtonStyle(tinted: true))
         .disabled(model.transcript == nil)
-        .help("Copy transcript")
-        .accessibilityLabel("Copy transcript")
+        .help(copied ? "Copied" : "Copy transcript")
+        .accessibilityLabel(copied ? "Copied" : "Copy transcript")
         .axLeaf("HeaderBar.Button.CopyTranscript")
     }
 
@@ -289,6 +291,13 @@ struct TranscriptHeaderBar: View {
     private func writeToPasteboard(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+        copied = true
+        copiedReset?.cancel()
+        copiedReset = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            copied = false
+        }
     }
 
     private func toggleSpeak() {

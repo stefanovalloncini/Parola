@@ -20,6 +20,8 @@ struct SegmentCard: View {
     @State private var draftAssignSpeakerName: String = ""
     @State private var editingNote: Bool = false
     @State private var draftNote: String = ""
+    @State private var copied = false
+    @State private var copiedReset: Task<Void, Never>?
     @FocusState private var editingFocus: Bool
 
     private let radius: CGFloat = DS.Radius.regular
@@ -391,9 +393,11 @@ struct SegmentCard: View {
                 }
                 .axLeaf("Card.Button.Play")
             }
-            cardButton(systemName: "doc.on.doc", help: "Copy segment with timestamp") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(draggablePayload, forType: .string)
+            cardButton(
+                systemName: copied ? "checkmark" : "doc.on.doc",
+                help: copied ? "Copied" : "Copy segment with timestamp"
+            ) {
+                copySegment()
             }
             .axLeaf("Card.Button.Copy")
             moreMenu(isFavorite: isFavorite)
@@ -449,7 +453,7 @@ struct SegmentCard: View {
         }
     }
 
-    private func cardButton(systemName: String, help: String, tint: Color = DS.Color.secondaryText, action: @escaping () -> Void) -> some View {
+    private func cardButton(systemName: String, help: LocalizedStringKey, tint: Color = DS.Color.secondaryText, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(DS.Font.bodyStrong)
@@ -614,6 +618,18 @@ struct SegmentCard: View {
             attr.append(piece)
         }
         return attr
+    }
+
+    private func copySegment() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(draggablePayload, forType: .string)
+        copied = true
+        copiedReset?.cancel()
+        copiedReset = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            copied = false
+        }
     }
 
     private func copyDeeplink() {
