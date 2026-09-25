@@ -37,24 +37,28 @@ extension AppModel {
         textChanged: Bool,
         assignments: SpeakerAssignmentEdit?
     ) {
-        guard let undoManager else { return }
         let entryID = selectedEntryID
         // From the undo closure's perspective this edit's `new` favorites are current; `old` is the restore target.
         let inverseFavorites = (old: favorites.new, new: favorites.old)
         let inverseNotes = (old: notes.new, new: notes.old)
+        registerUndoStep(actionName: actionName) { model in
+            guard model.selectedEntryID == entryID else { return }
+            model.applyTranscriptEdit(
+                old, actionName: actionName, textChanged: textChanged, favorites: inverseFavorites,
+                notes: inverseNotes, assignments: assignments
+            )
+        }
+    }
+
+    func registerUndoStep(actionName: String, _ revert: @escaping @MainActor @Sendable (AppModel) -> Void) {
+        guard let undoManager else { return }
         // Only group explicitly when event grouping is off (tests): nesting inside the window's per-event group would leave that group unnamed, and the Edit menu title reads the top-level group's name.
         let opensGroup = !undoManager.groupsByEvent && !undoManager.isUndoing && !undoManager.isRedoing
             && undoManager.groupingLevel == 0
         if opensGroup { undoManager.beginUndoGrouping() }
         undoManager.registerUndo(withTarget: self) { model in
             // Undo always fires on the thread that calls undo()/redo(), which is the main thread here.
-            MainActor.assumeIsolated {
-                guard model.selectedEntryID == entryID else { return }
-                model.applyTranscriptEdit(
-                    old, actionName: actionName, textChanged: textChanged, favorites: inverseFavorites,
-                    notes: inverseNotes, assignments: assignments
-                )
-            }
+            MainActor.assumeIsolated { revert(model) }
         }
         undoManager.setActionName(actionName)
         if opensGroup { undoManager.endUndoGrouping() }

@@ -285,7 +285,26 @@ extension AppModel {
     }
 
     func setSegmentNote(_ note: String?, segmentID: Int) {
+        let stored = Self.storedNote(note)
+        let previous = currentSegmentNote(for: segmentID)
+        guard stored != previous else { return }
+        let actionName = stored == nil ? String(localized: "Delete Note") : String(localized: "Edit Note")
+        applySegmentNote(stored, replacing: previous, segmentID: segmentID, actionName: actionName)
+    }
+
+    static func storedNote(_ note: String?) -> String? {
+        guard let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
+    /// Both values travel with the step, so undo and redo never read a cache a refresh is about to replace.
+    private func applySegmentNote(_ note: String?, replacing previous: String?, segmentID: Int, actionName: String) {
         guard let entryID = selectedEntryID else { return }
+        patchLibraryEntry(id: entryID) { $0.segmentNotes[String(segmentID)] = note }
+        registerUndoStep(actionName: actionName) { model in
+            guard model.selectedEntryID == entryID else { return }
+            model.applySegmentNote(previous, replacing: note, segmentID: segmentID, actionName: actionName)
+        }
         Task { [weak self] in
             guard let self else { return }
             do {
@@ -313,6 +332,7 @@ extension AppModel {
             notes.map { (String($0.key), $0.value) },
             uniquingKeysWith: { first, _ in first }
         )
+        patchLibraryEntry(id: entryID) { $0.segmentNotes = stored }
         Task { [weak self] in
             guard let self else { return }
             do {

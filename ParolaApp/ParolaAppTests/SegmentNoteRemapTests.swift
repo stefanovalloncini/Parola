@@ -76,6 +76,36 @@ struct SegmentNoteEditTests {
         #expect(first.id != second.id)
     }
 
+    @Test("saving and deleting a note are one undo step each, and an unchanged save adds none")
+    func noteEditsAreUndoable() async throws {
+        let model = try await loadedModel()
+        let entryID = try #require(model.selectedEntryID)
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+
+        model.setSegmentNote("first", segmentID: 0)
+        model.setSegmentNote("  second  ", segmentID: 0)
+        model.setSegmentNote("second", segmentID: 0)
+        #expect(model.currentSegmentNote(for: 0) == "second")
+
+        undo.undo()
+        #expect(model.currentSegmentNote(for: 0) == "first")
+        undo.undo()
+        #expect(model.currentSegmentNote(for: 0) == nil)
+        #expect(!undo.canUndo)
+        undo.redo()
+        #expect(model.currentSegmentNote(for: 0) == "first")
+
+        model.setSegmentNote(nil, segmentID: 0)
+        #expect(model.currentSegmentNote(for: 0) == nil)
+        undo.undo()
+        #expect(model.currentSegmentNote(for: 0) == "first")
+        #expect(await waitUntil {
+            (try? await model.library.load(entryID).entry.segmentNotes) == ["0": "first"]
+        })
+    }
+
     @Test("splitting moves the note to the first half, and undo and redo carry it")
     func splitCarriesTheNote() async throws {
         let model = try await loadedModel()

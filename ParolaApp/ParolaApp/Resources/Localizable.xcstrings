@@ -3915,6 +3915,17 @@
         }
       }
     },
+    "Delete Note": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina nota"
+          }
+        }
+      }
+    },
     "Delete Now": {
       "extractionState": "manual",
       "localizations": {
@@ -4585,6 +4596,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modifica destinazione"
+          }
+        }
+      }
+    },
+    "Edit Note": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifica nota"
           }
         }
       }
