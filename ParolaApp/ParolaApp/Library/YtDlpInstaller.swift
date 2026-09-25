@@ -198,8 +198,19 @@ enum YtDlpInstaller {
         }
         let started = ContinuousClock.now
         let ending = await waitForExit(proc, deadline: deadline)
-        pipe.fileHandleForReading.readabilityHandler = nil
-        chunkContinuation.finish()
+        // brew's Error line is usually its last, so wait for the pipe's end; a child still holding it gets two seconds.
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask { _ = await bufferTask.value; return true }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(2))
+                return false
+            }
+            if await group.next() != true {
+                pipe.fileHandleForReading.readabilityHandler = nil
+                chunkContinuation.finish()
+            }
+            group.cancelAll()
+        }
         let output = await bufferTask.value
         let elapsed = LogValue.duration(started.duration(to: .now))
         switch ending {

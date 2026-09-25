@@ -283,6 +283,28 @@ struct YtDlpUpdateTests {
         #expect(try String(contentsOf: log, encoding: .utf8) == "upgrade yt-dlp\n")
     }
 
+    @Test("the Error line brew prints just before it exits is kept")
+    func keepsTheLastLine() async throws {
+        let brew = try script("yes '==> noise' | head -n 5000; echo 'Error: yt-dlp: Failed to download resource' >&2; exit 1")
+        defer { try? FileManager.default.removeItem(at: brew) }
+
+        let outcome = await YtDlpInstaller.upgrade(formula: "yt-dlp", brewPath: brew.path)
+
+        #expect(outcome == .failure("yt-dlp: Failed to download resource"))
+    }
+
+    @Test("a child that keeps brew's output open doesn't hold the result")
+    func childHoldingThePipe() async throws {
+        let brew = try script("sleep 20 &\necho 'Error: yt-dlp not installed'\nexit 1")
+        defer { try? FileManager.default.removeItem(at: brew) }
+        let started = ContinuousClock.now
+
+        let outcome = await YtDlpInstaller.upgrade(formula: "yt-dlp", brewPath: brew.path)
+
+        #expect(outcome == .failure("yt-dlp not installed"))
+        #expect(started.duration(to: .now) < .seconds(10))
+    }
+
     @Test("a failed upgrade reports what brew printed")
     func failedUpgradeReportsOutput() async throws {
         let brew = try script("echo 'Error: yt-dlp not installed' >&2; exit 1")
