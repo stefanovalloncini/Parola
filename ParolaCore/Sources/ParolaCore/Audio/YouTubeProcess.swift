@@ -43,7 +43,7 @@ enum YouTubeProcess {
         }
     }
 
-    /// `waitUntilExit()` can miss an exit and block for good, so this waits on the handler `start` installed.
+    /// Off the launching thread, `waitUntilExit()` can block for good on a notification queued to that thread's run loop, so this waits on the handler `start` installed.
     private static func waitForExit(_ process: Process, exit: ExitSignal) async {
         await withTaskCancellationHandler {
             await exit.wait()
