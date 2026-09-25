@@ -9,6 +9,7 @@ enum BootstrapSideEffect: Sendable, Hashable {
     case meetingDetector
     case watchedFolders
     case dictationHotkey
+    case micHotkey
     case libraryPurgeOnLaunch
     case refreshYtDlp
     case liveCaptionsTranslateRestore
@@ -18,7 +19,7 @@ enum BootstrapSideEffect: Sendable, Hashable {
 
     static let all: Set<BootstrapSideEffect> = [
         .sparkle, .launchAtLogin, .menuBarExtra, .dockIconRegistration, .appIntentsDonation,
-        .meetingDetector, .watchedFolders, .dictationHotkey,
+        .meetingDetector, .watchedFolders, .dictationHotkey, .micHotkey,
         .libraryPurgeOnLaunch, .refreshYtDlp, .liveCaptionsTranslateRestore,
         .automationBridge, .modelsPathSync, .diagnosticsLog
     ]

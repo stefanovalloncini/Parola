@@ -14,6 +14,7 @@ final class MicHotkeyController {
     private var configureTask: Task<Void, Never>?
 
     func bind(_ model: AppModel) {
+        guard model.activeSideEffects.contains(.micHotkey) else { return }
         configureTask?.cancel()
         lastConfig = nil
         self.model = model

@@ -253,6 +253,7 @@ extension AppModel {
             streamingEnabled: useStreaming,
             hotkeyKeyCode: dictationKeyCode,
             hotkeyModifiers: dictationModifierFlags,
+            listensForHotkey: activeSideEffects.contains(.dictationHotkey),
             mode: dictationMode,
             workflows: dictationWorkflows(),
             postProcessor: currentDictationProcessor(),

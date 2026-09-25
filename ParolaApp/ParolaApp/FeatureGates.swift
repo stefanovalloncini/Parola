@@ -5,6 +5,7 @@ extension FeatureSet {
     func excludedSideEffects(mode: AppBootstrap.Mode) -> Set<BootstrapSideEffect> {
         var excluded: Set<BootstrapSideEffect> = []
         if !isEnabled(.dictation) { excluded.insert(.dictationHotkey) }
+        if !isEnabled(.micRecording) { excluded.insert(.micHotkey) }
         if !isEnabled(.meetings) { excluded.insert(.meetingDetector) }
         if !isEnabled(.watchedFolders) { excluded.insert(.watchedFolders) }
         if !isEnabled(.youtube) { excluded.insert(.refreshYtDlp) }

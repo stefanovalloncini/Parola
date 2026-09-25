@@ -522,6 +522,51 @@ struct AppModelDictationTests {
         #expect(defaults.integer(forKey: "dictationKeyCode") == 105)
     }
 
+    @Test("without the hotkey side effect, turning dictation on arms it on a monitor that hears no keys")
+    func dictationWithoutTheHotkeyListensToNoKeys() {
+        let model = makeModel()
+        model.dictationController.recorderFactory = { _ in IntentStubRecorder() }
+
+        model.dictationEnabled = true
+        #expect(model.dictationController.isRunning)
+        #expect(model.dictationController.configuration?.listensForHotkey == false)
+
+        model.dictationKeyCode = 105
+        #expect(model.dictationController.configuration?.listensForHotkey == false)
+        model.abortDictation()
+    }
+
+    @Test("only a configuration allowed to listen gets the global key monitor")
+    func hotkeyMonitorFollowsTheGate() {
+        var configuration = DictationController.Configuration(
+            modelName: "openai_whisper-tiny",
+            language: nil,
+            deviceUID: nil,
+            streamingEnabled: false,
+            hotkeyKeyCode: 96,
+            mode: .pushToTalk,
+            workflows: [:],
+            postProcessor: IdentityPostProcessor()
+        )
+        #expect(DictationController.hotkeyMonitor(for: configuration) is SilentHotkeyMonitor)
+
+        configuration.listensForHotkey = true
+        #expect(DictationController.hotkeyMonitor(for: configuration) is GlobalHotkeyMonitor)
+    }
+
+    @Test("without the mic hotkey side effect, binding installs no key monitor")
+    func micHotkeyStaysOffWithoutTheSideEffect() async {
+        let model = makeModel()
+        model.micHotkeyEnabled = true
+        let controller = MicHotkeyController()
+        controller.monitorFactory = { _, _ in SilentHotkeyMonitor() }
+
+        controller.bind(model)
+        await Task.yield()
+
+        #expect(controller.monitor == nil)
+    }
+
     @Test("startDictationFromIntent restarts a stopped controller when already enabled")
     func intentStartsStoppedController() {
         let model = makeModel()
@@ -568,4 +613,8 @@ private actor EndingSpy: StreamingTranscriber {
     }
 
     func currentModel() async -> String? { "openai_whisper-tiny" }
+}
+
+private struct IdentityPostProcessor: TextPostProcessor {
+    func process(_ text: String) async -> String { text }
 }

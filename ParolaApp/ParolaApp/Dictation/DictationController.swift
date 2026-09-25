@@ -61,6 +61,8 @@ final class DictationController {
         var streamingEnabled: Bool
         var hotkeyKeyCode: Int
         var hotkeyModifiers: NSEvent.ModifierFlags = []
+        /// Off unless the launch owns the dictation hotkey: a test sandbox must not hear keys pressed in other apps.
+        var listensForHotkey = false
         var mode: DictationMode
         var workflows: [String: [DictationWorkflow]]
         var postProcessor: any TextPostProcessor
@@ -102,7 +104,7 @@ final class DictationController {
         guard coordinator == nil else { return }
         self.configuration = configuration
         let hotkey = hotkeyFactory?(configuration.hotkeyKeyCode, configuration.hotkeyModifiers)
-            ?? GlobalHotkeyMonitor(keyCode: configuration.hotkeyKeyCode, modifiers: configuration.hotkeyModifiers)
+            ?? Self.hotkeyMonitor(for: configuration)
         let workflows = configuration.workflows
         // Own session, not appModel.session: the shared one serializes whole transcribe
         // runs, so a fallback dictation stop would queue for minutes behind a long
@@ -147,6 +149,12 @@ final class DictationController {
         }
         coordinator = coord
         enqueueMonitorWork { await coord.startMonitoring() }
+    }
+
+    /// Without the hotkey the coordinator still arms, so `simulatePress()` and `simulateRelease()` keep working.
+    static func hotkeyMonitor(for configuration: Configuration) -> any HotkeyMonitor {
+        guard configuration.listensForHotkey else { return SilentHotkeyMonitor() }
+        return GlobalHotkeyMonitor(keyCode: configuration.hotkeyKeyCode, modifiers: configuration.hotkeyModifiers)
     }
 
     func stop() {

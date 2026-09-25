@@ -30,6 +30,7 @@ struct FeatureGatesTests {
         let lean = FeatureSet(enabled: [.batch])
         let excluded = lean.excludedSideEffects(mode: .normal)
         #expect(excluded.contains(.dictationHotkey))
+        #expect(excluded.contains(.micHotkey))
         #expect(excluded.contains(.meetingDetector))
         #expect(excluded.contains(.watchedFolders))
         #expect(excluded.contains(.refreshYtDlp))

@@ -102,6 +102,12 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
 
 typealias F5HotkeyMonitor = GlobalHotkeyMonitor
 
+/// Hears no keys; presses reach the coordinator only through its simulate calls.
+final class SilentHotkeyMonitor: HotkeyMonitor {
+    func start(handler: @escaping @Sendable (HotkeyEvent) -> Void) async {}
+    func stop() async {}
+}
+
 enum DictationHotkey: Int, CaseIterable {
     case f5  = 96   // kVK_F5
     case f6  = 97

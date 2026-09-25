@@ -46,6 +46,7 @@ extension BootstrapSideEffect: LogSafe {
         case .meetingDetector: return "meetingDetector"
         case .watchedFolders: return "watchedFolders"
         case .dictationHotkey: return "dictationHotkey"
+        case .micHotkey: return "micHotkey"
         case .libraryPurgeOnLaunch: return "libraryPurgeOnLaunch"
         case .refreshYtDlp: return "refreshYtDlp"
         case .liveCaptionsTranslateRestore: return "liveCaptionsTranslateRestore"
