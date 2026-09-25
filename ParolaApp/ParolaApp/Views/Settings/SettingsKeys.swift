@@ -126,7 +126,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
             return [
                 "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt", "diarize",
                 "generateCardMetadata", "showAITitles", "showAISummaries",
-                "customTitlePrompt", "customSummaryPrompt", "showSubtitleQC",
+                "customTitlePrompt", "customSummaryPrompt",
                 "openEntriesInNewWindow",
                 "playSoundWhenFinished", "appVisibilityMode", "duplicateImportPolicy"
             ]
@@ -224,7 +224,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
 enum UnscopedSettingsKeys {
     static let all: [String] = [
         "burnFontSize", "burnTextColor", "burnOutline",
-        "subtitleFPS", "skipSilences", "playbackRate",
+        "subtitleFPS", "skipSilences", "playbackRate", "showSubtitleQC",
         "transcriptCompact", "transcriptDisplayMode",
         "mainWindowAlwaysOnTop", "pinnedModel",
         "liveCaptions.fontSize", "liveCaptions.opacity", "presenter.fontSize",

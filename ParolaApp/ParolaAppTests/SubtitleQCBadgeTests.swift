@@ -61,8 +61,10 @@ struct SubtitleQCBadgeTests {
         #expect(second.showSubtitleQC == false)
     }
 
-    @Test("the key belongs to the general settings scope")
-    func keyIsScoped() {
-        #expect(SettingsPaneScope.general.defaultsKeys.contains("showSubtitleQC"))
+    @Test("no pane's reset clears the inspector's checkbox, but a backup and a full reset still cover it")
+    func keyIsUnscoped() {
+        let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
+        #expect(scoped.contains("showSubtitleQC") == false)
+        #expect(UnscopedSettingsKeys.all.contains("showSubtitleQC"))
     }
 }
