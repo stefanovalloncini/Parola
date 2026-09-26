@@ -29,6 +29,20 @@ struct SearchResultsTests {
         await waitUntil { model.searchResults?.count == count }
     }
 
+    @Test("a hit the list has not caught up with is in the results the moment they land", .timeLimit(.minutes(1)))
+    func unlistedHitResolvesBeforeTheResultsLand() async throws {
+        let model = makeModel("search-unlisted")
+        await model.refreshLibraryAndWait()
+        let entry = try await add("a fresh budget", to: model)
+        #expect(model.libraryEntry(id: entry.id) == nil)
+        let baseline = model.searchResultsVersion
+
+        model.search("budget")
+        await waitUntil { model.searchResultsVersion != baseline }
+
+        #expect(model.searchResults?.map(\.id) == [entry.id])
+    }
+
     @Test("a deleted result leaves the results", .timeLimit(.minutes(1)))
     func deletedResultDisappears() async throws {
         let model = makeModel("search-delete")

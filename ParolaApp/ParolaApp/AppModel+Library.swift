@@ -694,10 +694,13 @@ extension AppModel {
             guard !Task.isCancelled, let self else { return }
             let matches = await library.search(q)
             guard !Task.isCancelled else { return }
+            // Rows resolve against the published list; a hit it has yet to catch up with would drop out of the bridge's reply.
+            if matches.contains(where: { libraryEntry(id: $0.entryID) == nil }) {
+                await refreshLibraryAndWait()
+                guard !Task.isCancelled else { return }
+            }
             searchMatches = Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0) })
             searchRanking = matches.map(\.entryID)
-            // A hit the list hasn't caught up with yet shows once the refresh lands.
-            if matches.contains(where: { libraryEntry(id: $0.entryID) == nil }) { refreshLibrary() }
         }
     }
 
