@@ -5,6 +5,7 @@ enum IntentActionError: LocalizedError, Equatable {
     case recordingInProgress
     case batchInProgress
     case transcriptionInProgress
+    case exportInProgress
     case notRecording
     case notMedia
     case cancelled
@@ -18,6 +19,8 @@ enum IntentActionError: LocalizedError, Equatable {
             return "Parola is running a batch right now. Wait for it to finish."
         case .transcriptionInProgress:
             return "Parola is already transcribing. Wait for it to finish."
+        case .exportInProgress:
+            return "Parola is exporting a video right now. Wait for it to finish."
         case .notRecording:
             return "No recording is running."
         case .notMedia:
@@ -28,6 +31,13 @@ enum IntentActionError: LocalizedError, Equatable {
             return message
         }
     }
+}
+
+/// A finished file run's hand-off to the library: the text it produced and the save still copying its media.
+struct FileRunLanding {
+    let runToken: Int
+    let text: String
+    let entry: Task<LibraryEntry, any Error>
 }
 
 extension AppModel {
@@ -43,21 +53,53 @@ extension AppModel {
         }
     }
 
+    /// Shortcuts can't answer the duplicate sheet, and the file's scope ends on return, so this waits for the media copy.
     func transcribeFileFromIntent(_ url: URL) async throws -> String {
-        if case .recording = phase { throw IntentActionError.recordingInProgress }
-        if batchIsRunning { throw IntentActionError.batchInProgress }
-        if transcribeTaskRunning { throw IntentActionError.transcriptionInProgress }
-        guard url.pathExtension.lowercased() != "parola", !Self.isSubtitleImport(url) else {
+        try ensureIntentCanStartFileRun()
+        guard url.isFileURL, url.pathExtension.lowercased() != "parola", !Self.isSubtitleImport(url) else {
             throw IntentActionError.notMedia
         }
-        transcribe(fileURL: url)
-        guard let task = fileTranscribeTask else {
+        introduction.defer()
+        let digest = await SourceDigest.digest(of: url, deadline: fileReadDeadline)
+        if let digest, duplicateImportPolicy != .transcribeAgain,
+           let existing = await library.findEntry(digest: digest) {
+            try ensureIntentCanStartFileRun()
+            do {
+                return try await openEntry(existing.id).text
+            } catch is CancellationError {
+                throw IntentActionError.cancelled
+            } catch {
+                throw IntentActionError.failed(error.localizedDescription)
+            }
+        }
+        try ensureIntentCanStartFileRun()
+        beginFileTranscription(fileURL: url, translateOverride: nil, sourceDigest: digest)
+        guard let run = fileTranscribeTask else {
             throw IntentActionError.failed("Parola couldn't start transcribing \(url.lastPathComponent).")
         }
-        await task.value
-        if case .failed(let message) = phase { throw IntentActionError.failed(message) }
-        guard phase == .ready, let transcript else { throw IntentActionError.cancelled }
-        return transcript.text
+        let runToken = fileRunGeneration
+        await run.value
+        guard let landing = fileRunLanding, landing.runToken == runToken else {
+            if case .failed(let message) = phase { throw IntentActionError.failed(message) }
+            throw IntentActionError.cancelled
+        }
+        do {
+            _ = try await landing.entry.value
+        } catch {
+            throw IntentActionError.failed(error.localizedDescription)
+        }
+        return landing.text
+    }
+
+    /// Checked again after every await: a drop or a recording can start while the file hashes.
+    private func ensureIntentCanStartFileRun() throws {
+        switch phase {
+        case .recording: throw IntentActionError.recordingInProgress
+        case .exporting: throw IntentActionError.exportInProgress
+        default: break
+        }
+        if batchIsRunning { throw IntentActionError.batchInProgress }
+        if transcribeTaskRunning { throw IntentActionError.transcriptionInProgress }
     }
 
     func stopRecordingFromIntent() async throws -> String {

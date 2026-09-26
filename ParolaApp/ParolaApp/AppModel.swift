@@ -1265,6 +1265,7 @@ final class AppModel {
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored var fileTranscribeTask: Task<Void, Never>?
+    @ObservationIgnored var fileRunLanding: FileRunLanding?
     @ObservationIgnored let fileReadDeadline: Duration
     @ObservationIgnored private var cancelPass = 0
     @ObservationIgnored private var unsettledInPass = 0
@@ -1668,6 +1669,7 @@ final class AppModel {
 
     /// `activate: false` saves without taking the selection, auto-titling, or running
     /// auto-exports — for interrupted or failed takes that only need to survive.
+    @discardableResult
     func persistToLibrary(
         _ result: Transcript,
         audioSource: URL?,
@@ -1676,22 +1678,25 @@ final class AppModel {
         activate: Bool = true,
         sourceDigest: String? = nil,
         playsCompletionSound: Bool = true
-    ) {
+    ) -> Task<LibraryEntry, any Error> {
         let category = pendingRecordingCategory
         pendingRecordingCategory = .transcription
         let navigationGeneration = loadEntryGeneration
+        let adding = Task { [library] in
+            try await library.add(
+                transcript: result,
+                audioSource: audioSource,
+                category: category,
+                title: title,
+                sourceDigest: sourceDigest,
+                source: source
+            )
+        }
         Task { [weak self] in
             guard let self else { return }
             var persistedEntryID: LibraryEntry.ID?
             do {
-                let entry = try await library.add(
-                    transcript: result,
-                    audioSource: audioSource,
-                    category: category,
-                    title: title,
-                    sourceDigest: sourceDigest,
-                    source: source
-                )
+                let entry = try await adding.value
                 persistedEntryID = entry.id
                 refreshLibrary()
                 // library.add copies media for seconds; if the user navigated meanwhile,
@@ -1723,6 +1728,7 @@ final class AppModel {
                 await autoSendEntry(persistedEntryID)
             }
         }
+        return adding
     }
 
     /// One transcription, one batch run or one re-run has landed in the library.
@@ -2140,7 +2146,11 @@ final class AppModel {
                 fileTranscribeStage = nil
                 endRecovery(recoveryToken)
                 phase = .ready
-                persistToLibrary(processed, audioSource: fileURL, source: .file, sourceDigest: sourceDigest)
+                fileRunLanding = FileRunLanding(
+                    runToken: runToken,
+                    text: processed.text,
+                    entry: persistToLibrary(processed, audioSource: fileURL, source: .file, sourceDigest: sourceDigest)
+                )
             } catch {
                 endRecovery(recoveryToken)
                 filePartialText = ""

@@ -487,6 +487,17 @@ extension AppModel {
     }
 
     func loadEntry(_ id: LibraryEntry.ID) {
+        startOpeningEntry(id)
+    }
+
+    /// `loadEntry` for a caller that needs what it opened; a later open makes this one throw `CancellationError`.
+    @discardableResult
+    func openEntry(_ id: LibraryEntry.ID) async throws -> Transcript {
+        try await startOpeningEntry(id).value
+    }
+
+    @discardableResult
+    private func startOpeningEntry(_ id: LibraryEntry.ID) -> Task<Transcript, any Error> {
         introduction.defer()
         loadEntryGeneration &+= 1
         let generation = loadEntryGeneration
@@ -495,13 +506,13 @@ extension AppModel {
         let pageAtStart = route
         let hit = searchResults == nil ? nil : searchQuery.trimmingCharacters(in: .whitespaces)
         let hitPosition = searchMatches[id]?.firstHit
-        Task { [weak self] in
-            guard let self else { return }
+        return Task { [weak self] in
+            guard let self else { throw CancellationError() }
             await flushPendingTranscriptSave()
             do {
                 let loaded = try await library.load(id)
                 // Two quick clicks race across the await, and the slower load would land last.
-                guard generation == loadEntryGeneration else { return }
+                guard generation == loadEntryGeneration else { throw CancellationError() }
                 installStoredTranscript(loaded.document.transcript)
                 closeFind()
                 sourceFileURL = loaded.document.audioURL
@@ -519,14 +530,17 @@ extension AppModel {
                 libraryOrigin = origin
                 libraryOriginEntryID = id
                 if let hit, !hit.isEmpty { revealInTranscript(hit, at: hitPosition) }
+                let opened = transcript ?? loaded.document.transcript
                 let openedAt = Date()
                 if (try? await library.markOpened(id: id, at: openedAt)) != nil {
                     patchLibraryEntry(id: id) { $0.lastOpenedAt = openedAt }
                 }
                 refreshLibrary()
+                return opened
             } catch {
-                guard generation == loadEntryGeneration else { return }
+                guard generation == loadEntryGeneration else { throw error }
                 phase = .failed(message: error.localizedDescription)
+                throw error
             }
         }
     }
