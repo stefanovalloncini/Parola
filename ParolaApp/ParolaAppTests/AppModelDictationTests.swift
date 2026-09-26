@@ -411,6 +411,21 @@ struct AppModelDictationTests {
         #expect(options.language == "en")
     }
 
+    @Test("discarding a streamed dictation cancels the take instead of decoding its tail")
+    func discardCancelsTheStream() async throws {
+        let spy = EndingSpy()
+        let recorder = MicDictationRecorder(
+            model: "openai_whisper-tiny",
+            language: "en",
+            makeStreamingSession: { spy }
+        )
+        try await recorder.start()
+
+        await recorder.stopAndDiscard()
+
+        #expect(await spy.ends == ["cancel"])
+    }
+
     @Test("startDictation threads the preferred input device into the configuration")
     func startDictationThreadsInputDevice() {
         let model = makeModel()
@@ -526,4 +541,31 @@ struct AppModelDictationTests {
 private struct IntentStubRecorder: DictationRecorder {
     func start() async throws {}
     func stopAndTranscribe() async throws -> String { "" }
+}
+
+private actor EndingSpy: StreamingTranscriber {
+    private(set) var ends: [String] = []
+    private var continuation: AsyncStream<StreamingEvent>.Continuation?
+
+    func start(
+        options: TranscriptionOptions,
+        speakerLabeler: (any StreamingSpeakerLabeler)?,
+        downloadProgress: (@Sendable (Double) -> Void)?
+    ) async throws -> AsyncStream<StreamingEvent> {
+        let (stream, continuation) = AsyncStream<StreamingEvent>.makeStream()
+        self.continuation = continuation
+        return stream
+    }
+
+    func stop() async {
+        ends.append("stop")
+        continuation?.finish()
+    }
+
+    func cancel() async {
+        ends.append("cancel")
+        continuation?.finish()
+    }
+
+    func currentModel() async -> String? { "openai_whisper-tiny" }
 }

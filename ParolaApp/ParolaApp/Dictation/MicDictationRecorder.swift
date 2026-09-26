@@ -18,6 +18,7 @@ actor MicDictationRecorder: DictationRecorder {
     private let fallbackSession: TranscriptionSession
     private var fallbackForwardingTask: Task<Void, Never>?
     private let clock: any Clock<Duration>
+    private let makeStreamingSession: @Sendable () -> any StreamingTranscriber
 
     private var streamingSession: (any StreamingTranscriber)?
     private var streamingConsumer: Task<Void, Never>?
@@ -34,7 +35,8 @@ actor MicDictationRecorder: DictationRecorder {
         session: TranscriptionSession? = nil,
         workflowResolver: (@Sendable () async -> DictationWorkflow?)? = nil,
         downloadProgress: (@Sendable (Double) -> Void)? = nil,
-        clock: any Clock<Duration> = ContinuousClock()
+        clock: any Clock<Duration> = ContinuousClock(),
+        makeStreamingSession: (@Sendable () -> any StreamingTranscriber)? = nil
     ) {
         self.model = model
         self.defaultLanguage = language
@@ -46,6 +48,9 @@ actor MicDictationRecorder: DictationRecorder {
         self.workflowResolver = workflowResolver
         self.downloadProgress = downloadProgress
         self.clock = clock
+        self.makeStreamingSession = makeStreamingSession ?? { [clock] in
+            StreamingTranscriberFactory.make(clock: clock, deviceUID: deviceUID)
+        }
     }
 
     private func resolveLanguageOverride() async {
@@ -80,7 +85,7 @@ actor MicDictationRecorder: DictationRecorder {
 
     func stopAndDiscard() async {
         if let session = streamingSession {
-            await session.stop()
+            await session.cancel()
             await streamingConsumer?.value
             streamingConsumer = nil
             streamingSession = nil
@@ -139,7 +144,7 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     private func startStreaming() async throws {
-        let session = StreamingTranscriberFactory.make(clock: clock, deviceUID: deviceUID)
+        let session = makeStreamingSession()
         streamingSegments = []
         streamingPartial = ""
         streamingFailure = nil
