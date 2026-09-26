@@ -157,9 +157,13 @@ struct ChatSheet: View {
                 history: transcript.chatHistory ?? [],
                 provider: .onDevice
             )
+            guard !Task.isCancelled else { return }
+            let history = await s.history
+            guard !Task.isCancelled else { return }
             session = s
-            displayedHistory = await s.history
+            displayedHistory = history
         } catch {
+            guard !Task.isCancelled else { return }
             sessionError = error.localizedDescription
         }
     }

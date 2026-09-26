@@ -306,15 +306,40 @@ struct ChatPane: View {
         session = nil
         displayedHistory = []
         guard let transcript = model.transcript else { return }
+        let loaded = await Self.loadSession(key: sessionKey, currentKey: { sessionKey }) {
+            try await model.makeChatSession(transcript: transcript, history: transcript.chatHistory ?? [])
+        }
+        switch loaded {
+        case .ready(let built, let history)?:
+            session = built
+            displayedHistory = history
+        case .failed(let message)?:
+            sessionError = message
+        case nil:
+            return
+        }
+    }
+
+    enum SessionLoad {
+        case ready(TranscriptChatSession, history: [ChatMessage])
+        case failed(String)
+    }
+
+    /// Nil when the pane moved to another entry while the session was built: installing it would answer, and record, into the wrong entry.
+    static func loadSession(
+        key: ChatSessionKey,
+        currentKey: () -> ChatSessionKey,
+        build: () async throws -> TranscriptChatSession
+    ) async -> SessionLoad? {
         do {
-            let s = try await model.makeChatSession(
-                transcript: transcript,
-                history: transcript.chatHistory ?? []
-            )
-            session = s
-            displayedHistory = await s.history
+            let built = try await build()
+            guard !Task.isCancelled, key == currentKey() else { return nil }
+            let history = await built.history
+            guard !Task.isCancelled, key == currentKey() else { return nil }
+            return .ready(built, history: history)
         } catch {
-            sessionError = error.localizedDescription
+            guard !Task.isCancelled, key == currentKey() else { return nil }
+            return .failed(error.localizedDescription)
         }
     }
 
