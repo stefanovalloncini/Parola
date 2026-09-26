@@ -46,7 +46,11 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var speakerLabeler: (any StreamingSpeakerLabeler)?
     private var failureAudioURL: URL?
     private var startedAt: ContinuousClock.Instant?
+    private var isStarting = false
+    private var pendingEnd: PendingEnd?
     nonisolated let persistAudio: Bool
+
+    enum PendingEnd { case stop, cancel }
 
     public init(modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil) {
         self.modelStore = modelStore
@@ -83,7 +87,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         speakerLabeler: (any StreamingSpeakerLabeler)? = nil,
         downloadProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> AsyncStream<StreamingEvent> {
-        guard loop == nil else {
+        guard loop == nil, !isStarting else {
             ParolaLog.fault(.streaming, "start called while a session was already running")
             throw ParolaError.transcriptionFailed("session already started")
         }
@@ -100,14 +104,19 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             .streaming, "streaming session starting on whisperkit",
             [.model: .safe(ModelToken(modelName))]
         )
-        if !modelStore.isInstalled(modelName) {
-            if await EngineRegistry.shared.registeredEngines().isEmpty {
-                await ParolaCoreBootstrap.registerBuiltInEngines()
+        let loaded = try await loadingModel { [modelStore] in
+            if !modelStore.isInstalled(modelName) {
+                if await EngineRegistry.shared.registeredEngines().isEmpty {
+                    await ParolaCoreBootstrap.registerBuiltInEngines()
+                }
+                _ = try await modelStore.download(variant: modelName, progress: downloadProgress)
             }
-            _ = try await modelStore.download(variant: modelName, progress: downloadProgress)
+            return try await StreamingModelCache.shared.borrow(modelName, store: modelStore).kit
         }
-
-        let kit = try await StreamingModelCache.shared.borrow(modelName, store: modelStore).kit
+        guard let kit = loaded else {
+            ParolaLog.info(.streaming, "take stopped before capture started")
+            return Self.takeEndedBeforeCapture(modelName: modelName, options: options)
+        }
         guard let tokenizer = kit.tokenizer else {
             ParolaLog.error(
                 .streaming, "tokenizer was nil after model load",
@@ -180,6 +189,31 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         }
     }
 
+    /// A stop that lands during the load yields nil and a cancel throws; either way capture never starts.
+    func loadingModel<Loaded>(_ load: () async throws -> Loaded) async throws -> Loaded? {
+        isStarting = true
+        pendingEnd = nil
+        defer { isStarting = false }
+        let loaded = try await load()
+        try Task.checkCancellation()
+        switch pendingEnd {
+        case .cancel: throw CancellationError()
+        case .stop: return nil
+        case nil: return loaded
+        }
+    }
+
+    static func takeEndedBeforeCapture(modelName: String, options: TranscriptionOptions) -> AsyncStream<StreamingEvent> {
+        let (stream, continuation) = AsyncStream<StreamingEvent>.makeStream()
+        continuation.yield(.finished(Transcript(
+            segments: [],
+            language: finalLanguage(for: [], options: options),
+            modelName: modelName
+        )))
+        continuation.finish()
+        return stream
+    }
+
     /// Runs a take on a loop the caller builds, so everything past the model load can be driven
     /// without a model.
     func launch(
@@ -224,7 +258,10 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     /// Stops the mic stream, flushes a final transcript, and finishes the stream.
     public func stop() async {
-        guard let loop else { return }
+        guard let loop else {
+            if isStarting, pendingEnd == nil { pendingEnd = .stop }
+            return
+        }
         self.loop = nil
         await loop.stop()
         // The run task performs the final tail flush after its loop exits; cancelling
@@ -264,7 +301,10 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     /// Ends the take without the final decode and deletes its audio; no `.finished` is sent.
     public func cancel() async {
-        guard let loop else { return }
+        guard let loop else {
+            if isStarting { pendingEnd = .cancel }
+            return
+        }
         self.loop = nil
         await loop.cancel()
         // A decode already in flight would otherwise run to the end before the loop sees the cancel.

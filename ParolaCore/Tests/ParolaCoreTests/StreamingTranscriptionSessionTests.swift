@@ -111,8 +111,83 @@ private func launchTake(
     }
 }
 
+/// A model load that stays in flight until the test lets it finish.
+private actor SuspendingLoader {
+    private var waiter: CheckedContinuation<Void, Never>?
+    private(set) var isLoading = false
+
+    func load() async -> String {
+        isLoading = true
+        await withCheckedContinuation { waiter = $0 }
+        return "kit"
+    }
+
+    func finish() {
+        waiter?.resume()
+        waiter = nil
+    }
+}
+
 @Suite("Ending a live take")
 struct StreamingTakeEndingTests {
+    @Test("a stop while the model loads ends the take before capture: the load yields nothing to launch")
+    func stopDuringLoadEndsTheTake() async throws {
+        let session = StreamingTranscriptionSession()
+        let loader = SuspendingLoader()
+        let starting = Task { try await session.loadingModel { await loader.load() } }
+        #expect(await eventually { await loader.isLoading })
+
+        await session.stop()
+        await loader.finish()
+
+        #expect(try await starting.value == nil)
+    }
+
+    @Test("a cancel while the model loads throws instead of launching")
+    func cancelDuringLoadThrows() async throws {
+        let session = StreamingTranscriptionSession()
+        let loader = SuspendingLoader()
+        let starting = Task { try await session.loadingModel { await loader.load() } }
+        #expect(await eventually { await loader.isLoading })
+
+        await session.cancel()
+        await loader.finish()
+
+        await #expect(throws: CancellationError.self) { _ = try await starting.value }
+    }
+
+    @Test("a load nobody ended hands back what it loaded, and a stop before any start is not remembered")
+    func untouchedLoadLaunches() async throws {
+        let session = StreamingTranscriptionSession()
+        await session.stop()
+        let loader = SuspendingLoader()
+        let starting = Task { try await session.loadingModel { await loader.load() } }
+        #expect(await eventually { await loader.isLoading })
+
+        await loader.finish()
+
+        #expect(try await starting.value == "kit")
+    }
+
+    @Test("a take stopped before capture finishes with an empty transcript and nothing else")
+    func takeEndedBeforeCaptureOnlyFinishes() async {
+        var events: [StreamingEvent] = []
+        for await event in StreamingTranscriptionSession.takeEndedBeforeCapture(
+            modelName: "openai_whisper-tiny", options: TranscriptionOptions(language: "it")
+        ) {
+            events.append(event)
+        }
+
+        #expect(events.count == 1)
+        guard case .finished(let transcript) = events.first else {
+            Issue.record("expected .finished, got \(events)")
+            return
+        }
+        #expect(transcript.segments.isEmpty)
+        #expect(transcript.language == "it")
+        #expect(transcript.sourceURL == nil)
+    }
+
     @Test("cancelling a take skips its final decode, deletes its audio and sends no finished transcript")
     func cancelDiscardsTheTake() async throws {
         let session = StreamingTranscriptionSession(persistAudio: true)

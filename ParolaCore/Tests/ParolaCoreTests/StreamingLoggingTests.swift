@@ -255,11 +255,12 @@ struct StreamingLoggingTests {
             #"ParolaLog.notice(.streaming, "engine \(variant.engineID) cannot stream")"#,
             #"ParolaLog.info( .streaming, "streaming session starting on whisperkit", [.model: .safe(ModelToken(modelName))]"#,
             #"ParolaLog.error( .streaming, "tokenizer was nil after model load", [.model: .safe(ModelToken(modelName))]"#,
+            #"ParolaLog.info(.streaming, "take stopped before capture started")"#,
             #"ParolaLog.error(.streaming, "streaming failed", failureFields(error))"#,
             #"if loop != nil { ParolaLog.error(.streaming, "streaming loop ended without a stop request") }"#,
             #"var fields: [LogField: LogValue] = [.error: .error(error)] if let startedAt { fields[.elapsed] = .duration(startedAt.duration(to: .now)) }"#,
         ], in: source)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 6)
+        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 7)
     }
 
     @Test("the realtime loop logs the three run outcomes and nothing per-iteration")
