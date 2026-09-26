@@ -171,7 +171,7 @@ struct FindAndReplaceTests {
         #expect(model.findFocusRequests == before &+ 2)
     }
 
-    @Test("every replacement tells the find bar to let go of its field")
+    @Test("every replacement asks the find bar for a fresh editing session")
     func replacementsAreCounted() {
         openFind(query: "world")
         model.findReplacement = "earth"

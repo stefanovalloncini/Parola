@@ -22,22 +22,38 @@ struct FindBar: View {
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.top, DS.Spacing.small)
         .padding(.bottom, DS.Spacing.tight)
-        .task(id: model.findFocusRequests) { await focusQuery() }
-        .onChange(of: model.findReplacements) { _, _ in endFieldEditing() }
+        .task(id: model.findFocusRequests) { await focus($queryFocused) }
+        .onChange(of: model.findReplacements) { _, _ in refocusAfterReplacing() }
     }
 
-    /// A field still editing answers ⌘Z with its own typing, so the replacement it just made would need Escape first.
-    private func endFieldEditing() {
-        guard let window = NSApp.keyWindow, (window.firstResponder as? NSTextView)?.isFieldEditor == true else { return }
-        if !window.makeFirstResponder(window.contentView) { window.makeFirstResponder(nil) }
+    /// The field keeps the caret, in a fresh editing session: the old one's typing would take the first ⌘Z from the replacement.
+    private func refocusAfterReplacing() {
+        let inReplacement = replaceFocused
+        if let window = NSApp.keyWindow, (window.firstResponder as? NSTextView)?.isFieldEditor == true,
+           !window.makeFirstResponder(window.contentView) {
+            window.makeFirstResponder(nil)
+        }
+        queryFocused = false
+        replaceFocused = false
+        Task {
+            if inReplacement {
+                await focus($replaceFocused, caretAtEnd: true)
+            } else {
+                await focus($queryFocused)
+            }
+        }
     }
 
-    /// Asked while the bar is still being built, focus lands on another field of the window, so the ask waits a frame and repeats until it holds.
-    private func focusQuery() async {
+    /// Asked while the window is still moving focus, the ask lands on another field, so it waits a frame and repeats until it holds.
+    private func focus(_ field: FocusState<Bool>.Binding, caretAtEnd: Bool = false) async {
         for _ in 0..<10 {
             try? await Task.sleep(for: .milliseconds(20))
-            if Task.isCancelled || queryFocused { return }
-            queryFocused = true
+            if Task.isCancelled { return }
+            if field.wrappedValue {
+                if caretAtEnd { (NSApp.keyWindow?.firstResponder as? NSTextView)?.moveToEndOfDocument(nil) }
+                return
+            }
+            field.wrappedValue = true
         }
     }
 
