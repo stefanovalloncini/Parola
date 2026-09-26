@@ -23,6 +23,7 @@ final class EntryWindowSession {
     var rate: Double { didSet { applyRate() } }
 
     var searchIsOpen = false
+    var searchFocusRequests = 0
     var searchQuery: String = "" { didSet { scheduleMatchRecompute() } }
     private(set) var matches: [TranscriptMatch] = []
     private(set) var currentMatchIndex = 0
@@ -270,6 +271,12 @@ final class EntryWindowSession {
     func toggleSearch() {
         searchIsOpen.toggle()
         if !searchIsOpen { searchQuery = "" }
+    }
+
+    /// What Edit › Find… does here, as in the main window: open the bar, or put the caret back in it.
+    func beginSearch() {
+        searchIsOpen = true
+        searchFocusRequests &+= 1
     }
 
     var currentMatch: TranscriptMatch? {

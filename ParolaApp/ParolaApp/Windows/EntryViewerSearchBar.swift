@@ -59,7 +59,7 @@ struct EntryViewerSearchBar: View {
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
-        .onAppear { queryFocused = true }
+        .task(id: session.searchFocusRequests) { await $queryFocused.request() }
     }
 
     private var matchSummary: String {

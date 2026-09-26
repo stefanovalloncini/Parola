@@ -200,6 +200,11 @@ struct OpenInNewWindowSettingTests {
         #expect(session.searchIsOpen)
         #expect(model.findIsOpen == false)
 
+        let requests = session.searchFocusRequests
+        model.beginFind()
+        #expect(session.searchIsOpen, "a second ⌘F keeps the viewer's bar open, as in the main window")
+        #expect(session.searchFocusRequests == requests &+ 1)
+
         model.entryWindowKeyChanged(entry.id, isKey: false)
         model.beginFind()
 

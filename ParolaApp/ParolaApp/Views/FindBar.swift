@@ -22,7 +22,7 @@ struct FindBar: View {
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.top, DS.Spacing.small)
         .padding(.bottom, DS.Spacing.tight)
-        .task(id: model.findFocusRequests) { await focus($queryFocused) }
+        .task(id: model.findFocusRequests) { await $queryFocused.request() }
         .onChange(of: model.findReplacements) { _, _ in refocusAfterReplacing() }
     }
 
@@ -37,23 +37,10 @@ struct FindBar: View {
         replaceFocused = false
         Task {
             if inReplacement {
-                await focus($replaceFocused, caretAtEnd: true)
+                await $replaceFocused.request(caretAtEnd: true)
             } else {
-                await focus($queryFocused)
+                await $queryFocused.request()
             }
-        }
-    }
-
-    /// Asked while the window is still moving focus, the ask lands on another field, so it waits a frame and repeats until it holds.
-    private func focus(_ field: FocusState<Bool>.Binding, caretAtEnd: Bool = false) async {
-        for _ in 0..<10 {
-            try? await Task.sleep(for: .milliseconds(20))
-            if Task.isCancelled { return }
-            if field.wrappedValue {
-                if caretAtEnd { (NSApp.keyWindow?.firstResponder as? NSTextView)?.moveToEndOfDocument(nil) }
-                return
-            }
-            field.wrappedValue = true
         }
     }
 
