@@ -661,6 +661,47 @@ struct AppModelDictationTests {
         model.abortDictation()
     }
 
+    /// Dictation on, a final held in its recorder, and every paste recorded instead of posted.
+    private func modelHoldingAFinal() async -> (AppModel, RecorderTally, CapturedInsertionStore) {
+        let model = makeModel()
+        let recorders = RecorderTally(text: "spoken words")
+        let pasted = CapturedInsertionStore()
+        model.dictationController.recorderFactory = { _ in recorders.make() }
+        model.dictationController.inserterFactory = { CapturingTextInserter(store: pasted) }
+        model.dictationEnabled = true
+        model.dictationController.simulatePress()
+        #expect(await waitUntil { model.dictationState == .listening })
+        model.stopDictationFromIntent()
+        #expect(await waitUntil { model.dictationState == .transcribing })
+        return (model, recorders, pasted)
+    }
+
+    @Test("turning dictation off mid-final drops it: nothing is pasted")
+    func turningOffDropsThePendingFinal() async throws {
+        let (model, recorders, pasted) = await modelHoldingAFinal()
+
+        model.dictationEnabled = false
+        #expect(model.dictationState == .idle)
+        #expect(!model.dictationController.isRunning)
+
+        for recorder in recorders.made { await recorder.release() }
+        #expect(await waitUntil { await recorders.made.first?.returned == true })
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(pasted.all().isEmpty)
+    }
+
+    @Test("a restart mid-final still pastes the last utterance")
+    func restartKeepsThePendingFinal() async throws {
+        let (model, recorders, pasted) = await modelHoldingAFinal()
+
+        model.restartDictation()
+        #expect(model.dictationController.isRunning)
+
+        for recorder in recorders.made { await recorder.release() }
+        #expect(await waitUntil { pasted.all() == ["spoken words"] })
+        model.abortDictation()
+    }
+
     @Test("startDictationFromIntent restarts a stopped controller when already enabled")
     func intentStartsStoppedController() {
         let model = makeModel()
@@ -714,13 +755,18 @@ private struct IdentityPostProcessor: TextPostProcessor {
 }
 
 private actor StuckRecorder: DictationRecorder {
+    private let text: String
     private var gate: CheckedContinuation<Void, Never>?
+    private(set) var returned = false
+
+    init(text: String = "") { self.text = text }
 
     func start() async throws {}
 
     func stopAndTranscribe() async throws -> String {
         await withCheckedContinuation { gate = $0 }
-        return ""
+        returned = true
+        return text
     }
 
     func stopAndDiscard() async {}
@@ -733,10 +779,13 @@ private actor StuckRecorder: DictationRecorder {
 
 @MainActor
 private final class RecorderTally {
+    private let text: String
     private(set) var made: [StuckRecorder] = []
 
+    init(text: String = "") { self.text = text }
+
     func make() -> StuckRecorder {
-        let recorder = StuckRecorder()
+        let recorder = StuckRecorder(text: text)
         made.append(recorder)
         return recorder
     }

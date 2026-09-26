@@ -238,8 +238,15 @@ extension AppModel {
             startDictation()
         } else {
             dictationPermissions.endWatchingForGrant()
-            stopDictation()
+            turnOffDictation()
         }
+    }
+
+    /// Unlike a restart's stop, this drops a final still on its way: nothing is pasted once dictation is off.
+    func turnOffDictation() {
+        pendingDictationRestart?.cancel()
+        pendingDictationRestart = nil
+        dictationController.discardAndStop()
     }
 
     func startDictation() {

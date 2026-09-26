@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Foundation
+import os
 import ParolaCore
 import ParolaDictation
 import SwiftUI
@@ -51,6 +52,8 @@ final class DictationController {
     @ObservationIgnored var anchorProvider: any FieldAnchorProviding = FocusedFieldLocator()
     @ObservationIgnored var hotkeyFactory: ((Int, NSEvent.ModifierFlags) -> any HotkeyMonitor)?
     @ObservationIgnored var recorderFactory: ((Configuration) -> any DictationRecorder)?
+    @ObservationIgnored var inserterFactory: (() -> any TextInserter)?
+    @ObservationIgnored private var pasteGate = PasteGate()
     private(set) var currentAnchor: FieldAnchor?
 
     var configuration: Configuration?
@@ -137,7 +140,9 @@ final class DictationController {
             }
         )
         let inserter: any TextInserter
-        if appModel?.mode == .test {
+        if let inserterFactory {
+            inserter = inserterFactory()
+        } else if appModel?.mode == .test {
             inserter = CapturingTextInserter()
         } else {
             inserter = PerAppTextInserter(
@@ -152,7 +157,7 @@ final class DictationController {
         let coord = DictationCoordinator(
             hotkey: hotkey,
             recorder: recorder,
-            inserter: inserter,
+            inserter: GatedTextInserter(base: inserter, gate: pasteGate),
             postProcessor: configuration.postProcessor,
             mode: configuration.mode,
             mediaSession: configuration.mediaSession,
@@ -195,6 +200,13 @@ final class DictationController {
     /// or inserting it. Unlike `stop()` (which flushes the pending utterance) this is the
     /// teardown for a hard reset, so a leaked listening session can't bleed — coordinator,
     /// HUD, and state — into the next test.
+    /// Turning dictation off drops what it would still paste, from this session or one a restart left finishing.
+    func discardAndStop() {
+        pasteGate.close()
+        pasteGate = PasteGate()
+        abort()
+    }
+
     func abort() {
         coordinatorGeneration += 1
         guard let coord = coordinator else {
@@ -449,5 +461,24 @@ final class DictationController {
             url = nil
         }
         return DictationWorkflowMap.select(in: workflows, for: bundleID, url: url)
+    }
+}
+
+/// Open while dictation stays on. A final that lands after it closes would paste into whatever app is in front by then.
+private final class PasteGate: Sendable {
+    private let open = OSAllocatedUnfairLock(initialState: true)
+
+    var isOpen: Bool { open.withLock { $0 } }
+
+    func close() { open.withLock { $0 = false } }
+}
+
+private struct GatedTextInserter: TextInserter {
+    let base: any TextInserter
+    let gate: PasteGate
+
+    func insert(_ text: String) async throws {
+        guard gate.isOpen else { return }
+        try await base.insert(text)
     }
 }

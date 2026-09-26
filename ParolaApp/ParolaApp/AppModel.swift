@@ -853,7 +853,7 @@ final class AppModel {
         }
         // Re-apply only the side effects this launch actually wired (skipped under skipBootstrap tests).
         if !dictationEnabled {
-            stopDictation()
+            turnOffDictation()
         } else if activeSideEffects.contains(.dictationHotkey) {
             stopDictation()
             startDictation()

@@ -18,7 +18,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "stopDictation",
                 area: .dictation,
-                summary: "Stops the active dictation session. A final transcription already running is given up after 3 s.",
+                summary: "Stops the active dictation session. If a final transcription is already running when this arrives, even one a stop made elsewhere started, it is given up after 3 s and its text is dropped.",
                 kind: .mutating,
                 handler: { _, ctx in
                     try ctx.require(.dictation)
