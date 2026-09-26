@@ -18,6 +18,15 @@ public enum SpeechRateSeries {
         segments: [TranscriptSegment],
         binSeconds: Double = 30
     ) -> [SpeechRateBin] {
+        compute(segments: segments, wordCounts: segments.map { countWords($0.text) }, binSeconds: binSeconds)
+    }
+
+    /// `wordCounts` holds one count per segment, as `TranscriptTextStats.segmentWordCounts` does.
+    public static func compute(
+        segments: [TranscriptSegment],
+        wordCounts: [Int],
+        binSeconds: Double = 30
+    ) -> [SpeechRateBin] {
         guard binSeconds > 0, !segments.isEmpty else { return [] }
         let total = segments.map(\.end).max() ?? 0
         guard total > 0 else { return [] }
@@ -26,8 +35,7 @@ public enum SpeechRateSeries {
         guard binCount > 0 else { return [] }
         var counts = Array(repeating: 0.0, count: binCount)
 
-        for seg in segments {
-            let words = countWords(seg.text)
+        for (seg, words) in zip(segments, wordCounts) {
             guard words > 0, seg.end > seg.start else { continue }
             let duration = seg.end - seg.start
             let wordsPerSecond = Double(words) / duration

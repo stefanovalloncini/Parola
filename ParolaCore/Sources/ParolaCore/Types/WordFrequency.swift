@@ -69,14 +69,23 @@ public enum WordFrequency {
     ) -> [Entry] {
         var counts: [String: Int] = [:]
         for raw in text.split(whereSeparator: { !$0.isLetter && !$0.isNumber && !$0.isApostrophe }) {
-            var token = String(raw).lowercased()
-            while token.first?.isApostrophe == true { token.removeFirst() }
-            while token.last?.isApostrophe == true { token.removeLast() }
-            guard token.count >= minLength else { continue }
-            guard !stopWords.contains(token) else { continue }
-            counts[token, default: 0] += 1
+            tally(raw, into: &counts, minLength: minLength, stopWords: stopWords)
         }
-        return counts.sorted { lhs, rhs in
+        return top(counts, limit: limit)
+    }
+
+    /// Counts one run of letters, digits and apostrophes, lowercased and stripped of its outer apostrophes.
+    static func tally(_ raw: Substring, into counts: inout [String: Int], minLength: Int, stopWords: Set<String>) {
+        var token = raw.lowercased()
+        while token.first?.isApostrophe == true { token.removeFirst() }
+        while token.last?.isApostrophe == true { token.removeLast() }
+        guard token.count >= minLength else { return }
+        guard !stopWords.contains(token) else { return }
+        counts[token, default: 0] += 1
+    }
+
+    static func top(_ counts: [String: Int], limit: Int) -> [Entry] {
+        counts.sorted { lhs, rhs in
             if lhs.value != rhs.value { return lhs.value > rhs.value }
             return lhs.key < rhs.key
         }
@@ -85,6 +94,6 @@ public enum WordFrequency {
     }
 }
 
-private extension Character {
+extension Character {
     var isApostrophe: Bool { self == "'" || self == "\u{2019}" }
 }

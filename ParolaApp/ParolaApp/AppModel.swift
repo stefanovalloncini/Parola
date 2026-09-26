@@ -78,7 +78,10 @@ final class AppModel {
             transcriptMatchesLoadedMedia = false
             if transcript == nil, promptOutput != nil { promptOutput = nil }
             currentSegmentIndex = nil
-            cachedTranscriptText = nil
+            if !Self.sameText(oldValue, transcript) {
+                cachedTranscriptText = nil
+                transcriptTextVersion &+= 1
+            }
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
             if hasTranscript != (transcript != nil) { hasTranscript = transcript != nil }
@@ -92,14 +95,22 @@ final class AppModel {
     private(set) var hasTranslation: Bool = false
     private(set) var transcriptSpeakers: [String] = []
     private(set) var transcriptVersion: Int = 0
+    /// Moves only when the segment texts or the language change: timing, speakers and chat leave it alone.
+    private(set) var transcriptTextVersion: Int = 0
     @ObservationIgnored private var cachedTranscriptText: String?
-    /// The full joined transcript, built once per transcript version instead of once per reader.
+    /// The full joined transcript, built once per text version instead of once per reader.
     var transcriptText: String {
         guard let transcript else { return "" }
         if let cachedTranscriptText { return cachedTranscriptText }
         let text = transcript.text
         cachedTranscriptText = text
         return text
+    }
+    /// Compares storage-shared texts in O(1) each, so a timing nudge costs a pass of pointer checks.
+    private static func sameText(_ lhs: Transcript?, _ rhs: Transcript?) -> Bool {
+        guard let lhs, let rhs else { return lhs == nil && rhs == nil }
+        guard lhs.language == rhs.language, lhs.segments.count == rhs.segments.count else { return false }
+        return zip(lhs.segments, rhs.segments).allSatisfy { $0.text == $1.text }
     }
     // Short-circuits rather than building Transcript.text just to test for emptiness on every view update.
     var transcriptIsEmpty: Bool {

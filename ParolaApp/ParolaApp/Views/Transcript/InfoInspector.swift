@@ -4,6 +4,8 @@ import ParolaCore
 struct InfoInspector: View {
     struct Derived {
         var text = TranscriptTextStats()
+        /// The `transcriptTextVersion` that `text` counts, so an edit that leaves the text alone reuses it.
+        var textVersion: Int?
         var speakers: [SpeakerStats] = []
         var confidenceAverage: Double?
         var lowConfidence: [TranscriptSegment] = []
@@ -79,7 +81,7 @@ struct InfoInspector: View {
                 ChaptersSection()
                 ActionItemsSection()
                 SpeechRateSection(bins: derived.speechRate)
-                WordFrequencySection()
+                WordFrequencySection(entries: derived.text.topWords)
             }
         }
         .task(id: model.transcriptVersion) { await recomputeDerived() }
@@ -227,25 +229,40 @@ struct InfoInspector: View {
             derived = Derived()
             return
         }
-        let text = model.transcriptText
-        guard transcript.segments.count > TranscriptDerive.synchronousCap else {
-            derived = Self.derive(transcript: transcript, text: text)
-            return
+        let textVersion = model.transcriptTextVersion
+        let knownText = derived.textVersion == textVersion ? derived.text : nil
+        let work = Task.detached(priority: .userInitiated) {
+            try Self.derive(transcript: transcript, textVersion: textVersion, knownText: knownText)
         }
-        let computed = await Task.detached(priority: .userInitiated) {
-            Self.derive(transcript: transcript, text: text)
-        }.value
-        guard !Task.isCancelled else { return }
+        let computed = try? await withTaskCancellationHandler {
+            try await work.value
+        } onCancel: {
+            work.cancel()
+        }
+        guard let computed, !Task.isCancelled else { return }
         derived = computed
     }
 
-    nonisolated static func derive(transcript: Transcript, text: String) -> Derived {
-        Derived(
-            text: TranscriptTextStats.compute(text: text),
+    /// `knownText` is the text count of an unchanged text: only timing, speakers and confidence need a fresh pass.
+    nonisolated static func derive(transcript: Transcript, textVersion: Int?, knownText: TranscriptTextStats?) throws -> Derived {
+        let text: TranscriptTextStats
+        if let knownText, knownText.segmentWordCounts.count == transcript.segments.count {
+            text = knownText
+        } else {
+            text = try TranscriptTextStats.compute(
+                segments: transcript.segments,
+                stopWords: WordFrequency.stopWords(for: transcript.language),
+                topWordLimit: WordFrequencySection.limit
+            )
+        }
+        try Task.checkCancellation()
+        return Derived(
+            text: text,
+            textVersion: textVersion,
             speakers: SpeakerStats.compute(for: transcript),
             confidenceAverage: SegmentConfidence.transcriptAverage(for: transcript),
             lowConfidence: SegmentConfidence.lowConfidence(segments: transcript.segments),
-            speechRate: SpeechRateSeries.compute(segments: transcript.segments, binSeconds: 30)
+            speechRate: SpeechRateSeries.compute(segments: transcript.segments, wordCounts: text.segmentWordCounts, binSeconds: 30)
         )
     }
 

@@ -30,7 +30,7 @@ struct TranslationSection: View {
         }
         // The list is ~100 languages sorted by locale, and the count walks the whole transcript;
         // neither belongs in a body pass the progress rows re-run per batch.
-        .task(id: model.transcriptVersion) {
+        .task(id: model.transcriptTextVersion) {
             characterCount = model.transcriptText.count
             rebuildMenuTargets()
         }

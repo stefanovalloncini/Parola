@@ -44,7 +44,7 @@ struct TranscriptHeaderBar: View {
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
         .onAppear { rebuildShareItem() }
-        .onChange(of: model.transcriptVersion) { _, _ in rebuildShareItem() }
+        .onChange(of: model.transcriptTextVersion) { _, _ in rebuildShareItem() }
         .onChange(of: title) { _, _ in rebuildShareItem() }
     }
 

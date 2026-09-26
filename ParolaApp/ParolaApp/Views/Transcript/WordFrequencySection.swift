@@ -2,8 +2,10 @@ import SwiftUI
 import ParolaCore
 
 struct WordFrequencySection: View {
+    nonisolated static let limit = 12
+
     @Environment(AppModel.self) private var model
-    @State private var entries: [WordFrequency.Entry] = []
+    let entries: [WordFrequency.Entry]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -23,13 +25,6 @@ struct WordFrequencySection: View {
                     }
                 }
             }
-        }
-        .task(id: model.transcriptVersion) {
-            let text = model.transcriptText
-            let stopWords = WordFrequency.stopWords(for: model.transcript?.language)
-            entries = await Task.detached {
-                WordFrequency.compute(text: text, limit: 12, stopWords: stopWords)
-            }.value
         }
     }
 }
