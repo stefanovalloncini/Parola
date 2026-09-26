@@ -2890,6 +2890,28 @@
         }
       }
     },
+    "Checking %lld files…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controllo di %lld file…"
+          }
+        }
+      }
+    },
+    "Checking 1 file…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controllo di 1 file…"
+          }
+        }
+      }
+    },
     "Checking…": {
       "extractionState": "manual",
       "localizations": {

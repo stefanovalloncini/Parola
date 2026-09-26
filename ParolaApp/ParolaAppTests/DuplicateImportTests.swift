@@ -193,6 +193,36 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a batch import says it is checking right away and keeps each new file's digest for the add")
+        func batchImportShowsCheckingAndKeepsDigests() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "queued")]
+                ))
+                let model = makeModel()
+                model.route = .statistics
+                let known = try makeWAV("checking-known")
+                let fresh = try makeWAV("checking-fresh", seconds: 0.4)
+                defer {
+                    try? FileManager.default.removeItem(at: known)
+                    try? FileManager.default.removeItem(at: fresh)
+                }
+                _ = try await seedLibrary(model, with: known)
+
+                model.importBatchFiles([known, fresh])
+                #expect(model.batchCheckingNotice == "Checking 2 files…")
+                #expect(model.route == .batch)
+                await model.awaitBatchImport()
+
+                #expect(model.batchCheckingNotice == nil)
+                #expect(model.batchJobs.map(\.url) == [fresh])
+                let digest = try SourceDigest.compute(contentsOf: fresh)
+                #expect(model.batchSourceDigests[fresh] == digest || model.batchJobs.first?.entryID != nil)
+                #expect(model.batchSourceDigests[known] == nil)
+                model.clearBatch()
+            }
+        }
+
         @Test("only Transcribe it again keeps a known file in a batch", arguments: [
             (DuplicateImportPolicy.alwaysAsk, true),
             (DuplicateImportPolicy.openExisting, true),

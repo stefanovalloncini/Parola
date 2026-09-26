@@ -123,6 +123,10 @@ final class AppModel {
     var retranscribeRequest: RetranscribeRequest?
     /// How many files the last batch import dropped because the library already had them.
     var batchDuplicatesSkipped: Int = 0
+    /// Dropped files still being hashed against the library before they join the batch.
+    var batchFilesBeingChecked: Int = 0
+    /// Digests the batch import already took, handed to the library add so it doesn't read the file again.
+    @ObservationIgnored var batchSourceDigests: [URL: String] = [:]
     @ObservationIgnored var duplicateCheckTask: Task<Void, Never>?
     @ObservationIgnored var batchImportTask: Task<Void, Never>?
     @ObservationIgnored var watchedImportTask: Task<Void, Never>?
@@ -637,11 +641,12 @@ final class AppModel {
         watchedImportTask = Task { [weak self] in
             await previous?.value
             guard let self else { return }
-            var digest: String?
+            var lookup: DuplicateNotice.Lookup?
             if skipsDuplicates {
-                digest = await SourceDigest.digest(of: url, deadline: deadline)
+                lookup = await DuplicateNotice.lookup(for: url, in: self.library, deadline: deadline)
             }
-            if let digest, await self.library.findEntry(digest: digest) != nil {
+            let digest = lookup?.digest
+            if lookup?.entry != nil {
                 guard !Task.isCancelled else { return }
                 self.batchDuplicatesSkipped += 1
                 ParolaLog.info(.library, "skipped a watched-folder file the library already holds")

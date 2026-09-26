@@ -9,6 +9,10 @@ struct BatchView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            if let checking = model.batchCheckingNotice {
+                checkingNotice(checking)
+                Divider()
+            }
             if let notice = model.batchDuplicateNotice {
                 duplicateNotice(notice)
                 Divider()
@@ -78,6 +82,22 @@ struct BatchView: View {
         )
     }
 
+    private func checkingNotice(_ text: String) -> some View {
+        HStack(spacing: DS.Spacing.small) {
+            ProgressView()
+                .controlSize(.small)
+            Text(text)
+                .font(DS.Font.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DS.Palette.subtleFill)
+        .axLeaf("Batch.Text.CheckingFiles")
+    }
+
     private func duplicateNotice(_ text: String) -> some View {
         HStack(spacing: DS.Spacing.small) {
             Image(systemName: "doc.on.doc")
@@ -97,7 +117,8 @@ struct BatchView: View {
     private var queuePane: some View {
         ZStack {
             if model.batchJobs.isEmpty {
-                BatchEmptyState()
+                // The notice above says what is happening; an empty state would invite a second drop.
+                if model.batchFilesBeingChecked == 0 { BatchEmptyState() }
             } else {
                 BatchJobList()
             }

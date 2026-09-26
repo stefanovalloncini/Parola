@@ -27,12 +27,11 @@ extension AppModel {
             // The user is waiting on this hash, so it gets the same budget as the header probe
             // rather than one that scales with the file: a file too big to hash in time simply
             // skips the check, and the bundle picks up its digest when the library writes it.
-            let digest = await SourceDigest.digest(of: fileURL, deadline: deadline)
-            var existing: LibraryEntry?
-            if let digest { existing = await self.library.findEntry(digest: digest) }
+            let lookup = await DuplicateNotice.lookup(for: fileURL, in: self.library, deadline: deadline)
+            let digest = lookup.digest
             guard !Task.isCancelled else { return }
             self.duplicateCheckTask = nil
-            guard let digest, let existing else {
+            guard let digest, let existing = lookup.entry else {
                 self.beginFileTranscription(fileURL: fileURL, translateOverride: translateOverride, sourceDigest: digest)
                 return
             }
@@ -101,20 +100,30 @@ extension AppModel {
         let previous = batchImportTask
         let deadline = fileReadDeadline
         let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
+        if skipsDuplicates {
+            batchFilesBeingChecked += urls.count
+            if batchIsEmpty, features.isEnabled(.batch), !phaseDefersArrivals, !transcribeTaskRunning {
+                route = .batch
+            }
+        }
         batchImportTask = Task { [weak self] in
             await previous?.value
             guard let self else { return }
+            var lookups: [DuplicateNotice.Lookup] = []
+            if skipsDuplicates {
+                lookups = await DuplicateNotice.lookups(for: urls, in: self.library, deadline: deadline)
+                self.batchFilesBeingChecked -= urls.count
+            }
             var keep: [URL] = []
             var skipped = 0
-            for url in urls {
-                guard skipsDuplicates,
-                      let digest = await SourceDigest.digest(of: url, deadline: deadline),
-                      await self.library.findEntry(digest: digest) != nil
-                else {
-                    keep.append(url)
+            for (index, url) in urls.enumerated() {
+                let lookup = index < lookups.count ? lookups[index] : nil
+                if lookup?.entry != nil {
+                    skipped += 1
                     continue
                 }
-                skipped += 1
+                keep.append(url)
+                if let digest = lookup?.digest { self.batchSourceDigests[url] = digest }
             }
             guard !Task.isCancelled else { return }
             self.batchDuplicatesSkipped = skipped
@@ -132,6 +141,14 @@ extension AppModel {
         while let task = batchImportTask {
             await task.value
             if batchImportTask == task { batchImportTask = nil }
+        }
+    }
+
+    var batchCheckingNotice: String? {
+        switch batchFilesBeingChecked {
+        case ..<1: return nil
+        case 1: return String(localized: "Checking 1 file…")
+        default: return String(localized: "Checking \(batchFilesBeingChecked) files…")
         }
     }
 

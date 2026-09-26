@@ -70,6 +70,38 @@ struct DuplicateNoticeTests {
         #expect(second.entry?.id == added.id)
     }
 
+    @Test("lookups answer every file in the order it came, a few hashes at a time")
+    func lookupsKeepInputOrder() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-notice-many-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let files = try (0..<7).map { index in
+            let url = tmp.appendingPathComponent("clip-\(index).wav")
+            try Data("RIFF-\(index)-\(String(repeating: "x", count: index * 1000))".utf8).write(to: url)
+            return url
+        }
+        let missing = tmp.appendingPathComponent("missing.wav")
+        let store = LibraryStore(libraryURL: tmp.appendingPathComponent("library"), extraIndexer: nil)
+        let known = try await store.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hi")],
+                language: "en",
+                modelName: "tiny"
+            ),
+            audioSource: files[4]
+        )
+
+        let lookups = await DuplicateNotice.lookups(for: files + [missing], in: store, width: 2)
+
+        #expect(lookups.count == 8)
+        for (url, lookup) in zip(files, lookups) {
+            #expect(lookup.digest == (try SourceDigest.compute(contentsOf: url)))
+        }
+        #expect(lookups.map { $0.entry?.id } == [nil, nil, nil, nil, known.id, nil, nil, nil])
+        #expect(lookups[7].digest == nil)
+    }
+
     @Test("a file that cannot be read yields neither digest nor entry")
     func unreadableFile() async throws {
         let tmp = FileManager.default.temporaryDirectory

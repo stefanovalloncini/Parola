@@ -94,11 +94,16 @@ extension AppModel {
     // Skips persistToLibrary on purpose: its runAutoExports call would fire a second time
     // (handleBatchEvent already ran the rules), and it would steal selection + refresh per job.
     private func persistBatchJobToLibrary(_ jobID: BatchJob.ID, transcript: Transcript, sourceURL: URL) {
+        let digest = batchSourceDigests.removeValue(forKey: sourceURL)
         let adding = Task { [weak self] () -> LibraryEntry? in
             guard let self else { return nil }
             do {
                 let entry = try await library.add(
-                    transcript: transcript, audioSource: sourceURL, category: .transcription, source: .file
+                    transcript: transcript,
+                    audioSource: sourceURL,
+                    category: .transcription,
+                    sourceDigest: digest,
+                    source: .file
                 )
                 landBatchJobEntry(entry.id, jobID: jobID)
                 return entry

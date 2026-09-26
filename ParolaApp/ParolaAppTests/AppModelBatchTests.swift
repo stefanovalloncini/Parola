@@ -552,6 +552,25 @@ struct AppModelBatchTests {
         #expect(model.libraryEntries.count == 1)
     }
 
+    @Test("a batch job's add takes the digest the import already hashed")
+    func batchAddReusesTheImportDigest() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportPresetIDs = []
+        let source = scratch.appendingPathComponent("hashed.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [job]
+        model.batchSourceDigests[source] = "digest-from-the-import"
+
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+
+        let entries = await Self.waitForEntries(in: model)
+        #expect(entries.first?.manifest.sourceDigest == "digest-from-the-import")
+        #expect(model.batchSourceDigests[source] == nil)
+    }
+
     @Test("persisting a batch job does not re-run its auto-export rules")
     func batchPersistDoesNotRerunAutoExports() async throws {
         let scratch = try Self.makeScratchDirectory()
