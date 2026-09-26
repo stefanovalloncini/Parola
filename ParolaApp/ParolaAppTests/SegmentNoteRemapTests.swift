@@ -51,6 +51,9 @@ struct SegmentNoteEditTests {
         )
         model.loadEntry(seeded.id)
         #expect(await waitUntil { model.selectedEntryID == seeded.id && model.transcript != nil })
+        // loadEntry ends by stamping the open and refreshing the library; a note patched in before that refresh lands would be overwritten.
+        #expect(await waitUntil { model.libraryEntry(id: seeded.id)?.lastOpenedAt != nil })
+        await model.libraryRefreshTask?.value
         return model
     }
 
