@@ -79,9 +79,14 @@ struct SegmentNoteSheet: View {
     }
 
     private func write(_ note: String?) {
-        if model.selectedEntryID == target.entryID {
+        if Self.canWrite(target, entryID: model.selectedEntryID, segments: model.transcript?.segments ?? []) {
             model.setSegmentNote(note, segmentID: target.segment.id)
         }
         dismiss()
+    }
+
+    /// A split, merge or delete made while the sheet was up can take its segment away; the note then goes nowhere.
+    static func canWrite(_ target: SegmentNoteTarget, entryID: LibraryEntry.ID?, segments: [TranscriptSegment]) -> Bool {
+        entryID == target.entryID && segments.contains { $0.id == target.segment.id }
     }
 }

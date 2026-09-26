@@ -76,6 +76,18 @@ struct SegmentNoteEditTests {
         #expect(first.id != second.id)
     }
 
+    @Test("the note editor writes only while its entry is open and its segment still exists")
+    func editorWritesOnlyToItsSegment() {
+        let segment = TranscriptSegment(id: 3, start: 0, end: 1, text: "kept")
+        let target = SegmentNoteTarget(entryID: "entry", segment: segment, note: nil)
+        let others = [TranscriptSegment(id: 4, start: 1, end: 2, text: "other")]
+
+        #expect(SegmentNoteSheet.canWrite(target, entryID: "entry", segments: [segment] + others))
+        #expect(!SegmentNoteSheet.canWrite(target, entryID: "entry", segments: others))
+        #expect(!SegmentNoteSheet.canWrite(target, entryID: "another", segments: [segment]))
+        #expect(!SegmentNoteSheet.canWrite(target, entryID: nil, segments: [segment]))
+    }
+
     @Test("saving and deleting a note are one undo step each, and an unchanged save adds none")
     func noteEditsAreUndoable() async throws {
         let model = try await loadedModel()
