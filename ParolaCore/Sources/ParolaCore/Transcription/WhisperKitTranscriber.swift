@@ -144,6 +144,8 @@ actor WhisperKitTranscriber: Transcriber {
             decodeOptions: decoding,
             callback: nil
         )
+        // Each chunk swallows its own cancellation: a cancelled run lands here as a short result.
+        try Task.checkCancellation()
 
         guard let first = results.first, let outcomes = first else {
             ParolaLog.error(

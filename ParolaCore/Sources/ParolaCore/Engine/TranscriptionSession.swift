@@ -163,6 +163,8 @@ public actor TranscriptionSession {
             }
             throw error
         }
+        // An engine can answer a cancel with the chunks that finished, as if the run were complete.
+        try Task.checkCancellation()
         // The source asset's own duration, not whatever the engine decoded: engines disagree with
         // each other and Parakeet reports none at all. AVAudioFile can't open every container
         // FluidAudio decodes, so fall back to the AVURLAsset probe (on the same deadline as the

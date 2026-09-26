@@ -108,6 +108,24 @@ struct BatchQueueTests {
         #expect(cancelled >= 1, "cancelInFlight should fire when the consuming task is cancelled")
     }
 
+    @Test("a session called from a cancelled task throws even when the engine hands back a result")
+    func sessionThrowsWhenEngineSwallowsTheCancel() async throws {
+        let setup = try await makeSession(behavior: .returnAfterCancel)
+        let run = Task {
+            try await setup.session.transcribe(
+                source: FileAudioSource(url: setup.audioURL),
+                options: TranscriptionOptions(model: "openai_whisper-tiny")
+            )
+        }
+        for _ in 0..<200 {
+            if await setup.factory.hangEntered { break }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        run.cancel()
+
+        await #expect(throws: CancellationError.self) { _ = try await run.value }
+    }
+
     @Test("finished always trails the last per-job event in a multi-job run")
     func finishedTrailsAllJobEvents() async throws {
         let setup = try await makeQueue(behavior: .succeed)
@@ -300,6 +318,7 @@ actor StubTranscriber: Transcriber {
         case succeed
         case cancel
         case hang
+        case returnAfterCancel
         case reportProgress([Double])
     }
 
@@ -329,6 +348,10 @@ actor StubTranscriber: Transcriber {
             return result(for: url)
         case .cancel:
             throw CancellationError()
+        case .returnAfterCancel:
+            await factory.recordHangEntered()
+            while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(5)) }
+            return result(for: url)
         case .hang:
             let task = Task<Transcript, Error> {
                 try await Task.sleep(for: .seconds(60))

@@ -17,9 +17,10 @@ struct BatchLoggingTests {
 
     private func makeQueue(
         behavior: StubTranscriber.Behavior = .succeed,
-        features: FeatureSet = .all
+        features: FeatureSet = .all,
+        factory: StubFactory? = nil
     ) async throws -> (queue: BatchQueue, audioURL: URL) {
-        let factory = StubFactory(behavior: behavior)
+        let factory = factory ?? StubFactory(behavior: behavior)
         let registry = EngineRegistry()
         await registry.register(engineID: .whisperKit, capabilities: .whisperKitDefaults) { _ in
             StubTranscriber(behavior: behavior, factory: factory)
@@ -94,6 +95,35 @@ struct BatchLoggingTests {
             #expect(finished.fields[.completed]?.text == "0")
             #expect(finished.fields[.failed]?.text == "0")
             #expect(finished.fields[.cancelled]?.text == "1")
+        }
+    }
+
+    @Test("a job cancelled while the engine finishes anyway counts as cancelled, not completed")
+    func cancelledJobWhoseEngineReturned() async throws {
+        try await withSink { sink in
+            let factory = StubFactory(behavior: .returnAfterCancel)
+            let (queue, audioURL) = try await makeQueue(behavior: .returnAfterCancel, factory: factory)
+            defer { try? FileManager.default.removeItem(at: audioURL.deletingLastPathComponent()) }
+            let job = BatchJob(url: audioURL)
+            let consumer = Task {
+                await drain(queue.process(jobs: [job], options: TranscriptionOptions(model: "openai_whisper-tiny")))
+            }
+            for _ in 0..<200 {
+                if await factory.hangEntered { break }
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+            #expect(await factory.hangEntered)
+            consumer.cancel()
+            await consumer.value
+            for _ in 0..<300 {
+                if !batchRecords(sink, message: "batch finished").isEmpty { break }
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+
+            let finished = try #require(batchRecords(sink, message: "batch finished").first)
+            #expect(finished.fields[.completed]?.text == "0")
+            #expect(finished.fields[.cancelled]?.text == "1")
+            #expect(batchRecords(sink, message: "job cancelled").count == 1)
         }
     }
 
