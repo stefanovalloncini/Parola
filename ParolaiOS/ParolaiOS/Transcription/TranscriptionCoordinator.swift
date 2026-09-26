@@ -84,8 +84,7 @@ final class TranscriptionCoordinator {
                     downloadProgress: makeDownloadProgressHandler(resumingTo: { .transcribing(file: audio) })
                 )
                 try Task.checkCancellation()
-                let processed = await postProcessed(result)
-                let entry = try await library.add(transcript: processed, audioSource: audio)
+                let entry = try await saveFileResult(result, audio: audio)
                 phase = .idle
                 onComplete?(entry)
             } catch is CancellationError {
@@ -94,6 +93,13 @@ final class TranscriptionCoordinator {
                 phase = .failed(message: error.localizedDescription)
             }
         }
+    }
+
+    func saveFileResult(_ result: Transcript, audio: URL) async throws -> LibraryEntry {
+        let processed = await postProcessed(result)
+        // The rules pass runs off the main actor, so a Cancel can land in it; past here the entry is written.
+        try Task.checkCancellation()
+        return try await library.add(transcript: processed, audioSource: audio)
     }
 
     func postProcessed(_ transcript: Transcript) async -> Transcript {

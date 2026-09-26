@@ -144,6 +144,24 @@ struct TranscriptionCoordinatorTests {
         #expect(entries.isEmpty)
     }
 
+    @Test("a file run cancelled during the rules pass saves nothing")
+    func cancelDuringRulesPassSavesNothing() async throws {
+        let (coord, library) = try makeCoordinator()
+        coord.postProcessor = { TranscriptPostProcessor.orthographyOnly }
+        let result = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 0.5, text: "Non so perchè")],
+            language: "it",
+            modelName: "openai_whisper-tiny"
+        )
+        let audio = FileManager.default.temporaryDirectory.appendingPathComponent("parola-cancelled-\(UUID().uuidString).m4a")
+
+        let run = Task { try await coord.saveFileResult(result, audio: audio) }
+        run.cancel()
+
+        await #expect(throws: CancellationError.self) { _ = try await run.value }
+        #expect(await library.list().isEmpty)
+    }
+
     @Test("finished event saves a transcript-only library entry")
     func finishedPersistsTranscript() async throws {
         let (coord, library) = try makeCoordinator()
