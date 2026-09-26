@@ -725,18 +725,21 @@ public actor LibraryStore {
     }
 
     /// Replaces the entry's summary, or clears it when `summary` is nil, and re-indexes: summary text is searchable.
-    public func setSummary(_ summary: Summary?, for id: LibraryEntry.ID) async throws {
+    /// `chapters`, when given, replaces the entry's chapter list in the same write, so the two never disagree on disk.
+    public func setSummary(_ summary: Summary?, chapters: [Chapter]? = nil, for id: LibraryEntry.ID) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
         var transcript = try Self.readStoredTranscript(at: bundleURL)
-        guard transcript.summary != summary else {
+        let keptChapters = chapters ?? transcript.chapters
+        guard transcript.summary != summary || transcript.chapters != keptChapters else {
             // The debounced transcript save can land this summary first, with indexing off.
             await indexEntry(try recacheEntry(at: bundleURL), transcript: transcript)
             return
         }
         transcript.summary = summary
+        transcript.chapters = keptChapters
         try await updateTranscript(transcript, for: id, reindex: true)
     }
 

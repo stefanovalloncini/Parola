@@ -34,9 +34,9 @@ extension AppModel {
                 self.transcript?.install(summary: summary)
                 adoptSavedChapters()
                 isSummarising = false
-                if let entryID = self.selectedEntryID {
+                if let entryID = self.selectedEntryID, let installed = self.transcript {
                     Task { [library] in
-                        try? await library.setSummary(summary, for: entryID)
+                        try? await library.setSummary(installed.summary, chapters: installed.chapters, for: entryID)
                     }
                 }
             } catch {
@@ -61,8 +61,9 @@ extension AppModel {
         adoptSavedChapters()
         summaryError = nil
         if let entryID = selectedEntryID {
+            let chapters = transcript?.chapters
             Task { [library] in
-                try? await library.setSummary(nil, for: entryID)
+                try? await library.setSummary(nil, chapters: chapters, for: entryID)
             }
         }
     }

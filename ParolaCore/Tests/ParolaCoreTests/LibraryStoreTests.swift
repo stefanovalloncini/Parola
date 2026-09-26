@@ -1251,6 +1251,28 @@ struct LibraryStoreTests {
         #expect(try await store.load(entry.id).document.transcript.summary == nil)
     }
 
+    @Test("a summary set with its chapters writes both lists together, and a clear can keep the chapters")
+    func setSummaryWritesTheChapterList() async throws {
+        let (store, _) = try makeTempLibrary()
+        var generated = makeTranscript()
+        generated.chapters = [Chapter(title: "Generated", start: 0)]
+        let entry = try await store.add(transcript: generated, audioSource: nil)
+        let summarized = [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 1)]
+
+        try await store.setSummary(Summary(text: "Recap", chapters: summarized), chapters: summarized, for: entry.id)
+        var stored = try await store.load(entry.id).document.transcript
+        #expect(stored.summary?.chapters == summarized)
+        #expect(stored.chapters == summarized)
+
+        try await store.setSummary(nil, chapters: summarized, for: entry.id)
+        stored = try await store.load(entry.id).document.transcript
+        #expect(stored.summary == nil)
+        #expect(stored.chapters == summarized)
+
+        try await store.setSummary(Summary(text: "Other"), for: entry.id)
+        #expect(try await store.load(entry.id).document.transcript.chapters == summarized)
+    }
+
     @Test("a summary a save already wrote without indexing still reaches the index")
     func setSummaryIndexesWhatASaveWrote() async throws {
         let (store, _) = try makeTempLibrary()
