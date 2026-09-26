@@ -156,7 +156,8 @@ extension ParolaAutomationServer {
                     guard let id = UUID(uuidString: idStr) else {
                         throw AutomationError.invalidArgs(field: "id", reason: "not a valid UUID")
                     }
-                    ctx.model.selectBatchJob(id)
+                    // A job saved to the library opens its entry, and the caller reads the transcript next.
+                    _ = try? await ctx.model.selectBatchJob(id)?.value
                     return .object(["selected": .string(idStr)])
                 }
             ),

@@ -352,15 +352,19 @@ extension AppModel {
     }
 
     /// Opens the job's library entry in place, or its own copy while the add is still in flight.
-    func selectBatchJob(_ id: BatchJob.ID) {
+    /// Hands back the entry's load, for a caller that has to wait until it is on screen.
+    @discardableResult
+    func selectBatchJob(_ id: BatchJob.ID) -> Task<Transcript, any Error>? {
         selectedBatchJobID = id
-        guard let job = batchJobs.first(where: { $0.id == id }) else { return }
+        guard let job = batchJobs.first(where: { $0.id == id }) else { return nil }
         if let entryID = job.entryID {
-            guard selectedEntryID != entryID else { return }
-            openEntryInPlace(entryID)
-        } else if let t = job.transcript {
+            guard selectedEntryID != entryID else { return nil }
+            return openEntryInPlace(entryID)
+        }
+        if let t = job.transcript {
             showUnsavedBatchJobReplacingSelection(job, t)
         }
+        return nil
     }
 
     private func showUnsavedBatchJobReplacingSelection(_ job: BatchJob, _ transcript: Transcript) {

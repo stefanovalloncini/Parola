@@ -456,6 +456,38 @@ struct AppModelBatchTests {
         #expect(model.route == .batch)
     }
 
+    @Test("the bridge's selectBatchJob returns once the job's entry is on screen")
+    func bridgeSelectWaitsForTheEntry() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportPresetIDs = []
+        model.generatesCardMetadata = false
+        let source = scratch.appendingPathComponent("bridge.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        let other = BatchJob(url: Self.makeURL("other"), status: .done, transcript: Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the other job")],
+            language: "en",
+            modelName: "stub"
+        ))
+        model.batchJobs = [job, other]
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+        let entryID = try #require(await Self.waitForEntryID(of: job.id, in: model))
+        model.selectBatchJob(other.id)
+        #expect(model.transcript?.segments.first?.text == "the other job")
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let command = try #require(server.batchCommands().first { $0.name == "selectBatchJob" })
+
+        _ = try await command.handler(
+            try command.validate(AutomationArgs(["id": .string(job.id.uuidString)])), context
+        )
+
+        #expect(model.selectedEntryID == entryID)
+        #expect(model.transcript?.segments.first?.text == "hi")
+    }
+
     @Test("an edit made while the selected job's add is in flight lands in the entry it becomes")
     func batchJobEditBeforeTheEntryLands() async throws {
         let scratch = try Self.makeScratchDirectory()

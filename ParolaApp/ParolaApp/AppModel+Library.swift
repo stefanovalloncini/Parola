@@ -562,8 +562,9 @@ extension AppModel {
     }
 
     /// For a list that shows the transcript beside itself, like the batch: the page, the phase and the origin stay as they are.
-    func openEntryInPlace(_ id: LibraryEntry.ID) {
-        _ = try? startOpeningEntry(id, inPlace: true)
+    @discardableResult
+    func openEntryInPlace(_ id: LibraryEntry.ID) -> Task<Transcript, any Error>? {
+        try? startOpeningEntry(id, inPlace: true)
     }
 
     /// `loadEntry` for a caller that needs what it opened; a later open makes this one throw `CancellationError`.
