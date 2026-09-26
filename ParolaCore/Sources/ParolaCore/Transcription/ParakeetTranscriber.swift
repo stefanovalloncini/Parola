@@ -91,12 +91,16 @@ actor ParakeetTranscriber: Transcriber {
 
         handlers.onStage?(.preparingAudio)
         var decoderState = TdtDecoderState.make()
+        let progress = await Self.forwardProgress(of: asr, url: url, to: handlers.onProgress)
+        defer { progress?.cancel() }
         // FluidAudio decodes and infers inside one opaque call, so the run counts as transcribing from here.
         handlers.onStage?(.transcribing)
         let result: ASRResult
         let startedAt = ContinuousClock.now
         do {
-            result = try await asr.transcribe(url, decoderState: &decoderState, language: nil)
+            result = try await asr.transcribe(
+                url, decoderState: &decoderState, language: Self.scriptHint(for: options.language)
+            )
         } catch {
             var fields: [LogField: LogValue] = [
                 .model: .safe(ModelToken(modelName)),
@@ -120,6 +124,48 @@ actor ParakeetTranscriber: Transcriber {
             sourceURL: url,
             languageDetection: resolved.detection
         )
+    }
+
+    /// On v3 the hint keeps the decoder to the language's script, so a Polish run can't drift into
+    /// Cyrillic tokens; languages FluidAudio doesn't list get no hint.
+    nonisolated static func scriptHint(for language: String?) -> Language? {
+        language.flatMap { Language(rawValue: $0.lowercased()) }
+    }
+
+    /// FluidAudio reports progress only on its disk-backed path, and a subscriber that leaves early
+    /// strands the stream for the next run, so a shorter file gets no subscriber at all.
+    nonisolated static func reportsProgress(forSeconds seconds: Double, config: ASRConfig = .default) -> Bool {
+        config.streamingEnabled && seconds * Double(config.sampleRate) > Double(config.streamingThreshold)
+    }
+
+    /// Seconds into the file, the unit `TranscribeHandlers.onProgress` takes.
+    nonisolated static func progressSeconds(fraction: Double, duration: Double) -> Double {
+        min(max(fraction, 0), 1) * duration
+    }
+
+    private static func forwardProgress(
+        of asr: AsrManager,
+        url: URL,
+        to onProgress: (@Sendable (Double) -> Void)?
+    ) async -> Task<Void, Never>? {
+        guard let onProgress else { return nil }
+        let read = await BoundedFileRead.run(deadline: FileReadDeadline.header) {
+            FileAudioSource(url: url).synchronousDuration()
+        }
+        guard case .done(let measured) = read, let duration = measured, reportsProgress(forSeconds: duration) else {
+            return nil
+        }
+        let fractions = await asr.transcriptionProgressStream
+        return Task {
+            do {
+                for try await fraction in fractions {
+                    if Task.isCancelled { return }
+                    onProgress(progressSeconds(fraction: fraction, duration: duration))
+                }
+            } catch {
+                return
+            }
+        }
     }
 
     func unload() async {
