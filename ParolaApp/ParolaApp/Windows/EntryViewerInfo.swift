@@ -28,7 +28,7 @@ struct EntryViewerInfo: View {
                     InfoRow(
                         icon: "text.word.spacing",
                         label: "Words",
-                        value: AppFormat.integer(session.transcript?.wordCount ?? 0),
+                        value: AppFormat.integer(session.wordCount),
                         numeric: true
                     )
                     InfoRow(

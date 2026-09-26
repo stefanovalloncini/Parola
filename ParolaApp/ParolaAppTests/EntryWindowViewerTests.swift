@@ -16,7 +16,7 @@ struct EntryWindowViewerTests {
             model, texts: ["alpha", "beta"], speakers: [nil, nil], audio: nil
         )
         let session = await EntryWindowTestSupport.openSession(model, entry)
-        let before = EntryViewerContinuous.contentSignature(for: session)
+        let before = session.contentSignature
 
         var edited = try #require(session.transcript)
         edited.segments[0].text = "alpha edited"
@@ -27,7 +27,57 @@ struct EntryWindowViewerTests {
 
         #expect(session.transcript?.segments.count == 2)
         #expect(session.transcript?.segments.first?.text == "alpha edited")
-        #expect(EntryViewerContinuous.contentSignature(for: session) != before)
+        #expect(session.contentSignature != before)
+    }
+
+    @Test("the window's text, speakers, words and flowing key are taken at load and follow a reload")
+    func derivationsFollowTheLoad() async throws {
+        let model = EntryWindowTestSupport.makeModel("viewerderived")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha beta", "gamma"], speakers: ["Ada", "Bo"], audio: nil
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        #expect(session.transcriptText == "alpha beta gamma")
+        #expect(session.speakers == ["Ada", "Bo"])
+        #expect(session.wordCount == 3)
+        let before = session.contentSignature
+        #expect(before == ContinuousChunks.contentSignature(
+            segments: session.transcript?.segments ?? [], useSpeakerColor: true, favoritesOnly: false,
+            favorites: [], translations: [:], speakerColorIndices: [:]
+        ))
+
+        let edited = EntryWindowTestSupport.transcript(texts: ["alpha", "gamma delta epsilon"], speakers: ["Ada", "Ada"])
+        try await EntryWindowTestSupport.store(model).updateTranscript(edited, for: entry.id, reindex: false)
+        await EntryWindowTestSupport.syncLibrary(model)
+        session.reload()
+        await session.loadTask?.value
+
+        #expect(session.transcriptText == "alpha gamma delta epsilon")
+        #expect(session.speakers == ["Ada"])
+        #expect(session.wordCount == 4)
+        #expect(session.contentSignature != before)
+    }
+
+    @Test("the word count is the library's when the manifest carries one")
+    func wordCountComesFromTheManifest() async throws {
+        let model = EntryWindowTestSupport.makeModel("viewerwords")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha beta"], speakers: [nil], audio: nil
+        )
+        let manifestURL = entry.bundleURL.appendingPathComponent("manifest.json")
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        var manifest = try decoder.decode(ParolaDocument.Manifest.self, from: Data(contentsOf: manifestURL))
+        manifest.wordCount = 42
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(manifest).write(to: manifestURL)
+        await EntryWindowTestSupport.syncLibrary(model)
+
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+
+        #expect(session.wordCount == 42)
+        #expect(session.transcript?.wordCount == 2)
     }
 
     @Test("a library bump for another entry does not re-read this one")

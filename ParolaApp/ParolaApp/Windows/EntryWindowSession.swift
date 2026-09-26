@@ -75,9 +75,15 @@ final class EntryWindowSession {
 
     var translationLanguage: String? { document?.transcript.translation?.targetLanguage }
 
-    var transcriptText: String { transcript?.text ?? "" }
+    private(set) var transcriptText = ""
 
-    var speakers: [String] { transcript?.uniqueSpeakers ?? [] }
+    private(set) var speakers: [String] = []
+
+    /// The library's count when it has one: `LibraryStore` keeps it with every transcript write.
+    private(set) var wordCount = 0
+
+    /// What the flowing view rebuilds on, taken once per load instead of hashed on every body pass.
+    private(set) var contentSignature = 0
 
     /// The library's length first: a correction measured from the media lands there, never in transcript.json.
     var durationSeconds: Double {
@@ -96,6 +102,25 @@ final class EntryWindowSession {
             indices[label] = person.colorIndex
         }
         speakerColorIndices = indices
+    }
+
+    private func rebuildDerivations(storedWordCount: Int?) {
+        let transcript = transcript
+        let text = transcript?.text ?? ""
+        if text != transcriptText { transcriptText = text }
+        let uniqueSpeakers = transcript?.uniqueSpeakers ?? []
+        if uniqueSpeakers != speakers { speakers = uniqueSpeakers }
+        let words = storedWordCount ?? transcript?.wordCount ?? 0
+        if words != wordCount { wordCount = words }
+        let signature = ContinuousChunks.contentSignature(
+            segments: transcript?.segments ?? [],
+            useSpeakerColor: uniqueSpeakers.count >= 2,
+            favoritesOnly: false,
+            favorites: favorites,
+            translations: translations,
+            speakerColorIndices: speakerColorIndices
+        )
+        if signature != contentSignature { contentSignature = signature }
     }
 
     func isFavorite(_ segmentID: TranscriptSegment.ID) -> Bool {
@@ -149,6 +174,7 @@ final class EntryWindowSession {
         loadFailed = false
         rebuildSegmentIndex()
         rebuildSideMaps()
+        rebuildDerivations(storedWordCount: loaded.entry.wordCount)
         refreshMatches()
         let audioURL = loaded.document.audioURL
         if let audioURL, player == nil || !keepingPlace || audioURL != playerURL {
@@ -168,6 +194,7 @@ final class EntryWindowSession {
         loadFailed = true
         rebuildSegmentIndex()
         rebuildSideMaps()
+        rebuildDerivations(storedWordCount: nil)
         refreshMatches()
         tearDownPlayer()
     }
