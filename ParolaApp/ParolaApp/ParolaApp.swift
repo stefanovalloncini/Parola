@@ -284,7 +284,8 @@ struct ParolaApp: App {
                     model.toggleSegmentFavorite(id)
                 }
                 .keyboardShortcut("d", modifiers: [.command])
-                .disabled(!model.mainTranscriptCommandsEnabled)
+                .disabled(!model.mainTranscriptCommandsEnabled || model.selectedEntryID == nil)
+                .help(model.selectedEntryID == nil ? "Save the transcript to the library first" : "")
                 Button("Copy as Markdown") { model.copyTranscriptAsFormat(.md) }
                     .disabled(!model.mainTranscriptCommandsEnabled)
                 Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }
