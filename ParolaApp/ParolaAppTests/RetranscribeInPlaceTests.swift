@@ -182,6 +182,35 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a re-run lets go of the slot without waiting for the cards queued ahead of it")
+        func rerunDoesNotWaitForTheCardQueue() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the new take")]
+                ))
+                let model = makeModel("retranscribe-card-queue")
+                let wav = try makeWAV("card-queue")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                let entry = try await seed(model, audio: wav)
+                #expect(await load(model, entry.id))
+                let (release, releaser) = AsyncStream<Void>.makeStream()
+                model.cardMetadataTimeout = .seconds(60)
+                model.cardMetadataOperation = { _ in
+                    for await _ in release { break }
+                    return CardMetadata(title: "Held", summary: "Released.")
+                }
+                model.enqueueCardMetadata(for: entry.id, transcript: model.transcript!)
+
+                model.retranscribeCurrentEntry(model: Self.appleSpeech, language: nil)
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
+                #expect(model.fileTranscribeTask == nil)
+                #expect(model.cardJobsPending == 2)
+                releaser.finish()
+                await model.awaitCardMetadataQueue()
+            }
+        }
+
         @Test("a cancel that lands in post-processing still leaves the old take alone")
         func cancelDuringPostProcessingKeepsTheOldTake() async throws {
             try await withMocksCleared(.transcriber) {

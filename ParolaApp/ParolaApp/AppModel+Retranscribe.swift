@@ -119,6 +119,6 @@ extension AppModel {
         phase = .ready
         playCompletionSound()
         // The card-metadata hook lives in persistToLibrary, which a re-run never passes through.
-        await enqueueCardMetadata(for: entryID, transcript: transcript).value
+        enqueueCardMetadata(for: entryID, transcript: transcript)
     }
 }

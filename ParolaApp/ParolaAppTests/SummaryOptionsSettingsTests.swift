@@ -107,14 +107,14 @@ struct SummaryOptionsSettingsTests {
         #expect(model.transcriptPaneMode == .transcript, "a real change of entry still resets the mode")
     }
 
-    @Test("autostart skips when the user navigates away during the card-metadata wait")
-    func autostartSkipsOnNavigationAway() async {
+    @Test("autostart starts when the entry lands, without waiting for its card")
+    func autostartDoesNotWaitForTheCard() async {
         let model = makeModel()
         model.autostartSummary = true
-        // Stands in for the real card-metadata call's latency without touching the shared mock LLM store.
+        let (release, releaser) = AsyncStream<Void>.makeStream()
         model.cardMetadataOperation = { _ in
-            try? await Task.sleep(for: .milliseconds(300))
-            return nil
+            for await _ in release { break }
+            return CardMetadata(title: "Card", summary: "Written after the summary started.")
         }
         let callCount = CallCounter()
         model.summariseOperation = { _, _ in
@@ -126,10 +126,31 @@ struct SummaryOptionsSettingsTests {
         model.transcript = makeTranscript(text: longText)
         model.persistToLibrary(makeTranscript(text: longText), audioSource: nil, source: .file, activate: true)
 
-        await waitUntil(timeoutMs: 2000) { model.selectedEntryID != nil }
-        model.selectedEntryID = "somewhere-else"
+        await waitUntil(timeoutMs: 2000) { callCount.value == 1 }
+        #expect(model.cardJobsPending == 1)
+        releaser.finish()
+        await model.awaitCardMetadataQueue()
+    }
 
-        try? await Task.sleep(for: .milliseconds(600))
+    @Test("autostart skips when the user moved on before the entry landed")
+    func autostartSkipsOnNavigationAway() async {
+        let model = makeModel()
+        model.autostartSummary = true
+        model.cardMetadataOperation = { _ in nil }
+        let callCount = CallCounter()
+        model.summariseOperation = { _, _ in
+            await callCount.increment()
+            return Summary(text: "auto summary")
+        }
+
+        let longText = String(repeating: "word ", count: 20)
+        model.transcript = makeTranscript(text: longText)
+        let adding = model.persistToLibrary(makeTranscript(text: longText), audioSource: nil, source: .file, activate: true)
+        model.loadEntryGeneration &+= 1
+        _ = try? await adding.value
+
+        try? await Task.sleep(for: .milliseconds(300))
+        #expect(model.selectedEntryID == nil)
         #expect(callCount.value == 0)
     }
 

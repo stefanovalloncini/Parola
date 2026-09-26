@@ -25,6 +25,10 @@ extension AppModel {
 
     var destinationsEnabled: Bool { features.isEnabled(.destinations) }
 
+    var hasAutoSendDestination: Bool {
+        destinationsEnabled && destinations.contains { $0.isEnabled && $0.autoSend }
+    }
+
     /// The destinations the Send to menus offer.
     var sendableDestinations: [AnyDestination] {
         guard destinationsEnabled else { return [] }

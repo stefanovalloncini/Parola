@@ -1825,14 +1825,16 @@ final class AppModel {
             }
             guard activate, let entry = persisted else { return }
             if playsCompletionSound { playCompletionSound() }
-            // Delivery sends the AI title, so it waits for the card.
-            await enqueueCardMetadata(for: entry.id, transcript: result).value
+            let card = enqueueCardMetadata(for: entry.id, transcript: result)
             if autostartSummary,
                features.isEnabled(.ai),
                loadEntryGeneration == navigationGeneration, selectedEntryID == entry.id,
                result.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= CardMetadataService.minimumCharacters {
                 summariseTranscript()
             }
+            // Delivery sends the AI title, so only a send waits for the card.
+            guard hasAutoSendDestination else { return }
+            await card.value
             await autoSendEntry(entry.id)
         }
         return adding
