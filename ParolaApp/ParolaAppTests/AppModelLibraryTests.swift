@@ -337,6 +337,44 @@ struct AppModelLibraryTests {
         #expect(model.transcript?.summary == nil)
     }
 
+    @Test("a summary generated after the chapters brings its own, and the reload shows the same list")
+    func summaryAfterChaptersKeepsOneList() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 60, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.loadEntry(seeded.id)
+        #expect(await waitUntil { model.selectedEntryID == seeded.id && model.transcript != nil })
+
+        let generated = [Chapter(title: "Generated", start: 0)]
+        model.smartChapters = generated
+        model.persistChapters(generated)
+        #expect(await waitUntil {
+            (try? await model.library.load(seeded.id).document.transcript.chapters) == generated
+        })
+
+        let summarized = [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 30)]
+        model.summariseOperation = { _, _ in Summary(text: "recap", chapters: summarized) }
+        model.summariseTranscript()
+        #expect(await waitUntil { !model.isSummarising && model.transcript?.summary != nil })
+        #expect(model.smartChapters == summarized)
+        #expect(await waitUntil {
+            (try? await model.library.load(seeded.id).document.transcript.chapters) == summarized
+        })
+
+        model.clearLoadedEntry()
+        model.loadEntry(seeded.id)
+        #expect(await waitUntil { model.smartChapters == summarized })
+        #expect(model.transcript?.summary?.chapters == summarized)
+    }
+
     @Test("summarizing the latest entry adopts its chapters, not the previous entry's")
     func summarizeLatestEntryAdoptsItsOwnChapters() async throws {
         // Seed before the model exists: its init primes the store's list cache, and an empty one never refills.

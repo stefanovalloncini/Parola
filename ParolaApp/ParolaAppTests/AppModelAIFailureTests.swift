@@ -148,6 +148,36 @@ struct AppModelAIFailureTests {
         }
     }
 
+    @Test("a summary lands with one chapter list: its own, else the kept one, even after Clear")
+    func summaryAndChaptersStayOneList() {
+        let generated = [Chapter(title: "Generated", start: 0)]
+        let summarized = [Chapter(title: "Summarized", start: 0)]
+        var transcript = Transcript(segments: [], language: "en", modelName: "stub", chapters: generated)
+
+        transcript.install(summary: Summary(text: "recap", chapters: summarized))
+        #expect(transcript.chapters == summarized)
+        #expect(transcript.summary?.chapters == summarized)
+
+        transcript.install(summary: Summary(text: "shorter recap"))
+        #expect(transcript.chapters == summarized)
+        #expect(transcript.summary?.chapters == summarized)
+
+        transcript.chapters = []
+        transcript.summary?.chapters = []
+        transcript.install(summary: Summary(text: "after clear"))
+        #expect(transcript.chapters == [])
+        transcript.install(summary: Summary(text: "with chapters", chapters: generated))
+        #expect(transcript.chapters == generated)
+
+        transcript.removeSummary()
+        #expect(transcript.summary == nil)
+        #expect(transcript.chapters == generated)
+
+        var older = Transcript(segments: [], language: "en", modelName: "stub", summary: Summary(text: "saved", chapters: generated))
+        older.removeSummary()
+        #expect(older.chapters == generated)
+    }
+
     @Test("clearing derived artifacts drops the AI errors too")
     func clearDerivedArtifactsClearsErrors() {
         let model = makeModel()

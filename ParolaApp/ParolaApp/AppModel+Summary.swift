@@ -31,7 +31,8 @@ extension AppModel {
                 // selects it moments later, and that late selection owns this summary.
                 guard self.derivedArtifactsGeneration == artifacts,
                       entryID == nil || self.selectedEntryID == entryID else { isSummarising = false; return }
-                self.transcript?.summary = summary
+                self.transcript?.install(summary: summary)
+                adoptSavedChapters()
                 isSummarising = false
                 if let entryID = self.selectedEntryID {
                     Task { [library] in
@@ -56,7 +57,8 @@ extension AppModel {
 
     func clearSummary() {
         guard transcript?.summary != nil else { return }
-        transcript?.summary = nil
+        transcript?.removeSummary()
+        adoptSavedChapters()
         summaryError = nil
         if let entryID = selectedEntryID {
             Task { [library] in
@@ -83,5 +85,23 @@ extension AppModel {
     func setTranscriptPaneMode(_ mode: TranscriptPaneMode) {
         guard canShow(mode) else { return }
         transcriptPaneMode = mode
+    }
+}
+
+extension Transcript {
+    /// One chapter list from the moment a summary lands: the summary's own chapters, or the ones already kept when it brought none.
+    mutating func install(summary: Summary) {
+        var summary = summary
+        if summary.chapters.isEmpty {
+            summary.chapters = chapters ?? self.summary?.chapters ?? []
+        }
+        chapters = summary.chapters
+        self.summary = summary
+    }
+
+    /// The chapters outlive the summary, so the Outline and the Info inspector keep showing them.
+    mutating func removeSummary() {
+        if chapters == nil { chapters = summary?.chapters }
+        summary = nil
     }
 }
