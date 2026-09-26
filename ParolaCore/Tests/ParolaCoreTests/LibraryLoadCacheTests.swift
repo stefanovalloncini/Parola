@@ -105,6 +105,26 @@ struct LibraryLoadCacheTests {
         #expect(firstText(try await store.load(b.id)) == "b")
     }
 
+    @Test("an add leaves the list and the load cache holding the entry, with no rescan or decode")
+    func addPatchesTheCaches() async throws {
+        let decodes = OSAllocatedUnfairLock(initialState: 0)
+        let (store, tmp) = try makeStore(didDecodeDocument: { decodes.withLock { $0 += 1 } })
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let first = try await store.add(transcript: makeTranscript("first"), audioSource: nil)
+        #expect(await store.list().map(\.id) == [first.id])
+        // Written behind the actor's back: only a rescan could find it.
+        try ParolaDocument.write(
+            transcript: makeTranscript("stray"), audioURL: nil,
+            to: tmp.appendingPathComponent("stray-bundle")
+        )
+
+        let second = try await store.add(transcript: makeTranscript("second"), audioSource: nil)
+
+        #expect(await store.list().map(\.id) == [second.id, first.id])
+        #expect(firstText(try await store.load(second.id)) == "second")
+        #expect(decodes.withLock { $0 } == 0)
+    }
+
     @Test("a manifest edit refreshes the cached entry without re-reading the transcript")
     func manifestEditPatchesTheCachedEntry() async throws {
         let (store, tmp) = try makeStore()
@@ -196,9 +216,8 @@ struct LibraryLoadCacheTests {
         let entry = try await store.add(transcript: makeTranscript("original 0"), audioSource: nil)
 
         for i in 0..<8 {
-            if i > 0 {
-                try await store.updateTranscript(makeTranscript("original \(i)"), for: entry.id)
-            }
+            // Also on the first pass: the add left the entry cached, and this load has to decode.
+            try await store.updateTranscript(makeTranscript("original \(i)"), for: entry.id)
             let loading = Task { try await store.load(entry.id) }
             try await gate.holding(1) {
                 try await store.updateTranscript(makeTranscript("edited \(i)"), for: entry.id)
@@ -217,9 +236,8 @@ struct LibraryLoadCacheTests {
         let entry = try await store.add(transcript: makeTranscript("original 0", segments: 8), audioSource: nil)
 
         for i in 0..<8 {
-            if i > 0 {
-                try await store.updateTranscript(makeTranscript("original \(i)", segments: 8), for: entry.id)
-            }
+            // Also on the first pass: the add left the entry cached, and these loads have to decode.
+            try await store.updateTranscript(makeTranscript("original \(i)", segments: 8), for: entry.id)
             let first = Task { try await store.load(entry.id) }
             let second = Task { try await store.load(entry.id) }
             try await gate.holding(2) {

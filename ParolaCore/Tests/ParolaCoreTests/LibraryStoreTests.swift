@@ -170,6 +170,27 @@ struct LibraryStoreTests {
         #expect(await store.list().first { $0.id == entry.id }?.aiTitle == nil)
     }
 
+    @Test("a new card swaps the old one's words in search and hands back the entry")
+    func cardMetadataReplacesItsSearchWords() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: makeFakeAudio(), category: .transcription)
+        let bodyWord = try #require(makeTranscript().text.split(separator: " ").first.map(String.init))
+
+        let first = try await store.setCardMetadata(aiTitle: "Quarterly zebra", shortSummary: nil, for: entry.id)
+        #expect(first.aiTitle == "Quarterly zebra")
+        #expect(await store.search("zebra").map(\.entryID) == [entry.id])
+
+        let second = try await store.setCardMetadata(aiTitle: "Annual okapi", shortSummary: "Mostly \(bodyWord).", for: entry.id)
+        #expect(second.aiTitle == "Annual okapi")
+        #expect(await store.search("zebra").isEmpty)
+        #expect(await store.search("okapi").map(\.entryID) == [entry.id])
+
+        try await store.setCardMetadata(aiTitle: nil, shortSummary: nil, for: entry.id)
+        #expect(await store.search("okapi").isEmpty)
+        let bodyHit = try #require(await store.search(bodyWord).first { $0.entryID == entry.id })
+        #expect(bodyHit.firstHit != nil)
+    }
+
     @Test("a re-run re-stamps the engine and language the rows name")
     func transcriptionDetailsFollowTheRerun() async throws {
         let (store, _) = try makeTempLibrary()
@@ -540,6 +561,8 @@ struct LibraryStoreTests {
         let (store, tmp) = try makeTempLibrary()
         defer { try? FileManager.default.removeItem(at: tmp) }
         let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        // The add left the entry cached; this load has to go to disk.
+        await store.dropCaches()
 
         let loading = Task { () -> LoadedEntry in
             for _ in 0..<1_000 where !Task.isCancelled {

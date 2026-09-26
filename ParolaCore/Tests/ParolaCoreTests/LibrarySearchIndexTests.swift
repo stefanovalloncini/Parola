@@ -134,6 +134,31 @@ final class LibrarySearchIndexTests {
         #expect(newMatches.contains(where: { $0.entryID == "e1" }))
     }
 
+    @Test("replacing auxiliary text swaps its words and keeps the body's")
+    func replaceAuxiliaryTextSwapsWords() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(
+            id: "e1", title: "Notes", text: "Sprint planning review",
+            auxiliaryText: "Walrus\nplanning", createdAt: Date()
+        )
+
+        #expect(await index.replaceAuxiliaryText("Walrus\nplanning", with: "Narwhal", for: "e1"))
+
+        #expect(await index.search("walrus").isEmpty)
+        #expect(await index.search("narwhal").map(\.entryID) == ["e1"])
+        let body = try #require(await index.search("planning").first)
+        #expect(body.entryID == "e1")
+        #expect(body.matchCount == 1)
+        #expect(await index.search("notes").map(\.entryID) == ["e1"])
+    }
+
+    @Test("replacing auxiliary text on an entry the index lacks says so")
+    func replaceAuxiliaryTextOnMissingEntry() async {
+        let (index, _) = makeTempIndex()
+        #expect(await index.replaceAuxiliaryText("", with: "Narwhal", for: "missing") == false)
+        #expect(await index.search("narwhal").isEmpty)
+    }
+
     @Test("snapshot persists across instances")
     func snapshotRoundTrip() async throws {
         let (index1, url) = makeTempIndex()

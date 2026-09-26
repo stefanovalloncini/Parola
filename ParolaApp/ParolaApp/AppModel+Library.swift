@@ -127,6 +127,27 @@ extension AppModel {
         )
     }
 
+    /// One assignment for an entry that just landed: its row patched, or inserted where the sort puts it, with no rescan.
+    func landLibraryEntry(_ entry: LibraryEntry) {
+        var entries = libraryEntries
+        if let index = entries.firstIndex(where: { $0.id == entry.id }) {
+            guard entries[index].manifest != entry.manifest else { return }
+            entries[index] = entry
+            if librarySortOrder == .titleAZ || librarySortOrder == .titleZA {
+                entries = sortedLibraryEntries(entries)
+            }
+            libraryEntries = entries
+        } else {
+            guard entry.deletedAt == nil else { return }
+            // In front, so the sort keeps it ahead of anything made the same second, as the store does.
+            entries = sortedLibraryEntries([entry] + entries)
+            libraryEntries = entries
+            refreshBundleSizes(for: entries)
+            refreshLibraryExcerpts()
+        }
+        refreshSearchResults()
+    }
+
     func setDeletedEntries(_ entries: [LibraryEntry]) {
         guard !Self.sameEntries(entries, deletedEntries, comparingLastOpened: false) else { return }
         deletedEntries = entries

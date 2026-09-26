@@ -202,8 +202,9 @@ extension AppModel {
         guard features.isEnabled(.ai) else { return nil }
         if let cardMetadataOperation {
             guard let meta = await cardMetadataOperation(transcript) else { return nil }
-            try? await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id)
-            await refreshLibraryAndWait()
+            if let entry = try? await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id) {
+                landCardMetadata(entry)
+            }
             return meta
         }
         let prompts = CardMetadataPrompts(
@@ -214,8 +215,7 @@ extension AppModel {
             let meta = try await CardMetadataService.generate(for: transcript, prompts: prompts, features: features)
             // A run the 30 s timeout gave up on must not land on top of a manual regenerate.
             guard !Task.isCancelled else { return nil }
-            try await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id)
-            await refreshLibraryAndWait()
+            landCardMetadata(try await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id))
             return meta
         } catch CardMetadataService.Failure.tooShort {
             return nil
@@ -223,6 +223,12 @@ extension AppModel {
             ParolaLog.notice(.ai, "card metadata skipped", [.error: .error(error)])
             return nil
         }
+    }
+
+    private func landCardMetadata(_ entry: LibraryEntry) {
+        let landing = Self.landingSignposter.beginInterval("card")
+        landLibraryEntry(entry)
+        Self.landingSignposter.endInterval("card", landing)
     }
 
     func generateYouTubeChapters() {

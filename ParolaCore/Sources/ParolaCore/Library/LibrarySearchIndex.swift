@@ -265,6 +265,39 @@ public actor LibrarySearchIndex {
         scheduleSave()
     }
 
+    /// Swaps one piece of an entry's auxiliary text for another without tokenizing the rest again.
+    /// False when the entry isn't indexed, so the caller can index it whole instead.
+    public func replaceAuxiliaryText(_ old: String, with new: String, for id: String) async -> Bool {
+        await ensureLoaded()
+        guard let entry = entries[id] else { return false }
+        var tallies: [String: Tally] = [:]
+        for (position, token) in entry.tokens.enumerated() {
+            tallies[token] = Tally(
+                count: position < entry.counts.count ? entry.counts[position] : 1,
+                offset: position < entry.offsets.count ? entry.offsets[position] : Self.noOffset
+            )
+        }
+        Self.enumerateTokens(in: old) { token, _ in tallies[token]?.count -= 1 }
+        Self.enumerateTokens(in: new) { token, _ in tallies[token, default: Tally()].count += 1 }
+        // A token the body holds keeps its place however the card changes; one only the old card held goes.
+        tallies = tallies.filter { $0.value.count > 0 || $0.value.offset != Self.noOffset }
+        let tokens = tallies.keys.sorted()
+        let replaced = IndexedEntry(
+            title: entry.title,
+            text: entry.text,
+            tokens: tokens,
+            counts: tokens.map { max(1, tallies[$0]?.count ?? 1) },
+            offsets: tokens.map { tallies[$0]?.offset ?? Self.noOffset },
+            boundaryOffsets: entry.boundaryOffsets,
+            boundaryCentiseconds: entry.boundaryCentiseconds,
+            fingerprint: entry.fingerprint
+        )
+        removeFromIndex(id)
+        install(replaced, for: id)
+        scheduleSave()
+        return true
+    }
+
     public func remove(_ id: String) async {
         await ensureLoaded()
         removeFromIndex(id)

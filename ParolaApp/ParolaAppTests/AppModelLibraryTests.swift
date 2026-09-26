@@ -761,6 +761,54 @@ struct AppModelLibraryTests {
         #expect(model.libraryEntries.map(\.id) == ["fresh"])
     }
 
+    @Test("a saved run joins the list and takes the selection with no rescan")
+    func landedRunInsertsWithoutRefresh() async throws {
+        let model = makeModel()
+        await model.libraryRefreshTask?.value
+        model.generatesCardMetadata = false
+        let older = try await model.library.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "older")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.landLibraryEntry(older)
+        let refreshes = model.libraryRefreshes
+        let listChanges = ObservationFlag()
+        let selection = ObservationFlag()
+        withObservationTracking {
+            _ = model.libraryVersion
+        } onChange: {
+            listChanges.fired = true
+        }
+        withObservationTracking {
+            _ = model.selectedEntryID
+        } onChange: {
+            selection.fired = true
+        }
+
+        let saved = try await model.persistToLibrary(
+            Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "newest")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            source: .file
+        ).value
+        for _ in 0..<200 where model.selectedEntryID == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.selectedEntryID == saved.id)
+        #expect(model.libraryEntries.map(\.id) == [saved.id, older.id])
+        #expect(model.libraryRefreshes == refreshes)
+        #expect(listChanges.fired && selection.fired)
+    }
+
     @Test("saving a segment note invalidates the observed path the segment card reads")
     func segmentNoteIsObserved() async throws {
         let model = makeModel()

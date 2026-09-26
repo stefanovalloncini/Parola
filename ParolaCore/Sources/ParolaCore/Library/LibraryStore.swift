@@ -467,8 +467,8 @@ public actor LibraryStore {
             guard FileManager.default.fileExists(atPath: target.path) else { throw CancellationError() }
             cancelled = true
         }
-        invalidateListCaches()
         if cancelled {
+            invalidateListCaches()
             // Best effort from here: the caller matches on CancellationError, so a manifest read
             // that fails must not surface as a different error.
             if let entry = try? makeEntry(bundleURL: target) {
@@ -476,7 +476,23 @@ public actor LibraryStore {
             }
             throw CancellationError()
         }
-        let entry = try makeEntry(bundleURL: target)
+        let entry: LibraryEntry
+        do {
+            entry = try makeEntry(bundleURL: target)
+        } catch {
+            invalidateListCaches()
+            throw error
+        }
+        patchCaches(with: entry, aheadOfTies: true)
+        // The caller is about to open what it just saved; it shouldn't have to decode it back.
+        var stored = transcript
+        stored.segments = stored.segments.droppingBlankText()
+        let document = ParolaDocument(
+            transcript: stored,
+            audioURL: ParolaDocument.audioURL(in: target, manifest: entry.manifest),
+            manifest: entry.manifest
+        )
+        cachedLoaded.insert(LoadedEntry(entry: entry, document: document), for: entry.id)
         await indexEntry(entry, transcript: transcript)
         return entry
     }
@@ -743,20 +759,30 @@ public actor LibraryStore {
         try await updateTranscript(transcript, for: id, reindex: true)
     }
 
-    /// Writes the on-device title and summary shown on the entry's card, then re-indexes so both are searchable.
-    public func setCardMetadata(aiTitle: String?, shortSummary: String?, for id: LibraryEntry.ID) async throws {
+    /// Writes the on-device title and summary shown on the entry's card and makes both searchable.
+    /// Returns the entry as it now stands, so a caller can update its row without listing the library.
+    @discardableResult
+    public func setCardMetadata(aiTitle: String?, shortSummary: String?, for id: LibraryEntry.ID) async throws -> LibraryEntry {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
+        var before: (aiTitle: String?, shortSummary: String?) = (nil, nil)
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            before = (manifest.aiTitle, manifest.shortSummary)
             manifest.aiTitle = aiTitle?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
             manifest.shortSummary = shortSummary?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
         }
         let entry = try recacheEntry(at: bundleURL)
-        if let transcript = await transcriptForReindex(id, at: bundleURL) {
+        let old = Self.searchAuxiliaryText(notes: [:], transcript: nil, aiTitle: before.aiTitle, shortSummary: before.shortSummary)
+        let new = Self.searchAuxiliaryText(notes: [:], transcript: nil, aiTitle: entry.aiTitle, shortSummary: entry.shortSummary)
+        guard old != new else { return entry }
+        await ensureSearchIndexReady()
+        if await !searchIndex.replaceAuxiliaryText(old, with: new, for: id),
+           let transcript = await transcriptForReindex(id, at: bundleURL) {
             await indexEntry(entry, transcript: transcript)
         }
+        return entry
     }
 
     /// Appends a delivery receipt to the entry. Receipts are not searchable, so this write skips
@@ -923,9 +949,10 @@ public actor LibraryStore {
         }
     }
 
-    private func patchCaches(with entry: LibraryEntry) {
+    /// `aheadOfTies` for an entry just added: made this second, it is still the newest of them.
+    private func patchCaches(with entry: LibraryEntry, aheadOfTies: Bool = false) {
         cachedActive = patched(cachedActive, with: entry, belongs: entry.deletedAt == nil) {
-            $0.createdAt > $1.createdAt
+            aheadOfTies ? $0.createdAt >= $1.createdAt : $0.createdAt > $1.createdAt
         }
         cachedDeleted = patched(cachedDeleted, with: entry, belongs: entry.deletedAt != nil) {
             ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast)

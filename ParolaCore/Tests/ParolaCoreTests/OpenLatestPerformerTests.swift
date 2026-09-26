@@ -42,9 +42,9 @@ struct OpenLatestPerformerTests {
         _ = try await IntentTranscriptLookup.latestTranscriptText(in: store, rescan: false)
         let latest = try await IntentTranscriptLookup.latestTranscriptText(in: store, rescan: false)
         #expect(latest.text == "the newest words")
-        #expect(decodes.withLock { $0 } == 1, "the second lookup should come from the store's cache")
+        #expect(decodes.withLock { $0 } == 0, "the add left the entry in the store's cache")
 
         _ = try await IntentTranscriptLookup.latestTranscriptText(in: store, rescan: true)
-        #expect(decodes.withLock { $0 } == 2)
+        #expect(decodes.withLock { $0 } == 1)
     }
 }

@@ -1750,6 +1750,9 @@ final class AppModel {
     /// A non-fatal warning (e.g. a failed library save) shown without replacing the open transcript.
     var nonFatalWarning: String?
 
+    /// Each main-actor turn a finished run lands in: the install, the saved entry, the AI card.
+    static let landingSignposter = OSSignposter(subsystem: "app.parola.app", category: "landing")
+
     /// `activate: false` saves without taking the selection, auto-titling, or running
     /// auto-exports — for interrupted or failed takes that only need to survive.
     @discardableResult
@@ -1781,12 +1784,14 @@ final class AppModel {
             do {
                 let entry = try await adding.value
                 persistedEntryID = entry.id
-                refreshLibrary()
+                let landing = Self.landingSignposter.beginInterval("entry")
+                landLibraryEntry(entry)
                 // library.add copies media for seconds; if the user navigated meanwhile,
                 // taking the selection would repoint their next edits at this new entry.
                 if activate, loadEntryGeneration == navigationGeneration, selectedEntryID == nil {
                     selectedEntryID = entry.id
                 }
+                Self.landingSignposter.endInterval("entry", landing)
                 if activate {
                     if playsCompletionSound { playCompletionSound() }
                     // A parked on-device model session must never hold up auto-export.
@@ -2219,6 +2224,8 @@ final class AppModel {
                 )
                 try Task.checkCancellation()
                 let processed = await postProcessDetached(result)
+                let landing = Self.landingSignposter.beginInterval("install")
+                defer { Self.landingSignposter.endInterval("install", landing) }
                 clearDerivedArtifacts()
                 selectedEntryID = nil
                 restorePlaybackSource(fileURL)

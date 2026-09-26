@@ -54,6 +54,22 @@ struct CardMetadataTests {
         }
     }
 
+    @Test("a card lands on its row without listing the library again")
+    func cardPatchesTheRow() async throws {
+        let model = makeModel(temporaryDefaults())
+        await model.libraryRefreshTask?.value
+        model.cardMetadataOperation = { _ in CardMetadata(title: "Piano vendite", summary: "Quote per canale.") }
+        let entry = try await model.library.add(transcript: longTranscript(), audioSource: nil, category: .transcription, source: .file)
+        model.landLibraryEntry(entry)
+        let refreshes = model.libraryRefreshes
+
+        await model.generateCardMetadata(for: entry.id, transcript: longTranscript())
+
+        #expect(model.libraryEntry(id: entry.id)?.aiTitle == "Piano vendite")
+        #expect(model.libraryEntry(id: entry.id)?.shortSummary == "Quote per canale.")
+        #expect(model.libraryRefreshes == refreshes)
+    }
+
     @Test("generation is skipped when the toggle is off")
     func skippedWhenOff() async throws {
         try await withOnDeviceMock("T\nS") {
