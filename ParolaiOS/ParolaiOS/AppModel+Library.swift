@@ -24,6 +24,15 @@ extension AppModel {
         }
     }
 
+    /// Picks up what another process saved into the library while the app was in the background.
+    func refreshLibraryIfChangedElsewhere() {
+        Task { [weak self, library] in
+            guard await library.folderChangedElsewhere() else { return }
+            await library.dropCaches()
+            self?.refreshLibrary()
+        }
+    }
+
     func deleteEntry(_ id: LibraryEntry.ID) {
         Task {
             do {

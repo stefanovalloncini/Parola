@@ -82,6 +82,8 @@ public actor LibraryStore {
     private var cachedDeleted: [LibraryEntry]?
     private var cachedLoaded = LoadedEntryCache(capacity: 3)
     private var listCacheEpoch = 0
+    /// The library folder's modification date as of the last scan or this store's own last add or removal.
+    private var folderStamp: Date?
     private var indexReadyTask: Task<Void, Never>?
     private var digestBackfillTask: Task<Void, Never>?
     private nonisolated let extraIndexerJobs: AsyncStream<@Sendable () async -> Void>.Continuation?
@@ -130,8 +132,9 @@ public actor LibraryStore {
         } else {
             self.extraIndexerJobs = nil
         }
-        try? FileManager.default.createDirectory(at: libraryURL, withIntermediateDirectories: true)
         let indexDirectory = libraryURL.appendingPathComponent(".search-index", isDirectory: true)
+        // Made here, not by the first index save, which would move the folder's date after a scan took it.
+        try? FileManager.default.createDirectory(at: indexDirectory, withIntermediateDirectories: true)
         self.searchIndex = LibrarySearchIndex(indexDirectory: indexDirectory)
         Task { await self.ensureSearchIndexReady() }
     }
@@ -222,13 +225,14 @@ public actor LibraryStore {
     private func rebuildSearchIndexIfStale() async {
         let url = libraryURL
         let epoch = listCacheEpoch
+        let stamp = Self.folderStamp(of: url)
         let scan = await offActorIO(qos: .utility) { [self] in indexScan(at: url) }
         guard let scan else {
             indexReadyTask = nil
             return
         }
         // The list caches want the same scan; skip it if a mutation landed while it ran.
-        if cachedActive == nil, epoch == listCacheEpoch { applyScan(scan.entries) }
+        if cachedActive == nil, epoch == listCacheEpoch { applyScan(scan.entries, folderStamp: stamp) }
         guard await searchIndex.needsRebuild(matching: scan.fingerprints) else { return }
         startSourceDigestBackfill(scan.entries)
         let indexable = scan.entries.filter { $0.deletedAt == nil }
@@ -339,16 +343,37 @@ public actor LibraryStore {
         // A mutation landing during the off-actor scan would cache pre-mutation state, so retry under the new epoch; the on-actor last resort stalls every caller and only exists to terminate.
         for _ in 0..<8 {
             let epoch = listCacheEpoch
+            let stamp = Self.folderStamp(of: url)
             let entries = await offActorIO { [self] in scanEntries(at: url) }
             if epoch == listCacheEpoch {
-                applyScan(entries ?? [])
+                applyScan(entries ?? [], folderStamp: stamp)
                 return
             }
         }
-        applyScan(scanEntries(at: url) ?? [])
+        let stamp = Self.folderStamp(of: url)
+        applyScan(scanEntries(at: url) ?? [], folderStamp: stamp)
     }
 
-    private func applyScan(_ entries: [LibraryEntry]) {
+    /// Read before the scan it belongs to, so a write landing during the scan still reads as a change.
+    private nonisolated static func folderStamp(of url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+    }
+
+    /// Whether another process saved or removed a bundle since this store last listed the folder.
+    /// One stat; false before the first listing, which reads the folder anyway.
+    public func folderChangedElsewhere() -> Bool {
+        guard let folderStamp else { return false }
+        return Self.folderStamp(of: libraryURL) != folderStamp
+    }
+
+    /// After this store adds or removes a bundle, the folder's new date is its own, unless it had already moved before.
+    private func adoptFolderStamp(ifUnchangedFrom before: Date?) {
+        guard folderStamp != nil, folderStamp == before else { return }
+        folderStamp = Self.folderStamp(of: libraryURL)
+    }
+
+    private func applyScan(_ entries: [LibraryEntry], folderStamp stamp: Date?) {
+        folderStamp = stamp
         cachedActive = entries
             .filter { $0.deletedAt == nil }
             .sorted { $0.createdAt > $1.createdAt }
@@ -444,6 +469,7 @@ public actor LibraryStore {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
         let target = bundleURL.appendingPathExtension("parola")
+        let stampBefore = Self.folderStamp(of: libraryURL)
         let digest = await resolvedDigest(sourceDigest, for: audioSource)
         var cancelled = false
         do {
@@ -484,6 +510,7 @@ public actor LibraryStore {
             throw error
         }
         patchCaches(with: entry, aheadOfTies: true)
+        adoptFolderStamp(ifUnchangedFrom: stampBefore)
         // The caller is about to open what it just saved; it shouldn't have to decode it back.
         var stored = transcript
         stored.segments = stored.segments.droppingBlankText()
@@ -1019,8 +1046,10 @@ public actor LibraryStore {
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
+        let stampBefore = Self.folderStamp(of: libraryURL)
         try FileManager.default.removeItem(at: bundleURL)
         removeFromCaches(id: id)
+        adoptFolderStamp(ifUnchangedFrom: stampBefore)
         await deindexEntry(id: id)
     }
 
@@ -1132,6 +1161,7 @@ public actor LibraryStore {
         let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
         if cachedDeleted == nil { await primeCaches() }
         let toPurge = (cachedDeleted ?? []).filter { ($0.deletedAt ?? .distantFuture) < cutoff }
+        let stampBefore = Self.folderStamp(of: libraryURL)
         var purgedIDs: [LibraryEntry.ID] = []
         var failed = 0
         var firstFailure: (any Error)?
@@ -1155,6 +1185,7 @@ public actor LibraryStore {
             // A delete that failed partway can leave a bundle the cached entry no longer describes.
             invalidateListCaches()
         }
+        adoptFolderStamp(ifUnchangedFrom: stampBefore)
         return PurgeResult(purgedIDs: purgedIDs, failed: failed)
     }
 
@@ -1170,6 +1201,7 @@ public actor LibraryStore {
     public func dropCaches() {
         cachedActive = nil
         cachedDeleted = nil
+        folderStamp = nil
         cachedLoaded.removeAll()
         listCacheEpoch &+= 1
     }

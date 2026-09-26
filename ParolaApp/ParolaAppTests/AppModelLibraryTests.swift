@@ -805,6 +805,32 @@ struct AppModelLibraryTests {
         #expect(model.deletedEntries.isEmpty)
     }
 
+    @Test("coming forward rescans the library only when another process changed its folder")
+    func activationRefreshesOnlyWhenChangedElsewhere() async throws {
+        let model = makeModel()
+        await model.libraryRefreshTask?.value
+        let refreshes = model.libraryRefreshes
+
+        await model.refreshLibraryIfChangedElsewhere().value
+        #expect(model.libraryRefreshes == refreshes)
+
+        let outside = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let written = try await outside.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "saved from the MCP server")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        await model.refreshLibraryIfChangedElsewhere().value
+        await model.libraryRefreshTask?.value
+
+        #expect(model.libraryRefreshes == refreshes + 1)
+        #expect(model.libraryEntries.map(\.id) == [written.id])
+    }
+
     @Test("a saved run joins the list and takes the selection with no rescan")
     func landedRunInsertsWithoutRefresh() async throws {
         let model = makeModel()

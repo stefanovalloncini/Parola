@@ -101,6 +101,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model?.handleAppResignedActive()
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        model?.refreshLibraryIfChangedElsewhere()
+    }
+
     func application(_ application: NSApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
         guard let url = Self.spotlightOpenURL(from: userActivity), let model else { return false }
         NSApp.activate(ignoringOtherApps: true)

@@ -82,6 +82,16 @@ extension AppModel {
         }
     }
 
+    /// Picks up what the MCP server or the CLI saved into the library while the app was in the background.
+    @discardableResult
+    func refreshLibraryIfChangedElsewhere() -> Task<Void, Never> {
+        Task { [weak self, library] in
+            guard await library.folderChangedElsewhere() else { return }
+            await library.dropCaches()
+            self?.refreshLibrary()
+        }
+    }
+
     /// `refreshLibrary()` is fire-and-forget; this awaits the scan so a caller sees `libraryEntries` updated before it returns.
     func refreshLibraryAndWait() async {
         refreshLibrary()

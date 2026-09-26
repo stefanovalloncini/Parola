@@ -582,6 +582,28 @@ struct LibraryStoreTests {
         #expect(await store.listDeleted().isEmpty)
     }
 
+    @Test("a bundle another process writes reads as a change; the store's own add and purge don't")
+    func folderChangeFromElsewhere() async throws {
+        let (store, tmp) = try makeTempLibrary()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        #expect(await store.folderChangedElsewhere() == false)
+        let first = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        _ = await store.list()
+        #expect(await store.folderChangedElsewhere() == false)
+
+        let second = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        try await store.purge(first.id)
+        #expect(await store.folderChangedElsewhere() == false)
+
+        let outside = LibraryStore(libraryURL: tmp, extraIndexer: nil)
+        let written = try await outside.add(transcript: makeTranscript(), audioSource: nil)
+        #expect(await store.folderChangedElsewhere())
+
+        await store.dropCaches()
+        #expect(Set(await store.list().map(\.id)) == [second.id, written.id])
+        #expect(await store.folderChangedElsewhere() == false)
+    }
+
     @Test("a load cancelled before it starts throws instead of decoding")
     func cancelledLoadDoesNotDeliver() async throws {
         let (store, tmp) = try makeTempLibrary()
@@ -1501,7 +1523,7 @@ struct LibraryStoreTests {
 
         let store = LibraryStore(libraryURL: tmp, extraIndexer: nil)
         #expect(await store.search("kryptonite").isEmpty)
-        #expect(FileManager.default.fileExists(atPath: indexDirectoryURL(in: tmp).path) == false)
+        #expect(FileManager.default.fileExists(atPath: indexManifestURL(in: tmp).path) == false)
     }
 
     @Test("search on a fresh store instance finds previously indexed entries")

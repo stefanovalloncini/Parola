@@ -5,6 +5,7 @@ import ParolaCore
 @main
 struct ParolaiOSApp: App {
     @State private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let model = AppModel()
@@ -17,6 +18,9 @@ struct ParolaiOSApp: App {
             AppRoot()
                 .environment(model)
                 .environment(model.playback)
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { model.refreshLibraryIfChangedElsewhere() }
+                }
         }
     }
 }
