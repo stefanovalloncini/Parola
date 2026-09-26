@@ -81,6 +81,7 @@ extension AppModel {
         fileTranscribeFraction = nil
         fileTranscribeStage = nil
         fileTranscribeTask = nil
+        retireFileRun(runToken)
     }
 
     /// Favorites, notes, the speaker map and the card metadata all name segments and labels this run replaced.

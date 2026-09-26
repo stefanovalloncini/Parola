@@ -1374,6 +1374,20 @@ final class AppModel {
         return fileRunGeneration
     }
 
+    /// An ended run stops matching its own token: a cancelled engine can keep emitting after the run lets go.
+    func retireFileRun(_ runToken: Int) {
+        guard fileRunGeneration == runToken else { return }
+        fileRunGeneration &+= 1
+    }
+
+    /// Whatever run holds the token loses it, and what it last painted goes with it.
+    private func retireCurrentFileRun() {
+        fileRunGeneration &+= 1
+        if !filePartialText.isEmpty { filePartialText = "" }
+        fileTranscribeFraction = nil
+        fileTranscribeStage = nil
+    }
+
     var transcribeTaskRunning: Bool {
         fileTranscribeTask != nil || youtubeTranscribeTask != nil || youtubeSubsTask != nil
             || duplicateCheckTask != nil
@@ -1396,6 +1410,7 @@ final class AppModel {
     private func cancelTranscriptionRuns() {
         duplicateCheckTask?.cancel()
         duplicateCheckTask = nil
+        if fileTranscribeTask != nil { retireCurrentFileRun() }
         fileTranscribeTask?.cancel()
         fileTranscribeTask = nil
         youtubeTranscribeTask?.cancel()
@@ -1446,6 +1461,7 @@ final class AppModel {
         deferredLinks = []
         cancelAndTrack(&downloadTask)
         cancelAndTrack(&fileTranscribeTask)
+        retireCurrentFileRun()
         cancelAndTrack(&youtubeTranscribeTask)
         cancelAndTrack(&youtubeSubsTask)
         cancelAndTrack(&burnTask)
@@ -2186,6 +2202,8 @@ final class AppModel {
     /// The run itself, past the routing and the duplicate check an arriving file goes through:
     /// Retry means this file, now.
     func beginFileTranscription(fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil) {
+        // Before the new token: cancelling retires whichever token the old run holds.
+        cancelTranscriptionRuns()
         let runToken = nextFileRunToken()
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
@@ -2210,7 +2228,6 @@ final class AppModel {
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
         let recoveryToken = beginFileTranscribeRecovery(sourceURL: fileURL)
 
-        cancelTranscriptionRuns()
         fileTranscribeTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -2244,11 +2261,16 @@ final class AppModel {
                     text: processed.text,
                     entry: persistToLibrary(processed, audioSource: fileURL, source: .file, sourceDigest: sourceDigest)
                 )
+                retireFileRun(runToken)
             } catch {
                 endRecovery(recoveryToken)
-                filePartialText = ""
-                fileTranscribeFraction = nil
-                fileTranscribeStage = nil
+                // A run a newer one replaced leaves the newer one's pane alone.
+                if fileRunGeneration == runToken {
+                    filePartialText = ""
+                    fileTranscribeFraction = nil
+                    fileTranscribeStage = nil
+                    retireFileRun(runToken)
+                }
                 if !Task.isCancelled {
                     applyTranscriptionError(error, source: fileURL, translateOverride: translateOverride)
                 }

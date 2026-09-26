@@ -28,6 +28,45 @@ struct FileHandlerCoalescingTests {
         #expect(hops() > mark, "no hop past \(mark) within a second", sourceLocation: sourceLocation)
     }
 
+    private func waitUntil(_ condition: () -> Bool) async -> Bool {
+        for _ in 0..<200 {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        return condition()
+    }
+
+    @Test("after a cancel, the abandoned run's late partial, progress and stage change nothing")
+    func cancelledRunCallbacksAreDropped() async {
+        let model = makeModel()
+        model.mediaDurationSeconds = 100
+        let token = model.nextFileRunToken()
+        let file = URL(fileURLWithPath: "/tmp/FileHandlerCoalescingTests/cancelled.wav")
+        let partials = model.makeFilePartialCoalescer(runToken: token)
+        let progress = model.makeFileProgressCoalescer(runToken: token)
+        let stage = model.makeFileStageHandler(fileURL: file, runToken: token)
+        model.phase = .loadingModel(name: "openai_whisper-tiny")
+        partials.send("before the cancel")
+        stage(.preparingAudio)
+        #expect(await waitUntil { model.phase == .transcribing(file: file) && !model.filePartialText.isEmpty })
+
+        model.cancelCurrentWork()
+        #expect(model.filePartialText.isEmpty)
+        model.phase = .downloadingModel(name: "openai_whisper-tiny", progress: 0.2)
+
+        partials.send("after the cancel")
+        progress.send(50)
+        stage(.transcribing)
+        await settle({ partials.hopCount }, past: 1)
+        await settle({ progress.hopCount }, past: 0)
+        try? await Task.sleep(for: .milliseconds(50))
+
+        #expect(model.filePartialText.isEmpty)
+        #expect(model.fileTranscribeFraction == nil)
+        #expect(model.fileTranscribeStage == nil)
+        #expect(model.phase == .downloadingModel(name: "openai_whisper-tiny", progress: 0.2))
+    }
+
     @Test("a burst of partials costs one hop and lands the newest text")
     func partialBurstTakesOneHop() async {
         let model = makeModel()
