@@ -11,7 +11,7 @@ final class LiveCaptionsController {
     var state: LiveCaptionsState = LiveCaptionsState() {
         didSet {
             if isActive != state.isActive { isActive = state.isActive }
-            let history = !(state.confirmedLines.isEmpty && state.partial.isEmpty)
+            let history = !(state.history.isEmpty && state.partial.isEmpty)
             if hasHistory != history { hasHistory = history }
         }
     }
@@ -45,12 +45,12 @@ final class LiveCaptionsController {
         guard translateToEnglish != enabled else { return }
         translateToEnglish = enabled
         guard state.isActive else { return }
-        let history = state.confirmedLines
+        let earlier = state
         await stop()
         guard !state.isActive, let current = lastOptions else { return }
         await start(options: optionsWithTranslate(current), deviceUID: lastDeviceUID)
         // start() resets state; keep what was already captioned before the flip.
-        state.confirmedLines = history + state.confirmedLines
+        state.continuing(after: earlier)
     }
 
     private func optionsWithTranslate(_ options: TranscriptionOptions) -> TranscriptionOptions {
@@ -152,12 +152,7 @@ final class LiveCaptionsController {
         let stamp = Self.timestampFormatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
         panel.nameFieldStringValue = "captions-\(stamp).txt"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        var body = state.confirmedLines.joined(separator: "\n")
-        if !state.partial.isEmpty {
-            if !body.isEmpty { body += "\n" }
-            body += state.partial
-        }
-        try? body.data(using: .utf8)?.write(to: url, options: .atomic)
+        try? state.historyText.data(using: .utf8)?.write(to: url, options: .atomic)
     }
 
     private func openPresenter() {

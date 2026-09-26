@@ -51,7 +51,7 @@ struct LiveCaptionsView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .contentTransition(.opacity)
-                .animation(.easeOut(duration: 0.22), value: controller.state.confirmedLines.count)
+                .animation(.easeOut(duration: 0.22), value: controller.state.history.count)
                 .accessibilityLabel(caption)
                 .accessibilityAddTraits(.updatesFrequently)
         }

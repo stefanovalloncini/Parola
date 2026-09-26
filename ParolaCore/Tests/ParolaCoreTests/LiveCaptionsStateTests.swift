@@ -36,6 +36,34 @@ struct LiveCaptionsStateTests {
         #expect(s.confirmedLines == ["two", "three"])
     }
 
+    @Test("the history keeps every confirmed line while the display keeps the last few")
+    func historyOutlivesTheDisplay() {
+        var s = LiveCaptionsState()
+        for index in 0..<10 {
+            s.apply(.confirmed(TranscriptSegment(id: index, start: Double(index), end: Double(index) + 1, text: "line \(index)")))
+        }
+        s.apply(.partial(text: "still talking"))
+
+        #expect(s.history.count == 10)
+        #expect(s.confirmedLines == ["line 6", "line 7", "line 8", "line 9"])
+        #expect(s.historyText == (0..<10).map { "line \($0)" }.joined(separator: "\n") + "\nstill talking")
+    }
+
+    @Test("a restarted run carries the earlier run's history and display")
+    func continuingKeepsTheEarlierRun() {
+        var earlier = LiveCaptionsState(maxLines: 2)
+        for text in ["one", "two", "three"] {
+            earlier.apply(.confirmed(TranscriptSegment(id: 0, start: 0, end: 1, text: text)))
+        }
+        var restarted = LiveCaptionsState(maxLines: 2)
+        restarted.apply(.confirmed(TranscriptSegment(id: 0, start: 0, end: 1, text: "four")))
+
+        restarted.continuing(after: earlier)
+
+        #expect(restarted.history == ["one", "two", "three", "four"])
+        #expect(restarted.confirmedLines == ["three", "four"])
+    }
+
     @Test("failed event records error and deactivates")
     func failedEvent() {
         var s = LiveCaptionsState(isActive: true)
@@ -60,6 +88,7 @@ struct LiveCaptionsStateTests {
         s.error = "bad"
         s.reset()
         #expect(s.confirmedLines.isEmpty)
+        #expect(s.history.isEmpty)
         #expect(s.partial.isEmpty)
         #expect(s.error == nil)
     }
