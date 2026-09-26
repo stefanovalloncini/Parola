@@ -106,13 +106,37 @@ struct Record: AsyncParsableCommand {
     }
 
     /// Both paths end here, so a batch take and a streamed one read the same.
-    func emit(_ transcript: Transcript) throws {
+    func emit(_ transcript: Transcript, to sink: RecordSink = .standard) throws {
         let finished = TranscriptPostProcessor.orthographyOnly.apply(transcript)
         let exporter = Exporters.exporter(for: format)
         if let output {
             try exporter.render(finished).write(to: URL(fileURLWithPath: output), options: .atomic)
         } else {
-            print(try exporter.renderText(finished))
+            sink.out(try exporter.renderText(finished))
+        }
+    }
+
+    /// A txt take to stdout is the live lines themselves, so each one is tidied as it prints.
+    func handle(_ event: StreamingEvent, lines: inout LiveLineTidier, sink: RecordSink) {
+        switch event {
+        case .partial(let text):
+            sink.err("\r\u{001B}[2K… \(text)")
+        case .confirmed(let segment):
+            sink.err("\r\u{001B}[2K")
+            if let line = lines.tidy(segment) { sink.out(line.text) }
+        case .voiceActivity:
+            break
+        case .warning(let msg):
+            sink.err("\nwarning: \(msg)\n")
+        case .failed(let msg):
+            sink.err("\nerror: \(msg)\n")
+        case .finished(let transcript):
+            guard format != .txt || output != nil else { break }
+            do {
+                try emit(transcript, to: sink)
+            } catch {
+                sink.err("error: failed to write output — \(error.localizedDescription)\n")
+            }
         }
     }
 
@@ -138,28 +162,9 @@ struct Record: AsyncParsableCommand {
         progress.finish()
 
         let consumer = Task {
+            var lines = LiveLineTidier(language: language)
             for await event in events {
-                switch event {
-                case .partial(let text):
-                    FileHandle.standardError.write(Data("\r\u{001B}[2K… \(text)".utf8))
-                case .confirmed(let segment):
-                    FileHandle.standardError.write(Data("\r\u{001B}[2K".utf8))
-                    print(segment.text)
-                case .voiceActivity:
-                    break
-                case .warning(let msg):
-                    stderr("\nwarning: \(msg)")
-                case .failed(let msg):
-                    stderr("\nerror: \(msg)")
-                case .finished(let transcript):
-                    let owesFinalRender = format != .txt || output != nil
-                    guard owesFinalRender else { break }
-                    do {
-                        try emit(transcript)
-                    } catch {
-                        stderr("error: failed to write output — \(error.localizedDescription)")
-                    }
-                }
+                handle(event, lines: &lines, sink: .standard)
             }
         }
 
@@ -167,6 +172,17 @@ struct Record: AsyncParsableCommand {
         await session.stop()
         await consumer.value
     }
+}
+
+/// Where `parola record` writes: stdout carries the transcript, stderr everything else.
+struct RecordSink: Sendable {
+    var out: @Sendable (String) -> Void
+    var err: @Sendable (String) -> Void
+
+    static let standard = RecordSink(
+        out: { print($0) },
+        err: { FileHandle.standardError.write(Data($0.utf8)) }
+    )
 }
 
 extension Record.Source: LogSafe {
