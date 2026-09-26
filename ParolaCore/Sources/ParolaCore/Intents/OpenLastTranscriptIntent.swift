@@ -15,11 +15,11 @@ enum ParolaIntentError: LocalizedError, Equatable {
     }
 }
 
-/// The newest entry's id and text, for an app that answers Open Last Transcript from the store it already holds.
+/// The newest entry's id and text. `rescan` is for a store other than the one the app writes through,
+/// whose caches can't see the app's writes; the app's own store passes false and keeps its caches.
 public enum IntentTranscriptLookup {
-    public static func latestTranscriptText(in store: LibraryStore) async throws -> (entryID: String, text: String) {
-        // The app writes through its own LibraryStore instance, so this one must re-scan disk.
-        await store.dropCaches()
+    public static func latestTranscriptText(in store: LibraryStore, rescan: Bool) async throws -> (entryID: String, text: String) {
+        if rescan { await store.dropCaches() }
         guard let latest = await store.list().first else {
             throw ParolaIntentError.noTranscripts
         }
@@ -44,7 +44,7 @@ public struct OpenLastTranscriptIntent: AppIntent {
         if let openLatest = IntentPerformers.openLatest {
             return .result(value: try await openLatest())
         }
-        let latest = try await IntentTranscriptLookup.latestTranscriptText(in: LibraryStore.shared)
+        let latest = try await IntentTranscriptLookup.latestTranscriptText(in: LibraryStore.shared, rescan: true)
         NotificationCenter.default.post(
             name: .parolaOpenEntry,
             object: nil,

@@ -206,7 +206,7 @@ struct IntentTests {
         }
         let newer = try await store.add(transcript: makeTranscript(text: "new words"), audioSource: nil)
 
-        let latest = try await IntentTranscriptLookup.latestTranscriptText(in: store)
+        let latest = try await IntentTranscriptLookup.latestTranscriptText(in: store, rescan: true)
 
         #expect(latest.entryID == newer.id)
         #expect(latest.text == "new words")
@@ -216,7 +216,7 @@ struct IntentTests {
     func latestTranscriptTextEmpty() async throws {
         let store = try makeTempStore()
         await #expect(throws: ParolaIntentError.noTranscripts) {
-            _ = try await IntentTranscriptLookup.latestTranscriptText(in: store)
+            _ = try await IntentTranscriptLookup.latestTranscriptText(in: store, rescan: true)
         }
     }
 
@@ -231,7 +231,7 @@ struct IntentTests {
         let writer = LibraryStore(libraryURL: tmp, extraIndexer: nil)
         _ = try await writer.add(transcript: makeTranscript(text: "fresh words"), audioSource: nil)
 
-        let latest = try await IntentTranscriptLookup.latestTranscriptText(in: reader)
+        let latest = try await IntentTranscriptLookup.latestTranscriptText(in: reader, rescan: true)
         #expect(latest.text == "fresh words")
     }
 

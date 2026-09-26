@@ -6,7 +6,7 @@ extension AppModel {
     /// RootView owns the selection, so the entry opens through the notification it listens for.
     func registerIntentPerformers() {
         IntentPerformers.openLatest = { [library] in
-            let latest = try await IntentTranscriptLookup.latestTranscriptText(in: library)
+            let latest = try await IntentTranscriptLookup.latestTranscriptText(in: library, rescan: false)
             NotificationCenter.default.post(name: .parolaOpenEntry, object: nil, userInfo: ["id": latest.entryID])
             return latest.text
         }
