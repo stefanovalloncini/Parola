@@ -124,6 +124,8 @@ extension AppModel {
     func sendEntry(_ entryID: LibraryEntry.ID, to destinationID: UUID) async -> DeliveryOutcome? {
         guard destinationsEnabled else { return nil }
         let name = destination(id: destinationID)?.name ?? ""
+        // The payload is read from the library, which is up to a second behind an edit.
+        if entryID == selectedEntryID { await flushPendingTranscriptSave() }
         let outcome = await deliveryEngine.send(entryID: entryID, to: destinationID)
         deliveryNotice = DeliveryNotice(
             entryID: entryID,

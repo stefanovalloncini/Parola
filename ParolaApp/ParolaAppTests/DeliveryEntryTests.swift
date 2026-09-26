@@ -35,6 +35,21 @@ struct DeliveryEntryTests {
         )
     }
 
+    @Test("a send right after an edit carries the edit", .timeLimit(.minutes(1)))
+    func sendCarriesTheLastEdit() async throws {
+        let model = makeModel("delivery-edit")
+        let recorder = MockDeliveryRecorder()
+        let mock = await installMock(on: model, recorder: recorder)
+        let entry = try await addEntry(to: model, text: "the first draft")
+        try await model.openEntry(entry.id)
+
+        model.editSegment(id: 0, newText: "the corrected line")
+        let outcome = await model.sendEntry(entry.id, to: mock.id)
+
+        #expect(outcome?.isDelivered == true)
+        #expect(await recorder.recorded().first?.transcript.text == "the corrected line")
+    }
+
     @Test("deleting an entry drops the delivery waiting to retry it", .timeLimit(.minutes(1)))
     func deleteDropsTheQueuedDelivery() async throws {
         let model = makeModel("delivery-delete")
