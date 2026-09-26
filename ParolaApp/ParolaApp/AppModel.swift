@@ -1236,6 +1236,8 @@ final class AppModel {
     @ObservationIgnored var libraryExcerptsTask: Task<Void, Never>?
     @ObservationIgnored var searchTask: Task<Void, Never>?
     @ObservationIgnored var libraryRefreshTask: Task<Void, Never>?
+    /// How many scans `refreshLibrary()` has started, so a test can bound them.
+    @ObservationIgnored var libraryRefreshes = 0
     @ObservationIgnored var pendingTranscriptSaveTask: Task<Void, Never>?
     @ObservationIgnored var pendingTranscriptSaveGeneration: Int = 0
     @ObservationIgnored private var pendingSaveTextChanged = false

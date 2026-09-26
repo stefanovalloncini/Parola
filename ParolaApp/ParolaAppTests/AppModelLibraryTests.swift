@@ -657,6 +657,28 @@ struct AppModelLibraryTests {
         #expect(first?.isCancelled == true)
     }
 
+    @Test("waiters that overlap join the newest refresh instead of restarting each other", .timeLimit(.minutes(1)))
+    func overlappingWaitersSettle() async throws {
+        let model = makeModel()
+        let entry = try await model.library.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil
+        )
+        let before = model.libraryRefreshes
+
+        async let first: Void = model.refreshLibraryAndWait()
+        async let second: Void = model.refreshLibraryAndWait()
+        async let third: Void = model.refreshLibraryAndWait()
+        _ = await (first, second, third)
+
+        #expect(model.libraryRefreshes - before <= 4, "\(model.libraryRefreshes - before) scans for three waiters")
+        #expect(model.libraryEntries.map(\.id) == [entry.id])
+    }
+
     @Test("a superseded refresh does not overwrite libraryEntries with its stale snapshot")
     func cancelledRefreshDoesNotClobber() async throws {
         let model = makeModel()

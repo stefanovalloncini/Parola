@@ -67,6 +67,7 @@ enum LibraryOrigin: Equatable {
 extension AppModel {
 
     func refreshLibrary() {
+        libraryRefreshes &+= 1
         libraryRefreshTask?.cancel()
         libraryRefreshTask = Task { [weak self] in
             guard let self else { return }
@@ -82,15 +83,15 @@ extension AppModel {
     }
 
     /// `refreshLibrary()` is fire-and-forget; this awaits the scan so a caller sees `libraryEntries` updated before it returns.
-    /// A concurrent `refreshLibrary()` cancels and replaces the task, and a cancelled scan returns
-    /// without publishing — so wait again rather than answer from the listing it left behind.
     func refreshLibraryAndWait() async {
-        repeat {
-            refreshLibrary()
-            guard let task = libraryRefreshTask else { return }
+        refreshLibrary()
+        // A newer refresh started after this caller's write, so it is joined: waiters restarting each other never settled.
+        while let task = libraryRefreshTask, !Task.isCancelled {
             await task.value
             if !task.isCancelled { return }
-        } while !Task.isCancelled
+            // A finished task a newer refresh cancelled reads as cancelled too, so only one nothing replaced restarts.
+            if libraryRefreshTask == task { refreshLibrary() }
+        }
     }
 
     /// Rows quote a transcript's first lines; the index is the only place that text is already in memory.
