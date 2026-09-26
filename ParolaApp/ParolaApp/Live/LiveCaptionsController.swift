@@ -21,11 +21,17 @@ final class LiveCaptionsController {
     var translateToEnglish: Bool = false
 
     private var panel: NSPanel?
+    /// Off in tests, which drive a session without putting a floating panel on screen.
+    private let showsPanel: Bool
     private var presenterWindow: NSWindow?
     private var session: (any StreamingTranscriber)?
     private var consumer: Task<Void, Never>?
     private var lastOptions: TranscriptionOptions?
     private var lastDeviceUID: String?
+
+    init(showsPanel: Bool = true) {
+        self.showsPanel = showsPanel
+    }
 
     isolated deinit {
         consumer?.cancel()
@@ -45,8 +51,9 @@ final class LiveCaptionsController {
         guard translateToEnglish != enabled else { return }
         translateToEnglish = enabled
         guard state.isActive else { return }
-        let earlier = state
         await stop()
+        // After the stop: it drains the lines still in flight into `state`, and start() resets it.
+        let earlier = state
         guard !state.isActive, let current = lastOptions else { return }
         await start(options: optionsWithTranslate(current), deviceUID: lastDeviceUID)
         // start() resets state; keep what was already captioned before the flip.
@@ -120,6 +127,7 @@ final class LiveCaptionsController {
     }
 
     private func showWindow() {
+        guard showsPanel else { return }
         if panel == nil {
             panel = LiveCaptionsWindow.make { [weak self] in
                 if let self {
