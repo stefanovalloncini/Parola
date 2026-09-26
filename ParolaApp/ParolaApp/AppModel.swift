@@ -2998,13 +2998,10 @@ final class AppModel {
             let takeTitle = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
             let savedPartial = !confirmed.isEmpty || audioURL != nil
             if savedPartial {
-                let partial = Transcript(
-                    segments: confirmed,
-                    language: currentOptions.language ?? "auto",
-                    modelName: selectedModel,
-                    sourceURL: audioURL,
-                    durationSeconds: confirmed.last?.end
+                let finished = await StreamingTranscriptionSession.finishedTake(
+                    segments: confirmed, options: currentOptions, modelName: selectedModel, audioURL: audioURL
                 )
+                let partial = await postProcessDetached(finished)
                 persistToLibrary(
                     partial,
                     audioSource: audioURL,

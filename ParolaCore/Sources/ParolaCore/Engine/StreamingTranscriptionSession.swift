@@ -281,21 +281,29 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         teardown()
     }
 
-    /// The take as saved: the live view shows confirmed segments as they land, while the saved
-    /// transcript goes through the same finishing as a file run.
     func finishedTranscript(recordedURL: URL?) async -> Transcript {
+        await Self.finishedTake(
+            segments: allConfirmed, options: optionsForRun, modelName: loadedModel ?? "unknown", audioURL: recordedURL
+        )
+    }
+
+    /// A live take's confirmed segments as they are saved, finished the way a file run is. An
+    /// interrupted take goes through this too, so it reads like one that was stopped.
+    public static func finishedTake(
+        segments: [TranscriptSegment],
+        options: TranscriptionOptions?,
+        modelName: String,
+        audioURL: URL?
+    ) async -> Transcript {
         let raw = Transcript(
-            segments: allConfirmed,
-            language: Self.finalLanguage(for: allConfirmed, options: optionsForRun),
-            modelName: loadedModel ?? "unknown",
-            sourceURL: recordedURL,
-            durationSeconds: allConfirmed.last?.end
+            segments: segments,
+            language: finalLanguage(for: segments, options: options),
+            modelName: modelName,
+            sourceURL: audioURL,
+            durationSeconds: segments.last?.end
         )
         return await TranscriptFinisher.finish(
-            raw,
-            engine: .whisperKit,
-            options: optionsForRun ?? TranscriptionOptions(),
-            audioURL: recordedURL
+            raw, engine: .whisperKit, options: options ?? TranscriptionOptions(), audioURL: audioURL
         )
     }
 

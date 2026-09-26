@@ -135,6 +135,25 @@ extension TranscriberMockSuites {
             #expect(saved.first?.title.hasSuffix("(interrupted)") == true)
         }
 
+        @Test("an interrupted take is saved finished and post-processed, like a stopped one")
+        func interruptedTakeIsFinished() async throws {
+            let model = makeModel()
+            model.findReplaceRules = [FindReplaceRule(find: "magazzino", replace: "deposito")]
+            model.liveSegments = [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "Non so perchè il magazzino"),
+                TranscriptSegment(id: 1, start: 2.2, end: 4, text: "è rimasto vuoto."),
+                TranscriptSegment(id: 2, start: 5, end: 7, text: "Sottotitoli creati dalla comunità Amara.org"),
+            ]
+
+            await model.handleStreamingEvent(.failed("stream boom"))
+
+            let saved = await entries(model, count: 1)
+            let entry = try #require(saved.first)
+            let stored = try await model.library.load(entry.id).document.transcript
+            #expect(stored.segments.map(\.text) == ["Non so perché il deposito è rimasto vuoto."])
+            #expect(stored.language == "it")
+        }
+
         @Test("recording checkpoints carry the in-flight audio URL even without segments")
         func recordingCheckpointCarriesAudioURL() async throws {
             let model = makeModel()
