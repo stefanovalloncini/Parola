@@ -138,4 +138,76 @@ struct SearchTests {
         #expect(updated.segments[1].text == "Farewell world.")
         #expect(updated.segments[1].words == nil)
     }
+
+    /// The String-overlay loop `findMatches` used before it moved to NSString.
+    private static func referenceMatches(_ transcript: Transcript, _ query: String, caseSensitive: Bool) -> [TranscriptMatch] {
+        guard !query.isEmpty else { return [] }
+        var out: [TranscriptMatch] = []
+        let options: String.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
+        for segment in transcript.segments {
+            var searchStart = segment.text.startIndex
+            while searchStart < segment.text.endIndex,
+                  let r = segment.text.range(of: query, options: options, range: searchStart..<segment.text.endIndex) {
+                let lo = segment.text.utf16.distance(from: segment.text.startIndex, to: r.lowerBound)
+                let hi = segment.text.utf16.distance(from: segment.text.startIndex, to: r.upperBound)
+                out.append(TranscriptMatch(segmentID: segment.id, range: lo..<hi))
+                searchStart = r.upperBound
+            }
+        }
+        return out
+    }
+
+    @Test("matches are the ones the String search found, over accents, emoji and case folding")
+    func matchesAgreeWithTheStringSearch() {
+        let texts = [
+            "Caffè caffè CAFFÈ, perché è così.",
+            "Cafe\u{301} decomposed next to café composed.",
+            "👩‍👩‍👧 family 👩‍👩‍👧 and 👍🏽 thumbs 🇮🇹 flag 🇮🇹",
+            "Straße STRASSE strasse ß SS",
+            "İstanbul istanbul ISTANBUL ı I",
+            "ΣΟΦΟΣ σοφος σοφoς ΣΊΣΥΦΟΣ",
+            "ﬁle file FILE ﬁ fi",
+            "aaaa aaa naïve NAÏVE naive",
+            "",
+            "   ",
+        ]
+        let transcript = Transcript(
+            segments: texts.enumerated().map { TranscriptSegment(id: $0.offset * 3, start: Double($0.offset), end: Double($0.offset) + 1, text: $0.element) },
+            language: "it",
+            modelName: "tiny"
+        )
+        let queries = [
+            "caffè", "CAFFÈ", "é", "e", "café", "👩‍👩‍👧", "👍", "🇮🇹", "ss", "SS", "strasse",
+            "i", "İ", "istanbul", "σοφος", "Σ", "ς", "fi", "file", "aa", "a", "ï", "naive", " ", "zzz",
+        ]
+        for query in queries {
+            for caseSensitive in [false, true] {
+                #expect(
+                    transcript.findMatches(query, caseSensitive: caseSensitive)
+                        == Self.referenceMatches(transcript, query, caseSensitive: caseSensitive),
+                    "query \(query) caseSensitive \(caseSensitive)"
+                )
+            }
+        }
+    }
+
+    /// The String search matched "St" for "ß" and "ff" for "ﬁ", and skipped a modifier inside an emoji, where Replace All disagreed.
+    @Test("matches are the spans Replace All rewrites where the String search disagreed with it")
+    func matchesAgreeWithReplaceAll() {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "Straße STRASSE ß così"),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "Caffè ﬁle file"),
+                TranscriptSegment(id: 2, start: 2, end: 3, text: "👍🏽 thumbs 👍"),
+            ],
+            language: "it",
+            modelName: "tiny"
+        )
+        #expect(transcript.findMatches("ß").map(\.range) == [4..<5, 11..<13, 15..<16])
+        #expect(transcript.replacingAll("ß", with: "#").segments[0].text == "Stra#e STRA#E # così")
+        #expect(transcript.findMatches("ﬁ").map(\.range) == [6..<7, 10..<12])
+        #expect(transcript.replacingAll("ﬁ", with: "#").segments[1].text == "Caffè #le #le")
+        #expect(transcript.findMatches("🏽").map(\.range) == [2..<4])
+        #expect(transcript.replacingAll("🏽", with: "#").segments[2].text == "👍# thumbs 👍")
+    }
 }

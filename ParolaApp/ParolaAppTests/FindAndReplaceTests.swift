@@ -136,6 +136,21 @@ struct FindAndReplaceTests {
         #expect(model.matches.count == 1)
     }
 
+    @Test("a Replace scans once: the rescan its edit queued is dropped")
+    func replaceScansOnce() throws {
+        openFind(query: "Hello")
+        model.findReplacement = "Hi"
+        try #require(model.matches.count == 2)
+
+        model.replaceCurrentMatch()
+        #expect(model.matchesDebounce?.isCancelled ?? true)
+        #expect(model.matches.count == 1)
+
+        model.replaceAllMatches()
+        #expect(model.matchesDebounce?.isCancelled ?? true)
+        #expect(model.matches.isEmpty)
+    }
+
     @Test("case-insensitive search catches more than case-sensitive")
     func caseSensitivity() {
         openFind(query: "world", caseSensitive: false)

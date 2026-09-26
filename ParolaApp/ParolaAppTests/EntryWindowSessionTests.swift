@@ -240,6 +240,30 @@ struct EntryWindowSessionTests {
         #expect(session.loadFailed == false)
     }
 
+    @Test("a reload rescans the standing query off the main actor and keeps the reader's match")
+    func reloadRescansTheQuery() async throws {
+        let model = EntryWindowTestSupport.makeModel("windowsrescan")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["beta", "beta two"], speakers: [nil, nil], audio: nil
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        session.searchQuery = "beta"
+        #expect(await waitUntil { session.matches.count == 2 })
+        session.goToNextMatch()
+        #expect(session.currentMatchIndex == 1)
+
+        let edited = EntryWindowTestSupport.transcript(texts: ["beta", "beta beta", "gamma"], speakers: [nil, nil, nil])
+        try await EntryWindowTestSupport.store(model).updateTranscript(edited, for: entry.id)
+        await EntryWindowTestSupport.syncLibrary(model)
+        session.reload()
+        await session.loadTask?.value
+        await session.matchesTask?.value
+
+        #expect(session.matches.map(\.segmentID) == [0, 1, 1])
+        #expect(session.matches(in: 1).map(\.range) == [0..<4, 5..<9])
+        #expect(session.currentMatchIndex == 1)
+    }
+
     @Test("reloading an entry that has gone leaves the empty state")
     func reloadOfADeletedEntryEmpties() async throws {
         let model = EntryWindowTestSupport.makeModel("windowsreloadgone")

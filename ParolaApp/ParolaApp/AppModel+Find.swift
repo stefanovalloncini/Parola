@@ -25,11 +25,14 @@ extension AppModel {
         }
     }
 
+    /// Scans now and drops the debounced scan an edit's `transcript` write just queued, so a Replace scans once.
     func recomputeMatches() {
+        matchesDebounce?.cancel()
         guard findIsOpen, let transcript else {
             applyMatches([])
             return
         }
+        if !findQuery.isEmpty, lastFindQuery != findQuery { lastFindQuery = findQuery }
         applyMatches(transcript.findMatches(findQuery, caseSensitive: findCaseSensitive))
     }
 
@@ -55,8 +58,8 @@ extension AppModel {
     /// Stops at the first hit instead of collecting every one, so a Find-closed jump doesn't rescan the whole transcript twice.
     static func transcriptHasMatch(_ query: String, caseSensitive: Bool, in segments: [TranscriptSegment]) -> Bool {
         guard !query.isEmpty else { return false }
-        let options: String.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
-        return segments.contains { $0.text.range(of: query, options: options) != nil }
+        let options: NSString.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
+        return segments.contains { ($0.text as NSString).range(of: query, options: options).location != NSNotFound }
     }
 
     /// The index quantizes a boundary to hundredths, so a segment can start a few milliseconds past the time the row shows.

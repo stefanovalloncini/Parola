@@ -21,15 +21,17 @@ public extension Transcript {
     func findMatches(_ query: String, caseSensitive: Bool = false) -> [TranscriptMatch] {
         guard !query.isEmpty else { return [] }
         var out: [TranscriptMatch] = []
-        let options: String.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
+        let options: NSString.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
         for segment in segments {
-            var searchStart = segment.text.startIndex
-            while searchStart < segment.text.endIndex,
-                  let r = segment.text.range(of: query, options: options, range: searchStart..<segment.text.endIndex) {
-                let lo = segment.text.utf16.distance(from: segment.text.startIndex, to: r.lowerBound)
-                let hi = segment.text.utf16.distance(from: segment.text.startIndex, to: r.upperBound)
-                out.append(TranscriptMatch(segmentID: segment.id, range: lo..<hi))
-                searchStart = r.upperBound
+            // NSString hands back the UTF-16 range the match stores, and skips the String overlay's per-call cost.
+            let text = segment.text as NSString
+            let length = text.length
+            var location = 0
+            while location < length {
+                let found = text.range(of: query, options: options, range: NSRange(location: location, length: length - location))
+                guard found.location != NSNotFound else { break }
+                out.append(TranscriptMatch(segmentID: segment.id, range: found.location..<NSMaxRange(found)))
+                location = max(NSMaxRange(found), location + 1)
             }
         }
         return out

@@ -37,6 +37,9 @@ final class EntryWindowSession {
     @ObservationIgnored private var matchesBySegment: [TranscriptSegment.ID: [TranscriptMatch]] = [:]
     @ObservationIgnored private var segmentsByID: [TranscriptSegment.ID: TranscriptSegment] = [:]
     @ObservationIgnored private var searchDebounceTask: Task<Void, Never>?
+    @ObservationIgnored private(set) var matchesTask: Task<Void, Never>?
+    /// A new query jumps to its first match even when a reload's scan supersedes the query's own.
+    @ObservationIgnored private var matchesResetPending = false
     @ObservationIgnored private(set) var appliedUpdatedAt: Date?
     private var appliedDurationSeconds: Double?
     /// Counts the bundle reads, so a test can tell a skipped reload from a silent one.
@@ -183,6 +186,8 @@ final class EntryWindowSession {
         loadTask = nil
         searchDebounceTask?.cancel()
         searchDebounceTask = nil
+        matchesTask?.cancel()
+        matchesTask = nil
         tearDownPlayer()
     }
 
@@ -314,22 +319,33 @@ final class EntryWindowSession {
     }
 
     private func recomputeMatches() {
-        currentMatchIndex = 0
+        matchesResetPending = true
         refreshMatches()
-        snapToCurrentMatch()
     }
 
     /// Re-runs the standing query over a transcript that changed under it, keeping the reader's place in the list.
     private func refreshMatches() {
+        matchesTask?.cancel()
         guard let transcript, !searchQuery.isEmpty else {
-            matches = []
-            matchesBySegment = [:]
-            currentMatchIndex = 0
+            matchesTask = nil
+            installMatches([])
             return
         }
-        matches = transcript.findMatches(searchQuery)
-        matchesBySegment = Dictionary(grouping: matches, by: \.segmentID)
-        currentMatchIndex = min(currentMatchIndex, max(matches.count - 1, 0))
+        let query = searchQuery
+        matchesTask = Task { [weak self] in
+            let found = await Task.detached { transcript.findMatches(query) }.value
+            guard !Task.isCancelled else { return }
+            self?.installMatches(found)
+        }
+    }
+
+    private func installMatches(_ found: [TranscriptMatch]) {
+        let resets = matchesResetPending
+        matchesResetPending = false
+        matches = found
+        matchesBySegment = Dictionary(grouping: found, by: \.segmentID)
+        currentMatchIndex = resets ? 0 : min(currentMatchIndex, max(found.count - 1, 0))
+        if resets { snapToCurrentMatch() }
     }
 
     private func snapToCurrentMatch() {
