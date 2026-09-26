@@ -65,6 +65,27 @@ struct SearchResultsTests {
         await waitUntil { model.searchResults?.map(\.id) == [entry.id] }
     }
 
+    @Test("a summary made in the app is searchable, and clearing it takes it out again", .timeLimit(.minutes(1)))
+    func summaryIsSearchable() async throws {
+        let model = AppModel(
+            skipBootstrap: true,
+            defaults: temporaryDefaults(),
+            libraryURL: makeTempLibraryURL("search-summary"),
+            features: Set(ParolaFeature.allCases)
+        )
+        model.summariseOperation = { _, _ in Summary(text: "Renewal deadlines are slipping") }
+        let entry = try await add("the weekly call", to: model)
+        try await model.openEntry(entry.id)
+
+        model.summariseTranscript()
+
+        await waitUntil { await model.library.search("renewal").map(\.entryID) == [entry.id] }
+
+        model.clearSummary()
+
+        await waitUntil { await model.library.search("renewal").isEmpty }
+    }
+
     @Test("an entry in the trash does not open", .timeLimit(.minutes(1)))
     func trashedEntryDoesNotOpen() async throws {
         let model = makeModel("search-trash-open")

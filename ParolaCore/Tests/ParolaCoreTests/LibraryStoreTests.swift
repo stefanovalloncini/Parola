@@ -1203,6 +1203,35 @@ struct LibraryStoreTests {
         #expect(await reopened.search("budget").map(\.entryID) == expected)
     }
 
+    @Test("a summary set after the entry was added is searchable, and a cleared one stops matching")
+    func setSummaryReindexes() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        #expect(await store.search("renewal").isEmpty)
+
+        try await store.setSummary(Summary(text: "Renewal deadlines are slipping"), for: entry.id)
+        #expect(await store.search("renewal").map(\.entryID) == [entry.id])
+        #expect(try await store.load(entry.id).document.transcript.summary?.text == "Renewal deadlines are slipping")
+
+        try await store.setSummary(nil, for: entry.id)
+        #expect(await store.search("renewal").isEmpty)
+        #expect(try await store.load(entry.id).document.transcript.summary == nil)
+    }
+
+    @Test("a summary a save already wrote without indexing still reaches the index")
+    func setSummaryIndexesWhatASaveWrote() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        var saved = makeTranscript()
+        saved.summary = Summary(text: "Renewal deadlines are slipping")
+        try await store.updateTranscript(saved, for: entry.id, reindex: false)
+        #expect(await store.search("renewal").isEmpty)
+
+        try await store.setSummary(saved.summary, for: entry.id)
+
+        #expect(await store.search("renewal").map(\.entryID) == [entry.id])
+    }
+
     @Test("summary text, segment notes, and speaker names are searchable")
     func searchFindsSummaryNotesSpeakers() async throws {
         let (store, _) = try makeTempLibrary()

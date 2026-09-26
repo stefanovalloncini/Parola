@@ -713,6 +713,22 @@ public actor LibraryStore {
         try await mutateTranscript(for: id, reindex: false) { $0.translation = translation }
     }
 
+    /// Replaces the entry's summary, or clears it when `summary` is nil, and re-indexes: summary text is searchable.
+    public func setSummary(_ summary: Summary?, for id: LibraryEntry.ID) async throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        var transcript = try Self.readCleanedDocument(at: bundleURL).transcript
+        guard transcript.summary != summary else {
+            // The debounced transcript save can land this summary first, with indexing off.
+            await indexEntry(try recacheEntry(at: bundleURL), transcript: transcript)
+            return
+        }
+        transcript.summary = summary
+        try await updateTranscript(transcript, for: id, reindex: true)
+    }
+
     /// Writes the on-device title and summary shown on the entry's card, then re-indexes so both are searchable.
     public func setCardMetadata(aiTitle: String?, shortSummary: String?, for id: LibraryEntry.ID) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

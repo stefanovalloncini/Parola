@@ -33,9 +33,9 @@ extension AppModel {
                       entryID == nil || self.selectedEntryID == entryID else { isSummarising = false; return }
                 self.transcript?.summary = summary
                 isSummarising = false
-                if let entryID = self.selectedEntryID, let updated = self.transcript {
+                if let entryID = self.selectedEntryID {
                     Task { [library] in
-                        try? await library.updateTranscript(updated, for: entryID, reindex: false)
+                        try? await library.setSummary(summary, for: entryID)
                     }
                 }
             } catch {
@@ -58,9 +58,9 @@ extension AppModel {
         guard transcript?.summary != nil else { return }
         transcript?.summary = nil
         summaryError = nil
-        if let entryID = selectedEntryID, let updated = transcript {
+        if let entryID = selectedEntryID {
             Task { [library] in
-                try? await library.updateTranscript(updated, for: entryID, reindex: false)
+                try? await library.setSummary(nil, for: entryID)
             }
         }
     }
