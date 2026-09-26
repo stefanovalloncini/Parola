@@ -250,4 +250,14 @@ struct ModelCatalogLookupTests {
         let ids = groups.flatMap { $0.1.map(\.id) }
         #expect(ids == ["nvidia_parakeet-tdt-0.6b-v3"])
     }
+
+    @Test("only Whisper streams, and an id outside the catalog is a legacy Whisper directory that does")
+    func canStreamFollowsTheEngine() throws {
+        let apple = try #require(ModelCatalog.all.first { $0.engineID == .appleSpeech })
+        #expect(ModelCatalog.canStream(id: "openai_whisper-tiny"))
+        #expect(ModelCatalog.canStream(id: "openai_whisper-large-v3_turbo"))
+        #expect(!ModelCatalog.canStream(id: apple.id))
+        #expect(!ModelCatalog.canStream(id: "nvidia_parakeet-tdt-0.6b-v3"))
+        #expect(ModelCatalog.canStream(id: "openai_whisper-custom-finetune"))
+    }
 }

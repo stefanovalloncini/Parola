@@ -128,6 +128,9 @@ final class AppModel {
     @ObservationIgnored var currentSegmentIndex: Int?
 
     var liveSegments: [TranscriptSegment] = []
+    /// Set when a take starts, from the route it actually took: the recording pane shows the live
+    /// transcript only for a take that streams.
+    private(set) var liveTakeIsStreaming = false
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
@@ -633,10 +636,8 @@ final class AppModel {
     @ObservationIgnored weak var liveCaptions: LiveCaptionsController?
 
     /// Nil when the selected model can stream live captions; otherwise the user-facing reason.
-    /// Ids outside the catalog are legacy WhisperKit directories, so they stream.
     var liveCaptionsUnavailableReason: String? {
-        guard let variant = ModelCatalog.variant(id: selectedModel),
-              variant.engineID != .whisperKit else { return nil }
+        guard !ModelCatalog.canStream(id: selectedModel) else { return nil }
         return "\(AppModel.modelLabel(selectedModel)) can't stream Live Captions. Pick a Whisper model first."
     }
 
@@ -2721,10 +2722,7 @@ final class AppModel {
     /// file-capture path instead, so the fixture transcribes the same way system audio does.
     /// Non-WhisperKit engines can't stream either — those record the take first, then transcribe.
     func shouldUseStreamingMic() async -> Bool {
-        guard useStreaming else { return false }
-        if let engine = ModelCatalog.variant(id: selectedModel)?.engineID, engine != .whisperKit {
-            return false
-        }
+        guard useStreaming, ModelCatalog.canStream(id: selectedModel) else { return false }
         return await MockAudioSourceRegistry.shared.resolve(for: .mic) == nil
     }
 
@@ -2774,6 +2772,7 @@ final class AppModel {
             }
             await mediaSession.enterRecording(config: config)
             do {
+                liveTakeIsStreaming = false
                 phase = .recording(source: source)
                 switch source {
                 case .microphone:
@@ -2907,6 +2906,7 @@ final class AppModel {
         streamingConsumer?.cancel()
         let s = StreamingTranscriberFactory.make(clock: clock, deviceUID: preferredInputDeviceUID, persistAudio: true)
         streamingSession = s
+        liveTakeIsStreaming = true
         liveSegments = []
         livePartialText = ""
         liveVoiceActive = false

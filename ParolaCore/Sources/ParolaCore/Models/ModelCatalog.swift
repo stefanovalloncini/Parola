@@ -209,6 +209,12 @@ public enum ModelCatalog {
         all.first { $0.id == id }
     }
 
+    /// Whether a live take can run on this model: only Whisper streams. Ids outside the catalog
+    /// are legacy WhisperKit directories, so they stream too.
+    public static func canStream(id: String) -> Bool {
+        (variant(id: id)?.engineID ?? .whisperKit) == .whisperKit
+    }
+
     /// Entries kept for people who already downloaded them; the pickers list them only when installed.
     public static let hiddenUnlessInstalled: Set<String> = ["nvidia_parakeet-tdt-0.6b-v2"]
 

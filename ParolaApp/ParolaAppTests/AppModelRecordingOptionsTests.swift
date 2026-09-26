@@ -358,3 +358,56 @@ extension TranscriberMockSuites {
         }
     }
 }
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("The recording pane follows the route a take took", .serialized)
+    struct LiveTakeRouteTests {
+        private func waitUntilRecording(_ model: AppModel, timeoutMs: Int = 3000) async -> Bool {
+            var elapsed = 0
+            while elapsed < timeoutMs {
+                if case .recording = model.phase { return true }
+                try? await Task.sleep(for: .milliseconds(15))
+                elapsed += 15
+            }
+            return false
+        }
+
+        @Test("a Whisper mic take streams, so the pane shows the live transcript")
+        func whisperTakeStreams() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["ciao"]))
+                let model = makeRecordingModel()
+                model.useStreaming = true
+                model.selectedModel = "openai_whisper-tiny"
+                model.recordingCountInSeconds = 0
+
+                model.startRecording(source: .microphone)
+
+                #expect(await waitUntilRecording(model))
+                #expect(model.liveTakeIsStreaming)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("an Apple Speech mic take records first, so the pane shows no live transcript")
+        func appleSpeechTakeDoesNotStream() async throws {
+            let fixture = try makeSilentWAV()
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let apple = try #require(ModelCatalog.all.first { $0.engineID == .appleSpeech })
+                let model = makeRecordingModel()
+                model.useStreaming = true
+                model.selectedModel = apple.id
+                model.recordingCountInSeconds = 0
+
+                model.startRecording(source: .microphone)
+
+                #expect(await waitUntilRecording(model))
+                #expect(!model.liveTakeIsStreaming)
+                model.cancelCurrentWork()
+            }
+        }
+    }
+}

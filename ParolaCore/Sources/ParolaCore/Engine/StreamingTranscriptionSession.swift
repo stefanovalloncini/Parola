@@ -90,7 +90,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         failureAudioURL = nil
 
         let modelName = options.model ?? ModelCatalog.fallbackModelID
-        if let variant = ModelCatalog.variant(id: modelName), variant.engineID != .whisperKit {
+        if !ModelCatalog.canStream(id: modelName), let variant = ModelCatalog.variant(id: modelName) {
             ParolaLog.notice(.streaming, "engine \(variant.engineID) cannot stream")
             throw ParolaError.unsupportedForEngine(
                 "Live transcription runs on Whisper models; \(variant.displayName) can't stream. Pick a Whisper model and try again."

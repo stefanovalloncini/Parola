@@ -302,8 +302,7 @@ extension AppModel {
                 warnings.append(String(localized: "\(label) doesn't support \(languageName). Dictation in that language won't work."))
             }
         }
-        // Ids missing from the catalog are legacy WhisperKit directories, so they stream.
-        if let variant, variant.engineID != .whisperKit {
+        if !ModelCatalog.canStream(id: model) {
             warnings.append(String(localized: "\(label) doesn't stream: no live preview, and the text arrives only after processing."))
         } else if !useStreaming {
             warnings.append(String(localized: "Streaming is off in General settings, so dictation shows no live preview."))
@@ -329,9 +328,7 @@ extension AppModel {
         useStreaming: Bool,
         isInstalled: (String) -> Bool
     ) -> String? {
-        guard useStreaming else { return nil }
-        guard (ModelCatalog.variant(id: model)?.engineID ?? .whisperKit) == .whisperKit else { return nil }
-        guard isInstalled(model) else { return nil }
+        guard useStreaming, ModelCatalog.canStream(id: model), isInstalled(model) else { return nil }
         return model
     }
 

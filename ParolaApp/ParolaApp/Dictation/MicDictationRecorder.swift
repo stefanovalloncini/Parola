@@ -125,10 +125,8 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     private var useStreaming: Bool {
-        guard streamingEnabled else { return false }
-        guard let model else { return false }
-        guard let variant = ModelCatalog.variant(id: model) else { return false }
-        return variant.engineID == .whisperKit
+        guard streamingEnabled, let model else { return false }
+        return ModelCatalog.canStream(id: model)
     }
 
     func transcriptionOptions() -> TranscriptionOptions {

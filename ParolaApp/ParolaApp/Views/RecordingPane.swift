@@ -6,7 +6,7 @@ struct RecordingPane: View {
     @Environment(AppModel.self) private var model
     @State private var startedAt: Date = Date()
 
-    private var isStreaming: Bool { source == .microphone && model.useStreaming }
+    private var isStreaming: Bool { model.liveTakeIsStreaming }
     private var stateLabel: String { String(localized: "Recording") }
     private var stopTitle: String {
         isStreaming ? String(localized: "Finish") : String(localized: "Stop")
