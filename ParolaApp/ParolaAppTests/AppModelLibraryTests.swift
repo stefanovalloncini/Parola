@@ -761,6 +761,50 @@ struct AppModelLibraryTests {
         #expect(model.libraryEntries.map(\.id) == ["fresh"])
     }
 
+    private func launchWithPurge(_ libraryURL: URL) -> AppModel {
+        AppModel(bootstrap: AppBootstrap(
+            mode: .test,
+            library: libraryURL,
+            defaultsOverride: temporaryDefaults(),
+            sideEffects: [.libraryPurgeOnLaunch],
+            filePicker: SystemFilePicker()
+        ))
+    }
+
+    @Test("a launch purge with nothing to remove leaves the library list alone")
+    func idleLaunchPurgeSkipsTheRefresh() async throws {
+        let model = launchWithPurge(makeTempLibraryURL("purge-idle"))
+        let refreshes = model.libraryRefreshes
+
+        await model.launchPurgeTask?.value
+
+        #expect(model.libraryRefreshes == refreshes)
+    }
+
+    @Test("a launch purge that removed something refreshes the list once")
+    func launchPurgeRefreshesAfterRemoving() async throws {
+        let libraryURL = makeTempLibraryURL("purge-some")
+        let seedStore = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        let stale = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "old")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        try await seedStore.delete(stale.id, at: Date().addingTimeInterval(-40 * 86_400))
+        let model = launchWithPurge(libraryURL)
+        let refreshes = model.libraryRefreshes
+
+        await model.launchPurgeTask?.value
+        await model.libraryRefreshTask?.value
+
+        #expect(model.libraryRefreshes == refreshes + 1)
+        #expect(model.deletedEntries.isEmpty)
+    }
+
     @Test("a saved run joins the list and takes the selection with no rescan")
     func landedRunInsertsWithoutRefresh() async throws {
         let model = makeModel()

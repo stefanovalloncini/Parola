@@ -556,6 +556,32 @@ struct LibraryStoreTests {
         #expect(FileManager.default.fileExists(atPath: old.bundleURL.path) == false)
     }
 
+    @Test("a purge over warm caches neither rescans nor drops them, and takes out what it removed")
+    func purgeKeepsWarmCaches() async throws {
+        let (store, tmp) = try makeTempLibrary()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let kept = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let old = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let now = Date()
+        try await store.delete(old.id, at: now.addingTimeInterval(-31 * 86_400))
+        #expect(await store.list().map(\.id) == [kept.id])
+        #expect(await store.listDeleted().map(\.id) == [old.id])
+        // Written behind the actor's back: only a rescan could find it.
+        try ParolaDocument.write(
+            transcript: makeTranscript(), audioURL: nil,
+            to: tmp.appendingPathComponent("stray-bundle")
+        )
+
+        let idle = await store.purgeDeletedOlderThan(days: 60, now: now)
+        #expect(idle.purged == 0)
+        #expect(await store.list().map(\.id) == [kept.id])
+
+        let result = await store.purgeDeletedOlderThan(days: 30, now: now)
+        #expect(result.purgedIDs == [old.id])
+        #expect(await store.list().map(\.id) == [kept.id])
+        #expect(await store.listDeleted().isEmpty)
+    }
+
     @Test("a load cancelled before it starts throws instead of decoding")
     func cancelledLoadDoesNotDeliver() async throws {
         let (store, tmp) = try makeTempLibrary()

@@ -68,7 +68,8 @@ final class AppModel {
         refreshModelList()
         refreshLibrary()
         Task { [weak self] in
-            await store.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())
+            let purge = await store.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())
+            guard purge.purged > 0 || purge.failed > 0 else { return }
             self?.refreshLibrary()
         }
     }

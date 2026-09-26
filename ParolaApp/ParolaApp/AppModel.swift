@@ -1367,6 +1367,7 @@ final class AppModel {
     @ObservationIgnored private var stopRequestedDuringStart = false
     @ObservationIgnored var derivedArtifactsGeneration = 0
     @ObservationIgnored var loadEntryGeneration = 0
+    @ObservationIgnored var launchPurgeTask: Task<Void, Never>?
 
     /// A fresh token for a file run's handlers; an older one belongs to a run that has been replaced.
     func nextFileRunToken() -> Int {
@@ -1715,16 +1716,15 @@ final class AppModel {
             startAutomationBridge()
         }
         if sideEffects.contains(.libraryPurgeOnLaunch) {
-            Task { [weak self, library] in
+            launchPurgeTask = Task { [weak self, library] in
                 let purge = await library.purgeDeletedOlderThan(
                     days: AppModel.trashRetentionDays, now: Date()
                 )
-                if purge.purged > 0 || purge.failed > 0 {
-                    ParolaLog.info(
-                        .library, "recently deleted purged on launch",
-                        [.count: .int(purge.purged), .failed: .int(purge.failed)]
-                    )
-                }
+                guard purge.purged > 0 || purge.failed > 0 else { return }
+                ParolaLog.info(
+                    .library, "recently deleted purged on launch",
+                    [.count: .int(purge.purged), .failed: .int(purge.failed)]
+                )
                 self?.refreshLibrary()
             }
         }

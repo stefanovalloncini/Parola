@@ -1130,7 +1130,7 @@ public actor LibraryStore {
     @discardableResult
     public func purgeDeletedOlderThan(days: Int, now: Date) async -> PurgeResult {
         let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
-        await primeCaches()
+        if cachedDeleted == nil { await primeCaches() }
         let toPurge = (cachedDeleted ?? []).filter { ($0.deletedAt ?? .distantFuture) < cutoff }
         var purgedIDs: [LibraryEntry.ID] = []
         var failed = 0
@@ -1138,7 +1138,7 @@ public actor LibraryStore {
         for entry in toPurge {
             do {
                 try FileManager.default.removeItem(at: entry.bundleURL)
-                cachedLoaded.remove(entry.id)
+                removeFromCaches(id: entry.id)
                 await deindexEntry(id: entry.id)
                 purgedIDs.append(entry.id)
             } catch {
@@ -1152,8 +1152,9 @@ public actor LibraryStore {
                 .library, "deleted entries could not be purged",
                 [.count: .int(failed), .error: .error(firstFailure)]
             )
+            // A delete that failed partway can leave a bundle the cached entry no longer describes.
+            invalidateListCaches()
         }
-        invalidateListCaches()
         return PurgeResult(purgedIDs: purgedIDs, failed: failed)
     }
 
