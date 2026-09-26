@@ -44,8 +44,10 @@ struct ContentRoutes: View {
         }
     }
 
+    private var routeID: RouteID { Self.routeID(for: model) }
+
     /// Coarse on purpose: one case per library filter keeps the list's identity across a category switch.
-    private var routeID: RouteID {
+    static func routeID(for model: AppModel) -> RouteID {
         if model.mode == .test, model.settingsRoutePreview { return .settingsPreview }
         switch model.route {
         case .batch: return .batch
@@ -53,12 +55,12 @@ struct ContentRoutes: View {
         case .statistics: return .statistics
         case .recentlyDeleted: return .recentlyDeleted
         case .transcript:
-            if !model.batchJobs.isEmpty { return .batchDetail }
-            return showsLibraryBrowse ? .library : .phase
+            if !model.batchIsEmpty { return .batchDetail }
+            return model.isBrowsingLibrary ? .library : .phase
         }
     }
 
-    private enum RouteID: Hashable {
+    enum RouteID: Hashable {
         case settingsPreview
         case batch
         case queue
@@ -71,7 +73,7 @@ struct ContentRoutes: View {
 
     @ViewBuilder
     private var transcriptContent: some View {
-        if !model.batchJobs.isEmpty {
+        if !model.batchIsEmpty {
             // Fixed width rather than a split: TranscriptPane already nests an HSplitView, and
             // two nested ones overflow the window instead of compressing — the batch list ate
             // the slack until the sidebar and the inspector both clipped at their window edges.
@@ -145,7 +147,7 @@ struct ContentRoutes: View {
         } else {
             switch BatchDetailPlaceholder(
                 isRunning: model.batchIsRunning,
-                hasCompletedJob: model.batchJobs.contains { $0.status == .done }
+                hasCompletedJob: model.batchHasDoneJob
             ) {
             case .running:
                 ProgressPane(title: "Transcribing batch…", progress: nil)
@@ -174,7 +176,7 @@ struct ContentRoutes: View {
         LibraryListView(
             category: LibraryListContent.browseCategory(
                 filter: model.libraryFilter,
-                searching: model.searchRanking != nil
+                searching: model.hasSearchResults
             ),
             searchRanking: model.searchRanking
         )

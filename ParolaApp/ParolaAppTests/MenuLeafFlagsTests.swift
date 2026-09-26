@@ -4,6 +4,11 @@ import Testing
 @testable import Parola
 import ParolaTestSupport
 
+// @unchecked: only written from the observation callback, which the model raises on the main actor.
+private final class MenuInvalidation: @unchecked Sendable {
+    var fired = false
+}
+
 @MainActor
 @Suite("Menu leaf flags track the state they mirror")
 struct MenuLeafFlagsTests {
@@ -50,6 +55,87 @@ struct MenuLeafFlagsTests {
         model.toggleFind()
         #expect(model.matches.isEmpty)
         #expect(model.hasMatches == false)
+    }
+
+    /// Everything the menu bar, the content route, the toolbar and the transcript header decide from.
+    private func readMenusAndRoute(_ model: AppModel) {
+        _ = HelpCommands(model: model, showShortcuts: {}).body
+        _ = FileCommands(model: model).body
+        _ = ViewCommands(model: model).body
+        _ = EditCommands(model: model).body
+        _ = PlaybackCommands(model: model).body
+        _ = CaptionsCommands(model: model, scratchpad: ScratchpadController(), liveCaptions: LiveCaptionsController()).body
+        _ = TranscriptCommands(model: model).body
+        _ = ContentRoutes.routeID(for: model)
+        _ = model.isBrowsingLibrary
+        _ = model.canReturnToOrigin
+        _ = model.batchIsRunning
+        _ = model.batchHasDoneJob
+    }
+
+    private func entry(_ id: String, title: String, favorites: [Int] = []) -> LibraryEntry {
+        var manifest = ParolaDocument.Manifest(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            originalAudioName: "\(id).m4a",
+            title: title,
+            modelName: "stub",
+            language: "en"
+        )
+        manifest.favoriteSegments = favorites
+        return LibraryEntry(
+            id: id,
+            bundleURL: URL(fileURLWithPath: "/tmp/MenuLeafFlagsTests/\(id).parola"),
+            manifest: manifest
+        )
+    }
+
+    @Test("a batch progress tick reaches neither the menus nor the route; a status change does")
+    func batchProgressSkipsMenusAndRoute() async {
+        let model = makeModel("leaf-batch-tick")
+        await model.libraryRefreshTask?.value
+        model.transcript = makeTranscript()
+        let job = BatchJob(url: URL(fileURLWithPath: "/tmp/leaf-batch-tick.wav"), status: .transcribing)
+        model.batchJobs = [job]
+        let invalidated = MenuInvalidation()
+        withObservationTracking {
+            readMenusAndRoute(model)
+        } onChange: {
+            invalidated.fired = true
+        }
+
+        await model.handleBatchEvent(.progress(jobID: job.id, fraction: 0.4))
+        await model.handleBatchEvent(.progress(jobID: job.id, fraction: 0.7))
+        #expect(!invalidated.fired)
+
+        await model.handleBatchEvent(.failed(jobID: job.id, reason: "boom"))
+        #expect(invalidated.fired)
+    }
+
+    @Test("a segment edit, a library write and a new set of hits leave the menus and the route alone")
+    func contentChangesSkipMenusAndRoute() async {
+        let model = makeModel("leaf-content")
+        await model.libraryRefreshTask?.value
+        model.transcript = makeTranscript()
+        model.libraryEntries = [entry("a", title: "First")]
+        model.selectedEntryID = "a"
+        model.searchRanking = ["a"]
+        let invalidated = MenuInvalidation()
+        withObservationTracking {
+            readMenusAndRoute(model)
+        } onChange: {
+            invalidated.fired = true
+        }
+
+        var edited = makeTranscript()
+        edited.segments[0].text = "Hello there."
+        model.transcript = edited
+        model.libraryEntries = [entry("a", title: "Renamed")]
+        model.searchRanking = []
+        #expect(!invalidated.fired)
+
+        model.libraryEntries = [entry("a", title: "Renamed", favorites: [0])]
+        #expect(invalidated.fired)
+        #expect(model.selectedEntryHasFavorites)
     }
 
     @Test("recentFiles rereads after recentFilesRaw changes under it")

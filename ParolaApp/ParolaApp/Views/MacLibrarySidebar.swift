@@ -7,7 +7,7 @@ struct MacLibrarySidebar: View {
     private var selectedRoute: SidebarRoute {
         SidebarRoute.selected(
             route: model.route,
-            searching: model.searchRanking != nil,
+            searching: model.hasSearchResults,
             filter: model.libraryFilter,
             browsingAll: model.libraryBrowsingAll
         )

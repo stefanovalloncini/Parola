@@ -347,12 +347,22 @@ final class AppModel {
 
     var batchJobs: [BatchJob] = [] {
         didSet {
+            guard !BatchJob.sameQueueShape(oldValue, batchJobs) else { return }
             let active = QueueCount.count(for: batchJobs)
             if active != activeBatchJobCount { activeBatchJobCount = active }
+            if batchIsEmpty != batchJobs.isEmpty { batchIsEmpty = batchJobs.isEmpty }
+            let running = batchJobs.contains { $0.status == .transcribing }
+            if batchIsRunning != running { batchIsRunning = running }
+            let hasDone = batchJobs.contains { $0.status == .done }
+            if batchHasDoneJob != hasDone { batchHasDoneJob = hasDone }
             saveBatchQueueSnapshot()
         }
     }
+    /// Mirrors of `batchJobs` that change only on a status transition, so a progress tick reaches none of their readers.
     private(set) var activeBatchJobCount: Int = 0
+    private(set) var batchIsEmpty = true
+    private(set) var batchIsRunning = false
+    private(set) var batchHasDoneJob = false
     var selectedBatchJobID: BatchJob.ID?
     @ObservationIgnored var batchTask: Task<Void, Never>?
     @ObservationIgnored var lastSavedBatchQueueURLs: [URL]?
@@ -1110,6 +1120,7 @@ final class AppModel {
             libraryVersion &+= 1
             let counts = Self.personUsageCounts(in: libraryEntries)
             if counts != personUsageCounts { personUsageCounts = counts }
+            updateSelectedEntryHasFavorites()
         }
     }
     /// How many speaker labels across the library stand for each person. Read off the maps, so an assignment an undo takes back stops counting.
@@ -1120,8 +1131,13 @@ final class AppModel {
     var recentlyDeletedSelection: Set<LibraryEntry.ID> = []
     /// The open query's hits, best first. Ids, not entries: a row resolves against the library, so a hit that was renamed or deleted shows as it is now.
     var searchRanking: [LibraryEntry.ID]? {
-        didSet { searchResultsVersion &+= 1 }
+        didSet {
+            searchResultsVersion &+= 1
+            if hasSearchResults != (searchRanking != nil) { hasSearchResults = searchRanking != nil }
+        }
     }
+    /// Whether a query's results are up, for readers that don't care which results they are.
+    private(set) var hasSearchResults = false
     var searchResults: [LibraryEntry]? {
         searchRanking.map { $0.compactMap(libraryEntry(id:)) }
     }
@@ -1132,12 +1148,12 @@ final class AppModel {
     var librarySearchFocusRequests: Int = 0
     /// True while the content area shows a library list instead of the phase machine's panes.
     var isBrowsingLibrary: Bool {
-        guard route == .transcript, batchJobs.isEmpty else { return false }
+        guard route == .transcript, batchIsEmpty else { return false }
         switch phase {
         case .idle, .ready:
             // Results the transcript did not come from take the content area; clearing them gives it back.
-            if hasTranscript { return searchRanking != nil && !openedFromSearch }
-            return searchRanking != nil || libraryFilter != nil || libraryBrowsingAll
+            if hasTranscript { return hasSearchResults && !openedFromSearch }
+            return hasSearchResults || libraryFilter != nil || libraryBrowsingAll
         default: return false
         }
     }
@@ -1155,13 +1171,19 @@ final class AppModel {
 
     /// The transcript is a drill-down only when it stands alone; in a batch the list is already beside it.
     var canReturnToOrigin: Bool {
-        hasTranscript && batchJobs.isEmpty && route == .transcript && !isBrowsingLibrary
+        hasTranscript && batchIsEmpty && route == .transcript && !isBrowsingLibrary
     }
     /// Why each result matched, keyed by entry: the snippet the results list shows under the row.
     var searchMatches: [String: LibrarySearchIndex.Match] = [:]
     var selectedEntryID: LibraryEntry.ID? {
-        didSet { if oldValue != selectedEntryID { transcriptPaneMode = .transcript } }
+        didSet {
+            guard oldValue != selectedEntryID else { return }
+            transcriptPaneMode = .transcript
+            updateSelectedEntryHasFavorites()
+        }
     }
+    /// The menus read this rather than `favoriteSegmentIDs`, which would tie them to every library write.
+    private(set) var selectedEntryHasFavorites = false
 
     // MARK: - Transcript windows
 
@@ -1176,6 +1198,13 @@ final class AppModel {
 
     private func rebuildLibraryIndex() {
         libraryEntriesByID = Dictionary(uniqueKeysWithValues: libraryEntries.map { ($0.id, $0) })
+    }
+
+    private func updateSelectedEntryHasFavorites() {
+        let hasFavorites = selectedEntryID
+            .flatMap { libraryEntriesByID[$0] }
+            .map { !$0.manifest.favoriteSegments.isEmpty } ?? false
+        if selectedEntryHasFavorites != hasFavorites { selectedEntryHasFavorites = hasFavorites }
     }
 
     func libraryEntry(id: LibraryEntry.ID) -> LibraryEntry? {

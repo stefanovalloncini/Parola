@@ -659,11 +659,11 @@ extension AppModel {
         LibraryOrigin.capture(
             sidebar: SidebarRoute.selected(
                 route: route,
-                searching: searchRanking != nil,
+                searching: hasSearchResults,
                 filter: libraryFilter,
                 browsingAll: libraryBrowsingAll
             ),
-            homeOnScreen: batchJobs.isEmpty && !hasTranscript
+            homeOnScreen: batchIsEmpty && !hasTranscript
         )
     }
 

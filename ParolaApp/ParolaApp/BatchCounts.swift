@@ -39,3 +39,11 @@ enum QueueCount {
         return String(localized: "\(n) in queue", locale: locale)
     }
 }
+
+extension BatchJob {
+    /// Same jobs, same order, same statuses: all the queue's mirrors and its saved snapshot are built from.
+    static func sameQueueShape(_ lhs: [BatchJob], _ rhs: [BatchJob]) -> Bool {
+        lhs.count == rhs.count
+            && zip(lhs, rhs).allSatisfy { $0.id == $1.id && $0.status == $1.status && $0.url == $1.url }
+    }
+}

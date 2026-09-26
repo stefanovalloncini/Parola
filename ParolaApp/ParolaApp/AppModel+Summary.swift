@@ -77,8 +77,8 @@ extension AppModel {
     /// Every mode needs a transcript; `.summary`/`.chat` also need the AI feature.
     func canShow(_ mode: TranscriptPaneMode) -> Bool {
         switch mode {
-        case .transcript: return transcript != nil
-        case .summary, .chat: return transcript != nil && features.isEnabled(.ai)
+        case .transcript: return hasTranscript
+        case .summary, .chat: return hasTranscript && features.isEnabled(.ai)
         }
     }
 

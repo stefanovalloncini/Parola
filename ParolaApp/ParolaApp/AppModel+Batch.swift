@@ -193,10 +193,6 @@ extension AppModel {
         }
     }
 
-    var batchIsRunning: Bool {
-        batchJobs.contains { $0.status == .transcribing }
-    }
-
     // MARK: - Queue persistence across quit
 
     var batchQueueFileURL: URL {
