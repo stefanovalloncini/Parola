@@ -369,6 +369,71 @@ final class DeliveryEngineTests {
         #expect(await engine.recentLog().last?.event == .delivered)
     }
 
+    @Test("a transcript deleted before the retry is dropped, not sent")
+    func deletedEntryIsDroppedOnRetry() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let destination = await mock(failuresBeforeSuccess: 1, recorder: recorder)
+        let payloads = PayloadSpy(failingCall: 2, error: DeliveryPayloadError.entryGone("entry-1"))
+        let engine = makeEngine(
+            destinations: [.mock(destination)],
+            store: try makeStore(),
+            clock: clock,
+            payload: { try await payloads.build($0) }
+        )
+
+        _ = await engine.send(entryID: "entry-1", to: destination.id)
+        #expect(await poll { clock.sleeperCount == 1 })
+        let retry = await engine.timerTask(for: "entry-1", destinationID: destination.id)
+        clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
+        await retry?.value
+
+        #expect(await engine.pending().isEmpty)
+        #expect(await recorder.recorded().isEmpty)
+        let last = try #require(await engine.recentLog().last)
+        #expect(last.event == .dropped)
+        #expect(last.destinationID == destination.id)
+    }
+
+    @Test("cancelling an entry drops its queued deliveries before they run")
+    func cancelDropsTheQueue() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let destination = await mock(failuresBeforeSuccess: 1, recorder: recorder)
+        let engine = makeEngine(destinations: [.mock(destination)], store: try makeStore(), clock: clock)
+        _ = await engine.send(entryID: "entry-1", to: destination.id)
+        #expect(await engine.pending().count == 1)
+
+        await engine.cancel(entryID: "entry-1")
+
+        #expect(await engine.pending().isEmpty)
+        #expect(await engine.timerTask(for: "entry-1", destinationID: destination.id) == nil)
+        let last = try #require(await engine.recentLog().last)
+        #expect(last.event == .dropped)
+        #expect(last.destinationName == "Mock vault")
+        clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
+        #expect(await recorder.recorded().isEmpty)
+    }
+
+    @Test("an auto-send whose transcript can't be read logs each destination it would have used")
+    func autoSendPayloadFailureNamesTheDestinations() async throws {
+        let recorder = MockDeliveryRecorder()
+        let destination = await mock(autoSend: true, recorder: recorder)
+        let engine = makeEngine(
+            destinations: [.mock(destination)],
+            store: try makeStore(),
+            clock: TestClock(),
+            payload: { throw DeliveryPayloadError.entryGone($0) }
+        )
+
+        let attempts = await engine.sendAutomatically(entryID: "entry-1")
+
+        #expect(attempts.isEmpty)
+        let last = try #require(await engine.recentLog().last)
+        #expect(last.destinationID == destination.id)
+        #expect(last.destinationName == "Mock vault")
+    }
+
     @Test("a second send for the same destination while one is in flight is skipped")
     func oneKeyIsSentOnceAtATime() async throws {
         let recorder = MockDeliveryRecorder()
@@ -544,14 +609,16 @@ actor OutcomeBox {
 actor PayloadSpy {
     private var calls = 0
     private let failingCall: Int
+    private let error: any Error
 
-    init(failingCall: Int) {
+    init(failingCall: Int, error: any Error = CocoaError(.fileReadUnknown)) {
         self.failingCall = failingCall
+        self.error = error
     }
 
     func build(_ entryID: LibraryEntry.ID) throws -> DeliveryPayload {
         calls += 1
-        guard calls != failingCall else { throw LibraryStore.LibraryError.notFound(entryID) }
+        guard calls != failingCall else { throw error }
         var payload = DeliveryPayloadTests.payload()
         payload.entryID = entryID
         return payload

@@ -267,6 +267,7 @@ public actor DeliveryEngine {
             let payload = try await payloadProvider(entryID)
             return await attempt(payload: payload, destination: destination)
         } catch {
+            if error is DeliveryPayloadError { dequeue(QueueKey(entryID: entryID, destinationID: destinationID)) }
             return skip(
                 .payloadUnavailable(error.localizedDescription),
                 entryID: entryID, destinationID: destinationID, name: destination.name
@@ -284,11 +285,10 @@ public actor DeliveryEngine {
         do {
             payload = try await payloadProvider(entryID)
         } catch {
-            appendMissing(
-                QueueKey(entryID: entryID, destinationID: UUID()),
-                name: "", event: .skipped,
-                detail: DeliverySkipReason.payloadUnavailable(error.localizedDescription).message
-            )
+            let detail = DeliverySkipReason.payloadUnavailable(error.localizedDescription).message
+            for destination in candidates {
+                append(.skipped, entryID: entryID, destination: destination, attempt: 0, detail: detail)
+            }
             return []
         }
         var attempts: [DeliveryAttempt] = []
@@ -307,6 +307,30 @@ public actor DeliveryEngine {
     // MARK: - Queue
 
     public func pending() -> [QueuedDelivery] { queue }
+
+    /// Stops retrying every delivery of an entry the user deleted: a trashed transcript must not
+    /// reach a vault when it comes back online.
+    public func cancel(entryID: LibraryEntry.ID) async {
+        let keys = queue
+            .filter { $0.entryID == entryID }
+            .map { QueueKey(entryID: $0.entryID, destinationID: $0.destinationID) }
+        guard !keys.isEmpty else { return }
+        let names = Dictionary(
+            await destinationsProvider().map { ($0.id, $0.name) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        for key in keys {
+            let attempts = queueAttempt(key)
+            dequeue(key)
+            record(
+                DeliveryLogEntry(
+                    at: Date(), event: .dropped, entryID: key.entryID,
+                    destinationID: key.destinationID, destinationName: names[key.destinationID] ?? "",
+                    attempt: attempts, detail: DeliveryPayloadError.entryGone(entryID).localizedDescription
+                )
+            )
+        }
+    }
 
     public func recentLog() -> [DeliveryLogEntry] { log.entries }
 
@@ -400,6 +424,10 @@ public actor DeliveryEngine {
         do {
             let payload = try await payloadProvider(key.entryID)
             _ = await attempt(payload: payload, destination: destination)
+        } catch let error as DeliveryPayloadError {
+            let attempts = queueAttempt(key)
+            dequeue(key)
+            append(.dropped, entryID: key.entryID, destination: destination, attempt: attempts, detail: error.localizedDescription)
         } catch {
             _ = failed(key, destination: destination, attempt: queueAttempt(key) + 1, error: error)
         }

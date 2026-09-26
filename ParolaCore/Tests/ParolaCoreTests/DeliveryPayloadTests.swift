@@ -19,6 +19,31 @@ struct DeliveryPayloadTests {
         )
     }
 
+    private func makeLibrary() throws -> LibraryStore {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-delivery-payload-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return LibraryStore(libraryURL: url, extraIndexer: nil)
+    }
+
+    @Test("a library entry loads as a payload; a trashed or purged one is gone for good")
+    func loadRefusesDeletedEntries() async throws {
+        let library = try makeLibrary()
+        let entry = try await library.add(transcript: Self.transcript(), audioSource: nil)
+
+        #expect(try await DeliveryPayload.load(entry.id, from: library).transcript.text == Self.transcript().text)
+
+        try await library.delete(entry.id)
+        await #expect(throws: DeliveryPayloadError.entryGone(entry.id)) {
+            _ = try await DeliveryPayload.load(entry.id, from: library)
+        }
+
+        try await library.purge(entry.id)
+        await #expect(throws: DeliveryPayloadError.entryGone(entry.id)) {
+            _ = try await DeliveryPayload.load(entry.id, from: library)
+        }
+    }
+
     static func payload(
         title: String = "Interview",
         aiTitle: String? = nil,

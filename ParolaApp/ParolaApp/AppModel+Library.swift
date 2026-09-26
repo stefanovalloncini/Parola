@@ -394,6 +394,7 @@ extension AppModel {
             do {
                 try await library.delete(id)
                 if selectedEntryID == id { clearLoadedEntry() }
+                if destinationsEnabled { await deliveryEngine.cancel(entryID: id) }
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
@@ -419,6 +420,7 @@ extension AppModel {
             do {
                 try await library.purge(id)
                 if selectedEntryID == id { clearLoadedEntry() }
+                if destinationsEnabled { await deliveryEngine.cancel(entryID: id) }
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }

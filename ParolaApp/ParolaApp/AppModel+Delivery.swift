@@ -103,8 +103,7 @@ extension AppModel {
         return DeliveryEngine(
             destinations: { [weak self] in await self?.destinations ?? [] },
             payload: { entryID in
-                let loaded = try await library.load(entryID)
-                return try DeliveryPayload(entry: loaded.entry, document: loaded.document)
+                try await DeliveryPayload.load(entryID, from: library)
             },
             store: DeliveryQueueStore(directory: deliveryDirectory),
             clock: clock,

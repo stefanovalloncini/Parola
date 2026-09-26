@@ -88,3 +88,29 @@ public struct DeliveryPayload: Codable, Sendable, Equatable {
         return transcript.segments.filter { starred.contains($0.id) }
     }
 }
+
+/// Why there is no payload to build, now or on any later retry.
+public enum DeliveryPayloadError: Error, LocalizedError, Equatable {
+    case entryGone(LibraryEntry.ID)
+
+    public var errorDescription: String? {
+        switch self {
+        case .entryGone: return "That transcript was deleted, so there is nothing to send."
+        }
+    }
+}
+
+public extension DeliveryPayload {
+    /// The payload for a library entry. One in Recently Deleted, or purged, throws `DeliveryPayloadError.entryGone`.
+    static func load(_ entryID: LibraryEntry.ID, from library: LibraryStore) async throws -> DeliveryPayload {
+        let loaded: LoadedEntry
+        do {
+            loaded = try await library.load(entryID)
+        } catch let error as LibraryStore.LibraryError {
+            guard case .notFound = error else { throw error }
+            throw DeliveryPayloadError.entryGone(entryID)
+        }
+        guard loaded.entry.deletedAt == nil else { throw DeliveryPayloadError.entryGone(entryID) }
+        return try DeliveryPayload(entry: loaded.entry, document: loaded.document)
+    }
+}
