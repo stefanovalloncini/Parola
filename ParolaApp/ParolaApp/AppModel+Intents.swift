@@ -60,8 +60,11 @@ extension AppModel {
         }
     }
 
+    /// Opening puts the phase to `.ready`, which would leave a running capture with nothing to stop it.
     func openLatestFromIntent() async throws -> String {
+        try ensurePhaseAllowsOpening()
         guard let latest = await library.list().first else { throw IntentActionError.libraryEmpty }
+        try ensurePhaseAllowsOpening()
         return try await openEntryForIntent(latest.id)
     }
 
@@ -109,13 +112,17 @@ extension AppModel {
 
     /// Checked again after every await: a drop or a recording can start while the file hashes.
     private func ensureIntentCanStartFileRun() throws {
+        try ensurePhaseAllowsOpening()
+        if batchIsRunning { throw IntentActionError.batchInProgress }
+        if transcribeTaskRunning { throw IntentActionError.transcriptionInProgress }
+    }
+
+    private func ensurePhaseAllowsOpening() throws {
         switch phase {
         case .recording: throw IntentActionError.recordingInProgress
         case .exporting: throw IntentActionError.exportInProgress
         default: break
         }
-        if batchIsRunning { throw IntentActionError.batchInProgress }
-        if transcribeTaskRunning { throw IntentActionError.transcriptionInProgress }
     }
 
     func stopRecordingFromIntent() async throws -> String {

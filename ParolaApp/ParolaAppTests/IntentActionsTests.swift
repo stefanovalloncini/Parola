@@ -121,6 +121,45 @@ struct IntentActionsTests {
         #expect(try storedText(older) == "the older take")
     }
 
+    @Test("Open Last Transcript leaves a recording or an export in charge of the phase", .timeLimit(.minutes(1)))
+    func openLatestRefusesDuringCaptureOrExport() async throws {
+        let model = makeModel()
+        _ = try await seedTwoEntries(in: model)
+
+        model.phase = .recording(source: .microphone)
+        await #expect(throws: IntentActionError.recordingInProgress) {
+            _ = try await model.openLatestFromIntent()
+        }
+        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.selectedEntryID == nil)
+
+        model.phase = .exporting(progress: 0.5)
+        await #expect(throws: IntentActionError.exportInProgress) {
+            _ = try await model.openLatestFromIntent()
+        }
+        #expect(model.phase == .exporting(progress: 0.5))
+    }
+
+    @Test("Summarize Last Transcript does nothing while a recording owns the phase", .timeLimit(.minutes(1)))
+    func summarizeLatestWaitsOutARecording() async throws {
+        let model = AppModel(
+            skipBootstrap: true,
+            defaults: temporaryDefaults(),
+            libraryURL: makeTempLibraryURL("intent-summarize-recording"),
+            features: Set(ParolaFeature.allCases)
+        )
+        model.summariseOperation = { _, _ in Summary(text: "recap") }
+        _ = try await seedTwoEntries(in: model)
+        model.phase = .recording(source: .microphone)
+
+        model.summarizeLatestEntry()
+        await settle()
+
+        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.selectedEntryID == nil)
+        #expect(model.transcript == nil)
+    }
+
     @Test("Open Last Transcript on an empty library says so")
     func openLatestOnAnEmptyLibrary() async {
         let model = makeModel()
