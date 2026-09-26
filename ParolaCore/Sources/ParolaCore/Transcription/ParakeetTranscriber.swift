@@ -132,10 +132,10 @@ actor ParakeetTranscriber: Transcriber {
         language.flatMap { Language(rawValue: $0.lowercased()) }
     }
 
-    /// FluidAudio reports progress only on its disk-backed path, and a subscriber that leaves early
-    /// strands the stream for the next run, so a shorter file gets no subscriber at all.
+    /// FluidAudio closes its progress session only past `maxModelSamples`; a subscriber cancelled on a shorter run strands it.
     nonisolated static func reportsProgress(forSeconds seconds: Double, config: ASRConfig = .default) -> Bool {
-        config.streamingEnabled && seconds * Double(config.sampleRate) > Double(config.streamingThreshold)
+        let margin = Double(config.sampleRate)
+        return seconds * Double(config.sampleRate) > Double(ASRConstants.maxModelSamples) + margin
     }
 
     /// Seconds into the file, the unit `TranscribeHandlers.onProgress` takes.

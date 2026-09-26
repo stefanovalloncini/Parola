@@ -19,11 +19,13 @@ struct ParakeetRunHintsTests {
         #expect(ParakeetTranscriber.scriptHint(for: "ja") == nil)
     }
 
-    @Test("only a file long enough for the disk-backed path gets a progress subscriber")
+    @Test("only a file past FluidAudio's progress threshold, plus a second, gets a progress subscriber")
     func progressOnlyPastTheStreamingThreshold() {
         #expect(!ParakeetTranscriber.reportsProgress(forSeconds: 12))
-        #expect(!ParakeetTranscriber.reportsProgress(forSeconds: 30))
-        #expect(ParakeetTranscriber.reportsProgress(forSeconds: 31))
+        #expect(!ParakeetTranscriber.reportsProgress(forSeconds: 15))
+        #expect(!ParakeetTranscriber.reportsProgress(forSeconds: 16))
+        #expect(ParakeetTranscriber.reportsProgress(forSeconds: 17))
+        #expect(ParakeetTranscriber.reportsProgress(forSeconds: 25))
         #expect(ParakeetTranscriber.reportsProgress(forSeconds: 3600))
     }
 
