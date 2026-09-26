@@ -610,10 +610,10 @@ struct AppModelDictationTests {
         #expect(await waitUntil { model.dictationState == .transcribing })
 
         model.stopDictationFromIntent()
-        #expect(await waitUntil { model.dictationState == .idle })
+        #expect(await waitUntil { recorders.made.count == 2 })
+        #expect(model.dictationState == .idle)
         #expect(model.dictationController.state == .idle)
         #expect(model.dictationController.isRunning)
-        #expect(recorders.made.count == 2)
 
         for recorder in recorders.made { await recorder.release() }
         model.abortDictation()
