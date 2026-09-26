@@ -89,7 +89,7 @@ struct MenuLeafFlagsTests {
         )
     }
 
-    @Test("a batch progress tick reaches neither the menus nor the route; a status change does")
+    @Test("a batch tick or a write that keeps every status reaches neither the menus nor the route; a status change does")
     func batchProgressSkipsMenusAndRoute() async {
         let model = makeModel("leaf-batch-tick")
         await model.libraryRefreshTask?.value
@@ -105,6 +105,9 @@ struct MenuLeafFlagsTests {
 
         await model.handleBatchEvent(.progress(jobID: job.id, fraction: 0.4))
         await model.handleBatchEvent(.progress(jobID: job.id, fraction: 0.7))
+        // A write to the list that leaves every status alone, as an entry landing makes.
+        model.batchJobs[0].entryID = "landed"
+        model.batchJobs[0].segmentCount = 3
         #expect(!invalidated.fired)
 
         await model.handleBatchEvent(.failed(jobID: job.id, reason: "boom"))
