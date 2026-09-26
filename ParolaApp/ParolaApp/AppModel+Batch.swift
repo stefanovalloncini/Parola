@@ -9,22 +9,25 @@ extension AppModel {
     private static let batchQueueEncoder = JSONEncoder()
 
     func startBatch(urls: [URL]) {
+        startBatch(jobs: urls.map { BatchJob(url: $0) })
+    }
+
+    func startBatch(jobs: [BatchJob]) {
         guard features.isEnabled(.batch) else {
             phase = .failed(message: ParolaError.featureDisabled(.batch).description)
             return
         }
         // Replacing batchJobs would strand the running job and the pending ones Resume waits on.
         if batchJobs.contains(where: { $0.status == .pending || $0.status == .transcribing }) {
-            addBatchFiles(urls)
+            addBatchJobs(jobs)
             return
         }
         // A single-file or YouTube run owns phase and transcript until it drains; starting here
         // would let both flows write them and leave whichever finished last on screen.
         if phaseDefersArrivals || transcribeTaskRunning {
-            deferredArrivals.append(contentsOf: urls)
+            deferredArrivals.append(contentsOf: jobs.map(\.url))
             return
         }
-        let jobs = urls.map { BatchJob(url: $0) }
         batchJobs = jobs
         selectedBatchJobID = jobs.first?.id
         route = .batch
@@ -62,7 +65,7 @@ extension AppModel {
             if let job = batchJobs.first(where: { $0.id == id }) {
                 let sidecarTargets = writeBatchExports(transcript: processed, sourceURL: job.url)
                 runAutoExports(transcript: processed, sourceURL: job.url, skippingTargets: sidecarTargets)
-                persistBatchJobToLibrary(id, transcript: processed, sourceURL: job.url)
+                persistBatchJobToLibrary(id, transcript: processed, sourceURL: job.url, sourceDigest: job.sourceDigest)
             }
         case .failed(let id, let reason):
             guard !isCancelled(id) else { return }
@@ -93,8 +96,9 @@ extension AppModel {
 
     // Skips persistToLibrary on purpose: its runAutoExports call would fire a second time
     // (handleBatchEvent already ran the rules), and it would steal selection + refresh per job.
-    private func persistBatchJobToLibrary(_ jobID: BatchJob.ID, transcript: Transcript, sourceURL: URL) {
-        let digest = batchSourceDigests.removeValue(forKey: sourceURL)
+    private func persistBatchJobToLibrary(
+        _ jobID: BatchJob.ID, transcript: Transcript, sourceURL: URL, sourceDigest digest: String?
+    ) {
         let adding = Task { [weak self] () -> LibraryEntry? in
             guard let self else { return nil }
             do {
@@ -219,21 +223,24 @@ extension AppModel {
     }
 
     func addBatchFiles(_ urls: [URL]) {
+        addBatchJobs(urls.map { BatchJob(url: $0) })
+    }
+
+    func addBatchJobs(_ jobs: [BatchJob]) {
         guard features.isEnabled(.batch) else {
             phase = .failed(message: ParolaError.featureDisabled(.batch).description)
             return
         }
-        guard !urls.isEmpty else { return }
+        guard !jobs.isEmpty else { return }
         if batchIsRunning {
-            batchJobs.append(contentsOf: urls.map { BatchJob(url: $0) })
+            batchJobs.append(contentsOf: jobs)
         } else if batchJobs.isEmpty {
-            startBatch(urls: urls)
+            startBatch(jobs: jobs)
         } else if phaseDefersArrivals || transcribeTaskRunning {
-            deferredArrivals.append(contentsOf: urls)
+            deferredArrivals.append(contentsOf: jobs.map(\.url))
         } else {
-            let newJobs = urls.map { BatchJob(url: $0) }
-            batchJobs.append(contentsOf: newJobs)
-            resumeBatch(pendingJobs: newJobs)
+            batchJobs.append(contentsOf: jobs)
+            resumeBatch(pendingJobs: jobs)
         }
     }
 
@@ -392,6 +399,8 @@ extension AppModel {
         batchJobs[idx].transcript = nil
         batchJobs[idx].entryID = nil
         batchJobs[idx].segmentCount = nil
+        // The file may have changed since it was hashed; the add takes its own digest.
+        batchJobs[idx].sourceDigest = nil
         batchProgress.reset(id)
         // Don't tear down a live batch to retry one file — runBatchTask cancels the running queue and
         // strands the in-flight job. Reset to .pending; the running batch's .finished resume picks it up.

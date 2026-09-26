@@ -584,15 +584,39 @@ struct AppModelBatchTests {
         model.batchExportPresetIDs = []
         let source = scratch.appendingPathComponent("hashed.wav")
         try Data("fake".utf8).write(to: source)
-        let job = BatchJob(url: source, status: .transcribing)
+        let job = BatchJob(url: source, status: .transcribing, sourceDigest: "digest-from-the-import")
         model.batchJobs = [job]
-        model.batchSourceDigests[source] = "digest-from-the-import"
 
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
 
         let entries = await Self.waitForEntries(in: model)
         #expect(entries.first?.manifest.sourceDigest == "digest-from-the-import")
-        #expect(model.batchSourceDigests[source] == nil)
+    }
+
+    @Test("a retried job hashes the file as it is now, not as the import found it")
+    func retryDropsTheImportDigest() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportPresetIDs = []
+        let source = scratch.appendingPathComponent("rewritten.wav")
+        try Data("first take".utf8).write(to: source)
+        let stale = try #require(try SourceDigest.compute(contentsOf: source))
+        let job = BatchJob(url: source, status: .failed, error: "boom", sourceDigest: stale)
+        model.batchJobs = [job]
+        try Data("second take".utf8).write(to: source)
+
+        model.retryBatchJob(job.id)
+        model.batchTask?.cancel()
+        model.batchTask = nil
+        #expect(model.batchJobs[0].sourceDigest == nil)
+        await model.handleBatchEvent(.started(jobID: job.id))
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+
+        let entries = await Self.waitForEntries(in: model)
+        let stored = try #require(entries.first?.manifest.sourceDigest)
+        #expect(stored != stale)
+        #expect(stored == (try SourceDigest.compute(contentsOf: source)))
     }
 
     @Test("persisting a batch job does not re-run its auto-export rules")

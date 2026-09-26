@@ -216,9 +216,7 @@ extension TranscriberMockSuites {
 
                 #expect(model.batchCheckingNotice == nil)
                 #expect(model.batchJobs.map(\.url) == [fresh])
-                let digest = try SourceDigest.compute(contentsOf: fresh)
-                #expect(model.batchSourceDigests[fresh] == digest || model.batchJobs.first?.entryID != nil)
-                #expect(model.batchSourceDigests[known] == nil)
+                #expect(model.batchJobs.first?.sourceDigest == (try SourceDigest.compute(contentsOf: fresh)))
                 model.clearBatch()
             }
         }

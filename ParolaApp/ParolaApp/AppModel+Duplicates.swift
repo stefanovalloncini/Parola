@@ -114,7 +114,7 @@ extension AppModel {
                 lookups = await DuplicateNotice.lookups(for: urls, in: self.library, deadline: deadline)
                 self.batchFilesBeingChecked -= urls.count
             }
-            var keep: [URL] = []
+            var keep: [BatchJob] = []
             var skipped = 0
             for (index, url) in urls.enumerated() {
                 let lookup = index < lookups.count ? lookups[index] : nil
@@ -122,8 +122,7 @@ extension AppModel {
                     skipped += 1
                     continue
                 }
-                keep.append(url)
-                if let digest = lookup?.digest { self.batchSourceDigests[url] = digest }
+                keep.append(BatchJob(url: url, sourceDigest: lookup?.digest))
             }
             guard !Task.isCancelled else { return }
             self.batchDuplicatesSkipped = skipped
@@ -131,7 +130,7 @@ extension AppModel {
                 if skipped > 0, self.features.isEnabled(.batch) { self.route = .batch }
                 return
             }
-            self.addBatchFiles(keep)
+            self.addBatchJobs(keep)
         }
     }
 

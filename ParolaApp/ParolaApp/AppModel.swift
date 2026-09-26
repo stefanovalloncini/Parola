@@ -125,8 +125,6 @@ final class AppModel {
     var batchDuplicatesSkipped: Int = 0
     /// Dropped files still being hashed against the library before they join the batch.
     var batchFilesBeingChecked: Int = 0
-    /// Digests the batch import already took, handed to the library add so it doesn't read the file again.
-    @ObservationIgnored var batchSourceDigests: [URL: String] = [:]
     @ObservationIgnored var duplicateCheckTask: Task<Void, Never>?
     @ObservationIgnored var batchImportTask: Task<Void, Never>?
     @ObservationIgnored var watchedImportTask: Task<Void, Never>?

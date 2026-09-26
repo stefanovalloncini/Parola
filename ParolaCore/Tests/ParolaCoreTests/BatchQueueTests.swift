@@ -16,15 +16,19 @@ struct BatchQueueTests {
 
     @Test("a job encoded before it knew its library entry still decodes")
     func decodesWithoutEntryFields() throws {
-        let saved = BatchJob(url: URL(fileURLWithPath: "/tmp/old.wav"), status: .done, entryID: "e", segmentCount: 3)
+        let saved = BatchJob(
+            url: URL(fileURLWithPath: "/tmp/old.wav"), status: .done, entryID: "e", segmentCount: 3, sourceDigest: "d"
+        )
         var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(saved)) as? [String: Any])
         object.removeValue(forKey: "entryID")
         object.removeValue(forKey: "segmentCount")
+        object.removeValue(forKey: "sourceDigest")
 
         let decoded = try JSONDecoder().decode(BatchJob.self, from: JSONSerialization.data(withJSONObject: object))
 
         #expect(decoded.entryID == nil)
         #expect(decoded.segmentCount == nil)
+        #expect(decoded.sourceDigest == nil)
         #expect(decoded.status == .done)
     }
 

@@ -20,6 +20,8 @@ public struct BatchJob: Identifiable, Sendable, Hashable, Codable {
     public var entryID: String?
     /// How many segments the result has, kept when the transcript itself is let go.
     public var segmentCount: Int?
+    /// The file's digest as the duplicate check took it, for the library add to reuse.
+    public var sourceDigest: String?
 
     public init(
         id: UUID = UUID(),
@@ -29,7 +31,8 @@ public struct BatchJob: Identifiable, Sendable, Hashable, Codable {
         error: String? = nil,
         progress: Double = 0,
         entryID: String? = nil,
-        segmentCount: Int? = nil
+        segmentCount: Int? = nil,
+        sourceDigest: String? = nil
     ) {
         self.id = id
         self.url = url
@@ -39,6 +42,7 @@ public struct BatchJob: Identifiable, Sendable, Hashable, Codable {
         self.progress = progress
         self.entryID = entryID
         self.segmentCount = segmentCount
+        self.sourceDigest = sourceDigest
     }
 
     public var displayName: String { url.deletingPathExtension().lastPathComponent }
