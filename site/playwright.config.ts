@@ -14,7 +14,7 @@ export default defineConfig({
     {
       name: "dark",
       use: { ...devices["Desktop Chrome"], colorScheme: "dark" },
-      testMatch: /(smoke|a11y|scenes|icons)\.spec\.ts/,
+      testMatch: /(smoke|a11y|scenes|icons|contrast)\.spec\.ts/,
     },
   ],
   webServer: {
