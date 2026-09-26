@@ -4,33 +4,43 @@ import AppIntents
 import os
 @testable import ParolaCore
 
-/// A one-shot async latch: `wait()` suspends until `fulfill()` is called from any thread.
+/// A one-shot async latch: `wait()` suspends until `fulfill()` is called from any thread, or until its timeout.
 private final class SignalGate: Sendable {
     private struct State {
-        var fulfilled = false
-        var continuation: CheckedContinuation<Void, Never>?
+        var outcome: Bool?
+        var continuation: CheckedContinuation<Bool, Never>?
     }
     private let state = OSAllocatedUnfairLock(initialState: State())
 
     func fulfill() {
-        let resume = state.withLock { state -> CheckedContinuation<Void, Never>? in
-            guard !state.fulfilled else { return nil }
-            state.fulfilled = true
+        settle(true)
+    }
+
+    /// A Darwin delivery can be lost, so the wait ends after `timeout` and says whether the signal came.
+    func wait(timeout: Duration = .seconds(5)) async -> Bool {
+        let timer = Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            self?.settle(false)
+        }
+        defer { timer.cancel() }
+        return await withCheckedContinuation { continuation in
+            let settled = state.withLock { state -> Bool? in
+                if let outcome = state.outcome { return outcome }
+                state.continuation = continuation
+                return nil
+            }
+            if let settled { continuation.resume(returning: settled) }
+        }
+    }
+
+    private func settle(_ outcome: Bool) {
+        let resume = state.withLock { state -> CheckedContinuation<Bool, Never>? in
+            guard state.outcome == nil else { return nil }
+            state.outcome = outcome
             defer { state.continuation = nil }
             return state.continuation
         }
-        resume?.resume()
-    }
-
-    func wait() async {
-        await withCheckedContinuation { continuation in
-            let alreadyFulfilled = state.withLock { state -> Bool in
-                if state.fulfilled { return true }
-                state.continuation = continuation
-                return false
-            }
-            if alreadyFulfilled { continuation.resume() }
-        }
+        resume?.resume(returning: outcome)
     }
 }
 
@@ -119,8 +129,7 @@ struct IntentTests {
 
             await confirmation("received start") { received in
                 DictationSignal.start()
-                await delivered.wait()
-                received()
+                if await delivered.wait() { received() }
             }
         }
     }
@@ -136,8 +145,7 @@ struct IntentTests {
 
             await confirmation("received stop") { received in
                 DictationSignal.stop()
-                await delivered.wait()
-                received()
+                if await delivered.wait() { received() }
             }
         }
     }
