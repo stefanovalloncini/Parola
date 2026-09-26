@@ -66,6 +66,19 @@ struct AutoLanguageDetectionTests {
         let short = ProbeWindowPlanner.candidates(duration: 12, windowSeconds: 20, limit: 5)
         #expect(short == [AudioProbeWindow(start: 0, duration: 12)])
 
+        #expect(
+            ProbeWindowPlanner.candidates(duration: 30, windowSeconds: 20, limit: 5)
+                == [AudioProbeWindow(start: 0, duration: 30)],
+            "a file under two windows long is probed whole, tail included"
+        )
+        #expect(
+            ProbeWindowPlanner.candidates(duration: 40, windowSeconds: 20, limit: 5)
+                == [AudioProbeWindow(start: 0, duration: 40)]
+        )
+        let justPast = ProbeWindowPlanner.candidates(duration: 41, windowSeconds: 20, limit: 5)
+        #expect(justPast.count == 2)
+        #expect(justPast.last?.end == 41)
+
         #expect(ProbeWindowPlanner.candidates(duration: 0, windowSeconds: 20, limit: 5).isEmpty)
     }
 
@@ -400,7 +413,7 @@ struct AutoLanguageDetectionTests {
         #expect(offsets.allSatisfy { Self.loudness(of: samples, at: $0) > 0.2 })
     }
 
-    @Test("a recording shorter than one window is read once")
+    @Test("a recording shorter than one window is read once, all the way to its end")
     func veryShortRecordingIsReadOnce() throws {
         let url = try Self.writeTone(sampleRate: 16_000, seconds: 25, loudRange: 0..<25)
         defer { try? FileManager.default.removeItem(at: url) }
@@ -410,7 +423,24 @@ struct AutoLanguageDetectionTests {
 
         let samples = try #require(WhisperKitTranscriber.probeSamples(url: url, scratch: probeURL))
 
+        #expect(samples.count > 24 * 16_000, "the scratch used to stop at the first 20 seconds")
         #expect(WhisperKitTranscriber.probeWindowOffsets(in: samples, windowSamples: Self.whisperWindow) == [0])
+    }
+
+    @Test("a 30-second recording whose speech starts late is probed on that speech")
+    func lateSpeechInAShortRecordingIsHeard() throws {
+        let url = try Self.writeTone(sampleRate: 16_000, seconds: 30, loudRange: 22..<30)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let probeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
+        defer { try? FileManager.default.removeItem(at: probeURL) }
+
+        let samples = try #require(WhisperKitTranscriber.probeSamples(url: url, scratch: probeURL))
+
+        #expect(samples.count > 29 * 16_000)
+        let offsets = WhisperKitTranscriber.probeWindowOffsets(in: samples, windowSamples: Self.whisperWindow)
+        #expect(offsets == [0])
+        #expect(Self.loudness(of: samples, at: 0) > 0.2)
     }
 
     private static let whisperWindow = 30 * 16_000

@@ -62,7 +62,8 @@ enum ProbeWindowPlanner {
         limit: Int = candidateLimit
     ) -> [AudioProbeWindow] {
         guard duration > 0, limit > 0 else { return [] }
-        guard duration > windowSeconds else {
+        // Under two windows long, the whole file costs no more than two windows and reaches the tail.
+        guard duration > 2 * windowSeconds else {
             return [AudioProbeWindow(start: 0, duration: duration)]
         }
         let span = duration - windowSeconds
