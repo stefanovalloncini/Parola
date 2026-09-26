@@ -531,6 +531,30 @@ struct AppModelBatchTests {
         #expect(model.libraryRefreshes == refreshesBefore + 1)
     }
 
+    @Test("cancelling the running job with nothing behind it still refreshes the list for the finished ones")
+    func cancellingTheLastJobRefreshesAfterItsAdds() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        await model.libraryRefreshTask?.value
+        model.batchExportPresetIDs = []
+        model.generatesCardMetadata = false
+        let source = scratch.appendingPathComponent("finished.wav")
+        try Data("fake".utf8).write(to: source)
+        let done = BatchJob(url: source, status: .transcribing)
+        let running = Self.makeJob("running")
+        model.batchJobs = [done, running]
+
+        await model.handleBatchEvent(.completed(jobID: done.id, transcript: Self.makeTranscript()))
+        await model.handleBatchEvent(.started(jobID: running.id))
+        model.cancelBatchJob(running.id)
+        await model.batchClosingRefresh?.value
+        await model.libraryRefreshTask?.value
+
+        #expect(model.libraryEntries.count == 1)
+        #expect(model.batchJobs.map(\.status) == [.done, .cancelled])
+    }
+
     @Test("a cancelled run still refreshes the list once the adds it finished land")
     func cancelledRunRefreshesAfterItsAdds() async throws {
         let scratch = try Self.makeScratchDirectory()

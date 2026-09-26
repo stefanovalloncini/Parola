@@ -119,6 +119,13 @@ extension AppModel {
         }
     }
 
+    /// Every way a run ends short of its .finished: the refresh that event would have made happens here.
+    private func stopBatchRun() {
+        batchTask?.cancel()
+        batchTask = nil
+        if !batchLibraryAdds.isEmpty { refreshLibraryOnceBatchAddsLand() }
+    }
+
     /// Refreshed before the last add returns, the list would miss that file until something else refreshed it.
     private func refreshLibraryOnceBatchAddsLand() {
         let adds = batchLibraryAdds
@@ -306,8 +313,7 @@ extension AppModel {
         let job = batchJobs[idx]
         switch job.status {
         case .transcribing:
-            batchTask?.cancel()
-            batchTask = nil
+            stopBatchRun()
             mutateBatchJob(id) { $0.status = .cancelled }
             phase = .ready
             let remaining = batchJobs.filter { $0.status == .pending }
@@ -364,9 +370,7 @@ extension AppModel {
     }
 
     func clearBatch() {
-        batchTask?.cancel()
-        batchTask = nil
-        if !batchLibraryAdds.isEmpty { refreshLibraryOnceBatchAddsLand() }
+        stopBatchRun()
         batchJobs = []
         selectedBatchJobID = nil
         batchDuplicatesSkipped = 0
@@ -375,8 +379,7 @@ extension AppModel {
     func cancelAllInFlightBatchJobs() {
         batchRunCancelled = true
         cancelAndTrack(&batchTask)
-        // A cancelled run never sees its .finished, so the refresh it would have made happens here.
-        if !batchLibraryAdds.isEmpty { refreshLibraryOnceBatchAddsLand() }
+        stopBatchRun()
         for idx in batchJobs.indices where batchJobs[idx].status == .pending || batchJobs[idx].status == .transcribing {
             batchJobs[idx].status = .cancelled
         }
