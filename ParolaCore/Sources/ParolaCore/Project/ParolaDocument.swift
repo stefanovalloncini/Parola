@@ -309,6 +309,24 @@ public struct ParolaDocument: Sendable {
         return ParolaDocument(transcript: transcript, audioURL: audioURL, manifest: manifest)
     }
 
+    /// The transcript's spoken text, joined the way `Transcript.text` joins it, without decoding word
+    /// timings, the chat or the translation. For previews of many bundles at once.
+    public static func readTranscriptText(at bundleURL: URL) throws -> String {
+        let transcript: SpokenText = try readJSON(at: bundleURL.appendingPathComponent("transcript.json"))
+        return transcript.segments
+            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    private struct SpokenText: Decodable {
+        struct Segment: Decodable {
+            let text: String
+        }
+
+        let segments: [Segment]
+    }
+
     static func audioURL(in bundleURL: URL, manifest: Manifest) -> URL? {
         let fm = FileManager.default
         if let stamped = manifest.audioFilename, !stamped.isEmpty {

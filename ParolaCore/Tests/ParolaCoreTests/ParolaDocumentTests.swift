@@ -32,6 +32,22 @@ struct ParolaDocumentTests {
         )
     }
 
+    @Test("the preview text reads a transcript that carries a chat and a translation")
+    func transcriptTextSkipsDatedFields() throws {
+        let scratch = tempDir()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var transcript = sampleTranscript()
+        transcript.segments.append(TranscriptSegment(id: 2, start: 3, end: 4, text: "   "))
+        transcript.chatHistory = [ChatMessage(role: .user, text: "what was decided?")]
+        transcript.translation = TranscriptTranslation(
+            targetLanguage: "it", segments: [0: "Ciao mondo."], createdAt: Date(), provider: "test"
+        )
+        let bundleURL = try ParolaDocument.write(transcript: transcript, audioURL: nil, to: scratch.appendingPathComponent("chat"))
+
+        #expect(try ParolaDocument.readTranscriptText(at: bundleURL) == "Hello world. From Parola.")
+        #expect(try ParolaDocument.readTranscriptText(at: bundleURL) == ParolaDocument.read(at: bundleURL).transcript.text)
+    }
+
     @Test("round-trip preserves transcript, manifest, and audio")
     func roundTrip() throws {
         let scratch = tempDir()

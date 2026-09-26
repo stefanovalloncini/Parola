@@ -297,6 +297,25 @@ struct RecentlyDeletedPreviewPassTests {
         #expect(published.first?["only"] == "text")
     }
 
+    @Test("a trashed entry with a chat and a translation still shows its text", .timeLimit(.minutes(1)))
+    func trashedEntryWithDatedFieldsPreviews() async throws {
+        let library = LibraryStore(libraryURL: makeTempLibraryURL("trash-preview"), extraIndexer: nil)
+        var transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the quarterly numbers")],
+            language: "en",
+            modelName: "stub"
+        )
+        transcript.chatHistory = [ChatMessage(role: .user, text: "what changed?")]
+        transcript.translation = TranscriptTranslation(
+            targetLanguage: "it", segments: [0: "i numeri del trimestre"], createdAt: Date(), provider: "test"
+        )
+        let entry = try await library.add(transcript: transcript, audioSource: nil)
+        try await library.delete(entry.id)
+        let trashed = try #require(await library.listDeleted().first)
+
+        #expect(await readTranscriptText(at: trashed.bundleURL) == "the quarterly numbers")
+    }
+
     @Test("a preview collapses its line breaks and stops at the cap")
     func previewIsTrimmedAndCapped() {
         #expect(RecentlyDeletedPreviews.preview(of: "  first line\nsecond line  ") == "first line second line")
