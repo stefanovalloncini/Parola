@@ -20,31 +20,19 @@ extension AppModel {
         writeJSON(findReplaceRules, forKey: "findReplaceRules")
     }
 
+    var transcriptPostProcessor: TranscriptPostProcessor {
+        TranscriptPostProcessor(ignoredRules: ignoredSegmentRules, findReplaceRules: findReplaceRules)
+    }
+
     func postProcess(_ transcript: Transcript) -> Transcript {
-        Self.postProcess(transcript, ignoredRules: ignoredSegmentRules, findReplaceRules: findReplaceRules)
+        transcriptPostProcessor.apply(transcript)
     }
 
-    nonisolated static func postProcess(
-        _ transcript: Transcript,
-        ignoredRules: [IgnoredSegmentRule],
-        findReplaceRules: [FindReplaceRule]
-    ) -> Transcript {
-        var out = transcript
-        out.segments = IgnoredSegments.apply(rules: ignoredRules, to: out.segments)
-        out.segments = GlobalFindReplace.apply(rules: findReplaceRules, to: out.segments)
-        out.segments = ItalianOrthography.apply(to: out.segments, language: out.language)
-        return out
-    }
-
-    /// Runs the rule pipeline off the main actor; completion paths await this so a long
-    /// transcript's regex pass can't hitch the UI right as results land.
+    /// Completion paths await this so a long transcript's regex pass can't hitch the UI right as
+    /// results land.
     func postProcessDetached(_ transcript: Transcript) async -> Transcript {
         if let postProcessOperation { return await postProcessOperation(transcript) }
-        let ignored = ignoredSegmentRules
-        let findReplace = findReplaceRules
-        return await Task.detached(priority: .userInitiated) {
-            Self.postProcess(transcript, ignoredRules: ignored, findReplaceRules: findReplace)
-        }.value
+        return await transcriptPostProcessor.applyOffActor(transcript)
     }
 
     /// The Speakers sheet's bulk rename. One simultaneous pass, so a pair like

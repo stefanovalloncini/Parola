@@ -20,7 +20,8 @@ final class TranscriptionCoordinator {
     private(set) var livePartialText: String = ""
 
     @ObservationIgnored var onComplete: (@MainActor (LibraryEntry) -> Void)?
-    @ObservationIgnored var postProcessor: (@MainActor (Transcript) -> Transcript)?
+    /// Read when a result lands, so rules edited mid-run still apply; the pass itself runs off the main actor.
+    @ObservationIgnored var postProcessor: (@MainActor () -> TranscriptPostProcessor)?
 
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let settings: UserSettings
@@ -83,7 +84,7 @@ final class TranscriptionCoordinator {
                     downloadProgress: makeDownloadProgressHandler(resumingTo: { .transcribing(file: audio) })
                 )
                 try Task.checkCancellation()
-                let processed = postProcessor?(result) ?? result
+                let processed = await postProcessed(result)
                 let entry = try await library.add(transcript: processed, audioSource: audio)
                 phase = .idle
                 onComplete?(entry)
@@ -93,6 +94,11 @@ final class TranscriptionCoordinator {
                 phase = .failed(message: error.localizedDescription)
             }
         }
+    }
+
+    func postProcessed(_ transcript: Transcript) async -> Transcript {
+        guard let postProcessor else { return transcript }
+        return await postProcessor().applyOffActor(transcript)
     }
 
     func cancelFileTranscription() {
@@ -185,8 +191,8 @@ final class TranscriptionCoordinator {
                 phase = .idle
                 return
             }
-            let processed = postProcessor?(final) ?? final
             Task { [generation] in
+                let processed = await postProcessed(final)
                 do {
                     let entry = try await library.add(
                         transcript: processed, audioSource: final.sourceURL, source: .microphone

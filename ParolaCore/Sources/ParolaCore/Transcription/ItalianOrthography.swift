@@ -35,13 +35,17 @@ public enum ItalianOrthography {
         "granché", "checché", "ché",
     ]
 
-    private static let corrections: [(regex: NSRegularExpression, acute: String)] = acuteForms.compactMap { acute in
-        guard let last = acute.last, last == "é" else { return nil }
-        let grave = acute.dropLast() + "è"
-        let pattern = "\\b" + NSRegularExpression.escapedPattern(for: String(grave)) + "\\b"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
-        return (regex, acute)
-    }
+    private static let acuteByGrave: [String: String] = Dictionary(
+        uniqueKeysWithValues: acuteForms.map { (String($0.dropLast()) + "è", $0) }
+    )
+
+    /// One alternation over every grave form: each alternative is a whole word, so no two can
+    /// overlap and a single scan finds what one regex per form used to.
+    private static let graveFamily: NSRegularExpression? = {
+        let alternatives = acuteByGrave.keys.sorted().map(NSRegularExpression.escapedPattern(for:))
+        let pattern = "\\b(?:" + alternatives.joined(separator: "|") + ")\\b"
+        return try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+    }()
 
     private static let truncations: [(regex: NSRegularExpression, replacement: String)] = {
         guard let po = try? NSRegularExpression(pattern: "\\bp[oò]\\b(?![\u{27}\u{2019}])") else { return [] }
@@ -56,27 +60,30 @@ public enum ItalianOrthography {
         let mayHaveTruncation = text.contains("po") || text.contains("pò")
         guard mayHaveGrave || mayHaveTruncation else { return text }
         var result = text
-        if mayHaveGrave {
-            for (regex, acute) in corrections {
-                result = replaceMatches(of: regex, in: result, with: acute)
-            }
+        if mayHaveGrave, let graveFamily {
+            result = replaceMatches(of: graveFamily, in: result) { acuteByGrave[$0.lowercased()] }
         }
         if mayHaveTruncation {
             for (regex, replacement) in truncations {
-                result = replaceMatches(of: regex, in: result, with: replacement)
+                result = replaceMatches(of: regex, in: result) { _ in replacement }
             }
         }
         return result
     }
 
-    private static func replaceMatches(of regex: NSRegularExpression, in text: String, with acute: String) -> String {
+    private static func replaceMatches(
+        of regex: NSRegularExpression,
+        in text: String,
+        with replacement: (String) -> String?
+    ) -> String {
         let ns = text as NSString
         let matches = regex.matches(in: text, range: NSRange(location: 0, length: ns.length))
         guard !matches.isEmpty else { return text }
         var result = text
         for match in matches.reversed() {
             let matched = ns.substring(with: match.range)
-            let cased = caseMatched(acute, like: matched)
+            guard let target = replacement(matched) else { continue }
+            let cased = caseMatched(target, like: matched)
             result = (result as NSString).replacingCharacters(in: match.range, with: cased)
         }
         return result

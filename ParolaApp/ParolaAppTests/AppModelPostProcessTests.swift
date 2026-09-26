@@ -139,20 +139,18 @@ struct AppModelPostProcessTests {
         #expect(model.findReplaceRules.isEmpty)
     }
 
-    @Test("static pipeline matches the instance postProcess result")
-    func staticPipelineMatchesInstance() {
+    @Test("user rules run before the Italian orthography pass")
+    func rulesRunBeforeOrthography() async {
         let model = makeModel()
         model.ignoredSegmentRules = [IgnoredSegmentRule(pattern: "noise")]
-        model.findReplaceRules = [FindReplaceRule(find: "teh", replace: "the")]
-        let input = Self.transcript(["noise", "teh perchè", "un pò"])
+        model.findReplaceRules = [FindReplaceRule(find: "perchè", replace: "per quale motivo")]
+        var input = Self.transcript(["noise", "perchè no", "un pò"])
+        input.language = "it"
 
-        let viaInstance = model.postProcess(input)
-        let viaStatic = AppModel.postProcess(
-            input,
-            ignoredRules: model.ignoredSegmentRules,
-            findReplaceRules: model.findReplaceRules
-        )
+        let synchronous = model.postProcess(input)
+        let detached = await model.postProcessDetached(input)
 
-        #expect(viaStatic.segments == viaInstance.segments)
+        #expect(synchronous.segments.map(\.text) == ["per quale motivo no", "un po'"])
+        #expect(detached.segments == synchronous.segments)
     }
 }

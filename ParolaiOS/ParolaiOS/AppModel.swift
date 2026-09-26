@@ -59,13 +59,11 @@ final class AppModel {
         loadAutoExportRules()
         loadIgnoredSegmentRules()
         loadFindReplaceRules()
-        coordinator.postProcessor = { [weak self] transcript in
-            guard let self else { return transcript }
-            var out = transcript
-            out.segments = IgnoredSegments.apply(rules: self.ignoredSegmentRules, to: out.segments)
-            out.segments = GlobalFindReplace.apply(rules: self.findReplaceRules, to: out.segments)
-            out.segments = ItalianOrthography.apply(to: out.segments, language: out.language)
-            return out
+        coordinator.postProcessor = { [weak self] in
+            TranscriptPostProcessor(
+                ignoredRules: self?.ignoredSegmentRules ?? [],
+                findReplaceRules: self?.findReplaceRules ?? []
+            )
         }
         refreshModelList()
         refreshLibrary()

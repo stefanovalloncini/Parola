@@ -102,12 +102,17 @@ struct Record: AsyncParsableCommand {
             )
         }
         progress.finish()
+        try emit(transcript)
+    }
 
+    /// Both paths end here, so a batch take and a streamed one read the same.
+    func emit(_ transcript: Transcript) throws {
+        let finished = TranscriptPostProcessor.orthographyOnly.apply(transcript)
         let exporter = Exporters.exporter(for: format)
         if let output {
-            try exporter.render(transcript).write(to: URL(fileURLWithPath: output), options: .atomic)
+            try exporter.render(finished).write(to: URL(fileURLWithPath: output), options: .atomic)
         } else {
-            print(try exporter.renderText(transcript))
+            print(try exporter.renderText(finished))
         }
     }
 
@@ -150,12 +155,7 @@ struct Record: AsyncParsableCommand {
                     let owesFinalRender = format != .txt || output != nil
                     guard owesFinalRender else { break }
                     do {
-                        let exporter = Exporters.exporter(for: format)
-                        if let output {
-                            try exporter.render(transcript).write(to: URL(fileURLWithPath: output), options: .atomic)
-                        } else {
-                            print(try exporter.renderText(transcript))
-                        }
+                        try emit(transcript)
                     } catch {
                         stderr("error: failed to write output — \(error.localizedDescription)")
                     }

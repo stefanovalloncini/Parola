@@ -150,11 +150,11 @@ public actor MCPServer {
         if let existing = duplicate.entry, request.skipDuplicates {
             return MCPToolCallResult(text: DuplicateNotice.text(for: existing, skipping: true))
         }
-        let transcript = try await transcribe(
+        let transcript = TranscriptPostProcessor.orthographyOnly.apply(try await transcribe(
             source: FileAudioSource(url: request.sourceURL),
             options: request.options,
             progress: progress
-        )
+        ))
         let rendered = try request.format.render(transcript)
         var blocks = outputBlocks(for: transcript, rendered: rendered, request: request)
         if let timing = TranscribeReport.timingNote(for: transcript) {

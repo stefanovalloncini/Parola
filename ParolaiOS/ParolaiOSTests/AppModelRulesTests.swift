@@ -82,6 +82,24 @@ struct AppModelRulesTests {
         #expect(model.findReplaceRules.isEmpty)
     }
 
+    @Test("a landed transcript gets the user's rules, then the Italian orthography")
+    func coordinatorAppliesRulesThenOrthography() async throws {
+        let model = try makeModel(defaults: freshDefaults())
+        model.ignoredSegmentRules = [IgnoredSegmentRule(pattern: "ehm")]
+        model.findReplaceRules = [FindReplaceRule(find: "perchè", replace: "per quale motivo")]
+        let input = Transcript(
+            segments: ["ehm", "perchè no", "un pò"].enumerated().map {
+                TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: $1)
+            },
+            language: "it",
+            modelName: "openai_whisper-tiny"
+        )
+
+        let out = await model.coordinator.postProcessed(input)
+
+        #expect(out.segments.map(\.text) == ["per quale motivo no", "un po'"])
+    }
+
     private func transcript(_ text: String) -> Transcript {
         Transcript(
             segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: text)],
