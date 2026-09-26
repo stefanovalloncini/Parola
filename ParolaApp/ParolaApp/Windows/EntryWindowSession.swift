@@ -37,6 +37,7 @@ final class EntryWindowSession {
     @ObservationIgnored private var segmentsByID: [TranscriptSegment.ID: TranscriptSegment] = [:]
     @ObservationIgnored private var searchDebounceTask: Task<Void, Never>?
     @ObservationIgnored private(set) var appliedUpdatedAt: Date?
+    private var appliedDurationSeconds: Double?
     /// Counts the bundle reads, so a test can tell a skipped reload from a silent one.
     @ObservationIgnored private(set) var loadGeneration = 0
 
@@ -74,8 +75,9 @@ final class EntryWindowSession {
 
     var speakers: [String] { transcript?.uniqueSpeakers ?? [] }
 
+    /// The library's length first: a correction measured from the media lands there, never in transcript.json.
     var durationSeconds: Double {
-        document?.transcript.durationSeconds ?? document?.manifest.durationSeconds ?? 0
+        appliedDurationSeconds ?? document?.transcript.durationSeconds ?? 0
     }
 
     /// The colour each speaker label wears in this window, read from this entry's own map.
@@ -138,6 +140,7 @@ final class EntryWindowSession {
         document = loaded.document
         title = LibraryEntryDisplay.title(for: loaded.entry)
         appliedUpdatedAt = loaded.entry.updatedAt
+        appliedDurationSeconds = loaded.entry.durationSeconds
         isLoading = false
         loadFailed = false
         rebuildSegmentIndex()
@@ -156,6 +159,7 @@ final class EntryWindowSession {
     private func markUnavailable() {
         document = nil
         appliedUpdatedAt = nil
+        appliedDurationSeconds = nil
         isLoading = false
         loadFailed = true
         rebuildSegmentIndex()

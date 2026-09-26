@@ -869,6 +869,18 @@ public actor LibraryStore {
         try recacheEntry(at: bundleURL)
     }
 
+    /// Records the length the entry's media actually measures, for a transcript that stored a wrong one.
+    public func setDurationSeconds(_ seconds: Double, for id: LibraryEntry.ID) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.durationSeconds = seconds
+        }
+        try recacheEntry(at: bundleURL)
+    }
+
     /// Stamps the entry's `lastOpenedAt` so the library can show when it was last viewed.
     public func markOpened(id: LibraryEntry.ID, at now: Date = Date()) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

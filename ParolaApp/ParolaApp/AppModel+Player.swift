@@ -45,13 +45,13 @@ extension AppModel {
     // The manifest alone: rewriting transcript.json would move updatedAt for an edit the user never made.
     private func persistCorrectedDuration(_ seconds: Double) {
         guard let id = selectedEntryID else { return }
-        let bundleURL = library.libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
-        Task {
-            let written: Void? = try? await Self.offMainIO {
-                try ParolaDocument.updateManifest(at: bundleURL) { $0.durationSeconds = seconds }
-            }
-            guard written != nil else { return }
+        // transcript.json keeps the old length, so every open re-patches; only the first one needs a write.
+        if let stored = libraryEntry(id: id)?.durationSeconds, abs(stored - seconds) <= 0.05 { return }
+        Task { [library] in
+            guard (try? await library.setDurationSeconds(seconds, for: id)) != nil else { return }
             patchLibraryEntry(id: id) { $0.durationSeconds = seconds }
+            // The patch misses a row the open's own refresh has yet to publish, and that listing predates the write.
+            refreshLibrary()
         }
     }
 

@@ -1203,6 +1203,20 @@ struct LibraryStoreTests {
         #expect(await reopened.search("budget").map(\.entryID) == expected)
     }
 
+    @Test("a duration set through the store is what the next listing reports")
+    func setDurationSecondsRecaches() async throws {
+        let (store, _) = try makeTempLibrary()
+        var transcript = makeTranscript()
+        transcript.durationSeconds = 2134
+        let entry = try await store.add(transcript: transcript, audioSource: nil)
+        #expect(await store.list().first?.durationSeconds == 2134)
+
+        try await store.setDurationSeconds(1, for: entry.id)
+
+        #expect(await store.list().first?.durationSeconds == 1)
+        #expect(try await store.load(entry.id).entry.durationSeconds == 1)
+    }
+
     @Test("a summary set after the entry was added is searchable, and a cleared one stops matching")
     func setSummaryReindexes() async throws {
         let (store, _) = try makeTempLibrary()

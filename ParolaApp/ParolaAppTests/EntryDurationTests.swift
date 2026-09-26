@@ -165,6 +165,51 @@ struct EntryDurationTests {
         #expect(stored.updatedAt == updatedAtBefore)
     }
 
+    @Test("the corrected duration goes through the store, so a refresh keeps it", .timeLimit(.minutes(1)))
+    func correctedDurationSurvivesARefresh() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, mediaSeconds: 1, transcriptDuration: 2134.272, text: "corrupted take")
+        await model.library.dropCaches()
+
+        #expect(await openEntry(entry.id, in: model))
+        #expect(await waitUntil { abs((model.libraryEntry(id: entry.id)?.durationSeconds ?? 0) - 1) < 0.05 })
+        let listed = await model.library.list().first { $0.id == entry.id }
+        await model.refreshLibraryAndWait()
+
+        #expect(abs((listed?.durationSeconds ?? 0) - 1) < 0.05, "the store still lists \(String(describing: listed?.durationSeconds))")
+        #expect(abs((model.libraryEntry(id: entry.id)?.durationSeconds ?? 0) - 1) < 0.05, "the refresh put the stale duration back")
+    }
+
+    @Test("an entry whose manifest already holds the corrected duration is not written again", .timeLimit(.minutes(1)))
+    func secondOpenWritesNoDuration() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, mediaSeconds: 1, transcriptDuration: 2134.272, text: "corrupted take")
+        await model.library.dropCaches()
+        // Inside the tolerance but not what the media measures, so a second write would show.
+        try await model.library.setDurationSeconds(1.03, for: entry.id)
+        await model.refreshLibraryAndWait()
+
+        #expect(await openEntry(entry.id, in: model))
+        #expect(await waitUntil { abs((model.transcript?.durationSeconds ?? 0) - 1) < 0.02 })
+        await settle()
+
+        #expect(try manifest(of: entry).durationSeconds == 1.03)
+    }
+
+    @Test("a viewer window shows the corrected duration, not the one transcript.json kept", .timeLimit(.minutes(1)))
+    func viewerUsesTheCorrectedDuration() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, mediaSeconds: 1, transcriptDuration: 2134.272, text: "corrupted take")
+        await model.library.dropCaches()
+        try await model.library.setDurationSeconds(1, for: entry.id)
+        await model.refreshLibraryAndWait()
+
+        let session = model.entryWindowSession(for: entry.id)
+        await session.loadTask?.value
+
+        #expect(session.durationSeconds == 1)
+    }
+
     @Test("the corrected duration reaches the row the list is drawing")
     func correctedDurationReachesTheLibraryRow() async throws {
         let model = makeModel()
