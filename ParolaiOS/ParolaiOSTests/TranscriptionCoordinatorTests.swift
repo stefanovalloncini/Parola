@@ -162,6 +162,42 @@ struct TranscriptionCoordinatorTests {
         #expect(await library.list().isEmpty)
     }
 
+    @Test("a take stopped before capture came up saves nothing and goes back to idle")
+    func emptyTakeWithoutAudioIsNotSaved() async throws {
+        let (coord, library) = try makeCoordinator()
+        var observed: LibraryEntry?
+        coord.onComplete = { entry in observed = entry }
+
+        coord.handleStreamingEvent(.finished(Transcript(segments: [], language: "en", modelName: "openai_whisper-tiny")))
+
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(observed == nil)
+        #expect(coord.phase == .idle)
+        #expect(await library.list().isEmpty)
+    }
+
+    @Test("a short take with audio but no words is still saved")
+    func silentTakeWithAudioIsSaved() async throws {
+        let (coord, library) = try makeCoordinator()
+        var observed: LibraryEntry?
+        coord.onComplete = { entry in observed = entry }
+        let audio = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-silent-take-\(UUID().uuidString).m4a")
+        try Data("audio".utf8).write(to: audio)
+        defer { try? FileManager.default.removeItem(at: audio) }
+
+        coord.handleStreamingEvent(.finished(Transcript(
+            segments: [], language: "en", modelName: "openai_whisper-tiny", sourceURL: audio
+        )))
+
+        for _ in 0..<50 {
+            if observed != nil { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(observed != nil)
+        #expect(await library.list().count == 1)
+    }
+
     @Test("finished event saves a transcript-only library entry")
     func finishedPersistsTranscript() async throws {
         let (coord, library) = try makeCoordinator()

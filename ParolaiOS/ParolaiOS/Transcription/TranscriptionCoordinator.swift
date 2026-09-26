@@ -199,6 +199,11 @@ final class TranscriptionCoordinator {
             }
             Task { [generation] in
                 let processed = await postProcessed(final)
+                // A take stopped before capture came up (say, during the first model download) has nothing to keep.
+                guard !processed.segments.isEmpty || final.sourceURL != nil else {
+                    phase = .idle
+                    return
+                }
                 do {
                     let entry = try await library.add(
                         transcript: processed, audioSource: final.sourceURL, source: .microphone

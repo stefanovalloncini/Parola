@@ -135,6 +135,36 @@ extension TranscriberMockSuites {
             #expect(saved.first?.title.hasSuffix("(interrupted)") == true)
         }
 
+        @Test("a take stopped before capture came up saves nothing and leaves recording quietly")
+        func emptyTakeWithoutAudioIsNotSaved() async {
+            let model = makeModel()
+            model.phase = .recording(source: .microphone)
+
+            await model.handleStreamingEvent(.finished(Transcript(
+                segments: [], language: "en", modelName: "openai_whisper-tiny"
+            )))
+
+            #expect(model.phase == .idle)
+            #expect(model.transcript == nil)
+            try? await Task.sleep(for: .milliseconds(300))
+            #expect(await model.library.list().isEmpty)
+        }
+
+        @Test("a short take with audio but no words is still saved")
+        func silentTakeWithAudioIsSaved() async throws {
+            let model = makeModel()
+            let wav = try makeTakeWAV(label: "silent-take")
+            defer { try? FileManager.default.removeItem(at: wav) }
+
+            await model.handleStreamingEvent(.finished(Transcript(
+                segments: [], language: "en", modelName: "openai_whisper-tiny", sourceURL: wav
+            )))
+
+            #expect(model.phase == .ready)
+            let saved = await entries(model, count: 1)
+            #expect(saved.count == 1)
+        }
+
         @Test("an interrupted take is saved finished and post-processed, like a stopped one")
         func interruptedTakeIsFinished() async throws {
             let model = makeModel()

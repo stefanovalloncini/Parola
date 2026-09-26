@@ -3026,11 +3026,18 @@ final class AppModel {
             stopRecordingWatch()
             endActiveRecovery()
             let processed = await postProcessDetached(transcript)
+            self.livePartialText = ""
+            self.liveSegments = []
+            // A take stopped before capture came up (say, during the first model download) has nothing to keep.
+            guard !processed.segments.isEmpty || processed.sourceURL != nil else {
+                phase = .idle
+                resolveRecordingOutcome(.success(processed.text))
+                drainDeferredArrivals()
+                return
+            }
             clearDerivedArtifacts()
             self.selectedEntryID = nil
             self.transcript = processed
-            self.livePartialText = ""
-            self.liveSegments = []
             self.phase = .ready
             if let audioURL = processed.sourceURL {
                 sourceFileURL = audioURL
