@@ -1,7 +1,9 @@
 import Foundation
 
 actor CondensedChatModel: LanguageModel {
-    private let index: TranscriptChat.KeywordIndex
+    private let transcript: Transcript
+    /// Built at the first question, on this actor, rather than wherever the session was made.
+    private var index: TranscriptChat.KeywordIndex?
     private let budgetTokens: Int
     private let makeDigest: @Sendable () async throws -> Summary
     private let makeModel: @Sendable (String) async throws -> any LanguageModel
@@ -13,7 +15,7 @@ actor CondensedChatModel: LanguageModel {
         makeDigest: @escaping @Sendable () async throws -> Summary,
         makeModel: @escaping @Sendable (String) async throws -> any LanguageModel
     ) {
-        self.index = TranscriptChat.KeywordIndex(transcript)
+        self.transcript = transcript
         self.budgetTokens = budgetTokens
         self.makeDigest = makeDigest
         self.makeModel = makeModel
@@ -43,6 +45,7 @@ actor CondensedChatModel: LanguageModel {
 
     private func model(for history: [ChatTurn]) async throws -> any LanguageModel {
         let question = history.last(where: { $0.role == .user })?.text ?? ""
+        let index = keywordIndex()
         let instructions = TranscriptChat.condensedInstructions(
             for: index,
             question: question,
@@ -50,6 +53,13 @@ actor CondensedChatModel: LanguageModel {
             budgetTokens: budgetTokens
         )
         return try await makeModel(instructions)
+    }
+
+    private func keywordIndex() -> TranscriptChat.KeywordIndex {
+        if let index { return index }
+        let built = TranscriptChat.KeywordIndex(transcript)
+        index = built
+        return built
     }
 
     private func cachedDigest() async throws -> Summary {

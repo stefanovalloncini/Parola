@@ -2,7 +2,11 @@ import Foundation
 
 enum TokenBudget {
     static func estimateTokens(_ text: String) -> Int {
-        max(1, (text.utf8.count + 3) / 4)
+        estimateTokens(utf8Count: text.utf8.count)
+    }
+
+    static func estimateTokens(utf8Count: Int) -> Int {
+        max(1, (utf8Count + 3) / 4)
     }
 
     static func estimateTokens(forHistory turns: [ChatTurn], system: String) -> Int {

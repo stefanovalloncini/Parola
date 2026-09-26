@@ -10,6 +10,11 @@ enum TranscriptPromptContext {
         return out
     }
 
+    /// The UTF-8 length of `timestampedLines`, line by line, so a size check never joins the whole transcript.
+    static func timestampedLinesUTF8Count(for transcript: Transcript) -> Int {
+        transcript.segments.reduce(0) { $0 + (timestampedLine(for: $1)?.utf8.count ?? 0) }
+    }
+
     // Each segment must stay a single timestamped line in the prompt; a blank one renders nothing.
     static func timestampedLine(for segment: TranscriptSegment) -> String? {
         let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)

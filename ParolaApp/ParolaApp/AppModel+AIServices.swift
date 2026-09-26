@@ -295,7 +295,10 @@ extension AppModel {
     func makeChatSession(transcript: Transcript, history: [ChatMessage]) async throws -> TranscriptChatSession {
         let choice = resolvedLanguageModelChoice(for: .chat)
         guard choice != .onDevice else {
-            return try TranscriptChat.makeSession(transcript: transcript, history: history, features: features)
+            // The async entry sizes the transcript off the main actor.
+            return try await TranscriptChat.makeSession(
+                transcript: transcript, history: history, provider: .onDevice, features: features
+            )
         }
         return try await TranscriptChat.makeSession(
             transcript: transcript,

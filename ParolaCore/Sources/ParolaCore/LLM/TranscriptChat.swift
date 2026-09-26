@@ -20,9 +20,8 @@ public enum TranscriptChat {
     ) throws -> TranscriptChatSession {
         try features.require(.ai)
         let budget = budgetTokens ?? defaultBudgetTokens
-        let instructions = systemInstructions(for: transcript)
         let model: any LanguageModel
-        if usesCondensedContext(instructions: instructions, budgetTokens: budget) {
+        if usesCondensedContext(for: transcript, budgetTokens: budget) {
             // Probe availability now so an over-budget session fails at creation like the plain path.
             _ = try makeOnDeviceModel(instructions: "")
             model = CondensedChatModel(
@@ -32,7 +31,7 @@ public enum TranscriptChat {
                 makeModel: { try makeOnDeviceModel(instructions: $0) }
             )
         } else {
-            model = try makeOnDeviceModel(instructions: instructions)
+            model = try makeOnDeviceModel(instructions: systemInstructions(for: transcript))
         }
         return TranscriptChatSession(transcript: transcript, history: history, model: model)
     }
@@ -79,9 +78,8 @@ public enum TranscriptChat {
     ) async throws -> TranscriptChatSession {
         try features.require(.ai)
         let budget = budgetTokens ?? defaultBudgetTokens
-        let instructions = systemInstructions(for: transcript)
         let model: any LanguageModel
-        if usesCondensedContext(instructions: instructions, budgetTokens: budget) {
+        if usesCondensedContext(for: transcript, budgetTokens: budget) {
             // Probe key/policy now so an over-budget session fails at creation like the plain path.
             _ = try await makeModel("")
             model = CondensedChatModel(
@@ -93,7 +91,7 @@ public enum TranscriptChat {
                 makeModel: makeModel
             )
         } else {
-            model = try await makeModel(instructions)
+            model = try await makeModel(systemInstructions(for: transcript))
         }
         return TranscriptChatSession(transcript: transcript, history: history, model: model)
     }
@@ -115,23 +113,21 @@ public enum TranscriptChat {
     /// The system prompt a chat session runs with: the instructions plus the whole transcript,
     /// one timestamped line per segment. A caller that builds its own model needs these.
     public static func systemInstructions(for transcript: Transcript) -> String {
-        var out = """
+        systemInstructionsHeader + TranscriptPromptContext.timestampedLines(for: transcript)
+    }
+
+    private static let systemInstructionsHeader = """
         You answer questions about a transcript. Be concise — one or two sentences unless the user asks for more. When you reference a moment from the audio, include its timestamp in MM:SS or HH:MM:SS form.
 
         Transcript follows. Each line is prefixed with its timestamp.
 
 
         """
-        out += TranscriptPromptContext.timestampedLines(for: transcript)
-        return out
-    }
 
-    static func usesCondensedContext(instructions: String, budgetTokens: Int) -> Bool {
-        TokenBudget.estimateTokens(instructions) > budgetTokens
-    }
-
+    /// Sized from the lines' lengths: a long transcript is condensed without ever building its full instructions.
     static func usesCondensedContext(for transcript: Transcript, budgetTokens: Int) -> Bool {
-        usesCondensedContext(instructions: systemInstructions(for: transcript), budgetTokens: budgetTokens)
+        let utf8Count = systemInstructionsHeader.utf8.count + TranscriptPromptContext.timestampedLinesUTF8Count(for: transcript)
+        return TokenBudget.estimateTokens(utf8Count: utf8Count) > budgetTokens
     }
 
     static func cloudBudgetTokens(for id: CloudLLMProviderID, responseHeadroom: Int = 4096) -> Int {

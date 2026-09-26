@@ -152,9 +152,10 @@ struct ChatSheet: View {
     private func rebuildSession() async {
         sessionError = nil
         do {
-            let s = try TranscriptChat.makeSession(
+            let s = try await TranscriptChat.makeSession(
                 transcript: transcript,
-                history: transcript.chatHistory ?? []
+                history: transcript.chatHistory ?? [],
+                provider: .onDevice
             )
             session = s
             displayedHistory = await s.history

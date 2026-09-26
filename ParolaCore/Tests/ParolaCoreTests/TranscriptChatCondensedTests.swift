@@ -36,6 +36,36 @@ struct TranscriptChatCondensedTests {
         #expect(TranscriptChat.usesCondensedContext(for: seededTranscript(), budgetTokens: 400))
     }
 
+    @Test("the size check reads the lines' lengths and decides as the built instructions did")
+    func sizeCheckMatchesTheBuiltInstructions() {
+        let texts = ["Hello", "  padded  ", "", "   ", "caffè perché", "👍🏽 emoji", "line\nbreak", String(repeating: "word ", count: 60)]
+        let speakers: [String?] = [nil, "Ada", "  ", " Bo ", nil, "Ada", "", nil]
+        for count in [1, 7, 40, 90, 400] {
+            let segments = (0..<count).map { index in
+                TranscriptSegment(
+                    id: index,
+                    start: Double(index) * 97.5,
+                    end: Double(index) * 97.5 + 5,
+                    text: texts[index % texts.count],
+                    speaker: speakers[index % speakers.count]
+                )
+            }
+            let transcript = Transcript(segments: segments, language: "en", modelName: "tiny")
+            let built = TranscriptChat.systemInstructions(for: transcript)
+            #expect(
+                TranscriptPromptContext.timestampedLinesUTF8Count(for: transcript)
+                    == TranscriptPromptContext.timestampedLines(for: transcript).utf8.count
+            )
+            for budget in [1, 400, TranscriptChat.defaultBudgetTokens, 20_000, TokenBudget.estimateTokens(built)] {
+                #expect(
+                    TranscriptChat.usesCondensedContext(for: transcript, budgetTokens: budget)
+                        == (TokenBudget.estimateTokens(built) > budget),
+                    "\(count) segments, budget \(budget)"
+                )
+            }
+        }
+    }
+
     @Test("condensed instructions carry the digest and the question's segments")
     func condensedContainsDigestAndRelevantExcerpts() {
         let digest = Summary(
