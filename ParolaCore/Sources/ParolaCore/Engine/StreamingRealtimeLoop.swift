@@ -61,6 +61,7 @@ actor StreamingRealtimeLoop {
     private var currentText = ""
     private var isRunning = false
     private var didStopCapture = false
+    private var stopRequested = false
 
     init(
         configuration: Configuration,
@@ -83,6 +84,8 @@ actor StreamingRealtimeLoop {
             ParolaLog.notice(.streaming, "microphone permission denied")
             return .permissionDenied
         }
+        // stop() can land while the first-run prompt is up; Allow must not bring up a mic nobody can stop.
+        guard !stopRequested else { return .stopped }
         let startedAt = ContinuousClock.now
         do {
             try deps.startCapture { [weak self] buffer in self?.ingest(buffer) }
@@ -154,6 +157,7 @@ actor StreamingRealtimeLoop {
     }
 
     func stop() {
+        stopRequested = true
         isRunning = false
         stopCapture()
     }

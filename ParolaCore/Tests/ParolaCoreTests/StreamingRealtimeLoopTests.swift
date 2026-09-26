@@ -98,6 +98,22 @@ private final class EventRecorder: Sendable {
 
 private struct ScriptError: Error {}
 
+/// A first-run microphone prompt that stays up until the test answers it.
+private actor PermissionPrompt {
+    private var waiter: CheckedContinuation<Bool, Never>?
+    private(set) var isShowing = false
+
+    func ask() async -> Bool {
+        isShowing = true
+        return await withCheckedContinuation { waiter = $0 }
+    }
+
+    func answer(_ granted: Bool) {
+        waiter?.resume(returning: granted)
+        waiter = nil
+    }
+}
+
 private func segment(_ start: Float, _ end: Float, _ text: String) -> TranscriptionSegment {
     TranscriptionSegment(start: start, end: end, text: text)
 }
@@ -121,7 +137,8 @@ private func makeLoop(
     useVAD: Bool = false,
     wantsConfirmedAudio: Bool = false,
     maxWindowSeconds: Double = 60,
-    permissionGranted: Bool = true
+    permissionGranted: Bool = true,
+    requestPermission: (@Sendable () async -> Bool)? = nil
 ) -> (loop: StreamingRealtimeLoop, capture: FakeCapture, script: TranscribeScript, recorder: EventRecorder) {
     let capture = FakeCapture()
     let script = TranscribeScript(responses: responses, failure: failure)
@@ -134,7 +151,7 @@ private func makeLoop(
         configuration: config,
         decodingOptions: DecodingOptions(),
         dependencies: .init(
-            requestPermission: { permissionGranted },
+            requestPermission: requestPermission ?? { permissionGranted },
             startCapture: { callback in
                 if let startFailure { throw startFailure }
                 capture.install(callback)
@@ -623,6 +640,25 @@ struct StreamingRealtimeLoopTests {
             return
         }
         #expect(!capture.installed)
+    }
+
+    @Test("a stop during the permission prompt keeps capture from starting after Allow")
+    func stopDuringPermissionPromptWins() async throws {
+        let prompt = PermissionPrompt()
+        let (loop, capture, script, _) = makeLoop(responses: [], requestPermission: { await prompt.ask() })
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { await prompt.isShowing })
+
+        await loop.stop()
+        await prompt.answer(true)
+
+        let outcome = await runTask.value
+        guard case .stopped = outcome else {
+            Issue.record("expected .stopped, got \(outcome)")
+            return
+        }
+        #expect(!capture.installed, "no capture starts once the user has already stopped")
+        #expect(await script.callCount == 0)
     }
 
     @Test("a transcription error fails the run and stops capture")
