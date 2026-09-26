@@ -638,6 +638,71 @@ struct DictationCoordinatorTests {
         #expect(inserted == ["toggled off"])
     }
 
+    private actor StuckFinishRecorder: DictationRecorder {
+        private(set) var finishing = false
+        private var gate: CheckedContinuation<Void, Never>?
+
+        func start() async throws {}
+
+        func stopAndTranscribe() async throws -> String {
+            finishing = true
+            await withCheckedContinuation { gate = $0 }
+            return "late text"
+        }
+
+        func stopAndDiscard() async {}
+
+        func release() {
+            gate?.resume()
+            gate = nil
+        }
+    }
+
+    @Test("giving up on a stuck final transcription goes idle and never inserts its late text")
+    func abandonedTranscriptionDropsLateText() async throws {
+        let recorder = StuckFinishRecorder()
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: MockHotkey(), recorder: recorder, inserter: inserter, mode: .toggle)
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await #expect(coord.state == .listening)
+
+        let finishing = Task { await coord.stopListening() }
+        var spins = 0
+        while await recorder.finishing == false, spins < 100_000 {
+            await Task.yield()
+            spins += 1
+        }
+        await #expect(coord.state == .transcribing)
+
+        await coord.abandonTranscription()
+        await #expect(coord.state == .idle)
+
+        await recorder.release()
+        await finishing.value
+        await #expect(coord.state == .idle)
+        let inserted = await inserter.inserted
+        #expect(inserted.isEmpty)
+    }
+
+    @Test("a stop in the failed state rests the session idle")
+    func stopInFailedStateGoesIdle() async throws {
+        let coord = DictationCoordinator(
+            hotkey: MockHotkey(), recorder: MockRecorder(outcome: .failure("boom")), inserter: MockInserter()
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        guard case .failed = await coord.state else {
+            Issue.record("expected the failed state")
+            return
+        }
+
+        await coord.stopListening()
+
+        await #expect(coord.state == .idle)
+    }
+
     @Test("a stop request during recorder startup is deferred, then finishes")
     func stopRequestDuringStartupIsDeferred() async throws {
         let hotkey = MockHotkey()

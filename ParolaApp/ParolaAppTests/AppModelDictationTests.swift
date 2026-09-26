@@ -567,6 +567,58 @@ struct AppModelDictationTests {
         #expect(controller.monitor == nil)
     }
 
+    @Test("stopping dictation resets the state the menu bar and the bridge read")
+    func stopResetsTheModelState() {
+        let model = makeModel()
+        model.dictationController.recorderFactory = { _ in IntentStubRecorder() }
+        model.dictationEnabled = true
+        model.dictationState = .transcribing
+
+        model.stopDictation()
+
+        #expect(model.dictationState == .idle)
+        #expect(!model.dictationController.isRunning)
+    }
+
+    @Test("a settings reload that turns dictation off stops it, in test mode too")
+    func reloadStopsDisabledDictation() {
+        let defaults = makeIsolatedDefaults()
+        let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("dictation-reload"))
+        model.dictationPerAppOverridesJSON = "{}"
+        model.dictationController.recorderFactory = { _ in IntentStubRecorder() }
+        model.dictationEnabled = true
+        #expect(model.dictationController.isRunning)
+
+        defaults.set(false, forKey: "dictationEnabled")
+        model.reloadSettings()
+
+        #expect(!model.dictationEnabled)
+        #expect(!model.dictationController.isRunning)
+    }
+
+    @Test("a stop while the final transcription hangs gives up after the grace and re-arms a fresh recorder")
+    func stopWhileTranscribingGivesUp() async {
+        let model = makeModel()
+        let recorders = RecorderTally()
+        model.dictationController.recorderFactory = { _ in recorders.make() }
+        model.dictationController.transcriptionStopGrace = .milliseconds(50)
+        model.dictationEnabled = true
+        model.dictationController.simulatePress()
+        #expect(await waitUntil { model.dictationState == .listening })
+
+        model.stopDictationFromIntent()
+        #expect(await waitUntil { model.dictationState == .transcribing })
+
+        model.stopDictationFromIntent()
+        #expect(await waitUntil { model.dictationState == .idle })
+        #expect(model.dictationController.state == .idle)
+        #expect(model.dictationController.isRunning)
+        #expect(recorders.made.count == 2)
+
+        for recorder in recorders.made { await recorder.release() }
+        model.abortDictation()
+    }
+
     @Test("startDictationFromIntent restarts a stopped controller when already enabled")
     func intentStartsStoppedController() {
         let model = makeModel()
@@ -617,4 +669,33 @@ private actor EndingSpy: StreamingTranscriber {
 
 private struct IdentityPostProcessor: TextPostProcessor {
     func process(_ text: String) async -> String { text }
+}
+
+private actor StuckRecorder: DictationRecorder {
+    private var gate: CheckedContinuation<Void, Never>?
+
+    func start() async throws {}
+
+    func stopAndTranscribe() async throws -> String {
+        await withCheckedContinuation { gate = $0 }
+        return ""
+    }
+
+    func stopAndDiscard() async {}
+
+    func release() {
+        gate?.resume()
+        gate = nil
+    }
+}
+
+@MainActor
+private final class RecorderTally {
+    private(set) var made: [StuckRecorder] = []
+
+    func make() -> StuckRecorder {
+        let recorder = StuckRecorder()
+        made.append(recorder)
+        return recorder
+    }
 }

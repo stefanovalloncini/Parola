@@ -2588,6 +2588,17 @@
         }
       }
     },
+    "Cancel transcription": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla trascrizione"
+          }
+        }
+      }
+    },
     "Cancelled": {
       "extractionState": "manual",
       "localizations": {

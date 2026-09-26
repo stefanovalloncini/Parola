@@ -680,6 +680,28 @@ struct StreamingRealtimeLoopTests {
         #expect(await script.callCount == 0)
     }
 
+    @Test("a stop while the mic prompt is unanswered ends the run before anyone answers it")
+    func stopDuringPermissionPromptEndsTheRun() async throws {
+        let prompt = PermissionPrompt()
+        let (loop, capture, _, _) = makeLoop(responses: [], requestPermission: { await prompt.ask() })
+        let ended = OSAllocatedUnfairLock<Bool?>(initialState: nil)
+        Task {
+            let outcome = await loop.run()
+            let stopped: Bool
+            if case .stopped = outcome { stopped = true } else { stopped = false }
+            ended.withLock { $0 = stopped }
+        }
+        #expect(await eventually { await prompt.isShowing })
+
+        await loop.stop()
+        #expect(await eventually { ended.withLock { $0 } != nil }, "an unanswered prompt must not park the stop")
+        #expect(ended.withLock { $0 } == true)
+
+        await prompt.answer(true)
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(!capture.installed)
+    }
+
     @Test("a transcription error fails the run and stops capture")
     func transcribeFailureStopsCapture() async throws {
         let (loop, capture, _, _) = makeLoop(responses: [], failure: ScriptError())

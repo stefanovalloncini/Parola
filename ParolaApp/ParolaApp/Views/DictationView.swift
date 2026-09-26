@@ -245,7 +245,8 @@ struct DictationView: View {
 
     @ViewBuilder
     private var stopButton: some View {
-        if let onStop, case .listening = state {
+        if let onStop, state == .listening || state == .transcribing {
+            let stopLabel: LocalizedStringKey = state == .transcribing ? "Cancel transcription" : "Stop dictation"
             Button(action: onStop) {
                 ZStack {
                     Circle().fill(Color.white.opacity(0.14))
@@ -256,8 +257,8 @@ struct DictationView: View {
                 .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
-            .help("Stop dictation")
-            .accessibilityLabel("Stop dictation")
+            .help(stopLabel)
+            .accessibilityLabel(stopLabel)
             .axLeaf("HUD.Button.Stop")
         }
     }

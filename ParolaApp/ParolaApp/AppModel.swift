@@ -852,8 +852,11 @@ final class AppModel {
             repaintTheme()
         }
         // Re-apply only the side effects this launch actually wired (skipped under skipBootstrap tests).
-        if activeSideEffects.contains(.dictationHotkey) {
-            if dictationEnabled { stopDictation(); startDictation() } else { stopDictation() }
+        if !dictationEnabled {
+            stopDictation()
+        } else if activeSideEffects.contains(.dictationHotkey) {
+            stopDictation()
+            startDictation()
         }
         if activeSideEffects.contains(.sparkle) {
             applySparkleChannelChange()

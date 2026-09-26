@@ -44,6 +44,10 @@ public actor DictationCoordinator {
     /// revive a live recorder nobody owns anymore (hot mic, stuck HUD).
     private var shutDown = false
 
+    /// Counts final transcriptions; one a stop gave up on stays at or below `abandonedFinishes`, so its late text is dropped.
+    private var finishes: UInt64 = 0
+    private var abandonedFinishes: UInt64 = 0
+
     private let features: FeatureSet
 
     public init(
@@ -173,9 +177,20 @@ public actor DictationCoordinator {
             stopRequestedDuringStart = true
             return
         }
-        if case .listening = state {
-            await finishListening()
+        switch state {
+        case .listening: await finishListening()
+        case .failed: await setState(.idle)
+        case .idle, .transcribing: break
         }
+    }
+
+    /// Gives up on a final transcription that is still running: the session goes idle and the text it may still
+    /// produce is never inserted. The recorder can stay busy, so the caller replaces this coordinator afterwards.
+    public func abandonTranscription() async {
+        guard case .transcribing = state else { return }
+        abandonedFinishes = finishes
+        ParolaLog.notice(.dictation, "final transcription abandoned in \(mode)")
+        await setState(.idle)
     }
 
     public func levels() async -> AsyncStream<Float> {
@@ -307,6 +322,8 @@ public actor DictationCoordinator {
     private func finishListening() async {
         guard state == .listening else { return }
         generation &+= 1
+        finishes &+= 1
+        let finish = finishes
         hybridLocked = false
         await setState(.transcribing)
         await mediaSession?.exitRecording()
@@ -317,12 +334,14 @@ public actor DictationCoordinator {
             if !trimmed.isEmpty {
                 let processed = await postProcessor.process(trimmed)
                 let final = SnippetMarker.stripped(processed).trimmingCharacters(in: .whitespacesAndNewlines)
-                if !final.isEmpty {
+                if !final.isEmpty, finish > abandonedFinishes {
                     try await inserter.insert(final)
                 }
             }
+            guard finish > abandonedFinishes else { return }
             await setState(.idle)
         } catch {
+            guard finish > abandonedFinishes else { return }
             ParolaLog.error(
                 .dictation, "dictation finish failed in \(mode)",
                 [.elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error)]

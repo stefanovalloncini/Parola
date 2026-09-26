@@ -63,6 +63,7 @@ actor StreamingRealtimeLoop {
     private var didStopCapture = false
     private var stopRequested = false
     private var flushesOnStop = true
+    private var permissionWait: CheckedContinuation<Bool?, Never>?
 
     init(
         configuration: Configuration,
@@ -81,7 +82,8 @@ actor StreamingRealtimeLoop {
     }
 
     func run() async -> Outcome {
-        guard await deps.requestPermission() else {
+        guard let granted = await permission() else { return .stopped }
+        guard granted else {
             ParolaLog.notice(.streaming, "microphone permission denied")
             return .permissionDenied
         }
@@ -162,6 +164,25 @@ actor StreamingRealtimeLoop {
         stopRequested = true
         isRunning = false
         stopCapture()
+        answerPermission(nil)
+    }
+
+    /// An unanswered microphone prompt never calls back, so a stop stops waiting for it; nil means the stop came first.
+    private func permission() async -> Bool? {
+        guard !stopRequested else { return nil }
+        let request = deps.requestPermission
+        return await withCheckedContinuation { continuation in
+            permissionWait = continuation
+            Task {
+                let granted = await request()
+                self.answerPermission(granted)
+            }
+        }
+    }
+
+    private func answerPermission(_ granted: Bool?) {
+        permissionWait?.resume(returning: granted)
+        permissionWait = nil
     }
 
     func cancel() {

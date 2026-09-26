@@ -45,6 +45,9 @@ final class DictationController {
         }
     }
 
+    @ObservationIgnored var transcriptionStopGrace: Duration = .seconds(3)
+    static let teardownBound: Duration = .seconds(30)
+
     @ObservationIgnored var anchorProvider: any FieldAnchorProviding = FocusedFieldLocator()
     @ObservationIgnored var hotkeyFactory: ((Int, NSEvent.ModifierFlags) -> any HotkeyMonitor)?
     @ObservationIgnored var recorderFactory: ((Configuration) -> any DictationRecorder)?
@@ -161,6 +164,7 @@ final class DictationController {
         coordinatorGeneration += 1
         guard let coord = coordinator else {
             state = .idle
+            appModel?.dictationState = .idle
             modelDownloadProgress = nil
             hideHUD()
             return
@@ -168,11 +172,13 @@ final class DictationController {
         coordinator = nil
         failedHideTask?.cancel()
         failedHideTask = nil
-        enqueueMonitorWork { await coord.stopMonitoring() }
+        // The flush of a last utterance can hang in its recorder, and every later install waits behind this op.
+        enqueueMonitorWork { _ = await AsyncTimeout.run(Self.teardownBound) { await coord.stopMonitoring() } }
         stopPartialStream()
         modelDownloadProgress = nil
         hideHUD()
         state = .idle
+        appModel?.dictationState = .idle
     }
 
     /// Tears dictation down and DISCARDS any in-flight recording without transcribing
@@ -223,9 +229,29 @@ final class DictationController {
 
     /// Finishes the active session in every mode; a simulated `.release` would be
     /// ignored by toggle mode, leaving the HUD stop button and intents dead there.
+    /// A final transcription already under way gets `transcriptionStopGrace` to land, then is given up.
     func requestStop() {
         guard let coord = coordinator else { return }
-        Task { await coord.stopListening() }
+        guard case .transcribing = state else {
+            Task { await coord.stopListening() }
+            return
+        }
+        let generation = coordinatorGeneration
+        let grace = transcriptionStopGrace
+        Task { [weak self] in
+            try? await Task.sleep(for: grace)
+            guard let self, generation == self.coordinatorGeneration, case .transcribing = self.state else { return }
+            await coord.abandonTranscription()
+            guard generation == self.coordinatorGeneration else { return }
+            self.rearm()
+        }
+    }
+
+    /// The coordinator that gave up may still be stuck in its recorder, so a fresh pair takes over.
+    private func rearm() {
+        guard let configuration else { return }
+        stop()
+        start(configuration: configuration)
     }
 
     var isRunning: Bool { coordinator != nil }
