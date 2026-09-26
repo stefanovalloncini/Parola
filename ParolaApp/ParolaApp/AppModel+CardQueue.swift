@@ -2,8 +2,7 @@ import Foundation
 import ParolaCore
 
 extension AppModel {
-    /// Queues the AI card for an entry that just landed. Cards run one at a time, since the on-device
-    /// model is one resource, and each one's timeout starts when it runs rather than when it was queued.
+    /// One card at a time; the timeout starts when the card runs, not when it was queued.
     @discardableResult
     func enqueueCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) -> Task<Void, Never> {
         guard generatesCardMetadata, features.isEnabled(.ai) else { return Task {} }

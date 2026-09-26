@@ -354,8 +354,7 @@ extension AppModel {
         change(&batchJobs[idx])
     }
 
-    /// Opens the job's library entry in place, or its own copy while the add is still in flight.
-    /// Hands back the entry's load, for a caller that has to wait until it is on screen.
+    /// Opens the job's entry in place, or its own copy while the add is in flight; returns the entry's load.
     @discardableResult
     func selectBatchJob(_ id: BatchJob.ID) -> Task<Transcript, any Error>? {
         // An open the last click started must not land over this one.
