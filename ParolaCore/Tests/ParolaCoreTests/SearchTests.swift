@@ -168,6 +168,7 @@ struct SearchTests {
             "ΣΟΦΟΣ σοφος σοφoς ΣΊΣΥΦΟΣ",
             "ﬁle file FILE ﬁ fi",
             "aaaa aaa naïve NAÏVE naive",
+            "one\r\ntwo\nthree\r four",
             "",
             "   ",
         ]
@@ -177,8 +178,9 @@ struct SearchTests {
             modelName: "tiny"
         )
         let queries = [
-            "caffè", "CAFFÈ", "é", "e", "café", "👩‍👩‍👧", "👍", "🇮🇹", "ss", "SS", "strasse",
+            "caffè", "CAFFÈ", "é", "e", "café", "👩‍👩‍👧", "👍", "🏽", "🇮🇹", "ss", "SS", "strasse",
             "i", "İ", "istanbul", "σοφος", "Σ", "ς", "fi", "file", "aa", "a", "ï", "naive", " ", "zzz",
+            "\n", "\r", "\r\n", "one\r\ntwo",
         ]
         for query in queries {
             for caseSensitive in [false, true] {
@@ -191,7 +193,7 @@ struct SearchTests {
         }
     }
 
-    /// The String search matched "St" for "ß" and "ff" for "ﬁ", and skipped a modifier inside an emoji, where Replace All disagreed.
+    /// The String search matched "St" for "ß" and "ff" for "ﬁ", where Replace All disagreed.
     @Test("matches are the spans Replace All rewrites where the String search disagreed with it")
     func matchesAgreeWithReplaceAll() {
         let transcript = Transcript(
@@ -207,7 +209,51 @@ struct SearchTests {
         #expect(transcript.replacingAll("ß", with: "#").segments[0].text == "Stra#e STRA#E # così")
         #expect(transcript.findMatches("ﬁ").map(\.range) == [6..<7, 10..<12])
         #expect(transcript.replacingAll("ﬁ", with: "#").segments[1].text == "Caffè #le #le")
-        #expect(transcript.findMatches("🏽").map(\.range) == [2..<4])
-        #expect(transcript.replacingAll("🏽", with: "#").segments[2].text == "👍# thumbs 👍")
+        #expect(transcript.findMatches("🏽").isEmpty)
+        #expect(transcript.replacingAll("🏽", with: "#").segments[2].text == "👍🏽 thumbs 👍")
+        #expect(!Transcript.containsMatch("🏽", in: transcript.segments))
+        #expect(Transcript.containsMatch("ß", in: transcript.segments))
+    }
+
+    @Test("a match never cuts a character, so a single Replace applies every one Find offers")
+    func everyMatchIsReplaceable() {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "👍🏽 ok 👍 🇮🇹🇮🇹 👩‍👩‍👧 cafe\u{301} café"),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "one\r\ntwo\nthree Straße ß"),
+            ],
+            language: "it",
+            modelName: "tiny"
+        )
+        for query in ["🏽", "👍", "🇮", "🇮🇹", "👩", "‍", "\u{301}", "e", "é", "\n", "\r", "\r\n", "ß", "ss", "o"] {
+            let matches = transcript.findMatches(query)
+            for match in matches {
+                #expect(transcript.applying(replacement: "#", to: match) != transcript, "\(query) at \(match.range)")
+            }
+            let rewritten = transcript.replacingAll(query, with: "#")
+            let replacedSegments = Set(matches.map(\.segmentID))
+            for (before, after) in zip(transcript.segments, rewritten.segments) {
+                #expect((before.text != after.text) == replacedSegments.contains(before.id), "\(query) in \(before.id)")
+            }
+        }
+        #expect(transcript.findMatches("\n").map(\.range) == [8..<9])
+    }
+
+    @Test("Replace All rewrites what it always did wherever the matches are whole characters")
+    func replaceAllKeepsItsOutput() {
+        let texts = ["Hello hello HELLO", "Caffè caffè CAFFÈ perché", "Straße STRASSE strasse ß", "ﬁle file FILE", "👩‍👩‍👧 👍 🇮🇹", "abcabcabc", ""]
+        let transcript = Transcript(
+            segments: texts.enumerated().map { TranscriptSegment(id: $0.offset, start: 0, end: 1, text: $0.element) },
+            language: "it",
+            modelName: "tiny"
+        )
+        for query in ["hello", "HELLO", "caffè", "è", "ß", "ss", "ﬁ", "fi", "👍", "🇮🇹", "abc", "a", " ", "zzz"] {
+            for caseSensitive in [false, true] {
+                let options: String.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
+                let expected = texts.map { $0.replacingOccurrences(of: query, with: "[$0]", options: options) }
+                let actual = transcript.replacingAll(query, with: "[$0]", caseSensitive: caseSensitive).segments.map(\.text)
+                #expect(actual == expected, "\(query) caseSensitive \(caseSensitive)")
+            }
+        }
     }
 }

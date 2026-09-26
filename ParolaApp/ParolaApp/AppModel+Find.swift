@@ -57,9 +57,7 @@ extension AppModel {
 
     /// Stops at the first hit instead of collecting every one, so a Find-closed jump doesn't rescan the whole transcript twice.
     static func transcriptHasMatch(_ query: String, caseSensitive: Bool, in segments: [TranscriptSegment]) -> Bool {
-        guard !query.isEmpty else { return false }
-        let options: NSString.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
-        return segments.contains { ($0.text as NSString).range(of: query, options: options).location != NSNotFound }
+        Transcript.containsMatch(query, caseSensitive: caseSensitive, in: segments)
     }
 
     /// The index quantizes a boundary to hundredths, so a segment can start a few milliseconds past the time the row shows.
