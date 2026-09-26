@@ -272,6 +272,87 @@ struct UndoTranscriptEditsTests {
         #expect(await model.library.search("original").count == 1)
     }
 
+    @Test("undoing an edit keeps the chapters and summary made after it, on disk too")
+    func undoKeepsLaterSummaryAndChapters() async throws {
+        let bootstrap = AppBootstrap(
+            mode: .test,
+            library: makeTempLibraryURL("undo-generated"),
+            defaultsOverride: temporaryDefaults(),
+            sideEffects: [],
+            filePicker: TestFilePicker(),
+            clock: ImmediateClock()
+        )
+        let model = AppModel(bootstrap: bootstrap)
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seed = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "original")],
+            language: "en",
+            modelName: "stub"
+        )
+        let entry = try await seedStore.add(transcript: seed, audioSource: nil, category: .transcription)
+        model.selectedEntryID = entry.id
+        model.transcript = seed
+
+        model.editSegment(id: 0, newText: "edited")
+        let chapters = [Chapter(title: "Opening", start: 0)]
+        model.smartChapters = chapters
+        model.persistChapters(chapters)
+        model.summariseOperation = { _, _ in Summary(text: "recap") }
+        model.summariseTranscript()
+        #expect(await waitUntil { !model.isSummarising && model.transcript?.summary?.text == "recap" })
+
+        undo.undo()
+        #expect(model.transcript?.segments[0].text == "original")
+        #expect(model.transcript?.summary?.text == "recap")
+        #expect(model.transcript?.chapters == chapters)
+        try await waitForPendingSave(model)
+        #expect(await waitUntil {
+            guard let stored = try? await model.library.load(entry.id).document.transcript else { return false }
+            return stored.segments.first?.text == "original" && stored.summary?.text == "recap" && stored.chapters == chapters
+        })
+
+        undo.redo()
+        #expect(model.transcript?.segments[0].text == "edited")
+        #expect(model.transcript?.summary?.text == "recap")
+    }
+
+    @Test("undo keeps a translation made after the edit, and rejoins a split's halves")
+    func undoCarriesALaterTranslation() {
+        let before = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "hello world"),
+                TranscriptSegment(id: 1, start: 2, end: 4, text: "second"),
+            ],
+            language: "en",
+            modelName: "stub"
+        )
+        var live = before
+        live.segments = [
+            TranscriptSegment(id: 5, start: 0, end: 1, text: "hello"),
+            TranscriptSegment(id: 6, start: 1, end: 2, text: "world"),
+            TranscriptSegment(id: 1, start: 2, end: 4, text: "second"),
+        ]
+        live.translation = TranscriptTranslation(
+            targetLanguage: "it", segments: [5: "ciao", 6: "mondo", 1: "secondo"], createdAt: .now, provider: "mock"
+        )
+        live.chatHistory = [ChatMessage(role: .user, text: "what was said?")]
+
+        let restored = before.restoring(generatedIn: live, translationAfterEdit: nil)
+        #expect(restored.segments == before.segments)
+        #expect(restored.translation?.segments == [0: "ciao mondo", 1: "secondo"])
+        #expect(restored.translation?.targetLanguage == "it")
+        #expect(restored.chatHistory == live.chatHistory)
+
+        let redone = live.restoring(generatedIn: restored, translationAfterEdit: nil)
+        #expect(redone.translation?.segments == [5: "ciao mondo", 1: "secondo"])
+
+        let unchanged = before.restoring(generatedIn: live, translationAfterEdit: live.translation)
+        #expect(unchanged.translation == nil)
+    }
+
     private func waitForPendingSave(_ model: AppModel) async throws {
         for _ in 0..<100 {
             if model.pendingTranscriptSaveTask == nil { return }

@@ -24,13 +24,14 @@ extension AppModel {
         if resolvedNotes.new != resolvedNotes.old { replaceSegmentNotes(resolvedNotes.new) }
         if let assignments { applySpeakerAssignmentEdit(assignments) }
         registerTranscriptUndo(
-            restoring: old, favorites: resolvedFavorites, notes: resolvedNotes, actionName: actionName,
-            textChanged: textChanged, assignments: inverseAssignments
+            restoring: old, translationAfterEdit: new.translation, favorites: resolvedFavorites,
+            notes: resolvedNotes, actionName: actionName, textChanged: textChanged, assignments: inverseAssignments
         )
     }
 
     private func registerTranscriptUndo(
         restoring old: Transcript,
+        translationAfterEdit: TranscriptTranslation?,
         favorites: (old: Set<Int>, new: Set<Int>),
         notes: (old: [Int: String], new: [Int: String]),
         actionName: String,
@@ -42,9 +43,10 @@ extension AppModel {
         let inverseFavorites = (old: favorites.new, new: favorites.old)
         let inverseNotes = (old: notes.new, new: notes.old)
         registerUndoStep(actionName: actionName) { model in
-            guard model.selectedEntryID == entryID else { return }
+            guard model.selectedEntryID == entryID, let live = model.transcript else { return }
             model.applyTranscriptEdit(
-                old, actionName: actionName, textChanged: textChanged, favorites: inverseFavorites,
+                old.restoring(generatedIn: live, translationAfterEdit: translationAfterEdit),
+                actionName: actionName, textChanged: textChanged, favorites: inverseFavorites,
                 notes: inverseNotes, assignments: assignments
             )
         }
@@ -192,5 +194,40 @@ extension AppModel {
             segments: t.segments, id: id, frameDelta: frames, fps: subtitleFPS
         )
         applyTranscriptEdit(t, actionName: String(localized: "Adjust Timing"), textChanged: false)
+    }
+}
+
+extension Transcript {
+    /// What undo and redo put back: this snapshot's segments, with the summary, chapters, chat and translation made since.
+    func restoring(generatedIn live: Transcript, translationAfterEdit: TranscriptTranslation?) -> Transcript {
+        var restored = self
+        restored.summary = live.summary
+        restored.chapters = live.chapters
+        restored.chatHistory = live.chatHistory
+        if live.translation != translationAfterEdit {
+            restored.translation = live.translation?.carried(from: live.segments, onto: segments)
+        }
+        return restored
+    }
+}
+
+extension TranscriptTranslation {
+    /// Carries a translation made after an edit across its undo: shared ids keep their text, and a split's halves rejoin or part again.
+    func carried(from liveSegments: [TranscriptSegment], onto restoredSegments: [TranscriptSegment]) -> TranscriptTranslation {
+        let restoredIDs = Set(restoredSegments.map(\.id))
+        let liveIDs = Set(liveSegments.map(\.id))
+        let gone = liveSegments.map(\.id).filter { !restoredIDs.contains($0) }
+        let back = restoredSegments.map(\.id).filter { !liveIDs.contains($0) }
+        var out = self
+        out.segments = segments.filter { restoredIDs.contains($0.key) }
+        if back.count == 1, gone.count > 1 {
+            let joined = gone.compactMap { segments[$0]?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            if !joined.isEmpty { out.segments[back[0]] = joined }
+        } else if gone.count == 1, let first = back.first, let text = segments[gone[0]] {
+            out.segments[first] = text
+        }
+        return out
     }
 }
