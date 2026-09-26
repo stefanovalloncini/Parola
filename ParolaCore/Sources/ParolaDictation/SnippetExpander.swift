@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 public protocol ClipboardReader: Sendable {
     func currentText() -> String?
@@ -49,6 +50,8 @@ public struct SnippetExpander: TextPostProcessor {
     public let appContext: any AppContextReader
     public let now: @Sendable () -> Date
     public let expandDeferred: Bool
+    /// One per snippet, nil where it can't fire: compiled here so an utterance never compiles a trigger.
+    private let triggers: [CompiledReplacement?]
 
     public init(
         snippets: [Snippet],
@@ -64,21 +67,19 @@ public struct SnippetExpander: TextPostProcessor {
         self.appContext = appContext ?? EmptyAppContextReader()
         self.now = now
         self.expandDeferred = expandDeferred
+        // A whitespace-only trigger compiles to nothing, matching the pane, which shows it as disabled.
+        self.triggers = snippets.map { $0.enabled ? $0.triggerRule.compiled() : nil }
     }
 
     public func process(_ text: String) async -> String {
-        let active = snippets.filter { snippet in
-            // Trim to match the pane's enable gate: a whitespace-only trigger renders as disabled
-            // there, and a bare-space pattern would otherwise rewrite every word boundary.
-            guard snippet.enabled,
-                  !snippet.trigger.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            else { return false }
-            return expandDeferred ? snippet.expandAtInsert : !snippet.expandAtInsert
+        let active = zip(snippets, triggers).compactMap { snippet, trigger -> (Snippet, CompiledReplacement)? in
+            guard let trigger, snippet.expandAtInsert == expandDeferred else { return nil }
+            return (snippet, trigger)
         }
         guard !active.isEmpty else { return text }
         let timestamp = now()
         var result = text
-        for snippet in active {
+        for (snippet, trigger) in active {
             let expanded = Self.expand(
                 snippet.replacement,
                 clipboard: clipboard,
@@ -86,7 +87,7 @@ public struct SnippetExpander: TextPostProcessor {
                 appContext: appContext,
                 now: timestamp
             )
-            result = Self.replace(trigger: snippet.trigger, in: result, with: expanded)
+            result = trigger.apply(to: result, replacement: expanded)
         }
         return result
     }
@@ -102,27 +103,6 @@ public struct SnippetExpander: TextPostProcessor {
             now: now,
             expandDeferred: true
         )
-    }
-
-    static func replace(trigger: String, in text: String, with replacement: String) -> String {
-        guard let pattern = wordBoundedPattern(for: trigger) else { return text }
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-            return text
-        }
-        let range = NSRange(text.startIndex..., in: text)
-        let escaped = NSRegularExpression.escapedTemplate(for: replacement)
-        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: escaped)
-    }
-
-    private static func wordBoundedPattern(for trigger: String) -> String? {
-        guard let first = trigger.first, let last = trigger.last else { return nil }
-        let escaped = NSRegularExpression.escapedPattern(for: trigger)
-        let isWord: (Character) -> Bool = { $0.isLetter || $0.isNumber || $0 == "_" }
-        // \b only matches at a word/non-word transition, so a trigger whose edge is punctuation
-        // (e.g. "brb!", ":)") could never satisfy it. Anchor each edge only when it's a word char.
-        let lead = isWord(first) ? "(?<![\\p{L}\\p{N}_])" : ""
-        let trail = isWord(last) ? "(?![\\p{L}\\p{N}_])" : ""
-        return "\(lead)\(escaped)\(trail)"
     }
 
     static func expand(
@@ -177,4 +157,11 @@ public struct SnippetExpander: TextPostProcessor {
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
+}
+
+extension Snippet {
+    /// Literal, word-bounded where `_` is a word character, and always case-insensitive.
+    var triggerRule: ReplacementRule {
+        ReplacementRule(find: trigger, replace: replacement, match: .literalWord(underscoreIsWordCharacter: true), caseSensitive: false)
+    }
 }

@@ -340,6 +340,7 @@ final class AppModel {
     @ObservationIgnored var failedTakeCategory: EntryCategory?
     @ObservationIgnored var failedTakeSource: EntrySource?
     @ObservationIgnored var pendingDictationRestart: Task<Void, Never>?
+    @ObservationIgnored var pendingDictationProcessorRebuild: Task<Void, Never>?
 
     var recordingDiskSpaceLow: Bool = false
     @ObservationIgnored var freeDiskSpaceProvider: () -> Int64? = { AppModel.systemFreeDiskSpace() }
@@ -526,14 +527,14 @@ final class AppModel {
     var snippets: [Snippet] = [] {
         didSet {
             saveSnippets()
-            if !isReloadingSettings { applyDictationCleanupPromptChange() }
+            if !isReloadingSettings { scheduleDictationProcessorRebuild() }
         }
     }
 
     var correctionRules: [CorrectionRule] = [] {
         didSet {
             saveCorrectionRules()
-            if !isReloadingSettings { applyDictationCleanupPromptChange() }
+            if !isReloadingSettings { scheduleDictationProcessorRebuild() }
         }
     }
 

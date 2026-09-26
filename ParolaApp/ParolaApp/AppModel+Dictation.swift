@@ -407,6 +407,21 @@ extension AppModel {
         dictationController.setPostProcessor(currentDictationProcessor())
     }
 
+    /// The Snippets and Corrections panes write on every keystroke; the chain is rebuilt once the typing settles.
+    func scheduleDictationProcessorRebuild() {
+        pendingDictationProcessorRebuild?.cancel()
+        guard dictationController.isRunning else {
+            pendingDictationProcessorRebuild = nil
+            return
+        }
+        let clock = clock
+        pendingDictationProcessorRebuild = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(400), clock: clock)
+            guard !Task.isCancelled else { return }
+            self?.applyDictationCleanupPromptChange()
+        }
+    }
+
     func refreshDictationTriggerPrompts() async {
         let user = await promptLibrary.userPrompts
         let prompts = (Prompt.builtIns + user).filter { !$0.triggerWords.isEmpty }

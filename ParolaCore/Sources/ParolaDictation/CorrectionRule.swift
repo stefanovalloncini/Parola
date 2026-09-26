@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 public struct CorrectionRule: Codable, Sendable, Identifiable, Hashable {
     public let id: UUID
@@ -39,41 +40,21 @@ public struct CorrectionRuleSet: TextPostProcessor, Sendable {
     public func process(_ text: String) async -> String { apply(to: text) }
 
     public let rules: [CorrectionRule]
-    private let compiled: [Compiled]
-
-    private struct Compiled: Sendable {
-        let regex: NSRegularExpression
-        let template: String
-    }
+    private let compiled: [CompiledReplacement]
 
     public init(rules: [CorrectionRule]) {
         self.rules = rules
-        self.compiled = rules.compactMap { rule -> Compiled? in
-            guard rule.enabled, !rule.from.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-            let escaped = NSRegularExpression.escapedPattern(for: rule.from)
-            guard !escaped.isEmpty, let first = rule.from.first, let last = rule.from.last else { return nil }
-            let isWord: (Character) -> Bool = { $0.isLetter || $0.isNumber }
-            // Anchor an edge only when it's a word char — a boundary anchor on a punctuation edge ("...", "(c)") could never match next to a letter.
-            let lead = isWord(first) ? "(?<![\\p{L}\\p{N}])" : ""
-            let trail = isWord(last) ? "(?![\\p{L}\\p{N}])" : ""
-            let bounded = "\(lead)\(escaped)\(trail)"
-            var options: NSRegularExpression.Options = []
-            if !rule.caseSensitive { options.insert(.caseInsensitive) }
-            guard let regex = try? NSRegularExpression(pattern: bounded, options: options) else {
-                return nil
-            }
-            return Compiled(regex: regex, template: NSRegularExpression.escapedTemplate(for: rule.to))
-        }
+        self.compiled = rules.compactMap { $0.enabled ? $0.replacementRule.compiled() : nil }
     }
 
     public func apply(to text: String) -> String {
-        guard !compiled.isEmpty else { return text }
-        var out = text
-        for rule in compiled {
-            let range = NSRange(out.startIndex..., in: out)
-            out = rule.regex.stringByReplacingMatches(in: out, range: range, withTemplate: rule.template)
-        }
-        return out
+        compiled.reduce(text) { $1.apply(to: $0) }
     }
+}
 
+extension CorrectionRule {
+    /// Literal and word-bounded, where `_` is not a word character.
+    var replacementRule: ReplacementRule {
+        ReplacementRule(find: from, replace: to, match: .literalWord(underscoreIsWordCharacter: false), caseSensitive: caseSensitive)
+    }
 }

@@ -47,13 +47,13 @@ public enum GlobalFindReplace {
         rules: [FindReplaceRule],
         to segments: [TranscriptSegment]
     ) -> [TranscriptSegment] {
-        let active = rules
-            .filter { $0.enabled && !$0.find.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .map { CompiledRule($0) }
+        let active = rules.filter(\.enabled).map(\.replacementRule).filter { !$0.isBlank }
         guard !active.isEmpty else { return segments }
+        // A regex that doesn't compile changes nothing, but its segments are still tidied below.
+        let compiled = active.compactMap { $0.compiled() }
         return segments.compactMap { seg in
             var copy = seg
-            let replaced = active.reduce(seg.text) { current, rule in
+            let replaced = compiled.reduce(seg.text) { current, rule in
                 rule.apply(to: current)
             }
             copy.text = replaced.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
@@ -62,29 +62,11 @@ public enum GlobalFindReplace {
             return copy
         }
     }
+}
 
-    private struct CompiledRule {
-        let rule: FindReplaceRule
-        let regex: NSRegularExpression?
-
-        init(_ rule: FindReplaceRule) {
-            self.rule = rule
-            if rule.regex {
-                let options: NSRegularExpression.Options = rule.caseSensitive ? [] : [.caseInsensitive]
-                self.regex = try? NSRegularExpression(pattern: rule.find, options: options)
-            } else {
-                self.regex = nil
-            }
-        }
-
-        func apply(to text: String) -> String {
-            if let regex {
-                let range = NSRange(text.startIndex..., in: text)
-                return regex.stringByReplacingMatches(in: text, range: range, withTemplate: rule.replace)
-            }
-            if rule.regex { return text }
-            let options: NSString.CompareOptions = rule.caseSensitive ? [] : [.caseInsensitive]
-            return text.replacingOccurrences(of: rule.find, with: rule.replace, options: options)
-        }
+extension FindReplaceRule {
+    /// Foundation's substring search for a plain rule, so "café" still finds a decomposed "café".
+    var replacementRule: ReplacementRule {
+        ReplacementRule(find: find, replace: replace, match: regex ? .regex : .substring, caseSensitive: caseSensitive)
     }
 }

@@ -283,13 +283,41 @@ struct AppModelDictationTests {
         model.startDictation()
         #expect(model.dictationController.isRunning)
 
+        model.correctionRules = [CorrectionRule(from: "q three", to: "Q")]
         model.correctionRules = [CorrectionRule(from: "q three", to: "Q3")]
+        // The rebuild waits for the pane's typing to settle; flush it.
+        await model.pendingDictationProcessorRebuild?.value
 
         let processor = model.dictationController.configuration?.postProcessor
         let out = await processor?.process("q three results")
         #expect(out == "Q3 results")
 
         model.stopDictation()
+    }
+
+    @Test("editing snippets refreshes a running dictation processor once the typing settles")
+    func snippetEditsRefreshRunningProcessor() async {
+        let model = makeModel()
+        model.startDictation()
+        #expect(model.dictationController.isRunning)
+
+        model.snippets = [Snippet(trigger: "o", replacement: "?")]
+        let pending = model.pendingDictationProcessorRebuild
+        model.snippets = [Snippet(trigger: "omw", replacement: "on my way")]
+        #expect(pending?.isCancelled == true)
+        await model.pendingDictationProcessorRebuild?.value
+
+        let out = await model.dictationController.configuration?.postProcessor.process("omw home")
+        #expect(out == "on my way home")
+
+        model.stopDictation()
+    }
+
+    @Test("rule edits with dictation off schedule nothing")
+    func ruleEditsWithDictationOffScheduleNothing() {
+        let model = makeModel()
+        model.correctionRules = [CorrectionRule(from: "teh", to: "the")]
+        #expect(model.pendingDictationProcessorRebuild == nil)
     }
 
     @Test("toggling self-correction strip refreshes a running dictation processor")
