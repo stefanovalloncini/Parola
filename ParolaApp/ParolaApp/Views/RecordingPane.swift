@@ -207,7 +207,7 @@ struct LiveTranscriptView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
                     ForEach(model.liveSegments) { seg in
-                        Text(seg.text.trimmingCharacters(in: .whitespaces))
+                        Text(seg.text)
                             .font(DS.Font.transcript)
                             .lineSpacing(DS.Spacing.transcriptLeading)
                             .foregroundStyle(DS.Color.primaryText)

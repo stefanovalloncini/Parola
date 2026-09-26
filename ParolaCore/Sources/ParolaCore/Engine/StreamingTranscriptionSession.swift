@@ -228,16 +228,28 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         if persister?.droppedAudio == true {
             continuation?.yield(.warning("The recorder fell behind, so the saved audio has gaps."))
         }
-        let finalTranscript = Transcript(
+        let finalTranscript = await finishedTranscript(recordedURL: recordedURL)
+        continuation?.yield(.finished(finalTranscript))
+        continuation?.finish()
+        teardown()
+    }
+
+    /// The take as saved: the live view shows confirmed segments as they land, while the saved
+    /// transcript goes through the same finishing as a file run.
+    func finishedTranscript(recordedURL: URL?) async -> Transcript {
+        let raw = Transcript(
             segments: allConfirmed,
             language: Self.finalLanguage(for: allConfirmed, options: optionsForRun),
             modelName: loadedModel ?? "unknown",
             sourceURL: recordedURL,
             durationSeconds: allConfirmed.last?.end
         )
-        continuation?.yield(.finished(finalTranscript))
-        continuation?.finish()
-        teardown()
+        return await TranscriptFinisher.finish(
+            raw,
+            engine: .whisperKit,
+            options: optionsForRun ?? TranscriptionOptions(),
+            audioURL: recordedURL
+        )
     }
 
     /// What a finished take is stamped with: the language the run was pinned to, else what the
@@ -299,14 +311,10 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         speakerLabeler = nil
     }
 
-    private func appendConfirmed(_ batch: ConfirmedAudioBatch) async {
+    func appendConfirmed(_ batch: ConfirmedAudioBatch) async {
         for seg in batch.segments {
-            var mapped = TranscriptSegment(
-                id: nextSegmentID,
-                start: Double(seg.start),
-                end: Double(seg.end),
-                text: seg.text
-            )
+            var mapped = WhisperSegmentMapping.segment(seg, id: nextSegmentID)
+            guard !mapped.text.isEmpty else { continue }
             nextSegmentID += 1
             if let labeler = speakerLabeler,
                let label = await labelSpeaker(for: mapped, in: batch, with: labeler) {

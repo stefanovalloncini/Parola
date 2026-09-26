@@ -108,11 +108,11 @@ struct WhisperInitialPromptTests {
     @Test("a run that transcribed nothing but the prompt back returns nothing")
     func thePromptEchoIsDropped() {
         let echo = [segment("  parola ")]
-        #expect(WhisperKitTranscriber.droppingPromptEcho(echo, prompt: "Parola").isEmpty)
-        #expect(WhisperKitTranscriber.droppingPromptEcho(echo, prompt: nil).count == 1)
-        #expect(WhisperKitTranscriber.droppingPromptEcho([segment("Parola is an app.")], prompt: "Parola").count == 1)
+        #expect(TranscriptFinisher.droppingPromptEcho(echo, prompt: "Parola").isEmpty)
+        #expect(TranscriptFinisher.droppingPromptEcho(echo, prompt: nil).count == 1)
+        #expect(TranscriptFinisher.droppingPromptEcho([segment("Parola is an app.")], prompt: "Parola").count == 1)
         #expect(
-            WhisperKitTranscriber.droppingPromptEcho(
+            TranscriptFinisher.droppingPromptEcho(
                 [segment("Parola"), segment("Parola")], prompt: "Parola"
             ).count == 2
         )

@@ -139,7 +139,7 @@ struct Record: AsyncParsableCommand {
                     FileHandle.standardError.write(Data("\r\u{001B}[2K… \(text)".utf8))
                 case .confirmed(let segment):
                     FileHandle.standardError.write(Data("\r\u{001B}[2K".utf8))
-                    print(segment.text.trimmingCharacters(in: .whitespaces))
+                    print(segment.text)
                 case .voiceActivity:
                     break
                 case .warning(let msg):

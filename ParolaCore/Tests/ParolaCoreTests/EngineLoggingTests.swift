@@ -49,6 +49,25 @@ struct EngineLoggingTests {
         }
     }
 
+    @Test("finishing a run that only read the prompt back logs the drop with the model")
+    func promptEchoDropIsLogged() async throws {
+        try await withSink { sink in
+            let echo = Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 2, text: "Parola")],
+                language: "en",
+                modelName: "openai_whisper-tiny"
+            )
+            let finished = await TranscriptFinisher.finish(
+                echo, engine: .whisperKit, options: TranscriptionOptions(initialPrompt: "Parola"), audioURL: nil
+            )
+            #expect(finished.segments.isEmpty)
+            let record = try #require(sink.records.first { $0.category == .engineWhisperKit })
+            #expect(record.level == .info)
+            #expect(record.message.rendered == "dropped a transcript that was only the prompt read back")
+            #expect(record.fields[.model] != nil)
+        }
+    }
+
     @Test("parakeet reports a transcribe with no model loaded as a fault")
     func parakeetTranscribeWithoutModel() async throws {
         try await withSink { sink in
@@ -94,10 +113,9 @@ struct EngineLoggingTests {
             #"ParolaLog.error( .engineWhisperKit, "engine returned no results", Self.emptyResultFields(model: modelName, url: url)"#,
             #"ParolaLog.error( .engineWhisperKit, "engine returned an empty result set", Self.emptyResultFields(model: modelName, url: url)"#,
             #"ParolaLog.info( .engineWhisperKit, "language probe inconclusive", [.count: .int(readings.count)]"#,
-            #"ParolaLog.info( .engineWhisperKit, "dropped a transcript that was only the prompt read back", [.model: .safe(ModelToken(modelName))]"#,
             #"fields[.audioSeconds] = .seconds(seconds)"#,
         ], in: source)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 8)
+        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 7)
     }
 
     @Test("the parakeet engine logs load, rejection, transcribe and download failures")

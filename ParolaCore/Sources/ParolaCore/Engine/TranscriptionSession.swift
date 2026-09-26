@@ -175,35 +175,21 @@ public actor TranscriptionSession {
         transcript.durationSeconds = probedDuration
             ?? estimatedDuration
             ?? transcript.segments.map(\.end).max()
-        let cleanupOptions = TranscriptCleanupOptions(
-            filtersHallucinations: options.filtersHallucinations,
-            mergesSentences: false
-        )
-        if engineID == .whisperKit {
-            transcript = await cleanedWithEnergy(transcript, at: audioURL, options: cleanupOptions)
-            // After the energy pass, which reads each segment's own span off disk: clamping first
-            // would point that read at three seconds of a window the engine had padded.
-            transcript.segments = PaddedSegmentSpan.clamped(transcript.segments)
-        } else {
-            transcript = TranscriptCleanup.apply(to: transcript, options: cleanupOptions, energy: nil)
-        }
-        if options.diarize {
+        transcript = try await TranscriptFinisher.finish(
+            transcript,
+            engine: engineID,
+            options: options,
+            audioURL: audioURL,
+            readDeadline: fileReadDeadline
+        ) { [options] tidied in
+            guard options.diarize else { return tidied }
             try Task.checkCancellation()
-            transcript = try await diarize(
-                transcript: transcript,
+            return try await self.diarize(
+                transcript: tidied,
                 audioURL: audioURL,
                 numberOfSpeakers: options.expectedSpeakers
             )
         }
-        // After the diarizer, so the merger's speaker guard can see the labels and stop a
-        // merge at a turn boundary.
-        transcript = TranscriptCleanup.apply(
-            to: transcript,
-            options: TranscriptCleanupOptions(
-                filtersHallucinations: false,
-                mergesSentences: engineID == .whisperKit
-            )
-        )
         let engineElapsed = engineStartedAt.duration(to: .now)
         transcript.transcriptionSeconds =
             Double(engineElapsed.components.seconds)
@@ -218,22 +204,6 @@ public actor TranscriptionSession {
             ]
         )
         return transcript
-    }
-
-    /// Same wedge the readability gate stops, one step later: unbounded here would park the session with the slot still held.
-    private func cleanedWithEnergy(
-        _ transcript: Transcript, at audioURL: URL, options: TranscriptCleanupOptions
-    ) async -> Transcript {
-        let read = await BoundedFileRead.run(deadline: fileReadDeadline) {
-            TranscriptCleanup.apply(
-                to: transcript, options: options, energy: AudioFileEnergyProbe(url: audioURL)
-            )
-        }
-        guard case .done(let cleaned) = read else {
-            ParolaLog.notice(.models, "skipped the energy pass: the file stopped reading")
-            return TranscriptCleanup.apply(to: transcript, options: options, energy: nil)
-        }
-        return cleaned
     }
 
     /// Stages speaker labels in place of SpeakerKit. Internal, so the CLI and both apps always

@@ -24,8 +24,8 @@ public enum TranscriptCleanup {
     }
 
     /// The energy probe is what lets the pass drop a line repeated over silence; a run with no file
-    /// behind it — a live stream, or a document read back from the library — passes nil and keeps
-    /// every repetition.
+    /// behind it — a live take that kept no audio, or a document read back from the library —
+    /// passes nil and keeps every repetition.
     static func apply(
         to transcript: Transcript,
         options: TranscriptCleanupOptions,
