@@ -40,8 +40,8 @@ struct ExportPreview: View {
                     .foregroundStyle(DS.Color.secondaryText)
             }
         }
+        // The previous text stays up while the next one renders; only the first load reads "Rendering…".
         .task(id: spec) {
-            state = .rendering
             try? await Task.sleep(for: Self.debounce)
             guard !Task.isCancelled else { return }
             do {
@@ -67,13 +67,44 @@ struct ExportPreview: View {
         }
     }
 
+    /// The export's first `characterCap` characters, rendered from the fewest segments that reach them.
     static func render(transcript: Transcript, spec: ExportSpec) async throws -> String {
-        let target = spec.textRendering
-        let cap = Self.characterCap
+        let exporter = Exporters.exporter(for: spec.textRendering)
+        var limit = firstPrefixSegments
+        var earlier: String?
+        while limit < transcript.segments.count {
+            let head = try await Self.head(of: transcript, segments: limit, exporter: exporter)
+            if head.isCapped {
+                if let earlier {
+                    // Two prefixes that agree stand for the whole; a head that moves with the segments (FCPXML's duration) disagrees.
+                    guard head.text == earlier else { break }
+                    return head.text
+                }
+                earlier = head.text
+            }
+            limit *= 2
+        }
+        return try await Self.head(of: transcript, segments: nil, exporter: exporter).text
+    }
+
+    private static let firstPrefixSegments = 200
+
+    private static func head(
+        of transcript: Transcript,
+        segments limit: Int?,
+        exporter: any TranscriptExporter
+    ) async throws -> (text: String, isCapped: Bool) {
+        try Task.checkCancellation()
+        var prefix = transcript
+        if let limit { prefix.segments = Array(transcript.segments.prefix(limit)) }
+        let slice = prefix
+        let cap = characterCap
         return try await AppModel.offMainIO {
-            let text = try Exporters.exporter(for: target).renderText(transcript)
-            guard text.count > cap else { return text }
-            return String(text.prefix(cap)) + "\n…"
+            let text = try exporter.renderText(slice)
+            guard let end = text.index(text.startIndex, offsetBy: cap, limitedBy: text.endIndex), end < text.endIndex else {
+                return (text, false)
+            }
+            return (String(text[..<end]) + "\n…", true)
         }
     }
 }

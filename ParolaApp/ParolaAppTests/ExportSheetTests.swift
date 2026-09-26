@@ -247,6 +247,55 @@ struct ExportSheetTests {
         #expect(text.count <= ExportPreview.characterCap + 2)
     }
 
+    @Test("the preview rendered from a prefix is the whole export's head, in every format")
+    func prefixPreviewMatchesTheWholeExport() async throws {
+        func transcript(segments count: Int, speakers: [String?]) -> Transcript {
+            let segments = (0..<count).map { index in
+                TranscriptSegment(
+                    id: index,
+                    start: Double(index) * 3 + 3500,
+                    end: Double(index) * 3 + 2.5 + 3500,
+                    text: "Line \(index) of speech, with a comma and some ordinary words.",
+                    speaker: speakers[index % speakers.count],
+                    words: (0..<3).map {
+                        WordTiming(id: "\(index)-\($0)", word: "w\($0)", start: Double(index) * 3, end: Double(index) * 3 + 0.5, probability: 0.9)
+                    }
+                )
+            }
+            var transcript = Transcript(segments: segments, language: "en", modelName: "stub", durationSeconds: Double(count) * 3 + 3500)
+            transcript.translation = TranscriptTranslation(
+                targetLanguage: "it",
+                segments: Dictionary(uniqueKeysWithValues: (0..<count).map { ($0, "Riga \($0).") }),
+                createdAt: Date(timeIntervalSince1970: 0),
+                provider: "test"
+            )
+            return transcript
+        }
+        let transcripts = [
+            transcript(segments: 1200, speakers: ["Ada", "Ada", "Grace"]),
+            transcript(segments: 1200, speakers: [nil]),
+            transcript(segments: 150, speakers: ["Ada", nil]),
+        ]
+        for transcript in transcripts {
+            for format in ExportFormat.allCases {
+                for grouping in [ExportGrouping.none, .speakerParagraphs] {
+                    for content in [ExportContent.original, .both] {
+                        var spec = ExportSpec.standard(for: format)
+                        spec.options.grouping = grouping
+                        spec.options.timestamps = content == .both
+                        spec.options.content = content
+                        let whole = try Exporters.exporter(for: spec.textRendering).renderText(transcript)
+                        let expected = whole.count > ExportPreview.characterCap
+                            ? String(whole.prefix(ExportPreview.characterCap)) + "\n…"
+                            : whole
+                        let preview = try await ExportPreview.render(transcript: transcript, spec: spec)
+                        #expect(preview == expected, "\(format) \(grouping) \(content) \(transcript.segments.count)")
+                    }
+                }
+            }
+        }
+    }
+
     @Test("a merged spec follows the field the caller named")
     func mergedSpecFollowsTheNamedField() throws {
         let model = makeModel()

@@ -53,30 +53,74 @@ public enum ExportGrouping: String, Sendable, Codable, Hashable, CaseIterable, I
     public func apply(
         to segments: [TranscriptSegment], translation: [Int: String]
     ) -> (segments: [TranscriptSegment], translation: [Int: String]) {
-        guard self == .speakerParagraphs else { return (segments, translation) }
+        guard self == .speakerParagraphs, let first = segments.first else { return (segments, translation) }
         var merged: [TranscriptSegment] = []
         var mergedTranslation = translation
-        for segment in segments {
-            guard var previous = merged.last,
-                  Format.presentationSpeakerLabel(previous.speaker) == Format.presentationSpeakerLabel(segment.speaker)
-            else {
-                merged.append(segment)
+        var run = SpeakerRun(head: first, label: Format.presentationSpeakerLabel(first.speaker), translation: translation)
+        for segment in segments.dropFirst() {
+            let label = Format.presentationSpeakerLabel(segment.speaker)
+            if label == run.label {
+                run.absorb(segment, translation: &mergedTranslation)
                 continue
             }
-            mergedTranslation = TranscriptTranslation.merging(mergedTranslation, of: previous.id, with: segment.id)
-            let head = previous.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            let tail = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            previous.text = [head, tail].filter { !$0.isEmpty }.joined(separator: " ")
-            previous.end = max(previous.end, segment.end)
-            // Half a run's word timings would read as the whole merged segment's; keep them only when every member has them.
-            if let head = previous.words, let tail = segment.words {
-                previous.words = head + tail
-            } else {
-                previous.words = nil
-            }
-            merged[merged.count - 1] = previous
+            merged.append(run.merged(into: &mergedTranslation))
+            run = SpeakerRun(head: segment, label: label, translation: mergedTranslation)
         }
+        merged.append(run.merged(into: &mergedTranslation))
         return (merged, mergedTranslation)
+    }
+}
+
+/// One speaker's consecutive segments, gathered in order and written out once when the speaker changes.
+private struct SpeakerRun {
+    let label: String?
+    private var head: TranscriptSegment
+    private var texts: [String]
+    private var translations: [String]
+    private var end: Double
+    private var words: [WordTiming]?
+    private var isMerged = false
+
+    init(head: TranscriptSegment, label: String?, translation: [Int: String]) {
+        self.head = head
+        self.label = label
+        texts = Self.trimmed(head.text).map { [$0] } ?? []
+        translations = translation[head.id].flatMap(Self.trimmed).map { [$0] } ?? []
+        end = head.end
+        words = head.words
+    }
+
+    mutating func absorb(_ segment: TranscriptSegment, translation: inout [Int: String]) {
+        isMerged = true
+        if let text = Self.trimmed(segment.text) { texts.append(text) }
+        if let text = translation.removeValue(forKey: segment.id).flatMap(Self.trimmed) { translations.append(text) }
+        end = max(end, segment.end)
+        // Half a run's word timings would read as the whole merged segment's; keep them only when every member has them.
+        if words != nil, let tail = segment.words {
+            words?.append(contentsOf: tail)
+        } else {
+            words = nil
+        }
+    }
+
+    /// A lone segment goes out untouched; a merged one joins its members' texts and translations with a space.
+    func merged(into translation: inout [Int: String]) -> TranscriptSegment {
+        guard isMerged else { return head }
+        var out = head
+        out.text = texts.joined(separator: " ")
+        out.end = end
+        out.words = words
+        if translations.isEmpty {
+            translation.removeValue(forKey: head.id)
+        } else {
+            translation[head.id] = translations.joined(separator: " ")
+        }
+        return out
+    }
+
+    private static func trimmed(_ text: String) -> String? {
+        let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return body.isEmpty ? nil : body
     }
 }
 

@@ -133,4 +133,66 @@ struct SpeakerParagraphGroupingTests {
         #expect(decoded.segments.count == 3)
         #expect(decoded.segments[0].text == "Good morning. How did the run go?")
     }
+
+    /// The pairwise merge the grouping ran before it gathered each run and wrote it once.
+    private static func legacyApply(
+        to segments: [TranscriptSegment], translation: [Int: String]
+    ) -> (segments: [TranscriptSegment], translation: [Int: String]) {
+        var merged: [TranscriptSegment] = []
+        var mergedTranslation = translation
+        for segment in segments {
+            guard var previous = merged.last,
+                  Format.presentationSpeakerLabel(previous.speaker) == Format.presentationSpeakerLabel(segment.speaker)
+            else {
+                merged.append(segment)
+                continue
+            }
+            mergedTranslation = TranscriptTranslation.merging(mergedTranslation, of: previous.id, with: segment.id)
+            let head = previous.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let tail = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            previous.text = [head, tail].filter { !$0.isEmpty }.joined(separator: " ")
+            previous.end = max(previous.end, segment.end)
+            if let head = previous.words, let tail = segment.words {
+                previous.words = head + tail
+            } else {
+                previous.words = nil
+            }
+            merged[merged.count - 1] = previous
+        }
+        return (merged, mergedTranslation)
+    }
+
+    @Test("gathering each run gives what the pairwise merge gave, translations included")
+    func matchesThePairwiseMerge() {
+        var state: UInt64 = 11
+        func next(_ bound: Int) -> Int {
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return Int((state >> 33) % UInt64(bound))
+        }
+        let speakers: [String?] = [nil, nil, "Ada", "Ada ", " Ada\n", "Grace", "", "  "]
+        let texts = ["Hello there.", "  padded  ", "", "   ", "caffè perché", "👍🏽 ok", "line\nbreak"]
+        let translations: [String?] = [nil, "Ciao.", "  spazi  ", "", "   ", "sì"]
+        for round in 0..<300 {
+            var segments: [TranscriptSegment] = []
+            var translation: [Int: String] = [:]
+            var clock = 0.0
+            for id in 0..<(1 + next(30)) {
+                let length = Double(1 + next(5))
+                let words: [WordTiming]? = next(4) == 0 ? nil : (0..<(1 + next(3))).map {
+                    WordTiming(id: "\(id)-\($0)", word: "w\($0)", start: clock, end: clock + 0.1, probability: 1)
+                }
+                segments.append(TranscriptSegment(
+                    id: id, start: clock, end: clock + length + (next(5) == 0 ? -3 : 0),
+                    text: texts[next(texts.count)], speaker: speakers[next(speakers.count)], words: words
+                ))
+                if let text = translations[next(translations.count)] { translation[id] = text }
+                clock += length
+            }
+            let map = round.isMultiple(of: 3) ? [:] : translation
+            let actual = ExportGrouping.speakerParagraphs.apply(to: segments, translation: map)
+            let expected = Self.legacyApply(to: segments, translation: map)
+            #expect(actual.segments == expected.segments, "round \(round)")
+            #expect(actual.translation == expected.translation, "round \(round)")
+        }
+    }
 }
