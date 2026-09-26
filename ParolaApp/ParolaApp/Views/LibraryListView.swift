@@ -246,7 +246,7 @@ struct LibraryListView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let category: EntryCategory?
-    var searchResults: [LibraryEntry]? = nil
+    var searchRanking: [LibraryEntry.ID]? = nil
 
     @State private var selection: Set<LibraryEntry.ID> = []
     @State private var pendingBulkDelete = false
@@ -282,8 +282,8 @@ struct LibraryListView: View {
     @discardableResult
     private func recomputeEntries(with filters: LibraryListContent.ActiveFilters) -> [LibraryRowDisplay] {
         let computed: [LibraryEntry]
-        if let searchResults {
-            computed = searchResults
+        if let searchRanking {
+            computed = searchRanking.compactMap { model.libraryEntry(id: $0) }
         } else {
             computed = LibraryListContent.rows(
                 from: model.libraryEntries,
@@ -313,7 +313,7 @@ struct LibraryListView: View {
         rowGroups = LibraryListContent.groups(
             for: displays,
             sortOrder: model.librarySortOrder,
-            isSearchResult: searchResults != nil
+            isSearchResult: searchRanking != nil
         )
         // Count and duration, never size: bundle sizes land later and only for audio, so the label used to change shape.
         totalsLabel = LibraryListContent.listSubtitle(count: displays.count, totalSeconds: totalSeconds) ?? ""
@@ -329,7 +329,7 @@ struct LibraryListView: View {
                 emptyState
             } else {
                 // Read once for the whole list, not per row: every row has to reserve the same column or none does.
-                let showsTimestamp = searchResults != nil && LibraryListContent.showsTimestampSlot(
+                let showsTimestamp = searchRanking != nil && LibraryListContent.showsTimestampSlot(
                     for: entries.map(\.id),
                     matches: model.searchMatches
                 )
@@ -368,7 +368,7 @@ struct LibraryListView: View {
         .onChange(of: model.personFilter) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeEntries() }
-        .onChange(of: searchResults) { _, _ in
+        .onChange(of: searchRanking) { _, _ in
             let newEntries = recomputeEntries()
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
@@ -494,7 +494,7 @@ struct LibraryListView: View {
 
     @ViewBuilder
     private func rowContent(for row: LibraryRowDisplay, showsTime: Bool, showsTimestamp: Bool) -> some View {
-        if searchResults == nil {
+        if searchRanking == nil {
             EntryRow(
                 display: row,
                 detail: .excerpt(row.excerpt),
@@ -513,7 +513,7 @@ struct LibraryListView: View {
 
     /// Computed, not stored: the entry set can stay put while a query edit changes how often each one matches.
     private var headerSubtitle: String? {
-        guard searchResults != nil else { return totalsLabel.isEmpty ? nil : totalsLabel }
+        guard searchRanking != nil else { return totalsLabel.isEmpty ? nil : totalsLabel }
         return LibraryListContent.searchTotalsLabel(for: entries.map(\.id), matches: model.searchMatches)
     }
 
@@ -521,9 +521,9 @@ struct LibraryListView: View {
         PageHeader(
             title: headerTitle,
             subtitle: headerSubtitle,
-            subtitleHelp: searchResults == nil ? totalsHelp : nil,
+            subtitleHelp: searchRanking == nil ? totalsHelp : nil,
             leading: {
-                if searchResults == nil {
+                if searchRanking == nil {
                     LibraryFilterBar(
                         labelFilter: $labelFilter,
                         languageFilter: $languageFilter,
@@ -588,7 +588,7 @@ struct LibraryListView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        if searchResults != nil {
+        if searchRanking != nil {
             searchEmptyState
         } else if filterHidesEverything {
             filteredEmptyState
@@ -612,7 +612,7 @@ struct LibraryListView: View {
 
     /// The category has rows; the filters are what emptied it. Offering "Record" here would be a lie.
     private var filterHidesEverything: Bool {
-        searchResults == nil
+        searchRanking == nil
             && LibraryListContent.filtersHideEverything(activeFilters, category: category, entries: model.libraryEntries)
     }
 
@@ -659,7 +659,7 @@ struct LibraryListView: View {
     }
 
     private var headerTitle: LocalizedStringKey {
-        if searchResults != nil {
+        if searchRanking != nil {
             return searchQueryText.isEmpty ? "Search results" : "Results for “\(searchQueryText)”"
         }
         switch category {
@@ -675,7 +675,7 @@ struct LibraryListView: View {
     }
 
     private var emptyIcon: String {
-        guard let category else { return searchResults != nil ? "magnifyingglass" : "tray" }
+        guard let category else { return searchRanking != nil ? "magnifyingglass" : "tray" }
         return DS.categorySymbol(for: category)
     }
 }

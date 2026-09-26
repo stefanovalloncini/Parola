@@ -1171,6 +1171,38 @@ struct LibraryStoreTests {
         #expect(results.contains(where: { $0.entryID == entry.id }))
     }
 
+    @Test("search breaks ties on occurrences, then the newest entry, then the id, the same on every store")
+    func searchTieOrderIsStable() async throws {
+        let (store, url) = try makeTempLibrary()
+        let sameMoment = Date(timeIntervalSinceNow: -4 * 3600)
+        func add(_ text: String, createdAt: Date) async throws -> LibraryEntry {
+            let entry = try await store.add(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: text)],
+                    language: "en",
+                    modelName: "tiny"
+                ),
+                audioSource: nil
+            )
+            try ParolaDocument.updateManifest(at: entry.bundleURL) { $0.createdAt = createdAt }
+            return entry
+        }
+        let twins = [
+            try await add("budget", createdAt: sameMoment),
+            try await add("budget", createdAt: sameMoment),
+        ].sorted { $0.id < $1.id }
+        let older = try await add("budget", createdAt: Date(timeIntervalSinceNow: -3 * 3600))
+        let repeated = try await add("budget budget budget", createdAt: Date(timeIntervalSinceNow: -5 * 3600))
+        let newer = try await add("budget", createdAt: Date(timeIntervalSinceNow: -3600))
+        let twoTerms = try await add("budgeting the budget", createdAt: Date(timeIntervalSinceNow: -6 * 3600))
+        await store.dropCaches()
+        let expected = [twoTerms.id, repeated.id, newer.id, older.id] + twins.map(\.id)
+
+        #expect(await store.search("budget").map(\.entryID) == expected)
+        let reopened = LibraryStore(libraryURL: url, extraIndexer: nil)
+        #expect(await reopened.search("budget").map(\.entryID) == expected)
+    }
+
     @Test("summary text, segment notes, and speaker names are searchable")
     func searchFindsSummaryNotesSpeakers() async throws {
         let (store, _) = try makeTempLibrary()

@@ -174,9 +174,9 @@ struct ContentRoutes: View {
         LibraryListView(
             category: LibraryListContent.browseCategory(
                 filter: model.libraryFilter,
-                searching: model.searchResults != nil
+                searching: model.searchRanking != nil
             ),
-            searchResults: model.searchResults
+            searchRanking: model.searchRanking
         )
     }
 

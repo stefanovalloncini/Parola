@@ -1092,8 +1092,12 @@ final class AppModel {
     var deletedEntries: [LibraryEntry] = []
     /// What Recently Deleted's bulk actions act on. It lives here so the page's header and the bridge read one selection.
     var recentlyDeletedSelection: Set<LibraryEntry.ID> = []
-    var searchResults: [LibraryEntry]? {
+    /// The open query's hits, best first. Ids, not entries: a row resolves against the library, so a hit that was renamed or deleted shows as it is now.
+    var searchRanking: [LibraryEntry.ID]? {
         didSet { searchResultsVersion &+= 1 }
+    }
+    var searchResults: [LibraryEntry]? {
+        searchRanking.map { $0.compactMap(libraryEntry(id:)) }
     }
     /// Lets a waiter tell "the query finished" from "the query returned what the last one did".
     @ObservationIgnored private(set) var searchResultsVersion: Int = 0
@@ -1106,8 +1110,8 @@ final class AppModel {
         switch phase {
         case .idle, .ready:
             // Results the transcript did not come from take the content area; clearing them gives it back.
-            if hasTranscript { return searchResults != nil && !openedFromSearch }
-            return searchResults != nil || libraryFilter != nil || libraryBrowsingAll
+            if hasTranscript { return searchRanking != nil && !openedFromSearch }
+            return searchRanking != nil || libraryFilter != nil || libraryBrowsingAll
         default: return false
         }
     }

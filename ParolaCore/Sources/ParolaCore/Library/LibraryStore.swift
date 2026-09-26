@@ -4,10 +4,12 @@ import MachO
 public actor LibraryStore {
     public enum LibraryError: Error, LocalizedError {
         case notFound(String)
+        case inTrash(String)
 
         public var errorDescription: String? {
             switch self {
             case .notFound(let id): return "Library entry \(id) not found."
+            case .inTrash: return "This transcript is in Recently Deleted. Restore it to open it."
             }
         }
     }
@@ -150,12 +152,25 @@ public actor LibraryStore {
         return cachedDeleted ?? []
     }
 
+    /// Best first. Ties fall to the most occurrences, then the newest entry, then the id, so a query
+    /// answers in the same order every time.
     public func search(_ query: String) async -> [LibrarySearchIndex.Match] {
         await ensureSearchIndexReady()
         if cachedActive == nil { await primeCaches() }
-        let activeIDs = Set((cachedActive ?? []).map(\.id))
+        let createdAt = Dictionary(
+            (cachedActive ?? []).map { ($0.id, $0.createdAt) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let matches = await searchIndex.search(query)
-        return matches.filter { activeIDs.contains($0.entryID) }
+        return matches
+            .compactMap { match in createdAt[match.entryID].map { (match: match, createdAt: $0) } }
+            .sorted { lhs, rhs in
+                if lhs.match.score != rhs.match.score { return lhs.match.score > rhs.match.score }
+                if lhs.match.matchCount != rhs.match.matchCount { return lhs.match.matchCount > rhs.match.matchCount }
+                if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+                return lhs.match.entryID < rhs.match.entryID
+            }
+            .map(\.match)
     }
 
     /// The opening text of every indexed entry, so a list can show what an entry says, or nil when the

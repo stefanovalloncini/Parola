@@ -193,7 +193,7 @@ struct StatisticsViewTests {
         model.libraryBrowsingAll = true
         model.route = .transcript
         model.searchQuery = "bianchi"
-        model.searchResults = []
+        model.searchRanking = []
         let server = try ParolaAutomationServer(model: model)
         let context = AutomationContext(model: model, server: server)
         let command = try #require(server.settingsCommands().first { $0.name == "setRoute" })
@@ -207,7 +207,7 @@ struct StatisticsViewTests {
         #expect(model.route == .statistics)
         #expect(model.libraryFilter == nil)
         #expect(model.libraryBrowsingAll == false)
-        #expect(model.searchResults == nil)
+        #expect(model.searchRanking == nil)
     }
 
     @Test("a transcript opened from the page records no list to go back to")

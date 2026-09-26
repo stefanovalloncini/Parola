@@ -38,7 +38,7 @@ struct IntakeSettingsVisibilityTests {
         #expect(model.isBrowsingLibrary)
 
         model.libraryBrowsingAll = false
-        model.searchResults = []
+        model.searchRanking = []
         #expect(model.isBrowsingLibrary)
     }
 

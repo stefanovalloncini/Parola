@@ -182,7 +182,7 @@ struct AppModelLibraryTests {
             audioSource: nil,
             category: .transcription
         )
-        model.searchResults = []
+        model.searchRanking = []
         model.searchQuery = "quarterly"
 
         model.loadEntry(seeded.id)
@@ -563,27 +563,27 @@ struct AppModelLibraryTests {
     @Test("every search result assignment is a new version")
     func searchResultsVersionBumps() {
         let model = makeModel()
-        let hit = [Self.entry(id: "a", title: "A", createdAt: Self.baseDate)]
+        let hit = ["a"]
         let start = model.searchResultsVersion
 
-        model.searchResults = hit
+        model.searchRanking = hit
         #expect(model.searchResultsVersion == start + 1)
 
-        model.searchResults = hit
+        model.searchRanking = hit
         #expect(model.searchResultsVersion == start + 2)
 
-        model.searchResults = nil
+        model.searchRanking = nil
         #expect(model.searchResultsVersion == start + 3)
     }
 
     @Test("search with an empty query clears searchResults and skips the debounce")
     func searchEmptyQueryClearsResults() {
         let model = makeModel()
-        model.searchResults = [Self.entry(id: "stale", title: "stale", createdAt: Self.baseDate)]
+        model.searchRanking = ["stale"]
 
         model.search("   ")
 
-        #expect(model.searchResults == nil)
+        #expect(model.searchRanking == nil)
     }
 
     /// A page takes the whole content area, so a query left live behind it is a result set nobody can see.
@@ -601,14 +601,14 @@ struct AppModelLibraryTests {
         for (name, route, open) in destinations {
             let model = makeModel()
             model.searchQuery = "bianchi"
-            model.searchResults = [Self.entry(id: "a", title: "A", createdAt: Self.baseDate)]
+            model.searchRanking = ["a"]
             model.libraryOrigin = .search
 
             open(model)
 
             #expect(model.route == route, "\(name)")
             #expect(model.searchQuery.isEmpty, "\(name)")
-            #expect(model.searchResults == nil, "\(name)")
+            #expect(model.searchRanking == nil, "\(name)")
             #expect(model.libraryOrigin == nil, "\(name)")
         }
     }

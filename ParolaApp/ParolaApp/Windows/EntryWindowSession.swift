@@ -124,6 +124,8 @@ final class EntryWindowSession {
             do {
                 let loaded = try await model.library.load(entryID)
                 guard !Task.isCancelled else { return }
+                // A trashed entry stops here: showing it would reload the bundle on every library change and edit it in the trash.
+                guard loaded.entry.deletedAt == nil else { markUnavailable(); return }
                 apply(loaded, keepingPlace: keepingPlace)
             } catch {
                 guard !Task.isCancelled else { return }

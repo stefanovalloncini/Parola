@@ -52,7 +52,7 @@ struct LibraryOriginTests {
     private func sidebar(_ model: AppModel) -> SidebarRoute {
         SidebarRoute.selected(
             route: model.route,
-            searching: model.searchResults != nil,
+            searching: model.searchRanking != nil,
             filter: model.libraryFilter,
             browsingAll: model.libraryBrowsingAll
         )
@@ -141,12 +141,12 @@ struct LibraryOriginTests {
         let model = makeModel()
         let entry = try await seedEntry(in: model, text: "bianchi call")
         model.searchQuery = "bianchi"
-        model.searchResults = [entry]
+        model.searchRanking = [entry.id]
 
         #expect(await openEntry(entry.id, in: model))
 
         #expect(model.transcriptOrigin == .search)
-        #expect(model.searchResults?.map(\.id) == [entry.id])
+        #expect(model.searchRanking == [entry.id])
         #expect(model.searchQuery == "bianchi")
         #expect(sidebar(model) == .search, "no row owns the results, so none is highlighted")
     }
@@ -252,12 +252,12 @@ struct LibraryOriginTests {
         let model = makeModel()
         let entry = try await seedEntry(in: model, text: "bianchi call")
         model.searchQuery = "bianchi"
-        model.searchResults = [entry]
+        model.searchRanking = [entry.id]
         #expect(await openEntry(entry.id, in: model))
 
         #expect(await goBack(in: model))
 
-        #expect(model.searchResults?.map(\.id) == [entry.id])
+        #expect(model.searchRanking == [entry.id])
         #expect(model.searchQuery == "bianchi")
         #expect(model.isBrowsingLibrary)
         #expect(sidebar(model) == .search)
@@ -345,11 +345,11 @@ struct LibraryOriginTests {
         let model = makeModel()
         let entry = try await seedEntry(in: model, text: "bianchi call")
         model.searchQuery = "bianchi"
-        model.searchResults = [entry]
+        model.searchRanking = [entry.id]
 
         model.browseCategory(.meeting)
 
-        #expect(model.searchResults == nil)
+        #expect(model.searchRanking == nil)
         #expect(model.searchQuery.isEmpty)
         #expect(sidebar(model) == .category(.meeting))
     }
@@ -361,7 +361,7 @@ struct LibraryOriginTests {
         let model = makeModel()
         let entry = try await seedEntry(in: model, text: "bianchi call")
         model.searchQuery = "bianchi"
-        model.searchResults = [entry]
+        model.searchRanking = [entry.id]
 
         #expect(await openEntry(entry.id, in: model))
 
@@ -377,7 +377,7 @@ struct LibraryOriginTests {
         #expect(await openEntry(entry.id, in: model))
 
         model.search("bianchi")
-        model.searchResults = [entry]
+        model.searchRanking = [entry.id]
 
         #expect(model.transcriptOrigin == .category(.meeting), "the query cannot take the list away")
         #expect(model.isBrowsingLibrary, "the transcript did not come from these results, so they cover it")
@@ -409,7 +409,7 @@ struct LibraryOriginTests {
         let model = makeModel()
         let entry = try await seedEntry(in: model, text: "bianchi call")
         model.searchQuery = "bianchi"
-        model.searchResults = [entry]
+        model.searchRanking = [entry.id]
         #expect(await openEntry(entry.id, in: model))
 
         model.search("bianchi")
@@ -468,7 +468,7 @@ struct LibraryOriginTests {
         let (model, server, _, _) = try makeRig()
         let entry = try await seedEntry(in: model, text: "bianchi call")
         model.searchQuery = "bianchi"
-        model.searchResults = [entry]
+        model.searchRanking = [entry.id]
         #expect(await openEntry(entry.id, in: model))
 
         guard case .object(let fields) = server.snapshotState() else {

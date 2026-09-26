@@ -76,7 +76,7 @@ extension AppModel {
             if Task.isCancelled { return }
             setDeletedEntries(deleted)
             refreshBundleSizes(for: active)
-            setLibraryEntries(sortedLibraryEntries(active))
+            if setLibraryEntries(sortedLibraryEntries(active)) { refreshSearchResults() }
             refreshLibraryExcerpts()
         }
     }
@@ -107,9 +107,11 @@ extension AppModel {
     }
 
     /// A refresh runs on every library touch, most of which change nothing, and reassigning anyway repaints every reader.
-    func setLibraryEntries(_ entries: [LibraryEntry]) {
-        guard !Self.sameEntries(entries, libraryEntries, comparingLastOpened: librarySortOrder == .lastOpened) else { return }
+    @discardableResult
+    func setLibraryEntries(_ entries: [LibraryEntry]) -> Bool {
+        guard !Self.sameEntries(entries, libraryEntries, comparingLastOpened: librarySortOrder == .lastOpened) else { return false }
         libraryEntries = entries
+        return true
     }
 
     /// A refresh differing only in `lastOpenedAt` is masked out, so its writer patches the row here.
@@ -504,7 +506,7 @@ extension AppModel {
         // Read before the transcript takes the content area, which is what hides the list it came from.
         let origin = captureLibraryOrigin()
         let pageAtStart = route
-        let hit = searchResults == nil ? nil : searchQuery.trimmingCharacters(in: .whitespaces)
+        let hit = searchRanking == nil ? nil : searchQuery.trimmingCharacters(in: .whitespaces)
         let hitPosition = searchMatches[id]?.firstHit
         return Task { [weak self] in
             guard let self else { throw CancellationError() }
@@ -513,6 +515,8 @@ extension AppModel {
                 let loaded = try await library.load(id)
                 // Two quick clicks race across the await, and the slower load would land last.
                 guard generation == loadEntryGeneration else { throw CancellationError() }
+                // Recently Deleted reads trashed bundles on purpose; opening one here would send its edits into the trash.
+                guard loaded.entry.deletedAt == nil else { throw LibraryStore.LibraryError.inTrash(id) }
                 installStoredTranscript(loaded.document.transcript)
                 closeFind()
                 sourceFileURL = loaded.document.audioURL
@@ -607,7 +611,7 @@ extension AppModel {
         LibraryOrigin.capture(
             sidebar: SidebarRoute.selected(
                 route: route,
-                searching: searchResults != nil,
+                searching: searchRanking != nil,
                 filter: libraryFilter,
                 browsingAll: libraryBrowsingAll
             ),
@@ -670,26 +674,35 @@ extension AppModel {
         searchQuery = query
         let q = query.trimmingCharacters(in: .whitespaces)
         if q.isEmpty {
-            searchResults = nil
+            searchRanking = nil
             searchMatches = [:]
             return
         }
         // Results land in the content area, so a query typed from Statistics or the trash has to leave the page.
         route = .transcript
+        runSearch(q)
+    }
+
+    private func runSearch(_ q: String) {
+        searchTask?.cancel()
         let clock = clock
         searchTask = Task { [weak self] in
             try? await Task.sleep(for: Self.searchDebounce, clock: clock)
             guard !Task.isCancelled, let self else { return }
             let matches = await library.search(q)
             guard !Task.isCancelled else { return }
-            let matchByID = Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0) })
-            let active = await library.list()
-            guard !Task.isCancelled else { return }
-            searchMatches = matchByID
-            searchResults = active
-                .filter { matchByID[$0.id] != nil }
-                .sorted { (matchByID[$0.id]?.score ?? 0) > (matchByID[$1.id]?.score ?? 0) }
+            searchMatches = Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0) })
+            searchRanking = matches.map(\.entryID)
+            // A hit the list hasn't caught up with yet shows once the refresh lands.
+            if matches.contains(where: { libraryEntry(id: $0.entryID) == nil }) { refreshLibrary() }
         }
+    }
+
+    /// A rename, a note or a card can change what the open query matches; re-ranks it where the page is.
+    func refreshSearchResults() {
+        let q = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard searchRanking != nil, !q.isEmpty else { return }
+        runSearch(q)
     }
 
     func clearSearch() {
