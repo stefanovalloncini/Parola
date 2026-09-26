@@ -178,6 +178,13 @@ final class AppModel {
     var customSummaryPrompt: String = "" { didSet { defaults.set(customSummaryPrompt, forKey: "customSummaryPrompt") } }
     /// Test seam: when set, replaces CardMetadataService so a test never touches the shared mock LLM store.
     @ObservationIgnored var cardMetadataOperation: (@Sendable (Transcript) async -> CardMetadata?)?
+    /// The last card job queued; the next one waits for it.
+    @ObservationIgnored var cardMetadataTail: Task<Void, Never>?
+    @ObservationIgnored var cardJobsPending = 0
+    @ObservationIgnored var cardRetryIDs: [LibraryEntry.ID] = []
+    @ObservationIgnored var cardRetryTask: Task<Void, Never>?
+    @ObservationIgnored var cardMetadataTimeout: Duration = .seconds(30)
+    @ObservationIgnored var cardRetryDelay: Duration = .seconds(60)
     /// Test seam: when set, replaces the rule pipeline, so a test controls the one suspension
     /// between the engine returning and the old take being overwritten.
     @ObservationIgnored var postProcessOperation: (@Sendable (Transcript) async -> Transcript)?
@@ -1780,10 +1787,10 @@ final class AppModel {
         }
         Task { [weak self] in
             guard let self else { return }
-            var persistedEntryID: LibraryEntry.ID?
+            var persisted: LibraryEntry?
             do {
                 let entry = try await adding.value
-                persistedEntryID = entry.id
+                persisted = entry
                 let landing = Self.landingSignposter.beginInterval("entry")
                 landLibraryEntry(entry)
                 // library.add copies media for seconds; if the user navigated meanwhile,
@@ -1792,29 +1799,25 @@ final class AppModel {
                     selectedEntryID = entry.id
                 }
                 Self.landingSignposter.endInterval("entry", landing)
-                if activate {
-                    if playsCompletionSound { playCompletionSound() }
-                    // A parked on-device model session must never hold up auto-export.
-                    _ = await AsyncTimeout.run(.seconds(30)) { [weak self] in
-                        await self?.generateCardMetadata(for: entry.id, transcript: result)
-                    }
-                    if autostartSummary,
-                       features.isEnabled(.ai),
-                       loadEntryGeneration == navigationGeneration, selectedEntryID == entry.id,
-                       result.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= CardMetadataService.minimumCharacters {
-                        summariseTranscript()
-                    }
-                }
             } catch {
                 ParolaLog.error(.library, "transcript could not be saved to the library", [.error: .error(error)])
                 nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
             }
+            // Exports read nothing the AI writes, so they don't wait for the card.
             if activate, let audioSource {
                 runAutoExports(transcript: result, sourceURL: audioSource)
             }
-            if activate, let persistedEntryID {
-                await autoSendEntry(persistedEntryID)
+            guard activate, let entry = persisted else { return }
+            if playsCompletionSound { playCompletionSound() }
+            // Delivery sends the AI title, so it waits for the card.
+            await enqueueCardMetadata(for: entry.id, transcript: result).value
+            if autostartSummary,
+               features.isEnabled(.ai),
+               loadEntryGeneration == navigationGeneration, selectedEntryID == entry.id,
+               result.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= CardMetadataService.minimumCharacters {
+                summariseTranscript()
             }
+            await autoSendEntry(entry.id)
         }
         return adding
     }

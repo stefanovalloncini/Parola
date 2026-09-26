@@ -177,7 +177,7 @@ extension AppModel {
     @discardableResult
     func generateCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) async -> CardMetadata? {
         guard generatesCardMetadata else { return nil }
-        return await writeCardMetadata(for: id, transcript: transcript)
+        return await writeCardMetadata(for: id, transcript: transcript).written
     }
 
     /// An explicit user request from the Info inspector: bypasses the generation toggle, still needs the AI feature.
@@ -189,7 +189,7 @@ extension AppModel {
     /// The same explicit request, aimed at a named entry: what the bridge's `force` routes to.
     @discardableResult
     func regenerateCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) async -> CardMetadata? {
-        await writeCardMetadata(for: id, transcript: transcript)
+        await writeCardMetadata(for: id, transcript: transcript).written
     }
 
     /// Blank custom prompts fall back to the built-in instructions instead of being sent as empty text.
@@ -197,15 +197,27 @@ extension AppModel {
         raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : raw
     }
 
-    @discardableResult
-    private func writeCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) async -> CardMetadata? {
-        guard features.isEnabled(.ai) else { return nil }
+    enum CardMetadataOutcome: Sendable {
+        case written(CardMetadata)
+        /// Nothing a second try could change: the AI feature is off or the transcript is too short.
+        case skipped
+        case failed
+
+        var written: CardMetadata? {
+            if case .written(let meta) = self { return meta }
+            return nil
+        }
+    }
+
+    func writeCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) async -> CardMetadataOutcome {
+        guard features.isEnabled(.ai) else { return .skipped }
         if let cardMetadataOperation {
-            guard let meta = await cardMetadataOperation(transcript) else { return nil }
+            guard let meta = await cardMetadataOperation(transcript) else { return .failed }
+            guard !Task.isCancelled else { return .failed }
             if let entry = try? await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id) {
                 landCardMetadata(entry)
             }
-            return meta
+            return .written(meta)
         }
         let prompts = CardMetadataPrompts(
             title: Self.resolvedPrompt(customTitlePrompt),
@@ -213,15 +225,15 @@ extension AppModel {
         )
         do {
             let meta = try await CardMetadataService.generate(for: transcript, prompts: prompts, features: features)
-            // A run the 30 s timeout gave up on must not land on top of a manual regenerate.
-            guard !Task.isCancelled else { return nil }
+            // A run the timeout gave up on must not land on top of a manual regenerate.
+            guard !Task.isCancelled else { return .failed }
             landCardMetadata(try await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id))
-            return meta
+            return .written(meta)
         } catch CardMetadataService.Failure.tooShort {
-            return nil
+            return .skipped
         } catch {
             ParolaLog.notice(.ai, "card metadata skipped", [.error: .error(error)])
-            return nil
+            return .failed
         }
     }
 

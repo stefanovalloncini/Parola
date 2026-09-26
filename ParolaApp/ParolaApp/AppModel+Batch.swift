@@ -115,10 +115,7 @@ extension AppModel {
         batchLibraryAdds.append(adding)
         Task { [weak self] in
             guard let entry = await adding.value else { return }
-            // A parked on-device model session must not hold a task per batch job open.
-            _ = await AsyncTimeout.run(.seconds(30)) { [weak self] in
-                await self?.generateCardMetadata(for: entry.id, transcript: transcript)
-            }
+            self?.enqueueCardMetadata(for: entry.id, transcript: transcript)
         }
     }
 
