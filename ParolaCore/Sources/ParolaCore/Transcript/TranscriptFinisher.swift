@@ -15,8 +15,7 @@ enum TranscriptFinisher {
         return merged(tidied, engine: engine)
     }
 
-    /// `labelSpeakers` runs before the sentence merge, so the merger's speaker guard can stop a
-    /// merge at a turn boundary.
+    /// `labelSpeakers` runs before the merge so the merger's speaker guard sees the labels.
     static func finish(
         _ transcript: Transcript,
         engine: EngineID,
@@ -64,8 +63,7 @@ enum TranscriptFinisher {
         var cleaned = await cleanedWithEnergy(
             transcript, at: audioURL, options: cleanup, deadline: readDeadline
         )
-        // After the energy pass, which reads each segment's own span off disk: clamping first
-        // would point that read at three seconds of a window the engine had padded.
+        // After the energy pass: clamped spans would point its reads at the engine's padding.
         cleaned.segments = PaddedSegmentSpan.clamped(cleaned.segments)
         return cleaned
     }

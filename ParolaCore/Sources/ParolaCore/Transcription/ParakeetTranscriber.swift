@@ -126,8 +126,7 @@ actor ParakeetTranscriber: Transcriber {
         )
     }
 
-    /// On v3 the hint keeps the decoder to the language's script, so a Polish run can't drift into
-    /// Cyrillic tokens; languages FluidAudio doesn't list get no hint.
+    /// On v3 the hint keeps a Polish run out of Cyrillic tokens; unlisted languages get none.
     nonisolated static func scriptHint(for language: String?) -> Language? {
         language.flatMap { Language(rawValue: $0.lowercased()) }
     }

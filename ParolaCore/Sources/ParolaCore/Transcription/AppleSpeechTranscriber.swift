@@ -303,8 +303,7 @@ actor AppleSpeechTranscriber: Transcriber {
     }
     #endif
 
-    /// Every open in a run gets the same deadline: a file on a stalled share parks `open()` in a
-    /// syscall nothing can interrupt.
+    /// A file on a stalled share parks `open()` in a syscall nothing can interrupt.
     static func openBounded(_ url: URL, deadline: Duration = FileReadDeadline.header) async throws -> AVAudioFile {
         let read = await BoundedFileRead.run(deadline: deadline) {
             Result { OpenedAudioFile(file: try AVAudioFile(forReading: url)) }
@@ -367,8 +366,7 @@ private struct OpenedAudioFile: @unchecked Sendable {
     let file: AVAudioFile
 }
 
-/// The cancel for whichever run holds the engine, kept outside the actor so it can be reached
-/// while a run holds it.
+/// The running analyzer's cancel, behind a lock so it is reachable while the actor is busy.
 final class InFlightCancel: Sendable {
     typealias Cancel = @Sendable () async -> Void
 

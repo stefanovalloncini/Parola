@@ -39,8 +39,7 @@ public enum ItalianOrthography {
         uniqueKeysWithValues: acuteForms.map { (String($0.dropLast()) + "è", $0) }
     )
 
-    /// One alternation over every grave form: each alternative is a whole word, so no two can
-    /// overlap and a single scan finds what one regex per form used to.
+    /// Whole-word alternatives can't overlap, so one scan matches what one regex per form did.
     private static let graveFamily: NSRegularExpression? = {
         let alternatives = acuteByGrave.keys.sorted().map(NSRegularExpression.escapedPattern(for:))
         let pattern = "\\b(?:" + alternatives.joined(separator: "|") + ")\\b"

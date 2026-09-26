@@ -1,9 +1,7 @@
 import Foundation
 
-/// Tidies confirmed live lines one at a time, for a surface that prints them as they land: the
-/// built-in hallucination filter and the post-processor, keyed on the pinned language or else on
-/// what the take reads as so far. Sentence merging needs the whole take, so it stays with the
-/// finished transcript.
+/// Tidies confirmed live lines as they print: the built-in hallucination filter and the post-processor,
+/// keyed on the pinned language or what the take reads as so far. Merging waits for the finished take.
 public struct LiveLineTidier: Sendable {
     private let pinnedLanguage: String?
     private let postProcessor: TranscriptPostProcessor

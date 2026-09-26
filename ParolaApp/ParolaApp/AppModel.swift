@@ -128,8 +128,7 @@ final class AppModel {
     @ObservationIgnored var currentSegmentIndex: Int?
 
     var liveSegments: [TranscriptSegment] = []
-    /// Set when a take starts, from the route it actually took: the recording pane shows the live
-    /// transcript only for a take that streams.
+    /// The route the running take took; the recording pane reads it.
     private(set) var liveTakeIsStreaming = false
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
@@ -2223,8 +2222,7 @@ final class AppModel {
     }
 
     func makeOptions(task: TranscriptionTask, model modelName: String, language: String?) -> TranscriptionOptions {
-        // Translate and speaker labels would fail the run, so the app drops them for an engine
-        // without them; a prompt or word timings it can't use the session drops on its own.
+        // Translate and speaker labels would fail the run; the session drops a prompt or word timings itself.
         let caps = ModelCatalog.staticCapabilities(forID: modelName) ?? .whisperKitDefaults
         return TranscriptionOptions(
             model: modelName,

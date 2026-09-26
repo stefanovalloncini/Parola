@@ -214,8 +214,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         return stream
     }
 
-    /// Runs a take on a loop the caller builds, so everything past the model load can be driven
-    /// without a model.
+    /// Runs a take on a loop the caller builds, so tests can drive it without a model.
     func launch(
         options: TranscriptionOptions,
         speakerLabeler: (any StreamingSpeakerLabeler)?,

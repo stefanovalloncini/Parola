@@ -28,8 +28,7 @@ extension AppModel {
         transcriptPostProcessor.apply(transcript)
     }
 
-    /// Completion paths await this so a long transcript's regex pass can't hitch the UI right as
-    /// results land.
+    /// Completion paths await this so a long regex pass can't hitch the UI as results land.
     func postProcessDetached(_ transcript: Transcript) async -> Transcript {
         if let postProcessOperation { return await postProcessOperation(transcript) }
         return await transcriptPostProcessor.applyOffActor(transcript)

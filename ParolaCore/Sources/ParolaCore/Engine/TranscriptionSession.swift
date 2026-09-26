@@ -329,8 +329,7 @@ public actor TranscriptionSession {
         await transcriber?.loadedModelName()
     }
 
-    /// A prompt or word timings the engine can't produce are dropped here rather than failing the
-    /// run: the engine would ignore them anyway, and every surface gets the same treatment.
+    /// Drops a prompt or word timings the engine can't produce instead of failing the run.
     static func supportedOptions(
         _ options: TranscriptionOptions,
         capabilities: EngineCapabilities,

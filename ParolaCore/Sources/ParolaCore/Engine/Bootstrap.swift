@@ -1,8 +1,7 @@
 import Foundation
 
 public enum ParolaCoreBootstrap {
-    /// What each built-in engine declares, as the registry receives it; the catalog's synchronous
-    /// lookup reads the same table.
+    /// Each built-in engine's declared capabilities; the catalog's synchronous lookup reads them too.
     static let builtInCapabilities: [EngineID: EngineCapabilities] = [
         WhisperKitTranscriber.engineID: WhisperKitTranscriber.capabilities,
         ParakeetTranscriber.engineID: ParakeetTranscriber.capabilities,
