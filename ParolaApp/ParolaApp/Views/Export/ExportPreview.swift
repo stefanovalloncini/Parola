@@ -69,10 +69,15 @@ struct ExportPreview: View {
 
     /// The export's first `characterCap` characters, rendered from the fewest segments that reach them.
     static func render(transcript: Transcript, spec: ExportSpec) async throws -> String {
-        let exporter = Exporters.exporter(for: spec.textRendering)
+        try await render(transcript: transcript, exporter: Exporters.exporter(for: spec.textRendering))
+    }
+
+    static func render(transcript: Transcript, exporter: any TranscriptExporter) async throws -> String {
         var limit = firstPrefixSegments
         var earlier: String?
         while limit < transcript.segments.count {
+            // A prefix whose double already covers the transcript could never be confirmed; the full render follows.
+            guard earlier != nil || limit * 2 < transcript.segments.count else { break }
             let head = try await Self.head(of: transcript, segments: limit, exporter: exporter)
             if head.isCapped {
                 if let earlier {

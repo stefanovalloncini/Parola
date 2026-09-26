@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import os
 import Testing
 @testable import Parola
 import ParolaCore
@@ -296,6 +297,37 @@ struct ExportSheetTests {
         }
     }
 
+    @Test("a transcript too short to confirm a prefix renders once, in full")
+    func shortTranscriptRendersOnce() async throws {
+        for count in [150, 300, 399] {
+            let segments = (0..<count).map {
+                TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "A line of speech about seventy characters long, give or take a few.")
+            }
+            let transcript = Transcript(segments: segments, language: "en", modelName: "stub")
+            let exporter = CountingExporter(Exporters.exporter(for: .txt))
+
+            let preview = try await ExportPreview.render(transcript: transcript, exporter: exporter)
+
+            #expect(exporter.renders == 1, "\(count) segments")
+            let whole = try Exporters.exporter(for: .txt).renderText(transcript)
+            #expect(preview == (whole.count > ExportPreview.characterCap ? String(whole.prefix(ExportPreview.characterCap)) + "\n…" : whole))
+        }
+    }
+
+    @Test("a long transcript confirms its head from two prefixes instead of rendering whole")
+    func longTranscriptRendersTwoPrefixes() async throws {
+        let segments = (0..<3000).map {
+            TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "A line of speech about seventy characters long, give or take a few.")
+        }
+        let transcript = Transcript(segments: segments, language: "en", modelName: "stub")
+        let exporter = CountingExporter(Exporters.exporter(for: .txt))
+
+        _ = try await ExportPreview.render(transcript: transcript, exporter: exporter)
+
+        #expect(exporter.renders == 3)
+        #expect(exporter.segmentsRendered == 200 + 400 + 800)
+    }
+
     @Test("a merged spec follows the field the caller named")
     func mergedSpecFollowsTheNamedField() throws {
         let model = makeModel()
@@ -352,5 +384,28 @@ struct ExportSheetTests {
         for format in ExportFormat.allCases {
             #expect(format.optionFields.contains(.grouping), "\(format.rawValue) should offer grouping")
         }
+    }
+}
+
+/// Counts what the preview asks an exporter to render.
+private final class CountingExporter: TranscriptExporter {
+    private struct Tally {
+        var renders = 0
+        var segments = 0
+    }
+
+    private let inner: any TranscriptExporter
+    private let tally = OSAllocatedUnfairLock(initialState: Tally())
+
+    init(_ inner: any TranscriptExporter) { self.inner = inner }
+
+    var format: ExportFormat { inner.format }
+    var spec: ExportSpec { inner.spec }
+    var renders: Int { tally.withLock { $0.renders } }
+    var segmentsRendered: Int { tally.withLock { $0.segments } }
+
+    func encode(_ transcript: Transcript) throws -> Data {
+        tally.withLock { $0.renders += 1; $0.segments += transcript.segments.count }
+        return try inner.encode(transcript)
     }
 }
