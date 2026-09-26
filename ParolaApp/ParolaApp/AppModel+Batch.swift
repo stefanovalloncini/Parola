@@ -73,7 +73,7 @@ extension AppModel {
             if !recordingActive {
                 phase = .ready
             }
-            refreshLibrary()
+            refreshLibraryOnceBatchAddsLand()
             // Draining alongside a resume would hand the queue two competing batch tasks; the
             // pending wave ends in another .finished, and the parked files drain there.
             let pending = batchJobs.filter { $0.status == .pending }
@@ -94,20 +94,40 @@ extension AppModel {
     // Skips persistToLibrary on purpose: its runAutoExports call would fire a second time
     // (handleBatchEvent already ran the rules), and it would steal selection + refresh per job.
     private func persistBatchJobToLibrary(_ jobID: BatchJob.ID, transcript: Transcript, sourceURL: URL) {
-        Task { [weak self] in
-            guard let self else { return }
+        let adding = Task { [weak self] () -> LibraryEntry? in
+            guard let self else { return nil }
             do {
                 let entry = try await library.add(
                     transcript: transcript, audioSource: sourceURL, category: .transcription, source: .file
                 )
                 landBatchJobEntry(entry.id, jobID: jobID)
-                // A parked on-device model session must not hold a task per batch job open.
-                _ = await AsyncTimeout.run(.seconds(30)) { [weak self] in
-                    await self?.generateCardMetadata(for: entry.id, transcript: transcript)
-                }
+                return entry
             } catch {
                 nonFatalWarning = "\(sourceURL.lastPathComponent) was transcribed, but Parola couldn't save it to your library. \(error.localizedDescription)"
+                return nil
             }
+        }
+        batchLibraryAdds.append(adding)
+        Task { [weak self] in
+            guard let entry = await adding.value else { return }
+            // A parked on-device model session must not hold a task per batch job open.
+            _ = await AsyncTimeout.run(.seconds(30)) { [weak self] in
+                await self?.generateCardMetadata(for: entry.id, transcript: transcript)
+            }
+        }
+    }
+
+    /// Refreshed before the last add returns, the list would miss that file until something else refreshed it.
+    private func refreshLibraryOnceBatchAddsLand() {
+        let adds = batchLibraryAdds
+        batchLibraryAdds = []
+        guard !adds.isEmpty else {
+            refreshLibrary()
+            return
+        }
+        batchClosingRefresh = Task { [weak self] in
+            for add in adds { _ = await add.value }
+            self?.refreshLibrary()
         }
     }
 
@@ -344,6 +364,7 @@ extension AppModel {
     func clearBatch() {
         batchTask?.cancel()
         batchTask = nil
+        if !batchLibraryAdds.isEmpty { refreshLibraryOnceBatchAddsLand() }
         batchJobs = []
         selectedBatchJobID = nil
         batchDuplicatesSkipped = 0
@@ -352,6 +373,8 @@ extension AppModel {
     func cancelAllInFlightBatchJobs() {
         batchRunCancelled = true
         cancelAndTrack(&batchTask)
+        // A cancelled run never sees its .finished, so the refresh it would have made happens here.
+        if !batchLibraryAdds.isEmpty { refreshLibraryOnceBatchAddsLand() }
         for idx in batchJobs.indices where batchJobs[idx].status == .pending || batchJobs[idx].status == .transcribing {
             batchJobs[idx].status = .cancelled
         }

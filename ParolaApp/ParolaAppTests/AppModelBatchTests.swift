@@ -508,25 +508,47 @@ struct AppModelBatchTests {
         #expect(storedText == "kept")
     }
 
-    @Test("the library list refreshes once per wave finish, not per job")
+    @Test("the wave's one refresh waits for the last job's add, sent back to back with the finish")
     func libraryRefreshesAtWaveFinish() async throws {
         let scratch = try Self.makeScratchDirectory()
         defer { try? FileManager.default.removeItem(at: scratch) }
         let model = makeModel()
         await model.libraryRefreshTask?.value
         model.batchExportPresetIDs = []
+        model.generatesCardMetadata = false
         let source = scratch.appendingPathComponent("clip.wav")
         try Data("fake".utf8).write(to: source)
         let job = BatchJob(url: source, status: .transcribing)
         model.batchJobs = [job]
+        let refreshesBefore = model.libraryRefreshes
 
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
-        let persisted = await Self.waitForEntries(in: model)
-        #expect(persisted.count == 1)
-        #expect(model.libraryEntries.isEmpty)
-
         await model.handleBatchEvent(.finished)
+        await model.batchClosingRefresh?.value
         await model.libraryRefreshTask?.value
+
+        #expect(model.libraryEntries.count == 1)
+        #expect(model.libraryRefreshes == refreshesBefore + 1)
+    }
+
+    @Test("a cancelled run still refreshes the list once the adds it finished land")
+    func cancelledRunRefreshesAfterItsAdds() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        await model.libraryRefreshTask?.value
+        model.batchExportPresetIDs = []
+        model.generatesCardMetadata = false
+        let source = scratch.appendingPathComponent("first.wav")
+        try Data("fake".utf8).write(to: source)
+        let done = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [done, Self.makeJob("second")]
+
+        await model.handleBatchEvent(.completed(jobID: done.id, transcript: Self.makeTranscript()))
+        model.cancelAllInFlightBatchJobs()
+        await model.batchClosingRefresh?.value
+        await model.libraryRefreshTask?.value
+
         #expect(model.libraryEntries.count == 1)
     }
 

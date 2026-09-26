@@ -374,6 +374,9 @@ final class AppModel {
     }
     @ObservationIgnored var unsavedBatchJobOnScreen: UnsavedBatchJob?
     @ObservationIgnored var unsavedBatchEdits: Set<BatchJob.ID> = []
+    /// The library adds of the finished jobs the closing refresh still has to wait for.
+    @ObservationIgnored var batchLibraryAdds: [Task<LibraryEntry?, Never>] = []
+    @ObservationIgnored var batchClosingRefresh: Task<Void, Never>?
     var selectedBatchJobID: BatchJob.ID?
     @ObservationIgnored var batchTask: Task<Void, Never>?
     @ObservationIgnored var lastSavedBatchQueueURLs: [URL]?
