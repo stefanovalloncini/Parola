@@ -134,7 +134,7 @@ extension ParolaAutomationServer {
                             "id": .string(job.id.uuidString),
                             "url": .string(job.url.path),
                             "status": .string(job.status.rawValue),
-                            "progress": .double(job.progress),
+                            "progress": .double(ctx.model.batchProgress.fraction(for: job.id)),
                             "error": .string(job.error ?? ""),
                             "hasTranscript": .bool(job.transcript != nil),
                         ])

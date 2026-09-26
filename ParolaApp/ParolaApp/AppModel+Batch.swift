@@ -43,14 +43,15 @@ extension AppModel {
             }
         case .progress(let id, let fraction):
             guard !isCancelled(id) else { return }
-            mutateBatchJob(id) { $0.progress = max($0.progress, fraction) }
+            batchProgress.advance(id, to: fraction)
         case .completed(let id, let transcript):
             guard !isCancelled(id) else { return }
             let processed = await postProcessDetached(transcript)
             // Re-check: a cancel that lands during the post-process await must not be
             // overwritten to .done, and its exports must not run.
             guard !isCancelled(id) else { return }
-            mutateBatchJob(id) { $0.status = .done; $0.transcript = processed; $0.progress = 1 }
+            batchProgress.advance(id, to: 1)
+            mutateBatchJob(id) { $0.status = .done; $0.transcript = processed }
             if id == selectedBatchJobID {
                 clearDerivedArtifacts()
                 selectedEntryID = nil
@@ -309,8 +310,8 @@ extension AppModel {
         guard let idx = batchJobs.firstIndex(where: { $0.id == id }) else { return }
         batchJobs[idx].status = .pending
         batchJobs[idx].error = nil
-        batchJobs[idx].progress = 0
         batchJobs[idx].transcript = nil
+        batchProgress.reset(id)
         // Don't tear down a live batch to retry one file — runBatchTask cancels the running queue and
         // strands the in-flight job. Reset to .pending; the running batch's .finished resume picks it up.
         if !batchIsRunning {

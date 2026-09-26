@@ -347,7 +347,9 @@ final class AppModel {
 
     var batchJobs: [BatchJob] = [] {
         didSet {
+            batchBuckets = BatchJobBuckets(batchJobs)
             guard !BatchJob.sameQueueShape(oldValue, batchJobs) else { return }
+            batchProgress.retain(Set(batchJobs.map(\.id)))
             let active = QueueCount.count(for: batchJobs)
             if active != activeBatchJobCount { activeBatchJobCount = active }
             if batchIsEmpty != batchJobs.isEmpty { batchIsEmpty = batchJobs.isEmpty }
@@ -363,6 +365,8 @@ final class AppModel {
     private(set) var batchIsEmpty = true
     private(set) var batchIsRunning = false
     private(set) var batchHasDoneJob = false
+    private(set) var batchBuckets = BatchJobBuckets()
+    @ObservationIgnored let batchProgress = BatchProgressBoard()
     var selectedBatchJobID: BatchJob.ID?
     @ObservationIgnored var batchTask: Task<Void, Never>?
     @ObservationIgnored var lastSavedBatchQueueURLs: [URL]?

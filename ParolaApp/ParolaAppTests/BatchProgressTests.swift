@@ -50,4 +50,27 @@ struct BatchProgressTests {
         #expect(BatchProgress.headerLabel(for: [Self.makeJob("a", .pending)], locale: english)?.text == "0 of 1 file")
         #expect(BatchProgress.headerLabel(for: jobs, locale: english)?.isProgress == true)
     }
+
+    @Test("one pass sorts the queue into its statuses, each in queue order")
+    func bucketsKeepQueueOrder() {
+        let jobs = [
+            Self.makeJob("a", .done), Self.makeJob("b", .pending), Self.makeJob("c", .done),
+            Self.makeJob("d", .transcribing), Self.makeJob("e", .pending),
+        ]
+        let buckets = BatchJobBuckets(jobs)
+        #expect(buckets.jobs(.done).map(\.displayName) == ["a", "c"])
+        #expect(buckets.jobs(.pending).map(\.displayName) == ["b", "e"])
+        #expect(buckets.jobs(.transcribing).map(\.displayName) == ["d"])
+        #expect(buckets.jobs(.failed).isEmpty)
+        #expect(buckets.hasFinished)
+        #expect(!buckets.holdsOnlyRunningJobs)
+    }
+
+    @Test("a queue of running and waiting jobs has nothing finished to clear")
+    func bucketsWithoutFinishedJobs() {
+        #expect(!BatchJobBuckets([Self.makeJob("a", .pending)]).hasFinished)
+        #expect(BatchJobBuckets([Self.makeJob("a", .transcribing)]).holdsOnlyRunningJobs)
+        #expect(BatchJobBuckets().holdsOnlyRunningJobs)
+        #expect(BatchJobBuckets([Self.makeJob("a", .cancelled)]).hasFinished)
+    }
 }

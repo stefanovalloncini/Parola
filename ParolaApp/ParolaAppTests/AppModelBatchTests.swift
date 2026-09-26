@@ -4,6 +4,11 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
+// @unchecked: only written from the observation callback, which the model raises on the main actor.
+private final class BatchObservationFlag: @unchecked Sendable {
+    var fired = false
+}
+
 @MainActor
 @Suite("AppModel batch")
 struct AppModelBatchTests {
@@ -116,16 +121,16 @@ struct AppModelBatchTests {
             url: Self.makeURL("a"),
             status: .failed,
             transcript: Self.makeTranscript(),
-            error: "boom",
-            progress: 0.5
+            error: "boom"
         )
         model.batchJobs = [failed]
+        model.batchProgress.advance(failed.id, to: 0.5)
 
         model.retryBatchJob(failed.id)
 
         #expect(model.batchJobs[0].status == .pending)
         #expect(model.batchJobs[0].error == nil)
-        #expect(model.batchJobs[0].progress == 0)
+        #expect(model.batchProgress.fraction(for: failed.id) == 0)
         #expect(model.batchJobs[0].transcript == nil)
         model.batchTask?.cancel()
         model.batchTask = nil
@@ -604,12 +609,40 @@ struct AppModelBatchTests {
         let id = model.batchJobs[0].id
 
         await model.handleBatchEvent(.progress(jobID: id, fraction: 0.4))
-        #expect(model.batchJobs[0].progress == 0.4)
+        #expect(model.batchProgress.fraction(for: id) == 0.4)
 
         await model.handleBatchEvent(.progress(jobID: id, fraction: 0.15))
-        #expect(model.batchJobs[0].progress == 0.4)
+        #expect(model.batchProgress.fraction(for: id) == 0.4)
 
-        #expect(model.batchJobs[1].progress == 0)
+        #expect(model.batchProgress.fraction(for: model.batchJobs[1].id) == 0)
+    }
+
+    @Test("a progress tick leaves the job list and every other row's bar alone")
+    func batchProgressTouchesOnlyItsOwnBar() async {
+        let model = makeModel()
+        model.batchJobs = [Self.makeJob("a", status: .transcribing), Self.makeJob("b")]
+        let running = model.batchJobs[0].id
+        let waiting = model.batchJobs[1].id
+        let listOrOtherBar = BatchObservationFlag()
+        withObservationTracking {
+            _ = model.batchJobs
+            _ = model.batchBuckets
+            _ = model.batchProgress.box(for: waiting).fraction
+        } onChange: {
+            listOrOtherBar.fired = true
+        }
+        let ownBar = BatchObservationFlag()
+        withObservationTracking {
+            _ = model.batchProgress.box(for: running).fraction
+        } onChange: {
+            ownBar.fired = true
+        }
+
+        await model.handleBatchEvent(.progress(jobID: running, fraction: 0.3))
+
+        #expect(!listOrOtherBar.fired)
+        #expect(ownBar.fired)
+        #expect(model.batchProgress.fraction(for: running) == 0.3)
     }
 
     @Test("progress for a cancelled job is ignored")
@@ -619,7 +652,7 @@ struct AppModelBatchTests {
 
         await model.handleBatchEvent(.progress(jobID: model.batchJobs[0].id, fraction: 0.9))
 
-        #expect(model.batchJobs[0].progress == 0)
+        #expect(model.batchProgress.fraction(for: model.batchJobs[0].id) == 0)
     }
 
     @Test("arrivals during recording defer instead of stomping capture")

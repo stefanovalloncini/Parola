@@ -3,21 +3,21 @@ import ParolaCore
 
 /// What a job says about itself: one line of status, wherever the job is rendered.
 enum BatchJobStatus {
-    static func text(for job: BatchJob) -> String {
-        switch job.status {
+    static func text(status: BatchJob.Status, progress: Double, error: String?, segmentCount: Int) -> String {
+        switch status {
         case .pending:
             return String(localized: "Queued")
         case .transcribing:
             // Under a percent the rounding would print "0%", which reads as stuck rather than starting.
-            guard job.progress >= 0.01 else { return String(localized: "Transcribing…") }
-            return String(localized: "Transcribing · \(AppFormat.percent(job.progress))")
+            guard progress >= 0.01 else { return String(localized: "Transcribing…") }
+            return String(localized: "Transcribing · \(AppFormat.percent(progress))")
         case .cancelled:
             return String(localized: "Cancelled")
         case .failed:
-            guard let error = job.error, !error.isEmpty else { return String(localized: "Failed") }
+            guard let error, !error.isEmpty else { return String(localized: "Failed") }
             return String(localized: "Failed: \(error)")
         case .done:
-            return String(localized: "Completed · \(SegmentCount.label(job.transcript?.segments.count ?? 0))")
+            return String(localized: "Completed · \(SegmentCount.label(segmentCount))")
         }
     }
 
@@ -48,29 +48,46 @@ enum BatchJobStatus {
 }
 
 /// What a row's ✕ means: the Queue cancels the run, the Batch page cancels the one file.
-struct JobCancelAction {
+struct JobCancelAction: Equatable {
+    enum Scope: Equatable {
+        case wholeBatch
+        case oneJob
+    }
+
+    let scope: Scope
     let help: LocalizedStringKey
     let axID: String
-    let run: () -> Void
 
     /// The Queue page's ✕, as `QueueRow` had it: one control for the whole run.
-    static func wholeBatch(_ run: @escaping () -> Void) -> JobCancelAction {
-        JobCancelAction(help: "Cancel Batch", axID: "Row.Button.CancelBatch", run: run)
+    static var wholeBatch: JobCancelAction {
+        JobCancelAction(scope: .wholeBatch, help: "Cancel Batch", axID: "Row.Button.CancelBatch")
     }
 
     /// The Batch page's ✕, as `BatchJobRow` had it: a running file is cancelled, a waiting one is removed.
-    static func oneJob(status: BatchJob.Status, _ run: @escaping () -> Void) -> JobCancelAction {
+    static func oneJob(status: BatchJob.Status) -> JobCancelAction {
         JobCancelAction(
+            scope: .oneJob,
             help: status == .transcribing ? "Cancel" : "Remove",
-            axID: "Row.Button.Cancel",
-            run: run
+            axID: "Row.Button.Cancel"
         )
+    }
+
+    @MainActor
+    func run(for id: BatchJob.ID, in model: AppModel) {
+        switch scope {
+        case .wholeBatch: model.cancelAllInFlightBatchJobs()
+        case .oneJob: model.cancelBatchJob(id)
+        }
     }
 }
 
-/// The one row a batch job draws, on the Queue page, on the Batch page and in the batch sidebar.
-struct JobRow: View {
-    let job: BatchJob
+/// The one row a batch job draws on every page; Equatable on what it draws, so a re-render skips unchanged jobs.
+struct JobRow: View, Equatable {
+    let id: BatchJob.ID
+    let url: URL
+    let status: BatchJob.Status
+    let error: String?
+    let segmentCount: Int
     var isSelected: Bool = false
     /// The sidebar's column is narrow: no progress bar and no trailing action, the status text alone.
     var compact: Bool = false
@@ -79,21 +96,38 @@ struct JobRow: View {
     @Environment(AppModel.self) private var model
     @State private var isHovering = false
 
+    init(job: BatchJob, isSelected: Bool = false, compact: Bool = false, cancel: JobCancelAction? = nil) {
+        self.id = job.id
+        self.url = job.url
+        self.status = job.status
+        self.error = job.error
+        self.segmentCount = job.transcript?.segments.count ?? 0
+        self.isSelected = isSelected
+        self.compact = compact
+        self.cancel = cancel
+    }
+
+    nonisolated static func == (lhs: JobRow, rhs: JobRow) -> Bool {
+        lhs.id == rhs.id && lhs.url == rhs.url && lhs.status == rhs.status && lhs.error == rhs.error
+            && lhs.segmentCount == rhs.segmentCount && lhs.isSelected == rhs.isSelected
+            && lhs.compact == rhs.compact && lhs.cancel == rhs.cancel
+    }
+
     /// Only the sidebar's selection is a solid accent fill; the pages wash theirs, where onAccent would vanish.
     private var onAccent: Bool { isSelected && compact }
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
-            EntryBadge(kind: EntrySourceKind(url: job.url), onAccent: onAccent)
+            EntryBadge(kind: EntrySourceKind(url: url), onAccent: onAccent)
             VStack(alignment: .leading, spacing: DS.Spacing.hair) {
-                Text(job.url.lastPathComponent)
+                Text(url.lastPathComponent)
                     .font(DS.Font.bodyStrong)
                     .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.primaryText)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 statusLine
-                if !compact, BatchJobStatus.showsProgress(job.status) {
-                    DSProgressBar(value: job.progress > 0 ? job.progress : nil)
+                if !compact, BatchJobStatus.showsProgress(status) {
+                    JobProgressBar(progress: model.batchProgress.box(for: id))
                         .padding(.top, DS.Spacing.hair)
                 }
             }
@@ -113,33 +147,36 @@ struct JobRow: View {
 
     private var statusLine: some View {
         HStack(spacing: DS.Spacing.tight) {
-            if let symbol = BatchJobStatus.symbol(for: job.status) {
+            if let symbol = BatchJobStatus.symbol(for: status) {
                 Image(systemName: symbol)
                     .font(DS.Font.secondary)
             }
-            Text(BatchJobStatus.text(for: job))
-                .font(DS.Font.secondary)
-                .monospacedDigit()
-                .lineLimit(1)
-                .truncationMode(.tail)
+            JobStatusText(
+                status: status,
+                error: error,
+                segmentCount: segmentCount,
+                progress: model.batchProgress.box(for: id)
+            )
         }
-        .foregroundStyle(onAccent ? DS.Color.onAccent : BatchJobStatus.tint(for: job.status))
+        .foregroundStyle(onAccent ? DS.Color.onAccent : BatchJobStatus.tint(for: status))
     }
 
     @ViewBuilder
     private var action: some View {
-        switch job.status {
+        switch status {
         case .pending, .transcribing:
             if let cancel {
-                actionButton(cancel.help, systemImage: "xmark", axID: cancel.axID, action: cancel.run)
+                actionButton(cancel.help, systemImage: "xmark", axID: cancel.axID) {
+                    cancel.run(for: id, in: model)
+                }
             }
         case .failed, .cancelled:
             actionButton("Retry", systemImage: "arrow.clockwise", axID: "Row.Button.Retry") {
-                model.retryBatchJob(job.id)
+                model.retryBatchJob(id)
             }
         case .done:
             actionButton("Open", systemImage: "doc.text", axID: "Row.Button.Open") {
-                model.openBatchJobTranscript(job.id)
+                model.openBatchJobTranscript(id)
             }
         }
     }
@@ -163,5 +200,34 @@ struct JobRow: View {
         compact
             ? .native
             : .wash(fill: DS.Color.selectionWash, border: DS.Color.accent.opacity(0.35))
+    }
+}
+
+/// The only views that read a job's progress, so a tick re-renders them and not the row around them.
+private struct JobStatusText: View {
+    let status: BatchJob.Status
+    let error: String?
+    let segmentCount: Int
+    let progress: BatchJobProgress
+
+    var body: some View {
+        Text(BatchJobStatus.text(
+            status: status,
+            progress: status == .transcribing ? progress.fraction : 0,
+            error: error,
+            segmentCount: segmentCount
+        ))
+        .font(DS.Font.secondary)
+        .monospacedDigit()
+        .lineLimit(1)
+        .truncationMode(.tail)
+    }
+}
+
+private struct JobProgressBar: View {
+    let progress: BatchJobProgress
+
+    var body: some View {
+        DSProgressBar(value: progress.fraction > 0 ? progress.fraction : nil)
     }
 }

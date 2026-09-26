@@ -68,20 +68,28 @@ struct QueueView: View {
 
     @ViewBuilder
     private var mainContent: some View {
-        if model.batchJobs.isEmpty {
+        if model.batchIsEmpty {
             empty
         } else {
-            let jobs = visibleJobs
-            if jobs.isEmpty {
+            let sections = visibleSections
+            if sections.isEmpty {
                 ContentUnavailableView.search(text: searchText)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: DS.Spacing.large) {
-                        section(title: "In Progress", jobs: jobs, statuses: [.transcribing, .pending])
-                        section(title: "Cancelled", jobs: jobs, statuses: [.cancelled])
-                        section(title: "Failed", jobs: jobs, statuses: [.failed])
-                        section(title: "Completed", jobs: jobs, statuses: [.done])
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(sections) { section in
+                            SectionCaption(section.title)
+                                .padding(.top, section.id == sections.first?.id ? 0 : DS.Spacing.large)
+                                .padding(.bottom, DS.Spacing.small)
+                            ForEach(section.jobs) { job in
+                                jobRow(job)
+                                if job.id != section.jobs.last?.id {
+                                    Divider()
+                                        .padding(.leading, DS.Spacing.small + EntryRowMetrics.textInset)
+                                }
+                            }
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, DS.Spacing.large)
@@ -109,66 +117,61 @@ struct QueueView: View {
     }
 
     private var hasFinishedJobs: Bool {
-        model.batchJobs.contains { $0.status == .done || $0.status == .cancelled || $0.status == .failed }
+        model.batchBuckets.hasFinished
     }
 
-    private var visibleJobs: [BatchJob] {
-        let query = searchText.trimmingCharacters(in: .whitespaces)
-        let filtered: [BatchJob]
-        if query.isEmpty {
-            filtered = model.batchJobs
-        } else {
-            filtered = model.batchJobs.filter {
-                $0.url.lastPathComponent.range(of: query, options: .caseInsensitive) != nil
-            }
-        }
-        switch sortOption {
-        case .newestFirst:
-            // Jobs append oldest-first, so insertion order is oldest-first.
-            return filtered.reversed()
-        case .oldestFirst:
-            return filtered
-        case .nameAscending:
-            return filtered.sorted {
-                $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedAscending
-            }
-        case .nameDescending:
-            return filtered.sorted {
-                $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedDescending
-            }
-        case .mostProgress:
-            return filtered.sorted { $0.progress > $1.progress }
-        case .leastProgress:
-            return filtered.sorted { $0.progress < $1.progress }
-        }
+    private struct JobSection: Identifiable {
+        let id: String
+        let title: LocalizedStringKey
+        let jobs: [BatchJob]
     }
 
     /// `statuses` is an order, not a set: In Progress lists the running job first whatever the sort picked.
-    @ViewBuilder
-    private func section(title: LocalizedStringKey, jobs: [BatchJob], statuses: [BatchJob.Status]) -> some View {
-        let matching = statuses.flatMap { status in jobs.filter { $0.status == status } }
-        if !matching.isEmpty {
-            VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                SectionCaption(title)
-                VStack(spacing: 0) {
-                    ForEach(matching) { job in
-                        jobRow(job)
-                        if job.id != matching.last?.id {
-                            Divider()
-                                .padding(.leading, DS.Spacing.small + EntryRowMetrics.textInset)
-                        }
-                    }
-                }
+    private static let layout: [(id: String, title: LocalizedStringKey, statuses: [BatchJob.Status])] = [
+        ("inProgress", "In Progress", [.transcribing, .pending]),
+        ("cancelled", "Cancelled", [.cancelled]),
+        ("failed", "Failed", [.failed]),
+        ("completed", "Completed", [.done]),
+    ]
+
+    private var visibleSections: [JobSection] {
+        let buckets = model.batchBuckets
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        return Self.layout.compactMap { layout in
+            let jobs = layout.statuses.flatMap { sorted(matching(buckets.jobs($0), query: query)) }
+            return jobs.isEmpty ? nil : JobSection(id: layout.id, title: layout.title, jobs: jobs)
+        }
+    }
+
+    private func matching(_ jobs: [BatchJob], query: String) -> [BatchJob] {
+        guard !query.isEmpty else { return jobs }
+        return jobs.filter { $0.url.lastPathComponent.range(of: query, options: .caseInsensitive) != nil }
+    }
+
+    private func sorted(_ jobs: [BatchJob]) -> [BatchJob] {
+        switch sortOption {
+        case .newestFirst:
+            // Jobs append oldest-first, so insertion order is oldest-first.
+            return jobs.reversed()
+        case .oldestFirst:
+            return jobs
+        case .nameAscending:
+            return jobs.sorted {
+                $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedAscending
             }
+        case .nameDescending:
+            return jobs.sorted {
+                $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedDescending
+            }
+        case .mostProgress:
+            return jobs.sorted { model.batchProgress.fraction(for: $0.id) > model.batchProgress.fraction(for: $1.id) }
+        case .leastProgress:
+            return jobs.sorted { model.batchProgress.fraction(for: $0.id) < model.batchProgress.fraction(for: $1.id) }
         }
     }
 
     private func jobRow(_ job: BatchJob) -> some View {
-        JobRow(
-            job: job,
-            isSelected: focusedJob == job.id,
-            cancel: .wholeBatch { model.cancelAllInFlightBatchJobs() }
-        )
+        JobRow(job: job, isSelected: focusedJob == job.id, cancel: .wholeBatch)
             .focusable(true)
             .focusEffectDisabled()
             .focused($focusedJob, equals: job.id)

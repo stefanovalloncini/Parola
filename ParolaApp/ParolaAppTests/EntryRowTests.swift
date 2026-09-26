@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import ParolaCore
 @testable import Parola
+import ParolaTestSupport
 
 @Suite("Entry row")
 struct EntryRowTests {
@@ -101,48 +102,35 @@ struct EntryRowTests {
     }
 }
 
+@MainActor
 @Suite("Job row")
 struct JobRowTests {
-    private func job(
+    private func text(
         _ status: BatchJob.Status,
         progress: Double = 0,
         error: String? = nil,
         segments: Int = 0
-    ) -> BatchJob {
-        BatchJob(
-            url: URL(fileURLWithPath: "/tmp/JobRowTests/take.wav"),
-            status: status,
-            transcript: segments > 0
-                ? Transcript(
-                    segments: (0..<segments).map {
-                        TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "riga")
-                    },
-                    language: "it",
-                    modelName: "stub"
-                )
-                : nil,
-            error: error,
-            progress: progress
-        )
+    ) -> String {
+        BatchJobStatus.text(status: status, progress: progress, error: error, segmentCount: segments)
     }
 
     @Test("a job says where it is, in words")
     func statusReadsInWords() {
-        #expect(BatchJobStatus.text(for: job(.pending)) == "Queued")
-        let running = BatchJobStatus.text(for: job(.transcribing, progress: 0.32))
+        #expect(text(.pending) == "Queued")
+        let running = text(.transcribing, progress: 0.32)
         #expect(running.contains("32"))
         #expect(running.hasPrefix("Transcribing · "))
-        #expect(BatchJobStatus.text(for: job(.cancelled, progress: 0.4)) == "Cancelled")
-        #expect(BatchJobStatus.text(for: job(.failed, error: "no audio track")) == "Failed: no audio track")
-        #expect(BatchJobStatus.text(for: job(.failed)) == "Failed")
-        #expect(BatchJobStatus.text(for: job(.done, segments: 12)) == "Completed · 12 segments")
+        #expect(text(.cancelled, progress: 0.4) == "Cancelled")
+        #expect(text(.failed, error: "no audio track") == "Failed: no audio track")
+        #expect(text(.failed) == "Failed")
+        #expect(text(.done, segments: 12) == "Completed · 12 segments")
     }
 
     /// Rounding a fraction under a percent prints "0%", which reads as stuck rather than as starting.
     @Test("a job that has just started says so instead of showing a zero")
     func earlyProgressStaysWordy() {
-        #expect(BatchJobStatus.text(for: job(.transcribing, progress: 0.004)) == "Transcribing…")
-        #expect(BatchJobStatus.text(for: job(.transcribing)) == "Transcribing…")
+        #expect(text(.transcribing, progress: 0.004) == "Transcribing…")
+        #expect(text(.transcribing) == "Transcribing…")
     }
 
     @Test("only a job that is still going draws a bar")
@@ -157,21 +145,38 @@ struct JobRowTests {
     /// The Queue's ✕ cancels the run; the Batch page's ✕ must stay the per-file control it was.
     @Test("each page's cancel keeps its own meaning and its own ax id")
     func cancelActionsDifferPerPage() {
-        var cancelledRun = 0
-        let queue = JobCancelAction.wholeBatch { cancelledRun += 1 }
-        #expect(queue.axID == "Row.Button.CancelBatch")
-        queue.run()
-        #expect(cancelledRun == 1)
+        let model = AppModel(
+            skipBootstrap: true,
+            defaults: temporaryDefaults(),
+            libraryURL: makeTempLibraryURL("job-row-cancel")
+        )
+        let running = BatchJob(url: URL(fileURLWithPath: "/tmp/JobRowTests/a.wav"), status: .transcribing)
+        let waiting = BatchJob(url: URL(fileURLWithPath: "/tmp/JobRowTests/b.wav"))
+        let spare = BatchJob(url: URL(fileURLWithPath: "/tmp/JobRowTests/c.wav"))
 
-        var cancelledJob = 0
-        let running = JobCancelAction.oneJob(status: .transcribing) { cancelledJob += 1 }
-        let waiting = JobCancelAction.oneJob(status: .pending) { cancelledJob += 1 }
-        #expect(running.axID == "Row.Button.Cancel")
-        #expect(waiting.axID == "Row.Button.Cancel")
-        #expect(running.help != waiting.help)
-        running.run()
-        waiting.run()
-        #expect(cancelledJob == 2)
+        let oneJob = JobCancelAction.oneJob(status: .pending)
+        #expect(oneJob.axID == "Row.Button.Cancel")
+        #expect(JobCancelAction.oneJob(status: .transcribing).help != oneJob.help)
+        model.batchJobs = [running, waiting, spare]
+        oneJob.run(for: waiting.id, in: model)
+        #expect(model.batchJobs.map(\.id) == [running.id, spare.id])
+
+        let queue = JobCancelAction.wholeBatch
+        #expect(queue.axID == "Row.Button.CancelBatch")
+        queue.run(for: spare.id, in: model)
+        #expect(model.batchJobs.map(\.status) == [.cancelled, .cancelled])
+    }
+
+    @Test("a row compares equal while what it draws is unchanged")
+    func rowEqualityFollowsWhatItDraws() {
+        var job = BatchJob(url: URL(fileURLWithPath: "/tmp/JobRowTests/take.wav"), status: .transcribing)
+        let row = JobRow(job: job, cancel: .wholeBatch)
+        job.progress = 0.8
+        #expect(JobRow(job: job, cancel: .wholeBatch) == row)
+        #expect(JobRow(job: job, isSelected: true, cancel: .wholeBatch) != row)
+        #expect(JobRow(job: job, cancel: .oneJob(status: .transcribing)) != row)
+        job.status = .done
+        #expect(JobRow(job: job, cancel: .wholeBatch) != row)
     }
 
     @Test("a running job has no glyph, since its bar is the indicator")

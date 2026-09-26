@@ -16,7 +16,7 @@ struct BatchJobList: View {
                 Button("Clear") { model.clearBatch() }
                     .buttonStyle(.borderless)
                     .controlSize(.small)
-                    .disabled(model.batchJobs.allSatisfy { $0.status == .transcribing })
+                    .disabled(model.batchBuckets.holdsOnlyRunningJobs)
                     .axLeaf("Queue.Button.Clear")
             }
             .padding(.horizontal, DS.Spacing.large)
@@ -75,14 +75,14 @@ struct BatchJobList: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     if sortOrder == .status {
-                        ForEach(statusGroups(from: matches), id: \.status) { group in
-                            VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                                SectionCaption(Text(verbatim: group.title))
-                                    .padding(.top, DS.Spacing.small)
-                                rows(group.jobs)
-                            }
+                        let groups = statusGroups()
+                        ForEach(groups, id: \.status) { group in
+                            SectionCaption(Text(verbatim: group.title))
+                                .padding(.top, group.status == groups.first?.status ? DS.Spacing.small : DS.Spacing.small * 2)
+                                .padding(.bottom, DS.Spacing.small)
+                            rows(group.jobs)
                         }
                     } else {
                         rows(sorted(matches))
@@ -96,24 +96,18 @@ struct BatchJobList: View {
     }
 
     private func rows(_ jobs: [BatchJob]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(jobs) { job in
-                rowWithKeyboardSupport(job: job)
-                if job.id != jobs.last?.id {
-                    Divider()
-                        .padding(.leading, DS.Spacing.small + EntryRowMetrics.textInset)
-                }
+        ForEach(jobs) { job in
+            rowWithKeyboardSupport(job: job)
+            if job.id != jobs.last?.id {
+                Divider()
+                    .padding(.leading, DS.Spacing.small + EntryRowMetrics.textInset)
             }
         }
     }
 
     private func rowWithKeyboardSupport(job: BatchJob) -> some View {
         let isPending = job.status == .pending
-        return JobRow(
-            job: job,
-            isSelected: model.selectedBatchJobID == job.id,
-            cancel: .oneJob(status: job.status) { model.cancelBatchJob(job.id) }
-        )
+        return JobRow(job: job, isSelected: model.selectedBatchJobID == job.id, cancel: .oneJob(status: job.status))
             .focusable(true)
             .focusEffectDisabled()
             .focused($focusedJob, equals: job.id)
@@ -156,11 +150,13 @@ struct BatchJobList: View {
     }
 
     private var filteredJobs: [BatchJob] {
+        matching(model.batchJobs)
+    }
+
+    private func matching(_ jobs: [BatchJob]) -> [BatchJob] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return model.batchJobs }
-        return model.batchJobs.filter {
-            $0.url.lastPathComponent.localizedCaseInsensitiveContains(query)
-        }
+        guard !query.isEmpty else { return jobs }
+        return jobs.filter { $0.url.lastPathComponent.localizedCaseInsensitiveContains(query) }
     }
 
     private func sorted(_ jobs: [BatchJob]) -> [BatchJob] {
@@ -184,10 +180,11 @@ struct BatchJobList: View {
         }
     }
 
-    private func statusGroups(from jobs: [BatchJob]) -> [BatchStatusGroup] {
+    private func statusGroups() -> [BatchStatusGroup] {
+        let buckets = model.batchBuckets
         let order: [BatchJob.Status] = [.transcribing, .pending, .done, .failed, .cancelled]
         return order.compactMap { status in
-            let bucket = jobs.filter { $0.status == status }
+            let bucket = matching(buckets.jobs(status))
             guard !bucket.isEmpty else { return nil }
             return BatchStatusGroup(status: status, jobs: bucket)
         }

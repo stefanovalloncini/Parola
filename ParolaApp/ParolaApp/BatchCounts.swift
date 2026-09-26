@@ -47,3 +47,26 @@ extension BatchJob {
             && zip(lhs, rhs).allSatisfy { $0.id == $1.id && $0.status == $1.status && $0.url == $1.url }
     }
 }
+
+/// The queue sorted into its statuses in one pass, shared by every list that groups the jobs by status.
+struct BatchJobBuckets {
+    private var byStatus: [BatchJob.Status: [BatchJob]] = [:]
+
+    init(_ jobs: [BatchJob] = []) {
+        for job in jobs { byStatus[job.status, default: []].append(job) }
+    }
+
+    /// In queue order.
+    func jobs(_ status: BatchJob.Status) -> [BatchJob] {
+        byStatus[status] ?? []
+    }
+
+    var hasFinished: Bool {
+        byStatus[.done] != nil || byStatus[.failed] != nil || byStatus[.cancelled] != nil
+    }
+
+    /// Nothing but the running job, so there is nothing a clear could take away.
+    var holdsOnlyRunningJobs: Bool {
+        byStatus.keys.allSatisfy { $0 == .transcribing }
+    }
+}
