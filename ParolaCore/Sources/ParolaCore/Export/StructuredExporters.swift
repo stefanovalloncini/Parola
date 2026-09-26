@@ -11,9 +11,31 @@ public struct JsonExporter: TranscriptExporter {
     public func encode(_ transcript: Transcript) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        var clean = transcript
-        clean.segments = transcript.segments.droppingBlankText()
-        return try encoder.encode(clean)
+        return try encoder.encode(JsonExport(transcript))
+    }
+}
+
+/// A .json export: the model's keys for what a reader needs, without the AI chat, the run timing or the source's folder.
+private struct JsonExport: Encodable {
+    let schemaVersion: Int
+    let segments: [TranscriptSegment]
+    let language: String
+    let modelName: String
+    /// A file's name alone, or a link as it is, under the model's key so the export still decodes as a `Transcript`.
+    let sourceURL: String?
+    let durationSeconds: Double?
+    let summary: Summary?
+    let translation: TranscriptTranslation?
+
+    init(_ transcript: Transcript) {
+        schemaVersion = transcript.schemaVersion
+        segments = transcript.segments.droppingBlankText()
+        language = transcript.language
+        modelName = transcript.modelName
+        sourceURL = transcript.sourceURL.map { $0.isFileURL ? $0.lastPathComponent : $0.absoluteString }
+        durationSeconds = transcript.durationSeconds
+        summary = transcript.summary
+        translation = transcript.translation
     }
 }
 

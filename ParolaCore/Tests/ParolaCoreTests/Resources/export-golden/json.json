@@ -63,5 +63,15 @@
       "text" : "Tell me how it went."
     }
   ],
-  "sourceURL" : "file:///tmp/parola-goldens/interview.m4a"
+  "sourceURL" : "interview.m4a",
+  "summary" : {
+    "actionItems" : [
+
+    ],
+    "chapters" : [
+
+    ],
+    "provider" : "Apple Intelligence",
+    "text" : "Ada and Grace talk through the export rewrite."
+  }
 }

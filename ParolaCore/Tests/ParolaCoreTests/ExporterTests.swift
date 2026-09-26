@@ -123,13 +123,41 @@ struct ExporterTests {
         #expect(out.contains("00:00:04.000 --> 00:00:07.250"))
     }
 
-    @Test("json round-trips through Codable")
+    @Test("json decodes as a transcript, with the source reduced to its file name")
     func json() throws {
         let original = sample()
         let rendered = try JsonExporter().renderText(original)
-        let data = Data(rendered.utf8)
-        let decoded = try JSONDecoder().decode(Transcript.self, from: data)
-        #expect(decoded == original)
+        let decoded = try JSONDecoder().decode(Transcript.self, from: Data(rendered.utf8))
+        var expected = original
+        expected.sourceURL = URL(string: "x.wav")
+        #expect(decoded == expected)
+        #expect(!rendered.contains("/tmp/"))
+    }
+
+    @Test("json leaves out the chat, the run timing and the language guess, and keeps the summary")
+    func jsonIsAnExportShape() throws {
+        var original = sample()
+        original.chatHistory = [ChatMessage(role: .user, text: "a private question")]
+        original.transcriptionSeconds = 12
+        original.languageDetection = .assumed("en")
+        original.summary = Summary(text: "Three greetings.")
+
+        let decoded = try JSONDecoder().decode(Transcript.self, from: JsonExporter().render(original))
+
+        #expect(decoded.chatHistory == nil)
+        #expect(decoded.transcriptionSeconds == nil)
+        #expect(decoded.languageDetection == nil)
+        #expect(decoded.summary?.text == "Three greetings.")
+    }
+
+    @Test("json keeps a link source as the link")
+    func jsonKeepsALink() throws {
+        var original = sample()
+        original.sourceURL = URL(string: "https://www.youtube.com/watch?v=abc123")
+
+        let decoded = try JSONDecoder().decode(Transcript.self, from: JsonExporter().render(original))
+
+        #expect(decoded.sourceURL == original.sourceURL)
     }
 
     @Test("json leaves a blank segment out")

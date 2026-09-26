@@ -6,6 +6,7 @@ import Testing
 @Suite("Export goldens", .tags(.fileSystem))
 struct ExportSpecGoldenTests {
 
+    /// Carries a chat, a run timing and an absolute path so the goldens pin what each format leaves out.
     static func fixture() -> Transcript {
         Transcript(
             segments: [
@@ -35,7 +36,18 @@ struct ExportSpecGoldenTests {
             language: "en",
             modelName: "openai_whisper-tiny",
             sourceURL: URL(fileURLWithPath: "/tmp/parola-goldens/interview.m4a"),
-            durationSeconds: 14
+            durationSeconds: 14,
+            transcriptionSeconds: 3.25,
+            summary: Summary(text: "Ada and Grace talk through the export rewrite."),
+            chatHistory: [
+                ChatMessage(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+                    role: .user,
+                    text: "What did Grace ship?",
+                    createdAt: Date(timeIntervalSince1970: 1_750_000_000)
+                ),
+            ],
+            languageDetection: .assumed("en")
         )
     }
 
