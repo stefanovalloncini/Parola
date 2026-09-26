@@ -15,8 +15,9 @@ enum ParolaIntentError: LocalizedError, Equatable {
     }
 }
 
-enum IntentTranscriptLookup {
-    static func latestTranscriptText(in store: LibraryStore) async throws -> (entryID: String, text: String) {
+/// The newest entry's id and text, for an app that answers Open Last Transcript from the store it already holds.
+public enum IntentTranscriptLookup {
+    public static func latestTranscriptText(in store: LibraryStore) async throws -> (entryID: String, text: String) {
         // The app writes through its own LibraryStore instance, so this one must re-scan disk.
         await store.dropCaches()
         guard let latest = await store.list().first else {
@@ -38,15 +39,17 @@ public struct OpenLastTranscriptIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let latest = try await IntentTranscriptLookup.latestTranscriptText(in: LibraryStore.shared)
-        await MainActor.run {
-            NotificationCenter.default.post(
-                name: .parolaOpenEntry,
-                object: nil,
-                userInfo: ["id": latest.entryID]
-            )
+        if let openLatest = IntentPerformers.openLatest {
+            return .result(value: try await openLatest())
         }
+        let latest = try await IntentTranscriptLookup.latestTranscriptText(in: LibraryStore.shared)
+        NotificationCenter.default.post(
+            name: .parolaOpenEntry,
+            object: nil,
+            userInfo: ["id": latest.entryID]
+        )
         return .result(value: latest.text)
     }
 }

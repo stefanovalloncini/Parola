@@ -4,7 +4,13 @@ import ParolaCore
 
 @main
 struct ParolaiOSApp: App {
-    @State private var model = AppModel()
+    @State private var model: AppModel
+
+    init() {
+        let model = AppModel()
+        model.registerIntentPerformers()
+        _model = State(initialValue: model)
+    }
 
     var body: some Scene {
         WindowGroup {

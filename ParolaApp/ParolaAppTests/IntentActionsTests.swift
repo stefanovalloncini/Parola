@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import Parola
@@ -54,6 +55,99 @@ struct IntentActionsTests {
         await #expect(throws: IntentActionError.self) {
             _ = try await model.transcribeFileFromIntent(URL(fileURLWithPath: "/tmp/doc.parola"))
         }
+    }
+
+    private func makeWAV(seconds: Double) throws -> URL {
+        let sampleRate = 16_000, channels = 1, bytesPerSample = 2
+        let dataBytes = Int(Double(sampleRate) * seconds) * channels * bytesPerSample
+        var data = Data()
+        func ascii(_ s: String) { data.append(contentsOf: Array(s.utf8)) }
+        func le32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
+        func le16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
+        ascii("RIFF"); le32(UInt32(36 + dataBytes)); ascii("WAVE")
+        ascii("fmt "); le32(16); le16(1); le16(UInt16(channels))
+        le32(UInt32(sampleRate)); le32(UInt32(sampleRate * channels * bytesPerSample))
+        le16(UInt16(channels * bytesPerSample)); le16(UInt16(bytesPerSample * 8))
+        ascii("data"); le32(UInt32(dataBytes))
+        data.append(Data(count: dataBytes))
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-intent-open-\(UUID().uuidString).wav")
+        try data.write(to: url)
+        return url
+    }
+
+    /// Manifests keep whole seconds, so the older entry is dated back an hour rather than added first.
+    private func seedTwoEntries(in model: AppModel) async throws -> (older: LibraryEntry, newest: LibraryEntry) {
+        func add(_ text: String, seconds: Double) async throws -> LibraryEntry {
+            let audio = try makeWAV(seconds: seconds)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            return try await model.library.add(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: text)],
+                    language: "en",
+                    modelName: "stub"
+                ),
+                audioSource: audio
+            )
+        }
+        let older = try await add("the older take", seconds: 0.3)
+        try ParolaDocument.updateManifest(at: older.bundleURL) { $0.createdAt = Date(timeIntervalSinceNow: -3600) }
+        let newest = try await add("the newest take", seconds: 0.4)
+        return (older, newest)
+    }
+
+    private func storedText(_ entry: LibraryEntry) throws -> String {
+        try ParolaDocument.read(at: entry.bundleURL).transcript.text
+    }
+
+    @Test("Open Last Transcript opens the newest entry, and the next edit lands in it", .timeLimit(.minutes(1)))
+    func openLatestOpensTheEntry() async throws {
+        let model = makeModel()
+        let (older, newest) = try await seedTwoEntries(in: model)
+        try await model.openEntry(older.id)
+        let newestAudio = try await model.library.load(newest.id).document.audioURL
+
+        let text = try await model.openLatestFromIntent()
+
+        #expect(text == "the newest take")
+        #expect(model.selectedEntryID == newest.id)
+        #expect(model.transcript?.text == "the newest take")
+        #expect(model.sourceFileURL == newestAudio)
+
+        model.editSegment(id: 0, newText: "edited after the shortcut")
+        await model.flushPendingTranscriptSave()
+
+        #expect(try storedText(newest) == "edited after the shortcut")
+        #expect(try storedText(older) == "the older take")
+    }
+
+    @Test("Open Last Transcript on an empty library says so")
+    func openLatestOnAnEmptyLibrary() async {
+        let model = makeModel()
+        await #expect(throws: IntentActionError.libraryEmpty) {
+            _ = try await model.openLatestFromIntent()
+        }
+    }
+
+    @Test("Summarize Last Transcript opens the entry with its own audio before summarising", .timeLimit(.minutes(1)))
+    func summarizeLatestOpensTheEntry() async throws {
+        let model = AppModel(
+            skipBootstrap: true,
+            defaults: temporaryDefaults(),
+            libraryURL: makeTempLibraryURL("intent-summarize"),
+            features: Set(ParolaFeature.allCases)
+        )
+        model.summariseOperation = { _, _ in Summary(text: "recap") }
+        let (older, newest) = try await seedTwoEntries(in: model)
+        try await model.openEntry(older.id)
+        let newestAudio = try await model.library.load(newest.id).document.audioURL
+
+        model.summarizeLatestEntry()
+
+        #expect(await waitUntil { model.selectedEntryID == newest.id && model.transcript?.summary?.text == "recap" })
+        #expect(model.transcript?.text == "the newest take")
+        #expect(model.sourceFileURL == newestAudio)
+        #expect((model.player?.currentItem?.asset as? AVURLAsset)?.url == newestAudio)
     }
 
     @Test("stop-recording intent throws when nothing is recording")
@@ -116,17 +210,19 @@ struct IntentActionsTests {
         }
     }
 
-    @Test("registerIntentPerformers installs both hooks")
+    @Test("registerIntentPerformers installs every hook")
     func registrationInstallsHooks() async throws {
         defer {
             IntentPerformers.stopRecording = nil
             IntentPerformers.transcribeFile = nil
+            IntentPerformers.openLatest = nil
         }
         let model = makeModel()
         model.registerIntentPerformers()
 
         #expect(IntentPerformers.stopRecording != nil)
         #expect(IntentPerformers.transcribeFile != nil)
+        #expect(IntentPerformers.openLatest != nil)
         await #expect(throws: IntentActionError.notRecording) {
             _ = try await IntentPerformers.stopRecording?()
         }

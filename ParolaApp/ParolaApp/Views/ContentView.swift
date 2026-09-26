@@ -17,12 +17,6 @@ struct ContentView: View {
             }
         }
         .animation(.smooth(duration: 0.35), value: model.introduction.isPresented)
-        .onReceive(NotificationCenter.default.publisher(for: .parolaOpenEntry)) { note in
-            model.introduction.defer()
-            if let id = note.userInfo?["id"] as? String {
-                model.selectedEntryID = id
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .parolaStartRecording)) { _ in
             model.startRecording(source: .microphone)
         }

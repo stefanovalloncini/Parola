@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import Parola
 import ParolaCore
@@ -19,6 +20,28 @@ struct AppModelLibraryTests {
             language: "en",
             modelName: "openai_whisper-tiny"
         )
+    }
+
+    @Test("Open Last Transcript answers from the app's own store and asks RootView to open the entry")
+    func openLatestUsesTheAppStore() async throws {
+        defer { IntentPerformers.openLatest = nil }
+        let (model, _) = try makeModel()
+        let older = try await model.library.add(transcript: transcript("older words"), audioSource: nil)
+        try ParolaDocument.updateManifest(at: older.bundleURL) { $0.createdAt = Date(timeIntervalSinceNow: -3600) }
+        let newest = try await model.library.add(transcript: transcript("newest words"), audioSource: nil)
+        let opened = OSAllocatedUnfairLock<String?>(initialState: nil)
+        let observer = NotificationCenter.default.addObserver(forName: .parolaOpenEntry, object: nil, queue: nil) { note in
+            let id = note.userInfo?["id"] as? String
+            opened.withLock { $0 = id }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        model.registerIntentPerformers()
+
+        let perform = try #require(IntentPerformers.openLatest)
+        let text = try await perform()
+
+        #expect(text == "newest words")
+        #expect(opened.withLock { $0 } == newest.id)
     }
 
     @Test("an empty query clears the search results synchronously")

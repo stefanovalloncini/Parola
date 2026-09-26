@@ -8,6 +8,7 @@ enum IntentActionError: LocalizedError, Equatable {
     case exportInProgress
     case notRecording
     case notMedia
+    case libraryEmpty
     case cancelled
     case failed(String)
 
@@ -25,6 +26,8 @@ enum IntentActionError: LocalizedError, Equatable {
             return "No recording is running."
         case .notMedia:
             return "Pick an audio or video file."
+        case .libraryEmpty:
+            return "There's nothing in your library yet."
         case .cancelled:
             return "The work was cancelled."
         case .failed(let message):
@@ -51,6 +54,25 @@ extension AppModel {
             guard let self else { throw IntentActionError.cancelled }
             return try await self.stopRecordingFromIntent()
         }
+        IntentPerformers.openLatest = { [weak self] in
+            guard let self else { throw IntentActionError.cancelled }
+            return try await self.openLatestFromIntent()
+        }
+    }
+
+    func openLatestFromIntent() async throws -> String {
+        guard let latest = await library.list().first else { throw IntentActionError.libraryEmpty }
+        return try await openEntryForIntent(latest.id)
+    }
+
+    private func openEntryForIntent(_ id: LibraryEntry.ID) async throws -> String {
+        do {
+            return try await openEntry(id).text
+        } catch is CancellationError {
+            throw IntentActionError.cancelled
+        } catch {
+            throw IntentActionError.failed(error.localizedDescription)
+        }
     }
 
     /// Shortcuts can't answer the duplicate sheet, and the file's scope ends on return, so this waits for the media copy.
@@ -64,13 +86,7 @@ extension AppModel {
         if let digest, duplicateImportPolicy != .transcribeAgain,
            let existing = await library.findEntry(digest: digest) {
             try ensureIntentCanStartFileRun()
-            do {
-                return try await openEntry(existing.id).text
-            } catch is CancellationError {
-                throw IntentActionError.cancelled
-            } catch {
-                throw IntentActionError.failed(error.localizedDescription)
-            }
+            return try await openEntryForIntent(existing.id)
         }
         try ensureIntentCanStartFileRun()
         beginFileTranscription(fileURL: url, translateOverride: nil, sourceDigest: digest)

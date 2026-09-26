@@ -17,15 +17,9 @@ extension AppModel {
         introduction.defer()
         guard features.isEnabled(.ai) else { return }
         Task { [weak self, library] in
-            guard let self else { return }
-            let entries = await library.list()
-            guard let latest = entries.first else { return }
-            do {
-                let loaded = try await library.load(latest.id)
-                self.installStoredTranscript(loaded.document.transcript)
-                self.selectedEntryID = latest.id
-                self.summariseTranscript(options: options)
-            } catch { }
+            guard let self, let latest = await library.list().first else { return }
+            do { try await self.openEntry(latest.id) } catch { return }
+            self.summariseTranscript(options: options)
         }
     }
 
