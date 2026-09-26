@@ -231,7 +231,7 @@ struct StatisticsViewTests {
         model.libraryEntries = [seeded]
         let record = StatisticsRecord(kind: .longestRun, entry: seeded, value: "1 sec")
 
-        RecordRow(record: record, showsAITitle: false, open: model.loadEntry).activate()
+        RecordRow(record: record, showsAITitle: false, open: { model.loadEntry($0) }).activate()
         for _ in 0..<200 where model.selectedEntryID != seeded.id {
             try await Task.sleep(for: .milliseconds(10))
         }

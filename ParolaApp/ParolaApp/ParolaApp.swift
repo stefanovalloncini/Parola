@@ -46,8 +46,7 @@ func handleParolaOpen(_ url: URL, model: AppModel) {
         guard model.features.isEnabled(.dictation) else { return }
         model.stopDictationFromIntent()
     case "open":
-        if let entryID = query["entry"] {
-            model.loadEntry(entryID)
+        if let entryID = query["entry"], model.loadEntry(entryID) {
             if let raw = query["t"], let seconds = Timecode.parse(raw) ?? Double(raw) {
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(500))

@@ -146,7 +146,7 @@ struct StatisticsView: View {
                 SectionCaption("Records")
                 VStack(spacing: 0) {
                     ForEach(records) { record in
-                        RecordRow(record: record, showsAITitle: model.showAITitles, open: model.loadEntry)
+                        RecordRow(record: record, showsAITitle: model.showAITitles, open: { model.loadEntry($0) })
                     }
                 }
                 .padding(.horizontal, -DS.Spacing.small)

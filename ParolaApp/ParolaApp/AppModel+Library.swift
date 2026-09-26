@@ -491,8 +491,16 @@ extension AppModel {
         }
     }
 
-    func loadEntry(_ id: LibraryEntry.ID) {
-        startOpeningEntry(id)
+    /// False, with a beep and nothing changed, while a recording or an export owns the phase.
+    @discardableResult
+    func loadEntry(_ id: LibraryEntry.ID) -> Bool {
+        do {
+            try startOpeningEntry(id)
+            return true
+        } catch {
+            refusalBeep?()
+            return false
+        }
     }
 
     /// `loadEntry` for a caller that needs what it opened; a later open makes this one throw `CancellationError`.
@@ -501,8 +509,18 @@ extension AppModel {
         try await startOpeningEntry(id).value
     }
 
+    /// Why an entry can't take the main pane now: opening sets `.ready`, and a capture or export under it couldn't be stopped.
+    var entryOpenRefusal: IntentActionError? {
+        switch phase {
+        case .recording: return .recordingInProgress
+        case .exporting: return .exportInProgress
+        default: return nil
+        }
+    }
+
     @discardableResult
-    private func startOpeningEntry(_ id: LibraryEntry.ID) -> Task<Transcript, any Error> {
+    private func startOpeningEntry(_ id: LibraryEntry.ID) throws(IntentActionError) -> Task<Transcript, any Error> {
+        if let refusal = entryOpenRefusal { throw refusal }
         introduction.defer()
         loadEntryGeneration &+= 1
         let generation = loadEntryGeneration

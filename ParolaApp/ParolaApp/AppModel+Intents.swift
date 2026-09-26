@@ -71,6 +71,8 @@ extension AppModel {
     private func openEntryForIntent(_ id: LibraryEntry.ID) async throws -> String {
         do {
             return try await openEntry(id).text
+        } catch let refusal as IntentActionError {
+            throw refusal
         } catch is CancellationError {
             throw IntentActionError.cancelled
         } catch {
@@ -118,11 +120,7 @@ extension AppModel {
     }
 
     private func ensurePhaseAllowsOpening() throws {
-        switch phase {
-        case .recording: throw IntentActionError.recordingInProgress
-        case .exporting: throw IntentActionError.exportInProgress
-        default: break
-        }
+        if let refusal = entryOpenRefusal { throw refusal }
     }
 
     func stopRecordingFromIntent() async throws -> String {

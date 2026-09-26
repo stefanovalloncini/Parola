@@ -21,12 +21,12 @@ extension AppModel {
     }
 
     /// Opening a library row: the main pane, or a window of its own when the setting or Option asks for one.
-    func openEntryFromLibrary(_ id: LibraryEntry.ID, inNewWindow forced: Bool) {
+    @discardableResult
+    func openEntryFromLibrary(_ id: LibraryEntry.ID, inNewWindow forced: Bool) -> Bool {
         if forced || openEntriesInNewWindow {
-            openEntryWindow(id)
-        } else {
-            loadEntry(id)
+            return openEntryWindow(id)
         }
+        return loadEntry(id)
     }
 
     func entryWindowSession(for id: LibraryEntry.ID) -> EntryWindowSession {

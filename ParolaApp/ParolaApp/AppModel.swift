@@ -247,6 +247,8 @@ final class AppModel {
     @ObservationIgnored var completionSoundPlayer: (@MainActor () -> Void)? = {
         NSSound(named: NSSound.Name("Glass"))?.play()
     }
+    /// The answer to a click the app refuses. Test mode clears it; a test stubs it to count them.
+    @ObservationIgnored var refusalBeep: (@MainActor () -> Void)? = { NSSound.beep() }
     var recordingCountInSeconds: Int = 0 { didSet { defaults.set(recordingCountInSeconds, forKey: "recordingCountInSeconds") } }
     var autoMuteWhileRecording: Bool = false { didSet { defaults.set(autoMuteWhileRecording, forKey: "autoMuteWhileRecording") } }
     var autoPauseMediaWhileRecording: Bool = false { didSet { defaults.set(autoPauseMediaWhileRecording, forKey: "autoPauseMediaWhileRecording") } }
@@ -1553,7 +1555,10 @@ final class AppModel {
             storageURL: bootstrap.library.map { $0.appendingPathComponent("Prompts.json") }
                 ?? PromptLibrary.defaultStorageURL
         )
-        if bootstrap.mode == .test { self.completionSoundPlayer = nil }
+        if bootstrap.mode == .test {
+            self.completionSoundPlayer = nil
+            self.refusalBeep = nil
+        }
         // Suppress the settings didSets during the bulk read: side effects (notably startDictation)
         // must wait until after wireDictationController + the gated side-effect block below, or the
         // dictation coordinator is built before appModel is wired.
