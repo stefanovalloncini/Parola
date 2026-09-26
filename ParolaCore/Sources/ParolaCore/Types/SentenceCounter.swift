@@ -11,8 +11,7 @@ public enum SentenceCounter {
     }
 }
 
-/// The three questions the text counters ask of every character. ASCII skips the Unicode property
-/// lookups, which otherwise cost most of a walk over the text.
+/// What the text counters ask of each character; ASCII skips the Unicode lookups that cost most of a walk.
 struct CharacterKind {
     let isWhitespace: Bool
     let isDigit: Bool

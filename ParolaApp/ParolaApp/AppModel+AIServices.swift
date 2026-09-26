@@ -290,12 +290,11 @@ extension AppModel {
         )
     }
 
-    /// Chat's one entry point: the on-device path keeps its condensed-context handling, and every
-    /// other choice answers through a model built for it.
+    /// Chat's one entry point, sized off the main actor: the on-device path keeps its condensed-context
+    /// handling, and every other choice answers through a model built for it.
     func makeChatSession(transcript: Transcript, history: [ChatMessage]) async throws -> TranscriptChatSession {
         let choice = resolvedLanguageModelChoice(for: .chat)
         guard choice != .onDevice else {
-            // The async entry sizes the transcript off the main actor.
             return try await TranscriptChat.makeSession(
                 transcript: transcript, history: history, provider: .onDevice, features: features
             )
