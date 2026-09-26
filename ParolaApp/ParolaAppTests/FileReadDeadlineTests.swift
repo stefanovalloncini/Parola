@@ -69,6 +69,39 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a batch import hashes against each file's own budget, not the one a single open waits on")
+        func batchImportIgnoresTheHeaderBudget() async throws {
+            let bootstrap = AppBootstrap(
+                mode: .test,
+                library: makeTempLibraryURL("file-read-deadline-batch"),
+                defaultsOverride: temporaryDefaults(),
+                sideEffects: [],
+                filePicker: TestFilePicker(),
+                enabledFeaturesOverride: Set(ParolaFeature.allCases),
+                fileReadDeadline: .zero
+            )
+            let model = AppModel(bootstrap: bootstrap)
+            let known = FileManager.default.temporaryDirectory
+                .appendingPathComponent("parola-budget-\(UUID().uuidString).wav")
+            try Data(repeating: 7, count: 4 << 20).write(to: known)
+            defer { try? FileManager.default.removeItem(at: known) }
+            _ = try await model.library.add(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "already here")],
+                    language: "en",
+                    modelName: "stub"
+                ),
+                audioSource: known,
+                category: .transcription
+            )
+
+            model.importBatchFiles([known])
+            await model.awaitBatchImport()
+
+            #expect(model.batchDuplicatesSkipped == 1)
+            #expect(model.batchJobs.isEmpty)
+        }
+
         @Test("the failure names the file and says the read ran out of time")
         func timeoutMessageNamesTheFile() {
             let message = AppModel.transcriptionFailureMessage(

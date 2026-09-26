@@ -98,7 +98,6 @@ extension AppModel {
         // Chained, not concurrent: two drops racing would interleave their jobs and leave the
         // notice reading whichever hash finished last.
         let previous = batchImportTask
-        let deadline = fileReadDeadline
         let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
         if skipsDuplicates {
             batchFilesBeingChecked += urls.count
@@ -111,7 +110,8 @@ extension AppModel {
             guard let self else { return }
             var lookups: [DuplicateNotice.Lookup] = []
             if skipsDuplicates {
-                lookups = await DuplicateNotice.lookups(for: urls, in: self.library, deadline: deadline)
+                // Each file gets the budget its size allows: the reads share the disk, and nobody waits on one of them.
+                lookups = await DuplicateNotice.lookups(for: urls, in: self.library)
                 self.batchFilesBeingChecked -= urls.count
             }
             var keep: [BatchJob] = []
