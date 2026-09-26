@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import Testing
+import os
 @testable import ParolaCore
 
 @Suite("Language probe scratch")
@@ -42,6 +43,36 @@ struct LanguageProbeScratchTests {
         #expect(timedOut)
         #expect(!bodyRan)
         #expect(startedAt.duration(to: .now) < .seconds(5))
+    }
+
+    @Test("a read that resumes after the deadline deletes the scratch it went on to write")
+    func lateWriteCleansUpAfterItself() async throws {
+        let written = OSAllocatedUnfairLock<URL?>(initialState: nil)
+        let source = URL(fileURLWithPath: "/tmp/parola-stalled-share.wav")
+
+        await #expect(throws: ParolaError.self) {
+            _ = try await LanguageProbeScratch.withScratch(
+                from: source,
+                deadline: .milliseconds(100),
+                extract: { _, scratch in
+                    Thread.sleep(forTimeInterval: 0.4)
+                    FileManager.default.createFile(atPath: scratch.path, contents: Data("late".utf8))
+                    written.withLock { $0 = scratch }
+                    return true
+                }
+            ) { _ in }
+        }
+
+        let deadline = ContinuousClock.now + .seconds(5)
+        while written.withLock({ $0 }) == nil, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let scratch = try #require(written.withLock { $0 })
+        while FileManager.default.fileExists(atPath: scratch.path), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(!FileManager.default.fileExists(atPath: scratch.path))
+        try? FileManager.default.removeItem(at: scratch)
     }
 
     @Test("the scratch exists while the probe listens and is gone afterwards")
