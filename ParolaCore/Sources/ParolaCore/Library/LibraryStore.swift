@@ -406,6 +406,17 @@ public actor LibraryStore {
         return try Self.readCleanedDocument(at: bundleURL)
     }
 
+    /// For a write that starts from disk: `setDurationSeconds` corrects the manifest alone, and
+    /// `updateTranscript` would copy transcript.json's old length back over it.
+    private nonisolated static func readStoredTranscript(at bundleURL: URL) throws -> Transcript {
+        let document = try readCleanedDocument(at: bundleURL)
+        var transcript = document.transcript
+        if let measured = document.manifest.durationSeconds, measured > 0 {
+            transcript.durationSeconds = measured
+        }
+        return transcript
+    }
+
     private nonisolated static func readCleanedDocument(at bundleURL: URL) throws -> ParolaDocument {
         var doc = try ParolaDocument.read(at: bundleURL)
         // Entries written before the blank-drop moved to assembly time still carry silent VAD
@@ -643,7 +654,7 @@ public actor LibraryStore {
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
-        let stored = try Self.readCleanedDocument(at: bundleURL).transcript
+        let stored = try Self.readStoredTranscript(at: bundleURL)
         var transcript = stored
         transform(&transcript)
         guard transcript != stored else { return stored }
@@ -719,7 +730,7 @@ public actor LibraryStore {
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
-        var transcript = try Self.readCleanedDocument(at: bundleURL).transcript
+        var transcript = try Self.readStoredTranscript(at: bundleURL)
         guard transcript.summary != summary else {
             // The debounced transcript save can land this summary first, with indexing off.
             await indexEntry(try recacheEntry(at: bundleURL), transcript: transcript)

@@ -1217,6 +1217,25 @@ struct LibraryStoreTests {
         #expect(try await store.load(entry.id).entry.durationSeconds == 1)
     }
 
+    @Test("a summary or a translation written after a duration correction keeps the corrected length")
+    func storeWritesKeepTheCorrectedDuration() async throws {
+        let (store, _) = try makeTempLibrary()
+        var transcript = makeTranscript()
+        transcript.durationSeconds = 2134
+        let entry = try await store.add(transcript: transcript, audioSource: nil)
+        try await store.setDurationSeconds(1, for: entry.id)
+
+        try await store.setSummary(Summary(text: "A short take."), for: entry.id)
+        #expect(await store.list().first?.durationSeconds == 1)
+        #expect(try await store.load(entry.id).document.transcript.durationSeconds == 1)
+
+        try await store.setTranslation(
+            TranscriptTranslation(targetLanguage: "it", segments: [0: "ciao"], createdAt: Date(), provider: "test"),
+            for: entry.id
+        )
+        #expect(await store.list().first?.durationSeconds == 1)
+    }
+
     @Test("a summary set after the entry was added is searchable, and a cleared one stops matching")
     func setSummaryReindexes() async throws {
         let (store, _) = try makeTempLibrary()
