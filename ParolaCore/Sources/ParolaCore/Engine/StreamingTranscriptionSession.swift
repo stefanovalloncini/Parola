@@ -135,11 +135,6 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             isModelMultilingual: textDecoder.isModelMultilingual
         )
 
-        let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
-        let (segStream, segCont) = AsyncStream<ConfirmedAudioBatch>.makeStream(bufferingPolicy: .bufferingNewest(64))
-
-        let sink = EventSink(continuation: cont)
-
         // Capture must not share the cached kit's AudioProcessor: its AVAudioEngine and sample
         // buffer are per-recording state, and another session could be borrowing the same kit.
         nonisolated(unsafe) let processor = AudioProcessor()
@@ -156,33 +151,48 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         let persister = persistAudio ? StreamingAudioPersister(sampleRate: Double(WhisperKit.sampleRate)) : nil
         let inputDeviceID = Self.resolveInputDeviceID(uid: deviceUID)
 
-        let loop = StreamingRealtimeLoop(
-            configuration: .init(wantsConfirmedAudio: speakerLabeler != nil),
-            decodingOptions: decoding,
-            dependencies: .init(
-                requestPermission: { await AudioProcessor.requestRecordPermission() },
-                startCapture: { ingest in
-                    try processor.startRecordingLive(inputDeviceID: inputDeviceID) { buffer in
-                        ingest(buffer)
-                        persister?.append(buffer)
-                        // Runs on the tap thread, serialized with processBuffer's appends, so this purge can't race them.
-                        processor.purgeAudioSamples(keepingLast: 0)
-                    }
-                },
-                stopCapture: { processor.stopRecording() },
-                transcribe: { samples, decodeOptions, progress in
-                    try await transcriber.run(audioArray: samples, decodeOptions: decodeOptions, callback: progress)
-                },
-                tick: { try await Task.sleep(nanoseconds: 100_000_000) }
-            ),
-            onPartial: { sink.handlePartial(text: $0) },
-            onEnergy: { sink.handleEnergy(last: $0) },
-            onConfirmed: { segCont.yield($0) }
-        )
-
         self.whisperKit = kit
-        self.persister = persister
         self.loadedModel = modelName
+        return launch(options: options, speakerLabeler: speakerLabeler, persister: persister) { sink, confirmed in
+            StreamingRealtimeLoop(
+                configuration: .init(wantsConfirmedAudio: speakerLabeler != nil),
+                decodingOptions: decoding,
+                dependencies: .init(
+                    requestPermission: { await AudioProcessor.requestRecordPermission() },
+                    startCapture: { ingest in
+                        try processor.startRecordingLive(inputDeviceID: inputDeviceID) { buffer in
+                            ingest(buffer)
+                            persister?.append(buffer)
+                            // Runs on the tap thread, serialized with processBuffer's appends, so this purge can't race them.
+                            processor.purgeAudioSamples(keepingLast: 0)
+                        }
+                    },
+                    stopCapture: { processor.stopRecording() },
+                    transcribe: { samples, decodeOptions, progress in
+                        try await transcriber.run(audioArray: samples, decodeOptions: decodeOptions, callback: progress)
+                    },
+                    tick: { try await Task.sleep(nanoseconds: 100_000_000) }
+                ),
+                onPartial: { sink.handlePartial(text: $0) },
+                onEnergy: { sink.handleEnergy(last: $0) },
+                onConfirmed: { confirmed.yield($0) }
+            )
+        }
+    }
+
+    /// Runs a take on a loop the caller builds, so everything past the model load can be driven
+    /// without a model.
+    func launch(
+        options: TranscriptionOptions,
+        speakerLabeler: (any StreamingSpeakerLabeler)?,
+        persister: StreamingAudioPersister?,
+        makeLoop: (EventSink, AsyncStream<ConfirmedAudioBatch>.Continuation) -> StreamingRealtimeLoop
+    ) -> AsyncStream<StreamingEvent> {
+        let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
+        let (segStream, segCont) = AsyncStream<ConfirmedAudioBatch>.makeStream(bufferingPolicy: .bufferingNewest(64))
+        let loop = makeLoop(EventSink(continuation: cont), segCont)
+
+        self.persister = persister
         self.optionsForRun = options
         self.loop = loop
         self.startedAt = .now
@@ -250,6 +260,21 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             options: optionsForRun ?? TranscriptionOptions(),
             audioURL: recordedURL
         )
+    }
+
+    /// Ends the take without the final decode and deletes its audio; no `.finished` is sent.
+    public func cancel() async {
+        guard let loop else { return }
+        self.loop = nil
+        await loop.cancel()
+        // A decode already in flight would otherwise run to the end before the loop sees the cancel.
+        streamerTask?.cancel()
+        await streamerTask?.value
+        segmentContinuation?.finish()
+        await consumerTask?.value
+        await persister?.discard()
+        continuation?.finish()
+        teardown()
     }
 
     /// What a finished take is stamped with: the language the run was pinned to, else what the

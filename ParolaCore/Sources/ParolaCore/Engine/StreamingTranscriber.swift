@@ -7,6 +7,9 @@ public protocol StreamingTranscriber: Sendable {
         downloadProgress: (@Sendable (Double) -> Void)?
     ) async throws -> AsyncStream<StreamingEvent>
     func stop() async
+    /// Ends the take without its final decode and deletes any audio it kept: nothing is saved and
+    /// no `.finished` arrives.
+    func cancel() async
     func currentModel() async -> String?
     /// The take's on-disk audio, when the transcriber persists one: the in-flight file
     /// while recording, or the file a failure left behind.

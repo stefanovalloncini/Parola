@@ -1347,7 +1347,7 @@ final class AppModel {
         cancelAndTrack(&streamingConsumer)
         if let s = streamingSession {
             streamingSession = nil
-            Task { await s.stop() }
+            Task { await s.cancel() }
         }
         if let source = liveSource {
             liveSource = nil

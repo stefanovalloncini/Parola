@@ -37,6 +37,127 @@ private final class RecordingLabeler: StreamingSpeakerLabeler {
     var calls: [Call] { state.withLock { $0 } }
 }
 
+/// Stands in for the mic and the decoder, so a whole take runs without a model.
+private final class TakeHarness: Sendable {
+    private struct State {
+        var ingest: (@Sendable ([Float]) -> Void)?
+        var decodes = 0
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    func install(_ ingest: @escaping @Sendable ([Float]) -> Void) {
+        state.withLock { $0.ingest = ingest }
+    }
+
+    func recordDecode() {
+        state.withLock { $0.decodes += 1 }
+    }
+
+    var installed: Bool { state.withLock { $0.ingest != nil } }
+    var decodes: Int { state.withLock { $0.decodes } }
+
+    func push(_ samples: [Float]) {
+        let ingest = state.withLock { $0.ingest }
+        ingest?(samples)
+    }
+}
+
+private func eventually(timeoutMs: Int = 5000, _ condition: @escaping @Sendable () async -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + .milliseconds(timeoutMs)
+    while ContinuousClock.now < deadline {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(1))
+    }
+    return await condition()
+}
+
+private func launchTake(
+    on session: StreamingTranscriptionSession,
+    persister: StreamingAudioPersister,
+    harness: TakeHarness
+) async -> AsyncStream<StreamingEvent> {
+    var configuration = StreamingRealtimeLoop.Configuration()
+    configuration.useVAD = false
+    let loopConfiguration = configuration
+    return await session.launch(options: TranscriptionOptions(), speakerLabeler: nil, persister: persister) { sink, confirmed in
+        StreamingRealtimeLoop(
+            configuration: loopConfiguration,
+            decodingOptions: DecodingOptions(),
+            dependencies: .init(
+                requestPermission: { true },
+                startCapture: { ingest in
+                    harness.install { buffer in
+                        ingest(buffer)
+                        persister.append(buffer)
+                    }
+                },
+                stopCapture: {},
+                transcribe: { _, _, _ in
+                    harness.recordDecode()
+                    return TranscriptionResult(
+                        text: " last words",
+                        segments: [TranscriptionSegment(start: 0, end: 0.5, text: " last words")],
+                        language: "en",
+                        timings: TranscriptionTimings()
+                    )
+                },
+                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+            ),
+            onPartial: { sink.handlePartial(text: $0) },
+            onEnergy: { sink.handleEnergy(last: $0) },
+            onConfirmed: { confirmed.yield($0) }
+        )
+    }
+}
+
+@Suite("Ending a live take")
+struct StreamingTakeEndingTests {
+    @Test("cancelling a take skips its final decode, deletes its audio and sends no finished transcript")
+    func cancelDiscardsTheTake() async throws {
+        let session = StreamingTranscriptionSession(persistAudio: true)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        let harness = TakeHarness()
+        let events = await launchTake(on: session, persister: persister, harness: harness)
+        #expect(await eventually { harness.installed })
+        harness.push([Float](repeating: 0.5, count: 8_000))
+        let audio = persister.url
+
+        await session.cancel()
+
+        var finished = false
+        for await event in events {
+            if case .finished = event { finished = true }
+        }
+        #expect(!finished)
+        #expect(harness.decodes == 0)
+        #expect(!FileManager.default.fileExists(atPath: audio.path))
+    }
+
+    @Test("stopping the same take decodes its tail and keeps the audio")
+    func stopKeepsTheTake() async throws {
+        let session = StreamingTranscriptionSession(persistAudio: true)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        let harness = TakeHarness()
+        let events = await launchTake(on: session, persister: persister, harness: harness)
+        #expect(await eventually { harness.installed })
+        harness.push([Float](repeating: 0.5, count: 8_000))
+        let audio = persister.url
+        defer { try? FileManager.default.removeItem(at: audio) }
+
+        await session.stop()
+
+        var finished: Transcript?
+        for await event in events {
+            if case .finished(let transcript) = event { finished = transcript }
+        }
+        #expect(harness.decodes == 1)
+        #expect(finished?.segments.map(\.text) == ["last words"])
+        #expect(finished?.sourceURL == audio)
+        #expect(FileManager.default.fileExists(atPath: audio.path))
+    }
+}
+
 @Suite("Streaming session event translation")
 struct StreamingTranscriptionSessionTests {
     @Test("a finished take is stamped with the language its text reads as, not \"auto\"")

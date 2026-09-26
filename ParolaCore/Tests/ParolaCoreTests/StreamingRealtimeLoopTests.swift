@@ -642,6 +642,25 @@ struct StreamingRealtimeLoopTests {
         #expect(!capture.installed)
     }
 
+    @Test("cancel releases the mic and skips the flush decode a stop would run")
+    func cancelSkipsTheFlush() async throws {
+        let (loop, capture, script, recorder) = makeLoop(responses: [[segment(0, 0.5, "tail")]])
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.push(seconds: 0.5, value: 0.5)
+        await loop.cancel()
+
+        let outcome = await runTask.value
+        guard case .cancelled = outcome else {
+            Issue.record("expected .cancelled, got \(outcome)")
+            return
+        }
+        #expect(capture.stopCount == 1)
+        #expect(await script.callCount == 0)
+        #expect(recorder.batches.isEmpty)
+    }
+
     @Test("a stop during the permission prompt keeps capture from starting after Allow")
     func stopDuringPermissionPromptWins() async throws {
         let prompt = PermissionPrompt()

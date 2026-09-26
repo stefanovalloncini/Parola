@@ -155,7 +155,7 @@ final class TranscriptionCoordinator {
         streamingTask?.cancel()
         streamingTask = nil
         Task {
-            await session.stop()
+            await session.cancel()
             deactivateAudioSession()
         }
     }

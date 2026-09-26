@@ -62,6 +62,7 @@ actor StreamingRealtimeLoop {
     private var isRunning = false
     private var didStopCapture = false
     private var stopRequested = false
+    private var flushesOnStop = true
 
     init(
         configuration: Configuration,
@@ -112,6 +113,7 @@ actor StreamingRealtimeLoop {
                 return .failed(error)
             }
         }
+        guard flushesOnStop else { return .cancelled }
         // Runs on this task, never from stop(): a flush entering the actor mid-iterate
         // would race the in-flight decode on the shared TranscribeTask.
         await finalFlush()
@@ -160,6 +162,11 @@ actor StreamingRealtimeLoop {
         stopRequested = true
         isRunning = false
         stopCapture()
+    }
+
+    func cancel() {
+        flushesOnStop = false
+        stop()
     }
 
     private func stopCapture() {

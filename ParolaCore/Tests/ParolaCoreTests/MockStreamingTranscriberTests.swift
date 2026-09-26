@@ -36,6 +36,26 @@ struct MockStreamingTranscriberTests {
         #expect(finished?.segments.first?.text == "hello world")
     }
 
+    @Test("cancel ends the stream without a finished transcript")
+    func cancelSendsNoFinished() async throws {
+        let response = MockTranscriberResponse(
+            segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "hello world")],
+            modelName: "mock"
+        )
+        let mock = MockStreamingTranscriber(response: response, clock: ContinuousClock())
+        let stream = try await mock.start(options: TranscriptionOptions(model: "mock"),
+                                          speakerLabeler: nil, downloadProgress: nil)
+        let collector = Task { () -> Bool in
+            var finished = false
+            for await event in stream {
+                if case .finished = event { finished = true }
+            }
+            return finished
+        }
+        await mock.cancel()
+        #expect(await collector.value == false)
+    }
+
     @Test("a canned failure emits a failed event and no confirmed segments")
     func cannedFailureEmitsFailedEvent() async throws {
         let response = MockTranscriberResponse(

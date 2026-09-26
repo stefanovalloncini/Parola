@@ -52,5 +52,12 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
         continuation = nil
     }
 
+    public func cancel() async {
+        emitTask?.cancel()
+        emitTask = nil
+        continuation?.finish()
+        continuation = nil
+    }
+
     public func currentModel() async -> String? { response.modelName }
 }
