@@ -456,6 +456,32 @@ struct AppModelBatchTests {
         #expect(model.route == .batch)
     }
 
+    @Test("an entry still loading for the last job clicked doesn't land over the next one")
+    func pendingOpenYieldsToTheNextSelection() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportPresetIDs = []
+        model.generatesCardMetadata = false
+        let source = scratch.appendingPathComponent("saved.wav")
+        try Data("fake".utf8).write(to: source)
+        let saved = BatchJob(url: source, status: .transcribing)
+        let waiting = Self.makeJob("waiting")
+        model.batchJobs = [saved, waiting]
+        await model.handleBatchEvent(.completed(jobID: saved.id, transcript: Self.makeTranscript()))
+        _ = try #require(await Self.waitForEntryID(of: saved.id, in: model))
+        model.selectedBatchJobID = nil
+        model.transcript = nil
+
+        let opening = try #require(model.selectBatchJob(saved.id))
+        model.selectBatchJob(waiting.id)
+
+        await #expect(throws: CancellationError.self) { _ = try await opening.value }
+        #expect(model.selectedBatchJobID == waiting.id)
+        #expect(model.selectedEntryID == nil)
+        #expect(model.transcript == nil)
+    }
+
     @Test("the bridge's selectBatchJob returns once the job's entry is on screen")
     func bridgeSelectWaitsForTheEntry() async throws {
         let scratch = try Self.makeScratchDirectory()

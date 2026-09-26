@@ -146,6 +146,7 @@ extension AppModel {
 
     /// A finished job whose library add hasn't returned: its own copy, with no entry to save edits to yet.
     private func showUnsavedBatchJob(_ id: BatchJob.ID, _ transcript: Transcript) {
+        loadEntryGeneration &+= 1
         clearDerivedArtifacts()
         selectedEntryID = nil
         self.transcript = transcript
@@ -355,6 +356,8 @@ extension AppModel {
     /// Hands back the entry's load, for a caller that has to wait until it is on screen.
     @discardableResult
     func selectBatchJob(_ id: BatchJob.ID) -> Task<Transcript, any Error>? {
+        // An open the last click started must not land over this one.
+        loadEntryGeneration &+= 1
         selectedBatchJobID = id
         guard let job = batchJobs.first(where: { $0.id == id }) else { return nil }
         if let entryID = job.entryID {
@@ -368,7 +371,6 @@ extension AppModel {
     }
 
     private func showUnsavedBatchJobReplacingSelection(_ job: BatchJob, _ transcript: Transcript) {
-        loadEntryGeneration &+= 1
         let pending = cancelAndDrainPendingTranscriptSave()
         showUnsavedBatchJob(job.id, transcript)
         installPlayer(for: job.url)
