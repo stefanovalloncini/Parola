@@ -91,33 +91,54 @@ struct IntentTests {
         #expect(resolved.isEmpty)
     }
 
+    /// Darwin notifications reach every process on the Mac, so these tests signal on names no running Parola listens to.
+    private func withPrivateSignalNames(_ body: (DictationSignal.Names) async throws -> Void) async rethrows {
+        let id = UUID().uuidString
+        let names = DictationSignal.Names(start: "com.parola.tests.\(id).start", stop: "com.parola.tests.\(id).stop")
+        try await DictationSignal.$names.withValue(names) {
+            try await body(names)
+        }
+    }
+
+    @Test("Parola's own signal names stay the ones the intents and the app share")
+    func parolaSignalNames() {
+        #expect(DictationSignal.Names.parola == DictationSignal.Names(
+            start: "com.parola.dictation.start", stop: "com.parola.dictation.stop"
+        ))
+        #expect(DictationSignal.names == .parola)
+    }
+
     @Test("Darwin dictation signal delivers across the start/stop names")
     func dictationSignalRoundTrip() async {
-        let delivered = SignalGate()
-        let subscription = DictationSignal.subscribe { name in
-            if name == DictationSignal.startName { delivered.fulfill() }
-        }
-        defer { subscription.cancel() }
+        await withPrivateSignalNames { names in
+            let delivered = SignalGate()
+            let subscription = DictationSignal.subscribe { name in
+                if name == names.start { delivered.fulfill() }
+            }
+            defer { subscription.cancel() }
 
-        await confirmation("received start") { received in
-            DictationSignal.start()
-            await delivered.wait()
-            received()
+            await confirmation("received start") { received in
+                DictationSignal.start()
+                await delivered.wait()
+                received()
+            }
         }
     }
 
     @Test("Darwin dictation signal delivers the stop name")
     func dictationStopSignalRoundTrip() async {
-        let delivered = SignalGate()
-        let subscription = DictationSignal.subscribe { name in
-            if name == DictationSignal.stopName { delivered.fulfill() }
-        }
-        defer { subscription.cancel() }
+        await withPrivateSignalNames { names in
+            let delivered = SignalGate()
+            let subscription = DictationSignal.subscribe { name in
+                if name == names.stop { delivered.fulfill() }
+            }
+            defer { subscription.cancel() }
 
-        await confirmation("received stop") { received in
-            DictationSignal.stop()
-            await delivered.wait()
-            received()
+            await confirmation("received stop") { received in
+                DictationSignal.stop()
+                await delivered.wait()
+                received()
+            }
         }
     }
 
@@ -151,36 +172,39 @@ struct IntentTests {
     }
 
     private func confirmDictationIntentSignalsOnce(
-        signal signalName: String,
+        signal: KeyPath<DictationSignal.Names, String>,
         notification: Notification.Name,
         when action: () async throws -> Void
     ) async throws {
-        let signalled = OSAllocatedUnfairLock(initialState: false)
-        let notificationPosts = OSAllocatedUnfairLock(initialState: 0)
-        let subscription = DictationSignal.subscribe { name in
-            if name == signalName { signalled.withLock { $0 = true } }
+        try await withPrivateSignalNames { names in
+            let signalName = names[keyPath: signal]
+            let signalled = OSAllocatedUnfairLock(initialState: false)
+            let notificationPosts = OSAllocatedUnfairLock(initialState: 0)
+            let subscription = DictationSignal.subscribe { name in
+                if name == signalName { signalled.withLock { $0 = true } }
+            }
+            let token = NotificationCenter.default.addObserver(
+                forName: notification, object: nil, queue: nil
+            ) { _ in notificationPosts.withLock { $0 += 1 } }
+            defer {
+                subscription.cancel()
+                NotificationCenter.default.removeObserver(token)
+            }
+            try await action()
+            var spins = 0
+            while !signalled.withLock({ $0 }), spins < 300 {
+                try? await Task.sleep(for: .milliseconds(10))
+                spins += 1
+            }
+            #expect(signalled.withLock { $0 }, "the Darwin signal is the one delivery channel")
+            #expect(notificationPosts.withLock { $0 } == 0, "a NotificationCenter post would double-fire the in-process subscriber")
         }
-        let token = NotificationCenter.default.addObserver(
-            forName: notification, object: nil, queue: nil
-        ) { _ in notificationPosts.withLock { $0 += 1 } }
-        defer {
-            subscription.cancel()
-            NotificationCenter.default.removeObserver(token)
-        }
-        try await action()
-        var spins = 0
-        while !signalled.withLock({ $0 }), spins < 300 {
-            try? await Task.sleep(for: .milliseconds(10))
-            spins += 1
-        }
-        #expect(signalled.withLock { $0 }, "the Darwin signal is the one delivery channel")
-        #expect(notificationPosts.withLock { $0 } == 0, "a NotificationCenter post would double-fire the in-process subscriber")
     }
 
     @Test("StartDictationIntent signals once, over Darwin only")
     func startDictationIntentSignalsOnce() async throws {
         try await confirmDictationIntentSignalsOnce(
-            signal: DictationSignal.startName,
+            signal: \.start,
             notification: .parolaStartDictation
         ) {
             _ = try await StartDictationIntent().perform()
@@ -190,7 +214,7 @@ struct IntentTests {
     @Test("StopDictationIntent signals once, over Darwin only")
     func stopDictationIntentSignalsOnce() async throws {
         try await confirmDictationIntentSignalsOnce(
-            signal: DictationSignal.stopName,
+            signal: \.stop,
             notification: .parolaStopDictation
         ) {
             _ = try await StopDictationIntent().perform()

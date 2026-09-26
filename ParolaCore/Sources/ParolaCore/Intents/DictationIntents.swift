@@ -11,12 +11,28 @@ public enum DictationSignal: Sendable {
     public static let startName: String = "com.parola.dictation.start"
     public static let stopName: String = "com.parola.dictation.stop"
 
+    /// The start and stop names one side posts and the other hears.
+    public struct Names: Sendable, Equatable {
+        public let start: String
+        public let stop: String
+
+        public init(start: String, stop: String) {
+            self.start = start
+            self.stop = stop
+        }
+
+        public static let parola = Names(start: DictationSignal.startName, stop: DictationSignal.stopName)
+    }
+
+    /// A Darwin notification reaches every process on the Mac, so a test binds names of its own here rather than post Parola's.
+    @TaskLocal public static var names: Names = .parola
+
     public static func start() {
-        post(startName)
+        post(names.start)
     }
 
     public static func stop() {
-        post(stopName)
+        post(names.stop)
     }
 
     private static func post(_ name: String) {
@@ -31,7 +47,7 @@ public enum DictationSignal: Sendable {
     }
 
     public static func subscribe(handler: @escaping @Sendable (String) -> Void) -> DictationSubscription {
-        let token = DictationSubscription(handler: handler)
+        let token = DictationSubscription(names: names, handler: handler)
         token.register()
         return token
     }
@@ -39,9 +55,11 @@ public enum DictationSignal: Sendable {
 
 /// Unchecked Sendable: `handler` is `@Sendable` and the only mutable state lives in CF's observer registry, which is thread-safe.
 public final class DictationSubscription: @unchecked Sendable {
+    let names: DictationSignal.Names
     let handler: @Sendable (String) -> Void
 
-    init(handler: @escaping @Sendable (String) -> Void) {
+    init(names: DictationSignal.Names, handler: @escaping @Sendable (String) -> Void) {
+        self.names = names
         self.handler = handler
     }
 
@@ -57,7 +75,7 @@ public final class DictationSubscription: @unchecked Sendable {
             center,
             observer,
             callback,
-            DictationSignal.startName as CFString,
+            names.start as CFString,
             nil,
             .deliverImmediately
         )
@@ -65,7 +83,7 @@ public final class DictationSubscription: @unchecked Sendable {
             center,
             observer,
             callback,
-            DictationSignal.stopName as CFString,
+            names.stop as CFString,
             nil,
             .deliverImmediately
         )

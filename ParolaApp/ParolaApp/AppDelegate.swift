@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         playbackKeys.bind(model)
         model.activationPolicyApplier = { NSApp.setActivationPolicy($0) }
         model.applyAppVisibilityMode()
-        if dictationSubscription == nil {
+        if dictationSubscription == nil, Self.hearsDictationSignal(model.activeSideEffects) {
             dictationSubscription = DictationSignal.subscribe { [weak self] name in
                 Task { @MainActor [weak self] in
                     guard let model = self?.model else { return }
@@ -52,6 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Task { @MainActor [weak self] in self?.model?.reloadSettings() }
             }
         }
+    }
+
+    /// The signal reaches every process on the Mac, so only a launch that owns dictation's outside triggers answers it; a test sandbox never does.
+    nonisolated static func hearsDictationSignal(_ sideEffects: Set<BootstrapSideEffect>) -> Bool {
+        sideEffects.contains(.dictationHotkey)
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {

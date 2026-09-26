@@ -30,6 +30,13 @@ struct BootstrapSideEffectTests {
         #expect(!BootstrapSideEffect.testing.contains(.diagnosticsLog))
     }
 
+    @Test("only a launch that owns the dictation hotkey answers the system-wide dictation signal")
+    func dictationSignalNeedsTheHotkeySideEffect() {
+        #expect(AppDelegate.hearsDictationSignal(BootstrapSideEffect.all))
+        #expect(!AppDelegate.hearsDictationSignal(BootstrapSideEffect.testing))
+        #expect(!AppDelegate.hearsDictationSignal([]))
+    }
+
     @Test(".testing is a subset of .all")
     func testingIsSubsetOfAll() {
         #expect(BootstrapSideEffect.testing.isSubset(of: BootstrapSideEffect.all))
