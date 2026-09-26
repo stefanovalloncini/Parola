@@ -415,6 +415,35 @@ final class DeliveryEngineTests {
         #expect(await recorder.recorded().isEmpty)
     }
 
+    @Test("a retry that drops the entry while cancel waits for the destination names is logged once")
+    func cancelRacingARetryLogsOneDrop() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let destination = await mock(failuresBeforeSuccess: 1, recorder: recorder)
+        let gate = DestinationsGate([.mock(destination)])
+        let payloads = PayloadSpy(failingCall: 2, error: DeliveryPayloadError.entryGone("entry-1"))
+        let engine = DeliveryEngine(
+            destinations: { await gate.list() },
+            payload: { try await payloads.build($0) },
+            store: try makeStore(),
+            clock: clock
+        )
+        _ = await engine.send(entryID: "entry-1", to: destination.id)
+        #expect(await poll { clock.sleeperCount == 1 })
+        let retry = await engine.timerTask(for: "entry-1", destinationID: destination.id)
+
+        await gate.arm()
+        let cancelling = Task { await engine.cancel(entryID: "entry-1") }
+        #expect(await poll { await gate.isHolding })
+        clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
+        await retry?.value
+        await gate.release()
+        await cancelling.value
+
+        #expect(await engine.pending().isEmpty)
+        #expect(await engine.recentLog().filter { $0.event == .dropped }.count == 1)
+    }
+
     @Test("an auto-send whose transcript can't be read logs each destination it would have used")
     func autoSendPayloadFailureNamesTheDestinations() async throws {
         let recorder = MockDeliveryRecorder()
@@ -622,6 +651,37 @@ actor PayloadSpy {
         var payload = DeliveryPayloadTests.payload()
         payload.entryID = entryID
         return payload
+    }
+}
+
+/// Holds the first destinations fetch after `arm()` until `release()`, so a test can run a retry inside it.
+actor DestinationsGate {
+    private let destinations: [AnyDestination]
+    private var armed = false
+    private var held: CheckedContinuation<Void, Never>?
+    private(set) var isHolding = false
+
+    init(_ destinations: [AnyDestination]) {
+        self.destinations = destinations
+    }
+
+    func arm() {
+        armed = true
+    }
+
+    func list() async -> [AnyDestination] {
+        if armed {
+            armed = false
+            isHolding = true
+            await withCheckedContinuation { held = $0 }
+        }
+        return destinations
+    }
+
+    func release() {
+        isHolding = false
+        held?.resume()
+        held = nil
     }
 }
 

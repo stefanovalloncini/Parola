@@ -311,14 +311,15 @@ public actor DeliveryEngine {
     /// Stops retrying every delivery of an entry the user deleted: a trashed transcript must not
     /// reach a vault when it comes back online.
     public func cancel(entryID: LibraryEntry.ID) async {
-        let keys = queue
-            .filter { $0.entryID == entryID }
-            .map { QueueKey(entryID: $0.entryID, destinationID: $0.destinationID) }
-        guard !keys.isEmpty else { return }
+        guard queue.contains(where: { $0.entryID == entryID }) else { return }
+        // Names first: a retry that runs during this await drops its own item, and the keys read after it leave that one out.
         let names = Dictionary(
             await destinationsProvider().map { ($0.id, $0.name) },
             uniquingKeysWith: { first, _ in first }
         )
+        let keys = queue
+            .filter { $0.entryID == entryID }
+            .map { QueueKey(entryID: $0.entryID, destinationID: $0.destinationID) }
         for key in keys {
             let attempts = queueAttempt(key)
             dequeue(key)
