@@ -117,10 +117,12 @@ struct BatchQueueTests {
                 options: TranscriptionOptions(model: "openai_whisper-tiny")
             )
         }
+        defer { run.cancel() }
         for _ in 0..<200 {
             if await setup.factory.hangEntered { break }
             try? await Task.sleep(for: .milliseconds(10))
         }
+        try #require(await setup.factory.hangEntered, "the cancel has to land inside the engine call")
         run.cancel()
 
         await #expect(throws: CancellationError.self) { _ = try await run.value }
