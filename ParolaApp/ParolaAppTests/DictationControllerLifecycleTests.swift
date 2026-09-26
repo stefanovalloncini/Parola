@@ -49,6 +49,29 @@ private struct StubRecorder: DictationRecorder {
     func stopAndTranscribe() async throws -> String { "" }
 }
 
+/// Holds its final until released, and remembers whether the flush was cancelled on the way.
+private actor HeldFlushRecorder: DictationRecorder {
+    private var gate: CheckedContinuation<Void, Never>?
+    private(set) var holding = false
+    private(set) var finishedCancelled: Bool?
+
+    func start() async throws {}
+
+    func stopAndTranscribe() async throws -> String {
+        holding = true
+        await withCheckedContinuation { gate = $0 }
+        finishedCancelled = Task.isCancelled
+        return ""
+    }
+
+    func stopAndDiscard() async {}
+
+    func release() {
+        gate?.resume()
+        gate = nil
+    }
+}
+
 private struct IdentityPostProcessor: TextPostProcessor {
     func process(_ text: String) async -> String { text }
 }
@@ -94,6 +117,41 @@ struct DictationControllerLifecycleTests {
         }
         #expect(ops.last == "start2", "live monitor should arm last: \(ops)")
 
+        controller.stop()
+    }
+
+    @Test("a restart arms the next monitor after the bound, and the old flush still finishes uncancelled")
+    func restartDoesNotCancelTheLastUtterance() async {
+        let log = MonitorLog()
+        let controller = DictationController()
+        let counter = Counter()
+        let held = HeldFlushRecorder()
+        controller.hotkeyFactory = { _, _ in SpyHotkeyMonitor(id: counter.next(), log: log) }
+        controller.recorderFactory = { _ in held }
+        controller.teardownBound = .milliseconds(50)
+
+        controller.start(configuration: makeConfiguration())
+        await log.waitForOps(2)
+        controller.simulatePress()
+        var spins = 0
+        while controller.state != .listening, spins < 500 {
+            try? await Task.sleep(for: .milliseconds(10))
+            spins += 1
+        }
+        #expect(controller.state == .listening)
+
+        controller.stop()
+        controller.start(configuration: makeConfiguration())
+        await log.waitForOps(5)
+        #expect(await held.holding, "the old session's final is still being flushed")
+
+        await held.release()
+        spins = 0
+        while await held.finishedCancelled == nil, spins < 500 {
+            try? await Task.sleep(for: .milliseconds(10))
+            spins += 1
+        }
+        #expect(await held.finishedCancelled == false)
         controller.stop()
     }
 }

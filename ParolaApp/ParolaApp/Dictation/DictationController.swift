@@ -46,7 +46,7 @@ final class DictationController {
     }
 
     @ObservationIgnored var transcriptionStopGrace: Duration = .seconds(3)
-    static let teardownBound: Duration = .seconds(30)
+    @ObservationIgnored var teardownBound: Duration = .seconds(30)
 
     @ObservationIgnored var anchorProvider: any FieldAnchorProviding = FocusedFieldLocator()
     @ObservationIgnored var hotkeyFactory: ((Int, NSEvent.ModifierFlags) -> any HotkeyMonitor)?
@@ -94,6 +94,16 @@ final class DictationController {
             await previous?.value
             await op()
         }
+    }
+
+    /// Chained like `enqueueMonitorWork`, but the next op waits for this one at most `limit`, and this one is never cancelled.
+    private func enqueueMonitorWork(waitingAtMost limit: Duration, _ op: @escaping @Sendable () async -> Void) {
+        let previous = monitorWork
+        let work = Task {
+            await previous?.value
+            await op()
+        }
+        monitorWork = Task { _ = await AsyncTimeout.run(limit) { await work.value } }
     }
 
     isolated deinit {
@@ -172,8 +182,8 @@ final class DictationController {
         coordinator = nil
         failedHideTask?.cancel()
         failedHideTask = nil
-        // The flush of a last utterance can hang in its recorder, and every later install waits behind this op.
-        enqueueMonitorWork { _ = await AsyncTimeout.run(Self.teardownBound) { await coord.stopMonitoring() } }
+        // A last utterance still lands and is inserted, however long its flush takes; only the next install stops waiting for it.
+        enqueueMonitorWork(waitingAtMost: teardownBound) { await coord.stopMonitoring() }
         stopPartialStream()
         modelDownloadProgress = nil
         hideHUD()
