@@ -358,15 +358,18 @@ struct SegmentCard: View {
             cardButton(
                 systemName: isFavorite ? "star.fill" : "star",
                 help: isFavorite ? "Remove from favorites" : "Add to favorites",
-                tint: isFavorite ? DS.Color.accent : DS.Color.secondaryText
+                tint: isFavorite ? DS.Color.accent : DS.Color.secondaryText,
+                unavailableReason: libraryOnlyReason
             ) {
                 model.toggleSegmentFavorite(segment.id)
             }
             .axLeaf("Card.Button.Favorite")
             cardButton(systemName: "pencil", help: "Edit") { beginEditing() }
                 .axLeaf("Card.Button.Edit")
-            cardButton(systemName: "note.text", help: "Add note") { model.beginEditingNote(for: segment) }
-                .axLeaf("Card.Button.Note")
+            cardButton(systemName: "note.text", help: "Add note", unavailableReason: libraryOnlyReason) {
+                model.beginEditingNote(for: segment)
+            }
+            .axLeaf("Card.Button.Note")
             if model.player != nil {
                 cardButton(systemName: "play.fill", help: "Play from here") {
                     model.seek(to: segment)
@@ -394,6 +397,7 @@ struct SegmentCard: View {
     private func moreMenu(isFavorite: Bool) -> some View {
         Menu {
             Button(isFavorite ? "Unfavorite" : "Favorite") { model.toggleSegmentFavorite(segment.id) }
+                .disabled(libraryOnlyReason != nil)
                 .axLeaf("Card.Button.ToggleFavorite")
             Button("Nudge Timing…") { timingPopoverOpen = true }
                 .axLeaf("Card.Button.Timing")
@@ -433,7 +437,13 @@ struct SegmentCard: View {
         }
     }
 
-    private func cardButton(systemName: String, help: LocalizedStringKey, tint: Color = DS.Color.secondaryText, action: @escaping () -> Void) -> some View {
+    private func cardButton(
+        systemName: String,
+        help: LocalizedStringKey,
+        tint: Color = DS.Color.secondaryText,
+        unavailableReason: LocalizedStringKey? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(DS.Font.bodyStrong)
@@ -442,8 +452,15 @@ struct SegmentCard: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(tint)
-        .help(help)
+        .opacity(unavailableReason == nil ? 1 : DS.Opacity.disabled)
+        .disabled(unavailableReason != nil)
+        .help(unavailableReason ?? help)
         .accessibilityLabel(help)
+    }
+
+    /// Notes and favorites are kept on the library entry, so a batch result, fetched subtitles or a restored take has nowhere to put them.
+    private var libraryOnlyReason: LocalizedStringKey? {
+        model.selectedEntryID == nil ? "Save the transcript to the library first" : nil
     }
 
     private var isLastSegment: Bool {
