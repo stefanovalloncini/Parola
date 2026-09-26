@@ -2223,15 +2223,15 @@ final class AppModel {
     }
 
     func makeOptions(task: TranscriptionTask, model modelName: String, language: String?) -> TranscriptionOptions {
-        // Drop the flags the chosen engine can't honor instead of letting the session's
-        // validation fail the whole run; the settings panes show a matching advisory.
+        // Translate and speaker labels would fail the run, so the app drops them for an engine
+        // without them; a prompt or word timings it can't use the session drops on its own.
         let caps = ModelCatalog.staticCapabilities(forID: modelName) ?? .whisperKitDefaults
         return TranscriptionOptions(
             model: modelName,
             language: language,
             task: (task == .translate && !caps.supportsTranslate) ? .transcribe : task,
-            wordTimestamps: wordTimestamps && caps.supportsWordTimestamps,
-            initialPrompt: (initialPrompt.isEmpty || !caps.supportsInitialPrompt) ? nil : initialPrompt,
+            wordTimestamps: wordTimestamps,
+            initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt,
             diarize: diarize && caps.supportsDiarization,
             expectedSpeakers: expectedSpeakersRaw > 0 ? expectedSpeakersRaw : nil
         )

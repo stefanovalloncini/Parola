@@ -81,7 +81,7 @@ public struct EngineCapabilities: Sendable, Hashable {
         supportedLanguages: .all,
         supportsTranslate: false,
         supportsInitialPrompt: false,
-        supportsWordTimestamps: true,
+        supportsWordTimestamps: false,
         supportsDiarization: false
     )
 

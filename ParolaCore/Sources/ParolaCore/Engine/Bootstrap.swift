@@ -1,6 +1,14 @@
 import Foundation
 
 public enum ParolaCoreBootstrap {
+    /// What each built-in engine declares, as the registry receives it; the catalog's synchronous
+    /// lookup reads the same table.
+    static let builtInCapabilities: [EngineID: EngineCapabilities] = [
+        WhisperKitTranscriber.engineID: WhisperKitTranscriber.capabilities,
+        ParakeetTranscriber.engineID: ParakeetTranscriber.capabilities,
+        AppleSpeechTranscriber.engineID: AppleSpeechTranscriber.capabilities,
+    ]
+
     /// Registers built-in engines into the shared `EngineRegistry`. Idempotent.
     /// Call once at app launch (and once at the start of CLI commands that transcribe).
     public static func registerBuiltInEngines(registry: EngineRegistry = .shared) async {

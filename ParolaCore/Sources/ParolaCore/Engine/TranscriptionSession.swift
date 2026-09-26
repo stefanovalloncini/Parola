@@ -86,7 +86,8 @@ public actor TranscriptionSession {
             options.language = "en"
         }
 
-        try await validate(options: options, engineID: engineID, variant: variant)
+        let capabilities = try await validate(options: options, engineID: engineID, variant: variant)
+        options = Self.supportedOptions(options, capabilities: capabilities, engineID: engineID)
         let startedAt = ContinuousClock.now
         ParolaLog.info(
             .models, "transcribe starting on \(engineID)",
@@ -326,11 +327,30 @@ public actor TranscriptionSession {
         await transcriber?.loadedModelName()
     }
 
+    /// A prompt or word timings the engine can't produce are dropped here rather than failing the
+    /// run: the engine would ignore them anyway, and every surface gets the same treatment.
+    static func supportedOptions(
+        _ options: TranscriptionOptions,
+        capabilities: EngineCapabilities,
+        engineID: EngineID
+    ) -> TranscriptionOptions {
+        var options = options
+        if options.initialPrompt != nil, !capabilities.supportsInitialPrompt {
+            ParolaLog.notice(.models, "engine \(engineID) takes no prompt; dropped it")
+            options.initialPrompt = nil
+        }
+        if options.wordTimestamps, !capabilities.supportsWordTimestamps {
+            ParolaLog.notice(.models, "engine \(engineID) emits no word timings; dropped the request")
+            options.wordTimestamps = false
+        }
+        return options
+    }
+
     private func validate(
         options: TranscriptionOptions,
         engineID: EngineID,
         variant: ModelVariant?
-    ) async throws {
+    ) async throws -> EngineCapabilities {
         if let allowed = managedConfiguration.allowedEngines, !allowed.contains(engineID) {
             ParolaLog.notice(.models, "rejected by policy: engine \(engineID)")
             throw ParolaError.policyRestricted(
@@ -366,6 +386,7 @@ public actor TranscriptionSession {
             ParolaLog.notice(.models, "engine \(engineID) rejected diarize")
             throw ParolaError.unsupportedForEngine("\(engineID.displayName) does not support speaker labels.")
         }
+        return caps
     }
 
     /// The only cause worth naming without reading the file's bytes — everything else stays silent rather than guess.

@@ -34,7 +34,7 @@ struct Engines: AsyncParsableCommand {
             }
         }
 
-        private func engineRows() async -> [EngineRow] {
+        func engineRows() async -> [EngineRow] {
             let registry = EngineRegistry.shared
             await ParolaCoreBootstrap.registerBuiltInEngines(registry: registry)
             var rows: [EngineRow] = []
@@ -79,7 +79,7 @@ struct Engines: AsyncParsableCommand {
     }
 }
 
-private struct EngineRow {
+struct EngineRow {
     let id: EngineID
     let capabilities: EngineCapabilities
 
@@ -103,7 +103,7 @@ private struct EngineRow {
         ]
     }
 
-    var json: [String: JSONValue] {
+    fileprivate var json: [String: JSONValue] {
         [
             "id": .string(id.rawValue),
             "displayName": .string(id.displayName),

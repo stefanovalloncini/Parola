@@ -272,14 +272,7 @@ public enum ModelCatalog {
     /// doesn't know about — callers must handle unknown engines explicitly rather than
     /// claim a possibly-wrong default. The registry remains the source of truth at run time.
     public static func staticCapabilities(for variant: ModelVariant) -> EngineCapabilities? {
-        let base: EngineCapabilities
-        switch variant.engineID {
-        case .whisperKit:  base = .whisperKitDefaults
-        case .parakeet:    base = .parakeetDefaults
-        case .appleSpeech: base = .appleSpeechDefaults
-        default:           return nil
-        }
-        return base.tightened(by: variant.languageScope)
+        ParolaCoreBootstrap.builtInCapabilities[variant.engineID]?.tightened(by: variant.languageScope)
     }
 
     public static func staticCapabilities(forID id: String) -> EngineCapabilities? {
