@@ -240,8 +240,8 @@ struct EntryWindowSessionTests {
         #expect(session.loadFailed == false)
     }
 
-    @Test("a reload rescans the standing query off the main actor and keeps the reader's match")
-    func reloadRescansTheQuery() async throws {
+    @Test("a reload rescans the standing query over the new text and keeps the reader's match")
+    func reloadKeepsTheReadersMatch() async throws {
         let model = EntryWindowTestSupport.makeModel("windowsrescan")
         let entry = try await EntryWindowTestSupport.seed(
             model, texts: ["beta", "beta two"], speakers: [nil, nil], audio: nil
@@ -262,6 +262,37 @@ struct EntryWindowSessionTests {
         #expect(session.matches.map(\.segmentID) == [0, 1, 1])
         #expect(session.matches(in: 1).map(\.range) == [0..<4, 5..<9])
         #expect(session.currentMatchIndex == 1)
+    }
+
+    @Test("a new query still jumps to its first match when a reload's scan supersedes its own")
+    func newQueryJumpSurvivesAReload() async throws {
+        let model = EntryWindowTestSupport.makeModel("windowsresetpending")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha one", "beta", "alpha two", "alpine three"], speakers: [nil, nil, nil, nil], audio: nil
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        session.searchQuery = "alpha"
+        #expect(await waitUntil { session.matches.count == 2 })
+        session.goToNextMatch()
+        #expect(session.currentMatchIndex == 1)
+        #expect(session.currentSegmentID == 2)
+
+        let gate = ScanGate()
+        session.scanMatches = { transcript, query in
+            await gate.enter()
+            return transcript.findMatches(query)
+        }
+        session.searchQuery = "alp"
+        #expect(await waitUntil { await gate.isHolding })
+
+        session.reload()
+        await session.loadTask?.value
+        await session.matchesTask?.value
+        await gate.open()
+
+        #expect(session.matches.map(\.segmentID) == [0, 2, 3])
+        #expect(session.currentMatchIndex == 0)
+        #expect(session.currentSegmentID == 0)
     }
 
     @Test("reloading an entry that has gone leaves the empty state")
@@ -368,5 +399,26 @@ struct EntryWindowSessionTests {
         #expect(session.currentTime == 2)
         #expect(session.currentSegmentID == 2)
         #expect(model.currentTimeSeconds == 0)
+    }
+}
+
+/// Holds the first scan it sees until the test opens it; later scans pass straight through.
+private actor ScanGate {
+    private var calls = 0
+    private var waiter: CheckedContinuation<Void, Never>?
+    private var isOpen = false
+    private(set) var isHolding = false
+
+    func enter() async {
+        calls += 1
+        guard calls == 1, !isOpen else { return }
+        isHolding = true
+        await withCheckedContinuation { waiter = $0 }
+    }
+
+    func open() {
+        isOpen = true
+        waiter?.resume()
+        waiter = nil
     }
 }

@@ -38,6 +38,10 @@ final class EntryWindowSession {
     @ObservationIgnored private var segmentsByID: [TranscriptSegment.ID: TranscriptSegment] = [:]
     @ObservationIgnored private var searchDebounceTask: Task<Void, Never>?
     @ObservationIgnored private(set) var matchesTask: Task<Void, Never>?
+    /// Runs the search off the main actor; a test swaps it to hold one scan open.
+    @ObservationIgnored var scanMatches: @Sendable (Transcript, String) async -> [TranscriptMatch] = { transcript, query in
+        await Task.detached { transcript.findMatches(query) }.value
+    }
     /// A new query jumps to its first match even when a reload's scan supersedes the query's own.
     @ObservationIgnored private var matchesResetPending = false
     @ObservationIgnored private(set) var appliedUpdatedAt: Date?
@@ -359,8 +363,9 @@ final class EntryWindowSession {
             return
         }
         let query = searchQuery
+        let scan = scanMatches
         matchesTask = Task { [weak self] in
-            let found = await Task.detached { transcript.findMatches(query) }.value
+            let found = await scan(transcript, query)
             guard !Task.isCancelled else { return }
             self?.installMatches(found)
         }
