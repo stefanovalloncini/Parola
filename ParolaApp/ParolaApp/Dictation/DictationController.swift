@@ -227,9 +227,7 @@ final class DictationController {
         Task { await coord.simulateRelease() }
     }
 
-    /// Finishes the active session in every mode; a simulated `.release` would be
-    /// ignored by toggle mode, leaving the HUD stop button and intents dead there.
-    /// A final transcription already under way gets `transcriptionStopGrace` to land, then is given up.
+    /// Stops in every mode, unlike a simulated release; a final already under way gets `transcriptionStopGrace`, then is given up.
     func requestStop() {
         guard let coord = coordinator else { return }
         guard case .transcribing = state else {
@@ -239,10 +237,8 @@ final class DictationController {
         let generation = coordinatorGeneration
         let grace = transcriptionStopGrace
         Task { [weak self] in
-            try? await Task.sleep(for: grace)
-            guard let self, generation == self.coordinatorGeneration, case .transcribing = self.state else { return }
-            await coord.abandonTranscription()
-            guard generation == self.coordinatorGeneration else { return }
+            guard await coord.giveUpOnTranscription(after: grace) else { return }
+            guard let self, generation == self.coordinatorGeneration else { return }
             self.rearm()
         }
     }

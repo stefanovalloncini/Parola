@@ -685,6 +685,84 @@ struct DictationCoordinatorTests {
         #expect(inserted.isEmpty)
     }
 
+    private actor QueuedFinishRecorder: DictationRecorder {
+        private var texts: [String]
+        private var gates: [CheckedContinuation<Void, Never>] = []
+
+        init(texts: [String]) { self.texts = texts }
+
+        var waiting: Int { gates.count }
+
+        func start() async throws {}
+
+        func stopAndTranscribe() async throws -> String {
+            let text = texts.removeFirst()
+            await withCheckedContinuation { gates.append($0) }
+            return text
+        }
+
+        func stopAndDiscard() async {}
+
+        func releaseNext() {
+            guard !gates.isEmpty else { return }
+            gates.removeFirst().resume()
+        }
+    }
+
+    private func eventually(_ condition: () async -> Bool) async -> Bool {
+        for _ in 0..<2000 {
+            if await condition() { return true }
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+        return await condition()
+    }
+
+    @Test("a stop's give-up belongs to its own final: the next session still finishes and inserts")
+    func giveUpLeavesTheNextSessionAlone() async throws {
+        let recorder = QueuedFinishRecorder(texts: ["one", "two"])
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: MockHotkey(), recorder: recorder, inserter: inserter, mode: .toggle)
+        await coord.startMonitoring()
+
+        await coord.handle(.press)
+        let first = Task { await coord.stopListening() }
+        #expect(await eventually { await recorder.waiting == 1 })
+        let giveUp = Task { await coord.giveUpOnTranscription(after: .milliseconds(300)) }
+
+        await recorder.releaseNext()
+        await first.value
+        #expect(await inserter.inserted == ["one"])
+
+        await coord.handle(.press)
+        let second = Task { await coord.stopListening() }
+        #expect(await eventually { await recorder.waiting == 1 })
+        #expect(await giveUp.value == false, "the timer fires while the second final runs and must leave it alone")
+        await #expect(coord.state == .transcribing)
+
+        await recorder.releaseNext()
+        await second.value
+        #expect(await inserter.inserted == ["one", "two"])
+        await #expect(coord.state == .idle)
+    }
+
+    @Test("a give-up on a final that never lands ends the session and drops its text")
+    func giveUpEndsAStuckFinal() async throws {
+        let recorder = QueuedFinishRecorder(texts: ["late"])
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: MockHotkey(), recorder: recorder, inserter: inserter, mode: .toggle)
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        let finish = Task { await coord.stopListening() }
+        #expect(await eventually { await recorder.waiting == 1 })
+
+        #expect(await coord.giveUpOnTranscription(after: .milliseconds(20)))
+        await #expect(coord.state == .idle)
+
+        await recorder.releaseNext()
+        await finish.value
+        #expect(await inserter.inserted.isEmpty)
+    }
+
     @Test("a stop in the failed state rests the session idle")
     func stopInFailedStateGoesIdle() async throws {
         let coord = DictationCoordinator(

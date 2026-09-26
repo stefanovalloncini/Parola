@@ -184,13 +184,29 @@ public actor DictationCoordinator {
         }
     }
 
-    /// Gives up on a final transcription that is still running: the session goes idle and the text it may still
-    /// produce is never inserted. The recorder can stay busy, so the caller replaces this coordinator afterwards.
-    public func abandonTranscription() async {
-        guard case .transcribing = state else { return }
-        abandonedFinishes = finishes
+    /// Gives up on the final transcription under way now: the session goes idle and its late text is never inserted.
+    /// Returns false when none is running. The recorder can stay busy, so the caller replaces this coordinator afterwards.
+    @discardableResult
+    public func abandonTranscription() async -> Bool {
+        guard case .transcribing = state else { return false }
+        return await abandon(finishes)
+    }
+
+    /// Waits up to `limit` for the final transcription under way now, then gives that one up as
+    /// ``abandonTranscription()`` does. A session that starts meanwhile is never touched.
+    public func giveUpOnTranscription(after limit: Duration) async -> Bool {
+        guard case .transcribing = state else { return false }
+        let finish = finishes
+        try? await Task.sleep(for: limit)
+        return await abandon(finish)
+    }
+
+    private func abandon(_ finish: UInt64) async -> Bool {
+        guard case .transcribing = state, finish == finishes, finish > abandonedFinishes else { return false }
+        abandonedFinishes = finish
         ParolaLog.notice(.dictation, "final transcription abandoned in \(mode)")
         await setState(.idle)
+        return true
     }
 
     public func levels() async -> AsyncStream<Float> {
