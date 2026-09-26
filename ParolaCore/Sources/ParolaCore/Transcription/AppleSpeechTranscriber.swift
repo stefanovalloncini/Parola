@@ -17,8 +17,7 @@ actor AppleSpeechTranscriber: Transcriber {
 
     private let modelStore: ModelStore
     private var loadedModel: String?
-    private var inFlightCancel: (@Sendable () async -> Void)?
-    private var inFlightEpoch: Int = 0
+    private let inFlight = InFlightCancel()
     private let signposter = OSSignposter(subsystem: "app.parola.core", category: "engine.apple-speech")
 
     init(modelStore: ModelStore) {
@@ -52,18 +51,11 @@ actor AppleSpeechTranscriber: Transcriber {
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
         defer { signposter.endInterval("transcribe", interval) }
         let cancellation = AnalyzerCancellation()
-        let priorCancel = inFlightCancel
-        inFlightEpoch &+= 1
-        let myEpoch = inFlightEpoch
-        inFlightCancel = { [weak cancellation] in await cancellation?.cancel() }
-        if let priorCancel {
-            await priorCancel()
+        let claim = inFlight.claim { [weak cancellation] in await cancellation?.cancel() }
+        if let prior = claim.prior {
+            await prior()
         }
-        defer {
-            if inFlightEpoch == myEpoch {
-                inFlightCancel = nil
-            }
-        }
+        defer { inFlight.release(claim.epoch) }
         return try await runSpeechAnalyzer(
             url: url,
             options: options,
@@ -76,8 +68,9 @@ actor AppleSpeechTranscriber: Transcriber {
         #endif
     }
 
-    func cancelInFlight() async {
-        await inFlightCancel?()
+    /// Off the actor: the session's stall-abandon has to reach a run whatever the actor is doing.
+    nonisolated func cancelInFlight() async {
+        await inFlight.cancel()
     }
 
     func unload() async {
@@ -130,7 +123,7 @@ actor AppleSpeechTranscriber: Transcriber {
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         await cancellation.attach(analyzer: analyzer)
-        let audioFile = try AVAudioFile(forReading: url)
+        let audioFile = try await Self.openBounded(url)
         let durationSeconds = Double(audioFile.length) / audioFile.processingFormat.sampleRate
 
         let collectorTask = Task { () async throws -> (segments: [TranscriptSegment], confidence: Double?) in
@@ -261,16 +254,12 @@ actor AppleSpeechTranscriber: Transcriber {
         )
         guard candidates.count > 1 else { return nil }
 
-        let probeURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-language-probe-\(UUID().uuidString).caf")
-        defer { try? FileManager.default.removeItem(at: probeURL) }
-        guard let windows = try? ProbeAudioExtractor.extract(from: url, to: probeURL),
-              !windows.isEmpty else { return nil }
-
-        let picker = AutoLanguagePicker { locale in
-            try await Self.runProbe(url: probeURL, locale: locale, cancellation: cancellation)
+        return try await LanguageProbeScratch.withScratch(from: url) { probeURL in
+            let picker = AutoLanguagePicker { locale in
+                try await Self.runProbe(url: probeURL, locale: locale, cancellation: cancellation)
+            }
+            return try await picker.pick(candidates: candidates, fallback: fallback)
         }
-        return try await picker.pick(candidates: candidates, fallback: fallback)
     }
 
     @available(macOS 26.0, iOS 26.0, *)
@@ -287,7 +276,7 @@ actor AppleSpeechTranscriber: Transcriber {
         )
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         await cancellation.attach(analyzer: analyzer)
-        let file = try AVAudioFile(forReading: url)
+        let file = try await openBounded(url)
         let collector = Task { () async throws -> LanguageProbeOutcome in
             var parts: [String] = []
             var meter = ConfidenceMeter()
@@ -313,6 +302,18 @@ actor AppleSpeechTranscriber: Transcriber {
         }
     }
     #endif
+
+    /// Every open in a run gets the same deadline: a file on a stalled share parks `open()` in a
+    /// syscall nothing can interrupt.
+    static func openBounded(_ url: URL, deadline: Duration = FileReadDeadline.header) async throws -> AVAudioFile {
+        let read = await BoundedFileRead.run(deadline: deadline) {
+            Result { OpenedAudioFile(file: try AVAudioFile(forReading: url)) }
+        }
+        guard case .done(let opened) = read else {
+            throw ParolaError.fileReadTimedOut(name: url.lastPathComponent)
+        }
+        return try opened.get().file
+    }
 
     /// Under a quarter-minute of trailing silence is ordinary; past that the transcript looks
     /// truncated to a reader and it is worth knowing whether the analyzer read that far.
@@ -358,6 +359,51 @@ actor AppleSpeechTranscriber: Transcriber {
             return Locale(identifier: language)
         }
         return Locale(identifier: "\(language)_\(region)")
+    }
+}
+
+// The file crosses from the reading thread to the task awaiting it once and is never shared.
+private struct OpenedAudioFile: @unchecked Sendable {
+    let file: AVAudioFile
+}
+
+/// The cancel for whichever run holds the engine, kept outside the actor so it can be reached
+/// while a run holds it.
+final class InFlightCancel: Sendable {
+    typealias Cancel = @Sendable () async -> Void
+
+    private struct State {
+        var cancel: Cancel?
+        var epoch = 0
+    }
+
+    struct Claim {
+        var epoch: Int
+        var prior: Cancel?
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    /// Installs a new run's cancel and hands back the one a previous run left behind.
+    func claim(_ cancel: @escaping Cancel) -> Claim {
+        state.withLock { state in
+            let prior = state.cancel
+            state.epoch &+= 1
+            state.cancel = cancel
+            return Claim(epoch: state.epoch, prior: prior)
+        }
+    }
+
+    /// Clears the cancel only if no later run has claimed the engine since.
+    func release(_ epoch: Int) {
+        state.withLock { state in
+            if state.epoch == epoch { state.cancel = nil }
+        }
+    }
+
+    func cancel() async {
+        let cancel = state.withLock { $0.cancel }
+        await cancel?()
     }
 }
 
