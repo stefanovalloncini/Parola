@@ -101,7 +101,7 @@ struct JobRow: View, Equatable {
         self.url = job.url
         self.status = job.status
         self.error = job.error
-        self.segmentCount = job.transcript?.segments.count ?? 0
+        self.segmentCount = job.segmentCount ?? job.transcript?.segments.count ?? 0
         self.isSelected = isSelected
         self.compact = compact
         self.cancel = cancel

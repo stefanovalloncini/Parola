@@ -16,6 +16,10 @@ public struct BatchJob: Identifiable, Sendable, Hashable, Codable {
     public var transcript: Transcript?
     public var error: String?
     public var progress: Double
+    /// The library entry the result was saved as; once it is set, the entry holds the transcript.
+    public var entryID: String?
+    /// How many segments the result has, kept when the transcript itself is let go.
+    public var segmentCount: Int?
 
     public init(
         id: UUID = UUID(),
@@ -23,7 +27,9 @@ public struct BatchJob: Identifiable, Sendable, Hashable, Codable {
         status: Status = .pending,
         transcript: Transcript? = nil,
         error: String? = nil,
-        progress: Double = 0
+        progress: Double = 0,
+        entryID: String? = nil,
+        segmentCount: Int? = nil
     ) {
         self.id = id
         self.url = url
@@ -31,6 +37,8 @@ public struct BatchJob: Identifiable, Sendable, Hashable, Codable {
         self.transcript = transcript
         self.error = error
         self.progress = progress
+        self.entryID = entryID
+        self.segmentCount = segmentCount
     }
 
     public var displayName: String { url.deletingPathExtension().lastPathComponent }

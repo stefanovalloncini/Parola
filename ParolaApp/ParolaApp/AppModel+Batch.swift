@@ -51,16 +51,18 @@ extension AppModel {
             // overwritten to .done, and its exports must not run.
             guard !isCancelled(id) else { return }
             batchProgress.advance(id, to: 1)
-            mutateBatchJob(id) { $0.status = .done; $0.transcript = processed }
+            mutateBatchJob(id) {
+                $0.status = .done
+                $0.transcript = processed
+                $0.segmentCount = processed.segments.count
+            }
             if id == selectedBatchJobID {
-                clearDerivedArtifacts()
-                selectedEntryID = nil
-                self.transcript = processed
+                showUnsavedBatchJob(id, processed)
             }
             if let job = batchJobs.first(where: { $0.id == id }) {
                 let sidecarTargets = writeBatchExports(transcript: processed, sourceURL: job.url)
                 runAutoExports(transcript: processed, sourceURL: job.url, skippingTargets: sidecarTargets)
-                persistBatchJobToLibrary(processed, sourceURL: job.url)
+                persistBatchJobToLibrary(id, transcript: processed, sourceURL: job.url)
             }
         case .failed(let id, let reason):
             guard !isCancelled(id) else { return }
@@ -91,19 +93,61 @@ extension AppModel {
 
     // Skips persistToLibrary on purpose: its runAutoExports call would fire a second time
     // (handleBatchEvent already ran the rules), and it would steal selection + refresh per job.
-    private func persistBatchJobToLibrary(_ transcript: Transcript, sourceURL: URL) {
+    private func persistBatchJobToLibrary(_ jobID: BatchJob.ID, transcript: Transcript, sourceURL: URL) {
         Task { [weak self] in
             guard let self else { return }
             do {
                 let entry = try await library.add(
                     transcript: transcript, audioSource: sourceURL, category: .transcription, source: .file
                 )
+                landBatchJobEntry(entry.id, jobID: jobID)
                 // A parked on-device model session must not hold a task per batch job open.
                 _ = await AsyncTimeout.run(.seconds(30)) { [weak self] in
                     await self?.generateCardMetadata(for: entry.id, transcript: transcript)
                 }
             } catch {
                 nonFatalWarning = "\(sourceURL.lastPathComponent) was transcribed, but Parola couldn't save it to your library. \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// A finished job whose library add hasn't returned: its own copy, with no entry to save edits to yet.
+    private func showUnsavedBatchJob(_ id: BatchJob.ID, _ transcript: Transcript) {
+        clearDerivedArtifacts()
+        selectedEntryID = nil
+        self.transcript = transcript
+        unsavedBatchJobOnScreen = UnsavedBatchJob(jobID: id, install: derivedArtifactsGeneration)
+    }
+
+    /// An edit made before the entry exists goes back into the job, so it reaches the entry when the add lands.
+    func keepUnsavedBatchEdit() {
+        guard selectedEntryID == nil, let transcript, let screen = unsavedBatchJobOnScreen,
+              screen.install == derivedArtifactsGeneration else { return }
+        unsavedBatchEdits.insert(screen.jobID)
+        if let index = batchJobs.firstIndex(where: { $0.id == screen.jobID }), batchJobs[index].entryID == nil {
+            batchJobs[index].transcript = transcript
+        }
+    }
+
+    /// From here the entry holds the transcript: the job lets go of its copy, and a copy still on screen becomes the entry.
+    private func landBatchJobEntry(_ entryID: LibraryEntry.ID, jobID: BatchJob.ID) {
+        let edited = unsavedBatchEdits.remove(jobID) != nil
+        let jobCopy = batchJobs.first(where: { $0.id == jobID })?.transcript
+        mutateBatchJob(jobID) {
+            $0.entryID = entryID
+            $0.transcript = nil
+        }
+        if let screen = unsavedBatchJobOnScreen, screen.jobID == jobID {
+            unsavedBatchJobOnScreen = nil
+            if screen.install == derivedArtifactsGeneration, selectedEntryID == nil {
+                selectedEntryID = entryID
+                if edited { persistCurrentTranscriptIfLoaded() }
+                return
+            }
+        }
+        if edited, let jobCopy {
+            Task { [library] in
+                try? await library.updateTranscript(jobCopy, for: entryID)
             }
         }
     }
@@ -272,20 +316,27 @@ extension AppModel {
         change(&batchJobs[idx])
     }
 
+    /// Opens the job's library entry in place, or its own copy while the add is still in flight.
     func selectBatchJob(_ id: BatchJob.ID) {
         selectedBatchJobID = id
-        if let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript {
-            loadEntryGeneration &+= 1
-            let pending = cancelAndDrainPendingTranscriptSave()
-            clearDerivedArtifacts()
-            selectedEntryID = nil
-            transcript = t
-            installPlayer(for: job.url)
-            adoptLoadedMediaDuration()
-            if let pending {
-                Task { [library] in
-                    try? await library.updateTranscript(pending.transcript, for: pending.id)
-                }
+        guard let job = batchJobs.first(where: { $0.id == id }) else { return }
+        if let entryID = job.entryID {
+            guard selectedEntryID != entryID else { return }
+            openEntryInPlace(entryID)
+        } else if let t = job.transcript {
+            showUnsavedBatchJobReplacingSelection(job, t)
+        }
+    }
+
+    private func showUnsavedBatchJobReplacingSelection(_ job: BatchJob, _ transcript: Transcript) {
+        loadEntryGeneration &+= 1
+        let pending = cancelAndDrainPendingTranscriptSave()
+        showUnsavedBatchJob(job.id, transcript)
+        installPlayer(for: job.url)
+        adoptLoadedMediaDuration()
+        if let pending {
+            Task { [library] in
+                try? await library.updateTranscript(pending.transcript, for: pending.id)
             }
         }
     }
@@ -311,6 +362,8 @@ extension AppModel {
         batchJobs[idx].status = .pending
         batchJobs[idx].error = nil
         batchJobs[idx].transcript = nil
+        batchJobs[idx].entryID = nil
+        batchJobs[idx].segmentCount = nil
         batchProgress.reset(id)
         // Don't tear down a live batch to retry one file — runBatchTask cancels the running queue and
         // strands the in-flight job. Reset to .pending; the running batch's .finished resume picks it up.
@@ -327,16 +380,16 @@ extension AppModel {
     }
 
     func openBatchJobTranscript(_ id: BatchJob.ID) {
-        guard let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript else { return }
-        selectedBatchJobID = id
-        loadEntryGeneration &+= 1
-        clearDerivedArtifacts()
-        selectedEntryID = nil
-        transcript = t
-        installPlayer(for: job.url)
-        adoptLoadedMediaDuration()
-        phase = .ready
-        route = .transcript
+        guard let job = batchJobs.first(where: { $0.id == id }) else { return }
+        if let entryID = job.entryID {
+            selectedBatchJobID = id
+            loadEntry(entryID)
+        } else if let t = job.transcript {
+            selectedBatchJobID = id
+            showUnsavedBatchJobReplacingSelection(job, t)
+            phase = .ready
+            route = .transcript
+        }
     }
 
     func reorderPendingBatchJobs(from source: IndexSet, to destination: Int) {

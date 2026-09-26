@@ -136,7 +136,8 @@ extension ParolaAutomationServer {
                             "status": .string(job.status.rawValue),
                             "progress": .double(ctx.model.batchProgress.fraction(for: job.id)),
                             "error": .string(job.error ?? ""),
-                            "hasTranscript": .bool(job.transcript != nil),
+                            "hasTranscript": .bool(job.transcript != nil || job.entryID != nil),
+                            "entryID": job.entryID.map(AutomationValue.string) ?? .null,
                         ])
                     })
                 }

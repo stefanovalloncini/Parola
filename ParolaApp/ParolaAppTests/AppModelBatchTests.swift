@@ -405,7 +405,107 @@ struct AppModelBatchTests {
         let loaded = try await model.library.load(try #require(entries.first?.id))
         #expect(loaded.document.audioURL != nil)
         #expect(model.selectedEntryID == "keep-me")
-        #expect(model.batchJobs.first?.transcript != nil)
+        let landed = await Self.waitForEntryID(of: job.id, in: model)
+        #expect(landed == entries.first?.id)
+        #expect(model.batchJobs.first?.transcript == nil)
+        #expect(model.batchJobs.first?.segmentCount == 1)
+    }
+
+    private static func waitForEntryID(
+        of jobID: BatchJob.ID, in model: AppModel, timeout: TimeInterval = 3
+    ) async -> LibraryEntry.ID? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let id = model.batchJobs.first(where: { $0.id == jobID })?.entryID { return id }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return nil
+    }
+
+    private static func waitUntil(timeout: TimeInterval = 3, _ condition: () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
+    }
+
+    @Test("an edit to a finished batch job reaches its library entry")
+    func batchJobEditReachesEntry() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportPresetIDs = []
+        let source = scratch.appendingPathComponent("memo.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [job]
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+        let entryID = try #require(await Self.waitForEntryID(of: job.id, in: model))
+        model.route = .batch
+
+        model.selectBatchJob(job.id)
+        #expect(await Self.waitUntil { model.selectedEntryID == entryID && model.transcript != nil })
+        model.editSegment(id: 0, newText: "corrected")
+        await model.flushPendingTranscriptSave()
+
+        let stored = try await model.library.load(entryID)
+        #expect(stored.document.transcript.segments.first?.text == "corrected")
+        #expect(model.phase == .idle)
+        #expect(model.route == .batch)
+    }
+
+    @Test("an edit made while the selected job's add is in flight lands in the entry it becomes")
+    func batchJobEditBeforeTheEntryLands() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportPresetIDs = []
+        let source = scratch.appendingPathComponent("early.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [job]
+        model.selectedBatchJobID = job.id
+
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+        #expect(model.selectedEntryID == nil)
+        model.editSegment(id: 0, newText: "fixed early")
+
+        let entryID = try #require(await Self.waitForEntryID(of: job.id, in: model))
+        #expect(model.selectedEntryID == entryID)
+        #expect(model.transcript?.segments.first?.text == "fixed early")
+        await model.flushPendingTranscriptSave()
+        let stored = try await model.library.load(entryID)
+        #expect(stored.document.transcript.segments.first?.text == "fixed early")
+    }
+
+    @Test("an edit to a job left before its add returns is saved to the entry anyway")
+    func batchJobEditLeftBehind() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportPresetIDs = []
+        let source = scratch.appendingPathComponent("left.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        let other = BatchJob(url: Self.makeURL("other"), status: .done, transcript: Self.makeTranscript())
+        model.batchJobs = [job, other]
+        model.selectedBatchJobID = job.id
+
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+        model.editSegment(id: 0, newText: "kept")
+        model.selectBatchJob(other.id)
+
+        let entryID = try #require(await Self.waitForEntryID(of: job.id, in: model))
+        #expect(model.selectedEntryID == nil)
+        var storedText: String?
+        for _ in 0..<300 {
+            storedText = try await model.library.load(entryID).document.transcript.segments.first?.text
+            if storedText == "kept" { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(storedText == "kept")
     }
 
     @Test("the library list refreshes once per wave finish, not per job")
@@ -522,7 +622,7 @@ struct AppModelBatchTests {
         #expect(model.phase == .ready)
     }
 
-    @Test("batch job selection clears the loaded library entry")
+    @Test("a batch job whose entry hasn't landed shows its own copy without a library selection")
     func selectBatchJobClearsSelectedEntry() async {
         let model = makeModel()
         model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav")])

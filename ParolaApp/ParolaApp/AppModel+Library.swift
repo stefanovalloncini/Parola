@@ -530,6 +530,11 @@ extension AppModel {
         }
     }
 
+    /// For a list that shows the transcript beside itself, like the batch: the page, the phase and the origin stay as they are.
+    func openEntryInPlace(_ id: LibraryEntry.ID) {
+        _ = try? startOpeningEntry(id, inPlace: true)
+    }
+
     /// `loadEntry` for a caller that needs what it opened; a later open makes this one throw `CancellationError`.
     @discardableResult
     func openEntry(_ id: LibraryEntry.ID) async throws -> Transcript {
@@ -546,8 +551,11 @@ extension AppModel {
     }
 
     @discardableResult
-    private func startOpeningEntry(_ id: LibraryEntry.ID) throws(IntentActionError) -> Task<Transcript, any Error> {
-        if let refusal = entryOpenRefusal { throw refusal }
+    private func startOpeningEntry(
+        _ id: LibraryEntry.ID,
+        inPlace: Bool = false
+    ) throws(IntentActionError) -> Task<Transcript, any Error> {
+        if !inPlace, let refusal = entryOpenRefusal { throw refusal }
         introduction.defer()
         loadEntryGeneration &+= 1
         let generation = loadEntryGeneration
@@ -576,11 +584,13 @@ extension AppModel {
                 } else {
                     tearDownPlayer()
                 }
-                phase = .ready
-                // Opened from the extra, a link or the duplicate sheet it would load behind a page; a page opened during the load is the later word.
-                if route == pageAtStart { route = .transcript }
-                libraryOrigin = origin
-                libraryOriginEntryID = id
+                if !inPlace {
+                    phase = .ready
+                    // Opened from the extra, a link or the duplicate sheet it would load behind a page; a page opened during the load is the later word.
+                    if route == pageAtStart { route = .transcript }
+                    libraryOrigin = origin
+                    libraryOriginEntryID = id
+                }
                 if let hit, !hit.isEmpty { revealInTranscript(hit, at: hitPosition) }
                 let opened = transcript ?? loaded.document.transcript
                 let openedAt = Date()
@@ -591,7 +601,11 @@ extension AppModel {
                 return opened
             } catch {
                 guard generation == loadEntryGeneration else { throw error }
-                phase = .failed(message: error.localizedDescription)
+                if inPlace {
+                    nonFatalWarning = error.localizedDescription
+                } else {
+                    phase = .failed(message: error.localizedDescription)
+                }
                 throw error
             }
         }

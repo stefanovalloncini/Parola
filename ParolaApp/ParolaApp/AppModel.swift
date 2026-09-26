@@ -367,6 +367,13 @@ final class AppModel {
     private(set) var batchHasDoneJob = false
     private(set) var batchBuckets = BatchJobBuckets()
     @ObservationIgnored let batchProgress = BatchProgressBoard()
+    struct UnsavedBatchJob {
+        let jobID: BatchJob.ID
+        /// The `derivedArtifactsGeneration` of the install; any later install moves it on.
+        let install: Int
+    }
+    @ObservationIgnored var unsavedBatchJobOnScreen: UnsavedBatchJob?
+    @ObservationIgnored var unsavedBatchEdits: Set<BatchJob.ID> = []
     var selectedBatchJobID: BatchJob.ID?
     @ObservationIgnored var batchTask: Task<Void, Never>?
     @ObservationIgnored var lastSavedBatchQueueURLs: [URL]?
@@ -3287,7 +3294,10 @@ final class AppModel {
     /// Schedules a debounced (~1 s) persist of the current transcript. Rapid edits coalesce: only the
     /// latest snapshot (identified by the generation counter) is written; earlier tasks cancel themselves.
     func persistCurrentTranscriptIfLoaded(textChanged: Bool = true) {
-        guard let id = selectedEntryID, let transcript else { return }
+        guard let id = selectedEntryID, let transcript else {
+            keepUnsavedBatchEdit()
+            return
+        }
         if textChanged { pendingSaveTextChanged = true }
         pendingTranscriptSaveGeneration &+= 1
         let generation = pendingTranscriptSaveGeneration
