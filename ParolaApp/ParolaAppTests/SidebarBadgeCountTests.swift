@@ -73,8 +73,9 @@ struct SidebarBadgeCountTests {
             invalidated.fired = true
         }
 
-        model.batchJobs[0].progress = 0.4
-        model.batchJobs[0].progress = 0.7
+        await model.handleBatchEvent(.progress(jobID: model.batchJobs[0].id, fraction: 0.4))
+        await model.handleBatchEvent(.progress(jobID: model.batchJobs[0].id, fraction: 0.7))
+        model.batchJobs[0].segmentCount = 2
         #expect(!invalidated.fired)
 
         model.batchJobs[0].status = .done

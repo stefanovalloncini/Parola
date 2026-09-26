@@ -171,7 +171,6 @@ struct JobRowTests {
     func rowEqualityFollowsWhatItDraws() {
         var job = BatchJob(url: URL(fileURLWithPath: "/tmp/JobRowTests/take.wav"), status: .transcribing)
         let row = JobRow(job: job, cancel: .wholeBatch)
-        job.progress = 0.8
         #expect(JobRow(job: job, cancel: .wholeBatch) == row)
         #expect(JobRow(job: job, isSelected: true, cancel: .wholeBatch) != row)
         #expect(JobRow(job: job, cancel: .oneJob(status: .transcribing)) != row)
