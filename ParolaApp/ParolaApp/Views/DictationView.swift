@@ -7,8 +7,10 @@ struct DictationView: View {
     let model: AppModel
     @Bindable var controller: DictationController
     var onStop: (() -> Void)?
+    var onCancel: (() -> Void)?
 
     @State private var startedAt: Date = Date()
+    @State private var cancelOffered = false
 
     private var state: DictationCoordinator.State { controller.state }
 
@@ -26,6 +28,7 @@ struct DictationView: View {
         .onChange(of: state) { _, newValue in
             if case .listening = newValue { startedAt = Date() }
         }
+        .task(id: state) { await offerCancel() }
         .axBranch("Dictation")
     }
 
@@ -245,22 +248,36 @@ struct DictationView: View {
 
     @ViewBuilder
     private var stopButton: some View {
-        if let onStop, state == .listening || state == .transcribing {
-            let stopLabel: LocalizedStringKey = state == .transcribing ? "Cancel transcription" : "Stop dictation"
-            Button(action: onStop) {
-                ZStack {
-                    Circle().fill(Color.white.opacity(0.14))
-                    Image(systemName: "stop.fill")
-                        .font(DS.Font.caption)
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.plain)
-            .help(stopLabel)
-            .accessibilityLabel(stopLabel)
-            .axLeaf("HUD.Button.Stop")
+        if let onStop, case .listening = state {
+            hudButton(systemName: "stop.fill", label: "Stop dictation", action: onStop)
+                .axLeaf("HUD.Button.Stop")
+        } else if let onCancel, cancelOffered, case .transcribing = state {
+            hudButton(systemName: "xmark", label: "Cancel transcription", action: onCancel)
+                .axLeaf("HUD.Button.Cancel")
         }
+    }
+
+    private func hudButton(systemName: String, label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                Circle().fill(Color.white.opacity(0.14))
+                Image(systemName: systemName)
+                    .font(DS.Font.caption)
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 22, height: 22)
+        }
+        .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(label)
+    }
+
+    /// Cancel shows up only after a second of transcribing, so the second click of a double-click on Stop finds nothing there.
+    private func offerCancel() async {
+        cancelOffered = false
+        guard case .transcribing = state else { return }
+        try? await Task.sleep(for: .seconds(1))
+        if !Task.isCancelled { cancelOffered = true }
     }
 
     @ViewBuilder

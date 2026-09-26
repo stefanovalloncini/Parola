@@ -423,6 +423,11 @@ extension AppModel {
         dictationController.requestStop()
     }
 
+    /// A script must not wait forever on a final that never lands, so the bridge's stop gives one up after the grace.
+    func stopDictationFromBridge() {
+        dictationController.requestStop(giveUpAfter: dictationController.transcriptionStopGrace)
+    }
+
     func stopDictation() {
         pendingDictationRestart?.cancel()
         pendingDictationRestart = nil

@@ -596,7 +596,7 @@ struct AppModelDictationTests {
         #expect(!model.dictationController.isRunning)
     }
 
-    @Test("a stop while the final transcription hangs gives up after the grace and re-arms a fresh recorder")
+    @Test("a bridge stop while the final transcription hangs gives up after the grace and re-arms a fresh recorder")
     func stopWhileTranscribingGivesUp() async {
         let model = makeModel()
         let recorders = RecorderTally()
@@ -609,12 +609,54 @@ struct AppModelDictationTests {
         model.stopDictationFromIntent()
         #expect(await waitUntil { model.dictationState == .transcribing })
 
-        model.stopDictationFromIntent()
+        model.stopDictationFromBridge()
         #expect(await waitUntil { recorders.made.count == 2 })
         #expect(model.dictationState == .idle)
         #expect(model.dictationController.state == .idle)
         #expect(model.dictationController.isRunning)
 
+        for recorder in recorders.made { await recorder.release() }
+        model.abortDictation()
+    }
+
+    @Test("a stop from an intent or a link never gives up a final already under way")
+    func intentStopWaitsForTheFinal() async throws {
+        let model = makeModel()
+        let recorders = RecorderTally()
+        model.dictationController.recorderFactory = { _ in recorders.make() }
+        model.dictationController.transcriptionStopGrace = .milliseconds(50)
+        model.dictationEnabled = true
+        model.dictationController.simulatePress()
+        #expect(await waitUntil { model.dictationState == .listening })
+        model.stopDictationFromIntent()
+        #expect(await waitUntil { model.dictationState == .transcribing })
+
+        model.stopDictationFromIntent()
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(model.dictationState == .transcribing)
+        #expect(recorders.made.count == 1)
+
+        for recorder in recorders.made { await recorder.release() }
+        #expect(await waitUntil { model.dictationState == .idle })
+        model.abortDictation()
+    }
+
+    @Test("Cancel drops the final at once, without the stop's grace, and re-arms a fresh recorder")
+    func cancelDropsTheFinalAtOnce() async {
+        let model = makeModel()
+        let recorders = RecorderTally()
+        model.dictationController.recorderFactory = { _ in recorders.make() }
+        model.dictationController.transcriptionStopGrace = .seconds(60)
+        model.dictationEnabled = true
+        model.dictationController.simulatePress()
+        #expect(await waitUntil { model.dictationState == .listening })
+        model.stopDictationFromIntent()
+        #expect(await waitUntil { model.dictationState == .transcribing })
+
+        model.dictationController.cancelTranscription()
+
+        #expect(await waitUntil(timeoutMs: 2000) { recorders.made.count == 2 })
+        #expect(model.dictationState == .idle)
         for recorder in recorders.made { await recorder.release() }
         model.abortDictation()
     }

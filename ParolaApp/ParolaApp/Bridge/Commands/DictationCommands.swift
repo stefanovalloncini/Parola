@@ -18,11 +18,11 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "stopDictation",
                 area: .dictation,
-                summary: "Stops the active dictation session.",
+                summary: "Stops the active dictation session. A final transcription already running is given up after 3 s.",
                 kind: .mutating,
                 handler: { _, ctx in
                     try ctx.require(.dictation)
-                    ctx.model.stopDictationFromIntent()
+                    ctx.model.stopDictationFromBridge()
                     return .object(["stopped": .bool(true)])
                 }
             ),

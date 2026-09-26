@@ -227,17 +227,28 @@ final class DictationController {
         Task { await coord.simulateRelease() }
     }
 
-    /// Stops in every mode, unlike a simulated release; a final already under way gets `transcriptionStopGrace`, then is given up.
-    func requestStop() {
+    /// Stops in every mode, unlike a simulated release. A final already under way lands and is inserted, unless `giveUpAfter` runs out first.
+    func requestStop(giveUpAfter grace: Duration? = nil) {
         guard let coord = coordinator else { return }
-        guard case .transcribing = state else {
+        guard case .transcribing = state, let grace else {
             Task { await coord.stopListening() }
             return
         }
         let generation = coordinatorGeneration
-        let grace = transcriptionStopGrace
         Task { [weak self] in
             guard await coord.giveUpOnTranscription(after: grace) else { return }
+            guard let self, generation == self.coordinatorGeneration else { return }
+            self.rearm()
+        }
+    }
+
+    /// The HUD's Cancel: the final under way is dropped at once and nothing is pasted.
+    func cancelTranscription() {
+        guard let coord = coordinator, case .transcribing = state else { return }
+        let generation = coordinatorGeneration
+        hideHUD()
+        Task { [weak self] in
+            guard await coord.abandonTranscription() else { return }
             guard let self, generation == self.coordinatorGeneration else { return }
             self.rearm()
         }
@@ -342,7 +353,12 @@ final class DictationController {
         guard let model = appModel else { return }
         if hud == nil {
             hud = DictationHUD.make { [self] in
-                DictationView(model: model, controller: self, onStop: { model.stopDictationFromIntent() })
+                DictationView(
+                    model: model,
+                    controller: self,
+                    onStop: { model.stopDictationFromIntent() },
+                    onCancel: { self.cancelTranscription() }
+                )
             }
         }
         guard let panel = hud else { return }
