@@ -229,12 +229,20 @@ extension AppModel {
             guard !Task.isCancelled else { return .failed }
             landCardMetadata(try await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id))
             return .written(meta)
-        } catch CardMetadataService.Failure.tooShort {
-            return .skipped
         } catch {
-            ParolaLog.notice(.ai, "card metadata skipped", [.error: .error(error)])
-            return .failed
+            let outcome = Self.cardOutcome(after: error, modelOutOfReach: LanguageModelFactory.onDeviceIsOutOfReach())
+            if case .failed = outcome { ParolaLog.notice(.ai, "card metadata skipped", [.error: .error(error)]) }
+            return outcome
         }
+    }
+
+    /// Only a failure a later try could change is worth one: not a short transcript, not a Mac the model can't run on.
+    nonisolated static func cardOutcome(after error: any Error, modelOutOfReach: Bool) -> CardMetadataOutcome {
+        if let failure = error as? CardMetadataService.Failure, failure == .tooShort || failure == .featureDisabled {
+            return .skipped
+        }
+        if error is LanguageModelFactory.Failure, modelOutOfReach { return .skipped }
+        return .failed
     }
 
     private func landCardMetadata(_ entry: LibraryEntry) {

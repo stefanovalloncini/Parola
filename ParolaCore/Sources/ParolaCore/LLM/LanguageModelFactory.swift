@@ -158,6 +158,15 @@ public enum LanguageModelFactory {
         return .osTooOld
     }
 
+    /// True when the on-device model can't serve a request and waiting won't change that: the device,
+    /// the OS or the Apple Intelligence setting rules it out. A model still downloading is not out of reach.
+    public static func onDeviceIsOutOfReach() -> Bool {
+        switch unavailability() {
+        case .deviceNotEligible, .notEnabled, .osTooOld: return true
+        case .modelNotReady, .unknown: return false
+        }
+    }
+
     /// Whether the on-device model can serve a request right now, and why not when it can't.
     public enum OnDeviceAvailability: Sendable, Equatable {
         case available

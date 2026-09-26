@@ -146,6 +146,8 @@ extension AppModel {
 
     /// A finished job whose library add hasn't returned: its own copy, with no entry to save edits to yet.
     private func showUnsavedBatchJob(_ id: BatchJob.ID, _ transcript: Transcript) {
+        let landing = Self.landingSignposter.beginInterval("install")
+        defer { Self.landingSignposter.endInterval("install", landing) }
         loadEntryGeneration &+= 1
         clearDerivedArtifacts()
         selectedEntryID = nil

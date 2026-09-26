@@ -121,6 +121,44 @@ struct CardMetadataQueueTests {
         #expect(try await model.library.load(entry.id).entry.aiTitle == nil)
     }
 
+    @Test("cards still waiting when the toggle goes off don't run")
+    func toggleOffStopsWaitingCards() async throws {
+        let model = makeModel()
+        let tracker = CallTracker()
+        let (release, releaser) = AsyncStream<Void>.makeStream()
+        model.cardMetadataOperation = { _ in
+            _ = tracker.enter()
+            for await _ in release { break }
+            tracker.leave()
+            return CardMetadata(title: "Ran", summary: "Ran.")
+        }
+        let first = try await addEntry(model, "first")
+        let second = try await addEntry(model, "second")
+        model.enqueueCardMetadata(for: first.id, transcript: transcript("first"))
+        model.enqueueCardMetadata(for: second.id, transcript: transcript("second"))
+        for _ in 0..<300 where tracker.total == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try #require(tracker.total == 1)
+
+        model.generatesCardMetadata = false
+        releaser.finish()
+        await model.awaitCardMetadataQueue()
+
+        #expect(tracker.total == 1)
+        #expect(model.cardRetryIDs.isEmpty)
+        #expect(try await model.library.load(second.id).entry.aiTitle == nil)
+    }
+
+    @Test("a model this Mac can't run and a transcript too short to title are never retried")
+    func permanentFailuresAreSkipped() {
+        let unavailable = LanguageModelFactory.Failure.notAvailable("Apple Intelligence is off.")
+        #expect(AppModel.cardOutcome(after: unavailable, modelOutOfReach: true).isSkipped)
+        #expect(!AppModel.cardOutcome(after: unavailable, modelOutOfReach: false).isSkipped)
+        #expect(AppModel.cardOutcome(after: CardMetadataService.Failure.tooShort, modelOutOfReach: false).isSkipped)
+        #expect(!AppModel.cardOutcome(after: CancellationError(), modelOutOfReach: true).isSkipped)
+    }
+
     @Test("auto-export doesn't wait for the card, and the landing still writes it")
     func autoExportRunsBeforeTheCard() async throws {
         let scratch = FileManager.default.temporaryDirectory
@@ -151,5 +189,12 @@ struct CardMetadataQueueTests {
         releaser.finish()
         await model.awaitCardMetadataQueue()
         #expect(try await model.library.load(saved.id).entry.aiTitle == "Held card")
+    }
+}
+
+private extension AppModel.CardMetadataOutcome {
+    var isSkipped: Bool {
+        if case .skipped = self { return true }
+        return false
     }
 }

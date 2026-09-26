@@ -111,12 +111,14 @@ extension AppModel {
             phase = .idle
             return
         }
+        let landing = Self.landingSignposter.beginInterval("install")
         refreshLibrary()
         if selectedEntryID == entryID {
             installStoredTranscript(transcript)
             adoptLoadedMediaDuration()
         }
         phase = .ready
+        Self.landingSignposter.endInterval("install", landing)
         playCompletionSound()
         // The card-metadata hook lives in persistToLibrary, which a re-run never passes through.
         enqueueCardMetadata(for: entryID, transcript: transcript)

@@ -26,8 +26,9 @@ extension AppModel {
         let job = Task { [weak self] in
             await previous?.value
             guard let self else { return }
-            var outcome: CardMetadataOutcome = .failed
-            if let source = await self.cardSource(transcript, for: id) {
+            var outcome: CardMetadataOutcome = .skipped
+            // The toggle may have gone off while this card waited its turn.
+            if self.generatesCardMetadata, let source = await self.cardSource(transcript, for: id) {
                 outcome = await AsyncTimeout.run(timeout, clock: clock) { [weak self] in
                     await self?.writeCardMetadata(for: id, transcript: source) ?? .skipped
                 } ?? .failed

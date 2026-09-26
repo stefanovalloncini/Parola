@@ -3139,6 +3139,8 @@ final class AppModel {
                 drainDeferredArrivals()
                 return
             }
+            let landing = Self.landingSignposter.beginInterval("install")
+            defer { Self.landingSignposter.endInterval("install", landing) }
             clearDerivedArtifacts()
             self.selectedEntryID = nil
             self.transcript = processed
@@ -3228,6 +3230,8 @@ final class AppModel {
                 options: currentOptions
             )
             let processed = await postProcessDetached(result)
+            let landing = Self.landingSignposter.beginInterval("install")
+            defer { Self.landingSignposter.endInterval("install", landing) }
             clearDerivedArtifacts()
             selectedEntryID = nil
             restorePlaybackSource(url)
