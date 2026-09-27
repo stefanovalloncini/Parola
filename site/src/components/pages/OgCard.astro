@@ -23,10 +23,12 @@ const shot = shotsFor(locale)["hero-window"];
 ---
 
 <!doctype html>
-<html lang={locale}>
+<html lang={locale} data-scheme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="robots" content="noindex" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#ffffff" />
     <title>Parola social card</title>
   </head>
   <body>
@@ -53,6 +55,10 @@ const shot = shotsFor(locale)["hero-window"];
 </html>
 
 <style>
+  html {
+    color-scheme: light;
+  }
+
   body {
     margin: 0;
   }

@@ -99,7 +99,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-scheme="light"]) {
     --ink: var(--cream);
     --ink-body: var(--night-ink-body);
     --muted: var(--night-muted);

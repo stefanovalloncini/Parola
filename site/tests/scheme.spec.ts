@@ -50,6 +50,19 @@ test.describe("dark scheme", () => {
     });
   }
 
+  for (const path of ["/og-card/", "/it/og-card/"]) {
+    test(`${path} keeps the light OG card`, async ({ page }) => {
+      await page.goto(path);
+      const h1 = await page.locator("h1").evaluate((element) => getComputedStyle(element).color);
+      expect(h1).toBe("rgb(15, 26, 20)");
+      const card = page.locator(".card");
+      const dark = await card.evaluate((element) => getComputedStyle(element).backgroundImage);
+      await page.emulateMedia({ colorScheme: "light" });
+      const light = await card.evaluate((element) => getComputedStyle(element).backgroundImage);
+      expect(dark).toBe(light);
+    });
+  }
+
   test("the skip link is readable when a keyboard reaches it", async ({ page }) => {
     await page.goto("/");
     await page.keyboard.press("Tab");

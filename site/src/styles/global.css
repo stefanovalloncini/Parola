@@ -183,7 +183,7 @@ button {
 }
 
 @media (prefers-color-scheme: dark) {
-  .mark {
+  :root:not([data-scheme="light"]) .mark {
     --sage-tint: rgb(169 194 166 / 0.1);
   }
 }
