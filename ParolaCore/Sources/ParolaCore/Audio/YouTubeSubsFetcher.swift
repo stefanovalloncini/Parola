@@ -9,6 +9,11 @@ public struct FetchedCaptions: Sendable {
     public let transcript: Transcript
     public let metadata: LinkMetadata
 
+    public init(transcript: Transcript, metadata: LinkMetadata) {
+        self.transcript = transcript
+        self.metadata = metadata
+    }
+
     public var videoTitle: String? { metadata.title }
 }
 

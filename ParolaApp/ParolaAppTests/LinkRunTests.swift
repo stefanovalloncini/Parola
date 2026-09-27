@@ -32,6 +32,7 @@ final class ScriptedLinkFetcher: LinkFetcher {
     let owned: Bool
     let failure: LinkDownloadFailure?
     let ignoresCancel: Bool
+    let captions: FetchedCaptions?
     private let count = OSAllocatedUnfairLock(initialState: 0)
     private let folders = OSAllocatedUnfairLock<[URL]>(initialState: [])
 
@@ -45,7 +46,8 @@ final class ScriptedLinkFetcher: LinkFetcher {
         gate: FetchGate? = nil,
         owned: Bool = false,
         failure: LinkDownloadFailure? = nil,
-        ignoresCancel: Bool = false
+        ignoresCancel: Bool = false,
+        captions: FetchedCaptions? = nil
     ) {
         self.fixture = fixture
         self.metadata = metadata
@@ -53,13 +55,15 @@ final class ScriptedLinkFetcher: LinkFetcher {
         self.owned = owned
         self.failure = failure
         self.ignoresCancel = ignoresCancel
+        self.captions = captions
     }
 
     var fetches: Int { count.withLock { $0 } }
     var workingFolders: [URL] { folders.withLock { $0 } }
 
     func fetchCaptions(url: URL, language: String?) async throws -> FetchedCaptions {
-        throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noCaptions))
+        guard let captions else { throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noCaptions)) }
+        return captions
     }
 
     func fetchAudio(url: URL, progress: @escaping @Sendable (LinkFetchEvent) -> Void) async throws -> FetchedMedia {
@@ -404,6 +408,35 @@ extension TranscriberMockSuites {
             await waitUntil { !FileManager.default.fileExists(atPath: folder.path) }
             #expect(model.phase == .idle)
             #expect(model.sourceFileURL != fetcher.workingFolders.first?.appendingPathComponent("audio.wav"))
+        }
+
+        @Test("fetched captions land with the video's title and page as a web entry, and say auto-export skipped them")
+        func captionsLanding() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            let captions = FetchedCaptions(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 2, text: "the video's own captions")],
+                    language: "en", modelName: "youtube-subs", sourceURL: Self.page
+                ),
+                metadata: ScriptedLinkFetcher.talk
+            )
+            let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture, captions: captions))
+            let srt = try #require(model.exportPresets.first { $0.spec.format == .srt })
+            model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [srt.id])]
+
+            #expect(model.fetchYouTubeSubs(urlString: Self.link) == .started)
+
+            await waitUntil { model.phase == .ready && model.selectedEntryID != nil }
+            let loaded = try await model.library.load(try #require(model.selectedEntryID))
+            #expect(loaded.entry.title == "A talk")
+            #expect(loaded.entry.manifest.source == .web)
+            #expect(loaded.document.transcript.sourceURL == Self.page)
+            #expect(model.transcript?.text.contains("own captions") == true)
+            await waitUntil { model.nonFatalWarning != nil }
+            #expect(model.nonFatalWarning == String(
+                localized: "Auto-export skipped this link: its rules save next to the source file, and a link has no folder to save in. Use Export instead."
+            ))
         }
 
         @Test("Retry after a failed transcription fetches the link again")
