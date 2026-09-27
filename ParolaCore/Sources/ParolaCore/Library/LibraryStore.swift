@@ -308,9 +308,9 @@ public actor LibraryStore {
         guard let scan else { return false }
         // The list caches want the same scan; skip it if a mutation landed while it ran.
         if cachedActive == nil, epoch == listCacheEpoch { applyScan(scan.entries, folderStamp: stamp) }
+        if role == .owner { startSourceDigestBackfill(scan.entries) }
         let staleness = await index.staleness(matching: scan.fingerprints)
         guard !staleness.isCurrent else { return true }
-        if role == .owner { startSourceDigestBackfill(scan.entries) }
         let indexable = scan.entries.filter {
             $0.deletedAt == nil && (staleness.needsRebuild || staleness.changed.contains($0.id))
         }

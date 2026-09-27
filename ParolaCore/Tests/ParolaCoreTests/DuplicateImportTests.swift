@@ -165,4 +165,22 @@ struct DuplicateImportTests {
         let digest = try #require(try SourceDigest.compute(contentsOf: audio))
         #expect(await store.findEntry(digest: digest)?.id == entry.id)
     }
+
+    @Test("the backfill fills a bundle whose index is already current")
+    func backfillRunsOverACurrentIndex() async throws {
+        let (seed, library) = try makeTempLibrary()
+        let audio = try makeAudio("RIFFcurrentindex")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let entry = try await seed.add(transcript: makeTranscript(), audioSource: audio)
+        await seed.flush()
+        try ParolaDocument.updateManifest(at: entry.bundleURL) { $0.sourceDigest = nil }
+
+        let store = LibraryStore(libraryURL: library, extraIndexer: nil)
+        await store.warmSearchIndex()
+        await store.waitForSourceDigestBackfill()
+
+        let digest = try #require(try SourceDigest.compute(contentsOf: audio))
+        #expect(try ParolaDocument.read(at: entry.bundleURL).manifest.sourceDigest == digest)
+        #expect(await store.findEntry(digest: digest)?.id == entry.id)
+    }
 }
