@@ -116,7 +116,7 @@ function collect(): Sample[] {
   document.documentElement.classList.add("hit-all");
   const found: Sample[] = [];
   for (const element of owners) {
-    // Doc tile type labels and Mail field labels are under 3.2:1 in light on main; out of T36's scope.
+    // These labels sit under 3.2:1 in light; known, left as is.
     if (element.closest(".doc .ext, .fields span")) continue;
     const style = getComputedStyle(element);
     const box = textBox(element);
