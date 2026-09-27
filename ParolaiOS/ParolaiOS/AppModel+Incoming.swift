@@ -12,9 +12,13 @@ extension AppModel {
                 _ = try await library.adopt(parolaBundle: url)
                 refreshLibrary()
             } else {
-                let copy = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("parola-incoming-\(UUID().uuidString)-\(url.lastPathComponent)")
-                try await FileCopier.copy(from: url, to: copy)
+                let copy = TranscriptionCoordinator.importCopyURL(for: url)
+                do {
+                    try await FileCopier.copy(from: url, to: copy)
+                } catch {
+                    TranscriptionCoordinator.removeImportCopy(copy)
+                    throw error
+                }
                 coordinator.startFileTranscriptionFromTrustedCopy(at: copy)
             }
         } catch {

@@ -144,6 +144,58 @@ struct TranscriptionCoordinatorTests {
         #expect(entries.isEmpty)
     }
 
+    @Test("a picked file lands under its own name, as a file import, and its copy is removed")
+    func pickedFileLandsUnderItsName() async throws {
+        await MockTranscriberRegistry.shared.install(
+            engineID: .appleSpeech,
+            response: MockTranscriberResponse(segments: [.init(start: 0, end: 1, text: "hello there")])
+        )
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-coord-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        let library = LibraryStore(libraryURL: tmp.appendingPathComponent("Library", isDirectory: true))
+        let settings = UserSettings(defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
+        settings.modelName = "apple-speech-analyzer"
+        let coord = TranscriptionCoordinator(library: library, settings: settings)
+        let name = "Interview \(UUID().uuidString.prefix(8))"
+        let picked = tmp.appendingPathComponent("\(name).wav")
+        try FileManager.default.copyItem(
+            at: try #require(Bundle(for: CoordinatorBundleAnchor.self).url(forResource: "sample", withExtension: "wav")),
+            to: picked
+        )
+        var landed: LibraryEntry?
+        var transcribing: URL?
+        coord.onComplete = { landed = $0 }
+
+        coord.startFileTranscription(at: picked)
+        for _ in 0..<250 where landed == nil {
+            if case .transcribing(let file) = coord.phase { transcribing = file }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        await MockTranscriberRegistry.shared.clear()
+
+        let entry = try #require(landed)
+        #expect(entry.title == name)
+        #expect(entry.manifest.source == .file)
+        #expect(entry.manifest.originalAudioName == "\(name).wav")
+        let copy = try #require(transcribing)
+        #expect(copy.lastPathComponent == "\(name).wav")
+        #expect(!FileManager.default.fileExists(atPath: copy.deletingLastPathComponent().path))
+        #expect(FileManager.default.fileExists(atPath: picked.path), "the user's file stays where it was")
+    }
+
+    @Test("removing an import copy leaves a file outside an import folder alone")
+    func removeImportCopyIsScoped() throws {
+        let stray = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-stray-\(UUID().uuidString).m4a")
+        try Data("audio".utf8).write(to: stray)
+        defer { try? FileManager.default.removeItem(at: stray) }
+
+        TranscriptionCoordinator.removeImportCopy(stray)
+
+        #expect(FileManager.default.fileExists(atPath: stray.path))
+    }
+
     @Test("a file run cancelled during the rules pass saves nothing")
     func cancelDuringRulesPassSavesNothing() async throws {
         let (coord, library) = try makeCoordinator()
@@ -224,3 +276,5 @@ struct TranscriptionCoordinatorTests {
         #expect(loaded.document.transcript.segments.first?.text == "Hi")
     }
 }
+
+private final class CoordinatorBundleAnchor {}

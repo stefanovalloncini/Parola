@@ -47,8 +47,8 @@ extension AppModel {
             presets: ExportPreset.formatPresets
         )
         guard !presets.isEmpty else { return }
-        Task { [weak self] in
-            guard let self else { return }
+        // The add cached what it saved, so this load decodes nothing.
+        Task.detached(priority: .utility) { [library] in
             do {
                 let loaded = try await library.load(entry.id)
                 let exportsDir = library.libraryURL.appendingPathComponent("Exports", isDirectory: true)

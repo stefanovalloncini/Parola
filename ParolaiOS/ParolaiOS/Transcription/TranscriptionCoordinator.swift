@@ -48,11 +48,11 @@ final class TranscriptionCoordinator {
         Task {
             let scoped = sourceURL.startAccessingSecurityScopedResource()
             defer { if scoped { sourceURL.stopAccessingSecurityScopedResource() } }
-            let copy = FileManager.default.temporaryDirectory
-                .appendingPathComponent("parola-ios-\(UUID().uuidString)-\(sourceURL.lastPathComponent)")
+            let copy = Self.importCopyURL(for: sourceURL)
             do {
                 try await FileCopier.copy(from: sourceURL, to: copy)
             } catch {
+                Self.removeImportCopy(copy)
                 phase = .failed(message: error.localizedDescription)
                 return
             }
@@ -60,8 +60,24 @@ final class TranscriptionCoordinator {
         }
     }
 
+    /// `copy` comes from `importCopyURL(for:)`; the run removes it once the entry holds its own.
     func startFileTranscriptionFromTrustedCopy(at copy: URL) {
         runTranscription(audio: copy)
+    }
+
+    private static let importFolderPrefix = "parola-import-"
+
+    /// A folder of its own per import, so the copy keeps the file's name: the entry is titled with it.
+    static func importCopyURL(for source: URL) -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(importFolderPrefix)\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent(source.lastPathComponent)
+    }
+
+    static func removeImportCopy(_ copy: URL) {
+        let folder = copy.deletingLastPathComponent()
+        guard folder.lastPathComponent.hasPrefix(importFolderPrefix) else { return }
+        try? FileManager.default.removeItem(at: folder)
     }
 
     func reportFileImportFailure(_ error: Error) {
@@ -71,6 +87,7 @@ final class TranscriptionCoordinator {
     private func runTranscription(audio: URL) {
         transcribeTask?.cancel()
         transcribeTask = Task {
+            defer { Self.removeImportCopy(audio) }
             do {
                 lastProgressPercent = -1
                 phase = .loadingModel(name: settings.modelName)
@@ -99,7 +116,7 @@ final class TranscriptionCoordinator {
         let processed = await postProcessed(result)
         // The rules pass runs off the main actor, so a Cancel can land in it; past here the entry is written.
         try Task.checkCancellation()
-        return try await library.add(transcript: processed, audioSource: audio)
+        return try await library.add(transcript: processed, audioSource: audio, source: .file)
     }
 
     func postProcessed(_ transcript: Transcript) async -> Transcript {
