@@ -16,8 +16,12 @@ public enum YouTubeSubsFetcher {
     }
 
     public static func fetchWithTitle(url: URL, preferLanguage: String? = nil) async throws -> YouTubeSubsResult {
+        try await fetchWithTitle(url: url, preferLanguage: preferLanguage, ytDlpPath: YouTubeProcess.findYtDlp())
+    }
+
+    static func fetchWithTitle(url: URL, preferLanguage: String?, ytDlpPath: String?) async throws -> YouTubeSubsResult {
         let site = LinkDownloadFailure.site(for: url)
-        guard let ytDlp = YouTubeProcess.findYtDlp() else {
+        guard let ytDlp = ytDlpPath else {
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolMissing, site: site))
         }
 
@@ -26,23 +30,11 @@ public enum YouTubeSubsFetcher {
         try FileManager.default.createDirectory(at: workingDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workingDir) }
 
-        let outputTemplate = workingDir.appendingPathComponent("%(id)s").path
-        let langList = preferLanguage ?? "en,en-US,en-GB"
-
         let process = Process()
         process.executableURL = URL(fileURLWithPath: ytDlp)
-        process.arguments = [
-            "--write-subs",
-            "--write-auto-subs",
-            "--skip-download",
-            "--sub-format", "vtt",
-            "--sub-lang", langList,
-            "--no-playlist",
-            "--no-warnings",
-            "--print", "before_dl:[PAROLA_TITLE] %(title)s",
-            "-o", outputTemplate,
-            url.absoluteString,
-        ]
+        process.arguments = arguments(
+            url: url, preferLanguage: preferLanguage, outputTemplate: workingDir.appendingPathComponent("%(id)s").path
+        )
         process.environment = YouTubeProcess.augmentedEnvironment()
 
         let stdout = Pipe()
@@ -77,23 +69,59 @@ public enum YouTubeSubsFetcher {
             throw error
         }
 
-        let videoTitle = parseTitle(from: stdoutText)
-
         let vttFiles = (try? FileManager.default.contentsOfDirectory(at: workingDir, includingPropertiesForKeys: nil)) ?? []
-        guard let chosen = pickVtt(from: vttFiles, preferLanguage: preferLanguage) else {
+        guard var transcript = try captions(from: vttFiles, preferLanguage: preferLanguage) else {
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noCaptions, site: site))
         }
+        transcript.sourceURL = url
+        return YouTubeSubsResult(transcript: transcript, videoTitle: parseTitle(from: stdoutText))
+    }
 
-        let isAuto = chosen.lastPathComponent.contains(".auto.")
-        var transcript = try VttImporter.parse(contentsOf: chosen)
-        // Only auto-generated captions roll; running the overlap dedupe on a manual/uploader
-        // track drops legitimate short cues and strips words that only coincidentally repeat.
-        if isAuto {
+    static func arguments(url: URL, preferLanguage: String?, outputTemplate: String) -> [String] {
+        [
+            "--write-subs",
+            "--write-auto-subs",
+            "--skip-download",
+            "--sub-format", "vtt",
+            "--sub-langs", subtitleLanguages(preferLanguage),
+            "--no-playlist",
+            "--no-warnings",
+            "--print", "before_dl:[PAROLA_TITLE] %(title)s",
+            "-o", outputTemplate,
+            url.absoluteString,
+        ]
+    }
+
+    /// Every automatic language but `<lang>-orig` is a machine translation, so Auto asks for the original first.
+    static func subtitleLanguages(_ preferLanguage: String?) -> String {
+        guard let language = preferLanguage, !language.isEmpty else { return ".*-orig,en,en-US,en-GB" }
+        return "\(language),\(language)-orig"
+    }
+
+    /// The track worth keeping from what yt-dlp wrote, parsed; speech-recognition captions lose their rolling repeats.
+    static func captions(from files: [URL], preferLanguage: String?) throws -> Transcript? {
+        let tracks = try files
+            .filter { $0.pathExtension == "vtt" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .map(CaptionTrack.init(contentsOf:))
+        guard let chosen = pickTrack(from: tracks, preferLanguage: preferLanguage) else { return nil }
+        var transcript = VttImporter.parse(chosen.raw)
+        // A hand-made track keeps every cue: the overlap dedupe would drop short cues and words that only happen to repeat.
+        if chosen.isSpeechRecognition {
             transcript = dedupeRollingCaptions(transcript)
         }
-        transcript.modelName = isAuto ? "youtube-auto-subs" : "youtube-subs"
-        transcript.sourceURL = url
-        return YouTubeSubsResult(transcript: transcript, videoTitle: videoTitle)
+        transcript.modelName = chosen.isSpeechRecognition ? "youtube-auto-subs" : "youtube-subs"
+        if !chosen.spokenLanguage.isEmpty { transcript.language = chosen.spokenLanguage }
+        return transcript
+    }
+
+    /// A hand-made track in the spoken language, then the speech-recognition original, then whatever else came back.
+    static func pickTrack(from tracks: [CaptionTrack], preferLanguage: String?) -> CaptionTrack? {
+        let original = tracks.first(where: \.isOriginal)
+        let spoken = preferLanguage.map(CaptionTrack.baseLanguage) ?? original?.spokenLanguage
+        let handMade = tracks.filter { !$0.isSpeechRecognition }
+        if let spoken, let match = handMade.first(where: { $0.spokenLanguage == spoken }) { return match }
+        return original ?? handMade.first ?? tracks.first
     }
 
     /// YouTube's auto-generated captions roll: each cue shows two lines where the first line
@@ -167,18 +195,37 @@ public enum YouTubeSubsFetcher {
         }
         return nil
     }
+}
 
-    static func pickVtt(from files: [URL], preferLanguage: String?) -> URL? {
-        let vtts = files.filter { $0.pathExtension == "vtt" }
-        if let lang = preferLanguage,
-           let exact = vtts.first(where: { $0.lastPathComponent.contains(".\(lang).") }) {
-            return exact
-        }
-        if let manual = vtts.first(where: { !$0.lastPathComponent.contains(".auto.") }) {
-            return manual
-        }
-        return vtts.first
+/// yt-dlp names every track `<id>.<lang>.vtt`, hand-made or not, so the kind of track is read from the file itself.
+struct CaptionTrack {
+    /// yt-dlp's key for the track: `en`, `pt-BR`, or `it-orig` for YouTube's speech recognition in the spoken language.
+    let language: String
+    let raw: String
+    let isSpeechRecognition: Bool
+
+    init(contentsOf url: URL) throws {
+        let parts = url.deletingPathExtension().lastPathComponent.split(separator: ".")
+        language = parts.count > 1 ? String(parts[parts.count - 1]) : ""
+        raw = String(decoding: try Data(contentsOf: url), as: UTF8.self)
+        isSpeechRecognition = language.hasSuffix("-orig") || Self.looksLikeSpeechRecognition(raw)
     }
 
+    var isOriginal: Bool { language.hasSuffix("-orig") }
+
+    var spokenLanguage: String { Self.baseLanguage(language) }
+
+    static func baseLanguage(_ key: String) -> String {
+        String(key.split(separator: "-").first ?? "").lowercased()
+    }
+
+    /// Speech recognition times every word inline and ends each line with a 10 ms cue; a hand-made track never does both.
+    static func looksLikeSpeechRecognition(_ raw: String) -> Bool {
+        guard raw.contains(/<\d{2}:\d{2}:\d{2}\.\d{3}><c>/) else { return false }
+        return raw.split(whereSeparator: \.isNewline).contains { line in
+            guard line.contains("-->"), let cue = VttImporter.parseTimeLine(String(line)) else { return false }
+            return abs(cue.end - cue.start - 0.01) < 0.002
+        }
+    }
 }
 #endif
