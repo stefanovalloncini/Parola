@@ -132,6 +132,8 @@ public actor MCPServer {
         args: [String: Any],
         progress: ProgressSink?
     ) async throws -> MCPToolCallResult {
+        // The app writes the library through its own store, and this server can outlive many of its saves.
+        if tool.readsLibrary { await libraryStore.reloadIfChangedElsewhere() }
         switch tool {
         case .transcribe:    return try await transcribe(args: args, progress: progress)
         case .listModels:    return listModels()

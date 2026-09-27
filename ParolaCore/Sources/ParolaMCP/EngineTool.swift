@@ -11,6 +11,13 @@ public enum EngineTool: String, CaseIterable, Sendable {
     case summarize        = "parola_summarize"
     case openApp          = "parola_open_app"
 
+    var readsLibrary: Bool {
+        switch self {
+        case .transcribe, .searchLibrary, .listRecent, .libraryStats: true
+        case .listModels, .listEngines, .summarize, .openApp: false
+        }
+    }
+
     public var mcpTool: MCPTool {
         switch self {
         case .transcribe:

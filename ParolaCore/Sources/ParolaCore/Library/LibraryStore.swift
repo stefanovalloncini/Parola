@@ -94,7 +94,7 @@ public actor LibraryStore {
 
     public nonisolated let libraryURL: URL
     public nonisolated let role: Role
-    private let searchIndex: LibrarySearchIndex
+    private var searchIndex: LibrarySearchIndex
     private let extraIndexer: LibraryIndexer?
     private var cachedActive: [LibraryEntry]?
     private var cachedDeleted: [LibraryEntry]?
@@ -102,6 +102,8 @@ public actor LibraryStore {
     private var listCacheEpoch = 0
     /// The library folder's modification date as of the last scan or this store's own last add or removal.
     private var folderStamp: Date?
+    /// A reader's view of the owner's index snapshot as of its last `reloadIfChangedElsewhere`.
+    private var seenSnapshotStamp: Date?
     private var indexReadyTask: Task<Void, Never>?
     private var searchIndexNeedsCheck = false
     private var digestBackfillTask: Task<Void, Never>?
@@ -153,7 +155,7 @@ public actor LibraryStore {
         } else {
             self.extraIndexerJobs = nil
         }
-        let indexDirectory = libraryURL.appendingPathComponent(".search-index", isDirectory: true)
+        let indexDirectory = Self.indexDirectory(in: libraryURL)
         switch role {
         case .owner:
             // Made here, not by the first index save, which would move the folder's date after a scan took it.
@@ -418,7 +420,7 @@ public actor LibraryStore {
 
     /// Read before the scan it belongs to, so a write landing during the scan still reads as a change.
     private nonisolated static func folderStamp(of url: URL) -> Date? {
-        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        modificationDate(of: url)
     }
 
     /// Whether another process saved or removed a bundle since this store last listed the folder.
@@ -426,6 +428,36 @@ public actor LibraryStore {
     public func folderChangedElsewhere() -> Bool {
         guard let folderStamp else { return false }
         return Self.folderStamp(of: libraryURL) != folderStamp
+    }
+
+    /// For a store beside the one that writes the library, such as the MCP server's: forgets what it
+    /// read when another process has saved, removed, renamed or re-indexed an entry since the last
+    /// call. Two stats when nothing moved. True when it dropped anything.
+    ///
+    /// A change that touches only a bundle's manifest and not the search index (a pin, a label, a
+    /// category) moves neither date, so it shows once something else does.
+    @discardableResult
+    public func reloadIfChangedElsewhere() -> Bool {
+        var snapshotMoved = false
+        if role == .reader {
+            let snapshot = Self.modificationDate(of: Self.indexDirectory(in: libraryURL).appendingPathComponent("manifest.json"))
+            snapshotMoved = snapshot != seenSnapshotStamp
+            seenSnapshotStamp = snapshot
+        }
+        guard folderChangedElsewhere() || snapshotMoved else { return false }
+        dropCaches()
+        if snapshotMoved, indexReadyTask != nil {
+            searchIndex = LibrarySearchIndex(readingSnapshotIn: Self.indexDirectory(in: libraryURL))
+        }
+        return true
+    }
+
+    private nonisolated static func indexDirectory(in libraryURL: URL) -> URL {
+        libraryURL.appendingPathComponent(".search-index", isDirectory: true)
+    }
+
+    private nonisolated static func modificationDate(of url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
     }
 
     /// After this store adds or removes a bundle, the folder's new date is its own, unless it had already moved before.
@@ -1265,15 +1297,16 @@ public actor LibraryStore {
         listCacheEpoch &+= 1
     }
 
-    /// Drops every in-memory cache so the next read re-scans disk. The app's `--test-mode` reset
-    /// wipes the library directory directly, behind this actor's back; without this the stale list
-    /// cache would resurrect entries whose bundles are already gone.
+    /// Drops every in-memory cache so the next read re-scans disk, and has the next search catch the
+    /// index up with the bundles. The app's `--test-mode` reset wipes the library directory directly,
+    /// behind this actor's back; without this the stale list cache would resurrect entries whose bundles are already gone.
     public func dropCaches() {
         cachedActive = nil
         cachedDeleted = nil
         folderStamp = nil
         cachedLoaded.removeAll()
         listCacheEpoch &+= 1
+        searchIndexNeedsCheck = true
     }
 
     private nonisolated func makeEntry(bundleURL: URL) throws -> LibraryEntry {

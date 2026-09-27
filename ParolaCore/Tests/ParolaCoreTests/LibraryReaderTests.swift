@@ -158,6 +158,44 @@ struct LibraryReaderTests {
         #expect(after["second.json"] != before["second.json"])
     }
 
+    @Test("after a rescan the owner indexes what a reader saved while it ran")
+    func ownerCatchesUpAfterARescan() async throws {
+        let dir = try makeTempLibraryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let app = owner(dir)
+        _ = try await app.add(transcript: transcript("alpha minutes"), audioSource: nil)
+        await app.flush()
+
+        let saved = try await reader(dir).add(transcript: transcript("zzyzxmarker minutes"), audioSource: nil)
+        #expect(await app.search("zzyzxmarker").isEmpty, "nothing told the app yet")
+        #expect(await app.folderChangedElsewhere())
+        await app.dropCaches()
+
+        #expect(await app.search("zzyzxmarker").map(\.entryID) == [saved.id])
+        await app.flush()
+        #expect(snapshotFiles(in: dir)["\(saved.id).json"] != nil)
+    }
+
+    @Test("a reader's own save is not a change made elsewhere, and a quiet library is not either")
+    func readerOwnSaveIsNotAChange() async throws {
+        let dir = try makeTempLibraryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let app = owner(dir)
+        _ = try await app.add(transcript: transcript("alpha minutes"), audioSource: nil)
+        await app.flush()
+        let store = reader(dir)
+        await store.reloadIfChangedElsewhere()
+        _ = await store.list()
+        #expect(await !store.reloadIfChangedElsewhere())
+
+        _ = try await store.add(transcript: transcript("zzyzxmarker minutes"), audioSource: nil)
+        #expect(await !store.reloadIfChangedElsewhere())
+
+        _ = try await app.add(transcript: transcript("beta minutes"), audioSource: nil)
+        #expect(await store.reloadIfChangedElsewhere())
+        #expect(await store.list().count == 3)
+    }
+
     @Test("a reader leaves each bundle's manifest as it found it")
     func readerWritesNoManifest() async throws {
         let dir = try makeTempLibraryDirectory()
