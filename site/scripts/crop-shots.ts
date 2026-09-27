@@ -8,10 +8,11 @@ const recipe = new URL("../src/data/crops.ts", import.meta.url);
 
 export async function cropShots(): Promise<void> {
   const recipeTime = statSync(recipe).mtimeMs;
-  for (const folder of ["", "it/"]) {
+  for (const folder of ["", "it/", "dark/", "it/dark/"]) {
     mkdirSync(new URL(`crops/${folder}`, assets), { recursive: true });
     for (const [name, crop] of Object.entries(crops)) {
       const source = fileURLToPath(new URL(`shots/${folder}${name}.png`, assets));
+      if (folder.includes("dark/") && !existsSync(source)) continue;
       const newest = Math.max(statSync(source).mtimeMs, recipeTime);
       for (const [variant, [x, y, width, height]] of Object.entries({
         wide: crop.wide,

@@ -1,5 +1,4 @@
 ---
-import { Picture } from "astro:assets";
 import { shotsFor } from "../../data/shots";
 import { storyBeats } from "../../data/story";
 import { localeOf, translator } from "../../i18n";
@@ -9,10 +8,12 @@ import MacBook from "../device/MacBook.astro";
 import SceneDictation from "./SceneDictation.astro";
 import SceneMeeting from "./SceneMeeting.astro";
 import StoryProps from "./StoryProps.astro";
+import ThemedPicture from "../ThemedPicture.astro";
 
 const locale = localeOf(Astro.currentLocale);
 const t = translator(locale);
 const shots = shotsFor(locale);
+const darkShots = shotsFor(locale, "dark");
 const shotSizes =
   "(min-width: 1600px) min(787px, calc(108vh - 424px)), (min-width: 721px) min(651px, 70vw, calc(108vh - 424px)), 70vw";
 
@@ -43,11 +44,9 @@ const beats = t(storyBeats);
       <MacBook class="laptop">
         <Desktop>
           <div class="scene scene-window">
-            <Picture
-              src={shots["hero-window"]}
-              alt=""
-              formats={["avif", "webp"]}
-              fallbackFormat="webp"
+            <ThemedPicture
+              light={shots["hero-window"]}
+              dark={darkShots["hero-window"]}
               widths={[720, 1080, 1440, 2160]}
               sizes={shotSizes}
               loading="eager"
@@ -55,11 +54,9 @@ const beats = t(storyBeats);
             />
           </div>
           <div class="scene scene-drop">
-            <Picture
-              src={shots["drop-zone"]}
-              alt=""
-              formats={["avif", "webp"]}
-              fallbackFormat="webp"
+            <ThemedPicture
+              light={shots["drop-zone"]}
+              dark={darkShots["drop-zone"]}
               widths={[720, 1080, 1440, 2160]}
               sizes={shotSizes}
             />

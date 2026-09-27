@@ -1,0 +1,20 @@
+---
+import type { GetImageResult } from "astro";
+
+interface Props {
+  sets: GetImageResult[];
+  sizes: string;
+  media?: string;
+}
+
+const { sets, sizes, media } = Astro.props;
+---
+
+{sets.map((set) => (
+  <source
+    media={media}
+    type={`image/${set.options.format}`}
+    srcset={set.srcSet.attribute}
+    sizes={sizes}
+  />
+))}

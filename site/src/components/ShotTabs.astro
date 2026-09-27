@@ -1,8 +1,9 @@
 ---
 import { getImage } from "astro:assets";
 import { cropOf, type TabShot } from "../data/crops";
-import { tabShotFor } from "../data/shots";
+import { darkTabShotFor, tabShotFor } from "../data/shots";
 import { localeOf } from "../i18n";
+import SourceSet from "./SourceSet.astro";
 
 export interface ShotTab {
   id: string;
@@ -23,10 +24,13 @@ const phone = "(max-width: 640px)";
 const phoneSizes = "calc(100vw - 32px)";
 const wideSizes =
   "(max-width: 720px) calc(100vw - 32px), (max-width: 984px) calc(100vw - 48px), 936px";
+const darkPhone = "(prefers-color-scheme: dark) and (max-width: 640px)";
+const darkWide = "(prefers-color-scheme: dark)";
 
 const pictures = await Promise.all(
   tabs.map(async (tab) => {
     const { wide, narrow } = tabShotFor(locale, tab.shot);
+    const twin = darkTabShotFor(locale, tab.shot);
     const variants = (image: typeof wide, widths: number[]) =>
       Promise.all(
         (["avif", "webp"] as const).map((format) =>
@@ -37,12 +41,20 @@ const pictures = await Promise.all(
       variants(wide, [960, 1440, wide.width]),
       variants(narrow, [400, narrow.width]),
     ]);
+    const [darkWideSets, darkNarrowSets] = twin
+      ? await Promise.all([
+          variants(twin.wide, [960, 1440, twin.wide.width]),
+          variants(twin.narrow, [400, twin.narrow.width]),
+        ])
+      : [undefined, undefined];
     const [, , width, height] = cropOf(tab.shot).wide;
     const [, , narrowWidth, narrowHeight] = cropOf(tab.shot).narrow;
     return {
       wide,
       wideSets,
       narrowSets,
+      darkWideSets,
+      darkNarrowSets,
       style: `--w: ${width}; --h: ${height}; --nw: ${narrowWidth}; --nh: ${narrowHeight}`,
     };
   }),
@@ -67,21 +79,22 @@ const pictures = await Promise.all(
       >
         <div class="crop" style={pictures[i]?.style} data-fade={cropOf(tab.shot).fade}>
           <picture>
-            {pictures[i]?.narrowSets.map((set) => (
-              <source
-                media={phone}
-                type={`image/${set.options.format}`}
-                srcset={set.srcSet.attribute}
+            {pictures[i]?.darkNarrowSets && (
+              <SourceSet
+                sets={pictures[i]?.darkNarrowSets ?? []}
+                media={darkPhone}
                 sizes={phoneSizes}
               />
-            ))}
-            {pictures[i]?.wideSets.map((set) => (
-              <source
-                type={`image/${set.options.format}`}
-                srcset={set.srcSet.attribute}
+            )}
+            {pictures[i]?.darkWideSets && (
+              <SourceSet
+                sets={pictures[i]?.darkWideSets ?? []}
+                media={darkWide}
                 sizes={wideSizes}
               />
-            ))}
+            )}
+            <SourceSet sets={pictures[i]?.narrowSets ?? []} media={phone} sizes={phoneSizes} />
+            <SourceSet sets={pictures[i]?.wideSets ?? []} sizes={wideSizes} />
             <img
               src={pictures[i]?.wideSets[1]?.src}
               width={pictures[i]?.wide.width}
