@@ -202,6 +202,35 @@ struct YouTubeProcessTests {
         #expect(!isAlive(pid))
     }
 
+    @Test("a run and its children that ignore SIGTERM are killed as a group")
+    func stubbornGroupIsKilled() async throws {
+        let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("parola-stubborn-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let childPid = scratch.appendingPathComponent("child")
+        let fake = try fakeYtDlp("""
+            trap '' TERM
+            sleep 30 &
+            echo $! > '\(childPid.path)'
+            echo "[PAROLA_P] 1 10"
+            while true; do sleep 1; done
+            """)
+        defer { try? FileManager.default.removeItem(at: fake) }
+
+        let failure = await linkFailure {
+            _ = try await YtDlpRunner.run(
+                ytDlpPath: fake.path, arguments: [], run: .download,
+                watch: .progress(tight(startup: .seconds(20), quiet: .seconds(1)))
+            )
+        }
+
+        #expect(failure?.reason == .stalled(seconds: 1))
+        let pid = try #require(Int32(String(contentsOf: childPid, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
+        let deadline = ContinuousClock.now + .seconds(3)
+        while isAlive(pid), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(!isAlive(pid))
+    }
+
     @Test("a binary that can't launch fails as a tool that didn't start")
     func launchFailure() async {
         let failure = await linkFailure {

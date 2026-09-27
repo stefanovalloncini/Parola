@@ -102,8 +102,6 @@ final class ExitSignal: Sendable {
 
     private let state = OSAllocatedUnfairLock(initialState: State())
 
-    var hasFired: Bool { state.withLock { $0.exited } }
-
     func fire() {
         let waiters = state.withLock { state in
             state.exited = true

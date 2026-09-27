@@ -110,7 +110,7 @@ enum YtDlpRunner {
             }
             group.addTask { await watchdog.expiry() }
             let first = await group.next() ?? .exited
-            if case .exited = first {} else { stop(process, exit: exit) }
+            if case .exited = first {} else { stop(process) }
             group.cancelAll()
             return first
         }
@@ -148,17 +148,17 @@ enum YtDlpRunner {
         case stalled(seconds: Int)
     }
 
-    /// SIGTERM reaches yt-dlp's whole process group, ffmpeg included; SIGKILL follows if it lingers.
-    private static func stop(_ process: Process, exit: ExitSignal) {
+    /// SIGTERM reaches yt-dlp's whole process group, ffmpeg included; five seconds on, SIGKILL goes to the same group.
+    private static func stop(_ process: Process) {
         guard process.isRunning else { return }
         process.terminate()
         let pid = process.processIdentifier
         DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(5)) {
-            if !exit.hasFired { kill(pid, SIGKILL) }
+            kill(-pid, SIGKILL)
         }
     }
 
-    /// Keeps the run's deadline: fixed for a wall clock, pushed out by every line for a download.
+    /// Keeps the run's deadline: fixed for a wall clock, pushed out by each metadata or progress line for a download.
     final class Watchdog: Sendable {
         private struct State {
             var deadline: ContinuousClock.Instant

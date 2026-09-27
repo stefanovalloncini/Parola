@@ -23,8 +23,7 @@ actor FetchGate {
     }
 }
 
-/// A link fetcher that reports a title and half the download, then hands back a local file. An owning fetcher
-/// copies the fixture into a working folder of its own, the way yt-dlp's download lands.
+/// Reports a title and half the download, then hands back the fixture, or an owned copy of it the way yt-dlp's lands.
 final class ScriptedLinkFetcher: LinkFetcher {
     let fixture: URL
     let metadata: LinkMetadata
@@ -174,8 +173,7 @@ extension TranscriberMockSuites {
             }
         }
 
-        /// The batch is driven by its events: a real queue would read the file through AVFoundation, which an
-        /// earlier suite's wedged FIFO can leave stuck for the rest of the process.
+        /// Driven by batch events: a real queue reads the file through AVFoundation, which a wedged FIFO test can stall.
         @Test("a link handed over while a batch runs waits for the batch")
         func linkParksBehindABatch() async throws {
             let fixture = try makeLinkFixtureWAV()
