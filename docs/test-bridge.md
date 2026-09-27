@@ -40,7 +40,7 @@ Response (failure):
 
 Every dispatch hops to `@MainActor` before touching `AppModel`, so the bridge is safe to call from any queue.
 
-The tools advertised over MCP are the typed `parola_*` set plus `parola_app_dispatch`. The `parola_app_*` names below stay callable but are no longer listed in `tools/list` — new integrations should reach for the typed tools or the `parola_app_dispatch` fallback.
+The tools advertised over MCP are the typed `parola_*` set plus `parola_app_dispatch`. The `parola_app_*` names below stay callable but are no longer listed in `tools/list` — new integrations should reach for the typed tools or the `parola_app_dispatch` fallback. A `parola_app_*` name runs the typed tool for the same command when there is one, and otherwise sends its command with the arguments given, as `parola_app_dispatch` does.
 
 ## Tool reference
 

@@ -19,16 +19,18 @@ struct ToolRegistryTests {
         }
     }
 
-    @Test("App tool names are namespaced under parola_app_")
-    func appNaming() {
-        for tool in AppTools.all {
-            #expect(tool.name.hasPrefix("parola_app_"), "app tool \(tool.name) missing prefix")
+    @Test("Legacy app tool names stay under parola_app_ and out of tools/list")
+    func legacyNaming() {
+        let listed = Set(ToolRegistry.allToolNames())
+        for name in LegacyAppTools.commands.keys {
+            #expect(name.hasPrefix("parola_app_"), "legacy tool \(name) missing prefix")
+            #expect(!listed.contains(name), "legacy tool \(name) is listed")
         }
     }
 
     @Test("Required props are declared properties")
     func requiredArePresent() {
-        for tool in AppTools.all {
+        for tool in TypedToolRegistry.all {
             let propNames = Set(tool.properties.map(\.name))
             for r in tool.required {
                 #expect(propNames.contains(r), "tool \(tool.name) marks '\(r)' as required but doesn't declare it")
@@ -47,22 +49,22 @@ struct ToolRegistryTests {
         }
     }
 
-    @Test("App tool schema mirrors property declarations")
-    func appToolSchemaShape() throws {
-        let setTheme = try #require(AppTools.byName["parola_app_set_theme"])
-        let data = try JSONEncoder().encode(setTheme.mcpTool)
+    @Test("Typed tool schema mirrors property declarations")
+    func typedToolSchemaShape() throws {
+        let export = try #require(TypedToolRegistry.byName["parola_export_transcript"])
+        let data = try JSONEncoder().encode(export.mcpTool)
         let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let schema = parsed?["inputSchema"] as? [String: Any]
         let props = schema?["properties"] as? [String: Any]
-        let theme = props?["theme"] as? [String: Any]
-        #expect(theme?["type"] as? String == "string")
-        #expect(theme?["enum"] as? [String] == ["light", "dark", "system"])
-        #expect(schema?["required"] as? [String] == ["theme"])
+        let format = props?["format"] as? [String: Any]
+        #expect(format?["type"] as? String == "string")
+        #expect((format?["enum"] as? [String])?.contains("srt") == true)
+        #expect(schema?["required"] as? [String] == ["format"])
     }
 
     @Test("Bridge invocation forwards filtered args and command")
     func bridgeInvocationFiltersArgs() async throws {
-        let tool = try #require(AppTools.byName["parola_app_select_model"])
+        let tool = try #require(TypedToolRegistry.byName["parola_select_model"])
         let bridge = RecordingBridge()
         _ = try await tool.invoke(args: ["name": "openai_whisper-tiny", "ignored": 42], bridge: bridge)
 
@@ -75,12 +77,12 @@ struct ToolRegistryTests {
 
     @Test("Tools without properties forward an empty object")
     func bridgeInvocationEmptyArgs() async throws {
-        let tool = try #require(AppTools.byName["parola_app_ping"])
+        let tool = try #require(TypedToolRegistry.byName["parola_get_state"])
         let bridge = RecordingBridge()
         _ = try await tool.invoke(args: ["whatever": "should-be-dropped"], bridge: bridge)
 
         let call = try #require(await bridge.lastCall)
-        #expect(call.cmd == "ping")
+        #expect(call.cmd == "getState")
         let parsed = try JSONSerialization.jsonObject(with: call.argsJSON) as? [String: Any]
         #expect(parsed?.isEmpty == true)
     }
@@ -95,17 +97,84 @@ struct ToolRegistryTests {
         #expect(AppLauncher.defaultBundleID == "app.parola.ParolaApp")
     }
 
-    @Test("Dictation app tools forward to startDictation / stopDictation")
+    private func callTool(_ name: String, _ arguments: [String: Any], bridge: RecordingBridge) async throws -> [String: Any] {
+        let server = MCPServer(libraryStore: scratchLibraryStore(), bridge: bridge)
+        let request = JSONRPCRequest(
+            jsonrpc: "2.0",
+            id: .int(1),
+            method: "tools/call",
+            params: AnyDecodable(["name": name, "arguments": arguments] as [String: Any])
+        )
+        let response = try #require(try await server.handle(request))
+        let json = try #require(
+            try JSONSerialization.jsonObject(with: JSONEncoder().encode(response)) as? [String: Any]
+        )
+        let result = try #require(json["result"] as? [String: Any])
+        #expect(result["isError"] as? Bool != true)
+        let call = try #require(await bridge.lastCall)
+        return try #require(try JSONSerialization.jsonObject(with: call.argsJSON) as? [String: Any])
+    }
+
+    @Test("Dictation legacy names forward to startDictation / stopDictation")
     func dictationToolsForwardCorrectly() async throws {
-        let start = try #require(AppTools.byName["parola_app_dictate"])
-        let stop = try #require(AppTools.byName["parola_app_dictate_stop"])
         let bridge = RecordingBridge()
-        _ = try await start.invoke(args: [:], bridge: bridge)
-        let startCall = try #require(await bridge.lastCall)
-        #expect(startCall.cmd == "startDictation")
-        _ = try await stop.invoke(args: [:], bridge: bridge)
-        let stopCall = try #require(await bridge.lastCall)
-        #expect(stopCall.cmd == "stopDictation")
+        _ = try await callTool("parola_app_dictate", [:], bridge: bridge)
+        #expect(await bridge.lastCall?.cmd == "startDictation")
+        _ = try await callTool("parola_app_dictate_stop", [:], bridge: bridge)
+        #expect(await bridge.lastCall?.cmd == "stopDictation")
+    }
+
+    @Test("A legacy name with a typed tool forwards what the typed tool does")
+    func legacyNameRunsTheTypedTool() async throws {
+        let bridge = RecordingBridge()
+        let args = try await callTool(
+            "parola_app_export_transcript", ["format": "srt", "includeTimestamps": true, "junk": 1], bridge: bridge
+        )
+        #expect(await bridge.lastCall?.cmd == "exportTranscript")
+        #expect(args["format"] as? String == "srt")
+        #expect(args["includeTimestamps"] as? Bool == true)
+        #expect(args["junk"] == nil)
+    }
+
+    @Test("A legacy name without a typed tool sends its command with the caller's arguments")
+    func legacyNameDispatchesItsCommand() async throws {
+        let bridge = RecordingBridge()
+        let args = try await callTool("parola_app_set_theme", ["theme": "dark"], bridge: bridge)
+        #expect(await bridge.lastCall?.cmd == "setTheme")
+        #expect(args["theme"] as? String == "dark")
+    }
+
+    @Test("A wait tool called without timeoutMs sends the default its description names")
+    func waitToolSendsItsDefault() async throws {
+        let bridge = RecordingBridge()
+        let omitted = try await callTool("parola_wait_for_batch_job", ["jobID": "J"], bridge: bridge)
+        #expect(omitted["timeoutMs"] as? Int == 30_000)
+        let given = try await callTool("parola_wait_for_batch_job", ["jobID": "J", "timeoutMs": 1_234], bridge: bridge)
+        #expect(given["timeoutMs"] as? Int == 1_234)
+        let legacy = try await callTool("parola_app_wait_for_phase", ["phase": "ready"], bridge: bridge)
+        #expect(legacy["timeoutMs"] as? Int == 10_000)
+    }
+
+    @Test("Every typed tool that takes timeoutMs sends the default its description names")
+    func typedTimeoutDefaultsMatchTheirDescriptions() throws {
+        let waits = TypedToolRegistry.all.filter { $0.argKeys.contains("timeoutMs") }
+        #expect(!waits.isEmpty)
+        for tool in waits {
+            let fallback = try #require(tool.defaultTimeoutMs, "\(tool.name) has no default timeout")
+            let described = tool.properties.first { $0.name == "timeoutMs" }?.description ?? ""
+            #expect(described.contains("Defaults to \(fallback)."), "\(tool.name): \(described)")
+        }
+    }
+
+    @Test("The client's socket outlasts the wait the app runs")
+    func socketTimeoutCoversTheWait() {
+        func timeout(_ cmd: String, _ args: String) -> TimeInterval {
+            BridgeClient.socketTimeout(cmd: cmd, argsJSON: Data(args.utf8), floor: 35)
+        }
+        #expect(timeout("waitForBatchJob", #"{"timeoutMs":300000}"#) == 305)
+        #expect(timeout("waitForPhase", #"{"timeoutMs":1000}"#) == 35)
+        #expect(timeout("waitForBatchEmpty", "{}") == BridgeClient.longestWaitDefault + 5)
+        #expect(timeout("ping", "{}") == 35)
     }
 
     @Test("BridgeClient pins a version constant for the wire protocol")

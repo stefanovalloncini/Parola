@@ -93,6 +93,13 @@ installed. App tools talk to a running Parola.app over a local bridge.
 `parola_app_dispatch` forwards any bridge command that has no typed tool. Call
 it with `{"command": "_handshake"}` for the full catalog.
 
+A wait tool called without `timeoutMs` sends the default its description names:
+10 s for `parola_wait_for_phase`, 30 s for `parola_wait_for_batch_job`, 5 s for
+`parola_wait_for_revision`. `parola-mcp` keeps the connection open for the wait
+plus 5 s. A `wait…` command sent through `parola_app_dispatch` without
+`timeoutMs` runs to the app's own default, so the connection stays open up to
+ten minutes.
+
 These fail with a clean error when the app isn't running. Call
 `parola_open_app` first; it launches the app and blocks until the bridge
 answers. The wire protocol and the bridge's own gating live in

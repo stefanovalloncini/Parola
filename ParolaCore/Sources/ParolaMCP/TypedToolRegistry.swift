@@ -3,20 +3,73 @@ import Foundation
 /// The curated top-20 MCP tools exposed by `parola-mcp`. Each entry pairs a typed schema with
 /// the bridge command it forwards to. Long-tail commands stay reachable via `parola_app_dispatch`.
 public struct TypedTool: Sendable {
+    public struct Property: Sendable {
+        public enum Kind: Sendable {
+            case string(enum: [String]? = nil)
+            case boolean
+            case integer
+            case stringArray
+            case any
+        }
+        public let name: String
+        public let kind: Kind
+        public let description: String?
+
+        public static func string(_ name: String, enum vals: [String]? = nil, description: String? = nil) -> Self {
+            .init(name: name, kind: .string(enum: vals), description: description)
+        }
+        public static func bool(_ name: String, description: String? = nil) -> Self {
+            .init(name: name, kind: .boolean, description: description)
+        }
+        public static func int(_ name: String, description: String? = nil) -> Self {
+            .init(name: name, kind: .integer, description: description)
+        }
+        public static func stringArray(_ name: String, description: String? = nil) -> Self {
+            .init(name: name, kind: .stringArray, description: description)
+        }
+        public static func any(_ name: String, description: String? = nil) -> Self {
+            .init(name: name, kind: .any, description: description)
+        }
+
+        var schema: [String: Any] {
+            var s: [String: Any] = [:]
+            switch kind {
+            case .string(let vals):
+                s["type"] = "string"
+                if let vals { s["enum"] = vals }
+            case .boolean:
+                s["type"] = "boolean"
+            case .integer:
+                s["type"] = "integer"
+            case .stringArray:
+                s["type"] = "array"
+                s["items"] = ["type": "string"]
+            case .any:
+                break
+            }
+            if let description { s["description"] = description }
+            return s
+        }
+    }
+
     public let name: String
     public let bridgeCmd: String
     public let description: String
-    public let properties: [AppTool.Property]
+    public let properties: [Property]
     public let required: [String]
     public let additionalProperties: Bool
+    /// Sent when a call leaves `timeoutMs` out, so the app waits as long as the description says and
+    /// the client's socket, sized from the request, outlasts the wait.
+    public let defaultTimeoutMs: Int?
 
     public init(
         name: String,
         bridgeCmd: String,
         description: String,
-        properties: [AppTool.Property],
+        properties: [Property],
         required: [String] = [],
-        additionalProperties: Bool = false
+        additionalProperties: Bool = false,
+        defaultTimeoutMs: Int? = nil
     ) {
         self.name = name
         self.bridgeCmd = bridgeCmd
@@ -24,6 +77,7 @@ public struct TypedTool: Sendable {
         self.properties = properties
         self.required = required
         self.additionalProperties = additionalProperties
+        self.defaultTimeoutMs = defaultTimeoutMs
     }
 
     public var mcpTool: MCPTool {
@@ -40,7 +94,10 @@ public struct TypedTool: Sendable {
 
     public func invoke(args: [String: Any], bridge: any BridgeProtocol) async throws -> MCPToolCallResult {
         let keys = Set(argKeys)
-        let filtered = args.filter { keys.contains($0.key) }
+        var filtered = args.filter { keys.contains($0.key) }
+        if let defaultTimeoutMs, filtered["timeoutMs"] == nil {
+            filtered["timeoutMs"] = defaultTimeoutMs
+        }
         let argsData = (try? JSONSerialization.data(withJSONObject: filtered)) ?? Data("{}".utf8)
         let text = try await bridge.call(bridgeCmd, argsJSON: argsData)
         return MCPToolCallResult(text: text)
@@ -148,7 +205,8 @@ public enum TypedToolRegistry {
                 .string("phase", enum: ["idle", "downloadingModel", "loadingModel", "fetchingLink", "transcribing", "recording", "exporting", "ready", "failed"], description: "Phase to wait for."),
                 .int("timeoutMs", description: "Max ms to wait. Defaults to 10000."),
             ],
-            required: ["phase"]
+            required: ["phase"],
+            defaultTimeoutMs: 10_000
         ),
         TypedTool(
             name: "parola_wait_for_batch_job",
@@ -158,7 +216,8 @@ public enum TypedToolRegistry {
                 .string("jobID", description: "Batch job UUID."),
                 .int("timeoutMs", description: "Max ms to wait. Defaults to 30000."),
             ],
-            required: ["jobID"]
+            required: ["jobID"],
+            defaultTimeoutMs: 30_000
         ),
         TypedTool(
             name: "parola_wait_for_revision",
@@ -168,7 +227,8 @@ public enum TypedToolRegistry {
                 .int("min", description: "Minimum revision value to wait for."),
                 .int("timeoutMs", description: "Max ms to wait. Defaults to 5000."),
             ],
-            required: ["min"]
+            required: ["min"],
+            defaultTimeoutMs: 5_000
         ),
         TypedTool(
             name: "parola_start_dictation",
@@ -214,6 +274,10 @@ public enum TypedToolRegistry {
 
     public static let byName: [String: TypedTool] = Dictionary(
         uniqueKeysWithValues: all.map { ($0.name, $0) }
+    )
+
+    static let byCommand: [String: TypedTool] = Dictionary(
+        uniqueKeysWithValues: all.map { ($0.bridgeCmd, $0) }
     )
 
     public static let appDispatch: MCPTool = {

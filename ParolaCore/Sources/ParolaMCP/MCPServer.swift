@@ -93,8 +93,8 @@ public actor MCPServer {
                 result = try await typedTool.invoke(args: args, bridge: bridge)
             } else if name == TypedToolRegistry.appDispatch.name {
                 result = try await dispatchAppCommand(args: args)
-            } else if let appTool = AppTools.byName[name] {
-                result = try await appTool.invoke(args: args, bridge: bridge)
+            } else if let legacy = try await LegacyAppTools.invoke(name, args: args, bridge: bridge) {
+                result = legacy
             } else {
                 return JSONRPCResponse.success(
                     id: request.id,

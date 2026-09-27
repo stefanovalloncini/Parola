@@ -56,9 +56,7 @@ public struct BridgeClient: BridgeProtocol {
         let port = try readPort()
         let token = readToken() ?? ""
         let payload = encodeRequest(cmd: cmd, argsJSON: argsJSON, token: token)
-        // Long-poll commands (waitForPhase, waitForBatchJob, ...) legally exceed the default
-        // socket timeout; honor the command's own timeoutMs plus slack.
-        let timeout = max(self.timeout, Self.requestedTimeout(argsJSON: argsJSON) + 5)
+        let timeout = Self.socketTimeout(cmd: cmd, argsJSON: argsJSON, floor: self.timeout)
 
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -94,10 +92,22 @@ public struct BridgeClient: BridgeProtocol {
         kill(pid_t(pid), 0) == 0 || errno == EPERM
     }
 
-    private static func requestedTimeout(argsJSON: Data) -> TimeInterval {
+    /// The longest a `wait…` command runs on its own default, which a call that names no `timeoutMs` gets.
+    static let longestWaitDefault: TimeInterval = 600
+
+    /// A long-poll command (waitForPhase, waitForBatchJob, ...) legally runs past `floor`, so the
+    /// socket waits out the command's own `timeoutMs` plus slack.
+    static func socketTimeout(cmd: String, argsJSON: Data, floor: TimeInterval) -> TimeInterval {
+        if let requested = requestedTimeout(argsJSON: argsJSON) {
+            return max(floor, requested + 5)
+        }
+        return cmd.hasPrefix("wait") ? max(floor, longestWaitDefault + 5) : floor
+    }
+
+    private static func requestedTimeout(argsJSON: Data) -> TimeInterval? {
         guard !argsJSON.isEmpty,
               let object = try? JSONSerialization.jsonObject(with: argsJSON) as? [String: Any],
-              let ms = object["timeoutMs"] as? Int, ms > 0 else { return 0 }
+              let ms = object["timeoutMs"] as? Int, ms > 0 else { return nil }
         return TimeInterval(ms) / 1000
     }
 
