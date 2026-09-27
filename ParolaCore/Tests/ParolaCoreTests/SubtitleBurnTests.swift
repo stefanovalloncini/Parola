@@ -47,6 +47,38 @@ struct SubtitleBurnTests {
         #expect(beforeCue == 0)
     }
 
+    @Test("the output keeps a 24 fps source's frame rate")
+    func keepsSourceFrameRate() async throws {
+        let dir = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let src = dir.appendingPathComponent("src.mp4")
+        let out = dir.appendingPathComponent("out.mp4")
+        try await writeBlackVideo(to: src, width: 320, height: 240, seconds: 1.0, fps: 24)
+
+        try await SubtitleBurner.burn(transcript: oneCue(), video: src, to: out)
+
+        let track = try #require(try await AVURLAsset(url: out).loadTracks(withMediaType: .video).first)
+        let rate = try await track.load(.nominalFrameRate)
+        #expect(abs(rate - 24) < 0.5, "burned at \(rate) fps")
+    }
+
+    @Test("a caption takes the same share of the frame at 720p and at 2160p")
+    func captionScalesWithTheFrame() async throws {
+        let dir = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var ratios: [Double] = []
+        for (width, height) in [(1280, 720), (3840, 2160)] {
+            let src = dir.appendingPathComponent("src-\(height).mp4")
+            let out = dir.appendingPathComponent("out-\(height).mp4")
+            try await writeBlackVideo(to: src, width: width, height: height, seconds: 1.0, fps: 24)
+            try await SubtitleBurner.burn(transcript: oneCue(), video: src, to: out)
+            let image = try await frame(of: out, atSeconds: 0.5, maxHeight: 540)
+            ratios.append(Double(brightRowCount(in: image)) / Double(image.height))
+        }
+        #expect(ratios[0] > 0.02)
+        #expect(abs(ratios[0] - ratios[1]) / ratios[0] < 0.2, "caption height share 720p \(ratios[0]) vs 2160p \(ratios[1])")
+    }
+
     @Test("renderTextImage rasterizes glyphs and returns nil for empty text")
     func renderTextImageProducesGlyphs() throws {
         let font = Format.cascadingFont(name: "Helvetica-Bold", size: 28, language: "unknown")
@@ -60,6 +92,55 @@ struct SubtitleBurnTests {
 
         #expect(SubtitleBurner.renderTextImage(text: "", font: font, color: white, size: box, scale: 2) == nil)
     }
+}
+
+private func scratchDirectory() throws -> URL {
+    let dir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("parola-burn-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    return dir
+}
+
+private func oneCue() -> Transcript {
+    Transcript(
+        segments: [TranscriptSegment(id: 0, start: 0.2, end: 0.9, text: "Hg SCALED")],
+        language: "unknown",
+        modelName: "test",
+        durationSeconds: 1.0
+    )
+}
+
+private func frame(of video: URL, atSeconds seconds: Double, maxHeight: CGFloat) async throws -> CGImage {
+    let generator = AVAssetImageGenerator(asset: AVURLAsset(url: video))
+    generator.appliesPreferredTrackTransform = true
+    generator.requestedTimeToleranceBefore = .zero
+    generator.requestedTimeToleranceAfter = CMTime(value: 1, timescale: 60)
+    generator.maximumSize = CGSize(width: maxHeight * 16 / 9, height: maxHeight)
+    return try await generator.image(at: CMTime(seconds: seconds, preferredTimescale: 600)).image
+}
+
+private func brightRowCount(in image: CGImage, threshold: Int = 180) -> Int {
+    let width = image.width
+    let height = image.height
+    var data = [UInt8](repeating: 0, count: width * height * 4)
+    guard let ctx = CGContext(
+        data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+        space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else { return 0 }
+    ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+    var rows = 0
+    for row in 0..<height {
+        let base = row * width * 4
+        for column in 0..<width {
+            let i = base + column * 4
+            let luma = (Int(data[i]) * 299 + Int(data[i + 1]) * 587 + Int(data[i + 2]) * 114) / 1000
+            if luma > threshold {
+                rows += 1
+                break
+            }
+        }
+    }
+    return rows
 }
 
 private final class ProgressReports: @unchecked Sendable {
@@ -80,7 +161,7 @@ private final class ProgressReports: @unchecked Sendable {
     }
 }
 
-private func writeBlackVideo(to url: URL, width: Int, height: Int, seconds: Double) async throws {
+private func writeBlackVideo(to url: URL, width: Int, height: Int, seconds: Double, fps: Int32 = 30) async throws {
     let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
     let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
         AVVideoCodecKey: AVVideoCodecType.h264,
@@ -99,7 +180,6 @@ private func writeBlackVideo(to url: URL, width: Int, height: Int, seconds: Doub
     guard writer.startWriting() else { throw writer.error ?? CocoaError(.fileWriteUnknown) }
     writer.startSession(atSourceTime: .zero)
 
-    let fps: Int32 = 30
     let frames = Int(seconds * Double(fps))
     for i in 0..<frames {
         while !input.isReadyForMoreMediaData {

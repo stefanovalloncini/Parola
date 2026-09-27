@@ -7,6 +7,7 @@ import QuartzCore
 
 /// Burns transcript segments into a video as open captions. Pure AVFoundation, no `ffmpeg` dependency.
 public enum SubtitleBurner {
+    /// Sizes are pixels on a frame whose short side is 1080; other frames get them in proportion.
     public struct Style: Sendable {
         public var fontName: String
         public var fontSize: CGFloat
@@ -49,8 +50,9 @@ public enum SubtitleBurner {
             throw ParolaError.ioError("Video file has no video track: \(video.path)")
         }
         let assetDuration = try await asset.load(.duration)
-        let naturalSize = try await sourceVideoTrack.load(.naturalSize)
-        let preferredTransform = try await sourceVideoTrack.load(.preferredTransform)
+        let (naturalSize, preferredTransform, minFrameDuration, nominalFrameRate) = try await sourceVideoTrack.load(
+            .naturalSize, .preferredTransform, .minFrameDuration, .nominalFrameRate
+        )
         let renderSize = renderSize(naturalSize: naturalSize, transform: preferredTransform)
 
         let composition = AVMutableComposition()
@@ -81,7 +83,7 @@ public enum SubtitleBurner {
 
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = renderSize
-        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        videoComposition.frameDuration = frameDuration(minFrameDuration: minFrameDuration, nominalFrameRate: nominalFrameRate)
 
         let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compVideoTrack)
         layerInstruction.setTransform(preferredTransform, at: .zero)
@@ -103,7 +105,7 @@ public enum SubtitleBurner {
                 transcript: transcript,
                 duration: CMTimeGetSeconds(assetDuration),
                 renderSize: renderSize,
-                style: style
+                metrics: CaptionMetrics(style: style, renderSize: renderSize)
             ),
             asTrackID: overlayTrackID
         )
@@ -140,11 +142,45 @@ public enum SubtitleBurner {
         OutputMarker.mark(output)
     }
 
+    /// The frame rate the source plays at: its shortest frame, else its nominal rate, else 30 fps. A
+    /// shortest frame under 1/240 s is a timing glitch, not a rate.
+    static func frameDuration(minFrameDuration: CMTime, nominalFrameRate: Float) -> CMTime {
+        if minFrameDuration.isNumeric, minFrameDuration.seconds >= 1.0 / 240 {
+            return minFrameDuration
+        }
+        if nominalFrameRate > 0 {
+            return CMTime(value: CMTimeValue((60_000 / Double(nominalFrameRate)).rounded()), timescale: 60_000)
+        }
+        return CMTime(value: 1, timescale: 30)
+    }
+
+    /// A style's sizes scaled to one frame.
+    struct CaptionMetrics {
+        let fontName: String
+        let fontSize: CGFloat
+        let bottomInset: CGFloat
+        let horizontalInset: CGFloat
+        let strokeWidth: CGFloat
+        let textColor: CGColor
+        let strokeColor: CGColor
+
+        init(style: Style, renderSize: CGSize) {
+            let scale = min(renderSize.width, renderSize.height) / 1080
+            fontName = style.fontName
+            fontSize = style.fontSize * scale
+            bottomInset = style.bottomInset * scale
+            horizontalInset = 40 * scale
+            strokeWidth = style.strokeWidth * scale
+            textColor = style.textColor
+            strokeColor = style.strokeColor
+        }
+    }
+
     private static func makeOverlayLayer(
         transcript: Transcript,
         duration: TimeInterval,
         renderSize: CGSize,
-        style: Style
+        metrics: CaptionMetrics
     ) -> CALayer {
         let parentLayer = CALayer()
         parentLayer.frame = CGRect(origin: .zero, size: renderSize)
@@ -153,7 +189,7 @@ public enum SubtitleBurner {
             let textLayer = makeTextLayer(
                 text: segment.text,
                 language: transcript.language,
-                style: style,
+                metrics: metrics,
                 renderSize: renderSize
             )
             attachVisibility(
@@ -169,15 +205,15 @@ public enum SubtitleBurner {
         return parentLayer
     }
 
-    private static func makeTextLayer(text: String, language: String, style: Style, renderSize: CGSize) -> CALayer {
+    private static func makeTextLayer(text: String, language: String, metrics: CaptionMetrics, renderSize: CGSize) -> CALayer {
         let layer = CALayer()
         layer.contentsScale = 2
 
-        let horizontalInset: CGFloat = 40
+        let horizontalInset = metrics.horizontalInset
         let maxWidth = renderSize.width - horizontalInset * 2
-        let maxHeight = max(style.fontSize * 3, 80)
+        let maxHeight = max(metrics.fontSize * 3, 80)
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let font = Format.cascadingFont(name: style.fontName, size: style.fontSize, language: language)
+        let font = Format.cascadingFont(name: metrics.fontName, size: metrics.fontSize, language: language)
 
         // Rasterize only the measured text bounds: every layer stays alive for the whole export,
         // and full-width bitmaps add up to gigabytes on hour-long transcripts.
@@ -186,7 +222,7 @@ public enum SubtitleBurner {
         let height = min(maxHeight, measured.height + 2)
         layer.frame = CGRect(
             x: horizontalInset + ((maxWidth - width) / 2).rounded(),
-            y: style.bottomInset + ((maxHeight - height) / 2).rounded(),
+            y: metrics.bottomInset + ((maxHeight - height) / 2).rounded(),
             width: width,
             height: height
         )
@@ -195,7 +231,7 @@ public enum SubtitleBurner {
         if let image = renderTextImage(
             text: trimmed,
             font: font,
-            color: style.textColor,
+            color: metrics.textColor,
             size: layer.bounds.size,
             scale: layer.contentsScale
         ) {
@@ -203,9 +239,9 @@ public enum SubtitleBurner {
         }
 
         layer.opacity = 0
-        layer.shadowColor = style.strokeColor
+        layer.shadowColor = metrics.strokeColor
         layer.shadowOpacity = 1
-        layer.shadowRadius = style.strokeWidth
+        layer.shadowRadius = metrics.strokeWidth
         layer.shadowOffset = .zero
         return layer
     }

@@ -23,7 +23,7 @@ struct Burn: AsyncParsableCommand {
     @Option(name: .long, help: "Subtitle font (default: Helvetica-Bold).")
     var font: String = "Helvetica-Bold"
 
-    @Option(name: .long, help: "Subtitle font size (default: 28).")
+    @Option(name: .long, help: "Subtitle font size in pixels on a 1080p frame; other frame sizes scale it (default: 28).")
     var fontSize: Double = 28
 
     func run() async throws {
