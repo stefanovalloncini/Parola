@@ -275,7 +275,7 @@ final class AppModel {
     var autoMuteWhileRecording: Bool = false { didSet { defaults.set(autoMuteWhileRecording, forKey: "autoMuteWhileRecording") } }
     var autoPauseMediaWhileRecording: Bool = false { didSet { defaults.set(autoPauseMediaWhileRecording, forKey: "autoPauseMediaWhileRecording") } }
     var recordingCountdown: Int? = nil
-    @ObservationIgnored private var countdownTask: Task<Void, Never>?
+    @ObservationIgnored private(set) var countdownTask: Task<Void, Never>?
 
     @ObservationIgnored private var cachedRecentFiles: [URL]?
     var recentFiles: [URL] {
@@ -2786,16 +2786,18 @@ final class AppModel {
             return
         }
         guard !recordingActive else { return }
+        let diskCheck = startDiskSpaceCheck()
         let countIn = max(0, recordingCountInSeconds)
         // The countdown overlay renders only in the main window; with no window visible
         // (global hotkey, menu bar) it would delay the take invisibly and uncancellably.
         let overlayVisible = mode == .test || NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
         if countIn > 0, overlayVisible {
             beginCountIn(seconds: countIn) { [weak self] in
-                self?.beginRecordingNow(source: source)
+                self?.beginRecordingNow(source: source, diskCheck: diskCheck)
             }
+            refuseDuringCountIn(diskCheck)
         } else {
-            beginRecordingNow(source: source)
+            beginRecordingNow(source: source, diskCheck: diskCheck)
         }
     }
 
@@ -2840,7 +2842,7 @@ final class AppModel {
         return false
     }
 
-    private func beginRecordingNow(source: RecordSource) {
+    private func beginRecordingNow(source: RecordSource, diskCheck: Task<Int64?, Never>) {
         pendingRecordingSource = source.entrySource
         let config = recordingMediaConfig(for: source)
         recordingStartInFlight = true
@@ -2851,7 +2853,7 @@ final class AppModel {
                 stopRequestedDuringStart = false
             }
             // Before anything is cancelled: a take refused for space leaves what was running alone.
-            guard await passesPreRecordingDiskCheck() else {
+            guard await passesPreRecordingDiskCheck(diskCheck) else {
                 resolveRecordingOutcome(.failure(IntentActionError.failed(Self.diskSpaceRefusalMessage())))
                 return
             }

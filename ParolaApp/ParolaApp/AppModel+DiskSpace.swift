@@ -45,8 +45,28 @@ extension AppModel {
         String(localized: "Not enough free disk space to record. Free up at least 200 MB and try again.", bundle: bundle)
     }
 
-    func passesPreRecordingDiskCheck() async -> Bool {
-        switch Self.diskSpaceVerdict(freeBytes: await Self.freeDiskSpace(freeDiskSpaceProvider)) {
+    /// Started with the request, so a count-in runs alongside the query and a refusal can end it early.
+    func startDiskSpaceCheck() -> Task<Int64?, Never> {
+        let provider = freeDiskSpaceProvider
+        return Task { await Self.freeDiskSpace(provider) }
+    }
+
+    /// A refusal that lands while the count-in runs ends it there, not after the last number.
+    func refuseDuringCountIn(_ check: Task<Int64?, Never>) {
+        let countdown = countdownTask
+        Task { [weak self] in
+            let freeBytes = await check.value
+            guard let self, Self.diskSpaceVerdict(freeBytes: freeBytes) == .refuse,
+                  let countdown, countdownTask == countdown else { return }
+            cancelRecordingCountdown()
+            let message = Self.diskSpaceRefusalMessage()
+            phase = .failed(message: message)
+            resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+        }
+    }
+
+    func passesPreRecordingDiskCheck(_ check: Task<Int64?, Never>) async -> Bool {
+        switch Self.diskSpaceVerdict(freeBytes: await check.value) {
         case .refuse:
             phase = .failed(message: Self.diskSpaceRefusalMessage())
             return false

@@ -94,6 +94,26 @@ extension TranscriberMockSuites {
             #expect(await waitUntil { !model.recordingActive })
         }
 
+        @Test("a take refused for space ends its count-in as soon as the answer lands")
+        func refusalCutsTheCountInShort() async {
+            let model = makeModel()
+            model.recordingCountInSeconds = 3
+            model.freeDiskSpaceProvider = { 100_000_000 }
+            let start = ContinuousClock.now
+
+            model.startRecording(source: .microphone)
+            #expect(model.recordingCountdown == 3)
+
+            let refused = await waitUntil {
+                if case .failed = model.phase { return true }
+                return false
+            }
+            #expect(refused)
+            #expect(start.duration(to: .now) < .seconds(2), "the refusal waited for the count-in")
+            #expect(model.recordingCountdown == nil)
+            #expect(!model.recordingActive)
+        }
+
         @Test("startRecording below 1 GB warns but still records")
         func startWarnsButRecords() async throws {
             let fixture = try makeSilentWAV()
