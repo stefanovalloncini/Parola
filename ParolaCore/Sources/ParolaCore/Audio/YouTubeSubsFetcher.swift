@@ -30,42 +30,23 @@ public enum YouTubeSubsFetcher {
         try FileManager.default.createDirectory(at: workingDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workingDir) }
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: ytDlp)
-        process.arguments = arguments(
-            url: url, preferLanguage: preferLanguage, outputTemplate: workingDir.appendingPathComponent("%(id)s").path
-        )
-        process.environment = YouTubeProcess.augmentedEnvironment()
-
-        let stdout = Pipe()
-        let stderr = Pipe()
-        process.standardOutput = stdout
-        process.standardError = stderr
-        let outDrain = PipeDrain(pipe: stdout)
-        let errDrain = PipeDrain(pipe: stderr)
-
-        let exit: ExitSignal
-        do { exit = try YouTubeProcess.start(process) } catch {
-            ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])
-            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolFailedToStart, site: site))
-        }
-        try await YouTubeProcess.waitForDownload(
-            process, exit: exit, seconds: 120, run: .captions, ytDlpPath: ytDlp, site: site
+        let output = try await YouTubeProcess.fetch(
+            ytDlpPath: ytDlp,
+            arguments: arguments(
+                url: url, preferLanguage: preferLanguage, outputTemplate: workingDir.appendingPathComponent("%(id)s").path
+            ),
+            run: .captions,
+            watch: .wallClock(seconds: 120),
+            site: site
         )
         try Task.checkCancellation()
 
-        let stdoutText = String(decoding: outDrain.data(), as: UTF8.self)
-
-        if process.terminationStatus != 0 {
+        if output.status != 0 {
             let failure = await YouTubeProcess.failure(
-                exitStatus: process.terminationStatus,
-                stderr: String(decoding: errDrain.data(), as: UTF8.self),
-                stdout: "",
-                ytDlpPath: ytDlp,
-                site: site
+                exitStatus: output.status, stderr: output.stderr, stdout: "", ytDlpPath: ytDlp, site: site
             )
             let error = ParolaError.linkDownloadFailed(failure)
-            ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(process.terminationStatus))", [.error: .error(error)])
+            ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(output.status))", [.error: .error(error)])
             throw error
         }
 
@@ -74,7 +55,7 @@ public enum YouTubeSubsFetcher {
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noCaptions, site: site))
         }
         transcript.sourceURL = url
-        return YouTubeSubsResult(transcript: transcript, videoTitle: parseTitle(from: stdoutText))
+        return YouTubeSubsResult(transcript: transcript, videoTitle: parseTitle(from: output.stdoutText))
     }
 
     static func arguments(url: URL, preferLanguage: String?, outputTemplate: String) -> [String] {

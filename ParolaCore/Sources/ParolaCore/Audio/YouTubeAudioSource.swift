@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 public extension URL {
     /// True if this URL points at a YouTube video page.
@@ -36,137 +37,106 @@ public extension URL {
 
 #if os(macOS)
 
-/// Audio source that downloads a YouTube video's audio via `yt-dlp`.
+/// Audio source that downloads a video's audio via `yt-dlp`.
 ///
 /// Requires `yt-dlp` on `$PATH`. Common install: `brew install yt-dlp`.
 public actor YouTubeAudioSource: AudioSource {
     public let url: URL
 
     private let workingDir: URL
-    private let timeoutSeconds: Int
-    private var downloadedURL: URL?
-    private var runningProcess: Process?
+    private let ytDlpPath: String?
+    private let limits: YtDlpRunner.ProgressLimits
+    private var fetched: FetchedMedia?
 
-    public init(url: URL, timeoutSeconds: Int = 120, features: FeatureSet = .resolve()) throws {
+    public init(url: URL, features: FeatureSet = .resolve()) throws {
+        try self.init(url: url, features: features, ytDlpPath: YouTubeProcess.findYtDlp(), limits: .init())
+    }
+
+    init(url: URL, features: FeatureSet, ytDlpPath: String?, limits: YtDlpRunner.ProgressLimits) throws {
         try features.require(.youtube)
         guard url.isYtDlpSupported else {
             ParolaLog.notice(.youtube, "URL is not on a host yt-dlp can fetch from")
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .unsupportedLink))
         }
         self.url = url
-        self.timeoutSeconds = timeoutSeconds
+        self.ytDlpPath = ytDlpPath
+        self.limits = limits
         self.workingDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-yt-\(UUID().uuidString)")
     }
 
     public func prepare() async throws -> URL {
-        if let downloadedURL { return downloadedURL }
+        try await fetch().fileURL
+    }
 
-        guard let ytDlp = YouTubeProcess.findYtDlp() else {
+    public func fetch(progress: @escaping @Sendable (LinkFetchEvent) -> Void = { _ in }) async throws -> FetchedMedia {
+        if let fetched { return fetched }
+        guard let ytDlp = ytDlpPath else {
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolMissing, site: site))
         }
-
         try FileManager.default.createDirectory(at: workingDir, withIntermediateDirectories: true)
-        let target = try await downloadAudio(ytDlpPath: ytDlp)
-        downloadedURL = target
-        return target
+        // Progress comes on stdout and post-processing on stderr, so a late progress line mustn't take the bar backwards.
+        let processing = OSAllocatedUnfairLock(initialState: false)
+        let output = try await YouTubeProcess.fetch(
+            ytDlpPath: ytDlp,
+            arguments: Self.arguments(url: url, outputTemplate: workingDir.appendingPathComponent("audio.%(ext)s").path),
+            run: .download,
+            watch: .progress(limits),
+            site: site
+        ) { line in
+            guard let event = line.event else { return }
+            let stale = processing.withLock { seen in
+                if case .processing = event { seen = true }
+                if case .downloading = event { return seen }
+                return false
+            }
+            if !stale { progress(event) }
+        }
+        try Task.checkCancellation()
+
+        guard output.status == 0 else {
+            let failure = await YouTubeProcess.failure(
+                exitStatus: output.status, stderr: output.stderr, stdout: output.stdoutText, ytDlpPath: ytDlp, site: site
+            )
+            let error = ParolaError.linkDownloadFailed(failure)
+            ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(output.status))", [.error: .error(error)])
+            throw error
+        }
+        guard let path = output.filePath, FileManager.default.fileExists(atPath: path) else {
+            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noAudio, site: site))
+        }
+        let media = FetchedMedia(fileURL: URL(fileURLWithPath: path), metadata: output.metadata ?? LinkMetadata())
+        fetched = media
+        return media
     }
 
     public func cancel() async {
-        if let process = runningProcess, process.isRunning {
-            process.terminate()
-        }
-        runningProcess = nil
         try? FileManager.default.removeItem(at: workingDir)
-        downloadedURL = nil
+        fetched = nil
     }
 
-    /// Best-effort duration in seconds. Probes via `yt-dlp --print duration` without downloading.
-    public func estimatedDuration() async -> Double? {
-        guard let ytDlp = YouTubeProcess.findYtDlp() else { return nil }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: ytDlp)
-        process.arguments = [
-            "--no-playlist",
-            "--no-warnings",
-            "--skip-download",
-            "--print", "duration",
-            url.absoluteString,
-        ]
-        process.environment = YouTubeProcess.augmentedEnvironment()
-        let stdout = Pipe()
-        process.standardOutput = stdout
-        process.standardError = Pipe()
-        let drain = PipeDrain(pipe: stdout)
-        guard let exit = try? YouTubeProcess.start(process) else { return nil }
-        try? await YouTubeProcess.waitWithTimeout(process, exit: exit, seconds: 20, run: .durationProbe)
-        guard process.terminationStatus == 0 else { return nil }
-        let raw = String(decoding: drain.data(), as: UTF8.self)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return Double(raw)
-    }
-
-    private func downloadAudio(ytDlpPath: String) async throws -> URL {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: ytDlpPath)
-        let outputTemplate = workingDir.appendingPathComponent("audio.%(ext)s").path
-        process.arguments = [
+    /// The m4a stream when the site has one, so yt-dlp only remuxes it; anything else is converted to m4a.
+    static func arguments(url: URL, outputTemplate: String) -> [String] {
+        [
+            "-f", "bestaudio[ext=m4a]/bestaudio/best",
             "-x",
             "--audio-format", "m4a",
             "--audio-quality", "0",
             "--no-playlist",
+            "--socket-timeout", "30",
+            "--progress",
+            "--newline",
+            "--progress-delta", "1",
+            "--progress-template", YtDlpLine.progressTemplate,
+            "--progress-template", YtDlpLine.processingTemplate,
+            "--print", YtDlpLine.metadataTemplate,
+            "--print", YtDlpLine.fileTemplate,
             "-o", outputTemplate,
-            "--print", "after_move:filepath",
             url.absoluteString,
         ]
-
-        process.environment = YouTubeProcess.augmentedEnvironment()
-
-        let stdout = Pipe()
-        let stderr = Pipe()
-        process.standardOutput = stdout
-        process.standardError = stderr
-        let outDrain = PipeDrain(pipe: stdout)
-        let errDrain = PipeDrain(pipe: stderr)
-
-        let exit: ExitSignal
-        do {
-            exit = try YouTubeProcess.start(process)
-        } catch {
-            ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])
-            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolFailedToStart, site: site))
-        }
-        runningProcess = process
-        defer { runningProcess = nil }
-
-        try await YouTubeProcess.waitForDownload(
-            process, exit: exit, seconds: timeoutSeconds, run: .download, ytDlpPath: ytDlpPath, site: site
-        )
-        try Task.checkCancellation()
-
-        let outText = String(decoding: outDrain.data(), as: UTF8.self)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let errText = String(decoding: errDrain.data(), as: UTF8.self)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard process.terminationStatus == 0 else {
-            let failure = await YouTubeProcess.failure(
-                exitStatus: process.terminationStatus, stderr: errText, stdout: outText, ytDlpPath: ytDlpPath, site: site
-            )
-            let error = ParolaError.linkDownloadFailed(failure)
-            ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(process.terminationStatus))", [.error: .error(error)])
-            throw error
-        }
-
-        let path = outText.components(separatedBy: "\n").last ?? outText
-        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else {
-            throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noAudio, site: site))
-        }
-        return URL(fileURLWithPath: path)
     }
 
     private var site: String? { LinkDownloadFailure.site(for: url) }
-
 }
 
 #endif

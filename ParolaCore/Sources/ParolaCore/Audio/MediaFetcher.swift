@@ -1,9 +1,9 @@
 #if os(macOS)
 import Foundation
 
-/// Downloads or resolves audio from a remote media URL and returns a local file URL.
+/// Downloads the audio behind a link to a local file, reporting how it's getting on.
 public protocol MediaFetcher: Sendable {
-    func prepare(url: URL) async throws -> URL
+    func fetch(url: URL, progress: @escaping @Sendable (LinkFetchEvent) -> Void) async throws -> FetchedMedia
 }
 
 public enum MediaFetcherFactory {

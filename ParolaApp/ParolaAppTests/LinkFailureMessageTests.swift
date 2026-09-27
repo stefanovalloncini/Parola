@@ -42,6 +42,7 @@ struct LinkFailureMessageTests {
         LinkDownloadFailure(reason: .unreachable, site: "vimeo.com"),
         LinkDownloadFailure(reason: .unreachable),
         LinkDownloadFailure(reason: .timedOut(seconds: 120), site: "YouTube"),
+        LinkDownloadFailure(reason: .stalled(seconds: 60), site: "YouTube"),
         LinkDownloadFailure(reason: .noCaptions, site: "YouTube"),
         LinkDownloadFailure(reason: .noAudio, site: "YouTube"),
         LinkDownloadFailure(reason: .unsupportedLink),

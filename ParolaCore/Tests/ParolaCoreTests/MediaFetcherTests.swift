@@ -11,8 +11,8 @@ struct MediaFetcherTests {
     @Test("MockMediaFetcher returns fixture regardless of input URL")
     func mockIgnoresInputURL() async throws {
         let fetcher = MockMediaFetcher(fixtureURL: fixtureA)
-        let result = try await fetcher.prepare(url: fixtureB)
-        #expect(result == fixtureA)
+        let result = try await fetcher.fetch(url: fixtureB) { _ in }
+        #expect(result.fileURL == fixtureA)
     }
 
     @Test("MockMediaFetcherRegistry install, resolve, clear round-trip")
@@ -46,7 +46,7 @@ struct MediaFetcherTests {
         #expect(reg.resolveFailure() == failure)
 
         do {
-            _ = try await MockMediaFetcher(failure: failure).prepare(url: fixtureB)
+            _ = try await MockMediaFetcher(failure: failure).fetch(url: fixtureB) { _ in }
             Issue.record("expected the canned failure")
         } catch ParolaError.linkDownloadFailed(let thrown) {
             #expect(thrown == failure)

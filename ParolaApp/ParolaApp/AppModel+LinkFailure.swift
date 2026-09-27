@@ -80,6 +80,8 @@ extension AppModel {
             return String(localized: "Couldn't reach \(site).", bundle: bundle)
         case .timedOut(let seconds):
             return String(localized: "The download didn't finish within \(seconds) seconds.", bundle: bundle)
+        case .stalled(let seconds):
+            return String(localized: "The download stopped making progress for \(seconds) seconds.", bundle: bundle)
         case .noCaptions:
             return String(localized: "This video has no captions. Transcribe it instead.", bundle: bundle)
         case .noAudio:
@@ -101,7 +103,7 @@ extension AppModel {
         switch reason {
         case .refused:
             return String(localized: "Try again later.", bundle: bundle)
-        case .unreachable, .timedOut:
+        case .unreachable, .timedOut, .stalled:
             return String(localized: "Check your internet connection and try again.", bundle: bundle)
         default:
             return nil

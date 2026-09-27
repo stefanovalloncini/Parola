@@ -4,9 +4,8 @@ import Foundation
 public final class YouTubeMediaFetcher: MediaFetcher {
     public init() {}
 
-    public func prepare(url: URL) async throws -> URL {
-        let source = try YouTubeAudioSource(url: url)
-        return try await source.prepare()
+    public func fetch(url: URL, progress: @escaping @Sendable (LinkFetchEvent) -> Void) async throws -> FetchedMedia {
+        try await YouTubeAudioSource(url: url).fetch(progress: progress)
     }
 }
 

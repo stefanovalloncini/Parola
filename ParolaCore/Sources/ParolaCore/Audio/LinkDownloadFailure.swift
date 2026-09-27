@@ -8,6 +8,8 @@ public struct LinkDownloadFailure: Sendable, Equatable {
         case unavailable(Unavailability)
         case unreachable
         case timedOut(seconds: Int)
+        /// The download printed no progress for this long.
+        case stalled(seconds: Int)
         case noCaptions
         case noAudio
         case unsupportedLink
@@ -111,6 +113,8 @@ public struct LinkDownloadFailure: Sendable, Equatable {
             return site.map { "Couldn't reach \($0)." } ?? "Couldn't reach the site."
         case .timedOut(let seconds):
             return "The download didn't finish within \(seconds) seconds."
+        case .stalled(let seconds):
+            return "The download stopped making progress for \(seconds) seconds."
         case .noCaptions:
             return "This video has no captions. Transcribe it instead."
         case .noAudio:
@@ -131,7 +135,7 @@ public struct LinkDownloadFailure: Sendable, Equatable {
     private var freshHint: String? {
         switch reason {
         case .refused: return "Try again later."
-        case .unreachable, .timedOut: return "Check your internet connection and try again."
+        case .unreachable, .timedOut, .stalled: return "Check your internet connection and try again."
         default: return nil
         }
     }
@@ -200,6 +204,7 @@ extension LinkDownloadFailure: LogSafe {
         case .unavailable(let why): token = "unavailable.\(why.rawValue)"
         case .unreachable: token = "unreachable"
         case .timedOut: token = "timedOut"
+        case .stalled: token = "stalled"
         case .noCaptions: token = "noCaptions"
         case .noAudio: token = "noAudio"
         case .unsupportedLink: token = "unsupportedLink"

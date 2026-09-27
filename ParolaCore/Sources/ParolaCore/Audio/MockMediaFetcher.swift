@@ -13,8 +13,8 @@ public final class MockMediaFetcher: MediaFetcher {
         outcome = .failure(.linkDownloadFailed(failure))
     }
 
-    public func prepare(url: URL) async throws -> URL {
-        try outcome.get()
+    public func fetch(url: URL, progress: @escaping @Sendable (LinkFetchEvent) -> Void) async throws -> FetchedMedia {
+        FetchedMedia(fileURL: try outcome.get())
     }
 }
 

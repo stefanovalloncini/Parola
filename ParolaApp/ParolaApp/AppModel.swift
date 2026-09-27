@@ -2561,7 +2561,7 @@ final class AppModel {
                 try Task.checkCancellation()
                 phase = .downloadingModel(name: "youtube", progress: 0)
                 let fetcher = MediaFetcherFactory.make()
-                let audioURL = try await fetcher.prepare(url: url)
+                let audioURL = try await fetcher.fetch(url: url) { _ in }.fileURL
                 try Task.checkCancellation()
                 sourceFileURL = audioURL
                 installPlayer(for: audioURL)

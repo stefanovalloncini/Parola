@@ -171,8 +171,15 @@ struct Transcribe: AsyncParsableCommand {
             stderr("Downloading audio from \(url.absoluteString)…")
             emitter.progress(.downloading, detail: url.absoluteString)
             let yt = try YouTubeAudioSource(url: url, features: ParolaCLI.features)
+            let bar = mcp ? nil : ProgressReporter(label: "downloading audio")
+            let media = try await yt.fetch { event in
+                guard case .downloading(let fraction?) = event else { return }
+                bar?.update(fraction)
+                emitter.progress(.downloading, fraction: fraction, detail: url.absoluteString)
+            }
+            bar?.finish()
             source = yt
-            sourceURL = try await yt.prepare()
+            sourceURL = media.fileURL
         }
 
         emitter.progress(.transcribing, detail: sourceURL.lastPathComponent)

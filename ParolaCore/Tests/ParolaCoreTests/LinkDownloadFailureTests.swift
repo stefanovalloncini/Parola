@@ -134,6 +134,7 @@ struct LinkDownloadFailureTests {
         (LinkDownloadFailure.Reason.refused(httpStatus: 403), true),
         (.unreachable, true),
         (.timedOut(seconds: 120), true),
+        (.stalled(seconds: 60), true),
         (.toolError("Unable to extract uploader id."), true),
         (.toolExited(status: 9), true),
         (.toolMissing, true),
@@ -149,6 +150,14 @@ struct LinkDownloadFailureTests {
     ])
     func worthRetrying(reason: LinkDownloadFailure.Reason, expected: Bool) {
         #expect(LinkDownloadFailure(reason: reason, site: "YouTube").isWorthRetrying == expected)
+    }
+
+    @Test("a download that stopped moving says so, not that it ran out of time")
+    func stalledReadsAsAStall() {
+        let failure = LinkDownloadFailure(reason: .stalled(seconds: 60), site: "YouTube")
+
+        #expect(failure.message == "The download stopped making progress for 60 seconds. Check your internet connection and try again.")
+        #expect(failure.logToken == "stalled")
     }
 
     @Test("a video an update can't unlock doesn't ask for one")
@@ -278,16 +287,12 @@ struct YtDlpProcessTests {
 
     @Test("a download that overruns its timeout fails as a link download with its site")
     func timeoutIsALinkFailure() async throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sleep")
-        process.arguments = ["5"]
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
-        let exit = try YouTubeProcess.start(process)
+        let fake = try script(#"[ "$1" = "--version" ] && exit 1; exec sleep 5"#)
+        defer { try? FileManager.default.removeItem(at: fake) }
 
         do {
-            try await YouTubeProcess.waitForDownload(
-                process, exit: exit, seconds: 0, run: .download, ytDlpPath: "/nonexistent/yt-dlp", site: "YouTube"
+            _ = try await YouTubeProcess.fetch(
+                ytDlpPath: fake.path, arguments: [], run: .download, watch: .wallClock(seconds: 0), site: "YouTube"
             )
             Issue.record("expected the wait to time out")
         } catch ParolaError.linkDownloadFailed(let failure) {
@@ -295,7 +300,6 @@ struct YtDlpProcessTests {
             #expect(failure.site == "YouTube")
             #expect(failure.ytDlpVersion == nil)
         }
-        #expect(process.isRunning == false)
     }
 }
 #endif

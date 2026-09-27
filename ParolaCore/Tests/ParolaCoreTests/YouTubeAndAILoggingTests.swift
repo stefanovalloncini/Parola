@@ -60,22 +60,16 @@ struct YouTubeAndAILoggingTests {
     @Test("a yt-dlp run that overruns its timeout is logged with the timeout, not the URL")
     func timeoutLogged() async throws {
         try await withSink { sink in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/sleep")
-            process.arguments = ["5"]
-            process.standardOutput = Pipe()
-            process.standardError = Pipe()
-            let exit = try YouTubeProcess.start(process)
-
             await #expect(throws: ParolaError.self) {
-                try await YouTubeProcess.waitWithTimeout(process, exit: exit, seconds: 0, run: .download)
+                _ = try await YtDlpRunner.run(
+                    ytDlpPath: "/bin/sleep", arguments: ["5"], run: .download, watch: .wallClock(seconds: 0)
+                )
             }
 
             let record = try #require(
                 records(sink, .youtube, message: "yt-dlp download timed out after 0s").first
             )
             #expect(record.level == .error)
-            #expect(process.isRunning == false)
         }
     }
 
@@ -159,13 +153,12 @@ struct YouTubeAndAILoggingTests {
     /// The remaining sites need `yt-dlp`, an unreachable Apple Intelligence state, or a refusing keychain — pinned in source.
     @Test("the sites that cannot be driven here are still present and still safe")
     func pinnedSites() throws {
+        #expect(try coreSource("Audio/YtDlpRunner").contains(
+            #"ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])"#
+        ))
         for name in ["Audio/YouTubeAudioSource", "Audio/YouTubeSubsFetcher"] {
-            let youtube = try coreSource(name)
-            #expect(youtube.contains(
-                #"ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])"#
-            ))
-            #expect(youtube.contains(
-                #"ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(process.terminationStatus))", [.error: .error(error)])"#
+            #expect(try coreSource(name).contains(
+                #"ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(output.status))", [.error: .error(error)])"#
             ))
         }
 
@@ -185,7 +178,8 @@ struct YouTubeAndAILoggingTests {
         }
 
         for name in [
-            "Audio/YouTubeAudioSource", "Audio/YouTubeSubsFetcher", "Audio/YouTubeProcess", "LLM/LanguageModelFactory",
+            "Audio/YouTubeAudioSource", "Audio/YouTubeSubsFetcher", "Audio/YouTubeProcess", "Audio/YtDlpRunner",
+            "LLM/LanguageModelFactory",
             "LLM/Cloud/CloudLanguageModel", "LLM/SummaryService", "LLM/Cloud/APIKeyStore",
         ] {
             for chunk in try coreSource(name).components(separatedBy: "ParolaLog.").dropFirst() {

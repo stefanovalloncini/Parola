@@ -13174,6 +13174,17 @@
         }
       }
     },
+    "The download stopped making progress for %lld seconds.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il download è rimasto fermo per %lld secondi."
+          }
+        }
+      }
+    },
     "The hotkey that turns speech into text in any app.": {
       "extractionState": "manual",
       "localizations": {
