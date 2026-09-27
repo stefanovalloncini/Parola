@@ -92,6 +92,7 @@ struct Transcribe: AsyncParsableCommand {
         if resolved.count == 1 {
             try await transcribeSingle(input: resolved[0], options: opts)
         } else {
+            try ParolaCLI.features.require(.batch)
             let kept = await keepingNewFiles(resolved.map(\.url))
             guard !kept.isEmpty else { return }
             try await transcribeBatch(urls: kept, options: opts)
@@ -213,7 +214,7 @@ struct Transcribe: AsyncParsableCommand {
 
         if summarise {
             do {
-                transcript.summary = try await SummaryService().summarise(transcript)
+                transcript.summary = try await SummaryService(features: ParolaCLI.features).summarise(transcript)
             } catch {
                 stderr("warning: summary skipped — \(error.localizedDescription)")
             }
@@ -285,7 +286,7 @@ struct Transcribe: AsyncParsableCommand {
         try FileManager.default.createDirectory(at: outDirURL, withIntermediateDirectories: true)
 
         let jobs = urls.map { BatchJob(url: $0) }
-        let queue = BatchQueue()
+        let queue = BatchQueue(features: ParolaCLI.features)
         let events = await queue.process(jobs: jobs, options: options)
 
         let jobByID = Dictionary(uniqueKeysWithValues: jobs.map { ($0.id, $0) })

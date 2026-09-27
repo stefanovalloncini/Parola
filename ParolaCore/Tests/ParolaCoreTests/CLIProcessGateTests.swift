@@ -38,6 +38,30 @@ struct CLIProcessGateTests {
         }
     }
 
+    @Test func gatedBatchRefusesBeforeTranscribing() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-cli-gate-batch-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let first = scratch.appendingPathComponent("a.wav")
+        let second = scratch.appendingPathComponent("b.wav")
+        try Data("RIFFgate-a".utf8).write(to: first)
+        try Data("RIFFgate-b".utf8).write(to: second)
+        let output = scratch.appendingPathComponent("out", isDirectory: true)
+        let library = scratch.appendingPathComponent("library", isDirectory: true)
+
+        try withManagedPlist(["enabledFeatures": ["youtube"]]) { plist in
+            let result = try runParola(
+                ["transcribe", first.path, second.path, "--output-dir", output.path, "--library", library.path],
+                plist: plist
+            )
+            #expect(result.status != 0)
+            #expect(result.output.contains("Batch transcription is disabled in this deployment"))
+            #expect(!result.output.contains("▶"))
+            #expect(!FileManager.default.fileExists(atPath: output.path))
+        }
+    }
+
     @Test func ungatedHelpKeepsEverything() throws {
         try withManagedPlist([:]) { plist in
             let result = try runParola(["--help"], plist: plist)
