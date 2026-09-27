@@ -39,9 +39,9 @@ enum LibraryListContent {
     /// Shown instead of `emptyTitle` when the category has rows and the filters are what hid them.
     static let filteredEmptyTitle = "No Matches for This Filter"
 
-    /// Search results replace the category rows, so the list runs without a category while they are showing.
-    static func browseCategory(filter: EntryCategory?, searching: Bool) -> EntryCategory? {
-        searching ? nil : filter
+    /// A browse list sits under the results only when clearing the query would show it: not on Home, not over a transcript.
+    static func showsBrowseList(filter: EntryCategory?, browsingAll: Bool, hasTranscript: Bool) -> Bool {
+        !hasTranscript && (filter != nil || browsingAll)
     }
 
     struct ActiveFilters: Equatable {
@@ -242,11 +242,75 @@ enum LibraryListContent {
     }
 }
 
+/// The library's content area: the browse list, with a query's results laid over it while one is open.
 struct LibraryListView: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let category: EntryCategory?
-    var searchRanking: [LibraryEntry.ID]? = nil
+    /// Whether clearing the query would show a browse list; Home and a loaded transcript have none under their results.
+    let browses: Bool
+    let searchRanking: [LibraryEntry.ID]?
+
+    /// Built the first time it would show, then kept up behind any results, so a query never re-diffs its rows.
+    @State private var browseMounted = false
+    @FocusState private var focus: LibraryListFocus?
+
+    private var searching: Bool { searchRanking != nil }
+
+    var body: some View {
+        ZStack {
+            if browseMounted {
+                LibraryBrowseList(category: category, focus: $focus)
+                    .equatable()
+                    .opacity(searching ? 0 : 1)
+                    .allowsHitTesting(!searching)
+                    .accessibilityHidden(searching)
+            }
+            if let searchRanking {
+                LibrarySearchResults(ranking: searchRanking, focus: $focus)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { syncBrowseMount() }
+        .onChange(of: browses) { _, _ in syncBrowseMount() }
+        .onChange(of: searching) { _, _ in
+            syncBrowseMount()
+            // The list with the keyboard hands it to the one taking its place, as the single list used to keep it.
+            switch focus {
+            case .browse? where searching: focus = resultsTakeFocus ? .results : nil
+            case .results? where !searching: focus = .browse
+            default: break
+            }
+        }
+        // The covered list stays in the key view loop, so Tab can still land on it; the keyboard moves past it.
+        .onChange(of: focus) { old, new in
+            guard searching, new == .browse else { return }
+            focus = old != .results && resultsTakeFocus ? .results : nil
+        }
+        .axBranch("Library")
+    }
+
+    private var resultsTakeFocus: Bool {
+        !(searchRanking?.isEmpty ?? true)
+    }
+
+    private func syncBrowseMount() {
+        if !browses {
+            browseMounted = false
+        } else if !searching {
+            browseMounted = true
+        }
+    }
+}
+
+/// A category's rows, or all of them, with the filters and the day groups.
+private struct LibraryBrowseList: View, Equatable {
+    @Environment(AppModel.self) private var model
+    let category: EntryCategory?
+    let focus: FocusState<LibraryListFocus?>.Binding
+
+    /// The focus binding is left out: it never changes, and comparing it would re-run this body on every keystroke.
+    nonisolated static func == (lhs: LibraryBrowseList, rhs: LibraryBrowseList) -> Bool {
+        lhs.category == rhs.category
+    }
 
     @State private var selection: Set<LibraryEntry.ID> = []
     @State private var pendingBulkDelete = false
@@ -281,19 +345,14 @@ struct LibraryListView: View {
     /// Takes filters explicitly so a category switch can recompute with the ones it just dropped, not `@State` it just wrote.
     @discardableResult
     private func recomputeEntries(with filters: LibraryListContent.ActiveFilters) -> [LibraryRowDisplay] {
-        let computed: [LibraryEntry]
-        if let searchRanking {
-            computed = searchRanking.compactMap { model.libraryEntry(id: $0) }
-        } else {
-            computed = LibraryListContent.rows(
-                from: model.libraryEntries,
-                category: category,
-                labelFilter: filters.label,
-                languageFilter: filters.language,
-                dateRange: filters.dateRange,
-                personFilter: filters.person
-            )
-        }
+        let computed = LibraryListContent.rows(
+            from: model.libraryEntries,
+            category: category,
+            labelFilter: filters.label,
+            languageFilter: filters.language,
+            dateRange: filters.dateRange,
+            personFilter: filters.person
+        )
         let sizes = model.libraryBundleSizes
         var totalBytes: Int64 = 0
         var totalSeconds: Double = 0
@@ -310,11 +369,7 @@ struct LibraryListView: View {
         }
         displayCache = cache
         entries = displays
-        rowGroups = LibraryListContent.groups(
-            for: displays,
-            sortOrder: model.librarySortOrder,
-            isSearchResult: searchRanking != nil
-        )
+        rowGroups = LibraryListContent.groups(for: displays, sortOrder: model.librarySortOrder, isSearchResult: false)
         // Count and duration, never size: bundle sizes land later and only for audio, so the label used to change shape.
         totalsLabel = LibraryListContent.listSubtitle(count: displays.count, totalSeconds: totalSeconds) ?? ""
         totalsHelp = totalBytes > 0 ? String(localized: "Total size: \(AppFormat.byteSize(totalBytes))") : nil
@@ -328,30 +383,18 @@ struct LibraryListView: View {
             if entries.isEmpty {
                 emptyState
             } else {
-                // Read once for the whole list, not per row: every row has to reserve the same column or none does.
-                let showsTimestamp = searchRanking != nil && LibraryListContent.showsTimestampSlot(
-                    for: entries.map(\.id),
-                    matches: model.searchMatches
+                LibraryRowList(
+                    groups: rowGroups,
+                    selection: $selection,
+                    detail: .excerpt,
+                    animatesRows: animatesRows,
+                    rename: { entry in
+                        renameDraft = LibraryEntryDisplay.title(for: entry)
+                        renamingEntry = entry
+                    },
+                    focus: focus,
+                    focusKey: .browse
                 )
-                List(selection: $selection) {
-                    ForEach(rowGroups) { group in
-                        Section {
-                            ForEach(group.rows) { row in
-                                listRow(row, showsTime: group.showsTime, showsTimestamp: showsTimestamp)
-                            }
-                        } header: {
-                            groupHeader(group)
-                        }
-                    }
-                }
-                .listStyle(.inset)
-                .tint(DS.Color.accent)
-                .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: entries.map(\.id))
-                // Empty on purpose: each row keeps its own context menu, and the list takes only double-click and Return.
-                .contextMenu(forSelectionType: LibraryEntry.ID.self) { _ in
-                } primaryAction: { ids in
-                    openFromList(ids)
-                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -368,10 +411,6 @@ struct LibraryListView: View {
         .onChange(of: model.personFilter) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeEntries() }
-        .onChange(of: searchRanking) { _, _ in
-            let newEntries = recomputeEntries()
-            selection = selection.intersection(Set(newEntries.map(\.id)))
-        }
         .onChange(of: category) { _, newCategory in
             let kept = LibraryListContent.filters(
                 activeFilters,
@@ -394,203 +433,37 @@ struct LibraryListView: View {
             displayCache.removeAll()
             recomputeEntries()
         }
-        .alert("Delete \(selection.count) entries?", isPresented: $pendingBulkDelete) {
-            Button("Cancel", role: .cancel) {}
-                .accessibilityIdentifier("alert.bulkDelete.cancel")
-            Button("Delete", role: .destructive) { performBulkDelete() }
-                .accessibilityIdentifier("alert.bulkDelete.confirm")
-        } message: {
-            Text("They'll move to Recently Deleted.")
-        }
-        .alert(
-            "Rename entry",
-            isPresented: isRenaming
-        ) {
-            TextField("Title", text: $renameDraft)
-            Button("Cancel", role: .cancel) { renamingEntry = nil }
-                .accessibilityIdentifier("alert.rename.cancel")
-            Button("Rename") {
-                if let id = renamingEntry?.id {
-                    model.renameEntry(id, to: renameDraft)
-                }
-                renamingEntry = nil
-            }
-            .accessibilityIdentifier("alert.rename.confirm")
-        }
-        .axBranch("Library")
-    }
-
-    @ViewBuilder
-    private func groupHeader(_ group: LibraryDateGroups.Group) -> some View {
-        if let title = group.title {
-            Text(verbatim: title)
-                .font(DS.Font.heading)
-                .foregroundStyle(DS.Color.primaryText)
-                .textCase(nil)
-                .listRowInsets(EdgeInsets(
-                    top: DS.Spacing.regular,
-                    leading: DS.Spacing.small,
-                    bottom: DS.Spacing.tight,
-                    trailing: DS.Spacing.small
-                ))
-                .accessibilityAddTraits(.isHeader)
-        }
-    }
-
-    private func listRow(_ row: LibraryRowDisplay, showsTime: Bool, showsTimestamp: Bool) -> some View {
-        let entry = row.entry
-        return rowContent(for: row, showsTime: showsTime, showsTimestamp: showsTimestamp)
-            // Both branches draw the same anatomy, so the rule runs under the text, never under the badge.
-            .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + SearchResultRow.separatorInset }
-            .contentShape(Rectangle())
-            .draggable(entry.bundleURL)
-            .contextMenu {
-                Button("Open") {
-                    model.openEntryFromLibrary(entry.id, inNewWindow: false)
-                }
-                Button("Open in New Window") {
-                    model.openEntryWindow(entry.id)
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).openInNewWindow")
-                Button(entry.pinned ? "Unpin" : "Pin") {
-                    model.togglePinned(for: entry.id)
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).\(entry.pinned ? "unpin" : "pin")")
-                Menu("Move to") {
-                    ForEach(EntryCategory.allCases.filter { $0 != entry.category }, id: \.self) { target in
-                        Button(LocalizedStringKey(libraryCategoryName(target))) {
-                            model.moveEntry(entry.id, to: target)
-                        }
-                    }
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).moveTo")
-                if model.destinationsEnabled {
-                    SendToMenu(model: model, entryID: entry.id)
-                        .accessibilityIdentifier("library.row.\(entry.id).sendTo")
-                }
-                Button("Reveal in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL])
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).revealInFinder")
-                Button("Rename…") {
-                    renameDraft = LibraryEntryDisplay.title(for: entry)
-                    renamingEntry = entry
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).rename")
-                Button("Delete", role: .destructive) {
-                    model.deleteEntry(entry.id)
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).delete")
-            }
-            .accessibilityIdentifier("library.row.\(entry.id)")
-            // List(.inset) indents its rows by 16pt of its own; this lands them on the 24pt gutter.
-            .listRowInsets(EdgeInsets(
-                top: DS.Spacing.tight,
-                leading: DS.Spacing.small,
-                bottom: DS.Spacing.tight,
-                trailing: DS.Spacing.small
-            ))
-    }
-
-    @ViewBuilder
-    private func rowContent(for row: LibraryRowDisplay, showsTime: Bool, showsTimestamp: Bool) -> some View {
-        if searchRanking == nil {
-            EntryRow(
-                display: row,
-                detail: .excerpt(row.excerpt),
-                isSelected: selection.contains(row.id),
-                showsTimeOnly: showsTime
-            )
-        } else {
-            SearchResultRow(
-                display: row,
-                match: model.searchMatches[row.id],
-                isSelected: selection.contains(row.id),
-                showsTimestamp: showsTimestamp
-            )
-        }
-    }
-
-    /// Computed, not stored: the entry set can stay put while a query edit changes how often each one matches.
-    private var headerSubtitle: String? {
-        guard searchRanking != nil else { return totalsLabel.isEmpty ? nil : totalsLabel }
-        return LibraryListContent.searchTotalsLabel(for: entries.map(\.id), matches: model.searchMatches)
+        .modifier(LibraryListAlerts(
+            selection: $selection,
+            pendingBulkDelete: $pendingBulkDelete,
+            renamingEntry: $renamingEntry,
+            renameDraft: $renameDraft
+        ))
     }
 
     private var header: some View {
         PageHeader(
             title: headerTitle,
-            subtitle: headerSubtitle,
-            subtitleHelp: searchRanking == nil ? totalsHelp : nil,
+            subtitle: totalsLabel.isEmpty ? nil : totalsLabel,
+            subtitleHelp: totalsHelp,
             leading: {
-                if searchRanking == nil {
-                    LibraryFilterBar(
-                        labelFilter: $labelFilter,
-                        languageFilter: $languageFilter,
-                        dateRangeFilter: $dateRangeFilter,
-                        personFilter: personFilterBinding,
-                        labelOptions: model.knownLabels(in: category),
-                        languageOptions: model.knownLanguages(in: category),
-                        peopleOptions: model.knownPeople(in: category)
-                    )
-                }
+                LibraryFilterBar(
+                    labelFilter: $labelFilter,
+                    languageFilter: $languageFilter,
+                    dateRangeFilter: $dateRangeFilter,
+                    personFilter: personFilterBinding,
+                    labelOptions: model.knownLabels(in: category),
+                    languageOptions: model.knownLanguages(in: category),
+                    peopleOptions: model.knownPeople(in: category)
+                )
             },
-            trailing: {
-                if !selection.isEmpty {
-                    Menu {
-                        ForEach(ExportFormat.allCases) { format in
-                            Button("\(format.displayName) (.\(format.fileExtension))") {
-                                model.bulkExportEntries(ids: selection, format: format)
-                            }
-                            .axLeaf("Header.MenuItem.Export\(format.rawValue.capitalized)")
-                        }
-                    } label: {
-                        Text("Export (\(selection.count))")
-                    }
-                    .menuStyle(.button)
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                    .menuIndicator(.hidden)
-                    .fixedSize()
-                    .axLeaf("Header.Menu.BulkExport")
-                    Button {
-                        pendingBulkDelete = true
-                    } label: {
-                        Text(verbatim: RecentlyDeletedCopy.deleteSelection(selection.count))
-                            .foregroundStyle(DS.Color.dangerText)
-                    }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                    .axLeaf("Header.Button.BulkDelete")
-                }
-            }
-        )
-    }
-
-    /// The primary action doesn't carry the event's modifiers, so Option is read as it runs.
-    private func openFromList(_ ids: Set<LibraryEntry.ID>) {
-        guard let request = LibraryListContent.openRequest(for: ids, modifiers: NSEvent.modifierFlags) else { return }
-        model.openEntryFromLibrary(request.id, inNewWindow: request.inNewWindow)
-    }
-
-    private func performBulkDelete() {
-        let targets = selection
-        selection.removeAll()
-        for id in targets {
-            model.deleteEntry(id)
-        }
-    }
-
-    private var isRenaming: Binding<Bool> {
-        Binding(
-            get: { renamingEntry != nil },
-            set: { if !$0 { renamingEntry = nil } }
+            trailing: { LibraryBulkActions(selection: selection, pendingBulkDelete: $pendingBulkDelete) }
         )
     }
 
     @ViewBuilder
     private var emptyState: some View {
-        if searchRanking != nil {
-            searchEmptyState
-        } else if filterHidesEverything {
+        if filterHidesEverything {
             filteredEmptyState
         } else {
             EmptyStateView(systemImage: emptyIcon, title: emptyTitle) {
@@ -612,17 +485,7 @@ struct LibraryListView: View {
 
     /// The category has rows; the filters are what emptied it. Offering "Record" here would be a lie.
     private var filterHidesEverything: Bool {
-        searchRanking == nil
-            && LibraryListContent.filtersHideEverything(activeFilters, category: category, entries: model.libraryEntries)
-    }
-
-    private var searchEmptyState: some View {
-        EmptyStateView(
-            systemImage: "magnifyingglass",
-            title: "No results for “\(searchQueryText)”",
-            message: "Search looks in titles and transcript text"
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        LibraryListContent.filtersHideEverything(activeFilters, category: category, entries: model.libraryEntries)
     }
 
     private var filteredEmptyState: some View {
@@ -654,14 +517,7 @@ struct LibraryListView: View {
         }
     }
 
-    private var searchQueryText: String {
-        model.searchQuery.trimmingCharacters(in: .whitespaces)
-    }
-
     private var headerTitle: LocalizedStringKey {
-        if searchRanking != nil {
-            return searchQueryText.isEmpty ? "Search results" : "Results for “\(searchQueryText)”"
-        }
         switch category {
         case .transcription: return "Transcriptions"
         case .meeting: return "Meetings"
@@ -675,7 +531,7 @@ struct LibraryListView: View {
     }
 
     private var emptyIcon: String {
-        guard let category else { return searchRanking != nil ? "magnifyingglass" : "tray" }
+        guard let category else { return "tray" }
         return DS.categorySymbol(for: category)
     }
 }

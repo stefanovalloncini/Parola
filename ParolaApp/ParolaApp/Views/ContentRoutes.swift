@@ -174,9 +174,11 @@ struct ContentRoutes: View {
     /// One call site on purpose: an `if` per case would give each branch its own identity and tear the List down on every sidebar move.
     private var libraryBrowseList: some View {
         LibraryListView(
-            category: LibraryListContent.browseCategory(
+            category: model.libraryFilter,
+            browses: LibraryListContent.showsBrowseList(
                 filter: model.libraryFilter,
-                searching: model.hasSearchResults
+                browsingAll: model.libraryBrowsingAll,
+                hasTranscript: model.hasTranscript
             ),
             searchRanking: model.searchRanking
         )

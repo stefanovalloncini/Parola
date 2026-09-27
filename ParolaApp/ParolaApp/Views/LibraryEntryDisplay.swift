@@ -76,7 +76,7 @@ enum LibraryEntryDisplay {
 }
 
 /// The strings a library row draws that are costly and never age, formatted once per entry snapshot.
-struct LibraryRowDisplay: Identifiable {
+struct LibraryRowDisplay: Identifiable, Equatable {
     let entry: LibraryEntry
     let title: String
     let timeOfDay: String

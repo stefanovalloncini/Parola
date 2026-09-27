@@ -175,12 +175,12 @@ struct LibraryListContentTests {
         #expect(byDate.isEmpty)
     }
 
-    @Test("search results take the list over from whatever category was showing")
-    func searchResultsWinOverTheFilter() {
-        #expect(LibraryListContent.browseCategory(filter: .meeting, searching: false) == .meeting)
-        #expect(LibraryListContent.browseCategory(filter: .meeting, searching: true) == nil)
-        #expect(LibraryListContent.browseCategory(filter: nil, searching: true) == nil)
-        #expect(LibraryListContent.browseCategory(filter: nil, searching: false) == nil)
+    @Test("a browse list waits under the results only where clearing the query would show it")
+    func browseListUnderTheResults() {
+        #expect(LibraryListContent.showsBrowseList(filter: .meeting, browsingAll: false, hasTranscript: false))
+        #expect(LibraryListContent.showsBrowseList(filter: nil, browsingAll: true, hasTranscript: false))
+        #expect(!LibraryListContent.showsBrowseList(filter: nil, browsingAll: false, hasTranscript: false))
+        #expect(!LibraryListContent.showsBrowseList(filter: .meeting, browsingAll: false, hasTranscript: true))
     }
 
     /// The list now survives sidebar moves, so what a category switch leaves behind is what the user keeps.
