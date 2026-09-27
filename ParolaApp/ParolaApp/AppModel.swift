@@ -2110,11 +2110,8 @@ final class AppModel {
         let files = DroppedFiles.classify(urls)
         guard !files.isEmpty else { return }
         introduction.defer()
-        if case .links = files.kind, let link = files.links.first {
-            transcribeYouTube(urlString: link.absoluteString)
-            return
-        }
         for url in files.subtitles { importSubtitle(fileURL: url) }
+        takeLinks(files.links, behindMedia: !files.media.isEmpty)
         guard !files.media.isEmpty else {
             for project in files.projects {
                 Task { [weak self] in await self?.openProjectDocument(at: project) }

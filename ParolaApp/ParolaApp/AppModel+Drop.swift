@@ -72,11 +72,8 @@ extension AppModel {
     func transcribeNow(urls: [URL]) {
         let files = DroppedFiles.classify(urls)
         guard !files.isEmpty else { return }
-        if case .links = files.kind, let link = files.links.first {
-            transcribeYouTube(urlString: link.absoluteString)
-            return
-        }
         for url in files.subtitles { importSubtitle(fileURL: url) }
+        takeLinks(files.links, behindMedia: !files.media.isEmpty)
         guard !files.media.isEmpty else {
             for project in files.projects {
                 Task { [weak self] in await self?.openProjectDocument(at: project) }
@@ -102,23 +99,32 @@ extension AppModel {
     func addToQueue(urls: [URL]) {
         let files = DroppedFiles.classify(urls)
         guard !files.isEmpty else { return }
-        if case .links = files.kind, let link = files.links.first {
-            transcribeYouTube(urlString: link.absoluteString)
-            return
-        }
         for url in files.subtitles { importSubtitle(fileURL: url) }
         guard !files.media.isEmpty else {
+            takeLinks(files.links, behindMedia: false)
             for project in files.projects {
                 Task { [weak self] in await self?.openProjectDocument(at: project) }
             }
             return
         }
+        takeLinks(files.links, behindMedia: true)
         guard features.isEnabled(.batch) else {
             transcribeNow(urls: files.media)
             return
         }
         importBatchFiles(files.media)
         if !batchJobs.isEmpty { route = .batch }
+    }
+
+    /// Every link a drop carries is taken: alone, the first starts and the rest queue; beside media, all wait for it.
+    func takeLinks(_ links: [URL], behindMedia: Bool) {
+        var waiting = links[...]
+        if !behindMedia, let first = waiting.popFirst() {
+            guard transcribeYouTube(urlString: first.absoluteString) != .rejected else { return }
+        } else if !features.isEnabled(.youtube) {
+            return
+        }
+        deferredLinks.append(contentsOf: waiting.map { .transcribe($0.absoluteString) })
     }
 
     /// Finder hands Open With one URL per callback, so a three-file selection arrives as three

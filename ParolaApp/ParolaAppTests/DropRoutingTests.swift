@@ -192,6 +192,80 @@ struct DropRoutingTests {
         #expect(model.phase == .recording(source: .microphone))
     }
 
+    private static let secondLink = URL(string: "https://vimeo.com/76979871")!
+
+    private func linkModel(_ fetcher: ScriptedLinkFetcher) -> AppModel {
+        let model = makeModel()
+        model.makeMediaFetcher = { fetcher }
+        return model
+    }
+
+    @Test("two links dropped on either half: the first starts, the second waits its turn", arguments: [
+        AppModel.DropHalf.now, .queue,
+    ])
+    func everyDroppedLinkIsTaken(half: AppModel.DropHalf) async {
+        let gate = FetchGate()
+        let fetcher = ScriptedLinkFetcher(fixture: Self.media("never.wav"), gate: gate)
+        let model = linkModel(fetcher)
+
+        await model.drop([Self.link, Self.secondLink], on: half).value
+
+        #expect(model.phase == .fetchingLink(title: nil, progress: nil))
+        #expect(model.deferredLinks == [.transcribe(Self.secondLink.absoluteString)])
+        await waitUntil { fetcher.fetches == 1 }
+        model.cancelCurrentWork()
+        await gate.open()
+    }
+
+    @Test("the waiting link runs once the first one ends")
+    func queuedLinkRunsNext() async {
+        let fetcher = ScriptedLinkFetcher(
+            fixture: Self.media("never.wav"), failure: LinkDownloadFailure(reason: .unavailable(.privateVideo), site: "YouTube")
+        )
+        let model = linkModel(fetcher)
+
+        model.transcribeNow(urls: [Self.link, Self.secondLink])
+
+        await waitUntil { fetcher.fetches == 2 }
+        await waitUntil { model.deferredLinks.isEmpty && !model.transcribeTaskRunning }
+    }
+
+    @Test("links dropped with media files wait behind the files instead of vanishing")
+    func linksBesideMediaWait() {
+        let fetcher = ScriptedLinkFetcher(fixture: Self.media("never.wav"))
+        let model = linkModel(fetcher)
+        model.fileTranscribeTask = Task {}
+        let file = Self.media("talk.wav")
+
+        model.transcribeNow(urls: [file, Self.link, Self.secondLink])
+
+        #expect(model.deferredArrivals == [file])
+        #expect(model.deferredLinks == [
+            .transcribe(Self.link.absoluteString), .transcribe(Self.secondLink.absoluteString),
+        ])
+        #expect(fetcher.fetches == 0)
+        model.fileTranscribeTask?.cancel()
+        model.fileTranscribeTask = nil
+    }
+
+    @Test("an opened subtitle file and a link both land")
+    func subtitleBesideLink() async throws {
+        let srt = FileManager.default.temporaryDirectory.appendingPathComponent("parola-drop-\(UUID().uuidString).srt")
+        try "1\n00:00:00,000 --> 00:00:01,000\nHello there.\n".write(to: srt, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: srt) }
+        let gate = FetchGate()
+        let fetcher = ScriptedLinkFetcher(fixture: Self.media("never.wav"), gate: gate)
+        let model = linkModel(fetcher)
+
+        model.handleIncomingFiles([srt, Self.link])
+
+        #expect(model.transcript?.text.contains("Hello there.") == true)
+        #expect(model.phase == .fetchingLink(title: nil, progress: nil))
+        await waitUntil { fetcher.fetches == 1 }
+        model.cancelCurrentWork()
+        await gate.open()
+    }
+
     @Test("a link the window will park gets the same plan a parked file gets")
     func deferredLinkPlanMatchesMediaPlan() {
         for batchEnabled in [true, false] {

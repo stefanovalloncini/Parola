@@ -30,6 +30,7 @@ final class ScriptedLinkFetcher: MediaFetcher {
     let metadata: LinkMetadata
     let gate: FetchGate?
     let owned: Bool
+    let failure: LinkDownloadFailure?
     private let count = OSAllocatedUnfairLock(initialState: 0)
     private let folders = OSAllocatedUnfairLock<[URL]>(initialState: [])
 
@@ -37,11 +38,18 @@ final class ScriptedLinkFetcher: MediaFetcher {
         title: "A talk", webpageURL: URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"), id: "dQw4w9WgXcQ", duration: 0.3
     )
 
-    init(fixture: URL, metadata: LinkMetadata = ScriptedLinkFetcher.talk, gate: FetchGate? = nil, owned: Bool = false) {
+    init(
+        fixture: URL,
+        metadata: LinkMetadata = ScriptedLinkFetcher.talk,
+        gate: FetchGate? = nil,
+        owned: Bool = false,
+        failure: LinkDownloadFailure? = nil
+    ) {
         self.fixture = fixture
         self.metadata = metadata
         self.gate = gate
         self.owned = owned
+        self.failure = failure
     }
 
     var fetches: Int { count.withLock { $0 } }
@@ -53,6 +61,7 @@ final class ScriptedLinkFetcher: MediaFetcher {
         progress(.downloading(fraction: 0.5))
         await gate?.wait()
         try Task.checkCancellation()
+        if let failure { throw ParolaError.linkDownloadFailed(failure) }
         guard owned else { return FetchedMedia(fileURL: fixture, metadata: metadata) }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("parola-yt-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
