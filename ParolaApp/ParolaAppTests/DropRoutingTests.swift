@@ -9,13 +9,16 @@ import ParolaTestSupport
 @Suite("Split drop routing")
 struct DropRoutingTests {
 
+    /// A link that reaches a run fails at once instead of starting a real yt-dlp.
     private func makeModel(features: Set<ParolaFeature> = Set(ParolaFeature.allCases)) -> AppModel {
-        AppModel(
+        let model = AppModel(
             skipBootstrap: true,
             defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("drop"),
             features: features
         )
+        model.linkFetcher = FixtureLinkFetcher(failure: LinkDownloadFailure(reason: .toolMissing))
+        return model
     }
 
     private static func media(_ name: String) -> URL {
@@ -196,7 +199,7 @@ struct DropRoutingTests {
 
     private func linkModel(_ fetcher: ScriptedLinkFetcher) -> AppModel {
         let model = makeModel()
-        model.makeMediaFetcher = { fetcher }
+        model.linkFetcher = fetcher
         return model
     }
 

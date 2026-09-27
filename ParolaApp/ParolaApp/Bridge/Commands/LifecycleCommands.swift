@@ -54,7 +54,7 @@ extension ParolaAutomationServer {
                     await MockLanguageModelStore.shared.clear()
                     await MockAudioSourceRegistry.shared.clear()
                     CapturedInsertionStore.shared.clear()
-                    MockMediaFetcherRegistry.shared.clear()
+                    model.linkFetcher = YtDlpLinkFetcher(features: model.features)
                     return .object(["reset": .bool(true)])
                 }
             ),

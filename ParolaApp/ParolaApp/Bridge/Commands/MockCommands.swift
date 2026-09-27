@@ -59,7 +59,7 @@ extension ParolaAutomationServer {
                 handler: { args, ctx in
                     try requireTestMode(ctx)
                     let path = try args.string("fixturePath")
-                    MockMediaFetcherRegistry.shared.install(URL(fileURLWithPath: path))
+                    ctx.model.linkFetcher = FixtureLinkFetcher(fixtureURL: URL(fileURLWithPath: path))
                     return .object(["installed": .bool(true)])
                 }
             ),
@@ -174,7 +174,7 @@ extension ParolaAutomationServer {
                         await MockAudioSourceRegistry.shared.clear()
                     }
                     if scope == "media" || scope == "all" {
-                        MockMediaFetcherRegistry.shared.clear()
+                        ctx.model.linkFetcher = YtDlpLinkFetcher(features: ctx.model.features)
                     }
                     if scope == "translator" || scope == "all" {
                         MockTranslatorRegistry.shared.clear()
@@ -204,7 +204,7 @@ extension ParolaAutomationServer {
                         "llm": .array(languageModels.map { .string($0) }),
                         "audio": .object(audioObject),
                         "capturedInsertions": .int(CapturedInsertionStore.shared.all().count),
-                        "mediaFetcher": .bool(MockMediaFetcherRegistry.shared.resolve() != nil),
+                        "mediaFetcher": .bool(ctx.model.linkFetcher is FixtureLinkFetcher),
                         "translator": MockTranslatorRegistry.shared.resolve().map { .string($0.mode.rawValue) } ?? .null,
                     ])
                 }

@@ -19,6 +19,8 @@ struct AppBootstrap: @unchecked Sendable {
     /// Where API keys are read and written. Left nil, a test-mode launch keeps them in memory and
     /// a normal launch uses the keychain, so a sandbox never writes into the real one.
     let apiKeyStore: (any APIKeyStore)?
+    /// Nil fetches links through yt-dlp.
+    let linkFetcher: (any LinkFetcher)?
 
     init(
         mode: Mode,
@@ -32,7 +34,8 @@ struct AppBootstrap: @unchecked Sendable {
         enabledFeaturesOverride: Set<ParolaFeature>? = nil,
         fileReadDeadline: Duration = FileReadDeadline.header,
         showsIntroduction: Bool = false,
-        apiKeyStore: (any APIKeyStore)? = nil
+        apiKeyStore: (any APIKeyStore)? = nil,
+        linkFetcher: (any LinkFetcher)? = nil
     ) {
         self.mode = mode
         self.library = library
@@ -46,6 +49,7 @@ struct AppBootstrap: @unchecked Sendable {
         self.fileReadDeadline = fileReadDeadline
         self.showsIntroduction = showsIntroduction
         self.apiKeyStore = apiKeyStore
+        self.linkFetcher = linkFetcher
     }
 
     static let normal: AppBootstrap = AppBootstrap(

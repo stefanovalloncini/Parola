@@ -25,7 +25,7 @@ actor FetchGate {
 
 /// A link fetcher that reports a title and half the download, then hands back a local file. An owning fetcher
 /// copies the fixture into a working folder of its own, the way yt-dlp's download lands.
-final class ScriptedLinkFetcher: MediaFetcher {
+final class ScriptedLinkFetcher: LinkFetcher {
     let fixture: URL
     let metadata: LinkMetadata
     let gate: FetchGate?
@@ -55,7 +55,11 @@ final class ScriptedLinkFetcher: MediaFetcher {
     var fetches: Int { count.withLock { $0 } }
     var workingFolders: [URL] { folders.withLock { $0 } }
 
-    func fetch(url: URL, progress: @escaping @Sendable (LinkFetchEvent) -> Void) async throws -> FetchedMedia {
+    func fetchCaptions(url: URL, language: String?) async throws -> FetchedCaptions {
+        throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noCaptions))
+    }
+
+    func fetchAudio(url: URL, progress: @escaping @Sendable (LinkFetchEvent) -> Void) async throws -> FetchedMedia {
         count.withLock { $0 += 1 }
         progress(.metadata(metadata))
         progress(.downloading(fraction: 0.5))
@@ -115,16 +119,15 @@ extension TranscriberMockSuites {
         private static let page = ScriptedLinkFetcher.talk.webpageURL
 
         private func makeModel(fetcher: ScriptedLinkFetcher) -> AppModel {
-            let model = AppModel(bootstrap: AppBootstrap(
+            AppModel(bootstrap: AppBootstrap(
                 mode: .test,
                 library: makeTempLibraryURL("link-run"),
                 defaultsOverride: temporaryDefaults(),
                 sideEffects: [],
                 filePicker: TestFilePicker(),
-                clock: ContinuousClock()
+                clock: ContinuousClock(),
+                linkFetcher: fetcher
             ))
-            model.makeMediaFetcher = { fetcher }
-            return model
         }
 
         private static let words = MockTranscriberResponse(

@@ -10,9 +10,8 @@ struct MockRegistries: OptionSet {
 
     static let transcriber = MockRegistries(rawValue: 1 << 0)
     static let audioSource = MockRegistries(rawValue: 1 << 1)
-    static let mediaFetcher = MockRegistries(rawValue: 1 << 2)
     static let streaming = MockRegistries(rawValue: 1 << 3)
-    static let all: MockRegistries = [.transcriber, .audioSource, .mediaFetcher, .streaming]
+    static let all: MockRegistries = [.transcriber, .audioSource, .streaming]
 }
 
 /// Awaited teardown on every exit: a fire-and-forget clear can land after the next test installed its mock.
@@ -30,6 +29,5 @@ func withMocksCleared(_ registries: MockRegistries, _ body: @MainActor () async 
 private func clearMocks(_ registries: MockRegistries) async {
     if registries.contains(.transcriber) { await MockTranscriberRegistry.shared.clear() }
     if registries.contains(.audioSource) { await MockAudioSourceRegistry.shared.clear() }
-    if registries.contains(.mediaFetcher) { MockMediaFetcherRegistry.shared.clear() }
     if registries.contains(.streaming) { MockStreamingTranscriberRegistry.shared.clear() }
 }

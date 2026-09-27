@@ -5,7 +5,7 @@ import Foundation
 /// Much faster than transcribing — Whisper isn't run at all.
 ///
 /// Requires `yt-dlp` on `$PATH`. Common install: `brew install yt-dlp`.
-public struct YouTubeSubsResult: Sendable {
+public struct FetchedCaptions: Sendable {
     public let transcript: Transcript
     public let metadata: LinkMetadata
 
@@ -13,15 +13,11 @@ public struct YouTubeSubsResult: Sendable {
 }
 
 public enum YouTubeSubsFetcher {
-    public static func fetch(url: URL, preferLanguage: String? = nil) async throws -> Transcript {
-        try await fetchWithTitle(url: url, preferLanguage: preferLanguage).transcript
+    public static func fetchWithTitle(url: URL, preferLanguage: String? = nil) async throws -> FetchedCaptions {
+        try await fetchWithTitle(url: url, preferLanguage: preferLanguage, ytDlpPath: YtDlpLocator.locate())
     }
 
-    public static func fetchWithTitle(url: URL, preferLanguage: String? = nil) async throws -> YouTubeSubsResult {
-        try await fetchWithTitle(url: url, preferLanguage: preferLanguage, ytDlpPath: YouTubeProcess.findYtDlp())
-    }
-
-    static func fetchWithTitle(url: URL, preferLanguage: String?, ytDlpPath: String?) async throws -> YouTubeSubsResult {
+    static func fetchWithTitle(url: URL, preferLanguage: String?, ytDlpPath: String?) async throws -> FetchedCaptions {
         let site = LinkDownloadFailure.site(for: url)
         guard let ytDlp = ytDlpPath else {
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolMissing, site: site))
@@ -58,7 +54,7 @@ public enum YouTubeSubsFetcher {
         }
         let metadata = output.metadata ?? LinkMetadata()
         transcript.sourceURL = metadata.webpageURL ?? url
-        return YouTubeSubsResult(transcript: transcript, metadata: metadata)
+        return FetchedCaptions(transcript: transcript, metadata: metadata)
     }
 
     static func arguments(url: URL, preferLanguage: String?, outputTemplate: String) -> [String] {

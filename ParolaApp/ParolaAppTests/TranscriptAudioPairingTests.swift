@@ -164,13 +164,13 @@ extension TranscriberMockSuites {
         func youtubePairsWithItsSource() async throws {
             let fixture = try makeSilentWAV(label: "youtube")
             defer { try? FileManager.default.removeItem(at: fixture) }
-            try await withMocksCleared([.transcriber, .mediaFetcher]) {
+            try await withMocksCleared([.transcriber]) {
                 let gate = MockTranscriberGate()
                 defer { Task { await gate.open() } }
-                MockMediaFetcherRegistry.shared.install(fixture)
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
 
                 let model = makeModel()
+                model.linkFetcher = FixtureLinkFetcher(fixtureURL: fixture)
                 model.transcribeYouTube(urlString: "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
                 let fetched = await waitUntil { model.sourceFileURL == fixture }
                 #expect(fetched)

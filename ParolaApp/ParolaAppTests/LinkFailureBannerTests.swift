@@ -61,14 +61,14 @@ extension TranscriberMockSuites {
     struct LinkFailureBannerTests {
         private static let link = "https://www.youtube.com/watch?v=9XUo28kxQt4&t=41s"
 
-        private func makeModel() -> AppModel {
-            AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("link-failure"))
+        private func makeModel(failing failure: LinkDownloadFailure = staleRefusal) -> AppModel {
+            let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("link-failure"))
+            model.linkFetcher = FixtureLinkFetcher(failure: failure)
+            return model
         }
 
         @Test("a link from the sheet fails with the plain message and can be retried")
         func sheetPath() async {
-            MockMediaFetcherRegistry.shared.installFailure(staleRefusal)
-            defer { MockMediaFetcherRegistry.shared.clear() }
             let model = makeModel()
 
             model.transcribeYouTube(urlString: Self.link)
@@ -81,8 +81,6 @@ extension TranscriberMockSuites {
 
         @Test("a link parked behind a take ends with the same message once it runs")
         func parkedPath() async {
-            MockMediaFetcherRegistry.shared.installFailure(staleRefusal)
-            defer { MockMediaFetcherRegistry.shared.clear() }
             let model = makeModel()
             model.phase = .recording(source: .microphone)
             #expect(model.transcribeYouTube(urlString: Self.link) == .parked)
@@ -97,13 +95,11 @@ extension TranscriberMockSuites {
 
         @Test("Retry runs the failed link again")
         func retryRunsTheLinkAgain() async {
-            MockMediaFetcherRegistry.shared.installFailure(staleRefusal)
-            defer { MockMediaFetcherRegistry.shared.clear() }
             let model = makeModel()
             model.transcribeYouTube(urlString: Self.link)
             await waitUntil { model.phase == .failed(message: staleRefusalMessage) }
 
-            MockMediaFetcherRegistry.shared.installFailure(LinkDownloadFailure(reason: .unreachable, site: "YouTube"))
+            model.linkFetcher = FixtureLinkFetcher(failure: LinkDownloadFailure(reason: .unreachable, site: "YouTube"))
             model.retryFailedTranscription()
 
             await waitUntil {
@@ -114,8 +110,6 @@ extension TranscriberMockSuites {
 
         @Test("Update yt-dlp on the banner hands over to Retry once it succeeds")
         func updateThenRetry() async throws {
-            MockMediaFetcherRegistry.shared.installFailure(staleRefusal)
-            defer { MockMediaFetcherRegistry.shared.clear() }
             let brew = try fakeTool("exit 0")
             let ytDlp = try fakeTool("echo 2099.01.01")
             defer {
@@ -141,8 +135,6 @@ extension TranscriberMockSuites {
 
         @Test("Dismiss on a banner that is updating yt-dlp stops the update")
         func dismissStopsTheUpdate() async throws {
-            MockMediaFetcherRegistry.shared.installFailure(staleRefusal)
-            defer { MockMediaFetcherRegistry.shared.clear() }
             let brew = try fakeTool("exec sleep 30")
             let ytDlp = try fakeTool("echo 2026.03.17")
             defer {
@@ -170,9 +162,7 @@ extension TranscriberMockSuites {
             LinkDownloadFailure(reason: .unavailable(.ageRestricted), site: "YouTube", ytDlpVersion: YtDlpVersion("2026.03.17"), ytDlpIsStale: true),
         ])
         func noRetryForUnavailableVideos(failure: LinkDownloadFailure) async {
-            MockMediaFetcherRegistry.shared.installFailure(failure)
-            defer { MockMediaFetcherRegistry.shared.clear() }
-            let model = makeModel()
+            let model = makeModel(failing: failure)
 
             model.transcribeYouTube(urlString: Self.link)
 
@@ -197,9 +187,7 @@ extension TranscriberMockSuites {
         @Test("a fresh yt-dlp's failure offers only Retry")
         func freshFailureOffersOnlyRetry() async {
             let fresh = LinkDownloadFailure(reason: .refused(httpStatus: 403), site: "YouTube", ytDlpVersion: YtDlpVersion("2099.01.01"))
-            MockMediaFetcherRegistry.shared.installFailure(fresh)
-            defer { MockMediaFetcherRegistry.shared.clear() }
-            let model = makeModel()
+            let model = makeModel(failing: fresh)
 
             model.transcribeYouTube(urlString: Self.link)
 

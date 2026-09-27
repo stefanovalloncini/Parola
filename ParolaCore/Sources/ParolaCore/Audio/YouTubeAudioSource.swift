@@ -37,19 +37,18 @@ public extension URL {
 
 #if os(macOS)
 
-/// Audio source that downloads a video's audio via `yt-dlp`.
+/// Downloads a video's audio via `yt-dlp`.
 ///
 /// Requires `yt-dlp` on `$PATH`. Common install: `brew install yt-dlp`.
-public actor YouTubeAudioSource: AudioSource {
+public actor YouTubeAudioSource {
     public let url: URL
 
     nonisolated let workingDir: URL
     private let ytDlpPath: String?
     private let limits: YtDlpRunner.ProgressLimits
-    private var fetched: FetchedMedia?
 
     public init(url: URL, features: FeatureSet = .resolve()) throws {
-        try self.init(url: url, features: features, ytDlpPath: YouTubeProcess.findYtDlp(), limits: .init())
+        try self.init(url: url, features: features, ytDlpPath: YtDlpLocator.locate(), limits: .init())
     }
 
     init(url: URL, features: FeatureSet, ytDlpPath: String?, limits: YtDlpRunner.ProgressLimits) throws {
@@ -65,20 +64,13 @@ public actor YouTubeAudioSource: AudioSource {
             .appendingPathComponent("\(LinkDownloadFolders.prefix)\(UUID().uuidString)")
     }
 
-    public func prepare() async throws -> URL {
-        try await fetch().fileURL
-    }
-
     public func fetch(progress: @escaping @Sendable (LinkFetchEvent) -> Void = { _ in }) async throws -> FetchedMedia {
-        if let fetched { return fetched }
         guard let ytDlp = ytDlpPath else {
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolMissing, site: site))
         }
         try FileManager.default.createDirectory(at: workingDir, withIntermediateDirectories: true)
         do {
-            let media = try await download(ytDlpPath: ytDlp, progress: progress)
-            fetched = media
-            return media
+            return try await download(ytDlpPath: ytDlp, progress: progress)
         } catch {
             try? FileManager.default.removeItem(at: workingDir)
             throw error
@@ -121,11 +113,6 @@ public actor YouTubeAudioSource: AudioSource {
         return FetchedMedia(
             fileURL: URL(fileURLWithPath: path), metadata: output.metadata ?? LinkMetadata(), workingDirectory: workingDir
         )
-    }
-
-    public func cancel() async {
-        try? FileManager.default.removeItem(at: workingDir)
-        fetched = nil
     }
 
     /// The m4a stream when the site has one, so yt-dlp only remuxes it; anything else is converted to m4a.

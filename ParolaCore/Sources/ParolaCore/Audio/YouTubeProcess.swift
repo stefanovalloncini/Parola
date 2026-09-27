@@ -11,6 +11,21 @@ enum YtDlpRun: String, LogSafe {
     var logToken: String { rawValue }
 }
 
+/// Where yt-dlp is: the one lookup both the downloads and Settings use.
+public enum YtDlpLocator {
+    public static func locate() -> String? {
+        for candidate in ["/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"] {
+            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+        }
+        let env = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        for dir in env.split(separator: ":") {
+            let candidate = "\(dir)/yt-dlp"
+            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+        }
+        return nil
+    }
+}
+
 enum YouTubeProcess {
     /// Launches `process` with its exit signal wired up first, so a quick exit can't slip past the wait.
     static func start(_ process: Process) throws -> ExitSignal {
@@ -18,22 +33,6 @@ enum YouTubeProcess {
         process.terminationHandler = { _ in exit.fire() }
         try process.run()
         return exit
-    }
-
-    static func findYtDlp() -> String? {
-        for candidate in ["/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"] {
-            if FileManager.default.isExecutableFile(atPath: candidate) {
-                return candidate
-            }
-        }
-        let env = ProcessInfo.processInfo.environment["PATH"] ?? ""
-        for dir in env.split(separator: ":") {
-            let candidate = "\(dir)/yt-dlp"
-            if FileManager.default.isExecutableFile(atPath: candidate) {
-                return candidate
-            }
-        }
-        return nil
     }
 
     /// GUI-launched apps inherit a minimal PATH without `/opt/homebrew/bin`; yt-dlp needs

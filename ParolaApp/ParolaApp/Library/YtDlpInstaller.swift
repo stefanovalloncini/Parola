@@ -20,15 +20,7 @@ enum YtDlpInstaller {
     }
 
     static func locate() -> String? {
-        for path in ["/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"] {
-            if FileManager.default.isExecutableFile(atPath: path) { return path }
-        }
-        let env = ProcessInfo.processInfo.environment["PATH"] ?? ""
-        for dir in env.split(separator: ":") {
-            let candidate = "\(dir)/yt-dlp"
-            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
-        }
-        return nil
+        YtDlpLocator.locate()
     }
 
     static func locateBrew() -> String? {

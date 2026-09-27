@@ -8,7 +8,7 @@ struct Transcribe: AsyncParsableCommand {
         abstract: "Transcribe an audio or video file."
     )
 
-    @Argument(help: "Path to one or more audio/video files, or a single YouTube URL. Multiple paths require --output-dir.")
+    @Argument(help: "Path to one or more audio/video files, or a single video link. Multiple paths require --output-dir.")
     var inputs: [String]
 
     @Option(name: .shortAndLong, help: "Model variant (e.g. openai_whisper-large-v3_turbo). Defaults to the recommended model — Apple Speech on macOS 26, no download.")
@@ -47,7 +47,7 @@ struct Transcribe: AsyncParsableCommand {
     @Option(name: .long, help: "Also save a .parola bundle to this path (audio + transcript + manifest).")
     var save: String?
 
-    @Flag(name: .long, help: "For YouTube URLs: prefer downloading existing captions over running Whisper.")
+    @Flag(name: .long, help: "For video links: prefer downloading existing captions over running Whisper.")
     var preferExistingSubs: Bool = false
 
     @Flag(name: .long, help: "Generate a summary and chapter markers via the on-device LLM (macOS 26+ / iOS 26+).")
@@ -129,8 +129,8 @@ struct Transcribe: AsyncParsableCommand {
 
     private static func resolveInput(_ raw: String) throws -> ResolvedInput {
         if raw.hasPrefix("http://") || raw.hasPrefix("https://") {
-            guard let url = URL(string: raw), url.isYouTubeVideo else {
-                throw ValidationError("Only YouTube URLs are supported. Got: \(raw)")
+            guard let url = URL(string: raw), url.isYtDlpSupported else {
+                throw ValidationError("yt-dlp can't download from this site. Got: \(raw)")
             }
             return .youtube(url)
         }
@@ -149,7 +149,8 @@ struct Transcribe: AsyncParsableCommand {
         if case .youtube(let url) = input, preferExistingSubs {
             stderr("Fetching captions from \(url.absoluteString)…")
             emitter.progress(.downloading, detail: url.absoluteString)
-            let transcript = TranscriptPostProcessor.orthographyOnly.apply(try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: language))
+            let captions = try await YtDlpLinkFetcher(features: ParolaCLI.features).fetchCaptions(url: url, language: language)
+            let transcript = TranscriptPostProcessor.orthographyOnly.apply(captions.transcript)
             try emitTranscript(transcript, sourceURL: url, entrySource: input.entrySource, emitter: emitter)
             return
         }
@@ -177,12 +178,12 @@ struct Transcribe: AsyncParsableCommand {
             try ParolaCLI.features.require(.youtube)
             stderr("Downloading audio from \(url.absoluteString)…")
             emitter.progress(.downloading, detail: url.absoluteString)
-            let yt = try YouTubeAudioSource(url: url, features: ParolaCLI.features)
+            let fetcher = YtDlpLinkFetcher(features: ParolaCLI.features)
             let bar = mcp ? nil : ProgressReporter(label: "downloading audio")
             let media: FetchedMedia
             do {
                 media = try await untilInterrupted {
-                    try await yt.fetch { event in
+                    try await fetcher.fetchAudio(url: url) { event in
                         guard case .downloading(let fraction?) = event else { return }
                         bar?.update(fraction)
                         emitter.progress(.downloading, fraction: fraction, detail: url.absoluteString)
@@ -195,7 +196,7 @@ struct Transcribe: AsyncParsableCommand {
             bar?.finish()
             fetched = media
             interruptCleanup = InterruptCleanup { media.discard() }
-            source = yt
+            source = FileAudioSource(url: media.fileURL)
             sourceURL = media.fileURL
             link = media.metadata
         }

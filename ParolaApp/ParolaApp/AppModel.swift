@@ -1647,6 +1647,7 @@ final class AppModel {
             engineChoices: engineChoices.map(\.id)
         )
         self.filePicker = bootstrap.filePicker
+        self.linkFetcher = bootstrap.linkFetcher ?? YtDlpLinkFetcher(features: features)
         self.mode = bootstrap.mode
         self.clock = bootstrap.clock
         self.fileReadDeadline = bootstrap.fileReadDeadline
@@ -2459,7 +2460,7 @@ final class AppModel {
     @ObservationIgnored var ytDlpUpdateTask: Task<Void, Never>?
     @ObservationIgnored var ytDlpUpdateDeadline: Duration = YtDlpInstaller.upgradeDeadline
     @ObservationIgnored var ytDlpLocator: () -> String? = { YtDlpInstaller.locate() }
-    @ObservationIgnored var makeMediaFetcher: () -> any MediaFetcher = { MediaFetcherFactory.make() }
+    @ObservationIgnored var linkFetcher: any LinkFetcher
 
     var ytDlpIsStale: Bool {
         ytDlpVersion?.isStale(asOf: Date()) ?? false
@@ -2626,14 +2627,14 @@ final class AppModel {
         cancelTranscriptionRuns()
         let runToken = nextFileRunToken()
         let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, source: .web)
-        let fetcher = makeMediaFetcher()
+        let fetcher = linkFetcher
         let progress = makeLinkFetchHandler(runToken: runToken)
         phase = .fetchingLink(title: nil, progress: nil)
         // A cold model load then overlaps the download instead of following it.
         if prewarmsDuringLinkFetch { prewarmSelectedModel() }
         youtubeTranscribeTask = Task { [weak self] in
             do {
-                let media = try await fetcher.fetch(url: url, progress: progress)
+                let media = try await fetcher.fetchAudio(url: url, progress: progress)
                 try Task.checkCancellation()
                 guard let self else { return }
                 self.youtubeTranscribeTask = nil
@@ -2694,12 +2695,13 @@ final class AppModel {
         }
 
         cancelTranscriptionRuns()
+        let fetcher = linkFetcher
         youtubeSubsTask = Task { [weak self] in
             guard let self else { return }
             do {
                 try Task.checkCancellation()
                 phase = .transcribing(file: url)
-                let result = try await YouTubeSubsFetcher.fetchWithTitle(url: url, preferLanguage: selectedLanguage)
+                let result = try await fetcher.fetchCaptions(url: url, language: selectedLanguage)
                 try Task.checkCancellation()
                 let processed = await postProcessDetached(result.transcript)
                 let landing = Self.landingSignposter.beginInterval("install")

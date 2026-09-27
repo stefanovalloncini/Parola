@@ -46,9 +46,8 @@ extension TranscriberMockSuites {
 
         @Test("transcribeYouTube reports a run it really started")
         func transcribeYouTubeReportsStarted() async throws {
-            MockMediaFetcherRegistry.shared.install(URL(fileURLWithPath: "/tmp/missing-\(UUID()).wav"))
-            defer { MockMediaFetcherRegistry.shared.clear() }
             let (model, server, context, commands) = try makeRig()
+            model.linkFetcher = FixtureLinkFetcher(fixtureURL: URL(fileURLWithPath: "/tmp/missing-\(UUID()).wav"))
             let command = try #require(commands["transcribeYouTube"])
             let args = try command.validate(AutomationArgs(["url": .string(Self.link)]))
 

@@ -28,9 +28,8 @@ extension TranscriberMockSuites {
 
         @Test("cancelled task leaves the replacement's handle intact")
         func restartKeepsHandle() async {
-            MockMediaFetcherRegistry.shared.install(URL(fileURLWithPath: "/tmp/missing-\(UUID()).wav"))
-            defer { MockMediaFetcherRegistry.shared.clear() }
             let model = makeModel()
+            model.linkFetcher = FixtureLinkFetcher(fixtureURL: URL(fileURLWithPath: "/tmp/missing-\(UUID()).wav"))
             model.transcribeYouTube(urlString: "https://www.youtube.com/watch?v=aaaaaaaaaaa")
             model.cancelCurrentWork()
             model.transcribeYouTube(urlString: "https://www.youtube.com/watch?v=bbbbbbbbbbb")
