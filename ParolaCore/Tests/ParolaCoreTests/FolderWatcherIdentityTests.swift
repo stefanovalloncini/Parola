@@ -39,7 +39,7 @@ struct FolderWatcherIdentityTests {
 
         try Fixture.writeSettled(folder.appendingPathComponent("drop.wav"), clock: clock)
         await watcher.checkForNewFiles()
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         #expect(collected.snapshot().map(\.lastPathComponent) == ["drop.wav"])
 
         try FileManager.default.moveItem(
@@ -120,7 +120,7 @@ struct FolderWatcherIdentityTests {
         await target.checkForNewFiles()
         #expect(Fixture.names(await target.pendingPaths) == ["late.m4a"])
         await source.checkForNewFiles()
-        try await secondScheduler.advanceAndWait()
+        try await secondScheduler.advance(ticks: 2)
 
         #expect(await target.pendingPaths.isEmpty)
         #expect(Fixture.names(await target.trackedPaths) == ["early.m4a", "late.m4a"])
@@ -148,7 +148,7 @@ struct FolderWatcherIdentityTests {
 
         try FileManager.default.moveItem(at: outside.appendingPathComponent("memo.m4a"), to: folder.appendingPathComponent("memo.m4a"))
         await watcher.checkForNewFiles()
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         await watcher.stop()
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["memo.m4a"])
@@ -178,7 +178,7 @@ struct FolderWatcherIdentityTests {
         try Fixture.writeSettled(folder.appendingPathComponent("fresh.mp3"), clock: clock)
         await watcher.checkForNewFiles()
         #expect(Fixture.names(await watcher.pendingPaths) == ["fresh.mp3"])
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         await watcher.stop()
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["fresh.mp3"])

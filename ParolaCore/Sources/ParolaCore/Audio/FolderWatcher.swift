@@ -10,7 +10,13 @@ public actor FolderWatcher {
 
     public struct Options: Sendable {
         public var recursive: Bool
+        /// The time between two checks of a file that is still arriving.
         public var settledInterval: Duration
+        /// How many checks in a row must find the same size and date before a file arrives.
+        public var stableChecks: Int
+        /// A file that changes this soon after it arrived (a copy that stalled, a recorder that was
+        /// paused) arrives again once it settles.
+        public var reemitWindow: Duration
         public var clock: any FolderWatcherClock
         public var scheduler: any FolderWatcherScheduler
         /// Share one ledger between the watchers of one app so a file moved between two watched
@@ -21,13 +27,17 @@ public actor FolderWatcher {
 
         public init(
             recursive: Bool = true,
-            settledInterval: Duration = .milliseconds(750),
+            settledInterval: Duration = .seconds(1),
+            stableChecks: Int = 3,
+            reemitWindow: Duration = .seconds(600),
             clock: any FolderWatcherClock = SystemFolderWatcherClock(),
             scheduler: any FolderWatcherScheduler = SystemFolderWatcherScheduler(),
             ledger: FolderWatcherLedger = FolderWatcherLedger()
         ) {
             self.recursive = recursive
             self.settledInterval = settledInterval
+            self.stableChecks = stableChecks
+            self.reemitWindow = reemitWindow
             self.clock = clock
             self.scheduler = scheduler
             self.ledger = ledger
@@ -40,8 +50,15 @@ public actor FolderWatcher {
     }
 
     enum FileStatus: Sendable, Equatable {
-        case settled
+        /// There before the watch began: a change to it is not an arrival.
+        case existing
         case pending
+        case emitted(at: Date)
+    }
+
+    private struct PendingCheck {
+        var stableChecks = 1
+        var downloadRequested = false
     }
 
     private struct TrackedFile {
@@ -60,6 +77,7 @@ public actor FolderWatcher {
             public var inode: UInt64
             public var size: Int64
             public var modified: Date
+            public var emittedAt: Date?
         }
 
         public var entries: [Entry]
@@ -90,7 +108,8 @@ public actor FolderWatcher {
     private var subdirSources: [String: DispatchSourceFileSystemObject] = [:]
     private var directories: [String: DirectoryRecord] = [:]
     private var files: [FileKey: TrackedFile] = [:]
-    private var pending: Set<FileKey> = []
+    private var pending: [FileKey: PendingCheck] = [:]
+    private var watchedAfterEmit: Set<FileKey> = []
     private var dirty: Set<String> = []
     private var drainTask: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
@@ -130,27 +149,30 @@ public actor FolderWatcher {
         // and closed our fd — don't resurrect a source on a closed descriptor.
         guard fileDescriptor == fd else { return }
         files = [:]
-        pending = []
+        pending = [:]
+        watchedAfterEmit = []
         directories = [:]
         guard !scan.missing.contains(rootPath) else { return }
         listedDirectoryCount += scan.listings.count
 
         let listed = scan.listings.flatMap(\.media)
         if let baseline {
+            let now = options.clock.now()
             for entry in baseline.entries {
+                let key = FileKey(inode: entry.inode)
                 let path = rootPath + "/" + entry.path
-                files[FileKey(inode: entry.inode)] = TrackedFile(path: path, size: entry.size, modified: entry.modified, status: .settled)
+                files[key] = TrackedFile(path: path, size: entry.size, modified: entry.modified, status: .existing)
+                setStatus(entry.emittedAt.map { .emitted(at: $0) } ?? .existing, for: key, now: now)
             }
             let listedKeys = Set(listed.map(\.key))
             var vanished = pathIndex(files.keys.filter { !listedKeys.contains($0) })
-            let now = options.clock.now()
             for item in listed {
                 resolve(item, vanished: &vanished, now: now)
             }
             depart(Set(vanished.values), now: now)
         } else {
             for item in listed {
-                files[item.key] = TrackedFile(path: item.path, size: item.size, modified: item.modified, status: .settled)
+                files[item.key] = TrackedFile(path: item.path, size: item.size, modified: item.modified, status: .existing)
             }
         }
         for listing in scan.listings {
@@ -162,9 +184,7 @@ public actor FolderWatcher {
         }
         baselineChanged = true
         publishBaselineChange()
-        if !pending.isEmpty {
-            schedulePendingCheck()
-        }
+        scheduleSettleTick()
 
         let (stream, continuation) = AsyncStream.makeStream(of: String.self)
         eventContinuation = continuation
@@ -240,6 +260,7 @@ public actor FolderWatcher {
         settledTask?.cancel()
         settledTask = nil
         pending.removeAll()
+        watchedAfterEmit.removeAll()
     }
 
     /// Rescans every directory the watcher knows, one level each.
@@ -290,9 +311,7 @@ public actor FolderWatcher {
         listedDirectoryCount += scan.listings.count
         apply(scan.listings)
         publishBaselineChange()
-        if !pending.isEmpty {
-            schedulePendingCheck()
-        }
+        scheduleSettleTick()
     }
 
     private func apply(_ listings: [Listing]) {
@@ -345,57 +364,93 @@ public actor FolderWatcher {
 
     private func resolve(_ item: ScannedFile, vanished: inout [String: FileKey], now: Date) {
         if var known = files[item.key] {
-            if known.status == .settled,
-               known.path != item.path || known.size != item.size || known.modified != item.modified {
+            let changed = known.size != item.size || known.modified != item.modified
+            let moved = known.path != item.path
+            known.path = item.path
+            if known.status != .pending, changed || moved {
                 known.size = item.size
                 known.modified = item.modified
                 baselineChanged = true
             }
-            known.path = item.path
             files[item.key] = known
+            if case .emitted(let at) = known.status, changed, arrivesAgain(modified: item.modified, emittedAt: at) {
+                setStatus(.pending, for: item.key, now: now)
+            }
         } else if let departure = options.ledger.claim(item.key, size: item.size, modified: item.modified, now: now) {
-            track(item, status: departure.status)
+            track(item, status: departure.status, now: now)
         } else if let oldKey = vanished[item.path], let old = files[oldKey],
                   old.size == item.size, old.modified == item.modified {
             // Same name, size and date under a new inode: an atomic save of the same bytes, or a
             // network volume that renumbered its files on remount.
             vanished.removeValue(forKey: item.path)
-            files.removeValue(forKey: oldKey)
-            pending.remove(oldKey)
-            track(item, status: old.status)
+            forget(oldKey)
+            track(item, status: old.status, now: now)
         } else {
-            track(item, status: .pending)
+            track(item, status: .pending, now: now)
         }
     }
 
     private func depart(_ keys: Set<FileKey>, now: Date) {
         for key in keys {
-            guard let gone = files.removeValue(forKey: key) else { continue }
-            pending.remove(key)
-            if gone.status == .settled { baselineChanged = true }
+            guard let gone = forget(key) else { continue }
             options.ledger.depart(key, .init(size: gone.size, modified: gone.modified, status: gone.status, departedAt: now))
         }
     }
 
-    private func track(_ item: ScannedFile, status: FileStatus) {
-        files[item.key] = TrackedFile(path: item.path, size: item.size, modified: item.modified, status: status)
-        if status == .pending {
-            pending.insert(item.key)
-        } else {
-            pending.remove(item.key)
+    @discardableResult
+    private func forget(_ key: FileKey) -> TrackedFile? {
+        guard let gone = files.removeValue(forKey: key) else { return nil }
+        pending[key] = nil
+        watchedAfterEmit.remove(key)
+        if gone.status != .pending { baselineChanged = true }
+        return gone
+    }
+
+    private func track(_ item: ScannedFile, status: FileStatus, now: Date) {
+        files[item.key] = TrackedFile(path: item.path, size: item.size, modified: item.modified, status: .pending)
+        setStatus(status, for: item.key, now: now)
+    }
+
+    private func setStatus(_ status: FileStatus, for key: FileKey, now: Date) {
+        guard let previous = files[key]?.status else { return }
+        files[key]?.status = status
+        if previous != status, previous != .pending || status != .pending {
             baselineChanged = true
         }
+        switch status {
+        case .pending:
+            if pending[key] == nil { pending[key] = PendingCheck() }
+            watchedAfterEmit.remove(key)
+        case .emitted(let at):
+            pending[key] = nil
+            if now < at.addingTimeInterval(Self.seconds(options.reemitWindow)) {
+                watchedAfterEmit.insert(key)
+            } else {
+                watchedAfterEmit.remove(key)
+            }
+        case .existing:
+            pending[key] = nil
+            watchedAfterEmit.remove(key)
+        }
+    }
+
+    /// Judged by the file's own date, so a change that happened while the app was quit counts too.
+    private func arrivesAgain(modified: Date, emittedAt: Date) -> Bool {
+        modified <= emittedAt.addingTimeInterval(Self.seconds(options.reemitWindow))
     }
 
     public func baseline() -> Baseline {
         let prefix = rootPath + "/"
         let entries: [Baseline.Entry] = files.compactMap { key, file in
-            guard file.status == .settled, file.path.hasPrefix(prefix) else { return nil }
+            guard file.status != .pending, file.path.hasPrefix(prefix) else { return nil }
+            var emittedAt: Date?
+            if case .emitted(let at) = file.status { emittedAt = at }
             return Baseline.Entry(
                 path: String(file.path.dropFirst(prefix.count)),
                 inode: key.inode,
                 size: file.size,
-                modified: file.modified
+                modified: file.modified,
+                emittedAt: emittedAt
             )
         }
         return Baseline(entries: entries.sorted { $0.path < $1.path })
@@ -407,55 +462,132 @@ public actor FolderWatcher {
         onBaselineChange?()
     }
 
-    private func schedulePendingCheck() {
-        if settledTask != nil { return }
+    private func scheduleSettleTick() {
+        guard settledTask == nil, !pending.isEmpty || !watchedAfterEmit.isEmpty else { return }
         let interval = options.settledInterval
         let scheduler = options.scheduler
         settledTask = Task { [weak self] in
             try? await scheduler.runTick(after: interval) { [weak self] in
-                await self?.processPending()
+                await self?.settleTick()
             }
         }
     }
 
-    private func processPending() {
+    private func settleTick() {
         settledTask = nil
-        guard !pending.isEmpty else { return }
         let now = options.clock.now()
-        let cutoff = now.addingTimeInterval(-Self.intervalAsSeconds(options.settledInterval))
-        for key in pending {
-            guard var file = files[key] else {
-                pending.remove(key)
-                continue
-            }
-            guard let info = FileInfo(file.path) else {
-                files.removeValue(forKey: key)
-                pending.remove(key)
-                continue
-            }
-            let mtime = info.modified
-            let size = info.size
-            if mtime <= cutoff && size == file.size && size > 0 {
-                file.status = .settled
-                pending.remove(key)
-                baselineChanged = true
-                // A move from another watched folder can reach this watcher before that one notices
-                // the file left; the settle delay gives it time to hand the file over.
-                if options.ledger.claim(key, size: size, modified: mtime, now: now) == nil {
-                    onNewMediaFile(URL(fileURLWithPath: file.path))
-                }
-            }
-            file.size = size
-            file.modified = mtime
-            files[key] = file
+        for key in pending.keys {
+            checkPending(key, now: now)
+        }
+        for key in watchedAfterEmit {
+            recheckEmitted(key, now: now)
         }
         publishBaselineChange()
-        if !pending.isEmpty {
-            schedulePendingCheck()
+        scheduleSettleTick()
+    }
+
+    private func checkPending(_ key: FileKey, now: Date) {
+        guard let file = files[key], var check = pending[key] else {
+            pending[key] = nil
+            return
+        }
+        guard let info = FileInfo(file.path) else {
+            forget(key)
+            return
+        }
+        let observation = SettleObservation(
+            size: info.size,
+            modified: info.modified,
+            created: info.created,
+            isDataless: info.isDataless || Self.isCloudPlaceholder(file.path)
+        )
+        let verdict = Self.settle(observation, after: (file.size, file.modified), checks: &check.stableChecks, now: now, options: options)
+        files[key]?.size = info.size
+        files[key]?.modified = info.modified
+        switch verdict {
+        case .wait:
+            pending[key] = check
+        case .download:
+            if !check.downloadRequested {
+                check.downloadRequested = true
+                try? FileManager.default.startDownloadingUbiquitousItem(at: URL(fileURLWithPath: file.path))
+            }
+            pending[key] = check
+        case .arrive:
+            // A move from another watched folder can reach this watcher before that one notices
+            // the file left; the settle delay gives it time to hand the file over.
+            if let departure = options.ledger.claim(key, size: info.size, modified: info.modified, now: now) {
+                setStatus(departure.status, for: key, now: now)
+            } else {
+                setStatus(.emitted(at: now), for: key, now: now)
+                onNewMediaFile(URL(fileURLWithPath: file.path))
+            }
         }
     }
 
-    private static func intervalAsSeconds(_ duration: Duration) -> Double {
+    private func recheckEmitted(_ key: FileKey, now: Date) {
+        guard let file = files[key], case .emitted(let at) = file.status,
+              now < at.addingTimeInterval(Self.seconds(options.reemitWindow)) else {
+            watchedAfterEmit.remove(key)
+            return
+        }
+        guard let info = FileInfo(file.path), info.size != file.size || info.modified != file.modified else { return }
+        files[key]?.size = info.size
+        files[key]?.modified = info.modified
+        baselineChanged = true
+        if arrivesAgain(modified: info.modified, emittedAt: at) {
+            setStatus(.pending, for: key, now: now)
+        }
+    }
+
+    struct SettleObservation: Equatable {
+        var size: Int64
+        var modified: Date
+        var created: Date
+        var isDataless: Bool
+    }
+
+    enum SettleVerdict: Equatable {
+        case wait
+        case download
+        case arrive
+    }
+
+    /// Finder dates a file it is still copying 14 February 1946.
+    private static let finderBusyDays = Date(timeIntervalSince1970: -753_667_200)...Date(timeIntervalSince1970: -753_494_400)
+
+    /// A file arrives once `stableChecks` checks in a row saw the same non-zero size and date, and
+    /// the date is older than one interval. A cloud placeholder waits for its download, and a file
+    /// Finder is still copying waits for Finder.
+    static func settle(
+        _ observation: SettleObservation,
+        after previous: (size: Int64, modified: Date),
+        checks: inout Int,
+        now: Date,
+        options: Options
+    ) -> SettleVerdict {
+        guard !observation.isDataless else {
+            checks = 1
+            return .download
+        }
+        guard observation.size > 0, !finderBusyDays.contains(observation.created) else {
+            checks = 1
+            return .wait
+        }
+        checks = observation.size == previous.size && observation.modified == previous.modified ? checks + 1 : 1
+        let cutoff = now.addingTimeInterval(-seconds(options.settledInterval))
+        return checks >= options.stableChecks && observation.modified <= cutoff ? .arrive : .wait
+    }
+
+    private static func isCloudPlaceholder(_ path: String) -> Bool {
+        guard let values = try? URL(fileURLWithPath: path)
+            .resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]),
+              values.isUbiquitousItem == true
+        else { return false }
+        return values.ubiquitousItemDownloadingStatus != .current
+    }
+
+    private static func seconds(_ duration: Duration) -> Double {
         let comp = duration.components
         return Double(comp.seconds) + Double(comp.attoseconds) / 1e18
     }
@@ -481,7 +613,7 @@ public actor FolderWatcher {
     }
 
     internal var pendingPaths: Set<String> {
-        Set(pending.compactMap { files[$0]?.path })
+        Set(pending.keys.compactMap { files[$0]?.path })
     }
 
     internal var trackedPaths: Set<String> {

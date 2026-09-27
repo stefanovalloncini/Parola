@@ -36,6 +36,13 @@ actor ManualScheduler: FolderWatcherScheduler {
         signalDone()
     }
 
+    /// Runs `ticks` settle checks. A settled file arrives on the second check after the scan that found it.
+    func advance(ticks: Int) async throws {
+        for _ in 0..<ticks {
+            try await advanceAndWait()
+        }
+    }
+
     func advanceAndWait() async throws {
         if parked.isEmpty {
             await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in

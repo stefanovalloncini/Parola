@@ -129,6 +129,8 @@ extension FolderWatcher {
         var isDirectory: Bool { mode & S_IFMT == S_IFDIR }
         var isRegularFile: Bool { mode & S_IFMT == S_IFREG }
         var isHidden: Bool { flags & UInt32(UF_HIDDEN) != 0 }
+        /// A cloud file whose bytes are still on the server.
+        var isDataless: Bool { flags & UInt32(SF_DATALESS) != 0 }
 
         private static func date(_ time: timespec) -> Date {
             Date(timeIntervalSince1970: TimeInterval(time.tv_sec) + TimeInterval(time.tv_nsec) / 1_000_000_000)

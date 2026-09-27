@@ -47,7 +47,7 @@ struct FolderWatcherBaselineTests {
         let after = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
         await after.start(baseline: saved)
         #expect(Fixture.names(await after.pendingPaths) == ["while-quit.wav", "nested.mp3"])
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         await after.stop()
 
         #expect(Set(collected.snapshot().map(\.lastPathComponent)) == ["while-quit.wav", "nested.mp3"])
@@ -72,7 +72,7 @@ struct FolderWatcherBaselineTests {
 
         try Fixture.writeSettled(folder.appendingPathComponent("new.m4a"), clock: clock)
         await watcher.checkForNewFiles()
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         await watcher.stop()
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["new.m4a"])
@@ -100,7 +100,7 @@ struct FolderWatcherBaselineTests {
         let scheduler = ManualScheduler()
         let after = makeWatcher(renamed, clock: clock, scheduler: scheduler, collected: collected)
         await after.start(baseline: try JSONDecoder().decode(FolderWatcher.Baseline.self, from: data))
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         await after.stop()
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["fresh.wav"])
@@ -125,7 +125,7 @@ struct FolderWatcherBaselineTests {
         let scheduler = ManualScheduler()
         let after = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
         await after.start(baseline: saved)
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         await after.stop()
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["settling.m4a"])
@@ -155,6 +155,8 @@ struct FolderWatcherBaselineTests {
         await watcher.checkForNewFiles()
         #expect(changes.withLock { $0 } == 1, "a file still settling is not part of the baseline yet")
 
+        try await scheduler.advanceAndWait()
+        #expect(changes.withLock { $0 } == 1, "one steady check is not enough")
         try await scheduler.advanceAndWait()
         #expect(changes.withLock { $0 } == 2)
         await watcher.checkForNewFiles()

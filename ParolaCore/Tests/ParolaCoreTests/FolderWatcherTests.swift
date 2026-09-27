@@ -59,7 +59,7 @@ struct FolderWatcherTests {
         let nestedFile = subdir.appendingPathComponent("clip.wav")
         try WatchedFolderFixture.writeSettled(nestedFile, clock: clock)
         await watcher.checkForNewFiles()
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         await watcher.stop()
 
         let captured = inserted.snapshot()
@@ -104,6 +104,8 @@ struct FolderWatcherTests {
             ofItemAtPath: partial.path
         )
         await watcher.checkForNewFiles()
+        try await scheduler.advance(ticks: 2)
+        #expect(inserted.snapshot().isEmpty, "the date changed on the first of these checks")
         try await scheduler.advanceAndWait()
         await watcher.stop()
 
@@ -137,7 +139,7 @@ struct FolderWatcherTests {
 
         try writeSettled()
         await watcher.checkForNewFiles()
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         #expect(inserted.snapshot().count == 1)
 
         try FileManager.default.removeItem(at: file)
@@ -145,7 +147,7 @@ struct FolderWatcherTests {
 
         try writeSettled()  // recreate with the same name
         await watcher.checkForNewFiles()
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         await watcher.stop()
 
         #expect(inserted.snapshot().count == 2, "recreated same-name file must be detected again")
@@ -178,7 +180,7 @@ struct FolderWatcherTests {
         let fresh = tempDir.appendingPathComponent("new-drop.wav")
         try writeSettled(fresh, clock: clock)
         await watcher.checkForNewFiles()
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         await watcher.stop()
 
         let captured = inserted.snapshot()
@@ -209,7 +211,7 @@ struct FolderWatcherTests {
         try writeSettled(tempDir.appendingPathComponent("notes.txt"), clock: clock)
         try writeSettled(tempDir.appendingPathComponent("audio.wav"), clock: clock)
         await watcher.checkForNewFiles()
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         await watcher.stop()
 
         let captured = inserted.snapshot()
