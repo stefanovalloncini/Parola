@@ -120,6 +120,37 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a re-run of a link's entry keeps the page it came from")
+        func webEntryKeepsItsPage() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the new take")]
+                ))
+                let model = makeModel("retranscribe-web")
+                let wav = try makeWAV("web")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                let page = try #require(URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
+                let entry = try await model.library.add(
+                    transcript: Transcript(
+                        segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the old take")],
+                        language: "en", modelName: "openai_whisper-tiny", sourceURL: page
+                    ),
+                    audioSource: wav, title: "A talk", source: .web
+                )
+                model.refreshLibrary()
+                _ = await waitUntil(timeoutMs: 10_000) { model.libraryEntry(id: entry.id) != nil }
+                #expect(await load(model, entry.id))
+
+                model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "en")
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" })
+                #expect(model.transcript?.sourceURL == page)
+                let stored = try await model.library.load(entry.id).document.transcript
+                #expect(stored.segments.first?.text == "the new take")
+                #expect(stored.sourceURL == page)
+            }
+        }
+
         @Test("the entry keeps its id, title and labels and loses what the old take derived")
         func entryIsReplacedInPlace() async throws {
             try await withMocksCleared(.transcriber) {

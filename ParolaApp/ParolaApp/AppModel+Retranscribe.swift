@@ -65,7 +65,9 @@ extension AppModel {
                 progressHandler: makeFileProgressHandler(runToken: runToken),
                 stageHandler: makeFileStageHandler(fileURL: audioURL, runToken: runToken)
             )
-            let processed = await postProcessDetached(result)
+            var processed = await postProcessDetached(result)
+            // The engine stamps the bundle file it read; a link's entry keeps pointing at its page.
+            if let page = loaded.document.transcript.sourceURL, !page.isFileURL { processed.sourceURL = page }
             // Post-processing is a suspension a cancel can land in, and past this line the old
             // transcript is gone: check rather than overwrite a take the user stopped.
             try Task.checkCancellation()
