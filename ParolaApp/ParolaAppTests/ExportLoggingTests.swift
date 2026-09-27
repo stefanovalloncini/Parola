@@ -129,7 +129,9 @@ struct ExportLoggingTests {
 
         model.runAutoExports(
             transcript: makeTranscript(),
-            sourceURL: unwritableDestination("secret-notes.wav")
+            audioSource: unwritableDestination("secret-notes.wav"),
+            source: .file,
+            entry: nil
         )
 
         let record = try #require(await waitForRecord(sink, message: "sidecar export failed as txt"))

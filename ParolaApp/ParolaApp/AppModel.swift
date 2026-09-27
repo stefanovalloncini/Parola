@@ -209,6 +209,8 @@ final class AppModel {
     var burnTextColorRaw: String = BurnTextColor.white.rawValue { didSet { defaults.set(burnTextColorRaw, forKey: "burnTextColor") } }
     var burnOutline: Bool = true { didSet { defaults.set(burnOutline, forKey: "burnOutline") } }
     var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue { didSet { defaults.set(htmlExportThemeRaw, forKey: "htmlExportTheme") } }
+    /// Empty means the default: Documents/Parola Exports.
+    var autoExportFolderPath: String = "" { didSet { defaults.set(autoExportFolderPath, forKey: "autoExportFolder") } }
     var dictationHudOpacity: Double = 1.0 { didSet { defaults.set(dictationHudOpacity, forKey: "dictationHudOpacity") } }
     var lastFindQuery: String = "" { didSet { defaults.set(lastFindQuery, forKey: "lastFindQuery") } }
     var userPrivacyMode: Bool = false { didSet { defaults.set(userPrivacyMode, forKey: "parola.userPrivacyMode") } }
@@ -840,6 +842,7 @@ final class AppModel {
         self.burnTextColorRaw = defaults.string(forKey: "burnTextColor") ?? BurnTextColor.white.rawValue
         self.burnOutline = readBool("burnOutline", default: true)
         self.htmlExportThemeRaw = defaults.string(forKey: "htmlExportTheme") ?? HtmlExportTheme.light.rawValue
+        self.autoExportFolderPath = defaults.string(forKey: "autoExportFolder") ?? ""
         self.dictationHudOpacity = readDouble("dictationHudOpacity", default: 1.0)
         self.lastFindQuery = defaults.string(forKey: "lastFindQuery") ?? ""
         self.userPrivacyMode = defaults.bool(forKey: "parola.userPrivacyMode")
@@ -1839,11 +1842,8 @@ final class AppModel {
                 nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
             }
             // Exports read nothing the AI writes, so they don't wait for the card.
-            if activate, source == .web {
-                // A failed save has already said so, and that warning matters more than the skipped export.
-                if persisted != nil { noteAutoExportSkippedForLink(sourceExtension: audioSource?.pathExtension ?? "vtt") }
-            } else if activate, let audioSource {
-                runAutoExports(transcript: result, sourceURL: audioSource)
+            if activate {
+                runAutoExports(transcript: result, audioSource: audioSource, source: source, entry: persisted, title: title)
             }
             guard activate, let entry = persisted else { return }
             if playsCompletionSound { playCompletionSound() }

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppKit
 import ParolaCore
 
 extension AppModel {
@@ -12,19 +13,60 @@ extension AppModel {
         writeJSON(autoExportRules, forKey: "autoExportRules")
     }
 
-    /// A link's audio sits in a temporary folder nobody opens, so its rules have nowhere to write.
-    func noteAutoExportSkippedForLink(sourceExtension: String) {
-        let planned = AutoExportEngine.plannedPresets(
-            rules: autoExportRules, sourceExtension: sourceExtension, presets: exportPresets
-        )
-        guard !planned.isEmpty else { return }
-        nonFatalWarning = String(
-            localized: "Auto-export skipped this link: its rules save next to the source file, and a link has no folder to save in. Use Export instead."
-        )
+    /// Where a take's or a link's files go.
+    var autoExportFolderURL: URL {
+        if !autoExportFolderPath.isEmpty { return URL(fileURLWithPath: autoExportFolderPath, isDirectory: true) }
+        return Self.defaultAutoExportFolder(libraryURL: library.libraryURL)
     }
 
-    func runAutoExports(transcript: Transcript, sourceURL: URL) {
-        writeSidecars(transcript, presets: [], source: SidecarSource(besideFile: sourceURL))
+    /// A library opened with `--library` (the sandbox, a test) keeps its exports beside itself, so only
+    /// the real library writes into Documents.
+    nonisolated static func defaultAutoExportFolder(libraryURL: URL) -> URL {
+        libraryURL == LibraryStore.defaultLibraryURL
+            ? URL.documentsDirectory.appendingPathComponent("Parola Exports", isDirectory: true)
+            : libraryURL.appendingPathComponent("Exports", isDirectory: true)
+    }
+
+    func chooseAutoExportFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = autoExportFolderURL
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        autoExportFolderPath = url.path
+    }
+
+    /// The auto-export rules for one finished run. A file's exports go beside it; a take's audio sits in
+    /// the recording scratch folder and a link's in a temporary one, so theirs go to the auto-export
+    /// folder under the entry's title.
+    func runAutoExports(
+        transcript: Transcript, audioSource: URL?, source: EntrySource, entry: LibraryEntry?, title: String? = nil
+    ) {
+        guard let target = sidecarSource(audioSource: audioSource, source: source, entry: entry, title: title) else {
+            return
+        }
+        writeSidecars(transcript, presets: [], source: target)
+    }
+
+    func sidecarSource(audioSource: URL?, source: EntrySource, entry: LibraryEntry?, title: String?) -> SidecarSource? {
+        switch source {
+        case .file:
+            return audioSource.map(SidecarSource.init(besideFile:))
+        case .microphone, .systemAudio, .web:
+            let name = entry.map(LibraryEntryDisplay.title(for:))
+                ?? title
+                ?? audioSource?.deletingPathExtension().lastPathComponent
+                ?? ""
+            return SidecarSource(
+                // Fetched captions have no audio; they arrive as WebVTT.
+                fileExtension: audioSource?.pathExtension ?? "vtt",
+                folder: autoExportFolderURL,
+                baseName: name,
+                owner: entry?.id ?? UUID().uuidString
+            )
+        }
     }
 
     /// The presets named here and the auto-export rules for this source, planned together so no file is written twice.

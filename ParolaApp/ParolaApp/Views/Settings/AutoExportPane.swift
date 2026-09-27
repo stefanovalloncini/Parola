@@ -55,7 +55,18 @@ struct AutoExportPane: View {
             }
             .axLeaf("AutoExport.Button.AddRule")
 
-            SettingHelper(text: "Auto-export writes additional files next to the source when transcription completes. Leave a rule's extension field empty to match every file.")
+            SettingHelper(text: "Auto-export writes additional files next to the source when transcription completes. Recordings and links have no folder of their own, so theirs go to the auto-export folder, named after the entry. Leave a rule's extension field empty to match every file.")
+
+            SettingsSection {
+                SettingRow(
+                    "Auto-export folder",
+                    descriptionVerbatim: (model.autoExportFolderURL.path as NSString).abbreviatingWithTildeInPath,
+                    isFirst: true
+                ) {
+                    Button("Choose…") { model.chooseAutoExportFolder() }
+                        .axLeaf("AutoExport.Button.ChooseFolder")
+                }
+            }
 
             SettingsSection("Export options") {
                 SettingRow("Subtitle line length",

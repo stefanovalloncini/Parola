@@ -149,4 +149,88 @@ struct AutoExportTests {
         }.value
         #expect(ranOffMain)
     }
+
+    // MARK: - Where a run's exports go
+
+    @MainActor
+    private func exportModel(_ name: String) -> AppModel {
+        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL(name))
+    }
+
+    @MainActor
+    private func waitForMarked(_ url: URL) async -> Bool {
+        for _ in 0..<300 {
+            if OutputMarker.isMarked(url) { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return OutputMarker.isMarked(url)
+    }
+
+    @MainActor
+    @Test("a take's exports go to the auto-export folder under the entry's title, not beside its scratch audio")
+    func takeExportsGoToTheFolder() async throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AutoExportTests-take-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let audio = scratch.appendingPathComponent("parola-recording-\(UUID().uuidString).wav")
+        try Data("fake".utf8).write(to: audio)
+        let model = exportModel("autoexport-take")
+        model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])]
+
+        let entry = try await model.persistToLibrary(
+            Self.sampleTranscript(), audioSource: audio, source: .microphone, title: "Standup 10:30"
+        ).value
+
+        let exported = model.autoExportFolderURL.appendingPathComponent("Standup 10-30.txt")
+        #expect(await waitForMarked(exported))
+        #expect(OutputMarker.owner(of: exported) == entry.id)
+        #expect(model.autoExportFolderURL == model.library.libraryURL.appendingPathComponent("Exports", isDirectory: true))
+        let beside = try FileManager.default.contentsOfDirectory(atPath: scratch.path)
+        #expect(beside == [audio.lastPathComponent])
+    }
+
+    @MainActor
+    @Test("a chosen auto-export folder is where takes land")
+    func chosenFolderIsHonored() async throws {
+        let chosen = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AutoExportTests-chosen-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: chosen) }
+        let model = exportModel("autoexport-chosen")
+        model.autoExportFolderPath = chosen.path
+        model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [ExportPreset.builtIn(for: .srt)!.id])]
+
+        model.runAutoExports(
+            transcript: Self.sampleTranscript(), audioSource: nil, source: .web, entry: nil, title: "A talk"
+        )
+
+        #expect(await waitForMarked(chosen.appendingPathComponent("A talk.srt")))
+        #expect(model.defaults.string(forKey: "autoExportFolder") == chosen.path)
+    }
+
+    @MainActor
+    @Test("a file's exports still go beside it")
+    func fileExportsStayBesideTheSource() async throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AutoExportTests-file-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let audio = scratch.appendingPathComponent("interview.m4a")
+        try Data("fake".utf8).write(to: audio)
+        let model = exportModel("autoexport-file")
+        model.autoExportRules = [AutoExportRule(sourceExtensions: ["m4a"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])]
+
+        model.runAutoExports(transcript: Self.sampleTranscript(), audioSource: audio, source: .file, entry: nil)
+
+        #expect(await waitForMarked(scratch.appendingPathComponent("interview.txt")))
+        #expect(!FileManager.default.fileExists(atPath: model.autoExportFolderURL.path))
+    }
+
+    @Test("the real library's auto-export folder is Documents/Parola Exports")
+    func defaultFolderForTheRealLibrary() {
+        #expect(
+            AppModel.defaultAutoExportFolder(libraryURL: LibraryStore.defaultLibraryURL)
+                == URL.documentsDirectory.appendingPathComponent("Parola Exports", isDirectory: true)
+        )
+    }
 }

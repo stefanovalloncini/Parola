@@ -413,7 +413,7 @@ extension TranscriberMockSuites {
             #expect(model.sourceFileURL != fetcher.workingFolders.first?.appendingPathComponent("audio.wav"))
         }
 
-        @Test("fetched captions land with the video's title and page as a web entry, and say auto-export skipped them")
+        @Test("fetched captions land with the video's title and page as a web entry, and auto-export writes them under that title")
         func captionsLanding() async throws {
             let fixture = try makeLinkFixtureWAV()
             defer { try? FileManager.default.removeItem(at: fixture) }
@@ -436,10 +436,10 @@ extension TranscriberMockSuites {
             #expect(loaded.entry.manifest.source == .web)
             #expect(loaded.document.transcript.sourceURL == Self.page)
             #expect(model.transcript?.text.contains("own captions") == true)
-            await waitUntil { model.nonFatalWarning != nil }
-            #expect(model.nonFatalWarning == String(
-                localized: "Auto-export skipped this link: its rules save next to the source file, and a link has no folder to save in. Use Export instead."
-            ))
+            let exported = model.autoExportFolderURL.appendingPathComponent("A talk.srt")
+            await waitUntil { FileManager.default.fileExists(atPath: exported.path) }
+            #expect(try String(contentsOf: exported, encoding: .utf8).contains("own captions"))
+            #expect(model.nonFatalWarning == nil)
         }
 
         @Test("the fetch pane ends on the newest folded state, whatever order two readers deliver in")
@@ -516,8 +516,8 @@ extension TranscriberMockSuites {
             relaunched.cancelCurrentWork()
         }
 
-        @Test("auto-export rules skip a link and say so instead of writing into its temporary folder")
-        func autoExportSkipsLinks() async throws {
+        @Test("a link's auto-exports go to the auto-export folder under the video's title, never into its download folder")
+        func autoExportWritesLinksToTheFolder() async throws {
             let fixture = try makeLinkFixtureWAV()
             defer { try? FileManager.default.removeItem(at: fixture) }
             try await withMocksCleared([.transcriber]) {
@@ -527,12 +527,12 @@ extension TranscriberMockSuites {
                 model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [srt.id])]
 
                 model.transcribeYouTube(urlString: Self.link)
-                await waitUntil { model.nonFatalWarning != nil }
+                let exported = model.autoExportFolderURL.appendingPathComponent("A talk.srt")
+                await waitUntil { OutputMarker.isMarked(exported) }
 
-                #expect(model.nonFatalWarning == String(
-                    localized: "Auto-export skipped this link: its rules save next to the source file, and a link has no folder to save in. Use Export instead."
-                ))
-                await settle()
+                #expect(try String(contentsOf: exported, encoding: .utf8).contains("own words"))
+                #expect(OutputMarker.owner(of: exported) == model.selectedEntryID)
+                #expect(model.nonFatalWarning == nil)
                 #expect(!FileManager.default.fileExists(atPath: fixture.deletingPathExtension().appendingPathExtension("srt").path))
             }
         }

@@ -2141,13 +2141,13 @@
         }
       }
     },
-    "Auto-export skipped this link: its rules save next to the source file, and a link has no folder to save in. Use Export instead.": {
+    "Auto-export folder": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "L'esportazione automatica ha saltato questo link: le sue regole salvano accanto al file di origine e un link non ha una cartella in cui salvare. Usa Esporta."
+            "value": "Cartella di esportazione automatica"
           }
         }
       }
@@ -2159,6 +2159,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "L'auto-export scrive file aggiuntivi accanto al file sorgente al termine della trascrizione."
+          }
+        }
+      }
+    },
+    "Auto-export writes additional files next to the source when transcription completes. Recordings and links have no folder of their own, so theirs go to the auto-export folder, named after the entry. Leave a rule's extension field empty to match every file.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'esportazione automatica scrive file aggiuntivi accanto al file sorgente al termine della trascrizione. Registrazioni e link non hanno una cartella propria, quindi i loro file vanno nella cartella di esportazione automatica, con il nome della voce. Lascia vuoto il campo delle estensioni di una regola per applicarla a ogni file."
           }
         }
       }
