@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import ParolaCore
+import ParolaTestSupport
 
 @Suite("Transcription session file-read deadline", .serialized)
 struct TranscriptionSessionFileReadTests {
@@ -89,10 +90,7 @@ struct TranscriptionSessionFileReadTests {
 
         let wedged = dir.appendingPathComponent("wedged.wav")
         #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
-        defer {
-            let writer = open(wedged.path, O_WRONLY | O_NONBLOCK)
-            if writer >= 0 { close(writer) }
-        }
+        defer { FIFOFixture.release(wedged) }
 
         let readable = dir.appendingPathComponent("readable.wav")
         try Data("RIFFstub".utf8).write(to: readable)
@@ -132,10 +130,7 @@ struct TranscriptionSessionFileReadTests {
 
         let wedged = dir.appendingPathComponent("wedged.wav")
         #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
-        defer {
-            let writer = open(wedged.path, O_WRONLY | O_NONBLOCK)
-            if writer >= 0 { close(writer) }
-        }
+        defer { FIFOFixture.release(wedged) }
         let readable = dir.appendingPathComponent("readable.wav")
         try Data("RIFFstub".utf8).write(to: readable)
 
@@ -168,10 +163,7 @@ struct TranscriptionSessionFileReadTests {
 
         let audioURL = dir.appendingPathComponent("vanishes.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)
-        defer {
-            let writer = open(audioURL.path, O_WRONLY | O_NONBLOCK)
-            if writer >= 0 { close(writer) }
-        }
+        defer { FIFOFixture.release(audioURL) }
 
         let session = try await makeSession(in: dir, transcriber: SwapsTheFileForAFifo())
         let started = ContinuousClock.now

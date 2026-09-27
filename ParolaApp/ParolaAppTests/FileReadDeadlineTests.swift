@@ -41,8 +41,7 @@ extension TranscriberMockSuites {
             let wedged = dir.appendingPathComponent("wedged.m4a")
             #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
             defer {
-                let writer = open(wedged.path, O_WRONLY | O_NONBLOCK)
-                if writer >= 0 { close(writer) }
+                FIFOFixture.release(wedged)
                 try? FileManager.default.removeItem(at: dir)
             }
 

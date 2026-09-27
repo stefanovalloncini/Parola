@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import WhisperKit
 @testable import ParolaCore
+import ParolaTestSupport
 
 @Suite("Whisper audio load", .serialized)
 struct WhisperAudioLoadTests {
@@ -45,10 +46,7 @@ struct WhisperAudioLoadTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("wedged.wav")
         #expect(mkfifo(url.path, 0o644) == 0, "could not create the FIFO the test needs")
-        defer {
-            let writer = open(url.path, O_WRONLY | O_NONBLOCK)
-            if writer >= 0 { close(writer) }
-        }
+        defer { FIFOFixture.release(url) }
 
         do {
             _ = try await WhisperKitTranscriber.loadSamples(

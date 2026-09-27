@@ -54,6 +54,29 @@ struct BatchQueueTests {
         #expect(failedOrder == jobs.map(\.id))
     }
 
+    @Test("a duration probe that never answers doesn't park the queue")
+    func stuckDurationProbeIsBounded() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("parola-batchprobe-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let missing = dir.appendingPathComponent("gone.wav")
+        let queue = BatchQueue(
+            session: TranscriptionSession(), features: .all, durationProbeDeadline: .milliseconds(200)
+        ) { _ in
+            try? await Task.sleep(for: .seconds(3600))
+            return nil
+        }
+
+        let started = ContinuousClock.now
+        var finished = false
+        for await event in await queue.process(jobs: [BatchJob(url: missing)], options: TranscriptionOptions(model: "openai_whisper-tiny")) {
+            if case .finished = event { finished = true }
+        }
+
+        #expect(finished)
+        #expect(started.duration(to: .now) < .seconds(10))
+    }
+
     @Test("BatchEvent.cancelled exists alongside .failed in the enum surface")
     func cancelledCase() {
         let id = UUID()

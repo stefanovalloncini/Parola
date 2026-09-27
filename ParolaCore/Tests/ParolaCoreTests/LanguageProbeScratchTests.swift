@@ -3,6 +3,7 @@ import Foundation
 import Testing
 import os
 @testable import ParolaCore
+import ParolaTestSupport
 
 @Suite("Language probe scratch")
 struct LanguageProbeScratchTests {
@@ -13,19 +14,13 @@ struct LanguageProbeScratchTests {
         return dir
     }
 
-    /// Lets the reader parked in `open()` go: a writer opening and closing the FIFO hands it an EOF.
-    private static func unpark(_ fifo: URL) {
-        let descriptor = open(fifo.path, O_WRONLY | O_NONBLOCK)
-        if descriptor >= 0 { close(descriptor) }
-    }
-
     @Test("a source that never opens times the probe out instead of parking it")
     func stalledSourceTimesOut() async throws {
         let dir = try Self.makeDirectory()
         let fifo = dir.appendingPathComponent("stalled.wav")
         #expect(mkfifo(fifo.path, 0o644) == 0)
         defer {
-            Self.unpark(fifo)
+            FIFOFixture.release(fifo)
             try? FileManager.default.removeItem(at: dir)
         }
 

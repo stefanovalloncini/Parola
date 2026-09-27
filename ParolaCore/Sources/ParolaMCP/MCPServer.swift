@@ -216,7 +216,7 @@ public actor MCPServer {
         let plan = await session.modelPlan(for: options)
         let map = TranscribeProgressMap(
             model: plan.model,
-            duration: await source.estimatedDuration(),
+            duration: await AsyncTimeout.run(FileReadDeadline.header) { await source.estimatedDuration() } ?? nil,
             downloadsModel: plan.needsDownload
         )
         let reporter = progress.reporter()

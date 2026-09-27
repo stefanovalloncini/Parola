@@ -64,11 +64,26 @@ public enum BatchEvent: Sendable {
 public actor BatchQueue {
     private let session: TranscriptionSession
     private let features: FeatureSet
+    private let durationProbeDeadline: Duration
+    private let durationProbe: @Sendable (URL) async -> Double?
     private var jobInFlight = false
 
     public init(session: TranscriptionSession = TranscriptionSession(), features: FeatureSet = .resolve()) {
+        self.init(session: session, features: features, durationProbeDeadline: FileReadDeadline.header) { url in
+            await FileAudioSource(url: url).estimatedDuration()
+        }
+    }
+
+    init(
+        session: TranscriptionSession,
+        features: FeatureSet,
+        durationProbeDeadline: Duration,
+        durationProbe: @escaping @Sendable (URL) async -> Double?
+    ) {
         self.session = session
         self.features = features
+        self.durationProbeDeadline = durationProbeDeadline
+        self.durationProbe = durationProbe
     }
 
     public func process(
@@ -117,7 +132,10 @@ public actor BatchQueue {
             let startedAt = ContinuousClock.now
             do {
                 let source = FileAudioSource(url: job.url)
-                let duration = await source.estimatedDuration()
+                // AVFoundation's asset queue can park on a file that never opens, and one parked load stalls the rest.
+                let duration = await AsyncTimeout.run(durationProbeDeadline) { [durationProbe, url = job.url] in
+                    await durationProbe(url)
+                } ?? nil
                 let forwarder = Self.progressForwarder(
                     jobID: job.id,
                     duration: duration,
