@@ -287,14 +287,13 @@ final class DictationController {
 
     /// A first-ever dictation press downloads the model while the coordinator is still `.idle`
     /// and the HUD hidden; showing it here is the only feedback the user gets during that wait.
+    /// `ModelStore.download` calls it once per whole percent.
     func noteModelDownloadProgress(_ fraction: Double) {
         guard isRunning else { return }
         if fraction >= 1 {
             modelDownloadProgress = nil
             return
         }
-        let percent = Int(fraction * 100)
-        guard percent != modelDownloadProgress.map({ Int($0 * 100) }) else { return }
         modelDownloadProgress = fraction
         showHUD()
     }

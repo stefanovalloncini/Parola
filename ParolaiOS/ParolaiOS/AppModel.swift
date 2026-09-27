@@ -54,6 +54,8 @@ final class AppModel {
         self.coordinator = TranscriptionCoordinator(library: store, settings: userSettings)
         coordinator.onComplete = { [weak self] entry in
             self?.refreshLibrary()
+            // The run may have downloaded its model first.
+            self?.refreshModelList()
             self?.runAutoExports(for: entry)
         }
         loadAutoExportRules()

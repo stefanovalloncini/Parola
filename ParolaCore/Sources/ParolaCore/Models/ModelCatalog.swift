@@ -218,11 +218,15 @@ public enum ModelCatalog {
     /// Entries kept for people who already downloaded them; the pickers list them only when installed.
     public static let hiddenUnlessInstalled: Set<String> = ["nvidia_parakeet-tdt-0.6b-v2"]
 
+    public static func isListed(_ id: String, installed: Bool) -> Bool {
+        installed || !hiddenUnlessInstalled.contains(id)
+    }
+
     public static func listedVariants(
         configuration: ManagedConfiguration = .shared,
         isInstalled: (String) -> Bool = { ModelStore.shared.isInstalled($0) }
     ) -> [ModelVariant] {
-        configuration.filterAllowed(all).filter { !hiddenUnlessInstalled.contains($0.id) || isInstalled($0.id) }
+        configuration.filterAllowed(all).filter { isListed($0.id, installed: isInstalled($0.id)) }
     }
 
     /// Best-effort suggestion for a mistyped or partial model id, e.g. the bare

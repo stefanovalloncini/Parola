@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import ParolaCore
 
 enum AppTheme: String, CaseIterable, Identifiable {
     case system
@@ -40,13 +41,24 @@ final class UserSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        modelName = defaults.string(forKey: "selectedModel") ?? "openai_whisper-tiny"
+        modelName = defaults.string(forKey: "selectedModel") ?? Self.defaultModelID()
         languageRaw = defaults.string(forKey: "selectedLanguageRaw") ?? ""
         translate = defaults.bool(forKey: "translate")
         wordTimestamps = defaults.object(forKey: "wordTimestamps") == nil ? true : defaults.bool(forKey: "wordTimestamps")
         initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
         onboardingComplete = defaults.bool(forKey: "onboardingComplete")
         appearance = AppTheme(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .system
+    }
+
+    /// Core's default, as long as it can run a live take: iOS records only through the streaming session.
+    static func defaultModelID(
+        configuration: ManagedConfiguration = .shared,
+        isInstalled: (String) -> Bool = { ModelStore.shared.isInstalled($0) }
+    ) -> String {
+        let id = ModelCatalog.defaultModelID(
+            for: TranscriptionOptions(), configuration: configuration, isInstalled: isInstalled
+        )
+        return ModelCatalog.canStream(id: id) ? id : ModelCatalog.fallbackModelID
     }
 
     var language: String? {

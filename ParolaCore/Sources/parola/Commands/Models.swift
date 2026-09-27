@@ -24,9 +24,8 @@ struct Models: AsyncParsableCommand {
         func run() async throws {
             CLIDiagnostics.installIfWanted(alwaysOn: false)
             let store = ModelStore.shared
-            let catalogEntries = store.catalog()
-            let installedNames = Set(catalogEntries.filter(\.isInstalled).map(\.name))
-            let entries = Self.listedRows(catalogEntries)
+            let entries = store.listedCatalog()
+            let installedNames = Set(entries.filter(\.isInstalled).map(\.name))
 
             if json {
                 print(try Self.jsonText(entries))
@@ -87,14 +86,6 @@ struct Models: AsyncParsableCommand {
             }
         }
 
-        /// The catalog rows every one of the three listings is built from, under the rule the app's
-        /// pickers use: a variant that is only offered once installed is not listed until it is.
-        static func listedRows(_ catalog: [ModelInfo]) -> [ModelInfo] {
-            let installed = Set(catalog.filter(\.isInstalled).map(\.name))
-            let listed = Set(ModelCatalog.listedVariants(isInstalled: installed.contains).map(\.id))
-            return catalog.filter { listed.contains($0.name) }
-        }
-
         static func jsonText(_ entries: [ModelInfo]) throws -> String {
             String(decoding: try JSONEncoder.pretty.encode(entries), as: UTF8.self)
         }
@@ -136,6 +127,7 @@ struct Models: AsyncParsableCommand {
             let progress = ProgressReporter(label: name)
             defer { progress.finish() }
             let url = try await store.download(variant: name, progress: { p in progress.update(p) })
+            progress.finish()
             print("Installed at \(url.path)")
         }
     }

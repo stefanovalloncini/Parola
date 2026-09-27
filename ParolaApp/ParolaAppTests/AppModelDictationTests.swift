@@ -498,17 +498,14 @@ struct AppModelDictationTests {
         #expect(AppModel.streamingPrewarmCandidate(model: "legacy-dir", useStreaming: true, isInstalled: { _ in false }) == nil)
     }
 
-    @Test("model download progress updates once per whole percent and clears at completion")
-    func downloadProgressThrottlesAndClears() {
+    @Test("model download progress shows each reading and clears at completion")
+    func downloadProgressShowsAndClears() {
         let model = makeModel()
         model.dictationController.recorderFactory = { _ in IntentStubRecorder() }
         model.dictationEnabled = true
         let controller = model.dictationController
 
         controller.noteModelDownloadProgress(0.421)
-        #expect(controller.modelDownloadProgress == 0.421)
-
-        controller.noteModelDownloadProgress(0.429)
         #expect(controller.modelDownloadProgress == 0.421)
 
         controller.noteModelDownloadProgress(0.43)

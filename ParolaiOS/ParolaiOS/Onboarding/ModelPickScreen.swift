@@ -67,6 +67,7 @@ struct ModelPickScreen: View {
         Task {
             do {
                 _ = try await ModelStore.shared.download(variant: variant)
+                model.refreshModelList()
             } catch {
                 model.lastError = error.localizedDescription
             }

@@ -20,19 +20,9 @@ struct ModelsListTests {
         }
     }
 
-    @Test("the earlier Parakeet is listed only once it is installed")
-    func earlierParakeetIsHiddenUntilInstalled() {
-        let withoutIt = Models.List.listedRows(catalog()).map(\.name)
-        #expect(!withoutIt.contains(Self.v2))
-        #expect(withoutIt.contains(Self.v3))
-
-        let withIt = Models.List.listedRows(catalog(installed: [Self.v2])).map(\.name)
-        #expect(withIt.contains(Self.v2))
-    }
-
     @Test("--json and --flat list the same rows as the grouped listing")
     func everyListingShowsTheSameRows() throws {
-        let rows = Models.List.listedRows(catalog())
+        let rows = catalog().filter { ModelCatalog.isListed($0.name, installed: $0.isInstalled) }
 
         let decoded = try JSONDecoder().decode(
             [ModelInfo].self, from: Data(try Models.List.jsonText(rows).utf8)

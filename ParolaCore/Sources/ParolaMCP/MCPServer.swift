@@ -237,7 +237,7 @@ public actor MCPServer {
     }
 
     private func listModels() -> MCPToolCallResult {
-        let installed = Set(modelStore.catalog().filter(\.isInstalled).map(\.name))
+        let installed = Set(modelStore.listedCatalog().filter(\.isInstalled).map(\.name))
         let grouped = ModelCatalog.groupedForPicker(isInstalled: installed.contains)
         var lines: [String] = []
         for (category, variants) in grouped {

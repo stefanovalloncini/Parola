@@ -1,12 +1,37 @@
 import Foundation
 import Testing
 @testable import Parola
+import ParolaCore
 
 @Suite("UserSettings language mapping")
 @MainActor
 struct UserSettingsTests {
     private func freshDefaults() -> UserDefaults {
         UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+    }
+
+    @Test("a managed default model is the first-launch pick")
+    func managedDefaultModel() {
+        let managed = ManagedConfiguration(plistOverride: ["defaultModel": "openai_whisper-base"])
+        #expect(UserSettings.defaultModelID(configuration: managed, isInstalled: { _ in false }) == "openai_whisper-base")
+    }
+
+    @Test("an installed recommended Whisper is the default")
+    func installedRecommendedIsTheDefault() {
+        let turbo = "openai_whisper-large-v3_turbo"
+        let id = UserSettings.defaultModelID(
+            configuration: ManagedConfiguration(plistOverride: [:]), isInstalled: { $0 == turbo }
+        )
+        #expect(id == turbo)
+    }
+
+    @Test("a default that cannot run a live take gives way to the smallest Whisper")
+    func nonStreamingDefaultFallsBack() {
+        let id = UserSettings.defaultModelID(
+            configuration: ManagedConfiguration(plistOverride: [:]), isInstalled: { _ in false }
+        )
+        #expect(ModelCatalog.canStream(id: id))
+        #expect(id == ModelCatalog.fallbackModelID)
     }
 
     @Test("language defaults to nil when nothing is stored")

@@ -5,6 +5,11 @@ import os
 public struct ModelScan: Sendable {
     public let catalog: [ModelInfo]
     public let installed: [ModelInfo]
+
+    /// `catalog` as every picker and listing shows it: a variant offered only once installed stays out until it is.
+    public var listedCatalog: [ModelInfo] {
+        catalog.filter { ModelCatalog.isListed($0.name, installed: $0.isInstalled) }
+    }
 }
 
 /// The slice of a Whisper `config.json` that identifies which checkpoint a folder holds.
@@ -187,6 +192,11 @@ public final class ModelStore: Sendable {
     /// Filters by the managed-config engine allowlist if one is set.
     public func catalog() -> [ModelInfo] {
         scan().catalog
+    }
+
+    /// `catalog()` as the pickers and listings show it.
+    public func listedCatalog() -> [ModelInfo] {
+        scan().listedCatalog
     }
 
     /// Returns models present on disk, even if not in the curated catalog. Includes
@@ -446,7 +456,7 @@ public final class ModelStore: Sendable {
 
     /// Downloads a model variant into our cache directory. If already present, returns immediately.
     /// Concurrent calls for the same variant are serialized; the loser returns the winner's result.
-    /// - Parameter progress: 0.0–1.0 progress callback (best-effort).
+    /// - Parameter progress: 0.0–1.0, called once per whole percent and never lower than the call before.
     /// - Parameter urlSession: Only reaches the HuggingFace path; a registry engine's own downloader ignores it.
     public func download(
         variant: String,
@@ -454,6 +464,7 @@ public final class ModelStore: Sendable {
         registry: EngineRegistry = .shared,
         urlSession: URLSession = .shared
     ) async throws -> URL {
+        let progress = progress.map(DownloadProgressGate.gating)
         if isInstalled(variant) {
             progress?(1.0)
             return installedURL(for: variant)

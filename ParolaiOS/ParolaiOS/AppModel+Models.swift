@@ -4,9 +4,9 @@ import ParolaCore
 
 extension AppModel {
     func refreshModelList() {
-        availableModels = ModelStore.shared.catalog()
+        availableModels = ModelStore.shared.listedCatalog()
         if !availableModels.contains(where: { $0.name == settings.modelName }) {
-            settings.modelName = availableModels.first?.name ?? "openai_whisper-tiny"
+            settings.modelName = UserSettings.defaultModelID()
         }
     }
 

@@ -14,21 +14,25 @@ struct AppModelModelsTests {
         return AppModel(libraryURL: tmp, defaults: defaults)
     }
 
-    @Test("refreshModelList mirrors the curated catalog")
-    func mirrorsCatalog() throws {
+    @Test("refreshModelList mirrors the catalog as every picker lists it")
+    func mirrorsListedCatalog() throws {
         let model = try makeModel()
         model.refreshModelList()
         #expect(model.availableModels.isEmpty == false)
-        #expect(model.availableModels == ModelStore.shared.catalog())
+        #expect(model.availableModels == ModelStore.shared.listedCatalog())
+        #expect(
+            !model.availableModels.contains { $0.name == "nvidia_parakeet-tdt-0.6b-v2" && !$0.isInstalled },
+            "the earlier Parakeet is offered only once installed"
+        )
     }
 
-    @Test("an unknown selected model is coerced to a catalog entry")
+    @Test("an unknown selected model falls back to the default")
     func coercesUnknownSelection() throws {
         let model = try makeModel()
         model.settings.modelName = "not-a-real-model"
         model.refreshModelList()
         #expect(model.availableModels.contains { $0.name == model.settings.modelName })
-        #expect(model.settings.modelName == model.availableModels.first?.name)
+        #expect(model.settings.modelName == UserSettings.defaultModelID())
     }
 
     @Test("a selected model that exists in the catalog is left unchanged")

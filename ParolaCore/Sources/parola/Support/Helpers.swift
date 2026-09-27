@@ -1,4 +1,5 @@
 import Foundation
+import os
 import ParolaCore
 
 func stderr(_ line: String) {
@@ -56,35 +57,36 @@ extension JSONEncoder {
     }
 }
 
-actor ProgressReporter {
+/// A download bar on stderr, drawn once per whole percent. It writes as it is called, under a lock,
+/// so the bar and its closing newline land in the order they were called.
+final class ProgressReporter: Sendable {
+    private struct State {
+        var percent = -1
+        var finished = false
+    }
+
     private let label: String
-    private var lastPercent: Int = -1
-    private var finished = false
+    private let state = OSAllocatedUnfairLock(initialState: State())
 
     init(label: String) { self.label = label }
 
-    nonisolated func update(_ fraction: Double) {
-        Task { await self.write(fraction) }
+    func update(_ fraction: Double) {
+        state.withLock { state in
+            let pct = max(0, min(100, Int(fraction * 100)))
+            guard !state.finished, pct != state.percent else { return }
+            state.percent = pct
+            let bars = pct / 5
+            let bar = String(repeating: "█", count: bars) + String(repeating: "·", count: 20 - bars)
+            FileHandle.standardError.write(Data("\r\(label) [\(bar)] \(pct)%".utf8))
+        }
     }
 
-    private func write(_ fraction: Double) {
-        guard !finished else { return }
-        let pct = max(0, min(100, Int(fraction * 100)))
-        guard pct != lastPercent else { return }
-        lastPercent = pct
-        let bars = pct / 5
-        let bar = String(repeating: "█", count: bars) + String(repeating: "·", count: 20 - bars)
-        FileHandle.standardError.write(Data("\r\(label) [\(bar)] \(pct)%".utf8))
-    }
-
-    nonisolated func finish() {
-        Task { await self.finalize() }
-    }
-
-    private func finalize() {
-        guard !finished else { return }
-        finished = true
-        FileHandle.standardError.write(Data("\n".utf8))
+    func finish() {
+        state.withLock { state in
+            guard !state.finished else { return }
+            state.finished = true
+            if state.percent >= 0 { FileHandle.standardError.write(Data("\n".utf8)) }
+        }
     }
 }
 

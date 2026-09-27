@@ -41,6 +41,22 @@ struct AppModelSpeakersTests {
         #expect(updated.segments[1].speaker == "SPEAKER_01")
     }
 
+    @Test("swapping two speakers keeps them apart")
+    func swapKeepsSpeakersApart() async throws {
+        let (model, _) = try makeModel()
+        let entry = try await model.library.add(transcript: twoSpeakerTranscript(), audioSource: nil)
+
+        let updated = await model.applySpeakerRenames(
+            ["SPEAKER_00": "SPEAKER_01", "SPEAKER_01": "SPEAKER_00"],
+            on: twoSpeakerTranscript(),
+            entryID: entry.id
+        )
+
+        #expect(updated.segments.map(\.speaker) == ["SPEAKER_01", "SPEAKER_00", "SPEAKER_01"])
+        let stored = try await model.library.load(entry.id).document.transcript
+        #expect(stored.segments.map(\.speaker) == ["SPEAKER_01", "SPEAKER_00", "SPEAKER_01"])
+    }
+
     @Test("trims whitespace around the new name")
     func trimsName() async throws {
         let (model, _) = try makeModel()

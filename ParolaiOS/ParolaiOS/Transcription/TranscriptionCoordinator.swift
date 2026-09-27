@@ -31,7 +31,6 @@ final class TranscriptionCoordinator {
     @ObservationIgnored private var transcribeTask: Task<Void, Never>?
     @ObservationIgnored private var recordingGeneration: Int = 0
     @ObservationIgnored private var cancelledGeneration: Int = -1
-    @ObservationIgnored private var lastProgressPercent: Int = -1
 
     init(library: LibraryStore, settings: UserSettings) {
         self.library = library
@@ -89,7 +88,6 @@ final class TranscriptionCoordinator {
         transcribeTask = Task {
             defer { Self.removeImportCopy(audio) }
             do {
-                lastProgressPercent = -1
                 phase = .loadingModel(name: settings.modelName)
                 if !ModelStore.shared.isInstalled(settings.modelName) {
                     phase = .downloadingModel(name: settings.modelName, progress: 0)
@@ -257,20 +255,17 @@ final class TranscriptionCoordinator {
         if case .downloadingModel = phase { phase = .recording }
     }
 
+    /// `ModelStore.download` calls the handler once per whole percent, never going backwards.
     func makeDownloadProgressHandler(resumingTo resume: @escaping @MainActor () -> Phase) -> @Sendable (Double) -> Void {
         let modelName = settings.modelName
-        return { [weak self] frac in
-            let percent = Int(frac * 100)
+        return { [weak self] fraction in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if frac >= 1 {
-                    self.lastProgressPercent = -1
+                if fraction >= 1 {
                     if case .downloadingModel = self.phase { self.phase = resume() }
                     return
                 }
-                guard percent != self.lastProgressPercent else { return }
-                self.lastProgressPercent = percent
-                self.phase = .downloadingModel(name: modelName, progress: frac)
+                self.phase = .downloadingModel(name: modelName, progress: fraction)
             }
         }
     }
