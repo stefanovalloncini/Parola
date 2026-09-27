@@ -110,6 +110,7 @@ public actor LibraryStore {
     private nonisolated let extraIndexerJobs: AsyncStream<@Sendable () async -> Void>.Continuation?
     private nonisolated let didDecodeDocument: (@Sendable () -> Void)?
     private nonisolated let didWriteBundle: (@Sendable () -> Void)?
+    private nonisolated let willCatchUpSearchIndex: (@Sendable () async -> Void)?
 
     public init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         self.init(libraryURL: libraryURL, extraIndexer: SpotlightIndexer())
@@ -124,10 +125,16 @@ public actor LibraryStore {
     struct TestSeams: Sendable {
         var didDecodeDocument: (@Sendable () -> Void)?
         var didWriteBundle: (@Sendable () -> Void)?
+        var willCatchUpSearchIndex: (@Sendable () async -> Void)?
 
-        init(didDecodeDocument: (@Sendable () -> Void)? = nil, didWriteBundle: (@Sendable () -> Void)? = nil) {
+        init(
+            didDecodeDocument: (@Sendable () -> Void)? = nil,
+            didWriteBundle: (@Sendable () -> Void)? = nil,
+            willCatchUpSearchIndex: (@Sendable () async -> Void)? = nil
+        ) {
             self.didDecodeDocument = didDecodeDocument
             self.didWriteBundle = didWriteBundle
+            self.willCatchUpSearchIndex = willCatchUpSearchIndex
         }
     }
 
@@ -142,6 +149,7 @@ public actor LibraryStore {
         self.extraIndexer = extraIndexer
         self.didDecodeDocument = seams.didDecodeDocument
         self.didWriteBundle = seams.didWriteBundle
+        self.willCatchUpSearchIndex = seams.willCatchUpSearchIndex
         // Extra-indexer calls drain FIFO on one background worker: CoreSpotlight's XPC can
         // stall indefinitely (observed on ad-hoc dev builds), and a best-effort mirror index
         // must never block the library write path.
@@ -186,13 +194,13 @@ public actor LibraryStore {
     /// answers in the same order every time. Only the first `snippetLimit` matches carry a snippet;
     /// `withSnippets(_:query:)` fills the rest when they are shown.
     public func search(_ query: String, snippetLimit: Int = .max) async -> [LibrarySearchIndex.Match] {
-        await ensureSearchIndexReady()
+        let index = await readySearchIndex()
         if cachedActive == nil { await primeCaches() }
         let createdAt = Dictionary(
             (cachedActive ?? []).map { ($0.id, $0.createdAt) },
             uniquingKeysWith: { first, _ in first }
         )
-        let matches = await searchIndex.search(query, snippets: false)
+        let matches = await index.search(query, snippets: false)
         let ranked = matches
             .compactMap { match in createdAt[match.entryID].map { (match: match, createdAt: $0) } }
             .sorted { lhs, rhs in
@@ -203,21 +211,19 @@ public actor LibraryStore {
             }
             .map(\.match)
         guard snippetLimit > 0 else { return ranked }
-        let head = await searchIndex.withSnippets(Array(ranked.prefix(snippetLimit)), query: query)
+        let head = await index.withSnippets(Array(ranked.prefix(snippetLimit)), query: query)
         return head + ranked.dropFirst(snippetLimit)
     }
 
     /// Builds the snippets `search` left empty, for the matches a list is about to show.
     public func withSnippets(_ matches: [LibrarySearchIndex.Match], query: String) async -> [LibrarySearchIndex.Match] {
-        await ensureSearchIndexReady()
-        return await searchIndex.withSnippets(matches, query: query)
+        await readySearchIndex().withSnippets(matches, query: query)
     }
 
     /// The opening text of every indexed entry, so a list can show what an entry says, or nil when
     /// `generation` is the one the caller already holds. The index answers from memory; nothing here reads a bundle.
     public func excerpts(after generation: Int) async -> LibrarySearchIndex.Excerpts? {
-        await ensureSearchIndexReady()
-        return await searchIndex.excerpts(after: generation)
+        await readySearchIndex().excerpts(after: generation)
     }
 
     /// Writes any pending debounced search-index snapshot to disk. Call before the app terminates.
@@ -258,6 +264,18 @@ public actor LibraryStore {
         await ensureSearchIndexReady()
     }
 
+    /// The index a caller reads, once caught up. A reader can swap its index while a catch-up runs,
+    /// so the one handed back is the one that was ready, and every read after it goes to that one.
+    private func readySearchIndex() async -> LibrarySearchIndex {
+        var index = searchIndex
+        for _ in 0..<8 {
+            await ensureSearchIndexReady()
+            guard index !== searchIndex else { return index }
+            index = searchIndex
+        }
+        return index
+    }
+
     private func ensureSearchIndexReady() async {
         if indexReadyTask == nil || searchIndexNeedsCheck {
             searchIndexNeedsCheck = false
@@ -282,6 +300,7 @@ public actor LibraryStore {
     /// when the snapshot was unusable. False when the library folder would not list, so the next caller tries again.
     private func catchUpSearchIndex() async -> Bool {
         let index = searchIndex
+        await willCatchUpSearchIndex?()
         let url = libraryURL
         let epoch = listCacheEpoch
         let stamp = Self.folderStamp(of: url)
@@ -663,8 +682,7 @@ public actor LibraryStore {
     private func indexEntry(_ entry: LibraryEntry, transcript: Transcript) async {
         let text = transcript.text
         if keepsSearchIndexCurrent {
-            await ensureSearchIndexReady()
-            await searchIndex.index(
+            await readySearchIndex().index(
                 id: entry.id,
                 title: entry.title,
                 text: text,
@@ -731,8 +749,7 @@ public actor LibraryStore {
 
     private func deindexEntry(id: String) async {
         if keepsSearchIndexCurrent {
-            await ensureSearchIndexReady()
-            await searchIndex.remove(id)
+            await readySearchIndex().remove(id)
         }
         guard let extraIndexer else { return }
         enqueueExtraIndexerWork {
@@ -780,8 +797,7 @@ public actor LibraryStore {
         } else if keepsSearchIndexCurrent {
             // transcript.json still moved, and the snapshot's fingerprint has to follow or the
             // next launch reads the newer file as a stale entry and indexes it again.
-            await ensureSearchIndexReady()
-            await searchIndex.refreshFingerprint(Self.bundleFingerprint(entry.bundleURL), for: entry.id)
+            await readySearchIndex().refreshFingerprint(Self.bundleFingerprint(entry.bundleURL), for: entry.id)
         }
     }
 
@@ -905,8 +921,7 @@ public actor LibraryStore {
         let old = Self.searchAuxiliaryText(notes: [:], transcript: nil, aiTitle: before.aiTitle, shortSummary: before.shortSummary)
         let new = Self.searchAuxiliaryText(notes: [:], transcript: nil, aiTitle: entry.aiTitle, shortSummary: entry.shortSummary)
         guard old != new, keepsSearchIndexCurrent else { return entry }
-        await ensureSearchIndexReady()
-        if await !searchIndex.replaceAuxiliaryText(old, with: new, for: id),
+        if await !readySearchIndex().replaceAuxiliaryText(old, with: new, for: id),
            let transcript = await transcriptForReindex(id, at: bundleURL) {
             await indexEntry(entry, transcript: transcript)
         }

@@ -196,6 +196,38 @@ struct LibraryReaderTests {
         #expect(await store.list().count == 3)
     }
 
+    @Test("searches racing a reader's index swap answer from the index that caught up")
+    func searchesRacingASwapSeeTheCatchUp() async throws {
+        let dir = try makeTempLibraryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let app = owner(dir)
+        _ = try await app.add(transcript: transcript("alpha minutes"), audioSource: nil)
+        await app.flush()
+        let gate = CatchUpGate()
+        let store = LibraryStore(
+            storeAt: dir, extraIndexer: nil,
+            seams: LibraryStore.TestSeams(willCatchUpSearchIndex: { await gate.pass() }),
+            role: .reader
+        )
+        await store.reloadIfChangedElsewhere()
+        #expect(await store.search("alpha").count == 1)
+        try seedBundle(in: dir, named: "seeded", text: "zzyzxmarker minutes")
+        await store.dropCaches()
+        await gate.arm()
+
+        let first = Task { await store.search("zzyzxmarker").map(\.entryID) }
+        await gate.waitUntilHeld()
+        // A snapshot the reader can't refresh in place makes it swap in a fresh index mid catch-up.
+        try Data("not json".utf8).write(to: indexDirectory(in: dir).appendingPathComponent("manifest.json"))
+        #expect(await store.reloadIfChangedElsewhere())
+        let second = Task { await store.search("zzyzxmarker").map(\.entryID) }
+        await gate.release()
+
+        #expect(await first.value == ["seeded"])
+        #expect(await second.value == ["seeded"])
+        #expect(await store.search("minutes").count == 2)
+    }
+
     @Test("a reader leaves each bundle's manifest as it found it")
     func readerWritesNoManifest() async throws {
         let dir = try makeTempLibraryDirectory()
@@ -218,5 +250,34 @@ struct LibraryReaderTests {
 
         #expect(report.healthy.map(\.id) == ["seeded"])
         #expect(try Data(contentsOf: manifestURL) == manifestBefore)
+    }
+}
+
+/// Holds the next catch-up after `arm()` until `release()`, so a test can act while it is parked.
+private actor CatchUpGate {
+    private var armed = false
+    private var held = false
+    private var heldWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseWaiter: CheckedContinuation<Void, Never>?
+
+    func arm() { armed = true }
+
+    func pass() async {
+        guard armed else { return }
+        armed = false
+        held = true
+        for waiter in heldWaiters { waiter.resume() }
+        heldWaiters = []
+        await withCheckedContinuation { releaseWaiter = $0 }
+    }
+
+    func waitUntilHeld() async {
+        guard !held else { return }
+        await withCheckedContinuation { heldWaiters.append($0) }
+    }
+
+    func release() {
+        releaseWaiter?.resume()
+        releaseWaiter = nil
     }
 }
