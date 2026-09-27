@@ -57,11 +57,7 @@ struct FolderWatcherTests {
         await watcher.start()
 
         let nestedFile = subdir.appendingPathComponent("clip.wav")
-        try Data(count: 1024).write(to: nestedFile)
-        try FileManager.default.setAttributes(
-            [.modificationDate: clock.start.addingTimeInterval(-10)],
-            ofItemAtPath: nestedFile.path
-        )
+        try WatchedFolderFixture.writeSettled(nestedFile, clock: clock)
         await watcher.checkForNewFiles()
         try await scheduler.advanceAndWait()
         await watcher.stop()
@@ -136,11 +132,7 @@ struct FolderWatcherTests {
 
         let file = tempDir.appendingPathComponent("clip.wav")
         func writeSettled() throws {
-            try Data(count: 1024).write(to: file)
-            try FileManager.default.setAttributes(
-                [.modificationDate: clock.start.addingTimeInterval(-10)],
-                ofItemAtPath: file.path
-            )
+            try WatchedFolderFixture.writeSettled(file, clock: clock)
         }
 
         try writeSettled()
@@ -262,11 +254,7 @@ struct FolderWatcherTests {
     }
 
     private func writeSettled(_ url: URL, clock: FixedClock) throws {
-        try Data(count: 1024).write(to: url)
-        try FileManager.default.setAttributes(
-            [.modificationDate: clock.start.addingTimeInterval(-10)],
-            ofItemAtPath: url.path
-        )
+        try WatchedFolderFixture.writeSettled(url, clock: clock)
     }
 
     private func makeTempDir() throws -> URL {
@@ -274,60 +262,5 @@ struct FolderWatcherTests {
             .appendingPathComponent("parola-folderwatch-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
-    }
-}
-
-final class CollectedURLs: Sendable {
-    private let storage = OSAllocatedUnfairLock<[URL]>(initialState: [])
-    func append(_ url: URL) {
-        storage.withLock { $0.append(url) }
-    }
-    func snapshot() -> [URL] {
-        storage.withLock { $0 }
-    }
-}
-
-struct FixedClock: FolderWatcherClock {
-    let start: Date
-    func now() -> Date { start }
-}
-
-actor ManualScheduler: FolderWatcherScheduler {
-    private var parked: [CheckedContinuation<Void, Never>] = []
-    private var done: [CheckedContinuation<Void, Never>] = []
-    private var arrivalWaiters: [CheckedContinuation<Void, Never>] = []
-
-    func runTick(after interval: Duration, _ body: @Sendable @escaping () async -> Void) async throws {
-        await park()
-        await body()
-        signalDone()
-    }
-
-    func advanceAndWait() async throws {
-        if parked.isEmpty {
-            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                arrivalWaiters.append(cont)
-            }
-        }
-        let go = parked.removeFirst()
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            done.append(cont)
-            go.resume()
-        }
-    }
-
-    private func park() async {
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            parked.append(cont)
-            if let waiter = arrivalWaiters.first {
-                arrivalWaiters.removeFirst()
-                waiter.resume()
-            }
-        }
-    }
-
-    private func signalDone() {
-        guard !done.isEmpty else { return }
-        done.removeFirst().resume()
     }
 }

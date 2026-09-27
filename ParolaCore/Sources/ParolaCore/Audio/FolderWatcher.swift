@@ -14,18 +14,44 @@ public actor FolderWatcher {
         public var settledInterval: Duration
         public var clock: any FolderWatcherClock
         public var scheduler: any FolderWatcherScheduler
+        /// Share one ledger between the watchers of one app so a file moved between two watched
+        /// folders is not imported again.
+        public var ledger: FolderWatcherLedger
+        /// Off in tests that drive every rescan themselves and need a fixed order between folders.
+        var observesFileSystem = true
 
         public init(
             recursive: Bool = true,
             settledInterval: Duration = .milliseconds(750),
             clock: any FolderWatcherClock = SystemFolderWatcherClock(),
-            scheduler: any FolderWatcherScheduler = SystemFolderWatcherScheduler()
+            scheduler: any FolderWatcherScheduler = SystemFolderWatcherScheduler(),
+            ledger: FolderWatcherLedger = FolderWatcherLedger()
         ) {
             self.recursive = recursive
             self.settledInterval = settledInterval
             self.clock = clock
             self.scheduler = scheduler
+            self.ledger = ledger
         }
+    }
+
+    /// The inode when the volume reports one, so a rename or a move keeps the file's identity;
+    /// otherwise the path.
+    enum FileKey: Hashable, Sendable {
+        case inode(UInt64)
+        case path(String)
+    }
+
+    enum FileStatus: Sendable, Equatable {
+        case settled
+        case pending
+    }
+
+    private struct TrackedFile {
+        var path: String
+        var size: Int64
+        var modified: Date
+        var status: FileStatus
     }
 
     private let folderURL: URL
@@ -37,16 +63,12 @@ public actor FolderWatcher {
     // A vnode source only fires for the directory it watches, so recursive mode
     // needs one source per subdirectory, synced as directories come and go.
     private var subdirSources: [String: DispatchSourceFileSystemObject] = [:]
-    private var knownFiles: Set<String> = []
-    private var pendingFiles: [String: PendingFile] = [:]
+    private var files: [FileKey: TrackedFile] = [:]
+    private var pending: Set<FileKey> = []
     private var scanTask: Task<Void, Never>?
     private var scanContinuation: AsyncStream<Void>.Continuation?
     private var settledTask: Task<Void, Never>?
-
-    private struct PendingFile {
-        var modificationDate: Date
-        var size: Int64
-    }
+    private var lastRescan: Task<Void, Never>?
 
     public init(
         folderURL: URL,
@@ -68,10 +90,14 @@ public actor FolderWatcher {
         guard fd >= 0 else { return }
         fileDescriptor = fd
         let scan = await scanFolderOffActor()
-        knownFiles = scan.files
         // stop() can run on this actor during the await above; if it did, it cleared fileDescriptor
         // and closed our fd — don't resurrect a source on a closed descriptor.
         guard fileDescriptor == fd else { return }
+        files = [:]
+        pending = []
+        for file in scan.files {
+            files[file.key] = TrackedFile(path: file.path, size: file.size, modified: file.modified, status: .settled)
+        }
 
         // bufferingNewest(1): events that land while a rescan is running collapse into one trailing rescan.
         let (stream, continuation) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
@@ -82,6 +108,7 @@ public actor FolderWatcher {
             }
         }
 
+        guard options.observesFileSystem else { return }
         source = Self.makeSource(fd: fd, continuation: continuation, queue: eventQueue)
         syncSubdirWatchers(scan.directories)
     }
@@ -139,30 +166,76 @@ public actor FolderWatcher {
         scanTask = nil
         settledTask?.cancel()
         settledTask = nil
-        pendingFiles.removeAll()
+        pending.removeAll()
     }
 
+    /// Rescans run one at a time: a scan that finished listing before a newer one must not apply its
+    /// older picture of the folder on top.
     internal func checkForNewFiles() async {
-        let scan = await scanFolderOffActor()
-        syncSubdirWatchers(scan.directories)
-        let current = scan.files
-        let added = current.subtracting(knownFiles)
-        // Replace, don't union: a vanished path must be forgotten so a same-name file recreated later
-        // is re-detected, and so the set stays bounded to the folder's current contents.
-        knownFiles = current
+        let previous = lastRescan
+        let rescan = Task {
+            await previous?.value
+            await rescanFolder()
+        }
+        lastRescan = rescan
+        await rescan.value
+    }
 
+    private func rescanFolder() async {
+        let scan = await scanFolderOffActor()
+        // A root that can't be listed (renamed away, unmounted) says nothing about its files.
+        guard !scan.rootMissing else { return }
+        syncSubdirWatchers(scan.directories)
+        reconcile(scan.files)
+        if !pending.isEmpty {
+            schedulePendingCheck()
+        }
+    }
+
+    private func reconcile(_ listed: [ScannedFile]) {
         let now = options.clock.now()
-        for path in added {
-            let url = URL(fileURLWithPath: path)
-            guard Self.isMediaFile(url) else { continue }
-            let attrs = try? FileManager.default.attributesOfItem(atPath: path)
-            let mtime = attrs?[.modificationDate] as? Date ?? now
-            let size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
-            pendingFiles[path] = PendingFile(modificationDate: mtime, size: size)
+        let listedKeys = Set(listed.map(\.key))
+        var vanished: [String: FileKey] = [:]
+        for (key, file) in files where !listedKeys.contains(key) {
+            vanished[file.path] = key
         }
 
-        if !pendingFiles.isEmpty {
-            schedulePendingCheck()
+        for item in listed {
+            if var known = files[item.key] {
+                known.path = item.path
+                if known.status == .settled {
+                    known.size = item.size
+                    known.modified = item.modified
+                }
+                files[item.key] = known
+            } else if let departure = options.ledger.claim(item.key, size: item.size, modified: item.modified, now: now) {
+                track(item, status: departure.status)
+            } else if let oldKey = vanished[item.path], let old = files[oldKey],
+                      old.size == item.size, old.modified == item.modified {
+                // Same name, size and date under a new inode: an atomic save of the same bytes, or a
+                // network volume that renumbered its files on remount.
+                vanished.removeValue(forKey: item.path)
+                files.removeValue(forKey: oldKey)
+                pending.remove(oldKey)
+                track(item, status: old.status)
+            } else {
+                track(item, status: .pending)
+            }
+        }
+
+        for key in vanished.values {
+            guard let gone = files.removeValue(forKey: key) else { continue }
+            pending.remove(key)
+            options.ledger.depart(key, .init(size: gone.size, modified: gone.modified, status: gone.status, departedAt: now))
+        }
+    }
+
+    private func track(_ item: ScannedFile, status: FileStatus) {
+        files[item.key] = TrackedFile(path: item.path, size: item.size, modified: item.modified, status: status)
+        if status == .pending {
+            pending.insert(item.key)
+        } else {
+            pending.remove(item.key)
         }
     }
 
@@ -179,23 +252,37 @@ public actor FolderWatcher {
 
     private func processPending() {
         settledTask = nil
-        guard !pendingFiles.isEmpty else { return }
+        guard !pending.isEmpty else { return }
         let now = options.clock.now()
         let cutoff = now.addingTimeInterval(-Self.intervalAsSeconds(options.settledInterval))
-        var stillPending: [String: PendingFile] = [:]
-        for (path, info) in pendingFiles {
-            let attrs = try? FileManager.default.attributesOfItem(atPath: path)
-            guard let attrs else { continue }
-            let mtime = attrs[.modificationDate] as? Date ?? info.modificationDate
-            let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0
-            if mtime <= cutoff && size == info.size && size > 0 {
-                onNewMediaFile(URL(fileURLWithPath: path))
-            } else {
-                stillPending[path] = PendingFile(modificationDate: mtime, size: size)
+        for key in pending {
+            guard var file = files[key] else {
+                pending.remove(key)
+                continue
             }
+            let values = try? URL(fileURLWithPath: file.path)
+                .resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+            guard let values else {
+                files.removeValue(forKey: key)
+                pending.remove(key)
+                continue
+            }
+            let mtime = values.contentModificationDate ?? file.modified
+            let size = Int64(values.fileSize ?? 0)
+            if mtime <= cutoff && size == file.size && size > 0 {
+                file.status = .settled
+                pending.remove(key)
+                // A move from another watched folder can reach this watcher before that one notices
+                // the file left; the settle delay gives it time to hand the file over.
+                if options.ledger.claim(key, size: size, modified: mtime, now: now) == nil {
+                    onNewMediaFile(URL(fileURLWithPath: file.path))
+                }
+            }
+            file.size = size
+            file.modified = mtime
+            files[key] = file
         }
-        pendingFiles = stillPending
-        if !pendingFiles.isEmpty {
+        if !pending.isEmpty {
             schedulePendingCheck()
         }
     }
@@ -205,10 +292,22 @@ public actor FolderWatcher {
         return Double(comp.seconds) + Double(comp.attoseconds) / 1e18
     }
 
-    private struct FolderScan: Sendable {
-        var files: Set<String> = []
-        var directories: Set<String> = []
+    private struct ScannedFile: Sendable {
+        var key: FileKey
+        var path: String
+        var size: Int64
+        var modified: Date
     }
+
+    private struct FolderScan: Sendable {
+        var files: [ScannedFile] = []
+        var directories: Set<String> = []
+        var rootMissing = false
+    }
+
+    private static let scanKeys: [URLResourceKey] = [
+        .isRegularFileKey, .isDirectoryKey, .fileIdentifierKey, .fileSizeKey, .contentModificationDateKey,
+    ]
 
     /// GCD, not `Task.detached`: a detached job resuming actor work around the enumerator's
     /// NSURL bridging has crashed with EXC_ARM_DA_ALIGN before.
@@ -222,25 +321,54 @@ public actor FolderWatcher {
 
     private nonisolated func scanFolder() -> FolderScan {
         let fm = FileManager.default
-        guard options.recursive else {
-            guard let contents = try? fm.contentsOfDirectory(atPath: folderURL.path) else { return FolderScan() }
-            return FolderScan(files: Set(contents.map { folderURL.appendingPathComponent($0).path }))
-        }
-        guard let enumerator = fm.enumerator(
-            at: folderURL,
-            includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else { return FolderScan() }
+        let keySet = Set(Self.scanKeys)
         var scan = FolderScan()
-        for case let url as URL in enumerator {
-            let resourceValues = try? url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
-            if resourceValues?.isDirectory == true {
+        func add(_ url: URL, _ values: URLResourceValues?) {
+            if values?.isDirectory == true {
                 scan.directories.insert(url.path)
-            } else if resourceValues?.isRegularFile == true {
-                scan.files.insert(url.path)
+            } else if values?.isRegularFile == true, Self.isMediaFile(url) {
+                let path = url.path
+                scan.files.append(ScannedFile(
+                    key: values?.fileIdentifier.map(FileKey.inode) ?? .path(path),
+                    path: path,
+                    size: Int64(values?.fileSize ?? 0),
+                    modified: values?.contentModificationDate ?? .distantPast
+                ))
             }
         }
+        guard options.recursive else {
+            guard let contents = try? fm.contentsOfDirectory(
+                at: folderURL, includingPropertiesForKeys: Self.scanKeys, options: []
+            ) else { return FolderScan(rootMissing: true) }
+            for url in contents {
+                add(url, try? url.resourceValues(forKeys: keySet))
+            }
+            return scan
+        }
+        // The enumerator comes back empty, not nil, for a missing root.
+        guard rootIsDirectory(), let enumerator = fm.enumerator(
+            at: folderURL,
+            includingPropertiesForKeys: Self.scanKeys,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return FolderScan(rootMissing: true) }
+        for case let url as URL in enumerator {
+            add(url, try? url.resourceValues(forKeys: keySet))
+        }
+        guard rootIsDirectory() else { return FolderScan(rootMissing: true) }
         return scan
+    }
+
+    private nonisolated func rootIsDirectory() -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: folderURL.path, isDirectory: &isDirectory) && isDirectory.boolValue
+    }
+
+    internal var pendingPaths: Set<String> {
+        Set(pending.compactMap { files[$0]?.path })
+    }
+
+    internal var trackedPaths: Set<String> {
+        Set(files.values.map(\.path))
     }
 }
 
