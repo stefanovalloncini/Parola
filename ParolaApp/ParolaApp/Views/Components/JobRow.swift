@@ -55,7 +55,8 @@ struct JobCancelAction: Equatable {
     }
 
     let scope: Scope
-    let help: LocalizedStringKey
+    /// A localization key, kept as a String so the action stays Sendable and the row's `==` can read it.
+    let help: String
     let axID: String
 
     /// The Queue page's ✕, as `QueueRow` had it: one control for the whole run.
@@ -88,10 +89,10 @@ struct JobRow: View, Equatable {
     let status: BatchJob.Status
     let error: String?
     let segmentCount: Int
-    var isSelected: Bool = false
+    let isSelected: Bool
     /// The sidebar's column is narrow: no progress bar and no trailing action, the status text alone.
-    var compact: Bool = false
-    var cancel: JobCancelAction?
+    let compact: Bool
+    let cancel: JobCancelAction?
 
     @Environment(AppModel.self) private var model
     @State private var isHovering = false
@@ -166,7 +167,7 @@ struct JobRow: View, Equatable {
         switch status {
         case .pending, .transcribing:
             if let cancel {
-                actionButton(cancel.help, systemImage: "xmark", axID: cancel.axID) {
+                actionButton(LocalizedStringKey(cancel.help), systemImage: "xmark", axID: cancel.axID) {
                     cancel.run(for: id, in: model)
                 }
             }

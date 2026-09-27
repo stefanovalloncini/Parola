@@ -16,12 +16,11 @@ public enum ParolaLog {
     /// a Dispatch hop or a C callback does not, and keeps logging to the installed sink, so a caller
     /// must not expect its capture to hold those records. A `Task { }` started inside the scope keeps
     /// `sink` for its whole life, including whatever it logs after `withSink` has returned.
-    public static func withSink<T>(
+    public nonisolated(nonsending) static func withSink<T>(
         _ sink: any DiagnosticsSink,
-        isolation: isolated (any Actor)? = #isolation,
-        operation: () async throws -> T
+        operation: nonisolated(nonsending) () async throws -> T
     ) async rethrows -> T {
-        try await $scopedSink.withValue(sink, operation: operation, isolation: isolation)
+        try await $scopedSink.withValue(sink, operation: operation)
     }
 
     /// The synchronous half of `withSink(_:operation:)`, under the same routing rule.

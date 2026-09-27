@@ -61,7 +61,7 @@ extension AppModel {
             self.cardRetryIDs = []
             guard self.generatesCardMetadata, self.features.isEnabled(.ai) else { return }
             for id in ids {
-                self.queueCardJob(id: id, transcript: nil, isRetry: true)
+                _ = self.queueCardJob(id: id, transcript: nil, isRetry: true)
             }
         }
     }
