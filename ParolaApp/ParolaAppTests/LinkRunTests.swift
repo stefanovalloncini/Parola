@@ -96,8 +96,7 @@ final class PhaseRecorder {
     }
 }
 
-func makeLinkFixtureWAV() throws -> URL {
-    let frames = 4800
+func makeLinkFixtureWAV(frames: Int = 4800) throws -> URL {
     var data = Data()
     func ascii(_ s: String) { data.append(contentsOf: Array(s.utf8)) }
     func le32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
@@ -264,6 +263,101 @@ extension TranscriberMockSuites {
                 }
 
                 await waitUntil { !FileManager.default.fileExists(atPath: folder.path) }
+            }
+        }
+
+        @Test("the link's handoff leaves a duplicate check a file started during the download alone")
+        func handoffKeepsAPendingDuplicateCheck() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.transcriber]) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: Self.words)
+                let gate = FetchGate()
+                let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture, gate: gate))
+                model.transcribeYouTube(urlString: Self.link)
+                let pendingCheck = Task<Void, Never> { try? await Task.sleep(for: .seconds(30)) }
+                defer { pendingCheck.cancel() }
+                model.duplicateCheckTask = pendingCheck
+
+                await gate.open()
+                await waitUntil { model.sourceFileURL == fixture }
+
+                #expect(model.duplicateCheckTask == pendingCheck)
+                #expect(!pendingCheck.isCancelled)
+                model.duplicateCheckTask = nil
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("a file opened during a link's download is transcribed, whichever finishes first")
+        func fileOpenedDuringTheFetchSurvives() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            // Large enough that hashing it outlasts the link's handoff.
+            let file = try makeLinkFixtureWAV(frames: 16_000 * 600)
+            defer {
+                try? FileManager.default.removeItem(at: fixture)
+                try? FileManager.default.removeItem(at: file)
+            }
+            try await withMocksCleared([.transcriber]) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: Self.words)
+                let gate = FetchGate()
+                let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture, gate: gate))
+                model.transcribeYouTube(urlString: Self.link)
+                await waitUntil { model.phase == .fetchingLink(title: "A talk", progress: 0.5) }
+
+                model.transcribe(fileURL: file)
+                await gate.open()
+
+                await waitUntil(timeoutMs: 20_000) {
+                    model.phase == .ready && model.transcript?.sourceURL == file && model.fileRunLanding != nil
+                }
+                let entry = try #require(try await model.fileRunLanding?.entry.value)
+                #expect(entry.manifest.source == .file)
+                #expect(model.sourceFileURL == file)
+            }
+        }
+
+        @Test("a re-run started during a link's download replaces the download and lands")
+        func reRunStartedDuringTheFetchSurvives() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            let audio = try makeLinkFixtureWAV(frames: 5000)
+            defer {
+                try? FileManager.default.removeItem(at: fixture)
+                try? FileManager.default.removeItem(at: audio)
+            }
+            try await withMocksCleared([.transcriber]) {
+                let held = MockTranscriberGate()
+                defer { Task { await held.open() } }
+                var response = MockTranscriberResponse(segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the re-run's words")])
+                response.gate = held
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: response)
+                let gate = FetchGate()
+                let fetcher = ScriptedLinkFetcher(fixture: fixture, gate: gate)
+                let model = makeModel(fetcher: fetcher)
+                let entry = try await model.library.add(
+                    transcript: Transcript(
+                        segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the old take")],
+                        language: "en", modelName: "openai_whisper-tiny"
+                    ),
+                    audioSource: audio
+                )
+                model.refreshLibrary()
+                await waitUntil { model.libraryEntry(id: entry.id) != nil }
+                model.transcribeYouTube(urlString: Self.link)
+                await waitUntil { fetcher.fetches == 1 }
+                model.loadEntry(entry.id)
+                await waitUntil { model.selectedEntryID == entry.id && model.transcript != nil }
+
+                model.retranscribeCurrentEntry(model: model.selectedModel, language: "en")
+                await gate.open()
+                await settle()
+                await held.open()
+
+                await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil && model.phase == .ready }
+                let stored = try await model.library.load(entry.id).document.transcript
+                #expect(stored.segments.first?.text == "the re-run's words")
+                #expect(model.sourceFileURL != fixture)
+                #expect(model.fileRunLanding == nil)
             }
         }
 

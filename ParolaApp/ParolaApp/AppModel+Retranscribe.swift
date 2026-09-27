@@ -33,6 +33,7 @@ extension AppModel {
         )
         let runToken = nextFileRunToken()
         cancelAndTrack(&fileTranscribeTask)
+        cancelLinkFetch()
         fileTranscribeTask = Task { [weak self] in
             await self?.runRetranscription(
                 entryID: entryID, modelName: modelName, options: options, runToken: runToken

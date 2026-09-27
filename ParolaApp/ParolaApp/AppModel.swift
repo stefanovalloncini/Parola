@@ -1420,9 +1420,11 @@ final class AppModel {
 
     /// A user-initiated start (file open, YouTube, recording) replaces whichever of these runs
     /// is in flight; letting the old one finish would stomp the new run's transcript later.
-    private func cancelTranscriptionRuns() {
-        duplicateCheckTask?.cancel()
-        duplicateCheckTask = nil
+    private func cancelTranscriptionRuns(keepingDuplicateCheck: Bool = false) {
+        if !keepingDuplicateCheck {
+            duplicateCheckTask?.cancel()
+            duplicateCheckTask = nil
+        }
         if fileTranscribeTask != nil { retireCurrentFileRun() }
         fileTranscribeTask?.cancel()
         fileTranscribeTask = nil
@@ -2221,8 +2223,8 @@ final class AppModel {
     func beginFileTranscription(
         fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil, fetchedLink: FetchedLink? = nil
     ) {
-        // Before the new token: cancelling retires whichever token the old run holds.
-        cancelTranscriptionRuns()
+        // Before the new token: cancelling retires the old run's token; a file opened mid-download keeps its duplicate check.
+        cancelTranscriptionRuns(keepingDuplicateCheck: fetchedLink != nil)
         let runToken = nextFileRunToken()
         if fetchedLink == nil { noteRecentFile(fileURL) }
         if let fetchedLink, let title = fetchedLink.media.metadata.title {
@@ -2638,6 +2640,12 @@ final class AppModel {
                 try Task.checkCancellation()
                 guard let self else { return }
                 self.youtubeTranscribeTask = nil
+                // A re-run started during the download is the newer start: the link gives way to it.
+                guard self.fileTranscribeTask == nil else {
+                    media.discard()
+                    self.endRecovery(recoveryToken)
+                    return
+                }
                 self.beginFileTranscription(
                     fileURL: media.fileURL, translateOverride: nil, fetchedLink: FetchedLink(link: url, media: media)
                 )
@@ -2652,6 +2660,12 @@ final class AppModel {
             }
         }
         return .started
+    }
+
+    /// A re-run replaces a link's download the way a newer file run replaces an older one.
+    func cancelLinkFetch() {
+        guard youtubeTranscribeTask != nil else { return }
+        cancelAndTrack(&youtubeTranscribeTask)
     }
 
     /// Playback follows the download into its entry before the folder goes; a failed save keeps the folder playing.
