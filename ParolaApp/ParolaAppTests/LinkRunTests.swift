@@ -366,13 +366,14 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("a link whose save fails says so, and the skipped auto-export doesn't hide it")
+        @Test("a link whose save fails says so, writes no export beside its download, and the note doesn't hide it")
         func saveFailureOutranksTheExportNote() async throws {
             let fixture = try makeLinkFixtureWAV()
             defer { try? FileManager.default.removeItem(at: fixture) }
             try await withMocksCleared([.transcriber]) {
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: Self.words)
-                let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture))
+                let fetcher = ScriptedLinkFetcher(fixture: fixture, owned: true)
+                let model = makeModel(fetcher: fetcher)
                 let srt = try #require(model.exportPresets.first { $0.spec.format == .srt })
                 model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [srt.id])]
                 let libraryURL = model.library.libraryURL
@@ -382,9 +383,13 @@ extension TranscriberMockSuites {
 
                 model.transcribeYouTube(urlString: Self.link)
                 await waitUntil { model.nonFatalWarning != nil }
-                await settle()
+                await settle(for: .milliseconds(500))
 
                 #expect(model.nonFatalWarning?.contains("couldn't save it to your library") == true)
+                let folder = try #require(fetcher.workingFolders.first)
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let left = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+                #expect(left == ["audio.wav"], "the kept download must be the only thing in its folder")
             }
         }
 

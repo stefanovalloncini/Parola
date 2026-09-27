@@ -1836,9 +1836,9 @@ final class AppModel {
                 nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
             }
             // Exports read nothing the AI writes, so they don't wait for the card.
-            // A failed save has already said so, and that warning matters more than the skipped export.
-            if activate, source == .web, persisted != nil {
-                noteAutoExportSkippedForLink(sourceExtension: audioSource?.pathExtension ?? "vtt")
+            if activate, source == .web {
+                // A failed save has already said so, and that warning matters more than the skipped export.
+                if persisted != nil { noteAutoExportSkippedForLink(sourceExtension: audioSource?.pathExtension ?? "vtt") }
             } else if activate, let audioSource {
                 runAutoExports(transcript: result, sourceURL: audioSource)
             }
