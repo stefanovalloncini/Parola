@@ -48,7 +48,12 @@ extension AppModel {
                 deliver(found)
                 return
             }
-            pendingLargeDrop = PendingLargeDrop(count: found.count) { deliver(found) }
+            // A second large drop joins the one still waiting, so one answer covers both.
+            let waiting = pendingLargeDrop
+            pendingLargeDrop = PendingLargeDrop(count: (waiting?.count ?? 0) + found.count) {
+                waiting?.deliver()
+                deliver(found)
+            }
         }
     }
 

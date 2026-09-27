@@ -499,6 +499,7 @@ final class ParolaAutomationServer {
             "dropPayloadCount": .int(model.dropDragPayload?.count ?? 0),
             "dropHighlight": .string(model.dropHighlight?.rawValue ?? ""),
             "dropZones": .string(model.dropZonePlan.name),
+            "pendingLargeDropCount": .int(model.pendingLargeDrop?.count ?? 0),
             "meetingDetectedApp": model.meetingDetectedApp.map { .string($0) } ?? .null,
             "introduction": Self.introductionState(model.introduction, currentModel: model.selectedModel),
             "favoriteSegments": .array(model.favoriteSegmentIDs.sorted().map { .int($0) }),

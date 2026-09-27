@@ -331,6 +331,27 @@ struct DropRoutingTests {
         #expect(model.batchJobs.count == AppModel.largeDropLimit + 2)
     }
 
+    @Test("a second large drop joins the one waiting, and one answer takes both")
+    func secondLargeDropJoinsTheFirst() async throws {
+        let model = makeModel()
+        model.batchJobs = [BatchJob(url: Self.media("running.wav"), status: .transcribing)]
+        let first = try folder(holding: AppModel.largeDropLimit + 1)
+        let second = try folder(holding: AppModel.largeDropLimit + 2)
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+        }
+
+        await model.drop([first], on: .queue).value
+        await model.drop([second], on: .queue).value
+        #expect(model.pendingLargeDrop?.count == 2 * AppModel.largeDropLimit + 3)
+
+        model.confirmLargeDrop()
+        await model.awaitBatchImport()
+
+        #expect(model.batchJobs.count == 2 * AppModel.largeDropLimit + 4)
+    }
+
     @Test("a large drop the user turns down leaves the queue as it was")
     func largeDropCancelled() async throws {
         let model = makeModel()

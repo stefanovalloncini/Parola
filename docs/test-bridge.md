@@ -166,7 +166,8 @@ Rows named without the `parola_app_` prefix are raw bridge commands, called thro
 | `parola_app_transcribe_file` | **path**, translate | Drop-equivalent: transcribe a file by absolute path. |
 | `parola_app_start_batch` | **paths** | Submit multiple files. Auto-navigates to Batch view. |
 | `parola_app_add_batch_files` | **paths** | Append more files to the existing batch. |
-| `dropFiles` | **paths**, half | Routes files through the split drop zone: `now` transcribes, `queue` enqueues. |
+| `dropFiles` | **paths**, half, confirmLarge | Routes files through the split drop zone: `now` transcribes, `queue` enqueues. A drop yielding more than 200 files waits on a prompt: the reply's `awaitingConfirmation` says so, and `confirmLarge: true` answers Add Files. |
+| `resolveLargeDrop` | **choice** | Answers the large-drop prompt: `add` queues the files, `cancel` drops them. `getState.pendingLargeDropCount` shows what is waiting. |
 | `previewDropZone` | payload, count, half | Test mode only: shapes the drop overlay without a drag so it can be captured. |
 | `parola_app_clear_batch` | — | Cancel and remove all queued jobs. |
 | `parola_app_select_batch_job` | **id** | Select a specific job to view its transcript. |

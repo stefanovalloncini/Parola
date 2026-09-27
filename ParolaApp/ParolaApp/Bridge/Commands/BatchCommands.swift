@@ -49,6 +49,13 @@ extension ParolaAutomationServer {
                         summary: "Which half of the drop zone the files landed on",
                         defaultValue: .string(AppModel.DropHalf.now.rawValue)
                     ),
+                    .init(
+                        name: "confirmLarge",
+                        kind: .boolean,
+                        required: false,
+                        summary: "Answer Add Files for a drop over the large-drop limit",
+                        defaultValue: .bool(false)
+                    ),
                 ],
                 handler: { args, ctx in
                     let urls = try resolveExistingPaths(args)
@@ -57,11 +64,31 @@ extension ParolaAutomationServer {
                         throw AutomationError.invalidArgs(field: "half", reason: "unknown half: \(raw)")
                     }
                     await ctx.model.drop(urls, on: half).value
+                    if (try args.optionalBool("confirmLarge")) == true { ctx.model.confirmLargeDrop() }
                     return .object([
                         "half": .string(half.rawValue),
                         "count": .int(urls.count),
                         "route": .string(ctx.model.route.rawValue),
+                        "awaitingConfirmation": .bool(ctx.model.pendingLargeDrop != nil),
                     ])
+                }
+            ),
+
+            AutomationCommand(
+                name: "resolveLargeDrop",
+                area: .batch,
+                summary: "Answers the prompt a drop over the large-drop limit raises: add queues the files, cancel drops them.",
+                kind: .mutating,
+                args: [
+                    .init(name: "choice", kind: .string(enum: ["add", "cancel"]), required: true, summary: "Which button to press"),
+                ],
+                handler: { args, ctx in
+                    guard let pending = ctx.model.pendingLargeDrop else {
+                        throw AutomationError.invalidArgs(field: "choice", reason: "no large drop is waiting")
+                    }
+                    let choice = try args.string("choice")
+                    if choice == "add" { ctx.model.confirmLargeDrop() } else { ctx.model.cancelLargeDrop() }
+                    return .object(["choice": .string(choice), "count": .int(pending.count)])
                 }
             ),
 
