@@ -439,6 +439,22 @@ extension TranscriberMockSuites {
             ))
         }
 
+        @Test("the fetch pane ends on the newest folded state, whatever order two readers deliver in")
+        func fetchPaneKeepsTheNewestState() async {
+            let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: URL(fileURLWithPath: "/tmp/never.wav")))
+            model.phase = .fetchingLink(title: nil, progress: nil)
+            let handler = model.makeLinkFetchHandler(runToken: model.nextFileRunToken())
+
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { for _ in 0..<2000 { handler(.metadata(LinkMetadata(title: "A talk"))) } }
+                group.addTask { for _ in 0..<2000 { handler(.downloading(fraction: 0.5)) } }
+            }
+
+            await waitUntil { model.phase == .fetchingLink(title: "A talk", progress: 0.5) }
+            await settle()
+            #expect(model.phase == .fetchingLink(title: "A talk", progress: 0.5))
+        }
+
         @Test("Retry after a failed transcription fetches the link again")
         func retryReplaysTheLink() async throws {
             let fixture = try makeLinkFixtureWAV()

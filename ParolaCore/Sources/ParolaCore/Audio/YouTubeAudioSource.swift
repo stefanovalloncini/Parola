@@ -80,7 +80,7 @@ public actor YouTubeAudioSource {
     private func download(
         ytDlpPath ytDlp: String, progress: @escaping @Sendable (LinkFetchEvent) -> Void
     ) async throws -> FetchedMedia {
-        // Progress comes on stdout and post-processing on stderr, so a late progress line mustn't take the bar backwards.
+        // Progress comes on stdout and post-processing on stderr: forwarding under the lock keeps a late progress line out.
         let processing = OSAllocatedUnfairLock(initialState: false)
         let output = try await YouTubeProcess.fetch(
             ytDlpPath: ytDlp,
@@ -90,12 +90,11 @@ public actor YouTubeAudioSource {
             site: site
         ) { line in
             guard let event = line.event else { return }
-            let stale = processing.withLock { seen in
+            processing.withLock { seen in
                 if case .processing = event { seen = true }
-                if case .downloading = event { return seen }
-                return false
+                if case .downloading = event, seen { return }
+                progress(event)
             }
-            if !stale { progress(event) }
         }
         try Task.checkCancellation()
 

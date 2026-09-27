@@ -393,6 +393,37 @@ struct YouTubeAudioDownloadTests {
         #expect(FileManager.default.fileExists(atPath: unrelated.path))
     }
 
+    @Test("no progress is delivered after the processing event, however the two pipes interleave")
+    func progressNeverFollowsProcessing() async throws {
+        let fake = try fakeYtDlp("""
+            while [ $# -gt 0 ]; do
+              [ "$1" = "-o" ] && out="$2"
+              shift
+            done
+            file=$(printf '%s' "$out" | sed 's/%(ext)s/m4a/')
+            i=0
+            while [ $i -lt 200 ]; do
+              echo "[PAROLA_P] $i 200"
+              [ $i -eq 100 ] && echo "[PAROLA_PP] started ExtractAudio" >&2
+              i=$((i + 1))
+            done
+            printf 'audio' > "$file"
+            echo "[PAROLA_FILE] $file"
+            """)
+        defer { try? FileManager.default.removeItem(at: fake) }
+
+        for _ in 0..<5 {
+            let events = EventLog()
+            let source = try YouTubeAudioSource(url: Self.link, features: .all, ytDlpPath: fake.path, limits: tight())
+            let media = try await source.fetch { events.append($0) }
+            media.discard()
+
+            let delivered = events.all
+            let processing = try #require(delivered.firstIndex(of: .processing))
+            #expect(!delivered[(processing + 1)...].contains { if case .downloading = $0 { true } else { false } })
+        }
+    }
+
     @Test("a download that ends without a file fails as no audio")
     func noFileIsNoAudio() async throws {
         let fake = try fakeYtDlp("echo '[PAROLA_P] 1 1'")

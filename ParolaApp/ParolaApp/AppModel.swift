@@ -2693,10 +2693,11 @@ final class AppModel {
             if self.phase != next { self.phase = next }
         }
         return { event in
-            coalescer.send(readout.withLock { state in
+            // Sent under the lock: the coalescer keeps the newest value, so it must get them in folding order.
+            readout.withLock { state in
                 state.apply(event)
-                return state
-            })
+                coalescer.send(state)
+            }
         }
     }
 
