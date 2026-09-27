@@ -12,6 +12,11 @@ interface Props {
 }
 
 const { light, dark, widths, sizes, loading = "lazy", fetchpriority = "auto" } = Astro.props;
+if (dark.width !== light.width || dark.height !== light.height) {
+  throw new Error(
+    `Dark twin size ${dark.width}x${dark.height} differs from light ${light.width}x${light.height}`,
+  );
+}
 const sets = (image: ImageMetadata) =>
   Promise.all(
     (["avif", "webp"] as const).map((format) =>
