@@ -53,7 +53,9 @@ extension AppModel {
                 let loaded = try await library.load(entry.id)
                 let exportsDir = library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
                 try FileManager.default.createDirectory(at: exportsDir, withIntermediateDirectories: true)
-                let base = (entry.title as NSString).deletingPathExtension
+                let base = Self.unusedExportBase(
+                    for: entry.title, extensions: presets.map(\.spec.format.fileExtension), in: exportsDir
+                )
                 for preset in presets {
                     let target = exportsDir.appendingPathComponent("\(base).\(preset.spec.format.fileExtension)")
                     let data = try Exporters.exporter(for: preset.spec).render(loaded.document.transcript)
@@ -63,5 +65,22 @@ extension AppModel {
                 // Best-effort; primary transcription already saved.
             }
         }
+    }
+
+    /// Imports that share a file name share a title, so the second one's exports become "Title 2", "Title 3"…
+    nonisolated static func unusedExportBase(
+        for title: String,
+        extensions: [String],
+        in directory: URL,
+        exists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> String {
+        func free(_ base: String) -> Bool {
+            !extensions.contains { exists(directory.appendingPathComponent("\(base).\($0)")) }
+        }
+        if free(title) { return title }
+        for counter in 2..<1000 where free("\(title) \(counter)") {
+            return "\(title) \(counter)"
+        }
+        return "\(title) \(UUID().uuidString)"
     }
 }
