@@ -8,7 +8,7 @@ A setting-gated local IPC that lets the `parola-mcp` server drive a running Paro
 |---|---|---|
 | In-app listener | `ParolaApp/ParolaApp/Bridge/ParolaAutomationServer.swift` | Ships in Debug and Release, gated by the `automationBridgeEnabled` setting (default on in Debug, off in Release) |
 | MCP client | `ParolaCore/Sources/ParolaMCP/BridgeClient.swift` | always |
-| MCP tool surface | `ParolaCore/Sources/ParolaMCP/` (`TypedToolRegistry.swift` + `AppTool.swift`) | always |
+| MCP tool surface | `ParolaCore/Sources/ParolaMCP/` (`TypedToolRegistry.swift` + `LegacyAppTools.swift`) | always |
 | Discovery file | `~/Library/Caches/Parola/bridge.port` | written at app launch |
 | Auth token | `~/Library/Caches/Parola/bridge.token` | written at app launch, `0600` |
 | Discovery record | `~/Library/Caches/Parola/bridge.json` | port, token, pid, startedAt, serverVersion |
