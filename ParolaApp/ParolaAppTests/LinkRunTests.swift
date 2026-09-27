@@ -31,6 +31,7 @@ final class ScriptedLinkFetcher: LinkFetcher {
     let gate: FetchGate?
     let owned: Bool
     let failure: LinkDownloadFailure?
+    let ignoresCancel: Bool
     private let count = OSAllocatedUnfairLock(initialState: 0)
     private let folders = OSAllocatedUnfairLock<[URL]>(initialState: [])
 
@@ -43,13 +44,15 @@ final class ScriptedLinkFetcher: LinkFetcher {
         metadata: LinkMetadata = ScriptedLinkFetcher.talk,
         gate: FetchGate? = nil,
         owned: Bool = false,
-        failure: LinkDownloadFailure? = nil
+        failure: LinkDownloadFailure? = nil,
+        ignoresCancel: Bool = false
     ) {
         self.fixture = fixture
         self.metadata = metadata
         self.gate = gate
         self.owned = owned
         self.failure = failure
+        self.ignoresCancel = ignoresCancel
     }
 
     var fetches: Int { count.withLock { $0 } }
@@ -64,7 +67,7 @@ final class ScriptedLinkFetcher: LinkFetcher {
         progress(.metadata(metadata))
         progress(.downloading(fraction: 0.5))
         await gate?.wait()
-        try Task.checkCancellation()
+        if !ignoresCancel { try Task.checkCancellation() }
         if let failure { throw ParolaError.linkDownloadFailed(failure) }
         guard owned else { return FetchedMedia(fileURL: fixture, metadata: metadata) }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("parola-yt-test-\(UUID().uuidString)")
@@ -381,6 +384,26 @@ extension TranscriberMockSuites {
 
                 #expect(model.nonFatalWarning?.contains("couldn't save it to your library") == true)
             }
+        }
+
+        @Test("a download that finishes just as it's cancelled leaves no folder behind")
+        func lateDownloadAfterCancelCleansUp() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            let gate = FetchGate()
+            let fetcher = ScriptedLinkFetcher(fixture: fixture, gate: gate, owned: true, ignoresCancel: true)
+            let model = makeModel(fetcher: fetcher)
+
+            model.transcribeYouTube(urlString: Self.link)
+            await waitUntil { fetcher.fetches == 1 }
+            model.cancelCurrentWork()
+            await gate.open()
+
+            await waitUntil { fetcher.workingFolders.count == 1 }
+            let folder = try #require(fetcher.workingFolders.first)
+            await waitUntil { !FileManager.default.fileExists(atPath: folder.path) }
+            #expect(model.phase == .idle)
+            #expect(model.sourceFileURL != fetcher.workingFolders.first?.appendingPathComponent("audio.wav"))
         }
 
         @Test("Retry after a failed transcription fetches the link again")

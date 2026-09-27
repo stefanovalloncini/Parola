@@ -182,7 +182,7 @@ struct Transcribe: AsyncParsableCommand {
             let bar = mcp ? nil : ProgressReporter(label: "downloading audio")
             let media: FetchedMedia
             do {
-                media = try await untilInterrupted {
+                media = try await untilInterrupted(abandoning: { $0.discard() }) {
                     try await fetcher.fetchAudio(url: url) { event in
                         guard case .downloading(let fraction?) = event else { return }
                         bar?.update(fraction)

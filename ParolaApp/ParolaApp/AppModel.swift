@@ -2638,8 +2638,11 @@ final class AppModel {
         youtubeTranscribeTask = Task { [weak self] in
             do {
                 let media = try await fetcher.fetchAudio(url: url, progress: progress)
-                try Task.checkCancellation()
-                guard let self else { return }
+                // A download that finished just as it was cancelled still owns a folder.
+                guard !Task.isCancelled, let self else {
+                    media.discard()
+                    throw CancellationError()
+                }
                 self.youtubeTranscribeTask = nil
                 // A re-run started during the download is the newer start: the link gives way to it.
                 guard self.fileTranscribeTask == nil else {

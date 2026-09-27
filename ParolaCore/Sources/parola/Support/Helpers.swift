@@ -97,7 +97,11 @@ func awaitStop(seconds: Double?) async {
 struct Interrupted: Error {}
 
 /// Runs `body` until SIGINT/SIGTERM, which cancels it and waits for it to unwind before throwing `Interrupted`.
-func untilInterrupted<T: Sendable>(_ body: @escaping @Sendable () async throws -> T) async throws -> T {
+/// A value `body` still finishes with after the signal goes to `abandon`, so whatever it holds can be cleaned up.
+func untilInterrupted<T: Sendable>(
+    abandoning abandon: @escaping @Sendable (T) -> Void = { _ in },
+    _ body: @escaping @Sendable () async throws -> T
+) async throws -> T {
     let signals = [AsyncSignalStream(signal: SIGINT), AsyncSignalStream(signal: SIGTERM)]
     return try await withThrowingTaskGroup(of: T?.self) { group in
         group.addTask { try await body() }
@@ -111,7 +115,13 @@ func untilInterrupted<T: Sendable>(_ body: @escaping @Sendable () async throws -
         defer { for stream in signals { stream.fire() } }
         let first = try await group.next() ?? nil
         group.cancelAll()
-        guard let first else { throw Interrupted() }
+        guard let first else {
+            for stream in signals { stream.fire() }
+            while let late = await group.nextResult() {
+                if case .success(let value?) = late { abandon(value) }
+            }
+            throw Interrupted()
+        }
         return first
     }
 }

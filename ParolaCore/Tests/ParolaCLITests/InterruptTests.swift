@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import ParolaCore
 @testable import parola
@@ -19,6 +20,22 @@ struct InterruptTests {
         #expect(value == 42)
         #expect(handlesByDefault(SIGINT))
         #expect(handlesByDefault(SIGTERM))
+    }
+
+    @Test("a value the body still finishes with after Ctrl-C is handed back for cleanup")
+    func lateValueIsAbandoned() async throws {
+        let abandoned = OSAllocatedUnfairLock<[Int]>(initialState: [])
+
+        await #expect(throws: Interrupted.self) {
+            _ = try await untilInterrupted(abandoning: { value in abandoned.withLock { $0.append(value) } }) {
+                kill(getpid(), SIGINT)
+                usleep(300_000)
+                return 7
+            }
+        }
+
+        #expect(abandoned.withLock { $0 } == [7])
+        #expect(handlesByDefault(SIGINT))
     }
 
     @Test("Ctrl-C during a download ends yt-dlp, removes its folder and reports the interrupt")
