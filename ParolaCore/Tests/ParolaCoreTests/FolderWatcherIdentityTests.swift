@@ -154,7 +154,7 @@ struct FolderWatcherIdentityTests {
         #expect(collected.snapshot().map(\.lastPathComponent) == ["memo.m4a"])
     }
 
-    @Test("a scan while the watched folder is missing forgets nothing, so its return emits nothing")
+    @Test("a scan that finds the watched folder missing reports it lost and keeps what it knew")
     func rootTemporarilyMissing() async throws {
         let parent = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: parent) }
@@ -166,20 +166,23 @@ struct FolderWatcherIdentityTests {
         try Fixture.writeSettled(folder.appendingPathComponent("Nested/two.wav"), clock: clock)
 
         let collected = CollectedURLs()
-        let scheduler = ManualScheduler()
-        let watcher = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
+        let watcher = makeWatcher(folder, clock: clock, scheduler: ManualScheduler(), observesFileSystem: false, collected: collected)
         await watcher.start()
 
         try FileManager.default.moveItem(at: folder, to: away)
         await watcher.checkForNewFiles()
+        #expect(await watcher.state == .lost)
         #expect(Fixture.names(await watcher.trackedPaths) == ["one.m4a", "two.wav"])
+        let saved = await watcher.baseline()
 
         try FileManager.default.moveItem(at: away, to: folder)
         try Fixture.writeSettled(folder.appendingPathComponent("fresh.mp3"), clock: clock)
-        await watcher.checkForNewFiles()
-        #expect(Fixture.names(await watcher.pendingPaths) == ["fresh.mp3"])
+        let scheduler = ManualScheduler()
+        let resumed = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
+        await resumed.start(baseline: saved)
+        #expect(Fixture.names(await resumed.pendingPaths) == ["fresh.mp3"])
         try await scheduler.advance(ticks: 2)
-        await watcher.stop()
+        await resumed.stop()
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["fresh.mp3"])
     }

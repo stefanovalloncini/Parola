@@ -22,10 +22,14 @@ struct WatchedFolder: Codable, Identifiable, Hashable {
 final class WatchedFoldersStore {
     private(set) var folders: [WatchedFolder] = []
     private(set) var lastError: String?
-    private(set) var staleFolderIDs: Set<UUID> = []
+    /// Folders nothing is watching right now: missing, in the Trash, on a volume that isn't mounted,
+    /// or no longer readable. They are tried again when a volume mounts and when the Mac wakes.
+    private(set) var unavailableFolderIDs: Set<UUID> = []
     @ObservationIgnored private var watchers: [UUID: FolderWatcher] = [:]
     @ObservationIgnored private var scopedURLs: [UUID: URL] = [:]
     @ObservationIgnored private var baselineWrites: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var starts: [UUID: UUID] = [:]
+    @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var watchEpoch = 0
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let baselines: WatchedFolderBaselines
@@ -51,6 +55,12 @@ final class WatchedFoldersStore {
         baselines.removeAll(except: Set(folders.map(\.id)))
         for folder in folders {
             startWatcher(for: folder)
+        }
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didMountNotification, NSWorkspace.didWakeNotification] {
+            systemObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.retryUnavailableFolders() }
+            })
         }
     }
 
@@ -91,7 +101,7 @@ final class WatchedFoldersStore {
         let watcher = watchers.removeValue(forKey: id)
         let scopedURL = scopedURLs.removeValue(forKey: id)
         folders.removeAll { $0.id == id }
-        staleFolderIDs.remove(id)
+        unavailableFolderIDs.remove(id)
         baselineWrites.removeValue(forKey: id)?.cancel()
         baselines.remove(id)
         save()
@@ -124,7 +134,7 @@ final class WatchedFoldersStore {
             if let idx = folders.firstIndex(where: { $0.id == folder.id }) {
                 folders[idx] = refreshed
             }
-            staleFolderIDs.remove(folder.id)
+            unavailableFolderIDs.remove(folder.id)
             // Another folder's baseline would flood it with arrivals; start it the way a new folder starts.
             if url.path != folder.displayPath {
                 baselineWrites.removeValue(forKey: folder.id)?.cancel()
@@ -143,8 +153,15 @@ final class WatchedFoldersStore {
         }
     }
 
-    func isStale(_ id: UUID) -> Bool {
-        staleFolderIDs.contains(id)
+    func isUnavailable(_ id: UUID) -> Bool {
+        unavailableFolderIDs.contains(id)
+    }
+
+    func retryUnavailableFolders() {
+        for folder in folders where unavailableFolderIDs.contains(folder.id)
+            && watchers[folder.id] == nil && starts[folder.id] == nil {
+            startWatcher(for: folder)
+        }
     }
 
     /// Applies an external change to the "watchedFolders" defaults key (settings reset or import)
@@ -156,7 +173,7 @@ final class WatchedFoldersStore {
         let previousScopes = scopedURLs
         watchers.removeAll()
         scopedURLs.removeAll()
-        staleFolderIDs.removeAll()
+        unavailableFolderIDs.removeAll()
         for task in baselineWrites.values { task.cancel() }
         baselineWrites.removeAll()
         folders = []
@@ -199,6 +216,9 @@ final class WatchedFoldersStore {
         carriesBaseline: Bool = true
     ) {
         let epoch = watchEpoch
+        let id = folder.id
+        let start = UUID()
+        starts[id] = start
         let bookmark = folder.bookmark
         let baselines = self.baselines
         Task { [weak self] in
@@ -208,33 +228,78 @@ final class WatchedFoldersStore {
             let resolved = await Self.resolveBookmark(bookmark)
             var baseline = carried
             if baseline == nil {
-                baseline = await baselines.read(folder.id)
+                baseline = await baselines.read(id)
             }
             guard let self else { return }
-            guard epoch == self.watchEpoch, self.folders.contains(where: { $0.id == folder.id }) else { return }
-            guard let resolved, !resolved.isStale, resolved.isDirectory,
+            defer { if self.starts[id] == start { self.starts[id] = nil } }
+            guard epoch == self.watchEpoch, let current = self.folders.first(where: { $0.id == id }) else { return }
+            guard let resolved, resolved.isDirectory, !Self.isInTrash(resolved.url),
                   resolved.url.startAccessingSecurityScopedResource() else {
-                self.staleFolderIDs.insert(folder.id)
+                if let carried { baselines.write(carried, for: id) }
+                self.unavailableFolderIDs.insert(id)
                 return
             }
-            self.staleFolderIDs.remove(folder.id)
-            self.scopedURLs[folder.id] = resolved.url
+            self.follow(current, to: resolved)
 
             let handler = self.onNewMediaFile
-            let id = folder.id
             let watcher = FolderWatcher(
                 folderURL: resolved.url,
                 options: self.watcherOptions,
                 onBaselineChange: { [weak self] in
                     Task { @MainActor in self?.scheduleBaselineWrite(for: id) }
                 },
+                onStateChange: { [weak self] state in
+                    guard state == .lost else { return }
+                    Task { @MainActor in await self?.restartLostWatcher(id) }
+                },
                 onNewMediaFile: { newURL in
                     Task { @MainActor in handler(newURL) }
                 }
             )
-            self.watchers[folder.id] = watcher
-            Task { await watcher.start(baseline: baseline) }
+            self.watchers[id] = watcher
+            self.scopedURLs[id] = resolved.url
+            await watcher.start(baseline: baseline)
+            guard self.watchers[id] === watcher else { return }
+            if await watcher.state == .unavailable {
+                self.watchers[id] = nil
+                self.scopedURLs.removeValue(forKey: id)?.stopAccessingSecurityScopedResource()
+                if let carried { baselines.write(carried, for: id) }
+                self.unavailableFolderIDs.insert(id)
+            } else {
+                self.unavailableFolderIDs.remove(id)
+            }
         }
+    }
+
+    /// A renamed or moved folder, or one on a volume mounted somewhere new, resolves with a stale
+    /// bookmark. The app isn't sandboxed, so the resolved folder is usable: keep watching it and
+    /// save a fresh bookmark and path.
+    private func follow(_ folder: WatchedFolder, to resolved: ResolvedBookmark) {
+        let moved = Self.canonicalPath(resolved.url) != Self.canonicalPath(URL(fileURLWithPath: folder.displayPath))
+        guard resolved.isStale || moved else { return }
+        let refreshed = WatchedFolder(
+            id: folder.id,
+            bookmark: resolved.freshBookmark ?? folder.bookmark,
+            displayPath: moved ? resolved.url.path : folder.displayPath
+        )
+        guard let index = folders.firstIndex(where: { $0.id == folder.id }) else { return }
+        folders[index] = refreshed
+        save()
+    }
+
+    private func restartLostWatcher(_ id: UUID) async {
+        guard let watcher = watchers[id], await watcher.state == .lost, watchers[id] === watcher,
+              let folder = folders.first(where: { $0.id == id }) else { return }
+        watchers[id] = nil
+        startWatcher(for: folder, replacing: watcher, releasing: scopedURLs.removeValue(forKey: id))
+    }
+
+    private static func isInTrash(_ url: URL) -> Bool {
+        url.pathComponents.contains { $0 == ".Trash" || $0 == ".Trashes" }
+    }
+
+    private static func canonicalPath(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     private func scheduleBaselineWrite(for id: UUID) {
@@ -250,9 +315,17 @@ final class WatchedFoldersStore {
         }
     }
 
+    private struct ResolvedBookmark: Sendable {
+        let url: URL
+        let isStale: Bool
+        let isDirectory: Bool
+        /// Made only for a stale bookmark.
+        let freshBookmark: Data?
+    }
+
     // Off the main thread: resolving a security-scoped bookmark can block on mounting its volume,
     // which would hang launch for a watched folder on a disconnected drive.
-    private nonisolated static func resolveBookmark(_ bookmark: Data) async -> (url: URL, isStale: Bool, isDirectory: Bool)? {
+    private nonisolated static func resolveBookmark(_ bookmark: Data) async -> ResolvedBookmark? {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 var isStale = false
@@ -266,7 +339,12 @@ final class WatchedFoldersStore {
                     return
                 }
                 let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-                continuation.resume(returning: (url, isStale, isDirectory))
+                let freshBookmark = isStale
+                    ? try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                    : nil
+                continuation.resume(returning: ResolvedBookmark(
+                    url: url, isStale: isStale, isDirectory: isDirectory, freshBookmark: freshBookmark
+                ))
             }
         }
     }

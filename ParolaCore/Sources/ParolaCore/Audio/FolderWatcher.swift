@@ -93,12 +93,28 @@ public actor FolderWatcher {
         var subdirectories: [String: FileKey] = [:]
     }
 
+    public enum State: Sendable, Equatable {
+        case idle
+        case watching
+        /// The folder couldn't be opened or listed when the watch started.
+        case unavailable
+        /// The folder was renamed, moved, deleted or unmounted while watched. The watcher stops
+        /// looking and keeps what it knew, for a new watcher started wherever the folder is now.
+        case lost
+    }
+
+    enum Event: Sendable {
+        case changed(String)
+        case rootLost
+    }
+
     private let folderURL: URL
     /// Symlinks resolved, as `open` resolves them for the root's descriptor, so the paths the watcher
     /// lists are in the directory its source watches.
     private let rootPath: String
     private let onNewMediaFile: @Sendable (URL) -> Void
     private let onBaselineChange: (@Sendable () -> Void)?
+    private let onStateChange: (@Sendable (State) -> Void)?
     private let options: Options
     private let eventQueue = DispatchQueue(label: "com.parola.folder-watch.\(UUID().uuidString)")
     private var fileDescriptor: Int32 = -1
@@ -113,22 +129,26 @@ public actor FolderWatcher {
     private var dirty: Set<String> = []
     private var drainTask: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
-    private var eventContinuation: AsyncStream<String>.Continuation?
+    private var eventContinuation: AsyncStream<Event>.Continuation?
     private var settledTask: Task<Void, Never>?
     private var baselineChanged = false
     private(set) var listedDirectoryCount = 0
+    public private(set) var state: State = .idle
 
-    /// `onBaselineChange` fires after a scan or a settle check changes what `baseline()` returns.
+    /// `onBaselineChange` fires after a scan or a settle check changes what `baseline()` returns;
+    /// `onStateChange` whenever `state` changes on its own, not for `start()` or `stop()` returning.
     public init(
         folderURL: URL,
         options: Options = Options(),
         onBaselineChange: (@Sendable () -> Void)? = nil,
+        onStateChange: (@Sendable (State) -> Void)? = nil,
         onNewMediaFile: @escaping @Sendable (URL) -> Void
     ) {
         self.folderURL = folderURL
         self.rootPath = Self.realPath(folderURL)
         self.options = options
         self.onBaselineChange = onBaselineChange
+        self.onStateChange = onStateChange
         self.onNewMediaFile = onNewMediaFile
     }
 
@@ -137,22 +157,30 @@ public actor FolderWatcher {
     }
 
     /// Without a baseline every file already in the folder counts as seen, as when a folder is first
-    /// added. With one, files the baseline doesn't account for arrive once they settle.
+    /// added. With one, files the baseline doesn't account for arrive once they settle. Ends in
+    /// `.watching`, or `.unavailable` when the folder can't be opened.
     public func start(baseline: Baseline? = nil) async {
-        guard source == nil else { return }
+        guard fileDescriptor < 0 else { return }
         let fd = folderURL.path.withCString { open($0, O_EVTONLY) }
-        guard fd >= 0 else { return }
+        guard fd >= 0 else {
+            state = .unavailable
+            return
+        }
         fileDescriptor = fd
         let request = ScanRequest(directories: [rootPath], knownSubdirectories: [:], recursive: options.recursive)
         let scan = await scanOffActor(request)
         // stop() can run on this actor during the await above; if it did, it cleared fileDescriptor
         // and closed our fd — don't resurrect a source on a closed descriptor.
         guard fileDescriptor == fd else { return }
+        guard !scan.missing.contains(rootPath) else {
+            tearDown()
+            state = .unavailable
+            return
+        }
         files = [:]
         pending = [:]
         watchedAfterEmit = []
         directories = [:]
-        guard !scan.missing.contains(rootPath) else { return }
         listedDirectoryCount += scan.listings.count
 
         let listed = scan.listings.flatMap(\.media)
@@ -186,35 +214,43 @@ public actor FolderWatcher {
         publishBaselineChange()
         scheduleSettleTick()
 
-        let (stream, continuation) = AsyncStream.makeStream(of: String.self)
+        let (stream, continuation) = AsyncStream.makeStream(of: Event.self)
         eventContinuation = continuation
         eventTask = Task { [weak self] in
-            for await directory in stream {
-                await self?.noteDirty(directory)
+            for await event in stream {
+                switch event {
+                case .changed(let directory): await self?.noteDirty(directory)
+                case .rootLost: await self?.lose()
+                }
             }
         }
+        state = .watching
 
         guard options.observesFileSystem else { return }
-        source = Self.makeSource(fd: fd, path: rootPath, continuation: continuation, queue: eventQueue)
+        source = Self.makeSource(fd: fd, path: rootPath, isRoot: true, continuation: continuation, queue: eventQueue)
         noteDirtyIfChangedSinceListing(rootPath)
         for path in directories.keys where path != rootPath {
             openSource(for: path)
         }
     }
 
+    /// The root also reports being renamed, deleted or unmounted: its path no longer leads to it.
     private static func makeSource(
         fd: Int32,
         path: String,
-        continuation: AsyncStream<String>.Continuation,
+        isRoot: Bool = false,
+        continuation: AsyncStream<Event>.Continuation,
         queue: DispatchQueue
     ) -> DispatchSourceFileSystemObject {
+        let lostMask: DispatchSource.FileSystemEvent = [.rename, .delete, .revoke]
         let src = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
-            eventMask: .write,
+            eventMask: isRoot ? lostMask.union(.write) : .write,
             queue: queue
         )
-        src.setEventHandler {
-            continuation.yield(path)
+        src.setEventHandler { [weak src] in
+            guard let src else { return }
+            continuation.yield(src.data.isDisjoint(with: lostMask) ? .changed(path) : .rootLost)
         }
         src.setCancelHandler { [fd] in
             close(fd)
@@ -239,6 +275,18 @@ public actor FolderWatcher {
     }
 
     public func stop() {
+        tearDown()
+        state = .idle
+    }
+
+    private func lose() {
+        guard state == .watching else { return }
+        tearDown()
+        state = .lost
+        onStateChange?(.lost)
+    }
+
+    private func tearDown() {
         // The source's cancel handler owns the fd. If start() opened the fd but hasn't created the
         // source yet (it's parked in the initial scan await), close the fd here so it can't leak.
         if let source {
@@ -307,7 +355,10 @@ public actor FolderWatcher {
         let scan = await scanOffActor(request)
         guard fileDescriptor >= 0 else { return }
         // A root that can't be listed (renamed away, unmounted) says nothing about its files.
-        guard !scan.missing.contains(rootPath) else { return }
+        guard !scan.missing.contains(rootPath) else {
+            lose()
+            return
+        }
         listedDirectoryCount += scan.listings.count
         apply(scan.listings)
         publishBaselineChange()

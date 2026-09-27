@@ -65,13 +65,13 @@ private struct WatchedFolderRow: View {
     let isFirst: Bool
 
     var body: some View {
-        let stale = store.isStale(folder.id)
+        let unavailable = store.isUnavailable(folder.id)
         SettingRow(titleVerbatim: folder.displayName,
                    descriptionVerbatim: folder.displayPath,
                    isFirst: isFirst) {
             HStack(spacing: 6) {
-                if stale {
-                    Label("Stale", systemImage: "exclamationmark.triangle.fill")
+                if unavailable {
+                    Label("Unavailable", systemImage: "exclamationmark.triangle.fill")
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.warningText)
                     Button("Re-Add") {

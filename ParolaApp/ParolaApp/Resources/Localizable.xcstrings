@@ -12517,17 +12517,6 @@
         }
       }
     },
-    "Stale": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Non valida"
-          }
-        }
-      }
-    },
     "Standing by": {
       "extractionState": "manual",
       "localizations": {
@@ -14649,6 +14638,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Non assegnato"
+          }
+        }
+      }
+    },
+    "Unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non disponibile"
           }
         }
       }

@@ -23,10 +23,17 @@ actor ManualScheduler: FolderWatcherScheduler {
         let continuation: CheckedContinuation<Bool, Never>
     }
 
+    struct NoTickScheduled: Error {}
+
+    private struct ArrivalWaiter {
+        let id: UUID
+        let continuation: CheckedContinuation<Bool, Never>
+    }
+
     private var parked: [Parked] = []
     private var cancelledBeforeParking: Set<UUID> = []
     private var done: [CheckedContinuation<Void, Never>] = []
-    private var arrivalWaiters: [CheckedContinuation<Void, Never>] = []
+    private var arrivalWaiters: [ArrivalWaiter] = []
 
     var parkedCount: Int { parked.count }
 
@@ -43,11 +50,18 @@ actor ManualScheduler: FolderWatcherScheduler {
         }
     }
 
+    /// Fails instead of hanging when the watcher never schedules a tick.
     func advanceAndWait() async throws {
         if parked.isEmpty {
-            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                arrivalWaiters.append(cont)
+            let id = UUID()
+            Task {
+                try? await Task.sleep(for: .seconds(5))
+                self.expireWaiter(id)
             }
+            let arrived = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+                arrivalWaiters.append(ArrivalWaiter(id: id, continuation: cont))
+            }
+            guard arrived else { throw NoTickScheduled() }
         }
         let go = parked.removeFirst()
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
@@ -68,12 +82,17 @@ actor ManualScheduler: FolderWatcherScheduler {
                 parked.append(Parked(id: id, continuation: cont))
                 if let waiter = arrivalWaiters.first {
                     arrivalWaiters.removeFirst()
-                    waiter.resume()
+                    waiter.continuation.resume(returning: true)
                 }
             }
         } onCancel: {
             Task { await self.cancelParked(id) }
         }
+    }
+
+    private func expireWaiter(_ id: UUID) {
+        guard let index = arrivalWaiters.firstIndex(where: { $0.id == id }) else { return }
+        arrivalWaiters.remove(at: index).continuation.resume(returning: false)
     }
 
     private func cancelParked(_ id: UUID) {

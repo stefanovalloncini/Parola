@@ -125,4 +125,66 @@ struct WatchedFoldersStoreWatchingTests {
         #expect(await waitUntil { arrivals.names == ["settling.m4a"] })
         await store.stopWatching()
     }
+
+    @Test("a stale bookmark is refreshed and the renamed folder is watched under its new name")
+    func staleBookmarkIsRefreshed() async throws {
+        let rig = try makeRig("stale")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let renamed = rig.root.appendingPathComponent("Recordings", isDirectory: true)
+        try FileManager.default.moveItem(at: rig.folder, to: renamed)
+
+        let arrivals = Arrivals()
+        let store = makeStore(rig, arrivals: arrivals)
+        #expect(await waitUntil { store.folders.first?.displayName == "Recordings" })
+        #expect(!store.isUnavailable(rig.folderID))
+        let saved = try JSONDecoder().decode([WatchedFolder].self, from: #require(rig.defaults.data(forKey: "watchedFolders")))
+        #expect(saved.map(\.displayName) == ["Recordings"])
+
+        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        try writeSettled(renamed.appendingPathComponent("new.m4a"))
+        #expect(await waitUntil { arrivals.names == ["new.m4a"] })
+        await store.stopWatching()
+    }
+
+    @Test("renaming a watched folder moves the watch with it, and nothing already there arrives again")
+    func renamedFolderKeepsItsWatch() async throws {
+        let rig = try makeRig("rename")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        try writeSettled(rig.folder.appendingPathComponent("old.m4a"))
+
+        let arrivals = Arrivals()
+        let store = makeStore(rig, arrivals: arrivals)
+        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+
+        let renamed = rig.root.appendingPathComponent("Archive", isDirectory: true)
+        try FileManager.default.moveItem(at: rig.folder, to: renamed)
+        #expect(await waitUntil { store.folders.first?.displayName == "Archive" })
+        try writeSettled(renamed.appendingPathComponent("after-rename.wav"))
+
+        #expect(await waitUntil { arrivals.names.contains("after-rename.wav") })
+        #expect(arrivals.names == ["after-rename.wav"])
+        #expect(!store.isUnavailable(rig.folderID))
+        await store.stopWatching()
+    }
+
+    @Test("a watched folder deleted and made again is watched again after a retry")
+    func recreatedFolderIsWatchedAgain() async throws {
+        let rig = try makeRig("recreate")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+
+        let arrivals = Arrivals()
+        let store = makeStore(rig, arrivals: arrivals)
+        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+
+        try FileManager.default.removeItem(at: rig.folder)
+        #expect(await waitUntil { store.isUnavailable(rig.folderID) })
+
+        try FileManager.default.createDirectory(at: rig.folder, withIntermediateDirectories: true)
+        try writeSettled(rig.folder.appendingPathComponent("back.m4a"))
+        store.retryUnavailableFolders()
+
+        #expect(await waitUntil { arrivals.names == ["back.m4a"] })
+        #expect(!store.isUnavailable(rig.folderID))
+        await store.stopWatching()
+    }
 }
