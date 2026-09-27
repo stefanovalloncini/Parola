@@ -66,6 +66,12 @@ public actor LibrarySearchIndex {
         }
     }
 
+    /// Every indexed entry's opening, and the generation that names this set of them.
+    public struct Excerpts: Sendable, Equatable {
+        public let generation: Int
+        public let byEntry: [String: String]
+    }
+
     struct RebuildEntry: Sendable {
         let id: String
         let title: String
@@ -119,6 +125,8 @@ public actor LibrarySearchIndex {
         let boundaryOffsets: [Int]
         let boundaryCentiseconds: [Int]
         let fingerprint: String
+        /// Cut from `text` when the entry is indexed or loaded; nil when the body has nothing to quote.
+        let excerpt: String?
     }
 
     private struct SnapshotEntry: Codable, Sendable {
@@ -187,9 +195,13 @@ public actor LibrarySearchIndex {
     // v11: one file per entry under `entries/`, listed by `manifest.json`; older snapshots are discarded and rebuilt.
     private static let snapshotVersion = 11
     private static let noOffset = -1
+    /// The length a library row quotes; excerpts are cut once, at index time, to this.
+    public static let excerptLength = 240
 
     private var entries: [String: IndexedEntry] = [:]
     private var inverted: [String: Set<String>] = [:]
+    private var excerptsByEntry: [String: String] = [:]
+    private var excerptsGeneration = 0
     private var dirtyEntryIDs: Set<String> = []
     private var sortedTokens: [String]?
     private var isLoaded = false
@@ -290,7 +302,8 @@ public actor LibrarySearchIndex {
             offsets: tokens.map { tallies[$0]?.offset ?? Self.noOffset },
             boundaryOffsets: entry.boundaryOffsets,
             boundaryCentiseconds: entry.boundaryCentiseconds,
-            fingerprint: entry.fingerprint
+            fingerprint: entry.fingerprint,
+            excerpt: entry.excerpt
         )
         removeFromIndex(id)
         install(replaced, for: id)
@@ -301,6 +314,7 @@ public actor LibrarySearchIndex {
     public func remove(_ id: String) async {
         await ensureLoaded()
         removeFromIndex(id)
+        if excerptsByEntry.removeValue(forKey: id) != nil { excerptsGeneration &+= 1 }
         scheduleSave()
     }
 
@@ -353,18 +367,12 @@ public actor LibrarySearchIndex {
         return results
     }
 
-    /// The opening of every indexed entry's text, keyed by entry id, or nil when that is what `previous`
-    /// already holds. Reads the text the index has in memory, so a list can show what an entry says without
-    /// opening a bundle, and the comparison stays on this actor rather than on the caller's.
-    public func excerpts(maxLength: Int, changedFrom previous: [String: String]) async -> [String: String]? {
+    /// The opening of every indexed entry's text, keyed by entry id, or nil when `generation` already names it.
+    /// Excerpts are cut as entries are indexed, so a caller that is up to date pays nothing here.
+    public func excerpts(after generation: Int) async -> Excerpts? {
         await ensureLoaded()
-        var opening: [String: String] = [:]
-        opening.reserveCapacity(entries.count)
-        for (id, entry) in entries {
-            guard let excerpt = Self.excerpt(from: entry.text, maxLength: maxLength) else { continue }
-            opening[id] = excerpt
-        }
-        return opening == previous ? nil : opening
+        guard generation != excerptsGeneration else { return nil }
+        return Excerpts(generation: excerptsGeneration, byEntry: excerptsByEntry)
     }
 
     /// Runs of whitespace collapse to one space and the cut lands on the last word that fits,
@@ -429,7 +437,8 @@ public actor LibrarySearchIndex {
             offsets: existing.offsets,
             boundaryOffsets: existing.boundaryOffsets,
             boundaryCentiseconds: existing.boundaryCentiseconds,
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            excerpt: existing.excerpt
         )
         entries[id] = updated
         dirtyEntryIDs.insert(id)
@@ -448,6 +457,12 @@ public actor LibrarySearchIndex {
         sortedTokens = nil
         for entry in prepared {
             install(entry.entry, for: entry.id)
+        }
+        let kept = Set(prepared.map(\.id))
+        let dropped = excerptsByEntry.keys.filter { !kept.contains($0) }
+        if !dropped.isEmpty {
+            for id in dropped { excerptsByEntry.removeValue(forKey: id) }
+            excerptsGeneration &+= 1
         }
         rebuildNeed = .none
         // A library with nothing to index still needs its empty snapshot on disk, or every launch rescans.
@@ -468,6 +483,8 @@ public actor LibrarySearchIndex {
             entries = state.entries
             inverted = state.inverted
             sortedTokens = nil
+            excerptsByEntry = state.entries.compactMapValues(\.excerpt)
+            if !excerptsByEntry.isEmpty { excerptsGeneration &+= 1 }
         case .staleDiscarded:
             ParolaLog.notice(.libraryIndex, "search index snapshot discarded, rebuilding")
             rebuildNeed = .staleSnapshot
@@ -531,7 +548,8 @@ public actor LibrarySearchIndex {
                 offsets: entry.offsets,
                 boundaryOffsets: entry.boundaryOffsets,
                 boundaryCentiseconds: entry.boundaryCentiseconds,
-                fingerprint: entry.fingerprint
+                fingerprint: entry.fingerprint,
+                excerpt: excerpt(from: entry.text, maxLength: excerptLength)
             )
             for token in entry.tokens {
                 inverted[token, default: []].insert(entry.id)
@@ -633,12 +651,17 @@ public actor LibrarySearchIndex {
             offsets: tokens.map { tallies[$0]?.offset ?? noOffset },
             boundaryOffsets: boundaries.map(\.textOffset),
             boundaryCentiseconds: boundaries.map { centiseconds($0.seconds) },
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            excerpt: excerpt(from: text, maxLength: excerptLength)
         )
     }
 
     private func install(_ entry: IndexedEntry, for id: String) {
         entries[id] = entry
+        if excerptsByEntry[id] != entry.excerpt {
+            excerptsByEntry[id] = entry.excerpt
+            excerptsGeneration &+= 1
+        }
         dirtyEntryIDs.insert(id)
         var vocabularyGrew = false
         for token in entry.tokens {

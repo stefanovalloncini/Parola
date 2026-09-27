@@ -176,11 +176,11 @@ public actor LibraryStore {
             .map(\.match)
     }
 
-    /// The opening text of every indexed entry, so a list can show what an entry says, or nil when the
-    /// caller already holds it. The index answers from memory; nothing here reads a bundle.
-    public func excerpts(maxLength: Int = 240, changedFrom previous: [String: String]) async -> [String: String]? {
+    /// The opening text of every indexed entry, so a list can show what an entry says, or nil when
+    /// `generation` is the one the caller already holds. The index answers from memory; nothing here reads a bundle.
+    public func excerpts(after generation: Int) async -> LibrarySearchIndex.Excerpts? {
         await ensureSearchIndexReady()
-        return await searchIndex.excerpts(maxLength: maxLength, changedFrom: previous)
+        return await searchIndex.excerpts(after: generation)
     }
 
     /// Writes any pending debounced search-index snapshot to disk. Call before the app terminates.

@@ -1101,4 +1101,53 @@ final class LibrarySearchIndexTests {
         let new = await index2.search("retro")
         #expect(new.contains(where: { $0.entryID == "e2" }))
     }
+
+    @Test("excerpts are cut when an entry is indexed and a caller that is current gets nothing")
+    func excerptsCutAtIndexTime() async throws {
+        let (index, _) = makeTempIndex()
+        let text = "Il primo paragrafo   della riunione.\n\nSeconda riga."
+        await index.index(id: "e1", title: "Riunione", text: text, createdAt: Date())
+        await index.index(id: "e2", title: "Empty", text: "  ", createdAt: Date())
+
+        let first = try #require(await index.excerpts(after: 0))
+        #expect(first.byEntry == [
+            "e1": try #require(LibrarySearchIndex.excerpt(from: text, maxLength: LibrarySearchIndex.excerptLength)),
+        ])
+        #expect(await index.excerpts(after: first.generation) == nil)
+    }
+
+    @Test("the excerpt generation moves only when an excerpt does")
+    func excerptGenerationFollowsTheText() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(id: "e1", title: "Notes", text: "sprint planning", createdAt: Date())
+        let start = try #require(await index.excerpts(after: 0)).generation
+
+        await index.index(id: "e1", title: "Renamed notes", text: "sprint planning", createdAt: Date())
+        _ = await index.replaceAuxiliaryText("", with: "A summary", for: "e1")
+        #expect(await index.excerpts(after: start) == nil)
+
+        await index.index(id: "e1", title: "Renamed notes", text: "retro feedback", createdAt: Date())
+        let edited = try #require(await index.excerpts(after: start))
+        #expect(edited.byEntry == ["e1": "retro feedback"])
+
+        await index.remove("e1")
+        let removed = try #require(await index.excerpts(after: edited.generation))
+        #expect(removed.byEntry.isEmpty)
+    }
+
+    @Test("excerpts come back with a loaded snapshot and leave with a rebuild that drops the entry")
+    func excerptsFollowLoadAndRebuild() async throws {
+        let (index1, url) = makeTempIndex()
+        await index1.index(id: "e1", title: "Notes", text: "sprint planning", createdAt: Date())
+        await index1.index(id: "e2", title: "Other", text: "retro feedback", createdAt: Date())
+        await index1.flush()
+
+        let index2 = LibrarySearchIndex(indexDirectory: url)
+        let loaded = try #require(await index2.excerpts(after: 0))
+        #expect(loaded.byEntry == ["e1": "sprint planning", "e2": "retro feedback"])
+
+        await index2.rebuild(entries: [.init(id: "e2", title: "Other", text: "retro feedback")])
+        let rebuilt = try #require(await index2.excerpts(after: loaded.generation))
+        #expect(rebuilt.byEntry == ["e2": "retro feedback"])
+    }
 }

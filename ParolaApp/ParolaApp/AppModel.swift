@@ -1313,6 +1313,7 @@ final class AppModel {
     }
     private(set) var libraryExcerptsVersion: Int = 0
     @ObservationIgnored var libraryExcerptsTask: Task<Void, Never>?
+    @ObservationIgnored var libraryExcerptsGeneration = 0
     @ObservationIgnored var searchTask: Task<Void, Never>?
     @ObservationIgnored var libraryRefreshTask: Task<Void, Never>?
     /// How many scans `refreshLibrary()` has started, so a test can bound them.

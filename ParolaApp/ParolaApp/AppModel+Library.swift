@@ -104,16 +104,16 @@ extension AppModel {
         }
     }
 
-    /// Rows quote a transcript's first lines; the index is the only place that text is already in memory.
+    /// Rows quote a transcript's first lines; the index cuts them as it indexes and names each set with a generation.
     func refreshLibraryExcerpts() {
         libraryExcerptsTask?.cancel()
-        // The store compares against what is already on screen, so the main actor never walks the map.
-        let known = libraryExcerpts
+        let known = libraryExcerptsGeneration
         libraryExcerptsTask = Task { [weak self] in
             guard let self else { return }
-            guard let excerpts = await library.excerpts(changedFrom: known) else { return }
+            guard let excerpts = await library.excerpts(after: known) else { return }
             guard !Task.isCancelled else { return }
-            libraryExcerpts = excerpts
+            libraryExcerptsGeneration = excerpts.generation
+            libraryExcerpts = excerpts.byEntry
         }
     }
 

@@ -748,6 +748,27 @@ struct AppModelLibraryTests {
         #expect(model.libraryEntries.map(\.id) == [entry.id])
     }
 
+    @Test("rows quote what the index cut, and a refresh that changed nothing leaves the quotes alone")
+    func excerptsLandOnceAndStay() async throws {
+        let model = makeModel()
+        let entry = try await model.library.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "The opening line of the take.")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil
+        )
+        await model.refreshLibraryAndWait()
+        await waitUntil { model.libraryExcerpts[entry.id] != nil }
+        #expect(model.libraryExcerpts[entry.id] == "The opening line of the take.")
+        let version = model.libraryExcerptsVersion
+
+        await model.refreshLibraryAndWait()
+        await model.libraryExcerptsTask?.value
+        #expect(model.libraryExcerptsVersion == version)
+    }
+
     @Test("a superseded refresh does not overwrite libraryEntries with its stale snapshot")
     func cancelledRefreshDoesNotClobber() async throws {
         let model = makeModel()
