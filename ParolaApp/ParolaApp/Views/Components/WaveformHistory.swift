@@ -16,7 +16,7 @@ struct LevelHistory: Equatable, Sendable {
     }
 }
 
-/// Ticks at `interval` while the capture hears sound and only polls a second after it stops, so silence isn't redrawn.
+/// Ticks at `interval` while the capture hears sound; a second after it stops, polls four times a second for its return.
 struct LevelMeterSchedule: TimelineSchedule {
     static let interval: TimeInterval = 1.0 / 30.0
     static let restingPoll: TimeInterval = 0.25
@@ -24,11 +24,15 @@ struct LevelMeterSchedule: TimelineSchedule {
 
     let meter: LevelMeter
 
+    static func isResting(lastSound: ContinuousClock.Instant?, now: ContinuousClock.Instant) -> Bool {
+        guard let lastSound else { return true }
+        return lastSound.duration(to: now) >= restAfter
+    }
+
     /// The step to the next frame, read from the meter as each one is asked for.
     static func step(lastSound: ContinuousClock.Instant?, now: ContinuousClock.Instant, mode: Mode) -> TimeInterval {
         guard mode == .normal else { return 1 }
-        guard let lastSound, lastSound.duration(to: now) < restAfter else { return restingPoll }
-        return interval
+        return isResting(lastSound: lastSound, now: now) ? restingPoll : interval
     }
 
     func entries(from startDate: Date, mode: Mode) -> Entries {
@@ -62,12 +66,14 @@ final class LevelTrace {
         history = LevelHistory(capacity: capacity)
     }
 
-    /// One sample per frame date, however often SwiftUI evaluates that frame.
-    func samples(at date: Date, reading meter: LevelMeter) -> [Float] {
-        if date != sampledAt {
-            sampledAt = date
-            history.append(meter.takePeak())
-        }
+    /// One sample per frame date, however often SwiftUI evaluates that frame. A resting poll adds none, so the bars
+    /// hold still in silence instead of crawling at the poll's pace.
+    func samples(at date: Date, reading meter: LevelMeter, now: ContinuousClock.Instant = .now) -> [Float] {
+        guard date != sampledAt else { return history.samples }
+        sampledAt = date
+        // Read even at rest, so the first bar after the silence is not the peak from before it.
+        let peak = meter.takePeak()
+        if !LevelMeterSchedule.isResting(lastSound: meter.lastSound, now: now) { history.append(peak) }
         return history.samples
     }
 }

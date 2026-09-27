@@ -35,6 +35,26 @@ struct LevelMeterDisplayTests {
         }
     }
 
+    @Test("a resting poll leaves the bars where they were, and sound starts them moving again")
+    @MainActor
+    func restingFramesHoldTheBars() {
+        let meter = LevelMeter()
+        let trace = LevelTrace(capacity: 4)
+        let frame = Date()
+        meter.record(0.8)
+        let heard = ContinuousClock.now
+        #expect(trace.samples(at: frame, reading: meter, now: heard) == [0, 0, 0, 0.8])
+
+        meter.record(0.01)
+        let resting = heard + LevelMeterSchedule.restAfter
+        #expect(LevelMeterSchedule.isResting(lastSound: meter.lastSound, now: resting))
+        #expect(trace.samples(at: frame.addingTimeInterval(1), reading: meter, now: resting) == [0, 0, 0, 0.8])
+        #expect(trace.samples(at: frame.addingTimeInterval(1.25), reading: meter, now: resting) == [0, 0, 0, 0.8])
+
+        meter.record(0.6)
+        #expect(trace.samples(at: frame.addingTimeInterval(1.5), reading: meter) == [0, 0, 0.8, 0.6])
+    }
+
     @Test("a frame samples the meter once, however often it is drawn, and keeps the peak between frames")
     @MainActor
     func traceSamplesOncePerFrame() {
