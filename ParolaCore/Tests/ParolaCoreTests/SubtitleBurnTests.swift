@@ -79,6 +79,26 @@ struct SubtitleBurnTests {
         #expect(abs(ratios[0] - ratios[1]) / ratios[0] < 0.2, "caption height share 720p \(ratios[0]) vs 2160p \(ratios[1])")
     }
 
+    @Test("a portrait clip stays portrait, with the caption at the bottom of what plays")
+    func rotatedSourceKeepsItsOrientation() async throws {
+        let dir = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let src = dir.appendingPathComponent("src.mp4")
+        let out = dir.appendingPathComponent("out.mp4")
+        try await writeBlackVideo(
+            to: src, width: 320, height: 240, seconds: 1.0, transform: CGAffineTransform(rotationAngle: .pi / 2)
+        )
+
+        try await SubtitleBurner.burn(transcript: oneCue(), video: src, to: out)
+
+        let image = try await frame(of: out, atSeconds: 0.5, maxHeight: 320)
+        #expect(image.width == 240)
+        #expect(image.height == 320)
+        let rows = brightRows(in: image)
+        #expect(!rows.isEmpty)
+        #expect(rows.allSatisfy { $0 > image.height * 2 / 3 }, "caption rows \(rows.first ?? -1)…\(rows.last ?? -1) of \(image.height)")
+    }
+
     @Test("renderTextImage rasterizes glyphs and returns nil for empty text")
     func renderTextImageProducesGlyphs() throws {
         let font = Format.cascadingFont(name: "Helvetica-Bold", size: 28, language: "unknown")
@@ -120,22 +140,27 @@ private func frame(of video: URL, atSeconds seconds: Double, maxHeight: CGFloat)
 }
 
 private func brightRowCount(in image: CGImage, threshold: Int = 180) -> Int {
+    brightRows(in: image, threshold: threshold).count
+}
+
+/// Row indices from the top of the image that hold at least one bright pixel.
+private func brightRows(in image: CGImage, threshold: Int = 180) -> [Int] {
     let width = image.width
     let height = image.height
     var data = [UInt8](repeating: 0, count: width * height * 4)
     guard let ctx = CGContext(
         data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
         space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else { return 0 }
+    ) else { return [] }
     ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-    var rows = 0
+    var rows: [Int] = []
     for row in 0..<height {
         let base = row * width * 4
         for column in 0..<width {
             let i = base + column * 4
             let luma = (Int(data[i]) * 299 + Int(data[i + 1]) * 587 + Int(data[i + 2]) * 114) / 1000
             if luma > threshold {
-                rows += 1
+                rows.append(row)
                 break
             }
         }
@@ -161,7 +186,9 @@ private final class ProgressReports: @unchecked Sendable {
     }
 }
 
-private func writeBlackVideo(to url: URL, width: Int, height: Int, seconds: Double, fps: Int32 = 30) async throws {
+private func writeBlackVideo(
+    to url: URL, width: Int, height: Int, seconds: Double, fps: Int32 = 30, transform: CGAffineTransform = .identity
+) async throws {
     let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
     let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
         AVVideoCodecKey: AVVideoCodecType.h264,
@@ -176,6 +203,7 @@ private func writeBlackVideo(to url: URL, width: Int, height: Int, seconds: Doub
             kCVPixelBufferHeightKey as String: height,
         ]
     )
+    input.transform = transform
     writer.add(input)
     guard writer.startWriting() else { throw writer.error ?? CocoaError(.fileWriteUnknown) }
     writer.startSession(atSourceTime: .zero)

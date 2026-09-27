@@ -1,9 +1,10 @@
 import Foundation
 import AVFoundation
+import CoreImage
 import CoreMedia
 import CoreGraphics
 import CoreText
-import QuartzCore
+import os
 
 /// Burns transcript segments into a video as open captions. Pure AVFoundation, no `ffmpeg` dependency.
 public enum SubtitleBurner {
@@ -81,34 +82,26 @@ public enum SubtitleBurner {
             )
         }
 
-        let videoComposition = AVMutableVideoComposition()
+        let captions = try BurnCaptionTrack(
+            cues: cues(from: transcript),
+            language: transcript.language,
+            metrics: CaptionMetrics(style: style, renderSize: renderSize),
+            renderSize: renderSize
+        )
+        // One caption drawn over each frame as it is composed; no layer tree holds every cue for the whole export.
+        let videoComposition = try await AVMutableVideoComposition.videoComposition(
+            with: composition,
+            applyingCIFiltersWithHandler: { request in
+                let frame = request.sourceImage
+                guard let caption = captions.image(at: request.compositionTime.seconds) else {
+                    request.finish(with: frame, context: nil)
+                    return
+                }
+                request.finish(with: caption.composited(over: frame).cropped(to: frame.extent), context: nil)
+            }
+        )
         videoComposition.renderSize = renderSize
         videoComposition.frameDuration = frameDuration(minFrameDuration: minFrameDuration, nominalFrameRate: nominalFrameRate)
-
-        let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compVideoTrack)
-        layerInstruction.setTransform(preferredTransform, at: .zero)
-
-        // Captions ride on their own track id: the animation tool's postProcessingAsVideoLayer
-        // variant drops the source video and exports solid white frames on macOS 26 and 27.
-        let overlayTrackID = composition.unusedTrackID()
-        let overlayInstruction = AVMutableVideoCompositionLayerInstruction()
-        overlayInstruction.trackID = overlayTrackID
-
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = CMTimeRangeMake(start: .zero, duration: assetDuration)
-        // Front to back: captions first, video behind them.
-        instruction.layerInstructions = [overlayInstruction, layerInstruction]
-        videoComposition.instructions = [instruction]
-
-        videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
-            additionalLayer: makeOverlayLayer(
-                transcript: transcript,
-                duration: CMTimeGetSeconds(assetDuration),
-                renderSize: renderSize,
-                metrics: CaptionMetrics(style: style, renderSize: renderSize)
-            ),
-            asTrackID: overlayTrackID
-        )
 
         if FileManager.default.fileExists(atPath: output.path) {
             try FileManager.default.removeItem(at: output)
@@ -155,7 +148,7 @@ public enum SubtitleBurner {
     }
 
     /// A style's sizes scaled to one frame.
-    struct CaptionMetrics {
+    struct CaptionMetrics: Sendable {
         let fontName: String
         let fontSize: CGFloat
         let bottomInset: CGFloat
@@ -176,74 +169,15 @@ public enum SubtitleBurner {
         }
     }
 
-    private static func makeOverlayLayer(
-        transcript: Transcript,
-        duration: TimeInterval,
-        renderSize: CGSize,
-        metrics: CaptionMetrics
-    ) -> CALayer {
-        let parentLayer = CALayer()
-        parentLayer.frame = CGRect(origin: .zero, size: renderSize)
-
+    static func cues(from transcript: Transcript) throws -> [BurnCue] {
+        var cues: [BurnCue] = []
+        cues.reserveCapacity(transcript.segments.count)
         for segment in transcript.segments {
-            let textLayer = makeTextLayer(
-                text: segment.text,
-                language: transcript.language,
-                metrics: metrics,
-                renderSize: renderSize
-            )
-            attachVisibility(
-                layer: textLayer,
-                segmentID: segment.id,
-                start: segment.start,
-                end: segment.end,
-                totalDuration: duration
-            )
-            parentLayer.addSublayer(textLayer)
+            try Task.checkCancellation()
+            let start = max(segment.start, 0)
+            cues.append(BurnCue(start: start, end: max(segment.end, start + 0.05), text: segment.text))
         }
-
-        return parentLayer
-    }
-
-    private static func makeTextLayer(text: String, language: String, metrics: CaptionMetrics, renderSize: CGSize) -> CALayer {
-        let layer = CALayer()
-        layer.contentsScale = 2
-
-        let horizontalInset = metrics.horizontalInset
-        let maxWidth = renderSize.width - horizontalInset * 2
-        let maxHeight = max(metrics.fontSize * 3, 80)
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let font = Format.cascadingFont(name: metrics.fontName, size: metrics.fontSize, language: language)
-
-        // Rasterize only the measured text bounds: every layer stays alive for the whole export,
-        // and full-width bitmaps add up to gigabytes on hour-long transcripts.
-        let measured = measureCaption(trimmed, font: font, maxWidth: maxWidth)
-        let width = min(maxWidth, measured.width + 4)
-        let height = min(maxHeight, measured.height + 2)
-        layer.frame = CGRect(
-            x: horizontalInset + ((maxWidth - width) / 2).rounded(),
-            y: metrics.bottomInset + ((maxHeight - height) / 2).rounded(),
-            width: width,
-            height: height
-        )
-
-        // CATextLayer draws no glyphs inside AVVideoCompositionCoreAnimationTool's export; rasterize via Core Text and composite as contents.
-        if let image = renderTextImage(
-            text: trimmed,
-            font: font,
-            color: metrics.textColor,
-            size: layer.bounds.size,
-            scale: layer.contentsScale
-        ) {
-            layer.contents = image
-        }
-
-        layer.opacity = 0
-        layer.shadowColor = metrics.strokeColor
-        layer.shadowOpacity = 1
-        layer.shadowRadius = metrics.strokeWidth
-        layer.shadowOffset = .zero
-        return layer
+        return cues.sorted { $0.start < $1.start }
     }
 
     static func measureCaption(_ text: String, font: CTFont, maxWidth: CGFloat) -> CGSize {
@@ -274,13 +208,26 @@ public enum SubtitleBurner {
         ])
     }
 
-    static func renderTextImage(text: String, font: CTFont, color: CGColor, size: CGSize, scale: CGFloat) -> CGImage? {
+    /// The dark halo that keeps a caption readable on a bright frame.
+    struct Outline {
+        let color: CGColor
+        let blur: CGFloat
+
+        /// How far the halo reaches past the text, and so the margin the bitmap needs around it.
+        var padding: CGFloat { (blur * 1.5).rounded(.up) }
+    }
+
+    /// The text laid out in a `size` box, with `outline.padding` of margin on every side when there is a halo.
+    static func renderTextImage(
+        text: String, font: CTFont, color: CGColor, size: CGSize, scale: CGFloat, outline: Outline? = nil
+    ) -> CGImage? {
         guard !text.isEmpty, size.width > 0, size.height > 0 else { return nil }
 
         let attributed = captionText(text, font: font, color: color)
+        let padding = outline.map(\.padding) ?? 0
 
-        let pixelWidth = Int((size.width * scale).rounded())
-        let pixelHeight = Int((size.height * scale).rounded())
+        let pixelWidth = Int(((size.width + padding * 2) * scale).rounded())
+        let pixelHeight = Int(((size.height + padding * 2) * scale).rounded())
         guard pixelWidth > 0, pixelHeight > 0,
               let ctx = CGContext(
                 data: nil,
@@ -292,6 +239,9 @@ public enum SubtitleBurner {
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
               ) else { return nil }
         ctx.scaleBy(x: scale, y: scale)
+        if let outline, outline.blur > 0 {
+            ctx.setShadow(offset: .zero, blur: outline.blur, color: outline.color)
+        }
 
         let framesetter = CTFramesetterCreateWithAttributedString(attributed)
         let fullRange = CFRangeMake(0, attributed.length)
@@ -300,41 +250,11 @@ public enum SubtitleBurner {
             CGSize(width: size.width, height: .greatestFiniteMagnitude), nil
         )
         let textHeight = min(suggested.height.rounded(.up), size.height)
-        let originY = ((size.height - textHeight) / 2).rounded()
-        let path = CGPath(rect: CGRect(x: 0, y: originY, width: size.width, height: textHeight), transform: nil)
+        let originY = padding + ((size.height - textHeight) / 2).rounded()
+        let path = CGPath(rect: CGRect(x: padding, y: originY, width: size.width, height: textHeight), transform: nil)
         let frame = CTFramesetterCreateFrame(framesetter, fullRange, path, nil)
         CTFrameDraw(frame, ctx)
         return ctx.makeImage()
-    }
-
-    private static func attachVisibility(
-        layer: CALayer,
-        segmentID: Int,
-        start: Double,
-        end: Double,
-        totalDuration: TimeInterval
-    ) {
-        let beginAt = max(start, 0.0001)
-        let endAt = max(end, beginAt + 0.05)
-
-        let appear = CABasicAnimation(keyPath: "opacity")
-        appear.fromValue = 0
-        appear.toValue = 1
-        appear.beginTime = beginAt
-        appear.duration = 0.05
-        appear.fillMode = .forwards
-        appear.isRemovedOnCompletion = false
-
-        let disappear = CABasicAnimation(keyPath: "opacity")
-        disappear.fromValue = 1
-        disappear.toValue = 0
-        disappear.beginTime = endAt
-        disappear.duration = 0.05
-        disappear.fillMode = .forwards
-        disappear.isRemovedOnCompletion = false
-
-        layer.add(appear, forKey: "appear-\(segmentID)")
-        layer.add(disappear, forKey: "disappear-\(segmentID)")
     }
 
     static func renderSize(naturalSize: CGSize, transform: CGAffineTransform) -> CGSize {
@@ -342,5 +262,85 @@ public enum SubtitleBurner {
         return isRotated
             ? CGSize(width: naturalSize.height, height: naturalSize.width)
             : naturalSize
+    }
+}
+
+/// One caption as the burn draws it.
+struct BurnCue: Sendable, Equatable {
+    let start: Double
+    let end: Double
+    let text: String
+}
+
+/// A burn's captions, looked up per frame. Only a cue that reaches the screen is rasterised, and only the
+/// last two stay, so memory holds flat however long the transcript runs.
+final class BurnCaptionTrack: Sendable {
+    private struct Rendered {
+        let index: Int
+        let image: CIImage?
+    }
+
+    private struct Recent {
+        var entries: [Rendered] = []
+    }
+
+    private let cues: [BurnCue]
+    private let starts: [Double]
+    private let metrics: SubtitleBurner.CaptionMetrics
+    private let renderSize: CGSize
+    private let language: String
+    private let recent = OSAllocatedUnfairLock(initialState: Recent())
+
+    init(cues: [BurnCue], language: String, metrics: SubtitleBurner.CaptionMetrics, renderSize: CGSize) throws {
+        self.cues = cues
+        starts = cues.map(\.start)
+        self.metrics = metrics
+        self.renderSize = renderSize
+        self.language = language
+    }
+
+    /// The caption on screen at `seconds`, placed in frame coordinates, or nil between cues.
+    func image(at seconds: Double) -> CIImage? {
+        guard let index = cueIndex(at: seconds) else { return nil }
+        return recent.withLock { recent in
+            if let hit = recent.entries.first(where: { $0.index == index }) { return hit.image }
+            let image = rasterize(cues[index])
+            recent.entries.append(Rendered(index: index, image: image))
+            if recent.entries.count > 2 { recent.entries.removeFirst() }
+            return image
+        }
+    }
+
+    var cachedCueCount: Int { recent.withLock { $0.entries.count } }
+
+    /// The cue that started last at or before `seconds`, if it hasn't ended.
+    func cueIndex(at seconds: Double) -> Int? {
+        var low = 0
+        var high = starts.count
+        while low < high {
+            let mid = (low + high) / 2
+            if starts[mid] <= seconds { low = mid + 1 } else { high = mid }
+        }
+        let index = low - 1
+        guard index >= 0, seconds < cues[index].end else { return nil }
+        return index
+    }
+
+    private func rasterize(_ cue: BurnCue) -> CIImage? {
+        let text = cue.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let font = Format.cascadingFont(name: metrics.fontName, size: metrics.fontSize, language: language)
+        let maxWidth = renderSize.width - metrics.horizontalInset * 2
+        let measured = SubtitleBurner.measureCaption(text, font: font, maxWidth: maxWidth)
+        let box = CGSize(width: min(maxWidth, measured.width + 4), height: measured.height + 2)
+        let outline = metrics.strokeWidth > 0
+            ? SubtitleBurner.Outline(color: metrics.strokeColor, blur: metrics.strokeWidth * 2)
+            : nil
+        guard let bitmap = SubtitleBurner.renderTextImage(
+            text: text, font: font, color: metrics.textColor, size: box, scale: 1, outline: outline
+        ) else { return nil }
+        let padding = outline?.padding ?? 0
+        let x = ((renderSize.width - CGFloat(bitmap.width)) / 2).rounded()
+        let y = (metrics.bottomInset - padding).rounded()
+        return CIImage(cgImage: bitmap).transformed(by: CGAffineTransform(translationX: x, y: y))
     }
 }
