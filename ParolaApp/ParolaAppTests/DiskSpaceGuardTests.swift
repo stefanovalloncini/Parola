@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import Parola
 import ParolaCore
@@ -77,18 +78,20 @@ extension TranscriberMockSuites {
         }
 
         @Test("startRecording refuses below the floor with a clear failure")
-        func startRefusesWhenNearlyFull() {
+        func startRefusesWhenNearlyFull() async {
             let model = makeModel()
             model.freeDiskSpaceProvider = { 100_000_000 }
 
             model.startRecording(source: .microphone)
 
-            guard case .failed(let message) = model.phase else {
-                Issue.record("expected .failed, got \(model.phase)")
-                return
+            let refused = await waitUntil {
+                if case .failed = model.phase { return true }
+                return false
             }
-            #expect(message.contains("200 MB"))
+            #expect(refused)
+            if case .failed(let message) = model.phase { #expect(message.contains("200 MB")) }
             #expect(model.liveSource == nil)
+            #expect(await waitUntil { !model.recordingActive })
         }
 
         @Test("startRecording below 1 GB warns but still records")
@@ -104,46 +107,78 @@ extension TranscriberMockSuites {
 
                 model.startRecording(source: .microphone)
 
-                #expect(model.recordingDiskSpaceLow)
                 let started = await waitUntil { self.isRecording(model) }
                 #expect(started)
+                #expect(model.recordingDiskSpaceLow)
                 model.cancelCurrentWork()
             }
         }
 
         @Test("startRecording with plenty of space clears a stale warning")
-        func startClearsStaleWarning() {
+        func startClearsStaleWarning() async throws {
+            let fixture = try makeSilentWAV()
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+
+                let model = makeModel()
+                model.useStreaming = false
+                model.recordingDiskSpaceLow = true
+                model.recordingCountInSeconds = 0
+                model.freeDiskSpaceProvider = { 50_000_000_000 }
+
+                model.startRecording(source: .microphone)
+
+                #expect(await waitUntil { self.isRecording(model) })
+                #expect(!model.recordingDiskSpaceLow)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("the free-space query never runs on the main thread, at the start or during a take")
+        func queryRunsOffMain() async {
             let model = makeModel()
-            model.recordingDiskSpaceLow = true
-            model.recordingCountInSeconds = 3
-            model.freeDiskSpaceProvider = { 50_000_000_000 }
+            let onMain = OSAllocatedUnfairLock<[Bool]>(initialState: [])
+            model.freeDiskSpaceProvider = {
+                onMain.withLock { $0.append(Thread.isMainThread) }
+                return 100_000_000
+            }
 
             model.startRecording(source: .microphone)
+            _ = await waitUntil { !model.recordingActive }
+            model.phase = .recording(source: .microphone)
+            await model.checkRecordingDiskSpace()
 
-            #expect(!model.recordingDiskSpaceLow)
-            model.cancelRecordingCountdown()
+            #expect(onMain.withLock { $0 } == [false, false])
+        }
+
+        @Test("a scratch folder the first take has not made yet is statted through its parent")
+        func scratchVolumeBeforeTheFolderExists() {
+            let parent = FileManager.default.temporaryDirectory
+            let missing = parent.appendingPathComponent("parola-scratch-\(UUID().uuidString)/inflight", isDirectory: true)
+            #expect(AppModel.existingAncestor(of: missing).standardizedFileURL.path == parent.standardizedFileURL.path)
+            #expect(AppModel.existingAncestor(of: parent).standardizedFileURL.path == parent.standardizedFileURL.path)
         }
 
         @Test("checkRecordingDiskSpace flips the warning both ways while recording")
-        func midRecordingWarnAndClear() {
+        func midRecordingWarnAndClear() async {
             let model = makeModel()
             model.phase = .recording(source: .microphone)
 
             model.freeDiskSpaceProvider = { 500_000_000 }
-            model.checkRecordingDiskSpace()
+            await model.checkRecordingDiskSpace()
             #expect(model.recordingDiskSpaceLow)
 
             model.freeDiskSpaceProvider = { 50_000_000_000 }
-            model.checkRecordingDiskSpace()
+            await model.checkRecordingDiskSpace()
             #expect(!model.recordingDiskSpaceLow)
         }
 
         @Test("checkRecordingDiskSpace does nothing outside a recording")
-        func checkIgnoredWhenNotRecording() {
+        func checkIgnoredWhenNotRecording() async {
             let model = makeModel()
             model.freeDiskSpaceProvider = { 0 }
 
-            model.checkRecordingDiskSpace()
+            await model.checkRecordingDiskSpace()
 
             #expect(model.phase == .idle)
             #expect(!model.recordingDiskSpaceLow)
@@ -168,7 +203,7 @@ extension TranscriberMockSuites {
                 #expect(started)
 
                 model.freeDiskSpaceProvider = { 100_000_000 }
-                model.checkRecordingDiskSpace()
+                await model.checkRecordingDiskSpace()
 
                 let stopped = await waitUntil {
                     if case .failed = model.phase { return true }

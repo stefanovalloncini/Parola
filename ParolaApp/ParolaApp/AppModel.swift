@@ -351,7 +351,7 @@ final class AppModel {
     @ObservationIgnored var pendingDictationProcessorRebuild: Task<Void, Never>?
 
     var recordingDiskSpaceLow: Bool = false
-    @ObservationIgnored var freeDiskSpaceProvider: () -> Int64? = { AppModel.systemFreeDiskSpace() }
+    @ObservationIgnored var freeDiskSpaceProvider: @Sendable () -> Int64? = { AppModel.systemFreeDiskSpace() }
 
     var batchJobs: [BatchJob] = [] {
         didSet {
@@ -2783,7 +2783,6 @@ final class AppModel {
             return
         }
         guard !recordingActive else { return }
-        guard applyPreRecordingDiskCheck() else { return }
         let countIn = max(0, recordingCountInSeconds)
         // The countdown overlay renders only in the main window; with no window visible
         // (global hotkey, menu bar) it would delay the take invisibly and uncancellably.
@@ -2841,9 +2840,6 @@ final class AppModel {
     private func beginRecordingNow(source: RecordSource) {
         pendingRecordingSource = source.entrySource
         let config = recordingMediaConfig(for: source)
-        // A recording replaces any transcription in flight, like a user file-open does;
-        // otherwise the old run would finish later and stomp the new take's transcript.
-        cancelTranscriptionRuns()
         recordingStartInFlight = true
         stopRequestedDuringStart = false
         Task {
@@ -2851,6 +2847,14 @@ final class AppModel {
                 recordingStartInFlight = false
                 stopRequestedDuringStart = false
             }
+            // Before anything is cancelled: a take refused for space leaves what was running alone.
+            guard await passesPreRecordingDiskCheck() else {
+                resolveRecordingOutcome(.failure(IntentActionError.failed(Self.diskSpaceRefusalMessage())))
+                return
+            }
+            // A recording replaces any transcription in flight, like a user file-open does;
+            // otherwise the old run would finish later and stomp the new take's transcript.
+            cancelTranscriptionRuns()
             let captureTargets = pendingCaptureBundleIDs ?? []
             pendingCaptureBundleIDs = nil
             if source == .microphone, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {

@@ -141,7 +141,7 @@ extension AppModel {
                 try? await Task.sleep(for: .seconds(30), clock: clock)
                 if Task.isCancelled { return }
                 guard let self else { return }
-                self.checkRecordingDiskSpace()
+                await self.checkRecordingDiskSpace()
                 if checkpoints { self.writeRecordingCheckpoint() }
             }
         }
