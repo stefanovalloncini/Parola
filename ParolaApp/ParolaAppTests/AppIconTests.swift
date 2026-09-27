@@ -193,12 +193,12 @@ struct AppIconTests {
         #expect(distance(backgrounds[.blue]!, backgrounds[.pink]!) > 0.2)
     }
 
-    @Test("the rendered icon carries a full ladder of representations")
+    @Test("the rendered icon carries a ladder of representations up to what the Dock draws")
     @MainActor
     func imageHasRepresentations() {
         let image = DockIcon.image(DockIcon.colors(accent: RGBA(0.20, 0.49, 0.96)))
         let sizes = Set(image.representations.map(\.pixelsWide)).sorted()
-        #expect(sizes == [16, 32, 64, 128, 256, 512, 1024])
-        #expect(image.size.width == 1024)
+        #expect(sizes == [16, 32, 64, 128, 256, 512])
+        #expect(image.size.width == 512)
     }
 }

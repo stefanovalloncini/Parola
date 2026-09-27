@@ -969,7 +969,7 @@ final class AppModel {
     }
 
     func applyCustomPalette(_ palette: ThemePalette) {
-        guard let data = try? JSONEncoder().encode(palette),
+        guard let data = try? AppModel.sharedJSONEncoder.encode(palette),
               let json = String(data: data, encoding: .utf8) else { return }
         themeCustomPaletteJSON = json
         themeIsCustom = true
@@ -992,7 +992,7 @@ final class AppModel {
 
     /// Saved at once but painted only when the edit ends: repainting mid-edit pulls the well from under the open colour panel.
     func previewCustomPalette(_ palette: ThemePalette) {
-        guard let data = try? JSONEncoder().encode(palette),
+        guard let data = try? AppModel.sharedJSONEncoder.encode(palette),
               let json = String(data: data, encoding: .utf8) else { return }
         themeCustomPaletteJSON = json
         themeIsCustom = true

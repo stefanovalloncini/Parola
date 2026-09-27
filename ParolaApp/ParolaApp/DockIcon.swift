@@ -13,7 +13,9 @@ enum DockIcon {
     static let cream = RGBA(0.99, 0.95, 0.90)
     static let ink = RGBA(0.10, 0.10, 0.10)
 
-    private static let repSizes = Set(AppIconArtwork.sizes.map(\.pixels)).sorted()
+    /// The Dock draws at most 256 pt on a 2x screen, so a 1024 px rep only adds to what each assignment ships.
+    private static let largestRep = 512
+    private static let repSizes = Set(AppIconArtwork.sizes.map(\.pixels)).filter { $0 <= largestRep }.sorted()
     private static var rendered: Colors?
 
     static func refresh() {
@@ -42,7 +44,7 @@ enum DockIcon {
     }
 
     static func image(_ colors: Colors) -> NSImage {
-        let largest = repSizes.last ?? 1024
+        let largest = repSizes.last ?? largestRep
         let image = NSImage(size: NSSize(width: largest, height: largest))
         for pixels in repSizes {
             guard let cgImage = AppIconArtwork.cgImage(
