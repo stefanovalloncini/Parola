@@ -771,6 +771,7 @@ extension AppModel {
             searchRanking = nil
             searchMatches = [:]
             searchSnippetIDs = []
+            searchResultsQuery = nil
             return
         }
         // Results land in the content area, so a query typed from Statistics or the trash has to leave the page.
@@ -791,9 +792,26 @@ extension AppModel {
                 await refreshLibraryAndWait()
                 guard !Task.isCancelled else { return }
             }
-            searchMatches = Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0) })
-            searchSnippetIDs = Set(matches.prefix(LibrarySearchResults.pageSize).map(\.entryID))
-            searchRanking = matches.map(\.entryID)
+            var published = matches
+            var filled = Set(matches.prefix(LibrarySearchResults.pageSize).map(\.entryID))
+            // The same query re-run after a library change keeps the snippets the list already asked for.
+            if q == searchResultsQuery {
+                let shown = searchSnippetIDs.subtracting(filled)
+                let refill = matches.filter { shown.contains($0.entryID) }
+                if !refill.isEmpty {
+                    let refilled = await library.withSnippets(refill, query: q)
+                    guard !Task.isCancelled else { return }
+                    let byID = Dictionary(uniqueKeysWithValues: refilled.map { ($0.entryID, $0) })
+                    published = matches.map { byID[$0.entryID] ?? $0 }
+                    filled.formUnion(byID.keys)
+                }
+            }
+            let askedMeanwhile = searchSnippetIDs.subtracting(filled)
+            searchMatches = Dictionary(uniqueKeysWithValues: published.map { ($0.entryID, $0) })
+            searchSnippetIDs = filled
+            searchResultsQuery = q
+            searchRanking = published.map(\.entryID)
+            fillSearchSnippets(for: Array(askedMeanwhile))
         }
     }
 

@@ -1200,6 +1200,8 @@ final class AppModel {
     var searchMatches: [String: LibrarySearchIndex.Match] = [:]
     /// The results whose snippet is built or on its way; the rest wait until the list shows them.
     @ObservationIgnored var searchSnippetIDs: Set<LibraryEntry.ID> = []
+    /// The query the published results were run for.
+    @ObservationIgnored var searchResultsQuery: String?
     var selectedEntryID: LibraryEntry.ID? {
         didSet {
             guard oldValue != selectedEntryID else { return }

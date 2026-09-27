@@ -169,4 +169,27 @@ struct SearchResultsTests {
         #expect(model.searchResultsVersion != version)
         #expect(model.searchMatches[entry.id]?.snippet == "")
     }
+
+    @Test("a re-run of the same query keeps the snippets of rows past the first page", .timeLimit(.minutes(1)))
+    func sameQueryRerunKeepsLaterSnippets() async throws {
+        let model = makeModel("search-snippet-rerun")
+        let page = LibrarySearchResults.pageSize
+        var added: [LibraryEntry] = []
+        for index in 0...page {
+            added.append(try await add("take \(index) of the budget review", to: model))
+        }
+        await searchAndWait("budget", in: model, count: page + 1)
+        let ranking = try #require(model.searchRanking)
+        let last = try #require(ranking.last)
+        model.fillSearchSnippets(for: [last])
+        await waitUntil { model.searchMatches[last]?.snippet.isEmpty == false }
+        let version = model.searchResultsVersion
+
+        model.togglePinned(for: added[0].id)
+
+        await waitUntil { model.searchResultsVersion != version }
+        #expect(model.searchRanking == ranking)
+        #expect(model.searchMatches[last]?.snippet.isEmpty == false)
+        #expect(model.searchMatches[last]?.highlights.isEmpty == false)
+    }
 }
