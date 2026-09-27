@@ -23,25 +23,16 @@ extension AppModel {
         )
     }
 
-    func runAutoExports(transcript: Transcript, sourceURL: URL, skippingTargets: Set<URL> = []) {
-        let specs = AutoExportEngine.plannedPresets(
-            rules: autoExportRules,
-            sourceExtension: sourceURL.pathExtension,
-            presets: exportPresets
-        ).map(\.spec)
-        guard !specs.isEmpty else { return }
-        Task.detached(priority: .utility) {
-            for spec in specs {
-                do {
-                    let target = sourceURL.deletingPathExtension().appendingPathExtension(spec.format.fileExtension)
-                    guard !skippingTargets.contains(target) else { continue }
-                    let data = try Exporters.exporter(for: spec).render(transcript)
-                    try data.write(to: target, options: .atomic)
-                } catch {
-                    // Auto-export is best-effort; primary transcription already in the library.
-                    ParolaLog.error(.export, "auto-export failed as \(spec.format)", [.error: .error(error)])
-                }
-            }
-        }
+    func runAutoExports(transcript: Transcript, sourceURL: URL) {
+        writeSidecars(transcript, presets: [], source: SidecarSource(besideFile: sourceURL))
+    }
+
+    /// The presets named here and the auto-export rules for this source, planned together so no file is written twice.
+    func writeSidecars(_ transcript: Transcript, presets: [ExportPreset], source: SidecarSource) {
+        let jobs = SidecarExportPlanner.plan(
+            presets: presets, rules: autoExportRules, library: exportPresets, source: source
+        )
+        guard !jobs.isEmpty else { return }
+        Task { _ = await ExportRunner.run(jobs, transcript: transcript) }
     }
 }

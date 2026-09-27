@@ -40,37 +40,30 @@ extension AppModel {
     }
 
     func runAutoExports(for entry: LibraryEntry) {
-        let ext = (entry.manifest.originalAudioName as NSString).pathExtension
-        let presets = AutoExportEngine.plannedPresets(
-            rules: autoExportRules,
-            sourceExtension: ext,
-            presets: ExportPreset.formatPresets
+        let rules = autoExportRules
+        let fileExtension = (entry.manifest.originalAudioName as NSString).pathExtension
+        let planned = AutoExportEngine.plannedPresets(
+            rules: rules, sourceExtension: fileExtension, presets: ExportPreset.formatPresets
         )
-        guard !presets.isEmpty else { return }
+        guard !planned.isEmpty else { return }
         // The add cached what it saved, so this load decodes nothing.
         Task.detached(priority: .utility) { [library] in
             let loaded: LoadedEntry
-            let exportsDir = library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
             do {
                 loaded = try await library.load(entry.id)
-                try FileManager.default.createDirectory(at: exportsDir, withIntermediateDirectories: true)
             } catch {
                 ParolaLog.error(.export, "auto-export could not start", [.error: .error(error)])
                 return
             }
+            let exportsDir = library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
             let base = Self.unusedExportBase(
-                for: entry.title, extensions: presets.map(\.spec.format.fileExtension), in: exportsDir
+                for: entry.title, extensions: planned.map(\.spec.format.fileExtension), in: exportsDir
             )
-            // Best-effort, one format at a time: the transcript is already saved, and one failure keeps the rest.
-            for preset in presets {
-                do {
-                    let target = exportsDir.appendingPathComponent("\(base).\(preset.spec.format.fileExtension)")
-                    let data = try Exporters.exporter(for: preset.spec).render(loaded.document.transcript)
-                    try data.write(to: target, options: .atomic)
-                } catch {
-                    ParolaLog.error(.export, "auto-export failed as \(preset.spec.format)", [.error: .error(error)])
-                }
-            }
+            let jobs = SidecarExportPlanner.plan(
+                presets: [], rules: rules, library: ExportPreset.formatPresets,
+                source: SidecarSource(fileExtension: fileExtension, folder: exportsDir, baseName: base)
+            )
+            _ = await ExportRunner.run(jobs, transcript: loaded.document.transcript)
         }
     }
 

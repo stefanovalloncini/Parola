@@ -63,8 +63,7 @@ extension AppModel {
                 showUnsavedBatchJob(id, processed)
             }
             if let job = batchJobs.first(where: { $0.id == id }) {
-                let sidecarTargets = writeBatchExports(transcript: processed, sourceURL: job.url)
-                runAutoExports(transcript: processed, sourceURL: job.url, skippingTargets: sidecarTargets)
+                writeSidecars(processed, presets: batchExportPresets, source: SidecarSource(besideFile: job.url))
                 persistBatchJobToLibrary(id, transcript: processed, sourceURL: job.url, sourceDigest: job.sourceDigest)
             }
         case .failed(let id, let reason):
@@ -204,25 +203,6 @@ extension AppModel {
                 await self?.handleBatchEvent(event)
             }
         }
-    }
-
-    @discardableResult
-    private func writeBatchExports(transcript: Transcript, sourceURL: URL) -> Set<URL> {
-        let plans: [(spec: ExportSpec, target: URL)] = batchExportPresets.map { preset in
-            (preset.spec, sourceURL.deletingPathExtension().appendingPathExtension(preset.spec.format.fileExtension))
-        }
-        guard !plans.isEmpty else { return [] }
-        Task.detached {
-            for plan in plans {
-                do {
-                    let data = try Exporters.exporter(for: plan.spec).render(transcript)
-                    try data.write(to: plan.target, options: .atomic)
-                } catch {
-                    // Sidecar write is best-effort; the transcript is already saved.
-                }
-            }
-        }
-        return Set(plans.map(\.target))
     }
 
     func addBatchFiles(_ urls: [URL]) {

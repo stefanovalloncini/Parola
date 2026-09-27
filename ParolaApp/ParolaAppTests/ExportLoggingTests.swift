@@ -132,7 +132,7 @@ struct ExportLoggingTests {
             sourceURL: unwritableDestination("secret-notes.wav")
         )
 
-        let record = try #require(await waitForRecord(sink, message: "auto-export failed as txt"))
+        let record = try #require(await waitForRecord(sink, message: "sidecar export failed as txt"))
         #expect(record.level == .error)
         #expect(record.fields[.error] != nil)
         #expect(record.formattedLine.contains("secret-notes") == false)
@@ -176,6 +176,6 @@ struct ExportLoggingTests {
                 #expect(call.contains("localizedDescription") == false, "\(name) logs a localized description")
             }
         }
-        #expect(total == 12)
+        #expect(total == 11)
     }
 }
