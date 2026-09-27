@@ -273,7 +273,7 @@ struct LibraryListView: View {
         .onChange(of: browses) { _, _ in syncBrowseMount() }
         .onChange(of: searching) { _, _ in
             syncBrowseMount()
-            // The list with the keyboard hands it to the one taking its place, as the single list used to keep it.
+            // The list with the keyboard hands it to the one taking its place.
             switch focus {
             case .browse? where searching: focus = resultsTakeFocus ? .results : nil
             case .results? where !searching: focus = .browse
