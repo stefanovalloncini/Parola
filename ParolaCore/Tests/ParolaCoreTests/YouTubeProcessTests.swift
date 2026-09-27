@@ -12,8 +12,11 @@ private func fakeYtDlp(_ body: String) throws -> URL {
 }
 
 /// A freshly written script can take a second or two to start under a loaded test run, so no limit here is shorter than three.
-private func tight(quiet: Duration = .seconds(5), processing: Duration = .seconds(5)) -> YtDlpRunner.ProgressLimits {
+private func tight(
+    startup: Duration = .seconds(10), quiet: Duration = .seconds(5), processing: Duration = .seconds(5)
+) -> YtDlpRunner.ProgressLimits {
     var limits = YtDlpRunner.ProgressLimits()
+    limits.startup = startup
     limits.quiet = quiet
     limits.processingFloor = processing
     limits.processingUnknownLength = processing
@@ -111,6 +114,39 @@ struct YouTubeProcessTests {
         #expect(!isAlive(pid))
     }
 
+    @Test("a silent extraction longer than the quiet limit is still within the startup allowance")
+    func silentStartupSurvives() async throws {
+        let fake = try fakeYtDlp("""
+            sleep 5
+            echo '[PAROLA_META] {"title": "Slow page", "duration": 12}'
+            echo "[PAROLA_P] 10 10"
+            echo "[PAROLA_FILE] /tmp/audio.m4a"
+            """)
+        defer { try? FileManager.default.removeItem(at: fake) }
+
+        let output = try await YtDlpRunner.run(
+            ytDlpPath: fake.path, arguments: [], run: .download,
+            watch: .progress(tight(startup: .seconds(15), quiet: .seconds(3)))
+        )
+
+        #expect(output.status == 0)
+        #expect(output.metadata?.title == "Slow page")
+    }
+
+    @Test("a run that never gets past extraction is ended once the startup allowance runs out")
+    func silentStartupStalls() async throws {
+        let fake = try fakeYtDlp("exec sleep 30")
+        defer { try? FileManager.default.removeItem(at: fake) }
+
+        let failure = await linkFailure {
+            _ = try await YtDlpRunner.run(
+                ytDlpPath: fake.path, arguments: [], run: .download,
+                watch: .progress(tight(startup: .seconds(3), quiet: .seconds(1)))
+            )
+        }
+        #expect(failure?.reason == .stalled(seconds: 3))
+    }
+
     @Test("post-processing runs on its own budget, not the quiet limit")
     func processingHasItsOwnBudget() async throws {
         let fake = try fakeYtDlp("""
@@ -189,6 +225,7 @@ struct YouTubeAudioDownloadTests {
             arguments.firstIndex(of: flag).map { arguments[$0 + 1] }
         }
         #expect(value(after: "-f") == "bestaudio[ext=m4a]/bestaudio/best")
+        #expect(value(after: "--downloader") == "native")
         #expect(value(after: "--audio-format") == "m4a")
         #expect(value(after: "--socket-timeout") == "30")
         #expect(value(after: "-o") == "/tmp/x/audio.%(ext)s")

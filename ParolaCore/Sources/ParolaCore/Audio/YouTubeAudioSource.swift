@@ -119,6 +119,8 @@ public actor YouTubeAudioSource {
     static func arguments(url: URL, outputTemplate: String) -> [String] {
         [
             "-f", "bestaudio[ext=m4a]/bestaudio/best",
+            // An external downloader from the user's yt-dlp config reports no progress for the watchdog to see.
+            "--downloader", "native",
             "-x",
             "--audio-format", "m4a",
             "--audio-quality", "0",

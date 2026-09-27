@@ -12,9 +12,11 @@ enum YtDlpRunner {
     }
 
     struct ProgressLimits: Sendable {
-        /// The longest a run may go without printing one of Parola's lines: startup, then between progress lines.
+        /// Extraction prints nothing under `--print`, so the stretch before the video's metadata gets its own allowance.
+        var startup: Duration = .seconds(120)
+        /// The longest a download may go without a progress line once the metadata is in.
         var quiet: Duration = .seconds(60)
-        /// Covers a live stream, which would otherwise download for as long as it airs.
+        /// Ends a download that keeps making progress for longer than any video Parola should fetch.
         var ceiling: Duration = .seconds(4 * 3600)
         var processingFloor: Duration = .seconds(120)
         var processingPerMediaSecond = 0.25
@@ -177,7 +179,7 @@ enum YtDlpRunner {
             case .progress(let limits):
                 ceiling = now + limits.ceiling
                 state = OSAllocatedUnfairLock(initialState: State(
-                    deadline: now + limits.quiet, expiry: .stalled(seconds: Self.wholeSeconds(limits.quiet))
+                    deadline: now + limits.startup, expiry: .stalled(seconds: Self.wholeSeconds(limits.startup))
                 ))
             }
         }
@@ -189,9 +191,9 @@ enum YtDlpRunner {
                 switch line {
                 case .metadata(let metadata):
                     state.mediaSeconds = metadata.duration
-                    if case .stalled = state.expiry { state.deadline = now + limits.quiet }
+                    Self.pushQuietDeadline(&state, now: now, limits: limits)
                 case .downloaded:
-                    if case .stalled = state.expiry { state.deadline = now + limits.quiet }
+                    Self.pushQuietDeadline(&state, now: now, limits: limits)
                 case .processing:
                     let budget = limits.processing(mediaSeconds: state.mediaSeconds)
                     state.deadline = now + budget
@@ -215,6 +217,12 @@ enum YtDlpRunner {
                 try? await Task.sleep(until: min(deadline, ceiling, now + .seconds(1)), clock: .continuous)
             }
             return .cancelled
+        }
+
+        private static func pushQuietDeadline(_ state: inout State, now: ContinuousClock.Instant, limits: ProgressLimits) {
+            guard case .stalled = state.expiry else { return }
+            state.deadline = now + limits.quiet
+            state.expiry = .stalled(seconds: wholeSeconds(limits.quiet))
         }
 
         private static func wholeSeconds(_ duration: Duration) -> Int {
