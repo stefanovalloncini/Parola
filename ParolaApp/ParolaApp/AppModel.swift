@@ -1348,6 +1348,7 @@ final class AppModel {
     @ObservationIgnored var deferredArrivals: [URL] = []
     @ObservationIgnored var deferredLinks: [DeferredLink] = []
     @ObservationIgnored var pendingOpenedFiles: [URL] = []
+    var pendingLargeDrop: PendingLargeDrop?
     @ObservationIgnored var openedFilesFlushTask: Task<Void, Never>?
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?
@@ -2076,7 +2077,7 @@ final class AppModel {
                 allowedTypes: [.audio, .movie] + Self.subtitleContentTypes,
                 allowsMultiple: true
             )
-            self.handleIncomingFiles(urls)
+            self.receive(urls) { [weak self] in self?.handleIncomingFiles($0) }
         }
     }
 

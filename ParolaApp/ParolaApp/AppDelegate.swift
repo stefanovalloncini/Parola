@@ -188,7 +188,7 @@ final class ServicesProvider: NSObject {
             return
         }
         NSApp.activate(ignoringOtherApps: true)
-        model.handleIncomingFiles(urls, translateOverride: translate)
+        model.receive(urls) { [weak model] in model?.handleIncomingFiles($0, translateOverride: translate) }
     }
 
     static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {

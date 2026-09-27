@@ -303,6 +303,65 @@ struct DropRoutingTests {
         #expect(model.dropZonePlan == .split(count: 1))
     }
 
+    private func folder(holding count: Int) throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("DropRoutingTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        for index in 0..<count {
+            try Data().write(to: dir.appendingPathComponent(String(format: "take-%03d.wav", index)))
+        }
+        return dir
+    }
+
+    @Test("a drop over the limit queues nothing until the user says yes")
+    func largeDropAsksFirst() async throws {
+        let model = makeModel()
+        model.batchJobs = [BatchJob(url: Self.media("running.wav"), status: .transcribing)]
+        let dir = try folder(holding: AppModel.largeDropLimit + 1)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        await model.drop([dir], on: .queue).value
+
+        #expect(model.pendingLargeDrop?.count == AppModel.largeDropLimit + 1)
+        #expect(model.batchJobs.count == 1)
+
+        model.confirmLargeDrop()
+        await model.awaitBatchImport()
+
+        #expect(model.pendingLargeDrop == nil)
+        #expect(model.batchJobs.count == AppModel.largeDropLimit + 2)
+    }
+
+    @Test("a large drop the user turns down leaves the queue as it was")
+    func largeDropCancelled() async throws {
+        let model = makeModel()
+        model.batchJobs = [BatchJob(url: Self.media("running.wav"), status: .transcribing)]
+        let dir = try folder(holding: AppModel.largeDropLimit + 1)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        await model.drop([dir], on: .queue).value
+        model.cancelLargeDrop()
+        await model.awaitBatchImport()
+
+        #expect(model.pendingLargeDrop == nil)
+        #expect(model.batchJobs.map(\.url.lastPathComponent) == ["running.wav"])
+    }
+
+    @Test("a drop at the limit goes straight in, walked off the main thread")
+    func dropAtTheLimitGoesStraightIn() async throws {
+        let model = makeModel()
+        model.batchJobs = [BatchJob(url: Self.media("running.wav"), status: .transcribing)]
+        let dir = try folder(holding: AppModel.largeDropLimit)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let drop = model.drop([dir], on: .queue)
+        #expect(model.batchJobs.count == 1, "nothing is walked before the drop returns")
+        await drop.value
+        await model.awaitBatchImport()
+
+        #expect(model.pendingLargeDrop == nil)
+        #expect(model.batchJobs.count == AppModel.largeDropLimit + 1)
+    }
+
     @Test("Open With collects every file before routing them")
     func openedFilesArriveAsOneBatch() async {
         let model = makeModel()
@@ -313,7 +372,7 @@ struct DropRoutingTests {
         model.collectOpenedFile(Self.media("three.wav"))
         #expect(model.pendingOpenedFiles.count == 3)
 
-        model.flushOpenedFiles()
+        await model.flushOpenedFiles()?.value
         await model.awaitBatchImport()
 
         #expect(model.batchJobs.map(\.url.lastPathComponent) == ["running.wav", "one.wav", "two.wav", "three.wav"])

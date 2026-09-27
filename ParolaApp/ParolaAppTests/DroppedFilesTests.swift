@@ -104,6 +104,45 @@ struct DroppedFilesTests {
         #expect(files.media.map(\.lastPathComponent) == ["loose.wav"])
     }
 
+    @Test("media inside a package in a dropped folder stays in the package, as a watched folder leaves it")
+    func packagesInsideFoldersAreNotWalked() throws {
+        let dir = try Self.makeScratch("library-bundles")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Self.touch("Photos Library.photoslibrary/originals/0/clip.mov", in: dir)
+        try Self.touch("Editor.app/Contents/Resources/intro.mp4", in: dir)
+        try Self.touch("loose.wav", in: dir)
+
+        let files = DroppedFiles.classify([dir])
+
+        #expect(files.media.map(\.lastPathComponent) == ["loose.wav"])
+    }
+
+    @Test("a package dropped on its own is not opened")
+    func droppedPackageIsOpaque() throws {
+        let dir = try Self.makeScratch("lone-bundle")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Self.touch("Photos Library.photoslibrary/originals/0/clip.mov", in: dir)
+
+        let files = DroppedFiles.classify([dir.appendingPathComponent("Photos Library.photoslibrary")])
+
+        #expect(files.isEmpty)
+    }
+
+    @Test("the off-main walk finds what the walk on the caller's thread finds, in the same order")
+    func offMainWalkMatches() async throws {
+        let dir = try Self.makeScratch("off-main")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Self.touch("b.wav", in: dir)
+        try Self.touch("nested/a.mkv", in: dir)
+        try Self.touch("notes.srt", in: dir)
+        try Self.touch("take.parola/audio.wav", in: dir)
+
+        let offMain = await DroppedFiles.classifyOffMain([dir])
+
+        #expect(offMain == DroppedFiles.classify([dir]))
+        #expect(offMain.all.map(\.lastPathComponent) == ["b.wav", "a.mkv", "notes.srt", "take.parola"])
+    }
+
     @Test("the same file dropped twice is kept once")
     func deduplicates() {
         let url = URL(fileURLWithPath: "/tmp/one.wav")

@@ -53,6 +53,20 @@ struct ContentView: View {
         } message: {
             if let warning = model.nonFatalWarning { Text(warning) }
         }
+        .alert(
+            "Add \(model.pendingLargeDrop?.count ?? 0) files?",
+            isPresented: Binding(
+                get: { model.pendingLargeDrop != nil },
+                set: { if !$0 { model.cancelLargeDrop() } }
+            )
+        ) {
+            Button("Cancel", role: .cancel) { model.cancelLargeDrop() }
+                .axLeaf("Alert.Button.CancelLargeDrop")
+            Button("Add Files") { model.confirmLargeDrop() }
+                .axLeaf("Alert.Button.AddLargeDrop")
+        } message: {
+            Text("They go into the queue and are transcribed one at a time.")
+        }
         .onAppear { model.undoManager = windowUndoManager }
         .onChange(of: windowUndoManager) { _, newValue in model.undoManager = newValue }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }

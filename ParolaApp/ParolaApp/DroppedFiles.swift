@@ -49,7 +49,7 @@ enum DroppedFiles {
     }
 
     /// Hovering classifies shallow (it runs on every drag entering the window); the drop itself
-    /// walks the whole tree, matching what a watched folder would pick up.
+    /// walks the whole tree and, like a watched folder, leaves packages such as a Photos library shut.
     enum FolderDepth: Sendable {
         case shallow
         case recursive
@@ -63,6 +63,11 @@ enum DroppedFiles {
 
         var isEmpty: Bool {
             media.isEmpty && subtitles.isEmpty && projects.isEmpty && links.isEmpty
+        }
+
+        /// Every file and link found, for an intake that classifies again: no folders are left to walk.
+        var all: [URL] {
+            links + media + subtitles + projects
         }
 
         var kind: Kind {
@@ -102,6 +107,15 @@ enum DroppedFiles {
         return result
     }
 
+    /// On GCD, not `Task.detached`, for the enumerator crash FolderWatcher.scanFolderOffActor describes.
+    static func classifyOffMain(_ urls: [URL]) async -> Classification {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: classify(urls))
+            }
+        }
+    }
+
     static func isProject(_ url: URL) -> Bool {
         url.pathExtension.lowercased() == projectExtension
     }
@@ -120,7 +134,7 @@ enum DroppedFiles {
     }
 
     private static func expand(_ url: URL, folders: FolderDepth) -> [URL] {
-        guard isDirectory(url), !isProject(url) else { return [url] }
+        guard isDirectory(url), !isProject(url), !isPackage(url) else { return [url] }
         let found = switch folders {
         case .shallow: topLevel(of: url)
         case .recursive: walk(url)
@@ -141,7 +155,7 @@ enum DroppedFiles {
         guard let walker = FileManager.default.enumerator(
             at: url,
             includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return [] }
         var found: [URL] = []
         for case let child as URL in walker {
@@ -157,6 +171,10 @@ enum DroppedFiles {
 
     private static func isDirectory(_ url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+    }
+
+    private static func isPackage(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true
     }
 }
 

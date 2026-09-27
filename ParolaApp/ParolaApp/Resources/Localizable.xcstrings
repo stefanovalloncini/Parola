@@ -1279,6 +1279,17 @@
         }
       }
     },
+    "Add %lld files?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungere %lld file?"
+          }
+        }
+      }
+    },
     "Add App…": {
       "extractionState": "manual",
       "localizations": {
@@ -1308,6 +1319,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi destinazione"
+          }
+        }
+      }
+    },
+    "Add Files": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi file"
           }
         }
       }
@@ -13401,6 +13423,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Queste cartelle non sono nel catalogo modelli corrente — di solito sono residui di vecchie versioni. Sicure da cancellare."
+          }
+        }
+      }
+    },
+    "They go into the queue and are transcribed one at a time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finiscono in coda e vengono trascritti uno alla volta."
           }
         }
       }

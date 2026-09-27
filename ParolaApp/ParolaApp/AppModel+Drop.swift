@@ -19,11 +19,47 @@ extension AppModel {
         )
     }
 
-    func drop(_ urls: [URL], on half: DropHalf) {
-        switch half {
-        case .now: transcribeNow(urls: urls)
-        case .queue: addToQueue(urls: urls)
+    /// Above this many files from one drop, nothing is queued until the user says so.
+    static let largeDropLimit = 200
+
+    /// A drop over `largeDropLimit` files, waiting on the alert that asks whether to take it.
+    struct PendingLargeDrop {
+        let count: Int
+        let deliver: @MainActor () -> Void
+    }
+
+    @discardableResult
+    func drop(_ urls: [URL], on half: DropHalf) -> Task<Void, Never> {
+        receive(urls) { [weak self] files in
+            switch half {
+            case .now: self?.transcribeNow(urls: files)
+            case .queue: self?.addToQueue(urls: files)
+            }
         }
+    }
+
+    /// Walks any folders off the main thread, then hands on what they hold as if those files had been dropped.
+    @discardableResult
+    func receive(_ urls: [URL], deliver: @escaping @MainActor ([URL]) -> Void) -> Task<Void, Never> {
+        Task { [weak self] in
+            let found = await DroppedFiles.classifyOffMain(urls).all
+            guard let self else { return }
+            guard found.count > Self.largeDropLimit else {
+                deliver(found)
+                return
+            }
+            pendingLargeDrop = PendingLargeDrop(count: found.count) { deliver(found) }
+        }
+    }
+
+    func confirmLargeDrop() {
+        let pending = pendingLargeDrop
+        pendingLargeDrop = nil
+        pending?.deliver()
+    }
+
+    func cancelLargeDrop() {
+        pendingLargeDrop = nil
     }
 
     /// The Transcribe Now half: the first media file starts, the rest wait their turn rather
@@ -93,10 +129,11 @@ extension AppModel {
         }
     }
 
-    func flushOpenedFiles() {
+    @discardableResult
+    func flushOpenedFiles() -> Task<Void, Never>? {
         let urls = pendingOpenedFiles
         pendingOpenedFiles = []
-        guard !urls.isEmpty else { return }
-        handleIncomingFiles(urls)
+        guard !urls.isEmpty else { return nil }
+        return receive(urls) { [weak self] in self?.handleIncomingFiles($0) }
     }
 }

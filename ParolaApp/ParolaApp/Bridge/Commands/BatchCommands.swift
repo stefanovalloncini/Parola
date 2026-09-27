@@ -56,7 +56,7 @@ extension ParolaAutomationServer {
                     guard let half = AppModel.DropHalf(rawValue: raw) else {
                         throw AutomationError.invalidArgs(field: "half", reason: "unknown half: \(raw)")
                     }
-                    ctx.model.drop(urls, on: half)
+                    await ctx.model.drop(urls, on: half).value
                     return .object([
                         "half": .string(half.rawValue),
                         "count": .int(urls.count),
