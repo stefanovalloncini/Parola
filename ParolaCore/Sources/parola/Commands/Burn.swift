@@ -5,7 +5,7 @@ import ParolaCore
 struct Burn: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "burn",
-        abstract: "Burn an SRT subtitle track into a video via ffmpeg."
+        abstract: "Burn an SRT subtitle track into a video, with AVFoundation."
     )
 
     @Argument(help: "Path to the source video.")

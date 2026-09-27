@@ -35,11 +35,13 @@ public enum SubtitleBurner {
     }
 
     /// Burns the transcript into a copy of the video, reporting export progress (0–1) roughly twice a second.
+    /// The captions are the cues an SRT export with `options` would write, fitted to the frame.
     public static func burn(
         transcript: Transcript,
         video: URL,
         to output: URL,
         style: Style = Style(),
+        options: ExportOptions = ExportSpec.standard(for: .srt).options,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async throws {
         guard FileManager.default.fileExists(atPath: video.path) else {
@@ -82,10 +84,11 @@ public enum SubtitleBurner {
             )
         }
 
-        let captions = try BurnCaptionTrack(
-            cues: cues(from: transcript),
+        let metrics = CaptionMetrics(style: style, renderSize: renderSize)
+        let captions = BurnCaptionTrack(
+            cues: try cues(from: transcript, options: options, metrics: metrics, renderSize: renderSize),
             language: transcript.language,
-            metrics: CaptionMetrics(style: style, renderSize: renderSize),
+            metrics: metrics,
             renderSize: renderSize
         )
         // One caption drawn over each frame as it is composed; no layer tree holds every cue for the whole export.
@@ -169,17 +172,6 @@ public enum SubtitleBurner {
         }
     }
 
-    static func cues(from transcript: Transcript) throws -> [BurnCue] {
-        var cues: [BurnCue] = []
-        cues.reserveCapacity(transcript.segments.count)
-        for segment in transcript.segments {
-            try Task.checkCancellation()
-            let start = max(segment.start, 0)
-            cues.append(BurnCue(start: start, end: max(segment.end, start + 0.05), text: segment.text))
-        }
-        return cues.sorted { $0.start < $1.start }
-    }
-
     static func measureCaption(_ text: String, font: CTFont, maxWidth: CGFloat) -> CGSize {
         guard !text.isEmpty, maxWidth > 0 else { return .zero }
         let attributed = captionText(text, font: font, color: CGColor(gray: 1, alpha: 1))
@@ -191,7 +183,7 @@ public enum SubtitleBurner {
         return CGSize(width: suggested.width.rounded(.up), height: suggested.height.rounded(.up))
     }
 
-    private static func captionText(_ text: String, font: CTFont, color: CGColor) -> NSAttributedString {
+    static func captionText(_ text: String, font: CTFont, color: CGColor) -> NSAttributedString {
         var alignment = CTTextAlignment.center
         let paragraphStyle = withUnsafeBytes(of: &alignment) { raw -> CTParagraphStyle in
             var setting = CTParagraphStyleSetting(
@@ -265,13 +257,6 @@ public enum SubtitleBurner {
     }
 }
 
-/// One caption as the burn draws it.
-struct BurnCue: Sendable, Equatable {
-    let start: Double
-    let end: Double
-    let text: String
-}
-
 /// A burn's captions, looked up per frame. Only a cue that reaches the screen is rasterised, and only the
 /// last two stay, so memory holds flat however long the transcript runs.
 final class BurnCaptionTrack: Sendable {
@@ -291,7 +276,7 @@ final class BurnCaptionTrack: Sendable {
     private let language: String
     private let recent = OSAllocatedUnfairLock(initialState: Recent())
 
-    init(cues: [BurnCue], language: String, metrics: SubtitleBurner.CaptionMetrics, renderSize: CGSize) throws {
+    init(cues: [BurnCue], language: String, metrics: SubtitleBurner.CaptionMetrics, renderSize: CGSize) {
         self.cues = cues
         starts = cues.map(\.start)
         self.metrics = metrics

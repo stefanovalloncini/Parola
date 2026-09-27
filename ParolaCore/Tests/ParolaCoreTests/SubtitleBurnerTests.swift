@@ -51,8 +51,8 @@ struct SubtitleBurnerTests {
     }
 
     @Test("the caption on screen is the one that started last and hasn't ended")
-    func cueLookup() throws {
-        let track = try captionTrack([
+    func cueLookup() {
+        let track = captionTrack([
             BurnCue(start: 1, end: 2, text: "one"),
             BurnCue(start: 2, end: 3, text: "two"),
             BurnCue(start: 5, end: 6, text: "three"),
@@ -67,8 +67,8 @@ struct SubtitleBurnerTests {
     }
 
     @Test("only the last two cues drawn stay in memory")
-    func cacheHoldsTwo() throws {
-        let track = try captionTrack((0..<10).map { BurnCue(start: Double($0), end: Double($0) + 0.9, text: "cue \($0)") })
+    func cacheHoldsTwo() {
+        let track = captionTrack((0..<10).map { BurnCue(start: Double($0), end: Double($0) + 0.9, text: "cue \($0)") })
         for second in 0..<10 {
             #expect(track.image(at: Double(second) + 0.5) != nil)
         }
@@ -77,7 +77,7 @@ struct SubtitleBurnerTests {
 
     @Test("a caption sits centred above the bottom inset")
     func captionPlacement() throws {
-        let track = try captionTrack([BurnCue(start: 0, end: 1, text: "Centred")])
+        let track = captionTrack([BurnCue(start: 0, end: 1, text: "Centred")])
         let extent = try #require(track.image(at: 0.5)?.extent)
         let halo = SubtitleBurner.Outline(color: CGColor(gray: 0, alpha: 1), blur: 8).padding
         #expect(abs(extent.midX - 960) <= 1)
@@ -90,17 +90,21 @@ struct SubtitleBurnerTests {
             segments: (0..<2000).map { TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "cue") },
             language: "en", modelName: "test"
         )
+        let size = CGSize(width: 1920, height: 1080)
+        let metrics = SubtitleBurner.CaptionMetrics(style: SubtitleBurner.Style(), renderSize: size)
         let task = Task { () throws -> [BurnCue] in
             while !Task.isCancelled { await Task.yield() }
-            return try SubtitleBurner.cues(from: transcript)
+            return try SubtitleBurner.cues(
+                from: transcript, options: ExportSpec.standard(for: .srt).options, metrics: metrics, renderSize: size
+            )
         }
         task.cancel()
         await #expect(throws: CancellationError.self) { try await task.value }
     }
 
-    private func captionTrack(_ cues: [BurnCue]) throws -> BurnCaptionTrack {
+    private func captionTrack(_ cues: [BurnCue]) -> BurnCaptionTrack {
         let size = CGSize(width: 1920, height: 1080)
-        return try BurnCaptionTrack(
+        return BurnCaptionTrack(
             cues: cues, language: "en",
             metrics: SubtitleBurner.CaptionMetrics(style: SubtitleBurner.Style(), renderSize: size),
             renderSize: size

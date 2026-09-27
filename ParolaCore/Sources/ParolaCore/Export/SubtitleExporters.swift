@@ -12,21 +12,27 @@ public struct SrtExporter: TranscriptExporter {
         var out = ""
         var cueNumber = 1
         for seg in transcript.segments {
-            let body = CaptionWrapper.wrap(seg.text, length: options.captionLength)
-            guard !body.isEmpty else { continue }
+            guard let text = cueText(for: seg, in: transcript) else { continue }
             let end = max(seg.end, seg.start + Format.minCaptionSeconds)
             out += "\(cueNumber)\n"
             out += "\(Self.srtTimestamp(seg.start)) --> \(Self.srtTimestamp(end))\n"
-            let tail = translation(for: seg, in: transcript)
-                .map { "\n" + CaptionWrapper.wrap($0, length: options.captionLength) } ?? ""
-            if options.speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
-                out += "\(speaker): \(body)\(tail)\n\n"
-            } else {
-                out += body + tail + "\n\n"
-            }
+            out += text + "\n\n"
             cueNumber += 1
         }
         return utf8(out)
+    }
+
+    /// What a segment's cue says: its wrapped text, the speaker in front when asked for, and a "both"
+    /// export's translation under it. Nil for a segment with no text. The burn draws the same words.
+    func cueText(for segment: TranscriptSegment, in transcript: Transcript) -> String? {
+        let body = CaptionWrapper.wrap(segment.text, length: options.captionLength)
+        guard !body.isEmpty else { return nil }
+        let tail = translation(for: segment, in: transcript)
+            .map { "\n" + CaptionWrapper.wrap($0, length: options.captionLength) } ?? ""
+        if options.speakers, let speaker = Format.presentationSpeakerLabel(segment.speaker) {
+            return "\(speaker): \(body)\(tail)"
+        }
+        return body + tail
     }
 
     static func srtTimestamp(_ seconds: Double) -> String {

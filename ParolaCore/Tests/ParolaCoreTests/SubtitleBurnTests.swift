@@ -99,6 +99,36 @@ struct SubtitleBurnTests {
         #expect(rows.allSatisfy { $0 > image.height * 2 / 3 }, "caption rows \(rows.first ?? -1)…\(rows.last ?? -1) of \(image.height)")
     }
 
+    @Test("a long caption on a portrait clip is burned whole, the last of its words included")
+    func longCaptionIsBurnedWhole() async throws {
+        let dir = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let src = dir.appendingPathComponent("src.mp4")
+        let out = dir.appendingPathComponent("out.mp4")
+        try await writeBlackVideo(to: src, width: 720, height: 1280, seconds: 3.0, fps: 24)
+        let text = String(repeating: "every word of this caption has to reach the screen ", count: 6) + "THE END"
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 3, text: text)],
+            language: "en", modelName: "test", durationSeconds: 3
+        )
+        let size = CGSize(width: 720, height: 1280)
+        let cues = try SubtitleBurner.cues(
+            from: transcript, options: ExportSpec.standard(for: .srt).options,
+            metrics: SubtitleBurner.CaptionMetrics(style: SubtitleBurner.Style(), renderSize: size), renderSize: size
+        )
+        let last = try #require(cues.last)
+        #expect(cues.count > 1)
+        #expect(last.text.hasSuffix("THE END"))
+
+        try await SubtitleBurner.burn(transcript: transcript, video: src, to: out)
+
+        let image = try await frame(of: out, atSeconds: (last.start + last.end) / 2, maxHeight: 1280)
+        let rows = brightRows(in: image)
+        #expect(!rows.isEmpty)
+        let oneLine = 28.0 * 720 / 1080 * 1.3
+        #expect(Double((rows.last ?? 0) - (rows.first ?? 0)) < oneLine * 2.5, "caption spans rows \(rows.first ?? -1)…\(rows.last ?? -1)")
+    }
+
     @Test("renderTextImage rasterizes glyphs and returns nil for empty text")
     func renderTextImageProducesGlyphs() throws {
         let font = Format.cascadingFont(name: "Helvetica-Bold", size: 28, language: "unknown")

@@ -3599,8 +3599,11 @@ final class AppModel {
     func burnSubtitlesIntoVideo() {
         guard let transcript else { return }
         let style = SubtitleBurner.Style.make(fontSize: burnFontSize, textColor: burnTextColor, outline: burnOutline)
+        let options = exportSpec(for: .srt).options
         let burn = burnOperation ?? { transcript, video, output, style, progress in
-            try await SubtitleBurner.burn(transcript: transcript, video: video, to: output, style: style, progress: progress)
+            try await SubtitleBurner.burn(
+                transcript: transcript, video: video, to: output, style: style, options: options, progress: progress
+            )
         }
         burnTask?.cancel()
         burnTask = Task { [weak self] in
