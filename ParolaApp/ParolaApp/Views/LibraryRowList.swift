@@ -26,8 +26,20 @@ struct LibraryRowList: View {
     let focusKey: LibraryListFocus
     var rowAppeared: ((LibraryEntry.ID) -> Void)?
 
+    /// Select All also takes the section rows, which are tagged with their groups' ids; only entries are kept.
+    static func entries(in proposed: Set<LibraryEntry.ID>, groups: [LibraryDateGroups.Group]) -> Set<LibraryEntry.ID> {
+        proposed.intersection(groups.lazy.flatMap(\.rows).map(\.id))
+    }
+
+    private var rowSelection: Binding<Set<LibraryEntry.ID>> {
+        Binding(
+            get: { selection },
+            set: { selection = Self.entries(in: $0, groups: groups) }
+        )
+    }
+
     var body: some View {
-        List(selection: $selection) {
+        List(selection: rowSelection) {
             ForEach(groups) { group in
                 Section {
                     ForEach(group.rows) { row in

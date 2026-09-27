@@ -43,7 +43,7 @@ struct LibrarySearchResults: View {
         resultIDs = resolved.map(\.id)
         rows = displays
         groups = LibraryListContent.groups(for: displays, sortOrder: model.librarySortOrder, isSearchResult: true)
-        selection.formIntersection(Set(displays.map(\.id)))
+        selection.formIntersection(resultIDs)
         model.fillSearchSnippets(for: displays.map(\.id))
     }
 
@@ -55,6 +55,26 @@ struct LibrarySearchResults: View {
         recompute()
     }
 
+    /// The table's Select All reaches only the rows it holds. While more results wait, the next page is realised before
+    /// the last row can be clicked, so a selection of every realised row is Select All (or Shift-extend to the end).
+    static func reachesEveryResult(_ selection: Set<LibraryEntry.ID>, realised: [LibraryEntry.ID], total: Int) -> Bool {
+        total > realised.count && realised.count > 1 && selection.count == realised.count && selection == Set(realised)
+    }
+
+    /// Bulk Export and Delete act on the selection, so it takes every hit; rows realised later come up selected.
+    private var selectionBinding: Binding<Set<LibraryEntry.ID>> {
+        Binding(
+            get: { selection },
+            set: { proposed in
+                guard Self.reachesEveryResult(proposed, realised: rows.map(\.id), total: resultIDs.count) else {
+                    selection = proposed
+                    return
+                }
+                selection = Set(resultIDs)
+            }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -64,7 +84,7 @@ struct LibrarySearchResults: View {
             } else {
                 LibraryRowList(
                     groups: groups,
-                    selection: $selection,
+                    selection: selectionBinding,
                     // Read over every result, not the realised rows, so the column doesn't jump as pages land.
                     detail: .match(showsTimestamp: LibraryListContent.showsTimestampSlot(
                         for: resultIDs, matches: model.searchMatches

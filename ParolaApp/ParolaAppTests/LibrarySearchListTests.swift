@@ -187,6 +187,58 @@ struct LibrarySearchListTests {
         }
     }
 
+    /// What the Edit menu does with a key window: the first responder in the chain that takes the action runs it.
+    private func sendToFirstResponder(_ action: Selector, in window: NSWindow) {
+        var responder = window.firstResponder
+        while let current = responder {
+            if current.responds(to: action) {
+                current.perform(action, with: nil)
+                return
+            }
+            responder = current.nextResponder
+        }
+    }
+
+    @Test("Select All in the results takes every hit, not just the pages realised so far")
+    func selectAllTakesEveryResult() async throws {
+        let hosted = await host(130)
+        defer { close(hosted) }
+        let ids = hosted.model.libraryEntries.map(\.id)
+        search(ids, in: hosted.model)
+        #expect(await settled(hosted) { tables(hosted).last?.numberOfRows == LibrarySearchResults.pageSize + 1 })
+        let results = try #require(tables(hosted).last)
+        hosted.window.makeFirstResponder(results)
+        _ = await settled(hosted)
+
+        sendToFirstResponder(#selector(NSResponder.selectAll(_:)), in: hosted.window)
+        _ = await settled(hosted)
+        // The table highlights rows as they are realised, so the pages past the first are scrolled in to check them.
+        for _ in 0..<4 {
+            results.scrollRowToVisible(results.numberOfRows - 1)
+            _ = await settled(hosted)
+        }
+        #expect(results.numberOfRows == ids.count + 1)
+        #expect(results.selectedRowIndexes.contains(results.numberOfRows - 1))
+    }
+
+    @Test("Select All counts entries, not the day headers the table also highlights")
+    func selectAllCountsEntries() {
+        let displays = entries(7).map { LibraryRowDisplay(entry: $0) }
+        let groups = LibraryDateGroups.groups(for: displays, sortOrder: .newest)
+        let highlighted = Set(groups.map(\.id)).union(displays.map(\.id))
+        #expect(groups.count > 1)
+        #expect(LibraryRowList.entries(in: highlighted, groups: groups) == Set(displays.map(\.id)))
+    }
+
+    @Test("only a selection of every realised row, with more results waiting, stands for all of them")
+    func everyRealisedRowStandsForAll() {
+        let realised = ["a", "b", "c"]
+        #expect(LibrarySearchResults.reachesEveryResult(["a", "b", "c"], realised: realised, total: 10))
+        #expect(!LibrarySearchResults.reachesEveryResult(["a", "b"], realised: realised, total: 10))
+        #expect(!LibrarySearchResults.reachesEveryResult(["a", "b", "c"], realised: realised, total: 3))
+        #expect(!LibrarySearchResults.reachesEveryResult(["a"], realised: ["a"], total: 10))
+    }
+
     @Test("a row within a lead's distance of the end asks for the next page while more results wait")
     func nextPageNearTheEnd() {
         let page = LibrarySearchResults.pageSize
