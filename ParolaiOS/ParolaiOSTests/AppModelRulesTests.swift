@@ -165,7 +165,7 @@ struct AppModelRulesTests {
             let entry = try await model.library.add(transcript: transcript(text), audioSource: audio, source: .file)
             #expect(entry.title == "Call 10.30")
             model.runAutoExports(for: entry)
-            let expected = entries.isEmpty ? "Call 10.30" : "Call 10.30 2"
+            let expected = entries.isEmpty ? "Call 10.30" : "Call 10.30 (2)"
             try await pollUntil {
                 ["srt", "txt"].allSatisfy {
                     FileManager.default.fileExists(atPath: exportsDir.appendingPathComponent("\(expected).\($0)").path)
@@ -175,20 +175,29 @@ struct AppModelRulesTests {
         }
 
         let first = try String(contentsOf: exportsDir.appendingPathComponent("Call 10.30.txt"), encoding: .utf8)
-        let second = try String(contentsOf: exportsDir.appendingPathComponent("Call 10.30 2.txt"), encoding: .utf8)
+        let second = try String(contentsOf: exportsDir.appendingPathComponent("Call 10.30 (2).txt"), encoding: .utf8)
         #expect(first.contains("first call"))
         #expect(second.contains("second call"))
         #expect(!FileManager.default.fileExists(atPath: exportsDir.appendingPathComponent("Call 10.srt").path))
     }
 
-    @Test("an export name is taken when any of the import's formats already uses it")
-    func exportBaseSkipsAnyTakenFormat() {
-        let dir = URL(fileURLWithPath: "/exports", isDirectory: true)
-        let taken: Set<String> = ["/exports/Talk.txt", "/exports/Talk 2.srt"]
+    @Test("running an entry's rules again replaces its own exports instead of numbering them")
+    func rerunReplacesItsOwnExports() async throws {
+        let model = try makeModel(defaults: freshDefaults())
+        model.autoExportRules = [
+            AutoExportRule(sourceExtensions: ["m4a"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id]),
+        ]
+        let audio = try makeAudioFile(ext: "m4a")
+        let entry = try await model.library.add(transcript: transcript("run twice"), audioSource: audio, title: "Talk")
+        let exportsDir = model.library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
+        let target = exportsDir.appendingPathComponent("Talk.txt")
 
-        let base = AppModel.unusedExportBase(for: "Talk", extensions: ["srt", "txt"], in: dir) { taken.contains($0.path) }
+        model.runAutoExports(for: entry)
+        try await pollUntil { OutputMarker.owner(of: target) == entry.id }
+        model.runAutoExports(for: entry)
+        try await Task.sleep(for: .milliseconds(200))
 
-        #expect(base == "Talk 3")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: exportsDir.path) == ["Talk.txt"])
     }
 
     @Test("a title with a slash exports into Exports, not a folder of its own")
@@ -205,14 +214,6 @@ struct AppModelRulesTests {
         let target = model.library.libraryURL.appendingPathComponent("Exports/Q3-Q4 review.txt")
         try await pollUntil { FileManager.default.fileExists(atPath: target.path) }
         #expect(try String(contentsOf: target, encoding: .utf8).contains("slash title"))
-    }
-
-    @Test("an export name never names a folder or a hidden file")
-    func exportBaseCleansTheTitle() {
-        let dir = URL(fileURLWithPath: "/exports", isDirectory: true)
-        #expect(AppModel.unusedExportBase(for: "a/b/c", extensions: ["txt"], in: dir) { _ in false } == "a-b-c")
-        #expect(AppModel.unusedExportBase(for: "..hidden", extensions: ["txt"], in: dir) { _ in false } == "hidden")
-        #expect(AppModel.unusedExportBase(for: "...", extensions: ["txt"], in: dir) { _ in false } == "Transcript")
     }
 
     @Test("runAutoExports writes nothing when no rule matches the source extension")

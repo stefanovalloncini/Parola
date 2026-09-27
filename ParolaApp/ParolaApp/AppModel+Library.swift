@@ -528,6 +528,7 @@ extension AppModel {
                     try await AppModel.offMainIO {
                         let data = try exporter.render(transcript)
                         try data.write(to: url, options: .atomic)
+                        OutputMarker.mark(url)
                     }
                 } catch {
                     // An entry id is <timestamp>-<uuid>; only the uuid half is loggable.

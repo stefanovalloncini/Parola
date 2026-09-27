@@ -66,6 +66,7 @@ extension AppModel {
         try await AppModel.offMainIO {
             let data = try Exporters.exporter(for: spec).render(transcript)
             try data.write(to: url, options: .atomic)
+            OutputMarker.mark(url)
         }
     }
 

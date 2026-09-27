@@ -342,7 +342,7 @@ struct AppModelBatchTests {
         #expect(written)
     }
 
-    @Test("batch sidecars win over auto-export rules for the same target")
+    @Test("a batch preset keeps the plain name; a rule's preset of the same format adds its own")
     func batchSidecarWinsOverAutoExportRule() async throws {
         let scratch = try Self.makeScratchDirectory()
         defer { try? FileManager.default.removeItem(at: scratch) }
@@ -367,12 +367,42 @@ struct AppModelBatchTests {
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
 
         let mdURL = scratch.appendingPathComponent("clip.md")
+        let ruleMdURL = scratch.appendingPathComponent("clip.Transcript-md.md")
         let mdWritten = await Self.waitForFile(at: mdURL)
+        let ruleMdWritten = await Self.waitForFile(at: ruleMdURL)
         let txtWritten = await Self.waitForFile(at: scratch.appendingPathComponent("clip.txt"))
         #expect(mdWritten)
+        #expect(ruleMdWritten)
         #expect(txtWritten)
         let markdown = try String(contentsOf: mdURL, encoding: .utf8)
         #expect(markdown.contains("*["))
+        let ruleMarkdown = try String(contentsOf: ruleMdURL, encoding: .utf8)
+        #expect(!ruleMarkdown.contains("*["))
+    }
+
+    @Test("a finished job remembers where its sidecars landed, a numbered copy included")
+    func batchJobRemembersItsSidecars() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportPresetIDs = [ExportPreset.builtIn(for: .srt)!.id]
+        model.autoExportRules = []
+        let source = scratch.appendingPathComponent("talk.mp4")
+        try Data("fake".utf8).write(to: source)
+        try Data("downloaded".utf8).write(to: scratch.appendingPathComponent("talk.srt"))
+        let job = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [job]
+
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+
+        let numbered = scratch.appendingPathComponent("talk (2).srt")
+        #expect(await Self.waitForFile(at: numbered))
+        let deadline = ContinuousClock.now + .seconds(3)
+        while model.batchSidecars[job.id] == nil, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(model.batchSidecars[job.id] == [numbered])
+        #expect(try String(contentsOf: scratch.appendingPathComponent("talk.srt"), encoding: .utf8) == "downloaded")
     }
 
     private static func waitForEntries(in model: AppModel, timeout: TimeInterval = 3) async -> [LibraryEntry] {

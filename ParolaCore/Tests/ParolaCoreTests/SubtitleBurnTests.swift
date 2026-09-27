@@ -30,6 +30,7 @@ struct SubtitleBurnTests {
             reports.append(fraction)
         }
         #expect(FileManager.default.fileExists(atPath: out.path))
+        #expect(OutputMarker.isMarked(out))
 
         // A short clip can finish between polls, so the callback may never fire; when it does,
         // every report must be a sane, non-decreasing fraction.

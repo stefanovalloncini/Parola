@@ -28,11 +28,14 @@ extension AppModel {
     }
 
     /// The presets named here and the auto-export rules for this source, planned together so no file is written twice.
-    func writeSidecars(_ transcript: Transcript, presets: [ExportPreset], source: SidecarSource) {
+    @discardableResult
+    func writeSidecars(
+        _ transcript: Transcript, presets: [ExportPreset], source: SidecarSource
+    ) -> Task<[ExportJobResult], Never>? {
         let jobs = SidecarExportPlanner.plan(
             presets: presets, rules: autoExportRules, library: exportPresets, source: source
         )
-        guard !jobs.isEmpty else { return }
-        Task { _ = await ExportRunner.run(jobs, transcript: transcript) }
+        guard !jobs.isEmpty else { return nil }
+        return Task { await ExportRunner.run(jobs, transcript: transcript) }
     }
 }

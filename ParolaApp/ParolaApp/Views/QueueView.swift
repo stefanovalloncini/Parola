@@ -200,8 +200,7 @@ struct QueueView: View {
             }
             .onDrag {
                 guard case .done = job.status else { return NSItemProvider() }
-                let exports = model.batchExportPresets
-                    .map { job.url.deletingPathExtension().appendingPathExtension($0.spec.format.fileExtension) }
+                let exports = (model.batchSidecars[job.id] ?? [])
                     .filter { FileManager.default.fileExists(atPath: $0.path) }
                 return NSItemProvider(object: (exports.first ?? job.url) as NSURL)
             }

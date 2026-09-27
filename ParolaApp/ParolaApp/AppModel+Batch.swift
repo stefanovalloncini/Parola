@@ -63,7 +63,14 @@ extension AppModel {
                 showUnsavedBatchJob(id, processed)
             }
             if let job = batchJobs.first(where: { $0.id == id }) {
-                writeSidecars(processed, presets: batchExportPresets, source: SidecarSource(besideFile: job.url))
+                if let sidecars = writeSidecars(
+                    processed, presets: batchExportPresets, source: SidecarSource(besideFile: job.url)
+                ) {
+                    Task { [weak self] in
+                        let written = await sidecars.value.compactMap(\.written)
+                        self?.batchSidecars[id] = written
+                    }
+                }
                 persistBatchJobToLibrary(id, transcript: processed, sourceURL: job.url, sourceDigest: job.sourceDigest)
             }
         case .failed(let id, let reason):
@@ -366,6 +373,7 @@ extension AppModel {
     func clearBatch() {
         stopBatchRun()
         batchJobs = []
+        batchSidecars = [:]
         selectedBatchJobID = nil
         batchDuplicatesSkipped = 0
     }

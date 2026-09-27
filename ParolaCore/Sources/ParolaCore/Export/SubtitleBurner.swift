@@ -137,6 +137,7 @@ public enum SubtitleBurner {
             if error is CancellationError || Task.isCancelled { throw CancellationError() }
             throw ParolaError.ioError("Export failed: \(error.localizedDescription)")
         }
+        OutputMarker.mark(output)
     }
 
     private static func makeOverlayLayer(
