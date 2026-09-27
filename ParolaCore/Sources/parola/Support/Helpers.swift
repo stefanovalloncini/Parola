@@ -94,6 +94,52 @@ func awaitStop(seconds: Double?) async {
     timer?.cancel()
 }
 
+struct Interrupted: Error {}
+
+/// Runs `body` until SIGINT/SIGTERM, which cancels it and waits for it to unwind before throwing `Interrupted`.
+func untilInterrupted<T: Sendable>(_ body: @escaping @Sendable () async throws -> T) async throws -> T {
+    let signals = [AsyncSignalStream(signal: SIGINT), AsyncSignalStream(signal: SIGTERM)]
+    return try await withThrowingTaskGroup(of: T?.self) { group in
+        group.addTask { try await body() }
+        for stream in signals {
+            group.addTask {
+                await stream.wait()
+                return nil
+            }
+        }
+        // Wakes whichever waiter is still parked, or the group would wait on it forever.
+        defer { for stream in signals { stream.fire() } }
+        let first = try await group.next() ?? nil
+        group.cancelAll()
+        guard let first else { throw Interrupted() }
+        return first
+    }
+}
+
+/// While alive, SIGINT or SIGTERM runs `cleanup` and ends the process with 130, the status a shell gives an interrupted command.
+final class InterruptCleanup: Sendable {
+    private let streams: [AsyncSignalStream]
+    private let watchers: [Task<Void, Never>]
+
+    init(_ cleanup: @escaping @Sendable () -> Void) {
+        let streams = [AsyncSignalStream(signal: SIGINT), AsyncSignalStream(signal: SIGTERM)]
+        self.streams = streams
+        watchers = streams.map { stream in
+            Task.detached {
+                await stream.wait()
+                guard !Task.isCancelled else { return }
+                cleanup()
+                exit(130)
+            }
+        }
+    }
+
+    func stop() {
+        for watcher in watchers { watcher.cancel() }
+        for stream in streams { stream.fire() }
+    }
+}
+
 /// Unchecked Sendable: `semaphore` is its own synchronization; `source` is `let` and `DispatchSourceSignal` is thread-safe.
 final class AsyncSignalStream: @unchecked Sendable {
     private let semaphore = DispatchSemaphore(value: 0)

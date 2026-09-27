@@ -1705,6 +1705,7 @@ final class AppModel {
         )
         if sideEffects.contains(.refreshYtDlp) {
             refreshYtDlpAvailability()
+            Task { try? await AppModel.offMainIO(qos: .utility) { LinkDownloadFolders.removeStale() } }
         }
         if sideEffects.contains(.watchedFolders) {
             _ = watchedFolders
@@ -1796,7 +1797,8 @@ final class AppModel {
         title: String? = nil,
         activate: Bool = true,
         sourceDigest: String? = nil,
-        playsCompletionSound: Bool = true
+        playsCompletionSound: Bool = true,
+        consumesAudio: Bool = false
     ) -> Task<LibraryEntry, any Error> {
         let category = pendingRecordingCategory
         pendingRecordingCategory = .transcription
@@ -1808,7 +1810,8 @@ final class AppModel {
                 category: category,
                 title: title,
                 sourceDigest: sourceDigest,
-                source: source
+                source: source,
+                consumesAudio: consumesAudio
             )
         }
         Task { [weak self] in
@@ -2280,20 +2283,22 @@ final class AppModel {
                 fileTranscribeStage = nil
                 endRecovery(recoveryToken)
                 phase = .ready
-                fileRunLanding = FileRunLanding(
-                    runToken: runToken,
-                    text: processed.text,
-                    entry: persistToLibrary(
-                        processed,
-                        audioSource: fileURL,
-                        source: fetchedLink == nil ? .file : .web,
-                        title: fetchedLink.map { $0.media.metadata.title ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()) },
-                        sourceDigest: sourceDigest
-                    )
+                let ownedDownload = fetchedLink.flatMap { $0.media.workingDirectory == nil ? nil : $0 }
+                let entry = persistToLibrary(
+                    processed,
+                    audioSource: fileURL,
+                    source: fetchedLink == nil ? .file : .web,
+                    title: fetchedLink.map { $0.media.metadata.title ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()) },
+                    sourceDigest: sourceDigest,
+                    consumesAudio: ownedDownload != nil
                 )
+                fileRunLanding = FileRunLanding(runToken: runToken, text: processed.text, entry: entry)
+                if let ownedDownload { followLinkAudioIntoLibrary(ownedDownload, entry: entry) }
                 retireFileRun(runToken)
             } catch {
                 endRecovery(recoveryToken)
+                // Retry and recovery fetch the link again, so the download has no further use.
+                fetchedLink?.media.discard()
                 // A run a newer one replaced leaves the newer one's pane alone.
                 if fileRunGeneration == runToken {
                     filePartialText = ""
@@ -2649,6 +2654,18 @@ final class AppModel {
             }
         }
         return .started
+    }
+
+    /// Playback follows the download into its entry before the folder goes; a failed save keeps the folder playing.
+    private func followLinkAudioIntoLibrary(_ fetched: FetchedLink, entry adding: Task<LibraryEntry, any Error>) {
+        Task { [weak self, library] in
+            guard let entry = try? await adding.value else { return }
+            let audio = try? await library.load(entry.id).document.audioURL
+            if let self, let audio, self.sourceFileURL == fetched.media.fileURL {
+                self.movePlayback(to: audio)
+            }
+            fetched.media.discard()
+        }
     }
 
     /// Folds yt-dlp's events into what the pane shows, so the newest hop always carries the title too.

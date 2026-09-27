@@ -33,6 +33,24 @@ struct LibraryStoreTests {
         )
     }
 
+    @Test("an add that consumes its audio moves it into the bundle; a plain add copies")
+    func consumedAudioIsMoved() async throws {
+        let (store, _) = try makeTempLibrary()
+        let consumed = try makeFakeAudio()
+        let copied = try makeFakeAudio()
+        defer { try? FileManager.default.removeItem(at: copied) }
+
+        let moved = try await store.add(transcript: makeTranscript(), audioSource: consumed, consumesAudio: true)
+        let kept = try await store.add(transcript: makeTranscript(), audioSource: copied)
+
+        #expect(!FileManager.default.fileExists(atPath: consumed.path))
+        #expect(FileManager.default.fileExists(atPath: copied.path))
+        for entry in [moved, kept] {
+            let audio = try #require(try await store.load(entry.id).document.audioURL)
+            #expect(try Data(contentsOf: audio) == Data("RIFFfakeaudio".utf8))
+        }
+    }
+
     @Test("chat history is never searchable")
     func chatHistoryIsNotIndexed() async throws {
         let (store, _) = try makeTempLibrary()

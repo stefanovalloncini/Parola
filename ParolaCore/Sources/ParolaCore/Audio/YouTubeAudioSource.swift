@@ -43,7 +43,7 @@ public extension URL {
 public actor YouTubeAudioSource: AudioSource {
     public let url: URL
 
-    private let workingDir: URL
+    nonisolated let workingDir: URL
     private let ytDlpPath: String?
     private let limits: YtDlpRunner.ProgressLimits
     private var fetched: FetchedMedia?
@@ -62,7 +62,7 @@ public actor YouTubeAudioSource: AudioSource {
         self.ytDlpPath = ytDlpPath
         self.limits = limits
         self.workingDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-yt-\(UUID().uuidString)")
+            .appendingPathComponent("\(LinkDownloadFolders.prefix)\(UUID().uuidString)")
     }
 
     public func prepare() async throws -> URL {
@@ -75,6 +75,19 @@ public actor YouTubeAudioSource: AudioSource {
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .toolMissing, site: site))
         }
         try FileManager.default.createDirectory(at: workingDir, withIntermediateDirectories: true)
+        do {
+            let media = try await download(ytDlpPath: ytDlp, progress: progress)
+            fetched = media
+            return media
+        } catch {
+            try? FileManager.default.removeItem(at: workingDir)
+            throw error
+        }
+    }
+
+    private func download(
+        ytDlpPath ytDlp: String, progress: @escaping @Sendable (LinkFetchEvent) -> Void
+    ) async throws -> FetchedMedia {
         // Progress comes on stdout and post-processing on stderr, so a late progress line mustn't take the bar backwards.
         let processing = OSAllocatedUnfairLock(initialState: false)
         let output = try await YouTubeProcess.fetch(
@@ -105,9 +118,9 @@ public actor YouTubeAudioSource: AudioSource {
         guard let path = output.filePath, FileManager.default.fileExists(atPath: path) else {
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noAudio, site: site))
         }
-        let media = FetchedMedia(fileURL: URL(fileURLWithPath: path), metadata: output.metadata ?? LinkMetadata())
-        fetched = media
-        return media
+        return FetchedMedia(
+            fileURL: URL(fileURLWithPath: path), metadata: output.metadata ?? LinkMetadata(), workingDirectory: workingDir
+        )
     }
 
     public func cancel() async {

@@ -163,6 +163,12 @@ struct Transcribe: AsyncParsableCommand {
         let source: any AudioSource
         let sourceURL: URL
         var link: LinkMetadata?
+        var fetched: FetchedMedia?
+        var interruptCleanup: InterruptCleanup?
+        defer {
+            interruptCleanup?.stop()
+            fetched?.discard()
+        }
         switch input {
         case .file(let url):
             source = FileAudioSource(url: url)
@@ -173,12 +179,22 @@ struct Transcribe: AsyncParsableCommand {
             emitter.progress(.downloading, detail: url.absoluteString)
             let yt = try YouTubeAudioSource(url: url, features: ParolaCLI.features)
             let bar = mcp ? nil : ProgressReporter(label: "downloading audio")
-            let media = try await yt.fetch { event in
-                guard case .downloading(let fraction?) = event else { return }
-                bar?.update(fraction)
-                emitter.progress(.downloading, fraction: fraction, detail: url.absoluteString)
+            let media: FetchedMedia
+            do {
+                media = try await untilInterrupted {
+                    try await yt.fetch { event in
+                        guard case .downloading(let fraction?) = event else { return }
+                        bar?.update(fraction)
+                        emitter.progress(.downloading, fraction: fraction, detail: url.absoluteString)
+                    }
+                }
+            } catch is Interrupted {
+                bar?.finish()
+                throw ExitCode(130)
             }
             bar?.finish()
+            fetched = media
+            interruptCleanup = InterruptCleanup { media.discard() }
             source = yt
             sourceURL = media.fileURL
             link = media.metadata

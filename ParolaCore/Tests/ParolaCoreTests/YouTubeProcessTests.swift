@@ -281,6 +281,81 @@ struct YouTubeAudioDownloadTests {
         #expect(delivered.filter { $0 == .processing }.count == 1)
     }
 
+    private static let writesAudio = """
+        while [ $# -gt 0 ]; do
+          [ "$1" = "-o" ] && out="$2"
+          shift
+        done
+        file=$(printf '%s' "$out" | sed 's/%(ext)s/m4a/')
+        printf 'audio' > "$file"
+        """
+
+    @Test("a finished download owns its folder until it's discarded")
+    func finishedDownloadOwnsItsFolder() async throws {
+        let fake = try fakeYtDlp(Self.writesAudio + "\necho \"[PAROLA_FILE] $file\"")
+        defer { try? FileManager.default.removeItem(at: fake) }
+        let source = try YouTubeAudioSource(url: Self.link, features: .all, ytDlpPath: fake.path, limits: tight())
+
+        let media = try await source.fetch()
+
+        #expect(media.workingDirectory == source.workingDir)
+        #expect(media.fileURL.deletingLastPathComponent().path == source.workingDir.path)
+        #expect(FileManager.default.fileExists(atPath: media.fileURL.path))
+        media.discard()
+        #expect(!FileManager.default.fileExists(atPath: source.workingDir.path))
+    }
+
+    @Test("a failed download leaves no folder behind")
+    func failedDownloadCleansUp() async throws {
+        let fake = try fakeYtDlp(Self.writesAudio + "\necho 'ERROR: [youtube] x: Video unavailable' >&2\nexit 1")
+        defer { try? FileManager.default.removeItem(at: fake) }
+        let source = try YouTubeAudioSource(url: Self.link, features: .all, ytDlpPath: fake.path, limits: tight())
+
+        let failure = await linkFailure { _ = try await source.fetch() }
+
+        #expect(failure?.reason == .unavailable(.removed))
+        #expect(!FileManager.default.fileExists(atPath: source.workingDir.path))
+    }
+
+    @Test("a cancelled download ends yt-dlp and leaves no folder behind")
+    func cancelledDownloadCleansUp() async throws {
+        let pidFile = FileManager.default.temporaryDirectory.appendingPathComponent("parola-pid-\(UUID().uuidString)")
+        let fake = try fakeYtDlp(Self.writesAudio + "\necho $$ > '\(pidFile.path)'\nexec sleep 30")
+        defer { try? FileManager.default.removeItem(at: fake) }
+        let source = try YouTubeAudioSource(url: Self.link, features: .all, ytDlpPath: fake.path, limits: tight(quiet: .seconds(30)))
+
+        let download = Task { try await source.fetch() }
+        while !FileManager.default.fileExists(atPath: pidFile.path) { try await Task.sleep(for: .milliseconds(20)) }
+        download.cancel()
+
+        await #expect(throws: CancellationError.self) { _ = try await download.value }
+        let pid = try #require(Int32(String(contentsOf: pidFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
+        #expect(!isAlive(pid))
+        #expect(!FileManager.default.fileExists(atPath: source.workingDir.path))
+    }
+
+    @Test("the launch sweep removes day-old download folders and nothing else")
+    func sweepRemovesStaleFolders() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("parola-sweep-\(UUID().uuidString)")
+        let stale = root.appendingPathComponent("\(LinkDownloadFolders.prefix)stale")
+        let fresh = root.appendingPathComponent("\(LinkDownloadFolders.prefix)fresh")
+        let unrelated = root.appendingPathComponent("parola-other")
+        for folder in [stale, fresh, unrelated] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+        let now = Date()
+        let twoDaysAgo = now.addingTimeInterval(-2 * 86_400)
+        try FileManager.default.setAttributes([.modificationDate: twoDaysAgo], ofItemAtPath: stale.path)
+        try FileManager.default.setAttributes([.modificationDate: twoDaysAgo], ofItemAtPath: unrelated.path)
+
+        #expect(LinkDownloadFolders.removeStale(in: root, now: now) == 1)
+
+        #expect(!FileManager.default.fileExists(atPath: stale.path))
+        #expect(FileManager.default.fileExists(atPath: fresh.path))
+        #expect(FileManager.default.fileExists(atPath: unrelated.path))
+    }
+
     @Test("a download that ends without a file fails as no audio")
     func noFileIsNoAudio() async throws {
         let fake = try fakeYtDlp("echo '[PAROLA_P] 1 1'")

@@ -474,7 +474,8 @@ public actor LibraryStore {
         category: EntryCategory = .transcription,
         title: String? = nil,
         sourceDigest: String? = nil,
-        source: EntrySource? = nil
+        source: EntrySource? = nil,
+        consumesAudio: Bool = false
     ) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
@@ -493,7 +494,8 @@ public actor LibraryStore {
                     category: category,
                     titleOverride: title,
                     sourceDigest: digest,
-                    entrySource: source
+                    entrySource: source,
+                    movesAudio: consumesAudio
                 )
                 didWriteBundle?()
             }

@@ -28,7 +28,7 @@ public enum YouTubeSubsFetcher {
         }
 
         let workingDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-yt-subs-\(UUID().uuidString)")
+            .appendingPathComponent("\(LinkDownloadFolders.prefix)subs-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: workingDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workingDir) }
 

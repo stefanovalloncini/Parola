@@ -104,6 +104,18 @@ extension AppModel {
         return LoadedAssetInfo(hasVideo: !tracks.isEmpty, durationSeconds: duration)
     }
 
+    /// The same audio at a new path: where the listener was, and whether it was playing, carry over.
+    func movePlayback(to url: URL) {
+        let position = currentTimeSeconds
+        let wasPlaying = isPlaying
+        let matchedMedia = transcriptMatchesLoadedMedia
+        sourceFileURL = url
+        installPlayer(for: url)
+        if matchedMedia { adoptLoadedMediaDuration() }
+        if position > 0 { seekPlayer(to: position) }
+        if wasPlaying { player?.play() }
+    }
+
     /// Re-points playback at a finished run's own audio: an entry opened mid-run leaves the player on the entry's file.
     func restorePlaybackSource(_ url: URL) {
         guard sourceFileURL != url else { return }

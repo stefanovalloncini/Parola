@@ -219,7 +219,8 @@ public struct ParolaDocument: Sendable {
         deletedAt: Date? = nil,
         titleOverride: String? = nil,
         sourceDigest: String? = nil,
-        entrySource: EntrySource? = nil
+        entrySource: EntrySource? = nil,
+        movesAudio: Bool = false
     ) throws -> URL {
         let target = destination.pathExtension == "parola"
             ? destination
@@ -232,13 +233,20 @@ public struct ParolaDocument: Sendable {
         }
         try fm.createDirectory(at: staging, withIntermediateDirectories: true)
 
+        var movedAudio: URL?
         do {
             var originalAudioName = ""
             var audioFilename: String?
             if let source {
                 let audioExt = source.pathExtension.isEmpty ? "wav" : source.pathExtension
                 let audioName = "audio.\(audioExt)"
-                try fm.copyItem(at: source, to: staging.appendingPathComponent(audioName))
+                let staged = staging.appendingPathComponent(audioName)
+                if movesAudio {
+                    try fm.moveItem(at: source, to: staged)
+                    movedAudio = staged
+                } else {
+                    try fm.copyItem(at: source, to: staged)
+                }
                 originalAudioName = source.lastPathComponent
                 audioFilename = audioName
             }
@@ -267,6 +275,7 @@ public struct ParolaDocument: Sendable {
             }
             try fm.moveItem(at: staging, to: target)
         } catch {
+            if let movedAudio, let source { try? fm.moveItem(at: movedAudio, to: source) }
             try? fm.removeItem(at: staging)
             throw error
         }

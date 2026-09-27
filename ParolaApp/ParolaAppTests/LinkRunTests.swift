@@ -23,24 +23,29 @@ actor FetchGate {
     }
 }
 
-/// A link fetcher that reports a title and half the download, then hands back a local file.
+/// A link fetcher that reports a title and half the download, then hands back a local file. An owning fetcher
+/// copies the fixture into a working folder of its own, the way yt-dlp's download lands.
 final class ScriptedLinkFetcher: MediaFetcher {
     let fixture: URL
     let metadata: LinkMetadata
     let gate: FetchGate?
+    let owned: Bool
     private let count = OSAllocatedUnfairLock(initialState: 0)
+    private let folders = OSAllocatedUnfairLock<[URL]>(initialState: [])
 
     static let talk = LinkMetadata(
         title: "A talk", webpageURL: URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"), id: "dQw4w9WgXcQ", duration: 0.3
     )
 
-    init(fixture: URL, metadata: LinkMetadata = ScriptedLinkFetcher.talk, gate: FetchGate? = nil) {
+    init(fixture: URL, metadata: LinkMetadata = ScriptedLinkFetcher.talk, gate: FetchGate? = nil, owned: Bool = false) {
         self.fixture = fixture
         self.metadata = metadata
         self.gate = gate
+        self.owned = owned
     }
 
     var fetches: Int { count.withLock { $0 } }
+    var workingFolders: [URL] { folders.withLock { $0 } }
 
     func fetch(url: URL, progress: @escaping @Sendable (LinkFetchEvent) -> Void) async throws -> FetchedMedia {
         count.withLock { $0 += 1 }
@@ -48,7 +53,13 @@ final class ScriptedLinkFetcher: MediaFetcher {
         progress(.downloading(fraction: 0.5))
         await gate?.wait()
         try Task.checkCancellation()
-        return FetchedMedia(fileURL: fixture, metadata: metadata)
+        guard owned else { return FetchedMedia(fileURL: fixture, metadata: metadata) }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("parola-yt-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent("audio.wav")
+        try FileManager.default.copyItem(at: fixture, to: file)
+        folders.withLock { $0.append(folder) }
+        return FetchedMedia(fileURL: file, metadata: metadata, workingDirectory: folder)
     }
 }
 
@@ -192,6 +203,55 @@ extension TranscriberMockSuites {
                 #expect(entry.title.hasPrefix(String(localized: "Web video — \("")")))
                 #expect(model.transcript?.sourceURL == URL(string: Self.link))
                 #expect(model.linkRunTitle == nil)
+            }
+        }
+
+        @Test("a landed link's audio moves into its entry, playback follows it, and the working folder goes")
+        func landingConsumesTheDownload() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.transcriber]) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: Self.words)
+                let fetcher = ScriptedLinkFetcher(fixture: fixture, owned: true)
+                let model = makeModel(fetcher: fetcher)
+
+                model.transcribeYouTube(urlString: Self.link)
+                await waitUntil { model.phase == .ready && model.fileRunLanding != nil }
+                let entry = try #require(try await model.fileRunLanding?.entry.value)
+                let folder = try #require(fetcher.workingFolders.first)
+                await waitUntil { !FileManager.default.fileExists(atPath: folder.path) }
+
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                #expect(FileManager.default.fileExists(atPath: audio.path))
+                #expect(model.sourceFileURL == audio)
+                await waitUntil { model.currentTranscriptTitle == "A talk" }
+            }
+        }
+
+        @Test("a link whose transcription fails or is cancelled leaves no working folder", arguments: [false, true])
+        func failedOrCancelledRunCleansUp(cancel: Bool) async throws {
+            let fixture = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.transcriber]) {
+                let held = MockTranscriberGate()
+                defer { Task { await held.open() } }
+                let failing = MockTranscriberResponse(failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom"))
+                var holding = Self.words
+                holding.gate = held
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: cancel ? holding : failing)
+                let fetcher = ScriptedLinkFetcher(fixture: fixture, owned: true)
+                let model = makeModel(fetcher: fetcher)
+
+                model.transcribeYouTube(urlString: Self.link)
+                await waitUntil { !fetcher.workingFolders.isEmpty && model.sourceFileURL != nil }
+                let folder = try #require(fetcher.workingFolders.first)
+                if cancel {
+                    model.cancelCurrentWork()
+                } else {
+                    await waitUntil { model.phase == .failed(message: "Transcription failed: boom") }
+                }
+
+                await waitUntil { !FileManager.default.fileExists(atPath: folder.path) }
             }
         }
 

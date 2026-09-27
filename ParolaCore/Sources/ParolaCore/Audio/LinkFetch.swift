@@ -37,14 +37,48 @@ public enum LinkFetchEvent: Sendable, Equatable {
     case processing
 }
 
-/// A link's audio, downloaded to a local file.
+/// A link's audio, downloaded to a local file. The download's working folder belongs to whoever holds this, and
+/// ``discard()`` removes it once the file has been used or moved into the library.
 public struct FetchedMedia: Sendable {
     public let fileURL: URL
     public let metadata: LinkMetadata
+    /// Nil when the file isn't the fetch's to delete, like a test fixture.
+    public let workingDirectory: URL?
 
-    public init(fileURL: URL, metadata: LinkMetadata = LinkMetadata()) {
+    public init(fileURL: URL, metadata: LinkMetadata = LinkMetadata(), workingDirectory: URL? = nil) {
         self.fileURL = fileURL
         self.metadata = metadata
+        self.workingDirectory = workingDirectory
+    }
+
+    public func discard() {
+        guard let workingDirectory else { return }
+        try? FileManager.default.removeItem(at: workingDirectory)
+    }
+}
+
+/// Every link fetch works in a `parola-yt-…` folder under the temporary directory.
+public enum LinkDownloadFolders {
+    public static let prefix = "parola-yt-"
+
+    /// A fetch cut short by a crash or a kill leaves its folder behind; a day on, nothing can still be using it.
+    @discardableResult
+    public static func removeStale(
+        in directory: URL = FileManager.default.temporaryDirectory,
+        olderThan age: TimeInterval = 86_400,
+        now: Date = Date()
+    ) -> Int {
+        let fm = FileManager.default
+        let folders = (try? fm.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: [.contentModificationDateKey], options: .skipsHiddenFiles
+        )) ?? []
+        var removed = 0
+        for folder in folders where folder.lastPathComponent.hasPrefix(prefix) {
+            let modified = (try? folder.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            guard let modified, now.timeIntervalSince(modified) > age else { continue }
+            if (try? fm.removeItem(at: folder)) != nil { removed += 1 }
+        }
+        return removed
     }
 }
 
