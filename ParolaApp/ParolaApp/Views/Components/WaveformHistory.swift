@@ -1,4 +1,5 @@
 import SwiftUI
+import ParolaCore
 
 struct LevelHistory: Equatable, Sendable {
     private(set) var samples: [Float]
@@ -15,8 +16,64 @@ struct LevelHistory: Equatable, Sendable {
     }
 }
 
+/// Ticks at `interval` while the capture hears sound and only polls a second after it stops, so silence isn't redrawn.
+struct LevelMeterSchedule: TimelineSchedule {
+    static let interval: TimeInterval = 1.0 / 30.0
+    static let restingPoll: TimeInterval = 0.25
+    static let restAfter: Duration = .seconds(1)
+
+    let meter: LevelMeter
+
+    /// The step to the next frame, read from the meter as each one is asked for.
+    static func step(lastSound: ContinuousClock.Instant?, now: ContinuousClock.Instant, mode: Mode) -> TimeInterval {
+        guard mode == .normal else { return 1 }
+        guard let lastSound, lastSound.duration(to: now) < restAfter else { return restingPoll }
+        return interval
+    }
+
+    func entries(from startDate: Date, mode: Mode) -> Entries {
+        Entries(meter: meter, mode: mode, date: startDate)
+    }
+
+    struct Entries: Sequence, IteratorProtocol {
+        let meter: LevelMeter
+        let mode: Mode
+        var date: Date
+
+        /// Frames stay on the grid they started on; only one that fell behind restarts from now.
+        mutating func next() -> Date? {
+            defer {
+                let step = LevelMeterSchedule.step(lastSound: meter.lastSound, now: .now, mode: mode)
+                let now = Date()
+                date = date.addingTimeInterval(step)
+                if date < now { date = now.addingTimeInterval(step) }
+            }
+            return date
+        }
+    }
+}
+
+/// The bars a history meter draws. A reference, not `@State`: each frame appends without invalidating the view.
+final class LevelTrace {
+    private(set) var history: LevelHistory
+    private var sampledAt: Date?
+
+    init(capacity: Int) {
+        history = LevelHistory(capacity: capacity)
+    }
+
+    /// One sample per frame date, however often SwiftUI evaluates that frame.
+    func samples(at date: Date, reading meter: LevelMeter) -> [Float] {
+        if date != sampledAt {
+            sampledAt = date
+            history.append(meter.takePeak())
+        }
+        return history.samples
+    }
+}
+
 struct WaveformHistory: View {
-    let level: Float
+    private let meter: LevelMeter?
     var capacity: Int = 32
     var barWidth: CGFloat = 2
     var spacing: CGFloat = 1.5
@@ -24,15 +81,13 @@ struct WaveformHistory: View {
     var idleHeight: CGFloat = 2
     var fill: Color = .white
 
-    /// A ready window of levels. When it is there the view draws it as-is instead of sampling `level`.
+    /// A ready window of levels. When it is there the view draws it as-is instead of reading a meter.
     private let envelope: [Float]?
 
-    @State private var history: LevelHistory
-    // `.now` re-read in the body restarts the schedule on every parent update, refilling the ring with one level.
-    @State private var clockStart = Date()
+    @State private var trace: LevelTrace
 
     init(
-        level: Float,
+        meter: LevelMeter?,
         capacity: Int = 32,
         barWidth: CGFloat = 2,
         spacing: CGFloat = 1.5,
@@ -40,7 +95,7 @@ struct WaveformHistory: View {
         idleHeight: CGFloat = 2,
         fill: Color = .white
     ) {
-        self.level = level
+        self.meter = meter
         self.capacity = capacity
         self.barWidth = barWidth
         self.spacing = spacing
@@ -48,7 +103,7 @@ struct WaveformHistory: View {
         self.idleHeight = idleHeight
         self.fill = fill
         self.envelope = nil
-        _history = State(initialValue: LevelHistory(capacity: capacity))
+        _trace = State(initialValue: LevelTrace(capacity: capacity))
     }
 
     init(
@@ -59,7 +114,7 @@ struct WaveformHistory: View {
         idleHeight: CGFloat = 2,
         fill: Color = .white
     ) {
-        self.level = 0
+        self.meter = nil
         self.capacity = samples.count
         self.barWidth = barWidth
         self.spacing = spacing
@@ -67,8 +122,8 @@ struct WaveformHistory: View {
         self.idleHeight = idleHeight
         self.fill = fill
         self.envelope = samples
-        // The envelope draws itself; the ring behind `level` is never sampled on this path.
-        _history = State(initialValue: LevelHistory(capacity: 1))
+        // The envelope draws itself; the trace behind a meter is never sampled on this path.
+        _trace = State(initialValue: LevelTrace(capacity: 1))
     }
 
     private var contentWidth: CGFloat {
@@ -79,13 +134,13 @@ struct WaveformHistory: View {
         Group {
             if let envelope {
                 bars(envelope)
-            } else {
-                // Audio levels arrive in irregular bursts; sampling the latest level on a steady ~30fps
-                // display clock makes the scroll cadence even (smooth) instead of stuttering with the input.
-                TimelineView(.periodic(from: clockStart, by: 1.0 / 30.0)) { timeline in
-                    bars(history.samples)
-                        .onChange(of: timeline.date) { _, _ in history.append(level) }
+            } else if let meter {
+                // Sampling on a steady display clock keeps the scroll even while buffers arrive in bursts.
+                TimelineView(LevelMeterSchedule(meter: meter)) { timeline in
+                    bars(trace.samples(at: timeline.date, reading: meter))
                 }
+            } else {
+                bars(trace.history.samples)
             }
         }
         .frame(width: contentWidth, height: maxHeight)
@@ -109,5 +164,21 @@ struct WaveformHistory: View {
         let shaped = pow(value, 0.6)
         let scaled = min(1, max(0, CGFloat(shaped)))
         return idleHeight + (maxHeight - idleHeight) * scaled
+    }
+}
+
+/// Draws whatever a meter reads now, on the same resting clock as the history.
+struct LevelMeterReading<Content: View>: View {
+    let meter: LevelMeter?
+    @ViewBuilder let content: (Float) -> Content
+
+    var body: some View {
+        if let meter {
+            TimelineView(LevelMeterSchedule(meter: meter)) { _ in
+                content(meter.level)
+            }
+        } else {
+            content(0)
+        }
     }
 }

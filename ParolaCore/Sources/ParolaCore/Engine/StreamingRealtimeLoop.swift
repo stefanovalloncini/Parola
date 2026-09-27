@@ -51,6 +51,7 @@ actor StreamingRealtimeLoop {
     private let onPartial: @Sendable (String) -> Void
     private let onEnergy: @Sendable (Float) -> Void
     private let onConfirmed: @Sendable (ConfirmedAudioBatch) -> Void
+    private let levelMeter: LevelMeter
     private let inbox = OSAllocatedUnfairLock(initialState: Inbox())
 
     private var window: [Float] = []
@@ -69,6 +70,7 @@ actor StreamingRealtimeLoop {
         configuration: Configuration,
         decodingOptions: DecodingOptions,
         dependencies: Dependencies,
+        levelMeter: LevelMeter = LevelMeter(),
         onPartial: @escaping @Sendable (String) -> Void,
         onEnergy: @escaping @Sendable (Float) -> Void,
         onConfirmed: @escaping @Sendable (ConfirmedAudioBatch) -> Void
@@ -79,6 +81,7 @@ actor StreamingRealtimeLoop {
         self.onPartial = onPartial
         self.onEnergy = onEnergy
         self.onConfirmed = onConfirmed
+        self.levelMeter = levelMeter
     }
 
     func run() async -> Outcome {
@@ -203,6 +206,7 @@ actor StreamingRealtimeLoop {
     nonisolated private func ingest(_ buffer: [Float]) {
         guard !buffer.isEmpty else { return }
         let avgEnergy = AudioProcessor.calculateEnergy(of: buffer).avg
+        levelMeter.record(AudioLevel.normalised(rms: avgEnergy))
         let rel = inbox.withLock { box -> Float in
             let baseline = box.energies.suffix(20).map(\.avg).min() ?? .infinity
             let rel = AudioProcessor.calculateRelativeEnergy(of: buffer, relativeTo: baseline)

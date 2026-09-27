@@ -169,6 +169,38 @@ private func makeLoop(
 
 @Suite("Streaming realtime loop")
 struct StreamingRealtimeLoopTests {
+    @Test("each captured buffer writes the level meter, with no hop through the session")
+    func captureWritesTheLevelMeter() async throws {
+        let capture = FakeCapture()
+        let meter = LevelMeter()
+        let loop = StreamingRealtimeLoop(
+            configuration: .init(),
+            decodingOptions: DecodingOptions(),
+            dependencies: .init(
+                requestPermission: { true },
+                startCapture: { capture.install($0) },
+                stopCapture: { capture.markStopped() },
+                transcribe: { _, _, _ in TranscriptionResult(text: "", segments: [], language: "en", timings: TranscriptionTimings()) },
+                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+            ),
+            levelMeter: meter,
+            onPartial: { _ in },
+            onEnergy: { _ in },
+            onConfirmed: { _ in }
+        )
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.push(seconds: 0.1, value: 0.1)
+        #expect(abs(meter.level - AudioLevel.normalised(rms: 0.1)) < 0.001)
+        capture.push(seconds: 0.1, value: 0)
+        #expect(meter.level == 0)
+        #expect(meter.takePeak() > 0.6)
+
+        await loop.stop()
+        _ = await runTask.value
+    }
+
     @Test("polling the capture leaves its callback one frame deep")
     func pollingDoesNotNestTheCallback() {
         let capture = FakeCapture()

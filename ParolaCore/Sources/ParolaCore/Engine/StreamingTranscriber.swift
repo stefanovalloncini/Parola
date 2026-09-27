@@ -11,6 +11,8 @@ public protocol StreamingTranscriber: Sendable {
     /// no `.finished` arrives.
     func cancel() async
     func currentModel() async -> String?
+    /// Written from the capture thread as buffers arrive; a meter reads it when it draws.
+    var levelMeter: LevelMeter { get }
     /// The take's on-disk audio, when the transcriber persists one: the in-flight file
     /// while recording, or the file a failure left behind.
     func recordingAudioURL() async -> URL?
@@ -18,6 +20,7 @@ public protocol StreamingTranscriber: Sendable {
 
 public extension StreamingTranscriber {
     func recordingAudioURL() async -> URL? { nil }
+    var levelMeter: LevelMeter { LevelMeter() }
 }
 
 public enum StreamingTranscriberFactory {

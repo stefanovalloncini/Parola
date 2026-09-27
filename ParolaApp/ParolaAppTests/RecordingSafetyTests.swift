@@ -7,7 +7,6 @@ import ParolaTestSupport
 private struct StubLiveSource: LiveAudioSource {
     let url: URL
     func start() async throws {}
-    func levels() async -> AsyncStream<Float> { AsyncStream { $0.finish() } }
     func prepare() async throws -> URL { url }
     func cancel() async {}
 }

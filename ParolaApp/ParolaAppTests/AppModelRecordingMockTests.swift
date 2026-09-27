@@ -76,6 +76,59 @@ extension TranscriberMockSuites {
             #expect(await model.shouldUseStreamingMic() == false)
         }
 
+        /// Test mode, so a take never asks macOS for the microphone.
+        private func makeRecordingModel() -> AppModel {
+            AppModel(bootstrap: AppBootstrap(
+                mode: .test,
+                library: makeTempLibraryURL("recording-meter"),
+                defaultsOverride: temporaryDefaults(),
+                sideEffects: [],
+                filePicker: TestFilePicker(),
+                clock: ContinuousClock()
+            ))
+        }
+
+        @Test("a capture take shows its source's meter and lets go of it when the take ends")
+        func captureTakeShowsItsMeter() async throws {
+            let fixture = FileManager.default.temporaryDirectory.appendingPathComponent("parola-meter-\(UUID()).wav")
+            try Data(count: 64).write(to: fixture)
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let model = makeRecordingModel()
+                model.useStreaming = false
+                model.recordingCountInSeconds = 0
+                model.freeDiskSpaceProvider = { 50_000_000_000 }
+
+                model.startRecording(source: .microphone)
+                await waitUntil { model.recordingLevelMeter != nil }
+                let source = try #require(model.liveSource as? FixtureAudioSource)
+                #expect(model.recordingLevelMeter === source.levelMeter)
+
+                model.cancelCurrentWork()
+                await waitUntil { model.recordingLevelMeter == nil }
+            }
+        }
+
+        @Test("a streaming take shows a meter too, and lets go of it when the take ends")
+        func streamingTakeShowsTheSessionMeter() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["hello"], delayMs: 5_000))
+                let model = makeRecordingModel()
+                model.useStreaming = true
+                model.selectedModel = "openai_whisper-tiny"
+                model.recordingCountInSeconds = 0
+                model.freeDiskSpaceProvider = { 50_000_000_000 }
+
+                model.startRecording(source: .microphone)
+                await waitUntil { model.recordingLevelMeter != nil }
+                #expect(model.liveTakeIsStreaming)
+
+                model.cancelCurrentWork()
+                await waitUntil { model.recordingLevelMeter == nil }
+            }
+        }
+
         @Test("streaming finish clears live buffers and installs the transcript")
         func finishedClearsLiveSegments() async {
             let model = makeModel()

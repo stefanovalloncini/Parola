@@ -32,7 +32,10 @@ enum AudioLevel {
             let sample = samples[index]
             sumSquares += sample * sample
         }
-        let rms = sqrtf(sumSquares / Float(frameCount))
+        return normalised(rms: sqrtf(sumSquares / Float(frameCount)))
+    }
+
+    static func normalised(rms: Float) -> Float {
         let minDb: Float = -55
         let db = 20 * log10f(max(rms, 1e-7))
         let clamped = max(minDb, min(0, db))

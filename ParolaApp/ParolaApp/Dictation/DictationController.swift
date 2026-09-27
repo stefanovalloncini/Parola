@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import Foundation
 import os
 import ParolaCore
@@ -10,7 +9,8 @@ import SwiftUI
 @Observable
 final class DictationController {
     private(set) var state: DictationCoordinator.State = .idle
-    @ObservationIgnored let audioLevel = CurrentValueSubject<Float, Never>(0)
+    /// The meter the listening take writes; the HUD reads it when it draws.
+    private(set) var levelMeter: LevelMeter?
     private(set) var partialText: String = "" {
         didSet {
             recentDictation = Self.capped(partialText)
@@ -331,21 +331,17 @@ final class DictationController {
     private func startLevelStream() {
         guard let coord = coordinator else { return }
         levelTask?.cancel()
-        let subject = audioLevel
-        levelTask = Task { @MainActor in
-            let stream = await coord.levels()
-            for await level in stream {
-                if abs(subject.value - level) > 0.05 {
-                    subject.send(level)
-                }
-            }
+        levelTask = Task { @MainActor [weak self] in
+            let meter = await coord.levelMeter()
+            guard let self, !Task.isCancelled else { return }
+            levelMeter = meter
         }
     }
 
     private func stopLevelStream() {
         levelTask?.cancel()
         levelTask = nil
-        audioLevel.send(0)
+        if levelMeter != nil { levelMeter = nil }
     }
 
     private func startPartialStream() {

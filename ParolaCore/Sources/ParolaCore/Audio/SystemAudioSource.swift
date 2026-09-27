@@ -14,7 +14,7 @@ public actor SystemAudioSource: LiveAudioSource {
     private let outputURL: URL
     private let outputFormat: AVAudioFormat
     private let callbackQueue = DispatchQueue(label: "com.parola.system-audio")
-    private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
+    public nonisolated let levelMeter = LevelMeter()
     private var captureFailure: String?
 
     public init() {
@@ -73,16 +73,12 @@ public actor SystemAudioSource: LiveAudioSource {
             interleaved: false
         )
 
-        let levelSink: @Sendable (Float) -> Void = { [weak self] level in
-            guard let self else { return }
-            Task { await self.emitLevel(level) }
-        }
         let handler = SampleHandler(
             converter: converter,
             writer: CaptureFileWriter(file: writeFile),
             outputFormat: outputFormat,
             queue: callbackQueue,
-            onLevel: levelSink
+            onLevel: { [levelMeter] in levelMeter.record($0) }
         )
         let stream = SCStream(filter: filter, configuration: config, delegate: handler)
         do {
@@ -119,28 +115,6 @@ public actor SystemAudioSource: LiveAudioSource {
         try? FileManager.default.removeItem(at: outputURL)
     }
 
-    /// Emits a normalised 0...1 amplitude per captured buffer. Multiple subscribers are supported.
-    public func levels() -> AsyncStream<Float> {
-        AsyncStream { continuation in
-            let id = UUID()
-            levelContinuations[id] = continuation
-            continuation.onTermination = { [weak self] _ in
-                guard let self else { return }
-                Task { await self.removeLevelContinuation(id) }
-            }
-        }
-    }
-
-    private func removeLevelContinuation(_ id: UUID) {
-        levelContinuations.removeValue(forKey: id)
-    }
-
-    private func emitLevel(_ level: Float) {
-        for continuation in levelContinuations.values {
-            continuation.yield(level)
-        }
-    }
-
     private func stop() async throws {
         if let stream {
             try? await stream.stopCapture()
@@ -151,10 +125,7 @@ public actor SystemAudioSource: LiveAudioSource {
             captureFailure = handler.failure
         }
         handler = nil
-        for continuation in levelContinuations.values {
-            continuation.finish()
-        }
-        levelContinuations.removeAll()
+        levelMeter.reset()
     }
 }
 

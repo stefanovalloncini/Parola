@@ -2,14 +2,15 @@ import Foundation
 
 /// Audio source that captures live input (microphone or system audio) into a
 /// temporary file. Distinct from ``AudioSource`` in that it can be started
-/// independently of ``prepare()`` and emits a level stream while recording.
+/// independently of ``prepare()`` and keeps a ``LevelMeter`` current while recording.
 ///
 /// Adopted by ``MicAudioSource``, ``SystemAudioSource``, and the test-mode
 /// ``FixtureAudioSource``. The agent platform's mock audio command swaps real
 /// sources for fixtures via ``MockAudioSourceRegistry``.
 public protocol LiveAudioSource: AudioSource {
     func start() async throws
-    func levels() async -> AsyncStream<Float>
+    /// Written by the capture as buffers arrive; a meter reads it when it draws.
+    var levelMeter: LevelMeter { get }
     /// The file this source is capturing into, once known — lets the app checkpoint
     /// an in-flight take for crash recovery. `nil` for sources that don't record to disk.
     func inFlightURL() async -> URL?
@@ -17,6 +18,7 @@ public protocol LiveAudioSource: AudioSource {
 
 public extension LiveAudioSource {
     func inFlightURL() async -> URL? { nil }
+    var levelMeter: LevelMeter { LevelMeter() }
 }
 
 public enum LiveAudioSourceFactory {

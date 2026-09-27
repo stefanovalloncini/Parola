@@ -31,6 +31,7 @@ public protocol StreamingSpeakerLabeler: Sendable {
 public actor StreamingTranscriptionSession: StreamingTranscriber {
     public let modelStore: ModelStore
     nonisolated let deviceUID: String?
+    public nonisolated let levelMeter = LevelMeter()
 
     private var whisperKit: WhisperKit?
     private var persister: StreamingAudioPersister?
@@ -182,6 +183,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
                     },
                     tick: { try await Task.sleep(nanoseconds: 100_000_000) }
                 ),
+                levelMeter: levelMeter,
                 onPartial: { sink.handlePartial(text: $0) },
                 onEnergy: { sink.handleEnergy(last: $0) },
                 onConfirmed: { confirmed.yield($0) }
@@ -372,6 +374,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     }
 
     private func teardown() {
+        levelMeter.reset()
         continuation = nil
         segmentContinuation = nil
         consumerTask = nil

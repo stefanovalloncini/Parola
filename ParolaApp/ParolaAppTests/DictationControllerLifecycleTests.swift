@@ -49,6 +49,13 @@ private struct StubRecorder: DictationRecorder {
     func stopAndTranscribe() async throws -> String { "" }
 }
 
+private struct MeteredRecorder: DictationRecorder {
+    let meter: LevelMeter
+    func start() async throws {}
+    func stopAndTranscribe() async throws -> String { "" }
+    func levelMeter() async -> LevelMeter? { meter }
+}
+
 /// Holds its final until released, and remembers whether the flush was cancelled on the way.
 private actor HeldFlushRecorder: DictationRecorder {
     private var gate: CheckedContinuation<Void, Never>?
@@ -117,6 +124,24 @@ struct DictationControllerLifecycleTests {
         }
         #expect(ops.last == "start2", "live monitor should arm last: \(ops)")
 
+        controller.stop()
+    }
+
+    @Test("the HUD reads the listening take's meter and lets go of it when listening ends")
+    func hudReadsTheTakeMeter() async {
+        let log = MonitorLog()
+        let controller = DictationController()
+        let meter = LevelMeter()
+        controller.hotkeyFactory = { _, _ in SpyHotkeyMonitor(id: 1, log: log) }
+        controller.recorderFactory = { _ in MeteredRecorder(meter: meter) }
+
+        controller.start(configuration: makeConfiguration())
+        await log.waitForOps(2)
+        controller.simulatePress()
+        await waitUntil { controller.levelMeter === meter }
+
+        controller.simulateRelease()
+        await waitUntil { controller.levelMeter == nil }
         controller.stop()
     }
 

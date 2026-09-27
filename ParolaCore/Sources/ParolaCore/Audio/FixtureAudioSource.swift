@@ -4,15 +4,15 @@ import AVFoundation
 /// AudioSource backed by an on-disk WAV fixture. Used by the agent platform to
 /// drive recording flows in test mode without real microphone or screen capture.
 ///
-/// `start()` paces emitted level samples via the injected clock so tests that
+/// `start()` paces the level meter's readings via the injected clock so tests that
 /// install a `TestClock` can advance time deterministically. `prepare()` returns
 /// the fixture URL so transcription can read it like any other file.
 public actor FixtureAudioSource: LiveAudioSource {
     private let fixtureURL: URL
     private let sleeper: @Sendable (Int) async throws -> Void
     private var started = false
-    private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
     private var paceTask: Task<Void, Never>?
+    public nonisolated let levelMeter = LevelMeter()
 
     public init<C: Clock>(fixtureURL: URL, clock: C) where C.Duration == Duration {
         self.fixtureURL = fixtureURL
@@ -28,21 +28,6 @@ public actor FixtureAudioSource: LiveAudioSource {
         return _make(clock)
     }
 
-    public func levels() -> AsyncStream<Float> {
-        AsyncStream { continuation in
-            let id = UUID()
-            levelContinuations[id] = continuation
-            continuation.onTermination = { [weak self] _ in
-                guard let self else { return }
-                Task { await self.removeLevelContinuation(id) }
-            }
-        }
-    }
-
-    private func removeLevelContinuation(_ id: UUID) {
-        levelContinuations.removeValue(forKey: id)
-    }
-
     public func start() async throws {
         guard !started else { return }
         guard FileManager.default.fileExists(atPath: fixtureURL.path) else {
@@ -53,11 +38,11 @@ public actor FixtureAudioSource: LiveAudioSource {
         let sleeper = sleeper
         let url = fixtureURL
         paceTask = Task { [weak self] in
-            await self?.emitLevels(from: url, sleeper: sleeper)
+            await self?.paceLevels(from: url, sleeper: sleeper)
         }
     }
 
-    private func emitLevels(from url: URL, sleeper: @Sendable (Int) async throws -> Void) async {
+    private func paceLevels(from url: URL, sleeper: @Sendable (Int) async throws -> Void) async {
         guard let file = try? AVAudioFile(forReading: url) else { return }
         let format = file.processingFormat
         let chunkFrames = AVAudioFrameCount(max(1, Int(format.sampleRate * 0.05)))
@@ -73,15 +58,8 @@ public actor FixtureAudioSource: LiveAudioSource {
                 return
             }
             if buffer.frameLength == 0 { return }
-            let level = AudioLevel.normalised(of: buffer)
-            emitLevel(level)
+            levelMeter.record(AudioLevel.normalised(of: buffer))
             try? await sleeper(frameDurationMs)
-        }
-    }
-
-    private func emitLevel(_ level: Float) {
-        for continuation in levelContinuations.values {
-            continuation.yield(level)
         }
     }
 
@@ -91,7 +69,7 @@ public actor FixtureAudioSource: LiveAudioSource {
         }
         paceTask?.cancel()
         paceTask = nil
-        finishLevels()
+        levelMeter.reset()
         started = false
         return fixtureURL
     }
@@ -100,7 +78,7 @@ public actor FixtureAudioSource: LiveAudioSource {
         started = false
         paceTask?.cancel()
         paceTask = nil
-        finishLevels()
+        levelMeter.reset()
     }
 
     public func estimatedDuration() async -> Double? {
@@ -111,12 +89,5 @@ public actor FixtureAudioSource: LiveAudioSource {
         } catch {
             return nil
         }
-    }
-
-    private func finishLevels() {
-        for continuation in levelContinuations.values {
-            continuation.finish()
-        }
-        levelContinuations.removeAll()
     }
 }

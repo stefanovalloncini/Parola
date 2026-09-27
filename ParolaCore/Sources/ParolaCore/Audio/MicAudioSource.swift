@@ -16,7 +16,7 @@ public actor MicAudioSource: LiveAudioSource {
     private let preferredDeviceUID: String?
     private var session: Session?
     private var outputScratch: AVAudioPCMBuffer?
-    private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
+    public nonisolated let levelMeter = LevelMeter()
 
     private struct Session {
         var outputURL: URL
@@ -31,29 +31,7 @@ public actor MicAudioSource: LiveAudioSource {
         self.preferredDeviceUID = deviceUID
     }
 
-    /// Emits a normalised 0...1 amplitude per captured buffer. Multiple subscribers are supported.
-    public func levels() -> AsyncStream<Float> {
-        AsyncStream { continuation in
-            let id = UUID()
-            levelContinuations[id] = continuation
-            continuation.onTermination = { [weak self] _ in
-                guard let self else { return }
-                Task { await self.removeLevelContinuation(id) }
-            }
-        }
-    }
-
-    private func removeLevelContinuation(_ id: UUID) {
-        levelContinuations.removeValue(forKey: id)
-    }
-
     public func inFlightURL() -> URL? { session?.outputURL }
-
-    private func emitLevel(_ level: Float) {
-        for continuation in levelContinuations.values {
-            continuation.yield(level)
-        }
-    }
 
     public func start() throws {
         guard session == nil else { return }
@@ -142,7 +120,7 @@ public actor MicAudioSource: LiveAudioSource {
     }
 
     private func write(box: BufferBox) {
-        emitLevel(AudioLevel.normalised(of: box.buffer))
+        levelMeter.record(AudioLevel.normalised(of: box.buffer))
 
         guard let current = session else { return }
         guard let outBuffer = StreamChunkConverter.convert(
@@ -188,10 +166,7 @@ public actor MicAudioSource: LiveAudioSource {
         await current.consumerTask.value
         session = nil
         outputScratch = nil
-        for continuation in levelContinuations.values {
-            continuation.finish()
-        }
-        levelContinuations.removeAll()
+        levelMeter.reset()
     }
 }
 

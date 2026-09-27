@@ -209,8 +209,8 @@ public actor DictationCoordinator {
         return true
     }
 
-    public func levels() async -> AsyncStream<Float> {
-        await recorder.levels()
+    public func levelMeter() async -> LevelMeter? {
+        await recorder.levelMeter()
     }
 
     public func partials() async -> AsyncStream<String> {

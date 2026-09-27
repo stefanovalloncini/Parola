@@ -1,5 +1,5 @@
-import Combine
 import SwiftUI
+import ParolaCore
 
 struct RecordingPane: View {
     let source: AppModel.RecordSource
@@ -21,7 +21,7 @@ struct RecordingPane: View {
             startedAt: startedAt,
             isVoiceActive: model.liveVoiceActive,
             stopTitle: stopTitle,
-            levelSubject: model.recordingAudioLevel,
+            levelMeter: model.recordingLevelMeter,
             showsWaveform: showsWaveform,
             onStop: { model.stopRecordingAndTranscribe() }
         )
@@ -83,7 +83,7 @@ struct RecordingCard: View {
     let startedAt: Date
     let isVoiceActive: Bool
     let stopTitle: String
-    var levelSubject: CurrentValueSubject<Float, Never>? = nil
+    var levelMeter: LevelMeter? = nil
     var showsWaveform: Bool = false
     let onStop: () -> Void
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 64
@@ -116,10 +116,18 @@ struct RecordingCard: View {
                         .font(DS.Font.heading)
                         .foregroundStyle(DS.Color.secondaryText)
                 }
-                if showsWaveform, let levelSubject {
-                    LiveRecordingWaveform(levelSubject: levelSubject)
-                        .frame(width: 220, height: 30)
-                        .padding(.top, DS.Spacing.hair)
+                if showsWaveform {
+                    WaveformHistory(
+                        meter: levelMeter,
+                        capacity: 48,
+                        barWidth: 2,
+                        spacing: 2,
+                        maxHeight: 28,
+                        idleHeight: 3,
+                        fill: DS.Color.accent
+                    )
+                    .frame(width: 220, height: 30)
+                    .padding(.top, DS.Spacing.hair)
                 }
                 Text(source.label)
                     .font(DS.Font.secondary)
@@ -149,23 +157,6 @@ struct RecordingCard: View {
             RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
                 .stroke(DS.Color.separator.opacity(0.6), lineWidth: 1)
         )
-    }
-}
-
-private struct LiveRecordingWaveform: View {
-    let levelSubject: CurrentValueSubject<Float, Never>
-    @State private var level: Float = 0
-    var body: some View {
-        WaveformHistory(
-            level: level,
-            capacity: 48,
-            barWidth: 2,
-            spacing: 2,
-            maxHeight: 28,
-            idleHeight: 3,
-            fill: DS.Color.accent
-        )
-        .onReceive(levelSubject.throttle(for: .milliseconds(45), scheduler: DispatchQueue.main, latest: true)) { level = $0 }
     }
 }
 

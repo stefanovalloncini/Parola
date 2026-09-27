@@ -1,4 +1,3 @@
-import Combine
 import CoreGraphics
 import Foundation
 import SwiftUI
@@ -1075,9 +1074,9 @@ final class AppModel {
     @ObservationIgnored let capturePermissions = SystemCapturePermissions()
 
     var dictationState: DictationCoordinator.State = .idle
-    @ObservationIgnored let recordingAudioLevel = CurrentValueSubject<Float, Never>(0)
+    /// The meter the take in progress writes; set once per take, never per buffer.
+    private(set) var recordingLevelMeter: LevelMeter?
     var recordingIsSilent: Bool = false
-    @ObservationIgnored var recordingLevelTask: Task<Void, Never>?
     @ObservationIgnored var silenceDetector: SilenceDetector = SilenceDetector(threshold: 8)
     @ObservationIgnored var silenceWatchTask: Task<Void, Never>?
     @ObservationIgnored var recordingAutoStopTask: Task<Void, Never>?
@@ -1435,7 +1434,7 @@ final class AppModel {
     private func teardownActiveCapture() {
         if recordingStartInFlight, liveSource == nil { stopRequestedDuringStart = true }
         stopSilenceWatch()
-        stopRecordingLevelObserver()
+        clearRecordingLevelMeter()
         stopRecordingWatch()
         endActiveRecovery()
         liveRecordingAudioURL = nil
@@ -1501,7 +1500,6 @@ final class AppModel {
         countdownTask?.cancel(); countdownTask = nil
         batchTask?.cancel(); batchTask = nil
         matchesDebounce?.cancel(); matchesDebounce = nil
-        recordingLevelTask?.cancel(); recordingLevelTask = nil
         silenceWatchTask?.cancel(); silenceWatchTask = nil
         recordingAutoStopTask?.cancel(); recordingAutoStopTask = nil
         recordingWatchTask?.cancel(); recordingWatchTask = nil
@@ -1765,7 +1763,6 @@ final class AppModel {
     }
 
     deinit {
-        recordingLevelTask?.cancel()
         recordingWatchTask?.cancel()
         streamingConsumer?.cancel()
         libraryRefreshTask?.cancel()
@@ -2926,7 +2923,7 @@ final class AppModel {
     private func adoptLiveSource(_ source: any LiveAudioSource) async -> Bool {
         guard stopRequestedDuringStart else {
             liveSource = source
-            observeRecordingLevels(from: source)
+            recordingLevelMeter = source.levelMeter
             // One audio-only checkpoint per take: a crash mid-recording leaves a
             // pointer to the in-flight file instead of losing the take outright.
             liveRecordingAudioURL = await source.inFlightURL()
@@ -2936,7 +2933,7 @@ final class AppModel {
             }
             return true
         }
-        stopRecordingLevelObserver()
+        clearRecordingLevelMeter()
         stopRecordingWatch()
         await source.cancel()
         await mediaSession.exitRecording()
@@ -2962,23 +2959,8 @@ final class AppModel {
         }
     }
 
-    private func observeRecordingLevels(from source: any LiveAudioSource) {
-        recordingLevelTask?.cancel()
-        let subject = recordingAudioLevel
-        recordingLevelTask = Task { @MainActor in
-            let stream = await source.levels()
-            for await value in stream {
-                if abs(subject.value - value) > 0.05 {
-                    subject.send(value)
-                }
-            }
-        }
-    }
-
-    private func stopRecordingLevelObserver() {
-        recordingLevelTask?.cancel()
-        recordingLevelTask = nil
-        recordingAudioLevel.send(0)
+    private func clearRecordingLevelMeter() {
+        if recordingLevelMeter != nil { recordingLevelMeter = nil }
     }
 
     private func updateSilenceFlag() {
@@ -3011,6 +2993,7 @@ final class AppModel {
         streamingConsumer?.cancel()
         let s = StreamingTranscriberFactory.make(clock: clock, deviceUID: preferredInputDeviceUID, persistAudio: true)
         streamingSession = s
+        recordingLevelMeter = s.levelMeter
         liveTakeIsStreaming = true
         liveSegments = []
         livePartialText = ""
@@ -3073,6 +3056,7 @@ final class AppModel {
             streamingSession = nil
             Task { await session.stop() }
         }
+        clearRecordingLevelMeter()
         stopSilenceWatch()
         stopRecordingWatch()
         endActiveRecovery()
@@ -3174,7 +3158,7 @@ final class AppModel {
                 // Await delivery of the final .finished event; cancelling here can drop the whole recording.
                 await streamingConsumer?.value
                 streamingConsumer = nil
-                stopRecordingLevelObserver()
+                clearRecordingLevelMeter()
                 stopSilenceWatch()
                 stopRecordingWatch()
                 // Both no-op when .finished already ran; they cover a stream that ends without one.
@@ -3197,14 +3181,14 @@ final class AppModel {
             await mediaSession.exitRecording()
             do {
                 let url = try await source.prepare()
-                stopRecordingLevelObserver()
+                clearRecordingLevelMeter()
                 await transcribeRecordedTake(
                     url: url,
                     title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date()),
                     source: pendingRecordingSource
                 )
             } catch {
-                stopRecordingLevelObserver()
+                clearRecordingLevelMeter()
                 endActiveRecovery()
                 liveRecordingAudioURL = nil
                 let message = Self.transcriptionFailureMessage(for: error)

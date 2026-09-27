@@ -11,12 +11,10 @@ actor MicDictationRecorder: DictationRecorder {
     private let streamingEnabled: Bool
     private let workflowResolver: (@Sendable () async -> DictationWorkflow?)?
     private let downloadProgress: (@Sendable (Double) -> Void)?
-    private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
     private var partialContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
 
     private var fallbackSource: (any LiveAudioSource)?
     private let fallbackSession: TranscriptionSession
-    private var fallbackForwardingTask: Task<Void, Never>?
     private let clock: any Clock<Duration>
     private let makeStreamingSession: @Sendable () -> any StreamingTranscriber
 
@@ -92,14 +90,10 @@ actor MicDictationRecorder: DictationRecorder {
             streamingSegments = []
             streamingPartial = ""
             streamingFailure = nil
-            broadcastLevel(0)
             return
         }
         guard let source = fallbackSource else { return }
         fallbackSource = nil
-        fallbackForwardingTask?.cancel()
-        fallbackForwardingTask = nil
-        broadcastLevel(0)
         // prepare() is the only way to stop capture; the finalized take is thrown away
         // unread, so no model load or transcription happens on this path.
         if let url = try? await source.prepare() {
@@ -107,15 +101,8 @@ actor MicDictationRecorder: DictationRecorder {
         }
     }
 
-    func levels() -> AsyncStream<Float> {
-        AsyncStream { continuation in
-            let id = UUID()
-            levelContinuations[id] = continuation
-            continuation.onTermination = { [weak self] _ in
-                guard let self else { return }
-                Task { await self.removeLevelContinuation(id) }
-            }
-        }
+    func levelMeter() -> LevelMeter? {
+        streamingSession?.levelMeter ?? fallbackSource?.levelMeter
     }
 
     func partials() -> AsyncStream<String> {
@@ -165,7 +152,6 @@ actor MicDictationRecorder: DictationRecorder {
         await streamingConsumer?.value
         streamingConsumer = nil
         streamingSession = nil
-        broadcastLevel(0)
         let failure = streamingFailure
         streamingFailure = nil
         let text = combinedText().trimmingCharacters(in: .whitespacesAndNewlines)
@@ -185,12 +171,9 @@ actor MicDictationRecorder: DictationRecorder {
             streamingSegments.append(segment)
             streamingPartial = ""
             broadcastPartial(combinedText())
-        case .voiceActivity(let active):
-            broadcastLevel(active ? 0.5 : 0.0)
         case .failed(let message):
             streamingFailure = message
-            broadcastLevel(0)
-        case .warning, .finished:
+        case .voiceActivity, .warning, .finished:
             break
         }
     }
@@ -207,21 +190,11 @@ actor MicDictationRecorder: DictationRecorder {
         let mic = await LiveAudioSourceFactory.makeMicrophone(deviceUID: deviceUID, clock: clock)
         try await mic.start()
         fallbackSource = mic
-        fallbackForwardingTask?.cancel()
-        let stream = await mic.levels()
-        fallbackForwardingTask = Task { [weak self] in
-            for await level in stream {
-                await self?.broadcastLevel(level)
-            }
-        }
     }
 
     private func stopFallback() async throws -> String {
         guard let source = fallbackSource else { return "" }
         self.fallbackSource = nil
-        fallbackForwardingTask?.cancel()
-        fallbackForwardingTask = nil
-        broadcastLevel(0)
         let url = try await source.prepare()
         let transcript = try await fallbackSession.transcribe(
             source: FileAudioSource(url: url),
@@ -231,18 +204,8 @@ actor MicDictationRecorder: DictationRecorder {
         return transcript.text
     }
 
-    private func removeLevelContinuation(_ id: UUID) {
-        levelContinuations.removeValue(forKey: id)
-    }
-
     private func removePartialContinuation(_ id: UUID) {
         partialContinuations.removeValue(forKey: id)
-    }
-
-    private func broadcastLevel(_ level: Float) {
-        for continuation in levelContinuations.values {
-            continuation.yield(level)
-        }
     }
 
     private func broadcastPartial(_ text: String) {

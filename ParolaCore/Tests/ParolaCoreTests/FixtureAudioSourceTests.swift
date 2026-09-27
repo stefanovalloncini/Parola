@@ -9,12 +9,29 @@ struct FixtureAudioSourceTests {
 
     @Test("start() opens a synthesised WAV without throwing")
     func startOpensWav() async throws {
-        let url = try writeSilenceWav(duration: 0.05)
+        let url = try writeWav(duration: 0.05)
         defer { try? FileManager.default.removeItem(at: url) }
 
         let source = FixtureAudioSource.make(fixtureURL: url, clock: ImmediateClock())
         try await source.start()
         await source.cancel()
+    }
+
+    @Test("a playing fixture keeps the level meter current, and cancelling rests it")
+    func fixtureWritesTheLevelMeter() async throws {
+        let url = try writeWav(duration: 0.3, amplitude: 0.3)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let source = FixtureAudioSource.make(fixtureURL: url, clock: ContinuousClock())
+        try await source.start()
+        let deadline = ContinuousClock.now + .seconds(5)
+        while source.levelMeter.lastSound == nil, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(source.levelMeter.lastSound != nil)
+
+        await source.cancel()
+        #expect(source.levelMeter.level == 0)
     }
 
     @Test("start() throws audioLoadFailed when the fixture is missing")
@@ -32,7 +49,7 @@ struct FixtureAudioSourceTests {
         }
     }
 
-    private func writeSilenceWav(duration: Double) throws -> URL {
+    private func writeWav(duration: Double, amplitude: Float = 0) throws -> URL {
         let sampleRate: Double = 16_000
         let frameCount = AVAudioFrameCount(sampleRate * duration)
         guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false) else {
@@ -42,6 +59,9 @@ struct FixtureAudioSourceTests {
             throw FixtureWriteError.bufferUnavailable
         }
         buffer.frameLength = frameCount
+        if amplitude > 0, let samples = buffer.floatChannelData?[0] {
+            for index in 0..<Int(frameCount) { samples[index] = index.isMultiple(of: 2) ? amplitude : -amplitude }
+        }
 
         let dir = FileManager.default.temporaryDirectory
         let url = dir.appendingPathComponent("parola-fixture-\(UUID().uuidString).wav")

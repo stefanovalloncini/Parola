@@ -15,7 +15,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
     private let outputURL: URL
     private let outputFormat: AVAudioFormat
     private let callbackQueue = DispatchQueue(label: "com.parola.process-tap")
-    private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
+    public nonisolated let levelMeter = LevelMeter()
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var ioProcID: AudioDeviceIOProcID?
@@ -135,16 +135,12 @@ public actor ProcessTapAudioSource: LiveAudioSource {
             interleaved: false
         )
 
-        let levelSink: @Sendable (Float) -> Void = { [weak self] level in
-            guard let self else { return }
-            Task { await self.emitLevel(level) }
-        }
         let handler = TapHandler(
             converter: converter,
             writer: CaptureFileWriter(file: writeFile),
             outputFormat: outputFormat,
             srcFormat: srcFormat,
-            onLevel: levelSink
+            onLevel: { [levelMeter] in levelMeter.record($0) }
         )
         self.handler = handler
 
@@ -180,29 +176,8 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         try? FileManager.default.removeItem(at: outputURL)
     }
 
-    /// Emits a normalised 0...1 amplitude per captured buffer. Multiple subscribers are supported.
-    public func levels() -> AsyncStream<Float> {
-        AsyncStream { continuation in
-            let id = UUID()
-            levelContinuations[id] = continuation
-            continuation.onTermination = { [weak self] _ in
-                guard let self else { return }
-                Task { await self.removeLevelContinuation(id) }
-            }
-        }
-    }
-
-    private func removeLevelContinuation(_ id: UUID) {
-        levelContinuations.removeValue(forKey: id)
-    }
-
-    private func emitLevel(_ level: Float) {
-        for continuation in levelContinuations.values {
-            continuation.yield(level)
-        }
-    }
-
     private func stop() async {
+        defer { levelMeter.reset() }
         if let ioProcID, aggregateID != kAudioObjectUnknown {
             AudioDeviceStop(aggregateID, ioProcID)
             AudioDeviceDestroyIOProcID(aggregateID, ioProcID)
@@ -213,10 +188,6 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         // clear the failure this one is about to latch.
         let stopping = handler
         handler = nil
-        for continuation in levelContinuations.values {
-            continuation.finish()
-        }
-        levelContinuations.removeAll()
         guard let stopping else { return }
         await callbackQueue.drain()
         captureFailure = stopping.failure

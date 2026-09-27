@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 public enum HotkeyEvent: Sendable {
     case press
@@ -29,8 +30,8 @@ public protocol DictationRecorder: Sendable {
     /// Stops recording and throws the captured audio away. Must not transcribe (or download
     /// a model): it runs on abort paths that only need the mic released promptly.
     func stopAndDiscard() async
-    /// Emits a normalised 0...1 amplitude per captured audio buffer while recording.
-    func levels() async -> AsyncStream<Float>
+    /// The meter the take in progress writes as buffers arrive; nil while nothing records.
+    func levelMeter() async -> LevelMeter?
     /// Emits partial transcription text as the recorder receives confidence-rising guesses.
     /// May emit nothing for non-streaming backends.
     func partials() async -> AsyncStream<String>
@@ -40,9 +41,7 @@ public extension DictationRecorder {
     func stopAndDiscard() async {
         _ = try? await stopAndTranscribe()
     }
-    func levels() async -> AsyncStream<Float> {
-        AsyncStream { $0.finish() }
-    }
+    func levelMeter() async -> LevelMeter? { nil }
     func partials() async -> AsyncStream<String> {
         AsyncStream { $0.finish() }
     }

@@ -5,6 +5,7 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
     private let sleeper: @Sendable (Int) async -> Void
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
     private var emitTask: Task<Void, Never>?
+    public nonisolated let levelMeter = LevelMeter()
 
     public init<C: Clock>(response: MockTranscriberResponse, clock: C) where C.Duration == Duration {
         self.response = response

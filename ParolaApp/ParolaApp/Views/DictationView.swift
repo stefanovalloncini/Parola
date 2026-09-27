@@ -1,4 +1,3 @@
-import Combine
 import SwiftUI
 import ParolaCore
 import ParolaDictation
@@ -215,7 +214,7 @@ struct DictationView: View {
                 Circle().fill(Color.white.opacity(0.45)).frame(width: 14, height: 14)
             }
         case .listening:
-            LiveWaveformBars(levelSubject: controller.audioLevel)
+            LevelMeterReading(meter: controller.levelMeter) { WaveformBars(level: $0) }
         case .transcribing:
             SpinningRing().frame(width: 14, height: 14)
         case .failed:
@@ -229,7 +228,7 @@ struct DictationView: View {
     private var overlayIndicator: some View {
         switch state {
         case .listening:
-            LiveWaveformHistory(levelSubject: controller.audioLevel, capacity: 18, maxHeight: 20)
+            WaveformHistory(meter: controller.levelMeter, capacity: 18, maxHeight: 20)
                 .frame(height: 22)
                 .fixedSize(horizontal: true, vertical: true)
         default:
@@ -312,27 +311,3 @@ struct DictationView: View {
         }
     }
 }
-
-// Audio levels arrive far faster than a display needs; throttle to ~22 fps so the live waveform
-// stays smooth instead of flooding the main thread with redraws during speech.
-
-private struct LiveWaveformBars: View {
-    let levelSubject: CurrentValueSubject<Float, Never>
-    @State private var level: Float = 0
-    var body: some View {
-        WaveformBars(level: level)
-            .onReceive(levelSubject.throttle(for: .milliseconds(45), scheduler: DispatchQueue.main, latest: true)) { level = $0 }
-    }
-}
-
-private struct LiveWaveformHistory: View {
-    let levelSubject: CurrentValueSubject<Float, Never>
-    let capacity: Int
-    let maxHeight: CGFloat
-    @State private var level: Float = 0
-    var body: some View {
-        WaveformHistory(level: level, capacity: capacity, maxHeight: maxHeight)
-            .onReceive(levelSubject.throttle(for: .milliseconds(45), scheduler: DispatchQueue.main, latest: true)) { level = $0 }
-    }
-}
-

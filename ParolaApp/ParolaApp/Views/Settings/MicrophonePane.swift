@@ -14,7 +14,7 @@ struct MicrophonePane: View {
     @Environment(AppModel.self) private var model
     @State private var devices: [AudioInputDevice] = []
     @State private var preview: MicPreviewController?
-    @State private var level: Float = 0
+    @State private var previewMeter: LevelMeter?
     @State private var startError: String?
     @State private var micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
 
@@ -50,7 +50,7 @@ struct MicrophonePane: View {
                 }
                 SettingRow("Live preview",
                            description: "Input level from the selected device, so you can check it before recording.") {
-                    VUMeter(level: level)
+                    LevelMeterReading(meter: previewMeter) { VUMeter(level: $0) }
                         .frame(width: 220, height: 18)
                 }
                 SettingRow("Auto-stop after",
@@ -125,10 +125,8 @@ struct MicrophonePane: View {
         preview = controller
         Task {
             do {
-                let stream = try await controller.start()
-                for await value in stream {
-                    if abs(level - value) > 0.01 { level = value }
-                }
+                let meter = try await controller.start()
+                if preview === controller { previewMeter = meter }
             } catch {
                 startError = error.localizedDescription
             }
@@ -141,7 +139,7 @@ struct MicrophonePane: View {
         if let controller {
             Task { await controller.stop() }
         }
-        level = 0
+        previewMeter = nil
     }
 
     private var micPermissionBanner: some View {
@@ -179,10 +177,10 @@ private final class MicPreviewController {
         self.source = MicAudioSource(deviceUID: deviceUID)
     }
 
-    func start() async throws -> AsyncStream<Float> {
+    func start() async throws -> LevelMeter {
         try await source.start()
         started = true
-        return await source.levels()
+        return source.levelMeter
     }
 
     func stop() async {
