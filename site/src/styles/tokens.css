@@ -7,7 +7,6 @@
   --paper-clear: rgb(255 255 255 / 0);
   --mist: #f3f5f2;
   --mist-deep: #e9ede8;
-  --card: #ffffff;
   --sage: #6b8a6b;
   --sage-deep: #3f6048;
   --sage-soft: #a9c2a6;
@@ -108,7 +107,6 @@
     --paper-clear: rgb(10 17 13 / 0);
     --mist: #111915;
     --mist-deep: #18211b;
-    --card: var(--paper);
     --sage-deep: var(--night-sage-deep);
     --sage-tint: var(--night-sage-tint);
     --accent-fill: #4f6f52;
