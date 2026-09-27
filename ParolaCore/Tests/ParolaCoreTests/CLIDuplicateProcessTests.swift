@@ -42,6 +42,58 @@ struct CLIDuplicateProcessTests {
         return url
     }
 
+    private func snapshotFiles(in library: URL) -> [String: Date] {
+        let root = library.appendingPathComponent(".search-index", isDirectory: true)
+        guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil) else { return [:] }
+        var files: [String: Date] = [:]
+        for case let url as URL in walker where !url.hasDirectoryPath {
+            files[url.lastPathComponent] = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        }
+        return files
+    }
+
+    @Test("the CLI reads the library it is pointed at and never writes its index")
+    func cliLeavesTheIndexAlone() async throws {
+        let scratch = try makeScratch()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let library = scratch.appendingPathComponent("library", isDirectory: true)
+        let audio = try makeWAV(in: scratch, named: "kickoff.wav")
+        let app = LibraryStore(libraryURL: library, extraIndexer: nil)
+        _ = try await app.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "seeded")],
+                language: "en",
+                modelName: "openai_whisper-tiny"
+            ),
+            audioSource: audio,
+            title: "Kickoff call"
+        )
+        await app.flush()
+        // A bundle the snapshot lacks: a store that owned the index would rebuild and rewrite it on sight.
+        _ = try ParolaDocument.write(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "behind")],
+                language: "en",
+                modelName: "openai_whisper-tiny"
+            ),
+            audioURL: nil,
+            to: library.appendingPathComponent("behind")
+        )
+        let before = snapshotFiles(in: library)
+        #expect(!before.isEmpty)
+
+        let transcribe = try runParola(
+            ["transcribe", audio.path, "--library", library.path, "--skip-duplicates"], timeout: 60
+        )
+        let stats = try runParola(["library", "stats", "--library", library.path], timeout: 60)
+        let verify = try runParola(["library", "verify", "--library", library.path], timeout: 60)
+
+        #expect(transcribe.stderr.contains("Already in the library as Kickoff call"))
+        #expect(stats.stdout.contains("Transcripts: 2"))
+        #expect(verify.stdout.contains("Healthy: 2"))
+        #expect(snapshotFiles(in: library) == before)
+    }
+
     @Test("--skip-duplicates stops before loading a model and says why")
     func skipDuplicatesReturnsEarly() async throws {
         let scratch = try makeScratch()

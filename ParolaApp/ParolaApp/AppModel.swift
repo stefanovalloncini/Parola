@@ -1692,6 +1692,7 @@ final class AppModel {
         loadCorrectionRules()
         refreshModelList()
         Task { await refreshPeople() }
+        Task { [library] in await library.warmSearchIndex() }
         refreshLibrary()
         restoreBatchQueue()
         loadPendingRecovery()

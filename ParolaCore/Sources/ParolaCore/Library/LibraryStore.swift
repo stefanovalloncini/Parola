@@ -51,12 +51,29 @@ public actor LibraryStore {
         }
     }
 
+    /// Who keeps the library's search index up to date on disk.
+    public enum Role: Sendable {
+        /// The app: it builds, saves and backfills the index and the bundles' manifests.
+        case owner
+        /// The CLI, the MCP server, an intent outside the app: reads the library beside its owner.
+        /// Its index lives in memory, caught up from the bundles, and nothing it reads is written back.
+        case reader
+    }
+
+    /// Set before the first `shared` access to point it at another folder, as `--library` does.
+    public nonisolated(unsafe) static var sharedLibraryOverride: URL?
+
+    /// A reader: every process that reaches for it reads a library the app owns.
     public static let shared: LibraryStore = {
         precondition(
             !isTestProcess,
             "LibraryStore.shared is the user's real library; a test must inject a scratch one."
         )
-        return LibraryStore()
+        return LibraryStore(
+            libraryURL: sharedLibraryOverride ?? defaultLibraryURL,
+            extraIndexer: SpotlightIndexer(),
+            role: .reader
+        )
     }()
 
     /// Whether a test bundle is loaded into this process. Neither `XCTestConfigurationFilePath` nor
@@ -76,6 +93,7 @@ public actor LibraryStore {
     }
 
     public nonisolated let libraryURL: URL
+    public nonisolated let role: Role
     private let searchIndex: LibrarySearchIndex
     private let extraIndexer: LibraryIndexer?
     private var cachedActive: [LibraryEntry]?
@@ -85,6 +103,7 @@ public actor LibraryStore {
     /// The library folder's modification date as of the last scan or this store's own last add or removal.
     private var folderStamp: Date?
     private var indexReadyTask: Task<Void, Never>?
+    private var searchIndexNeedsCheck = false
     private var digestBackfillTask: Task<Void, Never>?
     private nonisolated let extraIndexerJobs: AsyncStream<@Sendable () async -> Void>.Continuation?
     private nonisolated let didDecodeDocument: (@Sendable () -> Void)?
@@ -95,8 +114,8 @@ public actor LibraryStore {
     }
 
     /// Delegates through `storeAt:`, a label this init cannot itself spell, so dropping `seams:` here is a compile error, not a self-delegating recursion.
-    public init(libraryURL: URL, extraIndexer: LibraryIndexer?) {
-        self.init(storeAt: libraryURL, extraIndexer: extraIndexer, seams: TestSeams())
+    public init(libraryURL: URL, extraIndexer: LibraryIndexer?, role: Role = .owner) {
+        self.init(storeAt: libraryURL, extraIndexer: extraIndexer, seams: TestSeams(), role: role)
     }
 
     /// One struct, not two params, so this init's signature can never collide with the public ones by argument count; the hooks run off the actor after a decode and after `add` writes a bundle.
@@ -113,9 +132,11 @@ public actor LibraryStore {
     init(
         storeAt libraryURL: URL,
         extraIndexer: LibraryIndexer?,
-        seams: TestSeams
+        seams: TestSeams,
+        role: Role = .owner
     ) {
         self.libraryURL = libraryURL
+        self.role = role
         self.extraIndexer = extraIndexer
         self.didDecodeDocument = seams.didDecodeDocument
         self.didWriteBundle = seams.didWriteBundle
@@ -133,10 +154,14 @@ public actor LibraryStore {
             self.extraIndexerJobs = nil
         }
         let indexDirectory = libraryURL.appendingPathComponent(".search-index", isDirectory: true)
-        // Made here, not by the first index save, which would move the folder's date after a scan took it.
-        try? FileManager.default.createDirectory(at: indexDirectory, withIntermediateDirectories: true)
-        self.searchIndex = LibrarySearchIndex(indexDirectory: indexDirectory)
-        Task { await self.ensureSearchIndexReady() }
+        switch role {
+        case .owner:
+            // Made here, not by the first index save, which would move the folder's date after a scan took it.
+            try? FileManager.default.createDirectory(at: indexDirectory, withIntermediateDirectories: true)
+            self.searchIndex = LibrarySearchIndex(indexDirectory: indexDirectory)
+        case .reader:
+            self.searchIndex = LibrarySearchIndex(readingSnapshotIn: indexDirectory)
+        }
     }
 
     deinit {
@@ -225,27 +250,49 @@ public actor LibraryStore {
         return total
     }
 
+    /// Loads the search index and brings it up to date with the bundles, so the first search or
+    /// excerpt read doesn't wait on it. Nothing loads the index before something asks for it.
+    public func warmSearchIndex() async {
+        await ensureSearchIndexReady()
+    }
+
     private func ensureSearchIndexReady() async {
-        if indexReadyTask == nil {
-            indexReadyTask = Task { await self.rebuildSearchIndexIfStale() }
+        if indexReadyTask == nil || searchIndexNeedsCheck {
+            searchIndexNeedsCheck = false
+            // Chained, so two checks never reconcile the same index at once.
+            let previous = indexReadyTask
+            indexReadyTask = Task {
+                await previous?.value
+                if await !catchUpSearchIndex() { searchIndexNeedsCheck = true }
+            }
         }
         await indexReadyTask?.value
     }
 
-    private func rebuildSearchIndexIfStale() async {
+    /// A reader that never searched holds no index to keep current: its first search catches up from the bundles.
+    private var keepsSearchIndexCurrent: Bool {
+        role == .owner || indexReadyTask != nil
+    }
+
+    var hasRequestedSearchIndex: Bool { indexReadyTask != nil }
+
+    /// Reads again only the bundles the index is missing or holds an older copy of, or every one
+    /// when the snapshot was unusable. False when the library folder would not list, so the next caller tries again.
+    private func catchUpSearchIndex() async -> Bool {
+        let index = searchIndex
         let url = libraryURL
         let epoch = listCacheEpoch
         let stamp = Self.folderStamp(of: url)
         let scan = await offActorIO(qos: .utility) { [self] in indexScan(at: url) }
-        guard let scan else {
-            indexReadyTask = nil
-            return
-        }
+        guard let scan else { return false }
         // The list caches want the same scan; skip it if a mutation landed while it ran.
         if cachedActive == nil, epoch == listCacheEpoch { applyScan(scan.entries, folderStamp: stamp) }
-        guard await searchIndex.needsRebuild(matching: scan.fingerprints) else { return }
-        startSourceDigestBackfill(scan.entries)
-        let indexable = scan.entries.filter { $0.deletedAt == nil }
+        let staleness = await index.staleness(matching: scan.fingerprints)
+        guard !staleness.isCurrent else { return true }
+        if role == .owner { startSourceDigestBackfill(scan.entries) }
+        let indexable = scan.entries.filter {
+            $0.deletedAt == nil && (staleness.needsRebuild || staleness.changed.contains($0.id))
+        }
         let rebuilt = await offActorIO(qos: .utility) {
             var unreadable = 0
             let entries = indexable.map { entry -> LibrarySearchIndex.RebuildEntry in
@@ -285,7 +332,12 @@ public actor LibraryStore {
                 [.count: .int(rebuilt.unreadable)]
             )
         }
-        await searchIndex.rebuild(entries: rebuilt.entries)
+        if staleness.needsRebuild {
+            await index.rebuild(entries: rebuilt.entries)
+        } else {
+            await index.reconcile(entries: rebuilt.entries, removing: staleness.removed)
+        }
+        return true
     }
 
     /// Bundles written before the manifest carried a digest pick one up here, once per store, in
@@ -418,7 +470,8 @@ public actor LibraryStore {
         let doc = try await decodedDocument(at: bundleURL)
         // Bundles written before the manifest carried a duration learn it the first time
         // they're opened, so the library list fills in instead of staying blank forever.
-        if doc.manifest.durationSeconds == nil, let duration = doc.transcript.durationSeconds, duration > 0 {
+        if role == .owner, doc.manifest.durationSeconds == nil,
+           let duration = doc.transcript.durationSeconds, duration > 0 {
             try? ParolaDocument.updateManifest(at: bundleURL) { $0.durationSeconds = duration }
         }
         let entry = try makeEntry(bundleURL: bundleURL)
@@ -576,20 +629,22 @@ public actor LibraryStore {
     }
 
     private func indexEntry(_ entry: LibraryEntry, transcript: Transcript) async {
-        await ensureSearchIndexReady()
         let text = transcript.text
-        await searchIndex.index(
-            id: entry.id,
-            title: entry.title,
-            text: text,
-            auxiliaryText: Self.searchAuxiliaryText(
-                notes: entry.segmentNotes, transcript: transcript,
-                aiTitle: entry.aiTitle, shortSummary: entry.shortSummary
-            ),
-            boundaries: Self.segmentBoundaries(for: transcript),
-            fingerprint: Self.bundleFingerprint(entry.bundleURL),
-            createdAt: entry.createdAt
-        )
+        if keepsSearchIndexCurrent {
+            await ensureSearchIndexReady()
+            await searchIndex.index(
+                id: entry.id,
+                title: entry.title,
+                text: text,
+                auxiliaryText: Self.searchAuxiliaryText(
+                    notes: entry.segmentNotes, transcript: transcript,
+                    aiTitle: entry.aiTitle, shortSummary: entry.shortSummary
+                ),
+                boundaries: Self.segmentBoundaries(for: transcript),
+                fingerprint: Self.bundleFingerprint(entry.bundleURL),
+                createdAt: entry.createdAt
+            )
+        }
         guard let extraIndexer else { return }
         let title = entry.title
         enqueueExtraIndexerWork { [id = entry.id, createdAt = entry.createdAt] in
@@ -643,8 +698,10 @@ public actor LibraryStore {
     }
 
     private func deindexEntry(id: String) async {
-        await ensureSearchIndexReady()
-        await searchIndex.remove(id)
+        if keepsSearchIndexCurrent {
+            await ensureSearchIndexReady()
+            await searchIndex.remove(id)
+        }
         guard let extraIndexer else { return }
         enqueueExtraIndexerWork {
             await extraIndexer.deindex(id: id)
@@ -688,9 +745,9 @@ public actor LibraryStore {
         let entry = try recacheEntry(at: bundleURL)
         if reindex {
             await indexEntry(entry, transcript: transcript)
-        } else {
+        } else if keepsSearchIndexCurrent {
             // transcript.json still moved, and the snapshot's fingerprint has to follow or the
-            // next launch reads the newer file as a stale index and rebuilds the lot.
+            // next launch reads the newer file as a stale entry and indexes it again.
             await ensureSearchIndexReady()
             await searchIndex.refreshFingerprint(Self.bundleFingerprint(entry.bundleURL), for: entry.id)
         }
@@ -815,7 +872,7 @@ public actor LibraryStore {
         let entry = try recacheEntry(at: bundleURL)
         let old = Self.searchAuxiliaryText(notes: [:], transcript: nil, aiTitle: before.aiTitle, shortSummary: before.shortSummary)
         let new = Self.searchAuxiliaryText(notes: [:], transcript: nil, aiTitle: entry.aiTitle, shortSummary: entry.shortSummary)
-        guard old != new else { return entry }
+        guard old != new, keepsSearchIndexCurrent else { return entry }
         await ensureSearchIndexReady()
         if await !searchIndex.replaceAuxiliaryText(old, with: new, for: id),
            let transcript = await transcriptForReindex(id, at: bundleURL) {
@@ -1095,13 +1152,14 @@ public actor LibraryStore {
     /// Walks every `.parola` bundle in the library and reports half-written or invalid ones.
     public func verify() async -> VerificationReport {
         let url = libraryURL
-        let report = await offActorIO { Self.verifySync(at: url) }
+        let stampsDigests = role == .owner
+        let report = await offActorIO { Self.verifySync(at: url, stampingDigests: stampsDigests) }
         // The walk stamps missing digests as it goes, so every cached manifest may now be stale.
-        invalidateListCaches()
+        if stampsDigests { invalidateListCaches() }
         return report
     }
 
-    nonisolated static func verifySync(at libraryURL: URL) -> VerificationReport {
+    nonisolated static func verifySync(at libraryURL: URL, stampingDigests: Bool = true) -> VerificationReport {
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil) else {
             return VerificationReport(healthy: [], problems: [])
@@ -1137,14 +1195,14 @@ public actor LibraryStore {
                 LibraryEntry(
                     id: entryID(for: bundleURL),
                     bundleURL: bundleURL,
-                    manifest: stampingDigest(manifest, at: bundleURL)
+                    manifest: stampingDigests ? stampingDigest(manifest, at: bundleURL) : manifest
                 )
             )
         }
         return VerificationReport(healthy: healthy, problems: problems)
     }
 
-    /// Verify already walks every bundle, so it is where a pre-digest bundle picks one up.
+    /// The owner's verify already walks every bundle, so it is where a pre-digest bundle picks one up.
     private nonisolated static func stampingDigest(
         _ manifest: ParolaDocument.Manifest,
         at bundleURL: URL

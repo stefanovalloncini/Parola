@@ -66,6 +66,7 @@ final class AppModel {
             )
         }
         refreshModelList()
+        Task { await store.warmSearchIndex() }
         refreshLibrary()
         Task { [weak self] in
             let purge = await store.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())

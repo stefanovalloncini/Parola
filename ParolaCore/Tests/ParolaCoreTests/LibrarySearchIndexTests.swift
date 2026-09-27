@@ -896,6 +896,77 @@ final class LibrarySearchIndexTests {
         }
     }
 
+    @Test("staleness names the entries a scan found new, rewritten or gone")
+    func stalenessNamesChangedAndRemoved() async {
+        let (index, _) = makeTempIndex()
+        await index.rebuild(entries: [
+            .init(id: "e1", title: "One", text: "first", fingerprint: "f1"),
+            .init(id: "e2", title: "Two", text: "second", fingerprint: "f2"),
+            .init(id: "e3", title: "Three", text: "third", fingerprint: "f3")
+        ])
+
+        let staleness = await index.staleness(matching: ["e1": "f1", "e2": "f2b", "e4": "f4"])
+
+        #expect(staleness == .init(changed: ["e2", "e4"], removed: ["e3"]))
+        #expect(await index.staleness(matching: ["e1": "f1", "e2": "f2", "e3": "f3"]).isCurrent)
+    }
+
+    @Test("reconciling the changed entries answers as a rebuild of all of them would")
+    func reconcileMatchesRebuild() async {
+        let final: [LibrarySearchIndex.RebuildEntry] = [
+            .init(id: "e1", title: "Stand-up", text: "sprint planning and bug triage", fingerprint: "f1"),
+            .init(id: "e2", title: "Retro v2", text: "retro feedback on the release", fingerprint: "f2b"),
+            .init(id: "e4", title: "Weekly", text: "alpha sprint review notes", fingerprint: "f4")
+        ]
+        let (reconciled, _) = makeTempIndex()
+        await reconciled.rebuild(entries: [
+            .init(id: "e1", title: "Stand-up", text: "sprint planning and bug triage", fingerprint: "f1"),
+            .init(id: "e2", title: "Retro v1", text: "old placeholder text", fingerprint: "f2"),
+            .init(id: "e3", title: "Doomed", text: "zzyzxmarker filler", fingerprint: "f3")
+        ])
+        await reconciled.reconcile(entries: [final[1], final[2]], removing: ["e3"])
+        let (scratch, _) = makeTempIndex()
+        await scratch.rebuild(entries: final)
+
+        for query in ["sprint", "retro", "alpha", "placeholder", "zzyzxmarker", "notes", "spr"] {
+            #expect(await keyed(reconciled.search(query)) == keyed(scratch.search(query)), "query \(query)")
+        }
+        #expect(await reconciled.excerpts(after: -1)?.byEntry == scratch.excerpts(after: -1)?.byEntry)
+        #expect(await reconciled.staleness(matching: ["e1": "f1", "e2": "f2b", "e4": "f4"]).isCurrent)
+    }
+
+    @Test("an index reading another process's snapshot answers from it and never writes")
+    func readingIndexNeverWrites() async throws {
+        let (owner, url) = makeTempIndex()
+        await owner.index(id: "e1", title: "Notes", text: "sprint planning", fingerprint: "f1", createdAt: Date())
+        await owner.flush()
+        let manifestBefore = try Data(contentsOf: manifestURL(in: url))
+
+        let reader = LibrarySearchIndex(readingSnapshotIn: url)
+        #expect(await reader.search("sprint").map(\.entryID) == ["e1"])
+        await reader.index(id: "e2", title: "Retro", text: "sprint retro", fingerprint: "f2", createdAt: Date())
+        await reader.rebuild(entries: [.init(id: "e3", title: "Other", text: "sprint other", fingerprint: "f3")])
+        await reader.flush()
+
+        #expect(await reader.search("sprint").map(\.entryID) == ["e3"])
+        #expect(try Data(contentsOf: manifestURL(in: url)) == manifestBefore)
+        #expect(!FileManager.default.fileExists(atPath: entryURL("e2", in: url).path))
+        #expect(!FileManager.default.fileExists(atPath: entryURL("e3", in: url).path))
+    }
+
+    @Test("the snapshot is read when something first asks, not when the index is made")
+    func snapshotLoadsOnFirstUse() async throws {
+        let (owner, url) = makeTempIndex()
+        await owner.index(id: "e1", title: "Notes", text: "sprint planning", fingerprint: "f1", createdAt: Date())
+        await owner.flush()
+
+        let later = LibrarySearchIndex(indexDirectory: url)
+        await owner.index(id: "e2", title: "Retro", text: "sprint retro", fingerprint: "f2", createdAt: Date())
+        await owner.flush()
+
+        #expect(await later.search("sprint").count == 2, "the load sees what landed after the index was made")
+    }
+
     private func keyed(_ matches: [LibrarySearchIndex.Match]) -> [String: LibrarySearchIndex.Match] {
         Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0) })
     }

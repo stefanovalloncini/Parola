@@ -98,15 +98,10 @@ struct Transcribe: AsyncParsableCommand {
         }
     }
 
-    private var libraryStore: LibraryStore {
-        library.map { LibraryStore(libraryURL: URL(fileURLWithPath: $0, isDirectory: true), extraIndexer: nil) }
-            ?? .shared
-    }
-
     /// Prints the notice for every file the library already holds, and drops them when
     /// `--skip-duplicates` says to.
     private func keepingNewFiles(_ urls: [URL]) async -> [URL] {
-        let lookups = await DuplicateNotice.lookups(for: urls, in: libraryStore)
+        let lookups = await DuplicateNotice.lookups(for: urls, in: libraryStore(at: library))
         var kept: [URL] = []
         for (url, lookup) in zip(urls, lookups) {
             guard let existing = lookup.entry else {

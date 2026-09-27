@@ -196,8 +196,6 @@ public actor MCPServer {
             let entry = try await libraryStore.add(
                 transcript: transcript, audioSource: sourceURL, sourceDigest: digest
             )
-            // The search index saves on a debounce; this process can exit before it fires.
-            await libraryStore.flush()
             return "Saved to the library as `\(entry.id)`."
         } catch {
             return "Saving to the library failed: \(error.localizedDescription)"

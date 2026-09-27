@@ -37,6 +37,12 @@ func printEnglishOnlyAutoNotice(model: String) {
     }
 }
 
+/// The library a command reads: the `--library` folder when one is given, the app's otherwise.
+func libraryStore(at path: String?) -> LibraryStore {
+    if let path { LibraryStore.sharedLibraryOverride = URL(fileURLWithPath: path, isDirectory: true) }
+    return .shared
+}
+
 func humanBytes(_ bytes: Int) -> String {
     Measurement(value: Double(bytes), unit: UnitInformationStorage.bytes)
         .formatted(.byteCount(style: .file))

@@ -77,6 +77,7 @@ struct ParolaApp: App {
         ManagedConfiguration.userSettingsStore = bootstrap.defaults
         // Must precede AppModel: a managed launch resolves its engine choices against ModelStore.shared.
         ModelStore.sharedDirectoryOverride = bootstrap.models
+        LibraryStore.sharedLibraryOverride = bootstrap.library
         let m = AppModel(bootstrap: bootstrap)
         let lc = LiveCaptionsController()
         m.liveCaptions = lc

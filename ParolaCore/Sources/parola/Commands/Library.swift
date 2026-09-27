@@ -23,9 +23,7 @@ struct Library: AsyncParsableCommand {
 
         func run() async throws {
             CLIDiagnostics.installIfWanted(alwaysOn: false)
-            let store = library.map {
-                LibraryStore(libraryURL: URL(fileURLWithPath: $0, isDirectory: true), extraIndexer: nil)
-            } ?? LibraryStore.shared
+            let store = libraryStore(at: library)
             let calendar = Calendar.current
             let stats = LibraryStatistics.compute(entries: await store.list(), calendar: calendar)
             print(json ? jsonOutput(stats, calendar: calendar) : LibraryStatsReport.text(stats))
@@ -134,9 +132,7 @@ struct Library: AsyncParsableCommand {
 
         func run() async throws {
             CLIDiagnostics.installIfWanted(alwaysOn: false)
-            let store = library.map {
-                LibraryStore(libraryURL: URL(fileURLWithPath: $0, isDirectory: true), extraIndexer: nil)
-            } ?? LibraryStore.shared
+            let store = libraryStore(at: library)
             let report = await store.verify()
             if json {
                 print(jsonOutput(report))

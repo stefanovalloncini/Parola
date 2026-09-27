@@ -209,8 +209,11 @@ public actor LibrarySearchIndex {
     private var legacySnapshotPresent = false
     private var rebuildNeed: RebuildNeed = .none
     private var snapshotWriteFailing = false
-    private let loadTask: Task<LoadResult, Never>
+    /// Started by the first call that needs the index, so a process that never searches never decodes the snapshot.
+    private var loadTask: Task<LoadResult, Never>?
     private let indexDirectory: URL
+    /// False for a reader: the index lives in memory and the snapshot on disk stays the owner's.
+    private let persists: Bool
     private let saveDebounce: Duration
     private let clock: any Clock<Duration>
     private var pendingSaveTask: Task<Void, Never>?
@@ -238,21 +241,31 @@ public actor LibrarySearchIndex {
         )
     }
 
+    /// An index that answers from memory and never writes the snapshot, for a process that reads a library another one owns.
+    init(readingSnapshotIn indexDirectory: URL) {
+        self.init(
+            indexDirectory: indexDirectory,
+            saveDebounce: .milliseconds(250),
+            clock: ContinuousClock(),
+            writeSnapshotData: { data, url in try data.write(to: url, options: .atomic) },
+            persists: false
+        )
+    }
+
     init(
         indexDirectory: URL,
         saveDebounce: Duration,
         clock: any Clock<Duration>,
         writeSnapshotData: @escaping @Sendable (Data, URL) throws -> Void,
-        removeSnapshotFile: @escaping @Sendable (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }
+        removeSnapshotFile: @escaping @Sendable (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) },
+        persists: Bool = true
     ) {
         self.indexDirectory = indexDirectory
         self.saveDebounce = saveDebounce
         self.clock = clock
         self.writeSnapshotData = writeSnapshotData
         self.removeSnapshotFile = removeSnapshotFile
-        self.loadTask = Task.detached(priority: .utility) {
-            await Self.loadSnapshotOffPool(at: indexDirectory)
-        }
+        self.persists = persists
     }
 
     /// Indexes an entry. `auxiliaryText` (summary, notes, speaker names) is tokenized for search but never shown in snippets.
@@ -431,18 +444,37 @@ public actor LibrarySearchIndex {
         let task = pendingSaveTask
         pendingSaveTask = nil
         task?.cancel()
-        guard isLoaded else { return }
+        guard persists, isLoaded else { return }
         await saveSnapshot()
         await drainWrites()
+    }
+
+    /// How far the index is from the bundles `fingerprints` describes.
+    struct Staleness: Sendable, Equatable {
+        /// The snapshot was absent or unusable, so every entry has to be read again.
+        var needsRebuild = false
+        /// Bundles that are new or have moved since they were indexed.
+        var changed: Set<String> = []
+        /// Entries whose bundle has left the library.
+        var removed: Set<String> = []
+
+        var isCurrent: Bool { !needsRebuild && changed.isEmpty && removed.isEmpty }
+    }
+
+    /// Bundles added, removed or rewritten behind this index show up here, so only they are read again.
+    func staleness(matching fingerprints: [String: String]) async -> Staleness {
+        await ensureLoaded()
+        guard rebuildNeed == .none else { return Staleness(needsRebuild: true) }
+        return Staleness(
+            changed: Set(fingerprints.lazy.filter { self.entries[$0.key]?.fingerprint != $0.value }.map(\.key)),
+            removed: Set(entries.keys.lazy.filter { fingerprints[$0] == nil })
+        )
     }
 
     /// True when the snapshot is unusable, or when it was built from a different set of bundles
     /// than `fingerprints` describes — bundles added, removed or rewritten behind the app included.
     func needsRebuild(matching fingerprints: [String: String]) async -> Bool {
-        await ensureLoaded()
-        guard rebuildNeed == .none else { return true }
-        guard entries.count == fingerprints.count else { return true }
-        return entries.contains { fingerprints[$0.key] != $0.value.fingerprint }
+        await !staleness(matching: fingerprints).isCurrent
     }
 
     /// Records that an entry's bundle moved without its text changing, so the next launch does not
@@ -493,11 +525,39 @@ public actor LibrarySearchIndex {
         await saveSnapshot()
     }
 
+    /// Replaces the entries a scan found changed and drops the ones it found gone. Callers hold off
+    /// `index` and `remove` across it, as for `rebuild`.
+    func reconcile(entries changed: [RebuildEntry], removing removed: Set<String>) async {
+        await ensureLoaded()
+        let prepared = await Self.tokenizeOffActor(changed)
+        for id in removed {
+            removeFromIndex(id)
+            if excerptsByEntry.removeValue(forKey: id) != nil { excerptsGeneration &+= 1 }
+        }
+        for entry in prepared {
+            removeFromIndex(entry.id)
+            install(entry.entry, for: entry.id)
+        }
+        scheduleSave()
+    }
+
     private func ensureLoaded() async {
         guard !isLoaded else { return }
-        let result = await loadTask.value
+        let task: Task<LoadResult, Never>
+        if let loadTask {
+            task = loadTask
+        } else {
+            let directory = indexDirectory
+            task = Task.detached(priority: .utility) {
+                await Self.loadSnapshotOffPool(at: directory)
+            }
+            loadTask = task
+        }
+        let result = await task.value
         guard !isLoaded else { return }
         isLoaded = true
+        // The task would otherwise hold the loaded state for the index's lifetime, beside the copy edits make.
+        loadTask = nil
         legacySnapshotPresent = result.legacySnapshotPresent
         switch result.outcome {
         case .loaded(let state):
@@ -906,7 +966,7 @@ public actor LibrarySearchIndex {
     }
 
     private func scheduleSave() {
-        guard isDirty, pendingSaveTask == nil else { return }
+        guard persists, isDirty, pendingSaveTask == nil else { return }
         let debounce = saveDebounce
         let clock = clock
         pendingSaveTask = Task { [weak self] in
@@ -931,7 +991,7 @@ public actor LibrarySearchIndex {
     }
 
     private func saveSnapshot() async {
-        guard canPersistSnapshot, isDirty else { return }
+        guard persists, canPersistSnapshot, isDirty else { return }
         isDirty = false
         let pending = dirtyEntryIDs
         dirtyEntryIDs.removeAll()

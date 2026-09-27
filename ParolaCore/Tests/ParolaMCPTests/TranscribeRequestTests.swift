@@ -277,24 +277,23 @@ struct TranscribeRequestTests {
         #expect(matches.contains { $0.entryID == entry.id })
     }
 
-    @Test("a saved entry is searchable from a fresh store, not just this one's memory")
-    func saveFlushesTheSearchIndex() async throws {
+    @Test("a saved entry is searchable from the app's store, which indexes what the server wrote")
+    func savedEntryReachesTheAppsIndex() async throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let library = root.appending(path: "Library")
         let audio = root.appending(path: "talk.m4a")
         try Data("fake audio".utf8).write(to: audio)
         let server = MCPServer(
-            libraryStore: LibraryStore(libraryURL: library, extraIndexer: nil),
+            libraryStore: LibraryStore(libraryURL: library, extraIndexer: nil, role: .reader),
             bridge: NullBridge()
         )
 
         let note = await server.saveNote(for: fixture(), sourceURL: audio)
         #expect(!note.contains("failed"))
 
-        // The debounced index save has not fired yet; a process that exits now must not lose it.
-        let reopened = LibraryStore(libraryURL: library, extraIndexer: nil)
-        #expect(await !reopened.search("sprint").isEmpty)
+        let app = LibraryStore(libraryURL: library, extraIndexer: nil)
+        #expect(await !app.search("sprint").isEmpty)
     }
 
     @Test("a library that can't be written is reported, not thrown")

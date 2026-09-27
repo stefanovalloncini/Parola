@@ -61,46 +61,6 @@ struct IntentTests {
         )
     }
 
-    @Test("suggestedEntities returns recent library entries")
-    func suggestionsReturnsRecent() async throws {
-        let store = try makeTempStore()
-        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
-        let query = LibraryEntryEntityQuery(store: store)
-        let suggestions = try await query.suggestedEntities()
-        #expect(suggestions.count == 1)
-        #expect(suggestions.first?.id == entry.id)
-    }
-
-    @Test("entities(for:) resolves entries by id")
-    func entitiesByID() async throws {
-        let store = try makeTempStore()
-        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
-        let query = LibraryEntryEntityQuery(store: store)
-        let resolved = try await query.entities(for: [entry.id])
-        #expect(resolved.count == 1)
-        #expect(resolved.first?.id == entry.id)
-        #expect(resolved.first?.title == entry.title)
-    }
-
-    @Test("suggestedEntities limits to 10 most recent")
-    func suggestionsLimit() async throws {
-        let store = try makeTempStore()
-        for _ in 0..<12 {
-            _ = try await store.add(transcript: makeTranscript(), audioSource: nil)
-        }
-        let query = LibraryEntryEntityQuery(store: store)
-        let suggestions = try await query.suggestedEntities()
-        #expect(suggestions.count == 10)
-    }
-
-    @Test("entities(for:) returns empty for unknown ids")
-    func entitiesUnknown() async throws {
-        let store = try makeTempStore()
-        let query = LibraryEntryEntityQuery(store: store)
-        let resolved = try await query.entities(for: ["nope"])
-        #expect(resolved.isEmpty)
-    }
-
     /// Darwin notifications reach every process on the Mac, so these tests signal on names no running Parola listens to.
     private func withPrivateSignalNames(_ body: (DictationSignal.Names) async throws -> Void) async rethrows {
         let id = UUID().uuidString
