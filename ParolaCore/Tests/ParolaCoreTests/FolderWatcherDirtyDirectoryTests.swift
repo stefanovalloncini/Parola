@@ -1,0 +1,157 @@
+import Foundation
+import Testing
+@testable import ParolaCore
+
+@Suite("FolderWatcher rescans only the directories that changed", .tags(.fileSystem))
+struct FolderWatcherDirtyDirectoryTests {
+    private typealias Fixture = WatchedFolderFixture
+
+    private func makeWatcher(
+        _ folder: URL,
+        clock: FixedClock,
+        scheduler: ManualScheduler,
+        observesFileSystem: Bool = false,
+        collected: CollectedURLs
+    ) -> FolderWatcher {
+        var options = FolderWatcher.Options(recursive: true, settledInterval: .milliseconds(50), clock: clock, scheduler: scheduler)
+        options.observesFileSystem = observesFileSystem
+        return FolderWatcher(folderURL: folder, options: options) { collected.append($0) }
+    }
+
+    private func makeTree(_ clock: FixedClock, subfolders: [String]) throws -> URL {
+        let folder = try Fixture.makeTempDir()
+        for name in subfolders {
+            let subfolder = folder.appendingPathComponent(name)
+            try FileManager.default.createDirectory(at: subfolder, withIntermediateDirectories: true)
+            try Fixture.writeSettled(subfolder.appendingPathComponent("\(name).m4a"), clock: clock)
+            try Data("notes".utf8).write(to: subfolder.appendingPathComponent("\(name).txt"))
+        }
+        return folder
+    }
+
+    @Test("a change in one subfolder lists that subfolder and nothing else")
+    func onlyTheDirtyDirectoryIsListed() async throws {
+        let clock = FixedClock(start: Date())
+        let folder = try makeTree(clock, subfolders: ["A", "B", "C"])
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let watcher = makeWatcher(folder, clock: clock, scheduler: ManualScheduler(), collected: CollectedURLs())
+        await watcher.start()
+        #expect(await watcher.listedDirectoryCount == 4)
+        #expect(Fixture.names(await watcher.trackedPaths) == ["A.m4a", "B.m4a", "C.m4a"], "only media is tracked")
+
+        let subfolder = folder.appendingPathComponent("B")
+        try Fixture.writeSettled(subfolder.appendingPathComponent("new.wav"), clock: clock)
+        await watcher.markDirty([try realPath(subfolder)])
+
+        #expect(await watcher.listedDirectoryCount == 5)
+        #expect(Fixture.names(await watcher.pendingPaths) == ["new.wav"])
+        await watcher.stop()
+    }
+
+    @Test("a folder moved in whole is walked once and its media arrives")
+    func movedInFolderIsWalked() async throws {
+        let clock = FixedClock(start: Date())
+        let folder = try makeTree(clock, subfolders: ["A"])
+        let outside = try Fixture.makeTempDir()
+        defer {
+            try? FileManager.default.removeItem(at: folder)
+            try? FileManager.default.removeItem(at: outside)
+        }
+        let batch = outside.appendingPathComponent("Batch")
+        try FileManager.default.createDirectory(at: batch.appendingPathComponent("Day 2"), withIntermediateDirectories: true)
+        try Fixture.writeSettled(batch.appendingPathComponent("one.m4a"), clock: clock)
+        try Fixture.writeSettled(batch.appendingPathComponent("Day 2/two.mp3"), clock: clock)
+
+        let collected = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let watcher = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
+        await watcher.start()
+        let before = await watcher.listedDirectoryCount
+
+        try FileManager.default.moveItem(at: batch, to: folder.appendingPathComponent("Batch"))
+        await watcher.markDirty([try realPath(folder)])
+        #expect(await watcher.listedDirectoryCount == before + 3, "the root, then Batch and Day 2 walked once")
+
+        try await scheduler.advanceAndWait()
+        await watcher.stop()
+        #expect(Set(collected.snapshot().map(\.lastPathComponent)) == ["one.m4a", "two.mp3"])
+    }
+
+    @Test("a renamed subfolder keeps its files and drops the old directory")
+    func renamedSubfolderKeepsIdentity() async throws {
+        let clock = FixedClock(start: Date())
+        let folder = try makeTree(clock, subfolders: ["Inbox", "Other"])
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let nested = folder.appendingPathComponent("Inbox/Nested")
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        try Fixture.writeSettled(nested.appendingPathComponent("deep.wav"), clock: clock)
+
+        let watcher = makeWatcher(folder, clock: clock, scheduler: ManualScheduler(), collected: CollectedURLs())
+        await watcher.start()
+
+        try FileManager.default.moveItem(at: folder.appendingPathComponent("Inbox"), to: folder.appendingPathComponent("Done"))
+        await watcher.markDirty([try realPath(folder)])
+
+        #expect(await watcher.pendingPaths.isEmpty)
+        let tracked = await watcher.trackedPaths
+        #expect(Fixture.names(tracked) == ["Inbox.m4a", "deep.wav", "Other.m4a"])
+        #expect(tracked.filter { $0.contains("/Done/") }.count == 2)
+        let directories = Set(await watcher.watchedDirectories.map { ($0 as NSString).lastPathComponent })
+        #expect(directories.isSuperset(of: ["Done", "Nested", "Other"]))
+        #expect(!directories.contains("Inbox"))
+        await watcher.stop()
+    }
+
+    @Test("a subfolder deleted and recreated under the same name is listed again")
+    func replacedSubfolderIsRescanned() async throws {
+        let clock = FixedClock(start: Date())
+        let folder = try makeTree(clock, subfolders: ["Drop"])
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let collected = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let watcher = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
+        await watcher.start()
+
+        let drop = folder.appendingPathComponent("Drop")
+        try FileManager.default.removeItem(at: drop)
+        try FileManager.default.createDirectory(at: drop, withIntermediateDirectories: true)
+        try Fixture.writeSettled(drop.appendingPathComponent("replacement.m4a"), clock: clock)
+        await watcher.markDirty([try realPath(folder)])
+
+        #expect(Fixture.names(await watcher.trackedPaths) == ["replacement.m4a"])
+        try await scheduler.advanceAndWait()
+        await watcher.stop()
+        #expect(collected.snapshot().map(\.lastPathComponent) == ["replacement.m4a"])
+    }
+
+    @Test("a real file-system event rescans the folder it came from, not the whole tree")
+    func fileSystemEventRescansItsDirectory() async throws {
+        let clock = FixedClock(start: Date())
+        let names = (1...12).map { "Folder \($0)" }
+        let folder = try makeTree(clock, subfolders: names)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let watcher = makeWatcher(
+            folder, clock: clock, scheduler: ManualScheduler(), observesFileSystem: true, collected: CollectedURLs()
+        )
+        await watcher.start()
+        let before = await watcher.listedDirectoryCount
+        #expect(before == 13)
+
+        try Fixture.writeSettled(folder.appendingPathComponent("Folder 7/arrival.wav"), clock: clock)
+        let deadline = ContinuousClock.now + .seconds(5)
+        while await !Fixture.names(watcher.pendingPaths).contains("arrival.wav"), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(Fixture.names(await watcher.pendingPaths) == ["arrival.wav"])
+        let listed = await watcher.listedDirectoryCount - before
+        #expect(listed >= 1 && listed < 4, "listed \(listed) directories for one event")
+        await watcher.stop()
+    }
+
+    private func realPath(_ url: URL) throws -> String {
+        let resolved = try #require(realpath(url.path, nil))
+        defer { free(resolved) }
+        return String(cString: resolved)
+    }
+}
