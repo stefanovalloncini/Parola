@@ -69,16 +69,23 @@ struct CLIDuplicateProcessTests {
             title: "Kickoff call"
         )
         await app.flush()
-        // A bundle the snapshot lacks: a store that owned the index would rebuild and rewrite it on sight.
-        _ = try ParolaDocument.write(
+        // A bundle the snapshot lacks, with no digest or duration: a store that owned the library would
+        // rewrite the index on sight, and its verify would stamp the digest into the manifest.
+        let behind = try ParolaDocument.write(
             transcript: Transcript(
                 segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "behind")],
                 language: "en",
                 modelName: "openai_whisper-tiny"
             ),
-            audioURL: nil,
+            audioURL: audio,
             to: library.appendingPathComponent("behind")
         )
+        try ParolaDocument.updateManifest(at: behind) { manifest in
+            manifest.sourceDigest = nil
+            manifest.durationSeconds = nil
+        }
+        let behindManifest = behind.appendingPathComponent("manifest.json")
+        let manifestBefore = try Data(contentsOf: behindManifest)
         let before = snapshotFiles(in: library)
         #expect(!before.isEmpty)
 
@@ -92,6 +99,7 @@ struct CLIDuplicateProcessTests {
         #expect(stats.stdout.contains("Transcripts: 2"))
         #expect(verify.stdout.contains("Healthy: 2"))
         #expect(snapshotFiles(in: library) == before)
+        #expect(try Data(contentsOf: behindManifest) == manifestBefore)
     }
 
     @Test("--skip-duplicates stops before loading a model and says why")
