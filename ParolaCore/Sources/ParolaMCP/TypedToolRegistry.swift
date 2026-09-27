@@ -225,10 +225,10 @@ public enum TypedToolRegistry {
             description: "Block until the state revision counter reaches 'min' or the timeout fires.",
             properties: [
                 .int("min", description: "Minimum revision value to wait for."),
-                .int("timeoutMs", description: "Max ms to wait. Defaults to 5000."),
+                .int("timeoutMs", description: "Max ms to wait. Defaults to 10000."),
             ],
             required: ["min"],
-            defaultTimeoutMs: 5_000
+            defaultTimeoutMs: 10_000
         ),
         TypedTool(
             name: "parola_start_dictation",

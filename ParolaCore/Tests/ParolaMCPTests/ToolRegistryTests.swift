@@ -153,6 +153,8 @@ struct ToolRegistryTests {
         #expect(given["timeoutMs"] as? Int == 1_234)
         let legacy = try await callTool("parola_app_wait_for_phase", ["phase": "ready"], bridge: bridge)
         #expect(legacy["timeoutMs"] as? Int == 10_000)
+        let revision = try await callTool("parola_wait_for_revision", ["min": 3], bridge: bridge)
+        #expect(revision["timeoutMs"] as? Int == 10_000, "the app's own waitForRevision default")
     }
 
     @Test("Every typed tool that takes timeoutMs sends the default its description names")
