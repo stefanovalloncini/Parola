@@ -54,8 +54,29 @@ public actor FolderWatcher {
         var status: FileStatus
     }
 
+    /// The media a watcher has accounted for, saved between launches so a file added while the app
+    /// was quit still arrives and the files already there don't.
+    public struct Baseline: Codable, Sendable, Equatable {
+        public struct Entry: Codable, Sendable, Equatable {
+            /// Relative to the watched folder, which can itself be renamed or moved.
+            public var path: String
+            public var inode: UInt64?
+            public var size: Int64
+            public var modified: Date
+        }
+
+        public var entries: [Entry]
+
+        public init(entries: [Entry] = []) {
+            self.entries = entries
+        }
+    }
+
     private let folderURL: URL
+    /// Symlinks resolved, as the enumerator reports every path under it.
+    private let rootURL: URL
     private let onNewMediaFile: @Sendable (URL) -> Void
+    private let onBaselineChange: (@Sendable () -> Void)?
     private let options: Options
     private let eventQueue = DispatchQueue(label: "com.parola.folder-watch.\(UUID().uuidString)")
     private var fileDescriptor: Int32 = -1
@@ -69,14 +90,19 @@ public actor FolderWatcher {
     private var scanContinuation: AsyncStream<Void>.Continuation?
     private var settledTask: Task<Void, Never>?
     private var lastRescan: Task<Void, Never>?
+    private var baselineChanged = false
 
+    /// `onBaselineChange` fires after a scan or a settle check changes what `baseline()` returns.
     public init(
         folderURL: URL,
         options: Options = Options(),
+        onBaselineChange: (@Sendable () -> Void)? = nil,
         onNewMediaFile: @escaping @Sendable (URL) -> Void
     ) {
         self.folderURL = folderURL
+        self.rootURL = Self.realPath(folderURL)
         self.options = options
+        self.onBaselineChange = onBaselineChange
         self.onNewMediaFile = onNewMediaFile
     }
 
@@ -84,7 +110,9 @@ public actor FolderWatcher {
         self.init(folderURL: folderURL, options: Options(), onNewMediaFile: onNewMediaFile)
     }
 
-    public func start() async {
+    /// Without a baseline every file already in the folder counts as seen, as when a folder is first
+    /// added. With one, files the baseline doesn't account for arrive once they settle.
+    public func start(baseline: Baseline? = nil) async {
         guard source == nil else { return }
         let fd = folderURL.path.withCString { open($0, O_EVTONLY) }
         guard fd >= 0 else { return }
@@ -95,8 +123,22 @@ public actor FolderWatcher {
         guard fileDescriptor == fd else { return }
         files = [:]
         pending = []
-        for file in scan.files {
-            files[file.key] = TrackedFile(path: file.path, size: file.size, modified: file.modified, status: .settled)
+        if let baseline {
+            for entry in baseline.entries {
+                let path = rootURL.path + "/" + entry.path
+                let key = entry.inode.map(FileKey.inode) ?? .path(path)
+                files[key] = TrackedFile(path: path, size: entry.size, modified: entry.modified, status: .settled)
+            }
+            reconcile(scan.files)
+        } else {
+            for file in scan.files {
+                files[file.key] = TrackedFile(path: file.path, size: file.size, modified: file.modified, status: .settled)
+            }
+        }
+        baselineChanged = true
+        publishBaselineChange()
+        if !pending.isEmpty {
+            schedulePendingCheck()
         }
 
         // bufferingNewest(1): events that land while a rescan is running collapse into one trailing rescan.
@@ -187,9 +229,32 @@ public actor FolderWatcher {
         guard !scan.rootMissing else { return }
         syncSubdirWatchers(scan.directories)
         reconcile(scan.files)
+        publishBaselineChange()
         if !pending.isEmpty {
             schedulePendingCheck()
         }
+    }
+
+    public func baseline() -> Baseline {
+        let prefix = rootURL.path + "/"
+        let entries: [Baseline.Entry] = files.compactMap { key, file in
+            guard file.status == .settled, file.path.hasPrefix(prefix) else { return nil }
+            var inode: UInt64?
+            if case .inode(let number) = key { inode = number }
+            return Baseline.Entry(
+                path: String(file.path.dropFirst(prefix.count)),
+                inode: inode,
+                size: file.size,
+                modified: file.modified
+            )
+        }
+        return Baseline(entries: entries.sorted { $0.path < $1.path })
+    }
+
+    private func publishBaselineChange() {
+        guard baselineChanged else { return }
+        baselineChanged = false
+        onBaselineChange?()
     }
 
     private func reconcile(_ listed: [ScannedFile]) {
@@ -202,11 +267,13 @@ public actor FolderWatcher {
 
         for item in listed {
             if var known = files[item.key] {
-                known.path = item.path
-                if known.status == .settled {
+                if known.status == .settled,
+                   known.path != item.path || known.size != item.size || known.modified != item.modified {
                     known.size = item.size
                     known.modified = item.modified
+                    baselineChanged = true
                 }
+                known.path = item.path
                 files[item.key] = known
             } else if let departure = options.ledger.claim(item.key, size: item.size, modified: item.modified, now: now) {
                 track(item, status: departure.status)
@@ -226,6 +293,7 @@ public actor FolderWatcher {
         for key in vanished.values {
             guard let gone = files.removeValue(forKey: key) else { continue }
             pending.remove(key)
+            if gone.status == .settled { baselineChanged = true }
             options.ledger.depart(key, .init(size: gone.size, modified: gone.modified, status: gone.status, departedAt: now))
         }
     }
@@ -236,6 +304,7 @@ public actor FolderWatcher {
             pending.insert(item.key)
         } else {
             pending.remove(item.key)
+            baselineChanged = true
         }
     }
 
@@ -272,6 +341,7 @@ public actor FolderWatcher {
             if mtime <= cutoff && size == file.size && size > 0 {
                 file.status = .settled
                 pending.remove(key)
+                baselineChanged = true
                 // A move from another watched folder can reach this watcher before that one notices
                 // the file left; the settle delay gives it time to hand the file over.
                 if options.ledger.claim(key, size: size, modified: mtime, now: now) == nil {
@@ -282,6 +352,7 @@ public actor FolderWatcher {
             file.modified = mtime
             files[key] = file
         }
+        publishBaselineChange()
         if !pending.isEmpty {
             schedulePendingCheck()
         }
@@ -338,7 +409,7 @@ public actor FolderWatcher {
         }
         guard options.recursive else {
             guard let contents = try? fm.contentsOfDirectory(
-                at: folderURL, includingPropertiesForKeys: Self.scanKeys, options: []
+                at: rootURL, includingPropertiesForKeys: Self.scanKeys, options: []
             ) else { return FolderScan(rootMissing: true) }
             for url in contents {
                 add(url, try? url.resourceValues(forKeys: keySet))
@@ -347,7 +418,7 @@ public actor FolderWatcher {
         }
         // The enumerator comes back empty, not nil, for a missing root.
         guard rootIsDirectory(), let enumerator = fm.enumerator(
-            at: folderURL,
+            at: rootURL,
             includingPropertiesForKeys: Self.scanKeys,
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return FolderScan(rootMissing: true) }
@@ -358,9 +429,16 @@ public actor FolderWatcher {
         return scan
     }
 
+    /// `realpath`, not `resolvingSymlinksInPath`, which strips `/private` where the enumerator keeps it.
+    private static func realPath(_ url: URL) -> URL {
+        guard let resolved = realpath(url.path, nil) else { return url.standardizedFileURL }
+        defer { free(resolved) }
+        return URL(fileURLWithPath: String(cString: resolved), isDirectory: true)
+    }
+
     private nonisolated func rootIsDirectory() -> Bool {
         var isDirectory: ObjCBool = false
-        return FileManager.default.fileExists(atPath: folderURL.path, isDirectory: &isDirectory) && isDirectory.boolValue
+        return FileManager.default.fileExists(atPath: rootURL.path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
     internal var pendingPaths: Set<String> {

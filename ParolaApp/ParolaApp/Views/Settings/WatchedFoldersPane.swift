@@ -53,7 +53,7 @@ private struct WatchedFoldersPaneBody: View {
             }
             .axLeaf("WatchedFolders.Button.AddFolder")
 
-            SettingHelper(text: "New files dropped into a watched folder are transcribed automatically. Existing files are ignored.")
+            SettingHelper(text: "New files dropped into a watched folder are transcribed automatically, including ones added while Parola was closed. Files already there when you add the folder are ignored.")
             ResetPaneButton(scope: .watchedFolders)
         }
     }

@@ -656,8 +656,18 @@ final class AppModel {
 
     // MARK: - Watched folders
 
-    @ObservationIgnored lazy var watchedFolders: WatchedFoldersStore = WatchedFoldersStore { [weak self] url in
+    @ObservationIgnored lazy var watchedFolders: WatchedFoldersStore = WatchedFoldersStore(
+        defaults: defaults,
+        baselineDirectory: watchedFoldersDirectory
+    ) { [weak self] url in
         self?.handleWatchedArrival(url)
+    }
+
+    /// A `--library` override keeps the watchers' baselines next to that library, like the delivery queue.
+    var watchedFoldersDirectory: URL {
+        library.libraryURL == LibraryStore.defaultLibraryURL
+            ? URL.applicationSupportDirectory.appending(path: "Parola/Watched Folders", directoryHint: .isDirectory)
+            : library.libraryURL.appendingPathComponent("Watched Folders", isDirectory: true)
     }
 
     /// Nobody opened this file, so a copy the library holds follows the batch rule whether Parola is idle

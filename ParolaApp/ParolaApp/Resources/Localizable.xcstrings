@@ -8021,13 +8021,13 @@
         }
       }
     },
-    "New files dropped into a watched folder are transcribed automatically. Existing files are ignored.": {
+    "New files dropped into a watched folder are transcribed automatically, including ones added while Parola was closed. Files already there when you add the folder are ignored.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "I nuovi file aggiunti a una cartella monitorata vengono trascritti automaticamente. I file esistenti vengono ignorati."
+            "value": "I nuovi file aggiunti a una cartella monitorata vengono trascritti automaticamente, anche quelli arrivati mentre Parola era chiuso. I file già presenti quando aggiungi la cartella vengono ignorati."
           }
         }
       }
