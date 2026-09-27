@@ -251,6 +251,47 @@ struct DropRoutingTests {
         model.fileTranscribeTask = nil
     }
 
+    enum DuplicateOutcome: CaseIterable, Sendable {
+        case openExistingPolicy
+        case sheetDismissed
+        case batchSkipsIt
+    }
+
+    @Test("a link dropped beside a file the library already holds starts once the file settles", arguments: DuplicateOutcome.allCases)
+    func linkBesideADuplicateRuns(outcome: DuplicateOutcome) async throws {
+        let file = try makeLinkFixtureWAV()
+        let second = try makeLinkFixtureWAV(frames: 4900)
+        defer {
+            try? FileManager.default.removeItem(at: file)
+            try? FileManager.default.removeItem(at: second)
+        }
+        let gate = FetchGate()
+        let fetcher = ScriptedLinkFetcher(fixture: Self.media("never.wav"), gate: gate)
+        let model = linkModel(fetcher)
+        let known = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "held already")], language: "en", modelName: "tiny"
+        )
+        _ = try await model.library.add(transcript: known, audioSource: file)
+        _ = try await model.library.add(transcript: known, audioSource: second)
+        model.duplicateImportPolicy = outcome == .sheetDismissed ? .alwaysAsk : .openExisting
+
+        if outcome == .batchSkipsIt {
+            model.addToQueue(urls: [file, second, Self.link])
+        } else {
+            model.transcribeNow(urls: [file, Self.link])
+        }
+        if outcome == .sheetDismissed {
+            await waitUntil { model.duplicateImport != nil }
+            #expect(fetcher.fetches == 0)
+            model.dismissDuplicateImport()
+        }
+
+        await waitUntil { fetcher.fetches == 1 }
+        #expect(model.deferredLinks.isEmpty)
+        model.cancelCurrentWork()
+        await gate.open()
+    }
+
     @Test("an opened subtitle file and a link both land")
     func subtitleBesideLink() async throws {
         let srt = FileManager.default.temporaryDirectory.appendingPathComponent("parola-drop-\(UUID().uuidString).srt")
