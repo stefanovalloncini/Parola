@@ -135,7 +135,6 @@ struct IntakeSettingsToolbarRuleTests {
             .loadingModel(name: "tiny"),
             .transcribing(file: URL(fileURLWithPath: "/tmp/a.wav")),
             .recording(source: .microphone),
-            .exporting(progress: 0.2),
             .ready,
             .failed(message: "boom")
         ]

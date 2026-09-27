@@ -22,6 +22,12 @@ struct ContentRoutes: View {
                 .transition(.opacity)
         }
         .animation(reduceMotion ? nil : DS.Motion.route, value: routeID)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let job = model.burnJob {
+                BurnJobStrip(job: job)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
     }
 
     @ViewBuilder
@@ -114,8 +120,6 @@ struct ContentRoutes: View {
             LiveTranscribingPane(file: file)
         case .recording(let source):
             RecordingPane(source: source)
-        case .exporting(let progress):
-            ProgressPane(title: "Burning subtitles…", progress: progress)
         case .ready:
             if model.transcript != nil {
                 TranscriptPane()
@@ -141,7 +145,6 @@ struct ContentRoutes: View {
         case .recording: 4
         case .ready: 5
         case .failed: 6
-        case .exporting: 7
         case .fetchingLink: 8
         }
     }

@@ -36,16 +36,6 @@ struct IntentActionsTests {
         }
     }
 
-    @Test("transcribe-file intent throws instead of parking the file behind an export")
-    func transcribeThrowsWhileExporting() async {
-        let model = makeModel()
-        model.phase = .exporting(progress: 0.5)
-        await #expect(throws: IntentActionError.exportInProgress) {
-            _ = try await model.transcribeFileFromIntent(URL(fileURLWithPath: "/tmp/a.wav"))
-        }
-        #expect(model.deferredArrivals.isEmpty)
-    }
-
     @Test("transcribe-file intent rejects subtitle and project files")
     func transcribeRejectsNonMedia() async {
         let model = makeModel()
@@ -121,8 +111,8 @@ struct IntentActionsTests {
         #expect(try storedText(older) == "the older take")
     }
 
-    @Test("Open Last Transcript leaves a recording or an export in charge of the phase", .timeLimit(.minutes(1)))
-    func openLatestRefusesDuringCaptureOrExport() async throws {
+    @Test("Open Last Transcript leaves a recording in charge of the phase", .timeLimit(.minutes(1)))
+    func openLatestRefusesDuringCapture() async throws {
         let model = makeModel()
         _ = try await seedTwoEntries(in: model)
 
@@ -132,12 +122,6 @@ struct IntentActionsTests {
         }
         #expect(model.phase == .recording(source: .microphone))
         #expect(model.selectedEntryID == nil)
-
-        model.phase = .exporting(progress: 0.5)
-        await #expect(throws: IntentActionError.exportInProgress) {
-            _ = try await model.openLatestFromIntent()
-        }
-        #expect(model.phase == .exporting(progress: 0.5))
     }
 
     @Test("Summarize Last Transcript does nothing while a recording owns the phase", .timeLimit(.minutes(1)))

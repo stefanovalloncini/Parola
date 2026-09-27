@@ -574,13 +574,11 @@ extension AppModel {
         try await startOpeningEntry(id).value
     }
 
-    /// Why an entry can't take the main pane now: opening sets `.ready`, and a capture or export under it couldn't be stopped.
+    /// Why an entry can't take the main pane now: opening sets `.ready`, and a capture under it couldn't be stopped.
+    /// A burn keeps its own copy of the transcript, so opening another one leaves it running.
     var entryOpenRefusal: IntentActionError? {
-        switch phase {
-        case .recording: return .recordingInProgress
-        case .exporting: return .exportInProgress
-        default: return nil
-        }
+        if case .recording = phase { return .recordingInProgress }
+        return nil
     }
 
     @discardableResult

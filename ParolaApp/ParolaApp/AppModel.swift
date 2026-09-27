@@ -22,7 +22,6 @@ final class AppModel {
         case fetchingLink(title: String?, progress: Double?)
         case transcribing(file: URL)
         case recording(source: RecordSource)
-        case exporting(progress: Double)
         case ready
         case failed(message: String)
     }
@@ -1440,14 +1439,13 @@ final class AppModel {
     }
 
     var canCancel: Bool {
-        if batchTask != nil { return true }
-        if streamingConsumer != nil { return true }
-        if fileTranscribeTask != nil { return true }
-        if downloadTask != nil { return true }
-        if youtubeTranscribeTask != nil { return true }
-        if youtubeSubsTask != nil { return true }
-        if burnTask != nil { return true }
-        return false
+        hasForegroundWork || burnTask != nil
+    }
+
+    /// Everything Cancel stops ahead of a burn, which runs beside the rest and has its own Cancel.
+    private var hasForegroundWork: Bool {
+        batchTask != nil || streamingConsumer != nil || fileTranscribeTask != nil || downloadTask != nil
+            || youtubeTranscribeTask != nil || youtubeSubsTask != nil
     }
 
     private func teardownActiveCapture() {
@@ -1471,7 +1469,7 @@ final class AppModel {
     }
 
     func cancelCurrentWork() {
-        let hadWork = canCancel || liveSource != nil
+        let hadWork = hasForegroundWork || liveSource != nil
         // A new pass reports on its own runs only: one abandoned an hour ago must not make an
         // honest cancel look like it never finished.
         cancelPass &+= 1
@@ -1484,7 +1482,8 @@ final class AppModel {
         retireCurrentFileRun()
         cancelAndTrack(&youtubeTranscribeTask)
         cancelAndTrack(&youtubeSubsTask)
-        cancelAndTrack(&burnTask)
+        // Cancel stops what the window shows; a burn behind a run is stopped from its own strip.
+        if !hadWork { cancelBurn() }
         teardownActiveCapture()
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
         if hadWork || phase != .ready { phase = .idle }
@@ -2026,7 +2025,7 @@ final class AppModel {
     var downloadBlockedReason: String? {
         if recordingActive { return "Stop the recording before downloading a model." }
         switch phase {
-        case .transcribing, .exporting, .loadingModel, .fetchingLink:
+        case .transcribing, .loadingModel, .fetchingLink:
             return "Wait for the current job to finish before downloading a model."
         default:
             return nil
@@ -2104,12 +2103,10 @@ final class AppModel {
         }
     }
 
-    // Arrivals must never stomp an active capture, subtitle burn, or batch (drops, watched folders, Services, URL scheme).
+    // Arrivals must never stomp an active capture or batch (drops, watched folders, Services, URL scheme).
     var phaseDefersArrivals: Bool {
-        switch phase {
-        case .recording, .exporting: return true
-        default: return false
-        }
+        if case .recording = phase { return true }
+        return false
     }
 
     /// A batch runs on the global translate setting, so the override only reaches a single-file run.
@@ -3584,20 +3581,24 @@ final class AppModel {
     // MARK: - Burn subtitles into video
 
     var burnSheetOpen: Bool = false
+    /// The burn running beside everything else, or how the last one ended until it is dismissed.
+    var burnJob: BurnJob?
     @ObservationIgnored private var burnTask: Task<Void, Never>?
     /// Test seam: replaces SubtitleBurner.burn so burn timing and progress are deterministic.
     @ObservationIgnored var burnOperation: (@Sendable (Transcript, URL, URL, SubtitleBurner.Style, @escaping @Sendable (Double) -> Void) async throws -> Void)?
 
     var burnFontSize: BurnFontSize { BurnFontSize(rawValue: burnFontSizeRaw) ?? .medium }
     var burnTextColor: BurnTextColor { BurnTextColor(rawValue: burnTextColorRaw) ?? .white }
+    var burnIsRunning: Bool { burnJob?.isRunning == true }
 
     func requestBurnSubtitles() {
-        guard transcript != nil else { return }
+        guard transcript != nil, burnTask == nil else { return }
         burnSheetOpen = true
     }
 
+    /// Burns the open transcript as it is now: opening another entry or starting a run leaves it going.
     func burnSubtitlesIntoVideo() {
-        guard let transcript else { return }
+        guard let transcript, burnTask == nil else { return }
         let style = SubtitleBurner.Style.make(fontSize: burnFontSize, textColor: burnTextColor, outline: burnOutline)
         let options = exportSpec(for: .srt).options
         let burn = burnOperation ?? { transcript, video, output, style, progress in
@@ -3605,7 +3606,6 @@ final class AppModel {
                 transcript: transcript, video: video, to: output, style: style, options: options, progress: progress
             )
         }
-        burnTask?.cancel()
         burnTask = Task { [weak self] in
             guard let self else { return }
             let inputURLs = await self.filePicker.chooseInputFiles(
@@ -3620,31 +3620,46 @@ final class AppModel {
                 allowedTypes: [.mpeg4Movie]
             ) else { self.burnTask = nil; return }
 
-            self.phase = .exporting(progress: 0)
+            let job = BurnJob(id: UUID(), output: outputURL, state: .running(progress: 0))
+            self.burnJob = job
             let startedAt = ContinuousClock.now
             do {
                 try await burn(transcript, videoURL, outputURL, style) { [weak self] fraction in
-                    Task { @MainActor in
-                        guard let self, case .exporting = self.phase else { return }
-                        self.phase = .exporting(progress: fraction)
-                    }
+                    Task { @MainActor in self?.updateBurn(job.id, to: .running(progress: fraction)) }
                 }
-                self.phase = .ready
-                self.drainDeferredArrivals()
+                self.updateBurn(job.id, to: .finished)
             } catch is CancellationError {
                 try? FileManager.default.removeItem(at: outputURL)
-                self.phase = self.transcript != nil ? .ready : .idle
-                self.drainDeferredArrivals()
+                if self.burnJob?.id == job.id { self.burnJob = nil }
             } catch {
                 ParolaLog.error(
                     .export, "burn failed",
                     [.elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error)]
                 )
-                self.phase = .failed(message: "Burn failed: \(error.localizedDescription)")
-                self.drainDeferredArrivals()
+                self.updateBurn(job.id, to: .failed(message: Self.burnFailureMessage(for: error)))
             }
             if !Task.isCancelled { self.burnTask = nil }
         }
+    }
+
+    /// A progress report that arrives after its burn ended must not bring it back.
+    private func updateBurn(_ id: BurnJob.ID, to state: BurnJob.State) {
+        guard burnJob?.id == id else { return }
+        if case .running = state, burnJob?.isRunning != true { return }
+        burnJob?.state = state
+    }
+
+    func cancelBurn() {
+        cancelAndTrack(&burnTask)
+    }
+
+    func dismissBurnJob() {
+        guard !burnIsRunning else { return }
+        burnJob = nil
+    }
+
+    nonisolated static func burnFailureMessage(for error: Error, bundle: Bundle = .main) -> String {
+        String(localized: "Burn failed: \(error.localizedDescription)", bundle: bundle)
     }
 }
 
@@ -3658,7 +3673,6 @@ extension AppModel.Phase: LogSafe {
         case .fetchingLink: return "fetchingLink"
         case .transcribing: return "transcribing"
         case .recording: return "recording"
-        case .exporting: return "exporting"
         case .ready: return "ready"
         case .failed: return "failed"
         }

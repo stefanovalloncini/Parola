@@ -297,12 +297,12 @@ struct IntroductionBackstopTests {
         )
     }
 
-    /// `.exporting` parks the arrival before any transcription starts, so the test only proves the defer.
+    /// A recording parks the arrival before any transcription starts, so the test only proves the defer.
     @Test("a file arriving from the menu bar or an intent steps out of the introduction")
     func transcribeDefers() {
         let model = makeModel()
         model.introduction.restart()
-        model.phase = .exporting(progress: 0)
+        model.phase = .recording(source: .microphone)
         #expect(model.introduction.isPresented)
 
         model.transcribe(fileURL: URL(fileURLWithPath: "/tmp/parola-introduction-backstop.wav"))

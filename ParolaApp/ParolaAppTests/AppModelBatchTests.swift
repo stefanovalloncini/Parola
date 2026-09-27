@@ -1140,27 +1140,10 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.isEmpty)
     }
 
-    @Test("arrivals during a subtitle burn defer instead of racing the export")
-    func exportingDefersArrivals() {
-        let model = makeModel()
-        model.phase = .exporting(progress: 0.3)
-        let url = URL(fileURLWithPath: "/tmp/arrival.wav")
-        model.transcribe(fileURL: url)
-        #expect(model.deferredArrivals == [url])
-        #expect(model.phase == .exporting(progress: 0.3))
-        #expect(model.batchJobs.isEmpty)
-
-        model.startBatch(urls: [URL(fileURLWithPath: "/tmp/b.wav")])
-        #expect(model.deferredArrivals.count == 2)
-        #expect(model.batchJobs.isEmpty)
-    }
-
-    @Test("only recording and exporting defer arrivals")
+    @Test("only a recording defers arrivals")
     func phaseDeferralMatrix() {
         let model = makeModel()
         model.phase = .recording(source: .microphone)
-        #expect(model.phaseDefersArrivals)
-        model.phase = .exporting(progress: 0.5)
         #expect(model.phaseDefersArrivals)
 
         let passThrough: [AppModel.Phase] = [

@@ -5,7 +5,7 @@ import ParolaCore
 import ParolaTestSupport
 
 @MainActor
-@Suite("Opening an entry during a recording or an export")
+@Suite("Opening an entry during a recording")
 struct EntryOpenRefusalTests {
 
     @MainActor
@@ -13,7 +13,7 @@ struct EntryOpenRefusalTests {
         var count = 0
     }
 
-    private let busyPhases: [AppModel.Phase] = [.recording(source: .microphone), .exporting(progress: 0.5)]
+    private let busyPhases: [AppModel.Phase] = [.recording(source: .microphone)]
 
     private func makeModel(_ label: String) -> (AppModel, BeepCounter) {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL(label))
@@ -96,6 +96,38 @@ struct EntryOpenRefusalTests {
         #expect(beeps.count == 0)
     }
 
+    @Test("a burn doesn't stop an entry from opening, and keeps going once it has", .timeLimit(.minutes(1)))
+    func openingDuringABurn() async throws {
+        let picker = TestFilePicker()
+        let model = AppModel(
+            skipBootstrap: true, defaults: temporaryDefaults(), filePicker: picker, libraryURL: makeTempLibraryURL("refuse-burn")
+        )
+        let entry = try await addEntry(to: model)
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the burned one")], language: "en", modelName: "stub"
+        )
+        model.phase = .ready
+        await picker.queueInputResponse([FileManager.default.temporaryDirectory.appendingPathComponent("in.mp4")])
+        await picker.queueSaveResponse(FileManager.default.temporaryDirectory.appendingPathComponent("burn-open.mp4"))
+        let burned = BurnedTranscripts()
+        model.burnOperation = { transcript, _, _, _, progress in
+            await burned.record(transcript.text)
+            progress(0.25)
+            try await Task.sleep(for: .milliseconds(300))
+        }
+        model.burnSubtitlesIntoVideo()
+        await waitUntil { model.burnJob?.state == .running(progress: 0.25) }
+
+        #expect(model.entryOpenRefusal == nil)
+        #expect(model.openEntryFromLibrary(entry.id, inNewWindow: false))
+        await waitUntil { model.selectedEntryID == entry.id && model.transcript?.text == "an older take" }
+        #expect(model.burnIsRunning)
+
+        await waitUntil { model.burnJob?.state == .finished }
+        #expect(model.burnJob?.state == .finished)
+        #expect(await burned.texts == ["the burned one"])
+    }
+
     @Test("with nothing recording, the row, the link and the bridge all open the entry", .timeLimit(.minutes(1)))
     func openingStillWorksWhenReady() async throws {
         let (model, beeps) = makeModel("refuse-ready")
@@ -115,5 +147,13 @@ struct EntryOpenRefusalTests {
         withExtendedLifetime(server) {}
         await waitUntil { model.selectedEntryID == entry.id }
         #expect(beeps.count == 0)
+    }
+}
+
+private actor BurnedTranscripts {
+    private(set) var texts: [String] = []
+
+    func record(_ text: String) {
+        texts.append(text)
     }
 }

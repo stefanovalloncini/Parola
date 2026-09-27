@@ -108,7 +108,10 @@ struct ParolaApp: App {
                     applyAppAppearance(newValue)
                 }
                 .onChange(of: model.phase) { _, newValue in
-                    appDelegate.updateDockBadge(for: newValue)
+                    appDelegate.updateDockBadge(for: newValue, burnProgress: model.burnJob?.progress)
+                }
+                .onChange(of: model.burnJob?.progress) { _, newValue in
+                    appDelegate.updateDockBadge(for: model.phase, burnProgress: newValue)
                 }
                 .onChange(of: model.mainWindowAlwaysOnTop) { _, on in
                     applyAlwaysOnTop(on)

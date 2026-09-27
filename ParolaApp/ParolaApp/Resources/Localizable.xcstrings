@@ -2555,6 +2555,28 @@
         }
       }
     },
+    "Burn failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impressione dei sottotitoli non riuscita: %@"
+          }
+        }
+      }
+    },
+    "Burning subtitles into %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imprimo i sottotitoli in %@"
+          }
+        }
+      }
+    },
     "By Kind": {
       "extractionState": "manual",
       "localizations": {
@@ -12889,6 +12911,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli (.vtt)"
+          }
+        }
+      }
+    },
+    "Subtitles burned into %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli impressi in %@"
           }
         }
       }

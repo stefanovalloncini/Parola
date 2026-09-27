@@ -495,6 +495,7 @@ final class ParolaAutomationServer {
             "youtubeSheetOpen": .bool(model.youtubeSheetOpen),
             "liveCaptionsActive": .bool(model.liveCaptions?.isActive ?? false),
             "batchJobCount": .int(model.batchJobs.count),
+            "burn": Self.burnState(model.burnJob),
             "dropPayload": .string(model.dropDragPayload?.name ?? ""),
             "dropPayloadCount": .int(model.dropDragPayload?.count ?? 0),
             "dropHighlight": .string(model.dropHighlight?.rawValue ?? ""),
@@ -572,7 +573,6 @@ final class ParolaAutomationServer {
         case .fetchingLink: return "fetchingLink"
         case .transcribing: return "transcribing"
         case .recording: return "recording"
-        case .exporting: return "exporting"
         case .ready: return "ready"
         case .failed: return "failed"
         }
@@ -603,10 +603,20 @@ final class ParolaAutomationServer {
             ])
         case .recording(let source):
             return .object(["source": .string(source.rawValue)])
-        case .exporting(let progress):
-            return .object(["progress": .double(progress)])
         case .failed(let message):
             return .object(["message": .string(message)])
+        }
+    }
+
+    static func burnState(_ job: BurnJob?) -> AutomationValue {
+        guard let job else { return .null }
+        switch job.state {
+        case .running(let progress):
+            return .object(["state": .string("running"), "progress": .double(progress), "output": .string(job.output.path)])
+        case .finished:
+            return .object(["state": .string("finished"), "output": .string(job.output.path)])
+        case .failed(let message):
+            return .object(["state": .string("failed"), "message": .string(message), "output": .string(job.output.path)])
         }
     }
 

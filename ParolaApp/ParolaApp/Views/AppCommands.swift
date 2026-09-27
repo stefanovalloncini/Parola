@@ -244,6 +244,6 @@ struct TranscriptCommands: View {
             .disabled(!model.mainTranscriptCommandsEnabled)
         Divider()
         Button("Burn Subtitles into Video…") { model.requestBurnSubtitles() }
-            .disabled(!model.mainTranscriptCommandsEnabled)
+            .disabled(!model.mainTranscriptCommandsEnabled || model.burnIsRunning)
     }
 }

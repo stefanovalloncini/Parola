@@ -123,12 +123,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return components.url
     }
 
-    func updateDockBadge(for phase: AppModel.Phase) {
+    /// A burn shows its progress only while nothing in the window reports its own.
+    func updateDockBadge(for phase: AppModel.Phase, burnProgress: Double? = nil) {
         switch phase {
         case .idle, .ready, .failed:
             stopRecordingTick()
-            NSApp.dockTile.badgeLabel = nil
-        case .downloadingModel(_, let progress), .exporting(let progress):
+            NSApp.dockTile.badgeLabel = burnProgress.map { "\(Int($0 * 100))%" }
+        case .downloadingModel(_, let progress):
             stopRecordingTick()
             NSApp.dockTile.badgeLabel = "\(Int(progress * 100))%"
         case .loadingModel, .fetchingLink(_, nil):

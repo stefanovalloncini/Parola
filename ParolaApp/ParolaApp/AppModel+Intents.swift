@@ -5,7 +5,6 @@ enum IntentActionError: LocalizedError, Equatable {
     case recordingInProgress
     case batchInProgress
     case transcriptionInProgress
-    case exportInProgress
     case notRecording
     case notMedia
     case libraryEmpty
@@ -20,8 +19,6 @@ enum IntentActionError: LocalizedError, Equatable {
             return "Parola is running a batch right now. Wait for it to finish."
         case .transcriptionInProgress:
             return "Parola is already transcribing. Wait for it to finish."
-        case .exportInProgress:
-            return "Parola is exporting a video right now. Wait for it to finish."
         case .notRecording:
             return "No recording is running."
         case .notMedia:
