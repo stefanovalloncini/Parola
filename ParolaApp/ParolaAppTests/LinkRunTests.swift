@@ -361,6 +361,28 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a link whose save fails says so, and the skipped auto-export doesn't hide it")
+        func saveFailureOutranksTheExportNote() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.transcriber]) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: Self.words)
+                let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture))
+                let srt = try #require(model.exportPresets.first { $0.spec.format == .srt })
+                model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [srt.id])]
+                let libraryURL = model.library.libraryURL
+                try FileManager.default.removeItem(at: libraryURL)
+                try Data("not a folder".utf8).write(to: libraryURL)
+                defer { try? FileManager.default.removeItem(at: libraryURL) }
+
+                model.transcribeYouTube(urlString: Self.link)
+                await waitUntil { model.nonFatalWarning != nil }
+                await settle()
+
+                #expect(model.nonFatalWarning?.contains("couldn't save it to your library") == true)
+            }
+        }
+
         @Test("Retry after a failed transcription fetches the link again")
         func retryReplaysTheLink() async throws {
             let fixture = try makeLinkFixtureWAV()
