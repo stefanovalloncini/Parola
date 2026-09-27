@@ -509,45 +509,49 @@ extension AppModel {
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         let entriesByID = Dictionary(uniqueKeysWithValues: libraryEntries.map { ($0.id, $0) })
         let targets = ids.compactMap { entriesByID[$0] }
+        Task { [weak self] in
+            guard let self else { return }
+            exportNotice = await exportEntries(targets, format: format, to: folder)
+        }
+    }
+
+    /// Writes each entry as its own file and keeps going past a failure: the notice counts what landed
+    /// and names what didn't.
+    func exportEntries(_ entries: [LibraryEntry], format: ExportFormat, to folder: URL) async -> ExportNotice {
         let exporter = makeExporter(for: format)
-        Task { [library, weak self] in
-            var usedNames = Set<String>()
-            for entry in targets {
-                do {
-                    let loaded = try await library.load(entry.id)
-                    let transcript = loaded.document.transcript
-                    let safe = TranscriptShareFile.safeName(for: LibraryEntryDisplay.title(for: entry))
-                    var name = safe
-                    var suffix = 2
-                    while usedNames.contains(name) {
-                        name = "\(safe) (\(suffix))"
-                        suffix += 1
-                    }
-                    usedNames.insert(name)
-                    let url = folder.appendingPathComponent("\(name).\(format.fileExtension)")
-                    try await AppModel.offMainIO {
-                        let data = try exporter.render(transcript)
-                        try data.write(to: url, options: .atomic)
-                        OutputMarker.mark(url)
-                    }
-                } catch {
-                    // An entry id is <timestamp>-<uuid>; only the uuid half is loggable.
-                    var fields: [LogField: LogValue] = [.error: .error(error)]
-                    if let uuid = UUID(uuidString: String(entry.id.suffix(36))) {
-                        fields[.entry] = .id(uuid)
-                    }
-                    ParolaLog.error(.export, "library export failed as \(format)", fields)
-                    await MainActor.run { [weak self] in
-                        let name = LibraryEntryDisplay.title(for: entry)
-                        let reason = error.localizedDescription
-                        self?.phase = .failed(
-                            message: String(localized: "Export of \(name) failed: \(reason)")
-                        )
-                    }
-                    return
+        var usedNames = Set<String>()
+        var failures: [ExportNotice.Failure] = []
+        for entry in entries {
+            do {
+                let loaded = try await library.load(entry.id)
+                let transcript = loaded.document.transcript
+                let safe = TranscriptShareFile.safeName(for: LibraryEntryDisplay.title(for: entry))
+                var name = safe
+                var suffix = 2
+                while usedNames.contains(name) {
+                    name = "\(safe) (\(suffix))"
+                    suffix += 1
                 }
+                usedNames.insert(name)
+                let url = folder.appendingPathComponent("\(name).\(format.fileExtension)")
+                try await AppModel.offMainIO {
+                    let data = try exporter.render(transcript)
+                    try data.write(to: url, options: .atomic)
+                    OutputMarker.mark(url)
+                }
+            } catch {
+                // An entry id is <timestamp>-<uuid>; only the uuid half is loggable.
+                var fields: [LogField: LogValue] = [.error: .error(error)]
+                if let uuid = UUID(uuidString: String(entry.id.suffix(36))) {
+                    fields[.entry] = .id(uuid)
+                }
+                ParolaLog.error(.export, "library export failed as \(format)", fields)
+                failures.append(
+                    ExportNotice.Failure(name: LibraryEntryDisplay.title(for: entry), reason: error.localizedDescription)
+                )
             }
         }
+        return .bulk(exported: entries.count - failures.count, of: entries.count, failures: failures, folder: folder)
     }
 
     /// False, with a beep and nothing changed, while a recording or an export owns the phase.

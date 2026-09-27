@@ -30,7 +30,8 @@ extension AppModel {
                     try encoder.encode(items).write(to: url, options: .atomic)
                 }
             } catch {
-                self?.phase = .failed(message: AppModel.exportFailureMessage(for: error))
+                ParolaLog.error(.export, "snippets export failed", [.error: .error(error)])
+                self?.exportNotice = .failed(error)
             }
         }
     }

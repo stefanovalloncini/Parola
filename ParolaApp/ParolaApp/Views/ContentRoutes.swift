@@ -23,9 +23,15 @@ struct ContentRoutes: View {
         }
         .animation(reduceMotion ? nil : DS.Motion.route, value: routeID)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let job = model.burnJob {
-                BurnJobStrip(job: job)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            VStack(spacing: 0) {
+                if let notice = model.exportNotice {
+                    ExportNoticeStrip(notice: notice)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                if let job = model.burnJob {
+                    BurnJobStrip(job: job)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
     }

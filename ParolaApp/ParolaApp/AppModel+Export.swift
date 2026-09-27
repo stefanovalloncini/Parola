@@ -55,7 +55,7 @@ extension AppModel {
                 pasteboard.setString(text, forType: .string)
             } catch {
                 ParolaLog.error(.export, "copy failed as \(spec.format)", [.error: .error(error)])
-                self.phase = .failed(message: Self.exportFailureMessage(for: error))
+                self.exportNotice = .failed(error)
             }
         }
     }
@@ -87,8 +87,20 @@ extension AppModel {
                 allowedTypes: [.plainText]
             ) else { return }
             let body = NotesMarkdownRenderer.render(transcript: transcript, notes: notes, title: title)
-            try? body.data(using: .utf8)?.write(to: url, options: .atomic)
+            do {
+                try await AppModel.offMainIO {
+                    try Data(body.utf8).write(to: url, options: .atomic)
+                    OutputMarker.mark(url)
+                }
+            } catch {
+                ParolaLog.error(.export, "notes export failed", [.error: .error(error)])
+                self.exportNotice = .failed(error)
+            }
         }
+    }
+
+    func dismissExportNotice() {
+        exportNotice = nil
     }
 
     func jumpToNextSpeaker() {
@@ -235,7 +247,7 @@ extension AppModel {
                 try await self.exportTranscript(spec: spec, to: url)
             } catch {
                 ParolaLog.error(.export, "export failed as \(spec.format)", [.error: .error(error)])
-                self.phase = .failed(message: Self.exportFailureMessage(for: error))
+                self.exportNotice = .failed(error)
             }
         }
     }

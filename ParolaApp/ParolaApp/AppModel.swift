@@ -640,6 +640,7 @@ final class AppModel {
     /// Written only through `setDestinations(_:)`.
     var destinations: [AnyDestination] = []
     var deliveryNotice: DeliveryNotice?
+    var exportNotice: ExportNotice?
     @ObservationIgnored lazy var deliveryEngine: DeliveryEngine = makeDeliveryEngine()
 
     // MARK: - Watched folders

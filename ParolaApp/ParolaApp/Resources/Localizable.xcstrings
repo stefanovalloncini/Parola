@@ -5229,17 +5229,6 @@
         }
       }
     },
-    "Export of %@ failed: %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esportazione di %@ non riuscita: %@"
-          }
-        }
-      }
-    },
     "Export options": {
       "extractionState": "manual",
       "localizations": {
@@ -5258,6 +5247,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esporta la trascrizione corrente dal menu Trascrizione."
+          }
+        }
+      }
+    },
+    "Exported %lld of %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esportati %lld di %lld"
           }
         }
       }
@@ -15620,6 +15620,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La tua versione di yt-dlp non è aggiornata: aggiornala e riprova."
+          }
+        }
+      }
+    },
+    "and %lld more": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e altri %lld"
           }
         }
       }
