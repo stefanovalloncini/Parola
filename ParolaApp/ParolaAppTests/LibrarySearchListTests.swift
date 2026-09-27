@@ -196,4 +196,27 @@ struct LibrarySearchListTests {
         #expect(!LibrarySearchResults.wantsNextPage(appearedAt: page - lead - 1, shown: page, total: 130))
         #expect(!LibrarySearchResults.wantsNextPage(appearedAt: page - 1, shown: page, total: page))
     }
+
+    @Test("a row whose notes change is no longer equal to the one on screen, so it redraws with the new count")
+    func noteChangeRedrawsTheRow() {
+        let entry = entries(1)[0]
+        var noted = entry.manifest
+        noted.segmentNotes = ["0": "check the figure"]
+        let withNote = LibraryEntry(id: entry.id, bundleURL: entry.bundleURL, manifest: noted)
+        let before = LibraryRowDisplay(entry: entry)
+        let after = LibraryRowDisplay(entry: withNote)
+        #expect(before.noteCount == 0)
+        #expect(after.noteCount == 1)
+        #expect(before != after)
+
+        func row(_ display: LibraryRowDisplay) -> LibraryListRow {
+            LibraryListRow(row: display, detail: .excerpt, isSelected: false, showsTime: true, rename: { _ in })
+        }
+        #expect(row(before) != row(after))
+        #expect(row(before) == row(LibraryRowDisplay(entry: entry)))
+
+        var moved = entry.manifest
+        moved.category = .meeting
+        #expect(before != LibraryRowDisplay(entry: LibraryEntry(id: entry.id, bundleURL: entry.bundleURL, manifest: moved)))
+    }
 }

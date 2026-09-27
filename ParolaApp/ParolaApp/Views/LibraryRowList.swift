@@ -82,7 +82,7 @@ struct LibraryRowList: View {
 }
 
 /// One row with its menu. Equatable, so a click re-renders the rows whose selection moved, not all of them.
-private struct LibraryListRow: View, Equatable {
+struct LibraryListRow: View, Equatable {
     @Environment(AppModel.self) private var model
     let row: LibraryRowDisplay
     let detail: LibraryRowList.Detail

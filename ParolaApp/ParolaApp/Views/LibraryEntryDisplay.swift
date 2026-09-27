@@ -99,6 +99,25 @@ struct LibraryRowDisplay: Identifiable, Equatable {
     var noteCount: Int { entry.segmentNotes.count }
     var labels: [String] { entry.labels }
 
+    /// `LibraryEntry` compares by id, so its manifest is compared here: the note chip and the row's menu read it.
+    static func == (lhs: LibraryRowDisplay, rhs: LibraryRowDisplay) -> Bool {
+        lhs.entry.id == rhs.entry.id
+            && lhs.entry.bundleURL == rhs.entry.bundleURL
+            && lhs.entry.manifest == rhs.entry.manifest
+            && lhs.title == rhs.title
+            && lhs.timeOfDay == rhs.timeOfDay
+            && lhs.shortDate == rhs.shortDate
+            && lhs.durationLabel == rhs.durationLabel
+            && lhs.modelLabel == rhs.modelLabel
+            && lhs.languageLabel == rhs.languageLabel
+            && lhs.tooltip == rhs.tooltip
+            && lhs.excerpt == rhs.excerpt
+            && lhs.rawExcerpt == rhs.rawExcerpt
+            && lhs.showsAITitle == rhs.showsAITitle
+            && lhs.showsAISummary == rhs.showsAISummary
+            && lhs.sourceKind == rhs.sourceKind
+    }
+
     /// `date` is what the row states; `dateLabel` names it where the bare day would read as the creation.
     /// `showsAITitle`/`showsAISummary` swap in the entry's generated title and summary when it has one.
     init(
