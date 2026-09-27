@@ -80,7 +80,7 @@ test.describe("dark scheme", () => {
     await page.goto("/");
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     for (let y = 600; y < height; y += 1400) {
-      await page.evaluate((top) => window.scrollTo(0, top), y);
+      await page.evaluate((top) => window.scrollTo({ top, behavior: "instant" }), y);
       await page.waitForTimeout(120);
       const background = await page
         .locator("[data-header]")
@@ -102,5 +102,14 @@ test.describe("dark scheme", () => {
       .evaluate((dock) => getComputedStyle(dock, "::after").backgroundImage);
     expect(fade).not.toContain("255, 255, 255");
     expect(fade).toContain("10, 17, 13");
+  });
+
+  test("a black-background mark tile carries the light ring", async ({ page }) => {
+    await page.goto("/");
+    const shadow = await page
+      .locator("[data-edge]")
+      .first()
+      .evaluate((tile) => getComputedStyle(tile).boxShadow);
+    expect(shadow).toContain("255, 255, 255");
   });
 });

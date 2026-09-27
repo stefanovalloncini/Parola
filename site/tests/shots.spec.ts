@@ -56,14 +56,23 @@ test.describe("dark scheme", () => {
     const requested: string[] = [];
     page.on("request", (request) => requested.push(request.url()));
     await page.goto("/");
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForLoadState("networkidle");
     const lightOnly = new Set<string>();
     for (const picture of await page.locator(themed).all()) {
+      await picture.evaluate((element) =>
+        element.scrollIntoView({ behavior: "instant", block: "center" }),
+      );
+      await expect
+        .poll(() => picture.evaluate((element) => element.querySelector("img")?.complete ?? false))
+        .toBe(true);
       const { dark, light } = await sourcesOf(picture);
       light.filter((url) => !dark.includes(url)).forEach((url) => lightOnly.add(url));
     }
     expect(requested.filter((url) => lightOnly.has(url))).toEqual([]);
+
+    for (const picture of await page.locator(`.ai ${themed}`).all()) {
+      const { dark, current } = await sourcesOf(picture);
+      expect(dark).toContain(current);
+    }
   });
 
   test("the hero LCP image is not double-fetched", async ({ page }) => {
@@ -99,8 +108,10 @@ test.describe("dark scheme", () => {
   test("the Italian page uses the Italian captures", async ({ page }) => {
     await page.goto("/");
     const english = await sourcesOf(page.locator(`.drop [data-panel] ${themed}`).first());
+    expect(english.dark.length).toBeGreaterThan(0);
     await page.goto("/it/");
     const italian = await sourcesOf(page.locator(`.drop [data-panel] ${themed}`).first());
+    expect(italian.dark.length).toBeGreaterThan(0);
     expect(italian.dark.filter((url) => english.dark.includes(url))).toEqual([]);
   });
 });
