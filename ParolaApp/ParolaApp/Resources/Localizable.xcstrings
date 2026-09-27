@@ -2141,6 +2141,17 @@
         }
       }
     },
+    "Auto-export skipped this link: its rules save next to the source file, and a link has no folder to save in. Use Export instead.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'esportazione automatica ha saltato questo link: le sue regole salvano accanto al file di origine e un link non ha una cartella in cui salvare. Usa Esporta."
+          }
+        }
+      }
+    },
     "Auto-export writes additional files next to the source when transcription completes.": {
       "extractionState": "manual",
       "localizations": {
@@ -4508,6 +4519,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Download di %@"
+          }
+        }
+      }
+    },
+    "Downloading audio…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download dell'audio…"
           }
         }
       }

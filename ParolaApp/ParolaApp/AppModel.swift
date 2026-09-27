@@ -18,6 +18,8 @@ final class AppModel {
         case idle
         case downloadingModel(name: String, progress: Double)
         case loadingModel(name: String)
+        /// yt-dlp downloading a link's audio; nil progress while the site hasn't said how big it is.
+        case fetchingLink(title: String?, progress: Double?)
         case transcribing(file: URL)
         case recording(source: RecordSource)
         case exporting(progress: Double)
@@ -1821,7 +1823,9 @@ final class AppModel {
                 nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
             }
             // Exports read nothing the AI writes, so they don't wait for the card.
-            if activate, let audioSource {
+            if activate, source == .web {
+                noteAutoExportSkippedForLink(sourceExtension: audioSource?.pathExtension ?? "vtt")
+            } else if activate, let audioSource {
                 runAutoExports(transcript: result, sourceURL: audioSource)
             }
             guard activate, let entry = persisted else { return }
@@ -2005,7 +2009,7 @@ final class AppModel {
     var downloadBlockedReason: String? {
         if recordingActive { return "Stop the recording before downloading a model." }
         switch phase {
-        case .transcribing, .exporting, .loadingModel:
+        case .transcribing, .exporting, .loadingModel, .fetchingLink:
             return "Wait for the current job to finish before downloading a model."
         default:
             return nil
@@ -2153,6 +2157,8 @@ final class AppModel {
             return
         }
         let processed = postProcess(imported)
+        let landing = Self.landingSignposter.beginInterval("install")
+        defer { Self.landingSignposter.endInterval("install", landing) }
         clearDerivedArtifacts()
         selectedEntryID = nil
         sourceFileURL = fileURL
@@ -2203,12 +2209,14 @@ final class AppModel {
     }
 
     /// The run itself, past the routing and the duplicate check an arriving file goes through:
-    /// Retry means this file, now.
-    func beginFileTranscription(fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil) {
+    /// Retry means this file, now. A link's download lands here too, and Retry then means the link.
+    func beginFileTranscription(
+        fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil, fetchedLink: FetchedLink? = nil
+    ) {
         // Before the new token: cancelling retires whichever token the old run holds.
         cancelTranscriptionRuns()
         let runToken = nextFileRunToken()
-        noteRecentFile(fileURL)
+        if fetchedLink == nil { noteRecentFile(fileURL) }
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
         let probeSource = FileAudioSource(url: fileURL)
@@ -2219,7 +2227,7 @@ final class AppModel {
             }
             guard let self, self.fileRunGeneration == runToken else { return }
             guard case .done(let duration) = probe else {
-                self.failFileReadTimeout(fileURL)
+                self.failFileReadTimeout(fileURL, fetchedLink: fetchedLink)
                 return
             }
             if let duration, self.mediaDurationSeconds == nil { self.mediaDurationSeconds = duration }
@@ -2229,7 +2237,9 @@ final class AppModel {
         fileTranscribeStage = nil
 
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
-        let recoveryToken = beginFileTranscribeRecovery(sourceURL: fileURL)
+        let recoveryToken = fetchedLink.map {
+            beginFileTranscribeRecovery(sourceURL: $0.link, title: $0.media.metadata.title, source: .web)
+        } ?? beginFileTranscribeRecovery(sourceURL: fileURL)
 
         fileTranscribeTask = Task { [weak self] in
             guard let self else { return }
@@ -2246,7 +2256,8 @@ final class AppModel {
                     stageHandler: makeFileStageHandler(fileURL: fileURL, runToken: runToken)
                 )
                 try Task.checkCancellation()
-                let processed = await postProcessDetached(result)
+                var processed = await postProcessDetached(result)
+                if let fetchedLink { processed.sourceURL = fetchedLink.link }
                 let landing = Self.landingSignposter.beginInterval("install")
                 defer { Self.landingSignposter.endInterval("install", landing) }
                 clearDerivedArtifacts()
@@ -2262,7 +2273,13 @@ final class AppModel {
                 fileRunLanding = FileRunLanding(
                     runToken: runToken,
                     text: processed.text,
-                    entry: persistToLibrary(processed, audioSource: fileURL, source: .file, sourceDigest: sourceDigest)
+                    entry: persistToLibrary(
+                        processed,
+                        audioSource: fileURL,
+                        source: fetchedLink == nil ? .file : .web,
+                        title: fetchedLink.map { $0.media.metadata.title ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()) },
+                        sourceDigest: sourceDigest
+                    )
                 )
                 retireFileRun(runToken)
             } catch {
@@ -2275,7 +2292,12 @@ final class AppModel {
                     retireFileRun(runToken)
                 }
                 if !Task.isCancelled {
-                    applyTranscriptionError(error, source: fileURL, translateOverride: translateOverride)
+                    applyTranscriptionError(
+                        error,
+                        source: fetchedLink == nil ? fileURL : nil,
+                        translateOverride: translateOverride,
+                        link: fetchedLink?.retry
+                    )
                 }
             }
             if !Task.isCancelled {
@@ -2287,11 +2309,13 @@ final class AppModel {
 
     /// A probe that never came back means the file itself is out of reach, so the run reading the
     /// same bytes is not going to report anything of its own.
-    private func failFileReadTimeout(_ fileURL: URL) {
+    private func failFileReadTimeout(_ fileURL: URL, fetchedLink: FetchedLink?) {
         guard fileTranscribeTask != nil else { return }
         cancelAndTrack(&fileTranscribeTask)
         applyTranscriptionError(
-            ParolaError.fileReadTimedOut(name: fileURL.lastPathComponent), source: fileURL
+            ParolaError.fileReadTimedOut(name: fileURL.lastPathComponent),
+            source: fetchedLink == nil ? fileURL : nil,
+            link: fetchedLink?.retry
         )
     }
 
@@ -2423,6 +2447,7 @@ final class AppModel {
     @ObservationIgnored var ytDlpUpdateTask: Task<Void, Never>?
     @ObservationIgnored var ytDlpUpdateDeadline: Duration = YtDlpInstaller.upgradeDeadline
     @ObservationIgnored var ytDlpLocator: () -> String? = { YtDlpInstaller.locate() }
+    @ObservationIgnored var makeMediaFetcher: () -> any MediaFetcher = { MediaFetcherFactory.make() }
 
     var ytDlpIsStale: Bool {
         ytDlpVersion?.isStale(asOf: Date()) ?? false
@@ -2541,6 +2566,38 @@ final class AppModel {
         case subtitles(String)
     }
 
+    /// A link run's download, handed to the file run that transcribes it.
+    struct FetchedLink {
+        /// What the user handed over: Retry and recovery replay it.
+        let link: URL
+        let media: FetchedMedia
+
+        var retry: DeferredLink { .transcribe(link.absoluteString) }
+    }
+
+    /// What the fetch pane shows, folded from yt-dlp's events as they come.
+    struct LinkFetchReadout: Equatable, Sendable {
+        var title: String?
+        var progress: Double?
+
+        mutating func apply(_ event: LinkFetchEvent) {
+            switch event {
+            case .metadata(let metadata): title = metadata.title ?? title
+            case .downloading(let fraction): progress = fraction
+            case .processing: progress = nil
+            }
+        }
+    }
+
+    /// Only a real launch warms the model while a link downloads: a test's model must never load a real one.
+    private var prewarmsDuringLinkFetch: Bool { activeSideEffects.contains(.refreshYtDlp) }
+
+    /// A batch in flight owns the phase until its last job ends, so a link waits for it the way a file does.
+    var linkArrivalsDeferred: Bool {
+        phaseDefersArrivals || transcribeTaskRunning
+            || (batchTask != nil && batchJobs.contains { $0.status == .pending || $0.status == .transcribing })
+    }
+
     @discardableResult
     func transcribeYouTube(urlString: String) -> LinkHandoff {
         guard features.isEnabled(.youtube) else {
@@ -2549,52 +2606,55 @@ final class AppModel {
         }
         guard let url = makeYouTubeURL(urlString) else { return .rejected }
         // The download flips phase off .recording, and every stop affordance is keyed on it.
-        if phaseDefersArrivals || transcribeTaskRunning {
+        if linkArrivalsDeferred {
             deferredLinks.append(.transcribe(url.absoluteString))
             return .parked
         }
 
         cancelTranscriptionRuns()
+        let runToken = nextFileRunToken()
+        let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, source: .web)
+        let fetcher = makeMediaFetcher()
+        let progress = makeLinkFetchHandler(runToken: runToken)
+        phase = .fetchingLink(title: nil, progress: nil)
+        // A cold model load then overlaps the download instead of following it.
+        if prewarmsDuringLinkFetch { prewarmSelectedModel() }
         youtubeTranscribeTask = Task { [weak self] in
-            guard let self else { return }
             do {
+                let media = try await fetcher.fetch(url: url, progress: progress)
                 try Task.checkCancellation()
-                phase = .downloadingModel(name: "youtube", progress: 0)
-                let fetcher = MediaFetcherFactory.make()
-                let audioURL = try await fetcher.fetch(url: url) { _ in }.fileURL
-                try Task.checkCancellation()
-                sourceFileURL = audioURL
-                installPlayer(for: audioURL)
-
-                phase = .transcribing(file: audioURL)
-                let result = try await session.transcribe(
-                    source: FileAudioSource(url: audioURL),
-                    options: currentOptions,
-                    downloadProgress: makeDownloadProgressHandler(for: selectedModel)
-                )
-                try Task.checkCancellation()
-                let processed = await postProcessDetached(result)
-                clearDerivedArtifacts()
-                selectedEntryID = nil
-                restorePlaybackSource(audioURL)
-                transcript = processed
-                adoptLoadedMediaDuration()
-                phase = .ready
-                persistToLibrary(
-                    processed,
-                    audioSource: audioURL,
-                    source: .web,
-                    title: LibraryEntryDisplay.webVideoTitle(createdAt: Date())
+                guard let self else { return }
+                self.youtubeTranscribeTask = nil
+                self.beginFileTranscription(
+                    fileURL: media.fileURL, translateOverride: nil, fetchedLink: FetchedLink(link: url, media: media)
                 )
             } catch {
-                if !Task.isCancelled { applyTranscriptionError(error, link: .transcribe(url.absoluteString)) }
-            }
-            if !Task.isCancelled {
+                guard let self else { return }
+                self.endRecovery(recoveryToken)
+                self.retireFileRun(runToken)
+                guard !Task.isCancelled else { return }
+                self.applyTranscriptionError(error, link: .transcribe(url.absoluteString))
                 self.youtubeTranscribeTask = nil
                 self.drainDeferredArrivals()
             }
         }
         return .started
+    }
+
+    /// Folds yt-dlp's events into what the pane shows, so the newest hop always carries the title too.
+    func makeLinkFetchHandler(runToken: Int) -> @Sendable (LinkFetchEvent) -> Void {
+        let readout = OSAllocatedUnfairLock(initialState: LinkFetchReadout())
+        let coalescer = MainActorCoalescer<LinkFetchReadout> { [weak self] readout in
+            guard let self, self.fileRunGeneration == runToken, case .fetchingLink = self.phase else { return }
+            let next = Phase.fetchingLink(title: readout.title, progress: readout.progress)
+            if self.phase != next { self.phase = next }
+        }
+        return { event in
+            coalescer.send(readout.withLock { state in
+                state.apply(event)
+                return state
+            })
+        }
     }
 
     @discardableResult
@@ -2604,7 +2664,7 @@ final class AppModel {
             return .rejected
         }
         guard let url = makeYouTubeURL(urlString) else { return .rejected }
-        if phaseDefersArrivals || transcribeTaskRunning {
+        if linkArrivalsDeferred {
             deferredLinks.append(.subtitles(url.absoluteString))
             return .parked
         }
@@ -2618,6 +2678,8 @@ final class AppModel {
                 let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
                 try Task.checkCancellation()
                 let processed = await postProcessDetached(result)
+                let landing = Self.landingSignposter.beginInterval("install")
+                defer { Self.landingSignposter.endInterval("install", landing) }
                 installFetchedSubtitles(processed)
                 phase = .ready
                 persistToLibrary(
@@ -3569,6 +3631,7 @@ extension AppModel.Phase: LogSafe {
         case .idle: return "idle"
         case .downloadingModel: return "downloadingModel"
         case .loadingModel: return "loadingModel"
+        case .fetchingLink: return "fetchingLink"
         case .transcribing: return "transcribing"
         case .recording: return "recording"
         case .exporting: return "exporting"

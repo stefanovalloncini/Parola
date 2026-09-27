@@ -12,6 +12,17 @@ extension AppModel {
         writeJSON(autoExportRules, forKey: "autoExportRules")
     }
 
+    /// A link's audio sits in a temporary folder nobody opens, so its rules have nowhere to write.
+    func noteAutoExportSkippedForLink(sourceExtension: String) {
+        let planned = AutoExportEngine.plannedPresets(
+            rules: autoExportRules, sourceExtension: sourceExtension, presets: exportPresets
+        )
+        guard !planned.isEmpty else { return }
+        nonFatalWarning = String(
+            localized: "Auto-export skipped this link: its rules save next to the source file, and a link has no folder to save in. Use Export instead."
+        )
+    }
+
     func runAutoExports(transcript: Transcript, sourceURL: URL, skippingTargets: Set<URL> = []) {
         let specs = AutoExportEngine.plannedPresets(
             rules: autoExportRules,

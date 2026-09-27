@@ -14,11 +14,6 @@ struct ModelLabelTests {
         #expect(AppModel.modelLabel(id) == expected)
     }
 
-    @Test("the youtube pseudo-id falls back to its raw string")
-    func youtubePseudoIDFallsBack() {
-        #expect(AppModel.modelLabel("youtube") == "youtube")
-    }
-
     @Test("an unknown model id falls back to its raw string")
     func unknownIDFallsBack() {
         #expect(AppModel.modelLabel("made-up-model-id") == "made-up-model-id")

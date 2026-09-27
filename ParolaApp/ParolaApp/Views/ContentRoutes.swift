@@ -108,6 +108,8 @@ struct ContentRoutes: View {
             ProgressPane(title: "Downloading \(AppModel.modelLabel(name))", progress: progress)
         case .loadingModel(let name):
             ProgressPane(title: "Loading \(AppModel.modelLabel(name))…", progress: nil)
+        case .fetchingLink(let title, let progress):
+            ProgressPane(title: Self.fetchingTitle(title), progress: progress)
         case .transcribing(let file):
             LiveTranscribingPane(file: file)
         case .recording(let source):
@@ -125,6 +127,11 @@ struct ContentRoutes: View {
         }
     }
 
+    private static func fetchingTitle(_ videoTitle: String?) -> LocalizedStringKey {
+        guard let videoTitle else { return "Downloading audio…" }
+        return "Downloading \(videoTitle)"
+    }
+
     private var phaseViewID: Int {
         switch model.phase {
         case .idle: 0
@@ -135,6 +142,7 @@ struct ContentRoutes: View {
         case .ready: 5
         case .failed: 6
         case .exporting: 7
+        case .fetchingLink: 8
         }
     }
 

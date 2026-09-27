@@ -44,6 +44,13 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         self.title = title
         self.source = source
     }
+
+    /// A file by its name; a link by the video's title, or the link itself before the title was known.
+    var sourceName: String? {
+        guard let sourceURL else { return nil }
+        guard sourceURL.isFileURL else { return title ?? sourceURL.absoluteString }
+        return sourceURL.lastPathComponent
+    }
 }
 
 extension AppModel {
@@ -173,6 +180,7 @@ extension AppModel {
         switch checkpoint.kind {
         case .fileTranscription:
             guard let url = checkpoint.sourceURL else { return false }
+            guard url.isFileURL else { return url.isYtDlpSupported }
             return FileManager.default.fileExists(atPath: url.path)
         case .recording:
             if !checkpoint.segments.isEmpty { return true }
@@ -187,7 +195,12 @@ extension AppModel {
         try? FileManager.default.removeItem(at: recoveryFileURL)
         switch checkpoint.kind {
         case .fileTranscription:
-            guard let url = checkpoint.sourceURL, FileManager.default.fileExists(atPath: url.path) else { return }
+            guard let url = checkpoint.sourceURL else { return }
+            guard url.isFileURL else {
+                transcribeYouTube(urlString: url.absoluteString)
+                return
+            }
+            guard FileManager.default.fileExists(atPath: url.path) else { return }
             if let title = checkpoint.title {
                 // A recorded take mid-transcription when the app died: the take path keeps
                 // its title and saves the audio if this run fails too.

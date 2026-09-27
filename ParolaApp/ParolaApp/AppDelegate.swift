@@ -131,9 +131,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .downloadingModel(_, let progress), .exporting(let progress):
             stopRecordingTick()
             NSApp.dockTile.badgeLabel = "\(Int(progress * 100))%"
-        case .loadingModel:
+        case .loadingModel, .fetchingLink(_, nil):
             stopRecordingTick()
             NSApp.dockTile.badgeLabel = "…"
+        case .fetchingLink(_, let progress?):
+            stopRecordingTick()
+            NSApp.dockTile.badgeLabel = "\(Int(progress * 100))%"
         case .transcribing:
             stopRecordingTick()
             NSApp.dockTile.badgeLabel = "•"

@@ -145,7 +145,7 @@ public enum TypedToolRegistry {
             bridgeCmd: "waitForPhase",
             description: "Poll until the app's phase matches 'phase' or the timeout fires.",
             properties: [
-                .string("phase", enum: ["idle", "downloadingModel", "loadingModel", "transcribing", "recording", "exporting", "ready", "failed"], description: "Phase to wait for."),
+                .string("phase", enum: ["idle", "downloadingModel", "loadingModel", "fetchingLink", "transcribing", "recording", "exporting", "ready", "failed"], description: "Phase to wait for."),
                 .int("timeoutMs", description: "Max ms to wait. Defaults to 10000."),
             ],
             required: ["phase"]

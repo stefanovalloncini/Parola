@@ -92,7 +92,7 @@ public enum AppTools {
         AppTool(
             name: "parola_app_state",
             bridgeCmd: "getState",
-            description: "Snapshot the running Parola.app: phase (idle/loadingModel/downloadingModel/transcribing/recording/exporting/ready/failed), route, selectedModel, language, libraryFilter, appTheme, transcript presence, model list. Fails if no Debug build is running.",
+            description: "Snapshot the running Parola.app: phase (idle/loadingModel/downloadingModel/fetchingLink/transcribing/recording/exporting/ready/failed), route, selectedModel, language, libraryFilter, appTheme, transcript presence, model list. Fails if no Debug build is running.",
             properties: [],
             required: []
         ),
@@ -200,9 +200,9 @@ public enum AppTools {
         AppTool(
             name: "parola_app_wait_for_phase",
             bridgeCmd: "waitForPhase",
-            description: "Poll until the app's phase matches 'phase' (idle/loadingModel/downloadingModel/transcribing/recording/exporting/ready/failed) or the timeout fires. 'timeoutMs' defaults to 10000.",
+            description: "Poll until the app's phase matches 'phase' (idle/loadingModel/downloadingModel/fetchingLink/transcribing/recording/exporting/ready/failed) or the timeout fires. 'timeoutMs' defaults to 10000.",
             properties: [
-                .string("phase", enum: ["idle", "downloadingModel", "loadingModel", "transcribing", "recording", "exporting", "ready", "failed"]),
+                .string("phase", enum: ["idle", "downloadingModel", "loadingModel", "fetchingLink", "transcribing", "recording", "exporting", "ready", "failed"]),
                 .int("timeoutMs"),
             ],
             required: ["phase"]

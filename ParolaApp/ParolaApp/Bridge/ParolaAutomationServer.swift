@@ -569,6 +569,7 @@ final class ParolaAutomationServer {
         case .idle: return "idle"
         case .downloadingModel: return "downloadingModel"
         case .loadingModel: return "loadingModel"
+        case .fetchingLink: return "fetchingLink"
         case .transcribing: return "transcribing"
         case .recording: return "recording"
         case .exporting: return "exporting"
@@ -588,6 +589,11 @@ final class ParolaAutomationServer {
             return .object(["name": .string(name), "progress": .double(progress)])
         case .loadingModel(let name):
             return .object(["name": .string(name)])
+        case .fetchingLink(let title, let progress):
+            return .object([
+                "title": title.map { .string($0) } ?? .null,
+                "progress": progress.map { .double($0) } ?? .null,
+            ])
         case .transcribing(let file):
             return .object([
                 "file": .string(file.path),

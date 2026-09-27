@@ -54,7 +54,7 @@ struct ContentSheetsModifier: ViewModifier {
                 case .recording:
                     Text("Parola quit while recording. Restore puts the transcript captured up to that point in your library.")
                 case .fileTranscription:
-                    Text("Parola quit while transcribing \(checkpoint.sourceURL?.lastPathComponent ?? "this file").")
+                    Text("Parola quit while transcribing \(checkpoint.sourceName ?? "this file").")
                 }
             }
     }
@@ -69,7 +69,7 @@ struct ContentSheetsModifier: ViewModifier {
     private var recoveryTitle: String {
         switch model.pendingRecovery?.kind {
         case .recording: String(localized: "Restore recovered recording?")
-        case .fileTranscription: String(localized: "Transcribe \(model.pendingRecovery?.sourceURL?.lastPathComponent ?? "the file") again?")
+        case .fileTranscription: String(localized: "Transcribe \(model.pendingRecovery?.sourceName ?? "the file") again?")
         case nil: ""
         }
     }
