@@ -450,11 +450,8 @@ public actor LibraryStore {
     }
 
     /// For a store beside the one that writes the library, such as the MCP server's: forgets what it
-    /// read when another process has saved, removed, renamed or re-indexed an entry since the last
-    /// call. Two stats when nothing moved. True when it dropped anything.
-    ///
-    /// A change that touches only a bundle's manifest and not the search index (a pin, a label, a
-    /// category) moves neither date, so it shows once something else does.
+    /// read when another process has changed an entry or the search index since the last call. Two
+    /// stats when nothing moved. True when it dropped anything.
     @discardableResult
     public func reloadIfChangedElsewhere() -> Bool {
         var snapshotMoved = false
@@ -524,6 +521,7 @@ public actor LibraryStore {
         if role == .owner, doc.manifest.durationSeconds == nil,
            let duration = doc.transcript.durationSeconds, duration > 0 {
             try? ParolaDocument.updateManifest(at: bundleURL) { $0.durationSeconds = duration }
+            announceManifestEdit()
         }
         let entry = try makeEntry(bundleURL: bundleURL)
         let loaded = LoadedEntry(entry: entry, document: doc)
@@ -1073,16 +1071,18 @@ public actor LibraryStore {
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
             manifest.lastOpenedAt = now
         }
-        try recacheEntry(at: bundleURL)
+        // Nothing a reader shows depends on when an entry was opened, and opens are frequent.
+        try recacheEntry(at: bundleURL, announcing: false)
     }
 
     /// Re-reads the one manifest a mutation touched and folds it into the caches, so a single-entry
     /// edit doesn't force the next read to re-decode every bundle in the library.
     @discardableResult
-    private func recacheEntry(at bundleURL: URL) throws -> LibraryEntry {
+    private func recacheEntry(at bundleURL: URL, announcing: Bool = true) throws -> LibraryEntry {
         do {
             let entry = try makeEntry(bundleURL: bundleURL)
             patchCaches(with: entry)
+            if announcing { announceManifestEdit() }
             return entry
         } catch {
             ParolaLog.error(.library, "entry recache failed, caches dropped", [.error: .error(error)])
@@ -1090,6 +1090,14 @@ public actor LibraryStore {
             cachedLoaded.removeAll()
             throw error
         }
+    }
+
+    /// A manifest edit moves no date a reader checks, so the owner moves the folder's and keeps the new one as its own.
+    private func announceManifestEdit() {
+        guard role == .owner else { return }
+        let before = Self.folderStamp(of: libraryURL)
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: libraryURL.path)
+        adoptFolderStamp(ifUnchangedFrom: before)
     }
 
     /// `aheadOfTies` for an entry just added: made this second, it is still the newest of them.

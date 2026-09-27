@@ -196,6 +196,27 @@ struct LibraryReaderTests {
         #expect(await store.list().count == 3)
     }
 
+    @Test("an owner's manifest-only edit reaches a reader's next call and is not a change to the owner")
+    func manifestEditReachesTheReader() async throws {
+        let dir = try makeTempLibraryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let app = owner(dir)
+        let entry = try await app.add(transcript: transcript("alpha minutes"), audioSource: nil)
+        _ = await app.list()
+        let store = reader(dir)
+        await store.reloadIfChangedElsewhere()
+        #expect(await store.list().first?.pinned == false)
+
+        try await app.setPinned(true, for: entry.id)
+
+        #expect(await store.reloadIfChangedElsewhere())
+        #expect(await store.list().first?.pinned == true)
+        #expect(await !app.folderChangedElsewhere())
+
+        try await app.markOpened(id: entry.id)
+        #expect(await !store.reloadIfChangedElsewhere(), "an open changes nothing a reader shows")
+    }
+
     @Test("searches racing a reader's index swap answer from the index that caught up")
     func searchesRacingASwapSeeTheCatchUp() async throws {
         let dir = try makeTempLibraryDirectory()

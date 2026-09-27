@@ -91,6 +91,19 @@ struct MCPLibraryFreshnessTests {
         #expect(try await call(library.server, "parola_search_library", ["query": "qqxwtitle"]).contains(kept.id))
     }
 
+    @Test("a category the app changes shows in the server's next stats")
+    func appCategoryChangeShows() async throws {
+        let library = try makeLibrary()
+        defer { try? FileManager.default.removeItem(at: library.url) }
+        let entry = try await library.app.add(transcript: transcript("alpha minutes"), audioSource: nil, title: "Kickoff")
+        await library.app.flush()
+        #expect(try await call(library.server, "parola_library_stats").contains("Meetings: 0"))
+
+        try await library.app.setCategory(.meeting, for: entry.id)
+
+        #expect(try await call(library.server, "parola_library_stats").contains("Meetings: 1"))
+    }
+
     @Test("a file the app imported after the server started is reported as a duplicate")
     func appImportIsADuplicate() async throws {
         let library = try makeLibrary()
