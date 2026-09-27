@@ -44,6 +44,7 @@ struct LibrarySearchResults: View {
         rows = displays
         groups = LibraryListContent.groups(for: displays, sortOrder: model.librarySortOrder, isSearchResult: true)
         selection.formIntersection(Set(displays.map(\.id)))
+        model.fillSearchSnippets(for: displays.map(\.id))
     }
 
     /// Any row near the end counts, not one fixed row: a jump to the end can realise the last rows and skip the ones before.

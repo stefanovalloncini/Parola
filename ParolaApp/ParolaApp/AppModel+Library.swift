@@ -770,6 +770,7 @@ extension AppModel {
         if q.isEmpty {
             searchRanking = nil
             searchMatches = [:]
+            searchSnippetIDs = []
             return
         }
         // Results land in the content area, so a query typed from Statistics or the trash has to leave the page.
@@ -783,7 +784,7 @@ extension AppModel {
         searchTask = Task { [weak self] in
             try? await Task.sleep(for: Self.searchDebounce, clock: clock)
             guard !Task.isCancelled, let self else { return }
-            let matches = await library.search(q)
+            let matches = await library.search(q, snippetLimit: LibrarySearchResults.pageSize)
             guard !Task.isCancelled else { return }
             // Rows resolve against the published list; a hit it has yet to catch up with would drop out of the bridge's reply.
             if matches.contains(where: { libraryEntry(id: $0.entryID) == nil }) {
@@ -791,7 +792,27 @@ extension AppModel {
                 guard !Task.isCancelled else { return }
             }
             searchMatches = Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0) })
+            searchSnippetIDs = Set(matches.prefix(LibrarySearchResults.pageSize).map(\.entryID))
             searchRanking = matches.map(\.entryID)
+        }
+    }
+
+    /// The results list asks as it shows a page: only the first one comes with its snippets.
+    func fillSearchSnippets(for ids: [LibraryEntry.ID]) {
+        let missing = ids.compactMap { id in searchSnippetIDs.contains(id) ? nil : searchMatches[id] }
+        guard !missing.isEmpty else { return }
+        searchSnippetIDs.formUnion(missing.map(\.entryID))
+        let query = searchQuery.trimmingCharacters(in: .whitespaces)
+        let results = searchResultsVersion
+        Task { [weak self, library] in
+            let filled = await library.withSnippets(missing, query: query)
+            // A newer query or a re-run replaced the matches these were cut for.
+            guard let self, searchResultsVersion == results else { return }
+            var matches = searchMatches
+            for match in filled where matches[match.entryID] != nil {
+                matches[match.entryID] = match
+            }
+            searchMatches = matches
         }
     }
 

@@ -266,7 +266,7 @@ public actor MCPServer {
     private func searchLibrary(args: [String: Any]) async -> MCPToolCallResult {
         let query = (args["query"] as? String) ?? ""
         let limit = max(0, args["limit"] as? Int ?? 10)
-        let matches = await libraryStore.search(query)
+        let matches = await libraryStore.search(query, snippetLimit: limit)
         let lines = matches.prefix(limit).map { match in
             // A title, summary or speaker hit is not spoken anywhere, so it carries no time.
             let time = match.firstHit.map { ", at \(Timecode.format($0.seconds))" } ?? ""

@@ -318,7 +318,9 @@ public actor LibrarySearchIndex {
         scheduleSave()
     }
 
-    public func search(_ query: String) async -> [Match] {
+    /// With `snippets` off every match comes back with an empty snippet, for a caller that fills only
+    /// the ones it shows through `withSnippets(_:query:)`: each snippet walks the body to its hit.
+    public func search(_ query: String, snippets: Bool = true) async -> [Match] {
         let queryTokens = Self.tokenize(query)
         guard !queryTokens.isEmpty else { return [] }
         await ensureLoaded()
@@ -351,20 +353,39 @@ public actor LibrarySearchIndex {
 
         var results: [Match] = []
         results.reserveCapacity(scores.count)
+        let queryTokenSet = Set(queryTokens)
         for (id, score) in scores.sorted(by: { $0.value > $1.value }) {
             guard let entry = entries[id] else { continue }
-            let hit = earliest[id]
-            let snippet = Self.makeSnippet(text: entry.text, tokens: queryTokens, hit: hit)
+            let snippet = snippets ? Self.snippet(for: queryTokenSet, in: entry) : nil
             results.append(Match(
                 entryID: id,
                 score: score,
                 matchCount: hits[id] ?? 0,
-                snippet: snippet.text,
-                highlights: snippet.highlights,
-                firstHit: hit.flatMap { Self.firstHit(atOffset: $0.offset, in: entry) }
+                snippet: snippet?.text ?? "",
+                highlights: snippet?.highlights ?? [],
+                firstHit: earliest[id].flatMap { Self.firstHit(atOffset: $0.offset, in: entry) }
             ))
         }
         return results
+    }
+
+    /// The matches with their snippets built, as `search` builds them; one whose entry has left the index comes back as it was.
+    public func withSnippets(_ matches: [Match], query: String) async -> [Match] {
+        let queryTokens = Set(Self.tokenize(query))
+        guard !queryTokens.isEmpty, !matches.isEmpty else { return matches }
+        await ensureLoaded()
+        return matches.map { match in
+            guard let entry = entries[match.entryID] else { return match }
+            let snippet = Self.snippet(for: queryTokens, in: entry)
+            return Match(
+                entryID: match.entryID,
+                score: match.score,
+                matchCount: match.matchCount,
+                snippet: snippet.text,
+                highlights: snippet.highlights,
+                firstHit: match.firstHit
+            )
+        }
     }
 
     /// The opening of every indexed entry's text, keyed by entry id, or nil when `generation` already names it.
@@ -782,10 +803,32 @@ public actor LibrarySearchIndex {
         return Int(exactly: (seconds * 100).rounded()) ?? 0
     }
 
-    /// `hit` comes from the inverted index, so the body is walked to the window and never searched.
+    private static func snippet(for queryTokens: Set<String>, in entry: IndexedEntry) -> (text: String, highlights: [Highlight]) {
+        makeSnippet(text: entry.text, tokens: queryTokens, hit: earliestHit(of: queryTokens, in: entry))
+    }
+
+    /// Where the body first holds a word some query token starts; at a tie the longer token wins, never set order.
+    private static func earliestHit(of queryTokens: Set<String>, in entry: IndexedEntry) -> Hit? {
+        var best: Hit?
+        for queryToken in queryTokens {
+            // The same range `search` reads: sorted by scalars, then held to the prefix by characters.
+            let lower = firstIndex(in: entry.tokens, atLeast: queryToken)
+            let upper = firstIndex(in: entry.tokens, atLeast: queryToken + "\u{10FFFF}")
+            for position in lower..<upper where entry.tokens[position].hasPrefix(queryToken) {
+                guard let offset = bodyOffset(at: position, in: entry) else { continue }
+                if offset < best?.offset ?? Int.max
+                    || (offset == best?.offset && queryToken.count > best?.length ?? 0) {
+                    best = Hit(offset: offset, length: queryToken.count)
+                }
+            }
+        }
+        return best
+    }
+
+    /// `hit` comes from the index, so the body is walked to the window and never searched.
     private static func makeSnippet(
         text: String,
-        tokens: [String],
+        tokens: Set<String>,
         hit: Hit?
     ) -> (text: String, highlights: [Highlight]) {
         guard !text.isEmpty else { return ("", []) }
@@ -807,7 +850,7 @@ public actor LibrarySearchIndex {
         let snippetRange = Self.alignedToWords(window, in: text, keeping: firstHit)
         let body = String(text[snippetRange])
         var highlights: [Highlight] = []
-        for token in Set(tokens) {
+        for token in tokens {
             var cursor = body.startIndex
             while let hit = body.range(of: token, options: .caseInsensitive, range: cursor..<body.endIndex) {
                 let start = body.distance(from: body.startIndex, to: hit.lowerBound)

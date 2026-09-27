@@ -156,16 +156,17 @@ public actor LibraryStore {
     }
 
     /// Best first. Ties fall to the most occurrences, then the newest entry, then the id, so a query
-    /// answers in the same order every time.
-    public func search(_ query: String) async -> [LibrarySearchIndex.Match] {
+    /// answers in the same order every time. Only the first `snippetLimit` matches carry a snippet;
+    /// `withSnippets(_:query:)` fills the rest when they are shown.
+    public func search(_ query: String, snippetLimit: Int = .max) async -> [LibrarySearchIndex.Match] {
         await ensureSearchIndexReady()
         if cachedActive == nil { await primeCaches() }
         let createdAt = Dictionary(
             (cachedActive ?? []).map { ($0.id, $0.createdAt) },
             uniquingKeysWith: { first, _ in first }
         )
-        let matches = await searchIndex.search(query)
-        return matches
+        let matches = await searchIndex.search(query, snippets: false)
+        let ranked = matches
             .compactMap { match in createdAt[match.entryID].map { (match: match, createdAt: $0) } }
             .sorted { lhs, rhs in
                 if lhs.match.score != rhs.match.score { return lhs.match.score > rhs.match.score }
@@ -174,6 +175,15 @@ public actor LibraryStore {
                 return lhs.match.entryID < rhs.match.entryID
             }
             .map(\.match)
+        guard snippetLimit > 0 else { return ranked }
+        let head = await searchIndex.withSnippets(Array(ranked.prefix(snippetLimit)), query: query)
+        return head + ranked.dropFirst(snippetLimit)
+    }
+
+    /// Builds the snippets `search` left empty, for the matches a list is about to show.
+    public func withSnippets(_ matches: [LibrarySearchIndex.Match], query: String) async -> [LibrarySearchIndex.Match] {
+        await ensureSearchIndexReady()
+        return await searchIndex.withSnippets(matches, query: query)
     }
 
     /// The opening text of every indexed entry, so a list can show what an entry says, or nil when

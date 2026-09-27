@@ -133,4 +133,40 @@ struct SearchResultsTests {
         session.reloadIfEntryChanged()
         #expect(session.loadGeneration == loads, "a trashed entry is not re-read on every library change")
     }
+
+    @Test("the first page of results comes with snippets and the rest fill in when the list shows them", .timeLimit(.minutes(1)))
+    func laterPagesFillTheirSnippets() async throws {
+        let model = makeModel("search-snippet-pages")
+        let page = LibrarySearchResults.pageSize
+        for index in 0...page {
+            _ = try await add("take \(index) of the budget review", to: model)
+        }
+        await searchAndWait("budget", in: model, count: page + 1)
+        let ranking = try #require(model.searchRanking)
+        #expect(ranking.prefix(page).allSatisfy { model.searchMatches[$0]?.snippet.isEmpty == false })
+        let last = try #require(ranking.last)
+        #expect(model.searchMatches[last]?.snippet == "")
+
+        model.fillSearchSnippets(for: [last])
+
+        await waitUntil { model.searchMatches[last]?.snippet.isEmpty == false }
+        #expect(model.searchMatches[last]?.highlights.isEmpty == false)
+    }
+
+    @Test("snippets cut for an older query never land on a newer one", .timeLimit(.minutes(1)))
+    func staleSnippetsAreDropped() async throws {
+        let model = makeModel("search-snippet-stale")
+        let entry = try await add("the budget review", to: model)
+        await searchAndWait("budget", in: model, count: 1)
+        model.searchSnippetIDs = []
+        let version = model.searchResultsVersion
+
+        model.fillSearchSnippets(for: [entry.id])
+        model.searchRanking = [entry.id]
+        model.searchMatches = [entry.id: LibrarySearchIndex.Match(entryID: entry.id, score: 1, snippet: "")]
+        await settle()
+
+        #expect(model.searchResultsVersion != version)
+        #expect(model.searchMatches[entry.id]?.snippet == "")
+    }
 }

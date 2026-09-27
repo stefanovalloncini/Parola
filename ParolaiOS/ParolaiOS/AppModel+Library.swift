@@ -76,7 +76,7 @@ extension AppModel {
         searchTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(200))
             guard !Task.isCancelled, let self else { return }
-            let matches = await library.search(q)
+            let matches = await library.search(q, snippetLimit: 0)
             guard !Task.isCancelled else { return }
             let scoreByID = Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0.score) })
             let active = await library.list()

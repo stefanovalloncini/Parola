@@ -1150,4 +1150,19 @@ final class LibrarySearchIndexTests {
         let rebuilt = try #require(await index2.excerpts(after: loaded.generation))
         #expect(rebuilt.byEntry == ["e2": "retro feedback"])
     }
+
+    @Test("two query terms starting at the same place frame the snippet on the longer one")
+    func snippetHitTieTakesTheLongerTerm() async throws {
+        let (index, _) = makeTempIndex()
+        let text = String(repeating: "filler ", count: 12) + "parola " + String(repeating: "filler ", count: 12)
+        await index.index(id: "e1", title: "Tie", text: text, createdAt: Date())
+        let match = try #require(await index.search("pa parol").first)
+        let filled = try #require(await index.withSnippets(
+            [LibrarySearchIndex.Match(entryID: "e1", score: match.score, snippet: "")],
+            query: "parol pa"
+        ).first)
+        #expect(filled.snippet == match.snippet)
+        #expect(filled.highlights == match.highlights)
+        #expect(await index.search("pa parol", snippets: false).first?.snippet == "")
+    }
 }

@@ -1199,6 +1199,8 @@ final class AppModel {
     }
     /// Why each result matched, keyed by entry: the snippet the results list shows under the row.
     var searchMatches: [String: LibrarySearchIndex.Match] = [:]
+    /// The results whose snippet is built or on its way; the rest wait until the list shows them.
+    @ObservationIgnored var searchSnippetIDs: Set<LibraryEntry.ID> = []
     var selectedEntryID: LibraryEntry.ID? {
         didSet {
             guard oldValue != selectedEntryID else { return }

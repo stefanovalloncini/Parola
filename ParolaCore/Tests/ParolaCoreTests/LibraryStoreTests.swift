@@ -1274,6 +1274,40 @@ struct LibraryStoreTests {
         #expect(await reopened.search("budget").map(\.entryID) == expected)
     }
 
+    @Test("only the first matches carry a snippet, and the rest fill to what a full search gives")
+    func searchSnippetsForTheFirstPage() async throws {
+        let (store, _) = try makeTempLibrary()
+        let bodies = [
+            "we looked at the budget for march and april",
+            "a long preamble before anyone says budget out loud",
+            "budget budget budget",
+            "notes on the quarter; budgeting comes last",
+        ]
+        for body in bodies {
+            _ = try await store.add(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: body)],
+                    language: "en",
+                    modelName: "tiny"
+                ),
+                audioSource: nil
+            )
+        }
+        let full = await store.search("budget")
+        #expect(full.count == 4)
+        #expect(full.allSatisfy { !$0.snippet.isEmpty && !$0.highlights.isEmpty })
+
+        let paged = await store.search("budget", snippetLimit: 2)
+        #expect(paged.map(\.entryID) == full.map(\.entryID))
+        #expect(Array(paged.prefix(2)) == Array(full.prefix(2)))
+        #expect(paged.dropFirst(2).allSatisfy { $0.snippet.isEmpty && $0.highlights.isEmpty })
+        #expect(paged.map(\.firstHit) == full.map(\.firstHit))
+
+        let filled = await store.withSnippets(Array(paged.dropFirst(2)), query: "budget")
+        #expect(filled == Array(full.dropFirst(2)))
+        #expect(await store.search("budget", snippetLimit: 0).allSatisfy(\.snippet.isEmpty))
+    }
+
     @Test("a duration set through the store is what the next listing reports")
     func setDurationSecondsRecaches() async throws {
         let (store, _) = try makeTempLibrary()
