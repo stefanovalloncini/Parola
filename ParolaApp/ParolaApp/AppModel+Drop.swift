@@ -11,11 +11,12 @@ extension AppModel {
     var dropZonePlan: DroppedFiles.ZonePlan {
         // The chat composer is a nested drop target: it wins the drop, so the overlay must not claim it.
         guard let payload = dropDragPayload, !dragOverComposer else { return .none }
+        let linksWait: Bool = if case .links = payload { linkArrivalsDeferred } else { false }
         return DroppedFiles.plan(
             for: payload,
             batchEnabled: features.isEnabled(.batch),
             youtubeEnabled: features.isEnabled(.youtube),
-            arrivalsDeferred: phaseDefersArrivals
+            arrivalsDeferred: phaseDefersArrivals || linksWait
         )
     }
 

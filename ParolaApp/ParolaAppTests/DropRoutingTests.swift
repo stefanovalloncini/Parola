@@ -310,6 +310,21 @@ struct DropRoutingTests {
         await gate.open()
     }
 
+    @Test("the overlay offers a dragged link the parked plan while a batch runs")
+    func linkOverlayDuringABatch() {
+        let model = makeModel()
+        model.dropDragPayload = .links(count: 1)
+        #expect(model.dropZonePlan == .transcribeLink)
+
+        model.batchJobs = [BatchJob(url: Self.media("running.wav"), status: .transcribing)]
+        model.batchTask = Task {}
+
+        #expect(model.dropZonePlan == .queueOnly(count: 1))
+        #expect(model.transcribeYouTube(urlString: Self.link.absoluteString) == .parked)
+        model.batchTask = nil
+        model.batchJobs = []
+    }
+
     @Test("a link the window will park gets the same plan a parked file gets")
     func deferredLinkPlanMatchesMediaPlan() {
         for batchEnabled in [true, false] {
