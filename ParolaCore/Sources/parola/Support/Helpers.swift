@@ -131,7 +131,8 @@ final class InterruptCleanup: Sendable {
     private let streams: [AsyncSignalStream]
     private let watchers: [Task<Void, Never>]
 
-    init(_ cleanup: @escaping @Sendable () -> Void) {
+    /// `_exit`, not `exit`: the engines still run on other threads, and `exit` would tear down statics they use.
+    init(_ cleanup: @escaping @Sendable () -> Void, ending: @escaping @Sendable (Int32) -> Void = { _exit($0) }) {
         let streams = [AsyncSignalStream(signal: SIGINT), AsyncSignalStream(signal: SIGTERM)]
         self.streams = streams
         watchers = streams.map { stream in
@@ -139,7 +140,7 @@ final class InterruptCleanup: Sendable {
                 await stream.wait()
                 guard !Task.isCancelled else { return }
                 cleanup()
-                exit(130)
+                ending(130)
             }
         }
     }

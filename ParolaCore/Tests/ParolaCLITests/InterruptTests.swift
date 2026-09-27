@@ -38,6 +38,23 @@ struct InterruptTests {
         #expect(handlesByDefault(SIGINT))
     }
 
+    @Test("Ctrl-C during transcription cleans up first, then ends the process with 130")
+    func cleanupRunsBeforeTheEnd() async throws {
+        let calls = OSAllocatedUnfairLock<[String]>(initialState: [])
+        let cleanup = InterruptCleanup({ calls.withLock { $0.append("cleanup") } }, ending: { status in
+            calls.withLock { $0.append("end \(status)") }
+        })
+
+        kill(getpid(), SIGINT)
+        let deadline = ContinuousClock.now + .seconds(5)
+        while calls.withLock({ $0.count }) < 2, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        cleanup.stop()
+
+        #expect(calls.withLock { $0 } == ["cleanup", "end 130"])
+    }
+
     @Test("Ctrl-C during a download ends yt-dlp, removes its folder and reports the interrupt")
     func interruptEndsTheDownload() async throws {
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("parola-cli-interrupt-\(UUID().uuidString)")
