@@ -162,6 +162,7 @@ struct Transcribe: AsyncParsableCommand {
 
         let source: any AudioSource
         let sourceURL: URL
+        var link: LinkMetadata?
         switch input {
         case .file(let url):
             source = FileAudioSource(url: url)
@@ -180,6 +181,7 @@ struct Transcribe: AsyncParsableCommand {
             bar?.finish()
             source = yt
             sourceURL = media.fileURL
+            link = media.metadata
         }
 
         emitter.progress(.transcribing, detail: sourceURL.lastPathComponent)
@@ -195,6 +197,7 @@ struct Transcribe: AsyncParsableCommand {
         }
         progress.finish()
         transcript = TranscriptPostProcessor.orthographyOnly.apply(transcript)
+        if case .youtube(let url) = input { transcript.sourceURL = link?.webpageURL ?? url }
 
         if summarise {
             do {
@@ -205,7 +208,9 @@ struct Transcribe: AsyncParsableCommand {
         }
         warnIfLanguageAssumed(transcript)
         reportTiming(transcript)
-        try emitTranscript(transcript, sourceURL: sourceURL, entrySource: input.entrySource, emitter: emitter)
+        try emitTranscript(
+            transcript, sourceURL: sourceURL, entrySource: input.entrySource, title: link?.title, emitter: emitter
+        )
     }
 
     /// Stderr, and never under --mcp: that mode's stderr carries NDJSON a sentence would break.
@@ -227,6 +232,7 @@ struct Transcribe: AsyncParsableCommand {
         _ transcript: Transcript,
         sourceURL: URL,
         entrySource: EntrySource,
+        title: String? = nil,
         emitter: MCPProgressEmitter
     ) throws {
         let exporter = Exporters.exporter(for: format)
@@ -251,6 +257,7 @@ struct Transcribe: AsyncParsableCommand {
                 transcript: transcript,
                 audioURL: sourceURL,
                 to: URL(fileURLWithPath: savePath),
+                titleOverride: title,
                 entrySource: entrySource
             )
             stderr("Saved bundle to \(bundle.path)")

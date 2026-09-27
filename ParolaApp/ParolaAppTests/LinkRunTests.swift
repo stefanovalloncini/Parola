@@ -30,7 +30,11 @@ final class ScriptedLinkFetcher: MediaFetcher {
     let gate: FetchGate?
     private let count = OSAllocatedUnfairLock(initialState: 0)
 
-    init(fixture: URL, metadata: LinkMetadata = LinkMetadata(title: "A talk"), gate: FetchGate? = nil) {
+    static let talk = LinkMetadata(
+        title: "A talk", webpageURL: URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"), id: "dQw4w9WgXcQ", duration: 0.3
+    )
+
+    init(fixture: URL, metadata: LinkMetadata = ScriptedLinkFetcher.talk, gate: FetchGate? = nil) {
         self.fixture = fixture
         self.metadata = metadata
         self.gate = gate
@@ -87,7 +91,8 @@ extension TranscriberMockSuites {
     @MainActor
     @Suite("Link run", .serialized, .timeLimit(.minutes(1)))
     struct LinkRunTests {
-        private static let link = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        private static let link = "https://youtu.be/dQw4w9WgXcQ"
+        private static let page = ScriptedLinkFetcher.talk.webpageURL
 
         private func makeModel(fetcher: ScriptedLinkFetcher) -> AppModel {
             let model = AppModel(bootstrap: AppBootstrap(
@@ -131,9 +136,10 @@ extension TranscriberMockSuites {
                 #expect(phases.names.filter { $0 == "fetchingLink" }.count == 1)
                 #expect(phases.names.dropFirst(2).first.map { ["loadingModel", "downloadingModel", "transcribing"].contains($0) } == true)
                 #expect(model.sourceFileURL == fixture)
-                #expect(model.transcript?.sourceURL == URL(string: Self.link))
+                #expect(model.transcript?.sourceURL == Self.page)
                 #expect(entry.manifest.source == .web)
                 #expect(entry.title == "A talk")
+                #expect(model.linkRunTitle?.file == fixture && model.linkRunTitle?.title == "A talk")
                 #expect(!model.recentFiles.contains(fixture))
                 #expect(fetcher.fetches == 1)
             }
@@ -166,8 +172,26 @@ extension TranscriberMockSuites {
                 await model.handleBatchEvent(.finished)
 
                 await waitUntil { fetcher.fetches == 1 }
-                await waitUntil { model.phase == .ready && model.transcript?.sourceURL == URL(string: Self.link) }
+                await waitUntil { model.phase == .ready && model.transcript?.sourceURL == Self.page }
                 #expect(model.deferredLinks.isEmpty)
+            }
+        }
+
+        @Test("a link whose title yt-dlp didn't give lands under the dated web-video name, still pointing at its page")
+        func untitledLinkFallsBack() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.transcriber]) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: Self.words)
+                let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture, metadata: LinkMetadata()))
+
+                model.transcribeYouTube(urlString: Self.link)
+                await waitUntil { model.phase == .ready && model.fileRunLanding != nil }
+                let entry = try #require(try await model.fileRunLanding?.entry.value)
+
+                #expect(entry.title.hasPrefix(String(localized: "Web video — \("")")))
+                #expect(model.transcript?.sourceURL == URL(string: Self.link))
+                #expect(model.linkRunTitle == nil)
             }
         }
 

@@ -203,6 +203,7 @@ private struct LiveTranscribingPane: View {
     var body: some View {
         TranscribingPane(
             file: file,
+            name: model.linkRunTitle.flatMap { $0.file == file ? $0.title : nil },
             partial: model.filePartialText,
             progress: model.fileTranscribeFraction,
             expectsPartials: model.activeEngineStreamsPartials,

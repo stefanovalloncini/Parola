@@ -269,6 +269,8 @@ struct YouTubeAudioDownloadTests {
         #expect(media.fileURL.lastPathComponent == "audio.m4a")
         #expect(FileManager.default.fileExists(atPath: media.fileURL.path))
         #expect(media.metadata.title == "A talk")
+        #expect(media.metadata.webpageURL == URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
+        #expect(media.metadata.id == "dQw4w9WgXcQ")
         #expect(media.metadata.duration == 90)
         let delivered = events.all
         let fractions = delivered.compactMap { if case .downloading(let fraction) = $0 { fraction } else { nil } }

@@ -7,7 +7,9 @@ import Foundation
 /// Requires `yt-dlp` on `$PATH`. Common install: `brew install yt-dlp`.
 public struct YouTubeSubsResult: Sendable {
     public let transcript: Transcript
-    public let videoTitle: String?
+    public let metadata: LinkMetadata
+
+    public var videoTitle: String? { metadata.title }
 }
 
 public enum YouTubeSubsFetcher {
@@ -54,8 +56,9 @@ public enum YouTubeSubsFetcher {
         guard var transcript = try captions(from: vttFiles, preferLanguage: preferLanguage) else {
             throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noCaptions, site: site))
         }
-        transcript.sourceURL = url
-        return YouTubeSubsResult(transcript: transcript, videoTitle: parseTitle(from: output.stdoutText))
+        let metadata = output.metadata ?? LinkMetadata()
+        transcript.sourceURL = metadata.webpageURL ?? url
+        return YouTubeSubsResult(transcript: transcript, metadata: metadata)
     }
 
     static func arguments(url: URL, preferLanguage: String?, outputTemplate: String) -> [String] {
@@ -67,7 +70,7 @@ public enum YouTubeSubsFetcher {
             "--sub-langs", subtitleLanguages(preferLanguage),
             "--no-playlist",
             "--no-warnings",
-            "--print", "before_dl:[PAROLA_TITLE] %(title)s",
+            "--print", YtDlpLine.metadataTemplate,
             "-o", outputTemplate,
             url.absoluteString,
         ]
@@ -164,17 +167,6 @@ public enum YouTubeSubsFetcher {
         }
         guard overlap > 0 else { return nil }
         return currWords.dropFirst(overlap).joined(separator: " ")
-    }
-
-    static func parseTitle(from stdout: String) -> String? {
-        for raw in stdout.split(separator: "\n") {
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            if let range = line.range(of: "[PAROLA_TITLE]") {
-                let title = line[range.upperBound...].trimmingCharacters(in: .whitespaces)
-                if !title.isEmpty { return String(title) }
-            }
-        }
-        return nil
     }
 }
 

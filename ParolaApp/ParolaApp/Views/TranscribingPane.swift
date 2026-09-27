@@ -3,6 +3,7 @@ import ParolaCore
 
 struct TranscribingPane: View {
     let file: URL
+    var name: String?
     let partial: String
     let progress: Double?
     var expectsPartials: Bool = true
@@ -38,10 +39,17 @@ struct TranscribingPane: View {
         return heuristic
     }
 
+    /// A link's captions arrive with no file of their own, so the site stands in for the name.
+    private var shownName: String {
+        if let name { return name }
+        guard !file.isFileURL else { return file.lastPathComponent }
+        return LinkDownloadFailure.site(for: file) ?? file.absoluteString
+    }
+
     private var titleKey: LocalizedStringKey {
         showsPreparing
-            ? "Preparing \(file.lastPathComponent)…"
-            : "Transcribing \(file.lastPathComponent)…"
+            ? "Preparing \(shownName)…"
+            : "Transcribing \(shownName)…"
     }
 
     var body: some View {

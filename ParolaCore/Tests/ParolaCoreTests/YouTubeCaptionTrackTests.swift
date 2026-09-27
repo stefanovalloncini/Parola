@@ -173,16 +173,17 @@ struct YouTubeCaptionTrackTests {
             base=$(printf '%s' "$out" | sed 's/%(id)s/\(Self.videoID)/')
             cp '\(asr.path)' "$base.it-orig.vtt"
             cp '\(translated.path)' "$base.en.vtt"
-            echo '[PAROLA_TITLE] Una prova'
+            echo '[PAROLA_META] {"title": "Una prova", "webpage_url": "https://www.youtube.com/watch?v=\(Self.videoID)", "id": "\(Self.videoID)"}'
             """.write(to: script, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
 
         let result = try await YouTubeSubsFetcher.fetchWithTitle(
-            url: URL(string: "https://www.youtube.com/watch?v=\(Self.videoID)")!, preferLanguage: nil, ytDlpPath: script.path
+            url: URL(string: "https://youtu.be/\(Self.videoID)")!, preferLanguage: nil, ytDlpPath: script.path
         )
 
         #expect(try String(contentsOf: requested, encoding: .utf8) == ".*-orig,en,en-US,en-GB")
         #expect(result.videoTitle == "Una prova")
+        #expect(result.transcript.sourceURL == URL(string: "https://www.youtube.com/watch?v=\(Self.videoID)"))
         #expect(result.transcript.language == "it")
         #expect(result.transcript.modelName == "youtube-auto-subs")
         #expect(wordCount(result.transcript) == 20 * 4)

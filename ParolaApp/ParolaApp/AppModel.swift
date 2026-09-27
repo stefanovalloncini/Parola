@@ -148,6 +148,13 @@ final class AppModel {
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
+    /// A link run's video title with the file it was downloaded to, so the pane never names the working file.
+    var linkRunTitle: LinkRunTitle?
+
+    struct LinkRunTitle {
+        let file: URL
+        let title: String
+    }
     /// 0–1 fraction of the media transcribed so far, or nil while indeterminate (duration unknown, or the engine reports no progress).
     var fileTranscribeFraction: Double?
     var fileTranscribeStage: TranscribeStage?
@@ -2217,6 +2224,9 @@ final class AppModel {
         cancelTranscriptionRuns()
         let runToken = nextFileRunToken()
         if fetchedLink == nil { noteRecentFile(fileURL) }
+        if let fetchedLink, let title = fetchedLink.media.metadata.title {
+            linkRunTitle = LinkRunTitle(file: fileURL, title: title)
+        }
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
         let probeSource = FileAudioSource(url: fileURL)
@@ -2257,7 +2267,7 @@ final class AppModel {
                 )
                 try Task.checkCancellation()
                 var processed = await postProcessDetached(result)
-                if let fetchedLink { processed.sourceURL = fetchedLink.link }
+                if let fetchedLink { processed.sourceURL = fetchedLink.media.metadata.webpageURL ?? fetchedLink.link }
                 let landing = Self.landingSignposter.beginInterval("install")
                 defer { Self.landingSignposter.endInterval("install", landing) }
                 clearDerivedArtifacts()
@@ -2675,9 +2685,9 @@ final class AppModel {
             do {
                 try Task.checkCancellation()
                 phase = .transcribing(file: url)
-                let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
+                let result = try await YouTubeSubsFetcher.fetchWithTitle(url: url, preferLanguage: selectedLanguage)
                 try Task.checkCancellation()
-                let processed = await postProcessDetached(result)
+                let processed = await postProcessDetached(result.transcript)
                 let landing = Self.landingSignposter.beginInterval("install")
                 defer { Self.landingSignposter.endInterval("install", landing) }
                 installFetchedSubtitles(processed)
@@ -2686,7 +2696,7 @@ final class AppModel {
                     processed,
                     audioSource: nil,
                     source: .web,
-                    title: LibraryEntryDisplay.webVideoTitle(createdAt: Date()),
+                    title: result.videoTitle ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()),
                     playsCompletionSound: false
                 )
             } catch {
