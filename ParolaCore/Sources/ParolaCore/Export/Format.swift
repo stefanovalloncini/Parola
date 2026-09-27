@@ -74,12 +74,11 @@ public enum Format {
     }
 
     static func documentTitle(for transcript: Transcript) -> String {
-        let derived = transcript.sourceURL?
-            .deletingPathExtension()
-            .lastPathComponent
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if let derived, !derived.isEmpty { return derived }
-        return "Transcript"
+        guard let source = transcript.sourceURL else { return "Transcript" }
+        // A link's last path component is "watch" or a numeric id, never the video's name.
+        guard source.isFileURL else { return LinkDownloadFailure.site(for: source) ?? "Transcript" }
+        let derived = source.deletingPathExtension().lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+        return derived.isEmpty ? "Transcript" : derived
     }
 
     public static func escapeHTML(_ s: String) -> String {

@@ -160,6 +160,20 @@ struct ExporterTests {
         #expect(decoded.sourceURL == original.sourceURL)
     }
 
+    @Test("a link's exports are headed with its site, never the link's last path component", arguments: [
+        ("https://www.youtube.com/watch?v=abc123", "YouTube"),
+        ("https://vimeo.com/76979871", "vimeo.com"),
+    ])
+    func linkHeadingNamesTheSite(link: String, heading: String) throws {
+        var original = sample()
+        original.sourceURL = URL(string: link)
+
+        #expect(Format.documentTitle(for: original) == heading)
+        #expect(try MarkdownExporter().renderText(original).hasPrefix("# \(heading)\n"))
+        #expect(try HtmlExporter().renderText(original).contains("<title>\(heading)</title>"))
+        #expect(Format.documentTitle(for: sample()) == "x")
+    }
+
     @Test("json leaves a blank segment out")
     func jsonDropsBlankSegments() throws {
         var original = sample()
