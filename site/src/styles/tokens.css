@@ -100,6 +100,7 @@
   --sage-tint: var(--night-sage-tint);
   --shot-shadow: var(--night-shot-shadow);
   --tile-shadow: var(--night-tile-shadow);
+  --on-ink: #0f1a14;
   color: var(--ink-body);
 }
 
