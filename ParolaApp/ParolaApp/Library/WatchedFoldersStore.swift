@@ -248,7 +248,7 @@ final class WatchedFoldersStore {
         Task { [weak self] in
             let carried = await carry.value
             previousScope?.stopAccessingSecurityScopedResource()
-            let resolved = await Self.resolveBookmark(bookmark, mounting: mounting)
+            let resolved = await Self.resolveBookmark(bookmark, displayPath: folder.displayPath, mounting: mounting)
             let saved = carried == nil ? await baselines.read(id) : nil
             guard let self else {
                 if let carried { baselines.write(carried, for: id) }
@@ -306,12 +306,11 @@ final class WatchedFoldersStore {
     /// bookmark. The app isn't sandboxed, so the resolved folder is usable: keep watching it and
     /// save a fresh bookmark and path.
     private func follow(_ folder: WatchedFolder, to resolved: ResolvedBookmark) {
-        let moved = Self.canonicalPath(resolved.url) != Self.canonicalPath(URL(fileURLWithPath: folder.displayPath))
-        guard resolved.isStale || moved else { return }
+        guard resolved.isStale || resolved.movedTo != nil else { return }
         let refreshed = WatchedFolder(
             id: folder.id,
             bookmark: resolved.freshBookmark ?? folder.bookmark,
-            displayPath: moved ? resolved.url.path : folder.displayPath
+            displayPath: resolved.movedTo ?? folder.displayPath
         )
         guard let index = folders.firstIndex(where: { $0.id == folder.id }) else { return }
         folders[index] = refreshed
@@ -340,10 +339,6 @@ final class WatchedFoldersStore {
         url.pathComponents.contains { $0 == ".Trash" || $0 == ".Trashes" }
     }
 
-    private static func canonicalPath(_ url: URL) -> String {
-        url.resolvingSymlinksInPath().standardizedFileURL.path
-    }
-
     private func scheduleBaselineWrite(for id: UUID) {
         baselineWrites[id]?.cancel()
         let delay = baselineWriteDelay
@@ -363,11 +358,21 @@ final class WatchedFoldersStore {
         let isDirectory: Bool
         /// Made only for a stale bookmark.
         let freshBookmark: Data?
+        /// The folder's path when it is no longer where the display path says.
+        let movedTo: String?
+    }
+
+    /// Reads the file system, so it belongs off the main thread with the rest of a resolution.
+    nonisolated static func movedPath(of resolved: URL, from displayPath: String) -> String? {
+        func canonical(_ url: URL) -> String { url.resolvingSymlinksInPath().standardizedFileURL.path }
+        return canonical(resolved) == canonical(URL(fileURLWithPath: displayPath)) ? nil : resolved.path
     }
 
     // Off the main thread: resolving a security-scoped bookmark can block on mounting its volume,
     // which would hang launch for a watched folder on a disconnected drive.
-    private nonisolated static func resolveBookmark(_ bookmark: Data, mounting: Bool) async -> ResolvedBookmark? {
+    private nonisolated static func resolveBookmark(
+        _ bookmark: Data, displayPath: String, mounting: Bool
+    ) async -> ResolvedBookmark? {
         let options: URL.BookmarkResolutionOptions = mounting
             ? .withSecurityScope
             : [.withSecurityScope, .withoutMounting, .withoutUI]
@@ -388,7 +393,11 @@ final class WatchedFoldersStore {
                     ? try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
                     : nil
                 continuation.resume(returning: ResolvedBookmark(
-                    url: url, isStale: isStale, isDirectory: isDirectory, freshBookmark: freshBookmark
+                    url: url,
+                    isStale: isStale,
+                    isDirectory: isDirectory,
+                    freshBookmark: freshBookmark,
+                    movedTo: movedPath(of: url, from: displayPath)
                 ))
             }
         }

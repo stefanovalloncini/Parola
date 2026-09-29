@@ -159,9 +159,8 @@ public actor FolderWatcher {
     }
 
     private let folderURL: URL
-    /// Symlinks resolved, as `open` resolves them for the root's descriptor, so the paths the watcher
-    /// lists are in the directory its source watches.
-    private let rootPath: String
+    /// Symlinks resolved off the caller's thread in `start`, so listed paths name what the root source watches.
+    private var rootPath: String
     private let onNewMediaFile: @Sendable (URL) -> Void
     private let onBaselineChange: (@Sendable () -> Void)?
     private let onStateChange: (@Sendable (State) -> Void)?
@@ -202,7 +201,7 @@ public actor FolderWatcher {
         onNewMediaFile: @escaping @Sendable (URL) -> Void
     ) {
         self.folderURL = folderURL
-        self.rootPath = Self.realPath(folderURL)
+        self.rootPath = folderURL.standardizedFileURL.path
         self.options = options
         self.onBaselineChange = onBaselineChange
         self.onStateChange = onStateChange
@@ -226,6 +225,8 @@ public actor FolderWatcher {
             return
         }
         fileDescriptor = fd
+        rootPath = await resolveRootOffActor()
+        guard fileDescriptor == fd else { return }
         var rootStat = stat()
         rootInode = fstat(fd, &rootStat) == 0 ? UInt64(rootStat.st_ino) : nil
         let request = ScanRequest(
@@ -843,6 +844,16 @@ public actor FolderWatcher {
 
     private static func parent(of path: String) -> String {
         (path as NSString).deletingLastPathComponent
+    }
+
+    private func resolveRootOffActor() async -> String {
+        let url = folderURL
+        let queue = options.scanQueue
+        return await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: Self.realPath(url))
+            }
+        }
     }
 
     private static func realPath(_ url: URL) -> String {

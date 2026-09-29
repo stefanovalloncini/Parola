@@ -60,4 +60,19 @@ struct WatchedFoldersStoreTests {
         #expect(initial.id == refreshed.id)
         #expect(initial != refreshed)
     }
+
+    @Test("a folder reached through a symlink hasn't moved; a renamed one has, to its new path")
+    func movedPathSeesThroughSymlinks() throws {
+        let parent = FileManager.default.temporaryDirectory.appendingPathComponent("parola-moved-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let real = parent.appendingPathComponent("Real")
+        let link = parent.appendingPathComponent("Link")
+        let renamed = parent.appendingPathComponent("Renamed")
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: renamed, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+
+        #expect(WatchedFoldersStore.movedPath(of: real, from: link.path) == nil)
+        #expect(WatchedFoldersStore.movedPath(of: renamed, from: real.path) == renamed.path)
+    }
 }

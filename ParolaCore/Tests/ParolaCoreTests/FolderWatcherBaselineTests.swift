@@ -196,4 +196,30 @@ struct FolderWatcherBaselineTests {
         await unseeded.stop()
         await seeded.stop()
     }
+
+    @Test("a folder watched through a symlink reports the files under its real path")
+    func symlinkedFolderResolvesOnStart() async throws {
+        let parent = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let real = parent.appendingPathComponent("Real")
+        let link = parent.appendingPathComponent("Link")
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+        let clock = FixedClock(start: Date())
+
+        let collected = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let watcher = makeWatcher(link, clock: clock, scheduler: scheduler, collected: collected)
+        await watcher.start()
+        try Fixture.writeSettled(real.appendingPathComponent("new.wav"), clock: clock)
+        await watcher.checkForNewFiles()
+        try await scheduler.advance(ticks: 3)
+        let saved = await watcher.baseline()
+        await watcher.stop()
+
+        let resolved = try #require(realpath(real.path, nil))
+        defer { free(resolved) }
+        #expect(collected.snapshot().map(\.path) == [String(cString: resolved) + "/new.wav"])
+        #expect(saved?.entries.map(\.path) == ["new.wav"])
+    }
 }
