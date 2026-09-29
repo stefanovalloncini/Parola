@@ -258,6 +258,17 @@ extension AppModel {
         holdUntilSaved(arrival, saving, ringsWhenDry: false)
     }
 
+    /// The window's run of an arrival finished after the user moved on: it lands like one out of sight.
+    func landVisibleArrivalOutOfSight(_ arrival: WatchedArrival, _ transcript: Transcript) {
+        guard visibleArrivalID == arrival.id else { return }
+        visibleArrivalID = nil
+        let saving = land(RunLanding(
+            kind: .backgroundArrival, transcript: transcript, audioSource: arrival.url,
+            sourceDigest: arrival.sourceDigest
+        ))
+        holdUntilSaved(arrival, saving, ringsWhenDry: true)
+    }
+
     private func landBackgroundArrival(_ arrival: WatchedArrival, _ transcript: Transcript) {
         watchedLaneTask = nil
         backgroundArrivalID = nil

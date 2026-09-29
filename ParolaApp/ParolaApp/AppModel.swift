@@ -2240,6 +2240,7 @@ final class AppModel {
         fileTranscribeStage = nil
 
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
+        let windowGeneration = loadEntryGeneration
         // The lane keeps a watched file across a quit, so its run leaves no checkpoint to offer twice.
         let recoveryToken: Int? = arrival != nil ? nil : fetchedLink.map {
             beginFileTranscribeRecovery(sourceURL: $0.link, title: $0.media.metadata.title, source: .web)
@@ -2264,6 +2265,20 @@ final class AppModel {
                 // Post-processing is a suspension a cancel can land in; a replaced run must not land after it.
                 try Task.checkCancellation()
                 if let fetchedLink { processed.sourceURL = fetchedLink.media.metadata.webpageURL ?? fetchedLink.link }
+                // Idle when it started, busy now: what the user opened meanwhile keeps the window.
+                if let arrival, loadEntryGeneration != windowGeneration || sourceFileURL != fileURL {
+                    filePartialText = ""
+                    fileTranscribeFraction = nil
+                    fileTranscribeStage = nil
+                    switch phase {
+                    case .loadingModel, .downloadingModel, .transcribing: phase = transcript == nil ? .idle : .ready
+                    default: break
+                    }
+                    landVisibleArrivalOutOfSight(arrival, processed)
+                    retireFileRun(runToken)
+                    if !Task.isCancelled { self.fileTranscribeTask = nil }
+                    return
+                }
                 let landing = Self.landingSignposter.beginInterval("install")
                 defer { Self.landingSignposter.endInterval("install", landing) }
                 clearDerivedArtifacts()

@@ -198,6 +198,35 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("an arrival that took the idle window lands out of sight once the user opens something else")
+        func windowRunGivesWayToAnOpenedEntry() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                let rig = try makeRig("moved-on")
+                defer { try? FileManager.default.removeItem(at: rig.folder) }
+                let model = rig.model
+                let arrived = try makeWAV("Arrived", in: rig.folder)
+                arrive(model, arrived)
+                #expect(await waitUntil(timeoutMs: 10_000) { model.visibleArrivalID != nil })
+
+                let own = try await openOwnEntry(rig)
+                model.isPlaying = true
+                let player = try #require(model.player)
+                await gate.open()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                await model.awaitLandingSteps()
+                let landed = try #require(await model.library.list().first { $0.id != own.id })
+                #expect(model.selectedEntryID == own.id)
+                #expect(model.transcript?.segments.first?.text == "my own notes")
+                #expect(model.player === player)
+                #expect(model.isPlaying)
+                #expect(model.phase == .ready)
+                #expect(model.arrivalNotice?.state == .saved(landed.id))
+            }
+        }
+
         @Test("a burst of five lands every file with the same post-run steps")
         func burstLandsThroughOnePath() async throws {
             try await withMocksCleared(.transcriber) {
