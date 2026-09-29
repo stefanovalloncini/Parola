@@ -163,8 +163,8 @@ public actor ProcessTapAudioSource: LiveAudioSource {
     public func prepare() async throws -> URL {
         await stop()
         if let captureFailure {
-            try? FileManager.default.removeItem(at: outputURL)
-            throw ParolaError.captureUnavailable(captureFailure)
+            ParolaLog.error(.audioRecording, "app audio take cut short by a write failure")
+            throw CaptureInterrupted(url: outputURL, reason: captureFailure)
         }
         return outputURL
     }

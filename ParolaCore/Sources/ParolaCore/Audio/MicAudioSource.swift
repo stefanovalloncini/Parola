@@ -142,11 +142,10 @@ public actor MicAudioSource: LiveAudioSource {
         if let failure = writer.failure {
             ParolaLog.error(
                 .audioRecording,
-                "take discarded after a write failure",
+                "take cut short by a write failure",
                 [.count: .int(writer.droppedChunks)]
             )
-            try? FileManager.default.removeItem(at: url)
-            throw ParolaError.captureUnavailable(failure)
+            throw CaptureInterrupted(url: url, reason: failure)
         }
         return url
     }

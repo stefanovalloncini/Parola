@@ -3400,7 +3400,7 @@ final class AppModel {
         case .failed(let msg):
             await keepFailedLiveTake(msg, take: owner, session: session ?? streamingSession)
         case .finished(let transcript):
-            await landLiveTake(transcript, take: owner)
+            await landLiveTake(transcript, take: owner, session: session ?? streamingSession)
         }
     }
 
@@ -3447,12 +3447,13 @@ final class AppModel {
     }
 
     /// A live take's final transcript lands on screen and in the library; one with nothing in it says so.
-    private func landLiveTake(_ transcript: Transcript, take: TakeContext?) async {
+    private func landLiveTake(_ transcript: Transcript, take: TakeContext?, session: (any StreamingTranscriber)?) async {
         let recovery = activeRecoveryGeneration
         let arming = takeArming
         stopRecordingWatch()
         let takeCategory = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
+        let cutShort = await session?.audioWasCutShort() ?? false
         let processed = await postProcessDetached(transcript)
         livePartialText = ""
         liveSegments = []
@@ -3480,13 +3481,20 @@ final class AppModel {
         saveTake(
             processed,
             audio: processed.sourceURL,
-            title: title,
+            title: cutShort ? Self.takeTitle(title, suffix: .interrupted) : title,
             source: takeSource,
             category: takeCategory,
             activate: true,
             recovery: recovery
         )
         endLiveTake(take)
+        if cutShort {
+            exportNotice = ExportNotice(
+                message: String(localized: "The recording stopped saving to disk partway, so its audio ends early."),
+                failures: [],
+                folder: nil
+            )
+        }
         resolveRecordingOutcome(.success(processed.text))
     }
 
@@ -3521,18 +3529,19 @@ final class AppModel {
         stopSilenceWatch()
         let category = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
+        let recovery = activeRecoveryGeneration
         fileTranscribeTask?.cancel()
         fileTranscribeTask = Task {
             await mediaSession.exitRecording()
+            let title = Self.liveRecordingTitle(category: category, endedAt: Date())
             do {
                 let url = try await source.prepare()
                 clearTakeReadouts()
-                await transcribeRecordedTake(
-                    url: url,
-                    title: Self.liveRecordingTitle(category: category, endedAt: Date()),
-                    source: takeSource,
-                    category: category
-                )
+                await transcribeRecordedTake(url: url, title: title, source: takeSource, category: category)
+            } catch let cut as CaptureInterrupted {
+                clearTakeReadouts()
+                liveRecordingAudioURL = nil
+                keepCutShortTake(cut, title: title, source: takeSource, category: category, recovery: recovery)
             } catch {
                 clearTakeReadouts()
                 endActiveRecovery()
@@ -3554,6 +3563,26 @@ final class AppModel {
         if streamingConsumer == consumer { streamingConsumer = nil }
         // A no-op when .finished already ended the take; it covers a stream that ends without one.
         endLiveTake(take)
+    }
+
+    /// A take whose file stopped taking writes keeps the audio that landed, saved as interrupted, with Retry.
+    private func keepCutShortTake(
+        _ cut: CaptureInterrupted, title: String, source: EntrySource, category: EntryCategory, recovery: Int?
+    ) {
+        saveTake(
+            Self.untranscribedTranscript(of: cut.url, language: currentOptions.language),
+            audio: cut.url,
+            title: Self.takeTitle(title, suffix: .interrupted),
+            source: source,
+            category: category,
+            activate: false,
+            recovery: recovery
+        )
+        let message = String(localized: "Parola couldn't keep writing the recording to disk.")
+            + " " + String(localized: "The recording up to this point was saved to your library.")
+        phase = .failed(message: message)
+        armTakeRetry(url: cut.url, title: title, source: source, category: category)
+        resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
     /// Cancel on a take that has captured nothing: there is nothing to lose, so it ends without a word.
@@ -3848,7 +3877,16 @@ final class AppModel {
         let recovery = activeRecoveryGeneration
         let title = Self.liveRecordingTitle(category: category, endedAt: Date())
         await mediaSession.exitRecording()
-        let prepared = try? await source.prepare()
+        var cutShort = false
+        let prepared: URL?
+        do {
+            prepared = try await source.prepare()
+        } catch let cut as CaptureInterrupted {
+            prepared = cut.url
+            cutShort = true
+        } catch {
+            prepared = nil
+        }
         clearTakeReadouts()
         phase = .idle
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
@@ -3857,7 +3895,7 @@ final class AppModel {
         saveTake(
             Self.untranscribedTranscript(of: url, language: currentOptions.language),
             audio: url,
-            title: Self.takeTitle(title, suffix: .notTranscribed),
+            title: Self.takeTitle(title, suffix: cutShort ? .interrupted : .notTranscribed),
             source: takeSource,
             category: category,
             activate: false,

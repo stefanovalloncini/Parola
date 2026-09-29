@@ -100,7 +100,7 @@ struct CaptureLoggingTests {
         }
     }
 
-    @Test("the microphone source logs format, converter, engine and discard failures")
+    @Test("the microphone source logs format, converter, engine and cut-short failures")
     func micSites() throws {
         let source = try audioSource("MicAudioSource")
         expectCalls([
@@ -108,31 +108,32 @@ struct CaptureLoggingTests {
             #"ParolaLog.fault(.audioCapture, "could not build the capture format")"#,
             #"ParolaLog.fault(.audioCapture, "could not create the audio converter")"#,
             #"ParolaLog.error(.audioCapture, "audio engine failed to start", [.error: .error(error)])"#,
-            #"ParolaLog.error( .audioRecording, "take discarded after a write failure", [.count: .int(writer.droppedChunks)] )"#,
+            #"ParolaLog.error( .audioRecording, "take cut short by a write failure", [.count: .int(writer.droppedChunks)] )"#,
         ], in: source)
         #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 5)
     }
 
-    @Test("the system audio source logs availability, start and discard failures")
+    @Test("the system audio source logs availability, start and cut-short failures")
     func systemAudioSites() throws {
         let source = try audioSource("SystemAudioSource")
         expectCalls([
             #"ParolaLog.error(.audioCapture, "screencapturekit unavailable", [.error: .error(error)])"#,
             #"ParolaLog.error(.audioCapture, "no display available for system audio")"#,
             #"ParolaLog.error( .audioCapture, "system audio capture failed to start", [.error: .error(error)] )"#,
-            #"ParolaLog.error(.audioRecording, "system audio take discarded after a write failure")"#,
+            #"ParolaLog.error(.audioRecording, "system audio take cut short by a write failure")"#,
         ], in: source)
         #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 4)
     }
 
-    @Test("the process tap source logs the tap and the aggregate device")
+    @Test("the process tap source logs the tap, the aggregate device and a cut-short take")
     func processTapSites() throws {
         let source = try audioSource("ProcessTapAudioSource")
         expectCalls([
             #"ParolaLog.error( .audioCapture, "could not create the audio process tap", [.count: .int(processObjects.count)] )"#,
             #"ParolaLog.error(.audioCapture, "tap aggregate device failed to start")"#,
+            #"ParolaLog.error(.audioRecording, "app audio take cut short by a write failure")"#,
         ], in: source)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 2)
+        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 3)
     }
 
     // The pinned counts are also what rules out a per-buffer record appearing later.

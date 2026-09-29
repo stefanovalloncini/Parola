@@ -12,6 +12,14 @@ private struct StubTake: LiveAudioSource {
     func cancel() async {}
 }
 
+/// A take whose file stopped taking writes partway.
+private struct CutShortTake: LiveAudioSource {
+    let url: URL
+    func start() async throws {}
+    func prepare() async throws -> URL { throw CaptureInterrupted(url: url, reason: "the disk is full") }
+    func cancel() async {}
+}
+
 /// Whether a quit asked, and the reply it handed back once the take was wound down.
 @MainActor
 private final class QuitReply {
@@ -439,6 +447,29 @@ extension TranscriberMockSuites {
                 model.cancelCurrentWork()
                 #expect(!model.recordingIsSilent)
             }
+        }
+
+        // MARK: - A write that fails
+
+        @Test("a take whose file stopped taking writes keeps the audio that landed, saved as interrupted")
+        func cutShortTakeKeepsItsAudio() async throws {
+            let wav = try makeTakeWAV("cut-short")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            let model = makeModel()
+            model.liveSource = CutShortTake(url: wav)
+            model.phase = .recording(source: .microphone)
+
+            model.stopRecordingAndTranscribe()
+
+            let saved = try #require(await entries(model, count: 1).first)
+            #expect(saved.title.hasSuffix("(interrupted)"))
+            #expect(saved.manifest.originalAudioName.isEmpty == false)
+            #expect(FileManager.default.fileExists(atPath: wav.path), "the take's file is never deleted")
+            await waitUntil {
+                if case .failed(let message) = model.phase { return message.contains("saved to your library") }
+                return false
+            }
+            #expect(model.failedTakeAudioURL == wav, "Retry transcribes what was kept")
         }
 
         // MARK: - Titles

@@ -12,8 +12,10 @@ final class StreamingAudioPersister: Sendable {
     private let continuation: AsyncStream<[Float]>.Continuation
     private let writerTask: Task<URL?, Never>
     private let dropped = OSAllocatedUnfairLock(initialState: false)
+    private let failed: OSAllocatedUnfairLock<Bool>
 
-    init?(sampleRate: Double) {
+    /// `failingAfter` is a test seam: writes past that many fail, the way a full disk would.
+    init?(sampleRate: Double, failingAfter writeLimit: Int? = nil) {
         guard let format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: sampleRate,
@@ -35,18 +37,23 @@ final class StreamingAudioPersister: Sendable {
         )
         self.continuation = continuation
         let audioFile = file
+        let failed = OSAllocatedUnfairLock(initialState: false)
+        self.failed = failed
         writerTask = Task.detached(priority: .utility) {
-            var wroteAny = false
-            var failed = false
+            var writes = 0
+            var stopped = false
             for await samples in stream {
-                guard !failed, !samples.isEmpty else { continue }
-                if Self.append(samples, to: audioFile, format: format) {
-                    wroteAny = true
+                guard !stopped, !samples.isEmpty else { continue }
+                let allowed = writeLimit.map { writes < $0 } ?? true
+                if allowed, Self.append(samples, to: audioFile, format: format) {
+                    writes += 1
                 } else {
-                    failed = true
+                    stopped = true
+                    failed.withLock { $0 = true }
                 }
             }
-            guard wroteAny, !failed else {
+            // A failed write keeps everything before it; only a file with nothing in it goes.
+            guard writes > 0 else {
                 try? FileManager.default.removeItem(at: url)
                 return nil
             }
@@ -59,6 +66,11 @@ final class StreamingAudioPersister: Sendable {
         dropped.withLock { $0 }
     }
 
+    /// True when a write failed: the file ends where the failure began.
+    var writeFailed: Bool {
+        failed.withLock { $0 }
+    }
+
     func append(_ samples: [Float]) {
         if case .dropped = continuation.yield(samples) {
             noteDrop()
@@ -69,7 +81,7 @@ final class StreamingAudioPersister: Sendable {
         dropped.withLock { $0 = true }
     }
 
-    /// Finishes the WAV and returns its URL, or nil if nothing was written or a write failed.
+    /// Finishes the WAV and returns its URL, or nil if nothing was written.
     func finish() async -> URL? {
         continuation.finish()
         return await writerTask.value

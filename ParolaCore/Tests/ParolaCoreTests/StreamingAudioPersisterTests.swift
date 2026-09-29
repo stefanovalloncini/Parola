@@ -45,6 +45,29 @@ struct StreamingAudioPersisterTests {
         #expect(FileManager.default.fileExists(atPath: url.path))
     }
 
+    @Test("a write that fails keeps the audio written before it")
+    func failedWriteKeepsWrittenAudio() async throws {
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000, failingAfter: 1))
+        persister.append([0.1, 0.2, 0.3])
+        persister.append([0.4, 0.5])
+        persister.append([0.6])
+
+        let url = try #require(await persister.finish())
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(persister.writeFailed)
+        #expect(try AVAudioFile(forReading: url).length == 3)
+    }
+
+    @Test("a write that fails before anything landed leaves no file")
+    func failedFirstWriteLeavesNothing() async throws {
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000, failingAfter: 0))
+        persister.append([0.1, 0.2])
+
+        #expect(await persister.finish() == nil)
+        #expect(persister.writeFailed)
+        #expect(!FileManager.default.fileExists(atPath: persister.url.path))
+    }
+
     @Test("discard deletes the written file")
     func discardDeletesFile() async throws {
         let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))

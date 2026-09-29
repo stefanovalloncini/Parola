@@ -236,6 +236,29 @@ struct StreamingTakeEndingTests {
         await session.cancel()
     }
 
+    @Test("a take whose file stopped taking writes keeps what landed and says it was cut short")
+    func cutShortTakeKeepsItsAudio() async throws {
+        let session = StreamingTranscriptionSession(persistAudio: true)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000, failingAfter: 1))
+        let harness = TakeHarness()
+        let events = await launchTake(on: session, persister: persister, harness: harness)
+        #expect(await eventually { harness.installed })
+        harness.push([Float](repeating: 0.5, count: 8_000))
+        harness.push([Float](repeating: 0.5, count: 8_000))
+        let audio = persister.url
+        defer { try? FileManager.default.removeItem(at: audio) }
+
+        await session.stop()
+
+        var finished: Transcript?
+        for await event in events {
+            if case .finished(let transcript) = event { finished = transcript }
+        }
+        #expect(finished?.sourceURL == audio)
+        #expect(FileManager.default.fileExists(atPath: audio.path))
+        #expect(await session.audioWasCutShort())
+    }
+
     @Test("stopping the same take decodes its tail and keeps the audio")
     func stopKeepsTheTake() async throws {
         let session = StreamingTranscriptionSession(persistAudio: true)

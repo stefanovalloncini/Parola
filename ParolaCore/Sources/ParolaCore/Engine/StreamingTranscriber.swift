@@ -16,10 +16,13 @@ public protocol StreamingTranscriber: Sendable {
     /// The take's on-disk audio, when the transcriber persists one: the in-flight file
     /// while recording, or the file a failure left behind.
     func recordingAudioURL() async -> URL?
+    /// True once a stopped take's audio file had a write fail: the file ends early, the transcript doesn't.
+    func audioWasCutShort() async -> Bool
 }
 
 public extension StreamingTranscriber {
     func recordingAudioURL() async -> URL? { nil }
+    func audioWasCutShort() async -> Bool { false }
     var levelMeter: LevelMeter { LevelMeter() }
 }
 

@@ -101,9 +101,8 @@ public actor SystemAudioSource: LiveAudioSource {
     public func prepare() async throws -> URL {
         try await stop()
         if let captureFailure {
-            ParolaLog.error(.audioRecording, "system audio take discarded after a write failure")
-            try? FileManager.default.removeItem(at: outputURL)
-            throw ParolaError.captureUnavailable(captureFailure)
+            ParolaLog.error(.audioRecording, "system audio take cut short by a write failure")
+            throw CaptureInterrupted(url: outputURL, reason: captureFailure)
         }
         return outputURL
     }

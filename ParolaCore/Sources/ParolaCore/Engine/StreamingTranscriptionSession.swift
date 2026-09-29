@@ -46,6 +46,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var optionsForRun: TranscriptionOptions?
     private var speakerLabeler: (any StreamingSpeakerLabeler)?
     private var failureAudioURL: URL?
+    private var audioCutShort = false
     private var startedAt: ContinuousClock.Instant?
     private var isStarting = false
     private var pendingEnd: PendingEnd?
@@ -93,6 +94,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             throw ParolaError.transcriptionFailed("session already started")
         }
         failureAudioURL = nil
+        audioCutShort = false
 
         let modelName = options.model ?? ModelCatalog.fallbackModelID
         if !ModelCatalog.canStream(id: modelName), let variant = ModelCatalog.variant(id: modelName) {
@@ -276,6 +278,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         if persister?.droppedAudio == true {
             continuation?.yield(.warning("The recorder fell behind, so the saved audio has gaps."))
         }
+        audioCutShort = persister?.writeFailed == true
         let finalTranscript = await finishedTranscript(recordedURL: recordedURL)
         continuation?.yield(.finished(finalTranscript))
         continuation?.finish()
@@ -339,6 +342,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     public func recordingAudioURL() -> URL? {
         persister?.url ?? failureAudioURL
     }
+
+    public func audioWasCutShort() async -> Bool { audioCutShort }
 
     private func handleStreamerFailure(_ error: Error) async {
         ParolaLog.error(.streaming, "streaming failed", failureFields(error))
