@@ -66,6 +66,11 @@ final class AIJobRegistry {
         for (id, owner) in keys where owner == key { drop(id) }
     }
 
+    /// The entry was trashed or its transcript replaced, so nothing still running for it may land.
+    func cancelAll(for entryID: LibraryEntry.ID) {
+        for (id, owner) in keys where owner.entryID == entryID { drop(id) }
+    }
+
     /// Runs asked for before their transcript was saved now belong to the entry it was saved as.
     func adoptUnsaved(as entryID: LibraryEntry.ID) {
         for (id, owner) in keys where owner.entryID == nil { keys[id]?.entryID = entryID }

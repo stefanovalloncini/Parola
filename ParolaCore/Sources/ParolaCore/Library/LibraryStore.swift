@@ -684,7 +684,9 @@ public actor LibraryStore {
         return entry
     }
 
+    /// A trashed entry stays out of search and Spotlight, even when a late write lands in its bundle.
     private func indexEntry(_ entry: LibraryEntry, transcript: Transcript) async {
+        guard entry.deletedAt == nil else { return }
         let text = transcript.text
         if keepsSearchIndexCurrent {
             await readySearchIndex().index(

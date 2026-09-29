@@ -94,6 +94,7 @@ extension AppModel {
         clearingNotes notes: [String: String]
     ) async {
         guard !Task.isCancelled else { return }
+        aiJobs.cancelAll(for: entryID)
         do {
             try await library.updateTranscript(transcript, for: entryID)
             try await library.setTranscriptionDetails(

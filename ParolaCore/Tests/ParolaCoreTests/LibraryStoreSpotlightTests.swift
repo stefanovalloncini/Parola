@@ -52,6 +52,21 @@ struct LibraryStoreSpotlightTests {
         )
     }
 
+    @Test("a late write into a trashed entry keeps it out of Spotlight")
+    func writeToTrashedEntryStaysOut() async throws {
+        let indexer = RecordingIndexer()
+        let store = try makeStore(indexer: indexer)
+        let entry = try await addEntry(to: store)
+        try await store.delete(entry.id)
+
+        try await store.mutateTranscript(for: entry.id) { $0.summary = Summary(text: "late recap") }
+        try await store.setSummary(Summary(text: "late recap"), for: entry.id)
+        await store.waitForExtraIndexer()
+
+        #expect(await indexer.indexed == [entry.id], "only the add indexed it")
+        #expect(try await store.load(entry.id).document.transcript.summary?.text == "late recap")
+    }
+
     @Test("restoring a soft-deleted entry re-indexes it")
     func restoreReindexes() async throws {
         let indexer = RecordingIndexer()

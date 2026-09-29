@@ -189,6 +189,36 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a summary of the old text still running when the re-run lands is dropped, on screen and on disk")
+        func rerunDropsTheOldTextsSummary() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the new take")]
+                ))
+                let model = makeModel("retranscribe-summary")
+                let wav = try makeWAV("summary")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                let entry = try await seed(model, audio: wav)
+                #expect(await load(model, entry.id))
+                let (release, releaser) = AsyncStream<Void>.makeStream()
+                model.summariseOperation = { _, _ in
+                    for await _ in release { break }
+                    return Summary(text: "recap of the old take")
+                }
+                model.summariseTranscript()
+                #expect(model.isSummarising)
+
+                model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "it")
+                #expect(await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" })
+                #expect(!model.isSummarising)
+                releaser.finish()
+                await settle()
+
+                #expect(model.transcript?.summary == nil)
+                #expect(try await model.library.load(entry.id).document.transcript.summary == nil)
+            }
+        }
+
         @Test("a finished re-run plays the completion sound once")
         func rerunPlaysTheSound() async throws {
             try await withMocksCleared(.transcriber) {

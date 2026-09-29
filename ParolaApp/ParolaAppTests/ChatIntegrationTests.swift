@@ -243,6 +243,30 @@ struct ChatIntegrationTests {
         #expect(model.smartChapters.map(\.title) == ["A opens"])
     }
 
+    @Test("deleting an entry stops its summary run, so nothing lands in the trashed bundle")
+    func deleteCancelsTheRun() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let a = try await seedStore.add(transcript: makeTranscript(), audioSource: nil, category: .transcription)
+        model.loadEntry(a.id)
+        try await waitUntil { model.selectedEntryID == a.id && model.transcript != nil }
+        let gate = SummariseGate()
+        model.summariseOperation = { _, _ in
+            await gate.wait()
+            return Summary(text: "too late")
+        }
+
+        model.summariseTranscript()
+        #expect(model.isSummarising)
+        model.deleteEntry(a.id)
+        try await waitUntil { model.selectedEntryID == nil }
+        #expect(!model.aiJobs.isRunning(.summary, for: a.id))
+
+        gate.open()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(try await model.library.load(a.id).document.transcript.summary == nil)
+    }
+
     @Test("Clear stops the summary run in flight and nothing lands afterwards")
     func clearCancelsTheRun() async throws {
         let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))

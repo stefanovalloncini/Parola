@@ -456,6 +456,7 @@ extension AppModel {
     func deleteEntry(_ id: LibraryEntry.ID) {
         Task { [weak self] in
             guard let self else { return }
+            aiJobs.cancelAll(for: id)
             do {
                 try await library.delete(id)
                 if selectedEntryID == id { clearLoadedEntry() }
@@ -482,6 +483,7 @@ extension AppModel {
     func purgeEntry(_ id: LibraryEntry.ID) {
         Task { [weak self] in
             guard let self else { return }
+            aiJobs.cancelAll(for: id)
             do {
                 try await library.purge(id)
                 if selectedEntryID == id { clearLoadedEntry() }
