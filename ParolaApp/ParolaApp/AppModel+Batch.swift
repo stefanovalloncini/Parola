@@ -202,11 +202,26 @@ extension AppModel {
         guard arrivalDrain == nil else { return }
         arrivalDrain = Task { [weak self] in
             guard let self else { return }
+            if !foregroundIsHeld { await dropParkedFilesThatAreGone() }
             arrivalDrain = nil
             guard !foregroundIsHeld else { return }
             drainDeferredArrivals()
             pumpWatchedLane()
         }
+    }
+
+    /// A file deleted while it waited, or a burn cancelled mid-write, leaves nothing to open. Off main and
+    /// bounded: a stalled share keeps its files, and the run's own bounded read reports them.
+    private func dropParkedFilesThatAreGone() async {
+        let parked = deferredArrivals
+        guard !parked.isEmpty else { return }
+        let probe = parkedFileProbe
+        let checked = await BoundedFileRead.run(deadline: fileReadDeadline) {
+            Set(parked.filter(probe))
+        }
+        guard case .done(let present) = checked else { return }
+        let gone = Set(parked).subtracting(present)
+        deferredArrivals.removeAll { gone.contains($0) }
     }
 
     /// Waits for a scheduled drain, and for any drain it scheduled in turn.
@@ -218,8 +233,7 @@ extension AppModel {
 
     func drainDeferredArrivals() {
         guard !deferredArrivals.isEmpty || !deferredLinks.isEmpty else { return }
-        // A file deleted while it waited, or a burn cancelled mid-write, leaves nothing to open.
-        let urls = deferredArrivals.filter { FileManager.default.fileExists(atPath: $0.path) }
+        let urls = deferredArrivals
         deferredArrivals = []
         let parolaURLs = urls.filter(DroppedFiles.isProject)
         let subtitleURLs = urls.filter(Self.isSubtitleImport)

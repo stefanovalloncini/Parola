@@ -1390,6 +1390,10 @@ final class AppModel {
     @ObservationIgnored var deferredArrivals: [URL] = []
     @ObservationIgnored var deferredLinks: [DeferredLink] = []
     @ObservationIgnored var arrivalDrain: Task<Void, Never>?
+    /// Test seam: whether a parked file is still there when the drain comes for it.
+    @ObservationIgnored var parkedFileProbe: @Sendable (URL) -> Bool = {
+        FileManager.default.fileExists(atPath: $0.path)
+    }
     @ObservationIgnored var pendingOpenedFiles: [URL] = []
     var pendingLargeDrop: PendingLargeDrop?
     @ObservationIgnored var openedFilesFlushTask: Task<Void, Never>?

@@ -85,6 +85,41 @@ struct ForegroundSlotTests {
     }
 }
 
+extension ForegroundSlotTests {
+    @Test("a parked file on a share that stops answering is kept and still drains once the check gives up")
+    func stalledCheckKeepsTheFile() async {
+        let bootstrap = AppBootstrap(
+            mode: .test,
+            library: makeTempLibraryURL("foreground-slot-stalled"),
+            defaultsOverride: temporaryDefaults(),
+            sideEffects: [],
+            filePicker: TestFilePicker(),
+            clock: ContinuousClock(),
+            fileReadDeadline: .milliseconds(200)
+        )
+        let model = AppModel(bootstrap: bootstrap)
+        let stall = DispatchSemaphore(value: 0)
+        defer { stall.signal() }
+        model.parkedFileProbe = { _ in
+            stall.wait()
+            return false
+        }
+        let parked = URL(fileURLWithPath: "/tmp/parola-slot-\(UUID().uuidString).wav")
+        model.fileTranscribeTask = Task {}
+        model.deferredArrivals = [parked]
+
+        let started = ContinuousClock.now
+        model.fileTranscribeTask = nil
+        await model.awaitArrivalDrain()
+        await model.awaitBatchImport()
+
+        #expect(ContinuousClock.now - started < .seconds(5))
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.map(\.url) == [parked])
+        model.clearBatch()
+    }
+}
+
 extension TranscriberMockSuites {
     @MainActor
     @Suite("Arrival drain", .serialized)
