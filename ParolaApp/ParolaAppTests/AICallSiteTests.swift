@@ -247,7 +247,7 @@ struct AICallSiteTests {
             _ = try await first.ask("di cosa si parla?")
 
             #expect(await digests.count == 1)
-            #expect(model.transcript?.summary?.text == "the digest")
+            #expect(await waitUntil { model.transcript?.summary?.text == "the digest" })
             #expect(model.smartChapters.map(\.title) == ["Start"])
             let stored = try await model.library.load(entry.id).document.transcript
             #expect(stored.summary?.text == "the digest")

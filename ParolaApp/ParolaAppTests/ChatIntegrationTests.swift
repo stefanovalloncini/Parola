@@ -243,6 +243,44 @@ struct ChatIntegrationTests {
         #expect(model.smartChapters.map(\.title) == ["A opens"])
     }
 
+    @Test("a summary that lands while its entry is being opened shows in the opened pane and survives the next save")
+    func summaryLandsDuringAnOpen() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let long = Transcript(
+            segments: (0..<20_000).map { TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "line \($0) of a long meeting") },
+            language: "en",
+            modelName: "stub"
+        )
+        let a = try await seedStore.add(transcript: long, audioSource: nil, category: .transcription)
+        let b = try await seedStore.add(transcript: makeTranscript(), audioSource: nil, category: .transcription)
+        model.loadEntry(b.id)
+        try await waitUntil { model.selectedEntryID == b.id && model.transcript != nil }
+        let (release, releaser) = AsyncStream<Void>.makeStream()
+        model.summariseOperation = { _, _ in
+            for await _ in release { break }
+            return Summary(text: "summary for A")
+        }
+        model.summarise(entry: a.id, transcript: long)
+
+        // The open of A starts reading the long bundle, then the run finishes and queues its landing.
+        model.loadEntry(a.id)
+        await Task.yield()
+        releaser.finish()
+        holdMainActor(0.005)
+        await Task.yield()
+        // Held here, the read finishes before the landing gets a turn: the open installs a copy from before the write.
+        holdMainActor(0.5)
+        try await waitUntil(within: .seconds(5)) { model.selectedEntryID == a.id && !model.aiJobs.isRunning(.summary, for: a.id) }
+
+        #expect(model.transcript?.summary?.text == "summary for A")
+        model.editSegment(id: 0, newText: "edited after the landing")
+        await model.flushPendingTranscriptSave()
+        let stored = try await model.library.load(a.id).document.transcript
+        #expect(stored.segments.first?.text == "edited after the landing")
+        #expect(stored.summary?.text == "summary for A")
+    }
+
     @Test("deleting an entry stops its summary run, so nothing lands in the trashed bundle")
     func deleteCancelsTheRun() async throws {
         let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
@@ -365,6 +403,11 @@ struct ChatIntegrationTests {
             if stored == nil { try await Task.sleep(for: .milliseconds(10)) }
         }
         #expect(stored?.text == "persisted summary")
+    }
+
+    /// Blocks the main actor, so work finishing elsewhere queues up behind it in a known order.
+    private func holdMainActor(_ seconds: TimeInterval) {
+        Thread.sleep(forTimeInterval: seconds)
     }
 
     private func waitUntil(

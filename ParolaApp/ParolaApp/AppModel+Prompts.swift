@@ -108,16 +108,16 @@ extension AppModel {
     }
 
     private func landActionItems(_ items: [ActionItem], for entryID: LibraryEntry.ID?, askedAt artifacts: Int) async {
-        if isOnScreen(entryID, askedAt: artifacts) {
-            actionItems = items
-            transcript?.actionItems = items
+        if let entryID {
+            do {
+                try await library.setActionItems(items, for: entryID)
+            } catch {
+                ParolaLog.error(.library, "action items could not be saved to the library", [.error: .error(error)])
+            }
         }
-        guard let entryID else { return }
-        do {
-            try await library.setActionItems(items, for: entryID)
-        } catch {
-            ParolaLog.error(.library, "action items could not be saved to the library", [.error: .error(error)])
-        }
+        guard isOnScreen(entryID, askedAt: artifacts) else { return }
+        actionItems = items
+        transcript?.actionItems = items
     }
 
     func clearActionItems() {
@@ -169,15 +169,21 @@ extension AppModel {
 
     /// Chapters keep a place of their own, so an entry without a summary keeps them; a summary gets a copy, where exports read them.
     func persistChapters(_ chapters: [Chapter]) {
-        guard var updated = transcript else { return }
-        updated.chapters = chapters
-        updated.summary?.chapters = chapters
-        guard updated != transcript else { return }
-        transcript = updated
-        guard let entryID = selectedEntryID else { return }
+        guard installChapters(chapters), let entryID = selectedEntryID else { return }
         Task { [library] in
             try? await library.setChapters(chapters, for: entryID)
         }
+    }
+
+    /// Puts the chapters on the transcript on screen, and on its summary's copy; false when nothing changed.
+    @discardableResult
+    private func installChapters(_ chapters: [Chapter]) -> Bool {
+        guard var updated = transcript else { return false }
+        updated.chapters = chapters
+        updated.summary?.chapters = chapters
+        guard updated != transcript else { return false }
+        transcript = updated
+        return true
     }
 
     /// Re-reads whether Apple Intelligence can serve a request, so AI affordances can gate on it
@@ -218,17 +224,16 @@ extension AppModel {
     }
 
     private func landChapters(_ chapters: [Chapter], for entryID: LibraryEntry.ID?, askedAt artifacts: Int) async {
-        if isOnScreen(entryID, askedAt: artifacts) {
-            smartChapters = chapters
-            persistChapters(chapters)
-            return
+        if let entryID {
+            do {
+                try await library.setChapters(chapters, for: entryID)
+            } catch {
+                ParolaLog.error(.library, "chapters could not be saved to the library", [.error: .error(error)])
+            }
         }
-        guard let entryID else { return }
-        do {
-            try await library.setChapters(chapters, for: entryID)
-        } catch {
-            ParolaLog.error(.library, "chapters could not be saved to the library", [.error: .error(error)])
-        }
+        guard isOnScreen(entryID, askedAt: artifacts) else { return }
+        smartChapters = chapters
+        installChapters(chapters)
     }
 
     func clearSmartChapters() {

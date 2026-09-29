@@ -40,17 +40,18 @@ extension AppModel {
         summarise(entry: entryID, transcript: transcript)
     }
 
+    /// Disk first, then the pane if the entry is on screen by then, so an open racing the landing can't keep a copy without it.
     private func landSummary(_ summary: Summary, for entryID: LibraryEntry.ID?, askedAt artifacts: Int) async {
-        if isOnScreen(entryID, askedAt: artifacts) {
-            transcript?.install(summary: summary)
-            adoptSavedChapters()
+        if let entryID {
+            do {
+                try await library.mutateTranscript(for: entryID) { $0.install(summary: summary) }
+            } catch {
+                ParolaLog.error(.library, "summary could not be saved to the library", [.error: .error(error)])
+            }
         }
-        guard let entryID else { return }
-        do {
-            try await library.mutateTranscript(for: entryID) { $0.install(summary: summary) }
-        } catch {
-            ParolaLog.error(.library, "summary could not be saved to the library", [.error: .error(error)])
-        }
+        guard isOnScreen(entryID, askedAt: artifacts) else { return }
+        transcript?.install(summary: summary)
+        adoptSavedChapters()
     }
 
     /// Whether a run's transcript is on screen: the same entry, or for an unsaved one the same install.
