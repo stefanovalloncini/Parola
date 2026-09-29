@@ -5,6 +5,7 @@ import Testing
 @testable import Parola
 import ParolaCore
 import ParolaTestSupport
+import UniformTypeIdentifiers
 
 private struct StubTake: LiveAudioSource {
     let url: URL
@@ -87,6 +88,16 @@ private actor CutShortSession: StreamingTranscriber {
     func cancel() async {}
     func currentModel() async -> String? { nil }
     func audioWasCutShort() async -> Bool { true }
+}
+
+/// Remembers the names a Save panel would have suggested, and chooses nothing.
+private actor NameRecordingPicker: FilePicker {
+    private(set) var suggestedNames: [String] = []
+    func chooseInputFiles(allowedTypes: [UTType], allowsMultiple: Bool, message: String?) async -> [URL] { [] }
+    func chooseSaveDestination(suggestedName: String, allowedTypes: [UTType], message: String?) async -> URL? {
+        suggestedNames.append(suggestedName)
+        return nil
+    }
 }
 
 /// Whether a quit asked, and the reply it handed back once the take was wound down.
@@ -794,6 +805,61 @@ extension TranscriberMockSuites {
 
                 #expect(model.currentTranscriptTitle == title)
                 #expect(!model.currentTranscriptTitle.contains("parola-trust"))
+                model.stopTranscribingTake()
+            }
+        }
+
+        @Test("Transcribe keeps a title the user typed, note and all")
+        func transcribeKeepsATypedTitle() async throws {
+            let wav = try makeTakeWAV("typed-title")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "words at last")],
+                    gate: gate
+                ))
+                let model = makeModel()
+                await transcribingTake(model, wav: wav)
+                model.stopTranscribingTake()
+                let saved = try #require(await entries(model, count: 1).first)
+                try await model.library.renameEntry(saved.id, to: "Kept (not transcribed)")
+                model.loadEntry(saved.id)
+                await waitUntil { model.selectedEntryID == saved.id && model.transcript != nil }
+
+                await gate.open()
+                model.transcribeLoadedEntry()
+
+                await waitUntil { model.transcript?.text == "words at last" }
+                await model.awaitLandingSteps()
+                #expect(await model.library.list().first?.title == "Kept (not transcribed)")
+            }
+        }
+
+        @Test("Save As suggests a take's title while it still plays from its working file")
+        func saveAsNamesAnUnsavedTakeByItsTitle() async throws {
+            let wav = try makeTakeWAV("save-as-title")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "unsaved")],
+                    gate: MockTranscriberGate()
+                ))
+                let picker = NameRecordingPicker()
+                let model = AppModel(bootstrap: AppBootstrap(
+                    mode: .test, library: makeTempLibraryURL("save-as"), defaultsOverride: temporaryDefaults(),
+                    sideEffects: [], filePicker: picker, clock: ContinuousClock()
+                ))
+                model.recordingCountInSeconds = 0
+                model.freeDiskSpaceProvider = { 50_000_000_000 }
+                await transcribingTake(model, wav: wav)
+                model.transcript = Transcript(segments: [], language: "en", modelName: "m")
+                let title = try #require(model.recordedTake?.title)
+
+                model.saveProjectDocument()
+
+                await waitUntil { await !picker.suggestedNames.isEmpty }
+                #expect(await picker.suggestedNames == [TranscriptShareFile.safeName(for: title) + ".parola"])
                 model.stopTranscribingTake()
             }
         }

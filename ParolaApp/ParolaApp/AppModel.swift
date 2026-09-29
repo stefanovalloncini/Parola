@@ -4275,7 +4275,10 @@ final class AppModel {
 
     func saveProjectDocument() {
         guard let transcript, let sourceFileURL else { return }
-        let suggested = sourceFileURL.deletingPathExtension().lastPathComponent + ".parola"
+        // A take still playing from its working file goes by its title, never the file's name.
+        let name = recordedTakeTitle(playing: sourceFileURL).map(TranscriptShareFile.safeName(for:))
+            ?? sourceFileURL.deletingPathExtension().lastPathComponent
+        let suggested = name + ".parola"
         // A copy of a link's entry is still a link; with nothing loaded the writer derives it as before.
         let entrySource = libraryEntries.first { $0.id == selectedEntryID }?.manifest.source
         Task { [weak self] in
