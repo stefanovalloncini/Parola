@@ -3680,7 +3680,7 @@ final class AppModel {
         let run = takeRunCounter
         takeRun = run
         defer { if takeRun == run { takeRun = nil } }
-        let recovery = beginFileTranscribeRecovery(sourceURL: url, title: title, source: source)
+        let recovery = beginFileTranscribeRecovery(sourceURL: url, title: title, source: source, category: category)
         // Held by the run itself, so a Cancel's cleanup leaves it for the save that follows.
         recoveryHeldByTake.insert(recovery)
         recordedTake = RecordedTake(file: url, title: title)

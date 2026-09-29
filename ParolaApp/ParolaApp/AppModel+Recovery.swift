@@ -24,6 +24,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var title: String?
     /// Nil in a file written before the field, which a restored take reads as a microphone take.
     var source: EntrySource?
+    /// Nil in a file written before the field, which a restored take files as a transcription.
+    var category: EntryCategory?
 
     init(
         kind: Kind,
@@ -35,9 +37,11 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         audioURL: URL? = nil,
         title: String? = nil,
         source: EntrySource? = nil,
+        category: EntryCategory? = nil,
         id: UUID = UUID()
     ) {
         self.id = id
+        self.category = category
         self.kind = kind
         self.startedAt = startedAt
         self.modelName = modelName
@@ -61,6 +65,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         audioURL = try c.decodeIfPresent(URL.self, forKey: .audioURL)
         title = try c.decodeIfPresent(String.self, forKey: .title)
         source = try c.decodeIfPresent(EntrySource.self, forKey: .source)
+        category = try c.decodeIfPresent(EntryCategory.self, forKey: .category)
     }
 
     /// A take by its title, a file by its name; a link by the video's title, or the link itself before the title was known.
@@ -106,7 +111,9 @@ extension AppModel {
     }
 
     @discardableResult
-    func beginFileTranscribeRecovery(sourceURL: URL, title: String? = nil, source: EntrySource = .file) -> Int {
+    func beginFileTranscribeRecovery(
+        sourceURL: URL, title: String? = nil, source: EntrySource = .file, category: EntryCategory? = nil
+    ) -> Int {
         let generation = beginRecoveryGeneration()
         recordingRecoveryStartedAt = nil
         writeRecoveryFile(RecoveryCheckpoint(
@@ -115,7 +122,8 @@ extension AppModel {
             modelName: selectedModel,
             sourceURL: sourceURL,
             title: title,
-            source: source
+            source: source,
+            category: category
         ))
         return generation
     }
@@ -151,7 +159,8 @@ extension AppModel {
             language: selectedLanguage,
             segments: liveSegments,
             audioURL: liveRecordingAudioURL,
-            source: activeTake?.source.entrySource ?? pendingRecordingSource
+            source: activeTake?.source.entrySource ?? pendingRecordingSource,
+            category: activeTake?.category
         ))
     }
 
@@ -315,7 +324,8 @@ extension AppModel {
                 let adopted = adoptRecovery(checkpoint)
                 startTakeTask { [weak self] in
                     await self?.transcribeRecordedTake(
-                        url: url, title: title, source: checkpoint.source ?? .microphone, replacing: adopted
+                        url: url, title: title, source: checkpoint.source ?? .microphone,
+                        category: checkpoint.category ?? .transcription, replacing: adopted
                     )
                 }
             } else {
@@ -367,7 +377,7 @@ extension AppModel {
                 audio: url,
                 title: Self.takeTitle(title, suffix: .notTranscribed),
                 source: checkpoint.source ?? .microphone,
-                category: .transcription,
+                category: checkpoint.category ?? .transcription,
                 activate: false,
                 recovery: adoptRecovery(checkpoint),
                 onSaved: release
@@ -383,9 +393,9 @@ extension AppModel {
                 self.saveTake(
                     restored,
                     audio: audioURL,
-                    title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt),
+                    title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt, category: checkpoint.category ?? .transcription),
                     source: checkpoint.source ?? .microphone,
-                    category: .transcription,
+                    category: checkpoint.category ?? .transcription,
                     activate: false,
                     recovery: self.adoptRecovery(checkpoint),
                     onSaved: release
@@ -446,9 +456,9 @@ extension AppModel {
         saveTake(
             restored,
             audio: audioURL,
-            title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt),
+            title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt, category: checkpoint.category ?? .transcription),
             source: checkpoint.source ?? .microphone,
-            category: .transcription,
+            category: checkpoint.category ?? .transcription,
             activate: true,
             recovery: adoptRecovery(checkpoint)
         )
@@ -458,8 +468,10 @@ extension AppModel {
         WAVHeaderRepair.makeReadable(url) ? url : nil
     }
 
-    nonisolated static func recoveredRecordingTitle(startedAt: Date, bundle: Bundle = .main) -> String {
-        let title = liveRecordingTitle(category: .transcription, endedAt: startedAt, bundle: bundle)
+    nonisolated static func recoveredRecordingTitle(
+        startedAt: Date, category: EntryCategory = .transcription, bundle: Bundle = .main
+    ) -> String {
+        let title = liveRecordingTitle(category: category, endedAt: startedAt, bundle: bundle)
         return "\(title) \(String(localized: "(recovered)", bundle: bundle))"
     }
 

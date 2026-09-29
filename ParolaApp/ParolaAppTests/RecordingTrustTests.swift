@@ -820,6 +820,35 @@ extension TranscriberMockSuites {
             #expect(model.phase == .idle, "a take kept for later doesn't open")
         }
 
+        @Test("a meeting's checkpoint keeps it a meeting, whether it is restored or kept for later")
+        func checkpointKeepsTheCategory() async throws {
+            let library = makeTempLibraryURL("checkpoint-category")
+            try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+            let segments = [TranscriptSegment(id: 0, start: 0, end: 1, text: "the agenda")]
+            try writeLegacyCheckpoint(RecoveryCheckpoint(
+                kind: .recording, startedAt: Date(), modelName: "m", segments: segments, source: .systemAudio, category: .meeting
+            ), library: library)
+            let model = makeModel(libraryURL: library)
+            #expect(model.pendingRecovery?.category == .meeting)
+
+            model.declinePendingRecovery()
+
+            let kept = try #require(await entries(model, count: 1).first)
+            #expect(kept.category == .meeting)
+            #expect(kept.title.hasPrefix("Meeting "))
+
+            let transcribing = makeModel()
+            transcribing.beginFileTranscribeRecovery(
+                sourceURL: URL(fileURLWithPath: "/tmp/parola-meeting.wav"), title: "Meeting 1", source: .systemAudio, category: .meeting
+            )
+            await transcribing.pendingRecoveryWrite?.value
+            let written = try JSONDecoder().decode(
+                RecoveryCheckpoint.self, from: try Data(contentsOf: try #require(transcribing.activeRecoveryFileURL))
+            )
+            #expect(written.category == .meeting, "a take transcribing at a crash comes back as what it was")
+            transcribing.endActiveRecovery()
+        }
+
         @Test("only a confirmed Discard deletes a recovered take's audio")
         func discardDeletesTheTake() async throws {
             let library = makeTempLibraryURL("discard-take")
