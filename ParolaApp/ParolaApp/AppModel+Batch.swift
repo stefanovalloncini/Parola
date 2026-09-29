@@ -197,8 +197,7 @@ extension AppModel {
         linkArrivalsDeferred || recordingActive || duplicateImport != nil
     }
 
-    /// The one place a drain is scheduled. Whatever held the foreground has let go; on the next turn,
-    /// if nothing holds it by then, the arrivals parked behind it get their turn.
+    /// The one place a drain is scheduled: on the next turn, if nothing holds the foreground by then, what waited goes.
     func foregroundLetGo() {
         guard arrivalDrain == nil else { return }
         arrivalDrain = Task { [weak self] in
@@ -206,6 +205,7 @@ extension AppModel {
             arrivalDrain = nil
             guard !foregroundIsHeld else { return }
             drainDeferredArrivals()
+            pumpWatchedLane()
         }
     }
 

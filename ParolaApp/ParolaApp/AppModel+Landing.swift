@@ -15,6 +15,10 @@ struct RunLanding {
         case batchJob
         /// An entry's own audio run again: the result replaces what the entry held.
         case rerun
+        /// A watched-folder file that arrived while Parola was idle, run where the user can see it.
+        case arrival
+        /// A watched-folder file run out of sight while the user works on something else.
+        case backgroundArrival
     }
 
     let kind: Kind
@@ -62,6 +66,8 @@ struct LandingPolicy: Equatable, Sendable {
         case never
         /// The autostart rule, for an entry that took the selection.
         case whenSelected
+        /// The autostart rule, whatever is on screen.
+        case always
     }
 
     enum Export: Equatable, Sendable {
@@ -80,6 +86,8 @@ struct LandingPolicy: Equatable, Sendable {
     var autoSend: Bool
     /// The file goes into Open Recent when its run starts.
     var recents: Bool
+    /// A toast says the entry landed, and opens it.
+    var announces = false
 }
 
 extension RunLanding.Kind {
@@ -120,6 +128,17 @@ extension RunLanding.Kind {
             LandingPolicy(
                 selection: .keep, sound: true, card: true, summary: .never,
                 export: .none, autoSend: false, recents: false
+            )
+        case .arrival:
+            LandingPolicy(
+                selection: .unlessNavigated, sound: true, card: true, summary: .whenSelected,
+                export: .rules, autoSend: true, recents: false
+            )
+        case .backgroundArrival:
+            // The lane rings once when it runs dry, not once per file.
+            LandingPolicy(
+                selection: .none, sound: false, card: true, summary: .always,
+                export: .rules, autoSend: true, recents: false, announces: true
             )
         }
     }
@@ -260,20 +279,22 @@ extension AppModel {
         let message: LogMessage = landing.kind == .rerun
             ? "re-transcription could not be saved" : "transcript could not be saved to the library"
         ParolaLog.error(.library, message, [.error: .error(error)])
-        if landing.kind == .rerun {
-            nonFatalWarning = String(
-                localized: "The transcript ran again, but Parola couldn't save the result. \(error.localizedDescription)"
-            )
-        } else if landing.policy.selection == .batchCopy, let source = landing.audioSource {
-            nonFatalWarning = "\(source.lastPathComponent) was transcribed, but Parola couldn't save it to your library. \(error.localizedDescription)"
-        } else {
-            nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
+        let reason = error.localizedDescription
+        switch landing.kind {
+        case .rerun:
+            nonFatalWarning = String(localized: "The transcript ran again, but Parola couldn't save the result. \(reason)")
+        case .batchJob, .backgroundArrival:
+            let name = landing.audioSource?.lastPathComponent ?? ""
+            nonFatalWarning = "\(name) was transcribed, but Parola couldn't save it to your library. \(reason)"
+        default:
+            nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(reason)"
         }
     }
 
     private func finishLanding(_ entry: LibraryEntry, _ landing: RunLanding, navigation: Int) async {
         let policy = landing.policy
         if policy.sound { playCompletionSound() }
+        if policy.announces { arrivalNotice = ArrivalNotice(landed: entry) }
         let card = policy.card ? enqueueCardMetadata(for: entry.id, transcript: landing.transcript) : nil
         switch policy.summary {
         case .never:
@@ -282,6 +303,8 @@ extension AppModel {
             if loadEntryGeneration == navigation, selectedEntryID == entry.id {
                 applyAutostartSummary(to: entry.id, transcript: landing.transcript)
             }
+        case .always:
+            applyAutostartSummary(to: entry.id, transcript: landing.transcript)
         }
         // Delivery sends the AI title, so only a send waits for the card.
         guard policy.autoSend, hasAutoSendDestination else { return }

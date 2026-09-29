@@ -32,6 +32,10 @@ struct ContentRoutes: View {
                     BurnJobStrip(job: job)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+                if let notice = model.arrivalNotice {
+                    ArrivalToast(notice: notice)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
     }

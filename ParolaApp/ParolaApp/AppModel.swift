@@ -418,7 +418,10 @@ final class AppModel {
     @ObservationIgnored var batchSidecars: [BatchJob.ID: [URL]] = [:]
     var selectedBatchJobID: BatchJob.ID?
     @ObservationIgnored var batchTask: Task<Void, Never>? {
-        didSet { if oldValue != nil, batchTask == nil { foregroundLetGo() } }
+        didSet {
+            if oldValue == nil, batchTask != nil { preemptWatchedLane() }
+            if oldValue != nil, batchTask == nil { foregroundLetGo() }
+        }
     }
     @ObservationIgnored var lastSavedBatchQueueURLs: [URL]?
 
@@ -678,55 +681,18 @@ final class AppModel {
         return watchedFolders.pendingBaselineFlush()
     }
 
+    /// Watched-folder files waiting their turn, the one running included; each leaves when it lands or fails.
+    @ObservationIgnored var watchedArrivals: [WatchedArrival] = []
+    @ObservationIgnored var watchedLaneTask: Task<Void, Never>?
+    @ObservationIgnored var backgroundArrivalID: WatchedArrival.ID?
+    @ObservationIgnored var visibleArrivalID: WatchedArrival.ID?
+    var arrivalNotice: ArrivalNotice?
+
     /// A `--library` override keeps the watchers' baselines next to that library, like the delivery queue.
     var watchedFoldersDirectory: URL {
         library.libraryURL == LibraryStore.defaultLibraryURL
             ? URL.applicationSupportDirectory.appending(path: "Parola/Watched Folders", directoryHint: .isDirectory)
             : library.libraryURL.appendingPathComponent("Watched Folders", isDirectory: true)
-    }
-
-    /// Nobody opened this file, so a copy the library holds follows the batch rule whether Parola is idle
-    /// or busy: skipped and counted with the batch's duplicates, never a sheet or a jump to the stored entry.
-    func handleWatchedArrival(_ url: URL) {
-        let previous = watchedImportTask
-        let deadline = fileReadDeadline
-        let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
-        watchedImportTask = Task { [weak self] in
-            await previous?.value
-            guard let self else { return }
-            var lookup: DuplicateNotice.Lookup?
-            if skipsDuplicates {
-                lookup = await DuplicateNotice.lookup(for: url, in: self.library, deadline: deadline)
-            }
-            let digest = lookup?.digest
-            if lookup?.entry != nil {
-                guard !Task.isCancelled else { return }
-                self.batchDuplicatesSkipped += 1
-                ParolaLog.info(.library, "skipped a watched-folder file the library already holds")
-                return
-            }
-            guard !Task.isCancelled else { return }
-            self.startWatchedArrival(url, sourceDigest: digest)
-        }
-    }
-
-    // A user opening a file replaces the current run, but folder arrivals must not: two files
-    // landing together would cancel each other and only the last one would be transcribed.
-    private func startWatchedArrival(_ url: URL, sourceDigest: String?) {
-        if transcribeTaskRunning || phaseDefersArrivals || batchIsRunning {
-            deferredArrivals.append(url)
-            return
-        }
-        introduction.defer()
-        beginFileTranscription(fileURL: url, translateOverride: nil, sourceDigest: sourceDigest)
-    }
-
-    /// Waits for the duplicate check a watched arrival goes through before it runs or waits its turn.
-    func awaitWatchedImport() async {
-        while let task = watchedImportTask {
-            await task.value
-            if watchedImportTask == task { watchedImportTask = nil }
-        }
     }
 
     // MARK: - Live captions
@@ -1423,7 +1389,12 @@ final class AppModel {
     }
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored var fileTranscribeTask: Task<Void, Never>? {
-        didSet { if oldValue != nil, fileTranscribeTask == nil { foregroundLetGo() } }
+        didSet {
+            guard oldValue != fileTranscribeTask else { return }
+            if oldValue == nil { preemptWatchedLane() }
+            visibleArrivalLostTheWindow()
+            if fileTranscribeTask == nil { foregroundLetGo() }
+        }
     }
     @ObservationIgnored var fileRunLanding: FileRunLanding?
     @ObservationIgnored var landingSteps: Task<Void, Never>?
@@ -1442,7 +1413,10 @@ final class AppModel {
         didSet { if oldValue != nil, youtubeSubsTask == nil { foregroundLetGo() } }
     }
     @ObservationIgnored private var recordingStartInFlight = false {
-        didSet { if oldValue, !recordingStartInFlight { foregroundLetGo() } }
+        didSet {
+            if !oldValue, recordingStartInFlight { preemptWatchedLane() }
+            if oldValue, !recordingStartInFlight { foregroundLetGo() }
+        }
     }
     @ObservationIgnored private var stopRequestedDuringStart = false
     @ObservationIgnored var derivedArtifactsGeneration = 0
@@ -2212,12 +2186,13 @@ final class AppModel {
     /// The run itself, past the routing and the duplicate check an arriving file goes through:
     /// Retry means this file, now. A link's download lands here too, and Retry then means the link.
     func beginFileTranscription(
-        fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil, fetchedLink: FetchedLink? = nil
+        fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil, fetchedLink: FetchedLink? = nil,
+        arrival: WatchedArrival? = nil
     ) {
         // Before the new token: cancelling retires the old run's token; a file opened mid-download keeps its duplicate check.
         cancelTranscriptionRuns(keepingDuplicateCheck: fetchedLink != nil)
         let runToken = nextFileRunToken()
-        let landingKind: RunLanding.Kind = fetchedLink == nil ? .file : .link
+        let landingKind: RunLanding.Kind = arrival != nil ? .arrival : fetchedLink == nil ? .file : .link
         if landingKind.policy.recents { noteRecentFile(fileURL) }
         if let fetchedLink, let title = fetchedLink.media.metadata.title {
             linkRunTitle = LinkRunTitle(file: fileURL, title: title)
@@ -2289,6 +2264,7 @@ final class AppModel {
                 ))
                 fileRunLanding = FileRunLanding(runToken: runToken, text: processed.text, entry: entry)
                 if let ownedDownload { followLinkAudioIntoLibrary(ownedDownload, entry: entry) }
+                if let arrival { visibleArrivalLanded(arrival) }
                 retireFileRun(runToken)
             } catch {
                 endRecovery(recoveryToken)
@@ -2308,6 +2284,7 @@ final class AppModel {
                         translateOverride: translateOverride,
                         link: fetchedLink?.retry
                     )
+                    if let arrival { failArrival(arrival, error: error) }
                 }
             }
             if !Task.isCancelled { self.fileTranscribeTask = nil }
@@ -2318,12 +2295,12 @@ final class AppModel {
     /// same bytes is not going to report anything of its own.
     private func failFileReadTimeout(_ fileURL: URL, fetchedLink: FetchedLink?) {
         guard fileTranscribeTask != nil else { return }
+        let error = ParolaError.fileReadTimedOut(name: fileURL.lastPathComponent)
+        if let arrival = watchedArrivals.first(where: { $0.id == visibleArrivalID }) {
+            failArrival(arrival, error: error)
+        }
         cancelAndTrack(&fileTranscribeTask)
-        applyTranscriptionError(
-            ParolaError.fileReadTimedOut(name: fileURL.lastPathComponent),
-            source: fetchedLink == nil ? fileURL : nil,
-            link: fetchedLink?.retry
-        )
+        applyTranscriptionError(error, source: fetchedLink == nil ? fileURL : nil, link: fetchedLink?.retry)
     }
 
     func makeFilePartialHandler(runToken: Int) -> @Sendable (String) -> Void {

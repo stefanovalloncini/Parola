@@ -14270,6 +14270,17 @@
         }
       }
     },
+    "Transcribed %@ from a watched folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascritto %@ da una cartella monitorata"
+          }
+        }
+      }
+    },
     "Transcribed in": {
       "extractionState": "manual",
       "localizations": {

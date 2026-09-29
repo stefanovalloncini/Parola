@@ -981,8 +981,8 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.isEmpty)
     }
 
-    @Test("watched-folder arrivals defer while a file transcription is running")
-    func watchedArrivalDefersDuringFileTranscription() async {
+    @Test("watched-folder arrivals wait in their own lane while a file transcription is running")
+    func watchedArrivalWaitsDuringFileTranscription() async {
         let model = makeModel()
         model.fileTranscribeTask = Task {}
         let url = URL(fileURLWithPath: "/tmp/watched.wav")
@@ -990,7 +990,10 @@ struct AppModelBatchTests {
         model.handleWatchedArrival(url)
         await model.awaitWatchedImport()
 
-        #expect(model.deferredArrivals == [url])
+        #expect(model.watchedArrivals.map(\.url) == [url])
+        #expect(model.watchedLaneTask == nil)
+        #expect(model.deferredArrivals.isEmpty)
+        model.watchedArrivals = []
         model.fileTranscribeTask?.cancel()
         model.fileTranscribeTask = nil
     }

@@ -1,0 +1,289 @@
+import Foundation
+import Testing
+@testable import Parola
+import ParolaCore
+import ParolaTestSupport
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("Watched-folder lane", .serialized)
+    struct WatchedLaneTests {
+
+        private static let appleSpeech = "apple-speech-analyzer"
+
+        private actor Tally {
+            var cards = 0
+            func card() { cards += 1 }
+        }
+
+        @MainActor
+        private final class Sounds {
+            var plays = 0
+        }
+
+        private struct Rig {
+            let model: AppModel
+            let folder: URL
+            let tally: Tally
+            let sounds: Sounds
+            let recorder: MockDeliveryRecorder
+        }
+
+        private func makeRig(_ label: String) throws -> Rig {
+            let model = AppModel(
+                skipBootstrap: true,
+                defaults: temporaryDefaults(),
+                libraryURL: makeTempLibraryURL("watched-lane-\(label)"),
+                features: Set(ParolaFeature.allCases)
+            )
+            model.selectedModel = Self.appleSpeech
+            let tally = Tally()
+            model.cardMetadataOperation = { _ in
+                await tally.card()
+                return CardMetadata(title: "Titled", summary: "Summed up.")
+            }
+            let sounds = Sounds()
+            model.completionSoundPlayer = { sounds.plays += 1 }
+            model.playSoundWhenFinished = true
+            model.sweptFolders = { [] }
+            model.autoExportRules = [
+                AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])
+            ]
+            let recorder = MockDeliveryRecorder()
+            model.setDestinations([.mock(MockDestination(
+                name: "Mock vault", autoSend: true, categories: Set(EntryCategory.allCases), recorder: recorder
+            ))])
+            let folder = FileManager.default.temporaryDirectory
+                .appendingPathComponent("parola-lane-\(label)-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            return Rig(model: model, folder: folder, tally: tally, sounds: sounds, recorder: recorder)
+        }
+
+        private func makeWAV(_ name: String, in folder: URL, seconds: Double = 0.3) throws -> URL {
+            let sampleRate = 16_000, channels = 1, bytesPerSample = 2
+            let frames = Int(Double(sampleRate) * seconds)
+            let dataBytes = frames * channels * bytesPerSample
+            var data = Data()
+            func ascii(_ s: String) { data.append(contentsOf: Array(s.utf8)) }
+            func le32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
+            func le16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
+            ascii("RIFF"); le32(UInt32(36 + dataBytes)); ascii("WAVE")
+            ascii("fmt "); le32(16); le16(1); le16(UInt16(channels))
+            le32(UInt32(sampleRate)); le32(UInt32(sampleRate * channels * bytesPerSample))
+            le16(UInt16(channels * bytesPerSample)); le16(UInt16(bytesPerSample * 8))
+            ascii("data"); le32(UInt32(dataBytes))
+            data.append(Data(count: dataBytes))
+            let url = folder.appendingPathComponent("\(name).wav")
+            try data.write(to: url)
+            return url
+        }
+
+        private func install(_ gate: MockTranscriberGate, failing: Bool = false) async {
+            await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "from the watched folder")],
+                failure: failing ? MockTranscriberFailure(code: .transcriptionFailed, message: "boom") : nil,
+                gate: gate
+            ))
+        }
+
+        /// An entry of the user's own, open with its audio in the player.
+        private func openOwnEntry(_ rig: Rig) async throws -> LibraryEntry {
+            let audio = try makeWAV("own", in: rig.folder, seconds: 2)
+            let entry = try await rig.model.library.add(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "my own notes")],
+                    language: "en", modelName: "stub"
+                ),
+                audioSource: audio
+            )
+            try await rig.model.openEntry(entry.id)
+            return entry
+        }
+
+        private func arrive(_ model: AppModel, _ urls: URL...) async {
+            for url in urls { model.handleWatchedArrival(url) }
+            await model.awaitWatchedImport()
+        }
+
+        @Test("an arrival while a transcript is open and playing leaves the window alone and lands out of sight")
+        func busyArrivalLandsOutOfSight() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let rig = try makeRig("busy")
+                defer { try? FileManager.default.removeItem(at: rig.folder) }
+                let model = rig.model
+                let own = try await openOwnEntry(rig)
+                model.isPlaying = true
+                model.currentTimeSeconds = 12.5
+                let player = try #require(model.player)
+                let source = model.sourceFileURL
+                let route = model.route
+                let arrived = try makeWAV("Standup", in: rig.folder)
+
+                await arrive(model, arrived)
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+                await model.awaitLandingSteps()
+                let entries = await model.library.list()
+                let landed = try #require(entries.first { $0.id != own.id })
+                #expect(model.player === player)
+                #expect(model.isPlaying)
+                #expect(model.currentTimeSeconds == 12.5)
+                #expect(model.transcript?.segments.first?.text == "my own notes")
+                #expect(model.selectedEntryID == own.id)
+                #expect(model.sourceFileURL == source)
+                #expect(model.phase == .ready)
+                #expect(model.route == route)
+                #expect(model.batchJobs.isEmpty)
+                #expect(!model.recentFiles.contains(arrived))
+                #expect(model.arrivalNotice?.state == .saved(landed.id))
+                #expect(model.arrivalNotice?.name == "Standup")
+
+                model.openArrivalNotice()
+                #expect(await waitUntil(timeoutMs: 10_000) { model.selectedEntryID == landed.id })
+                #expect(model.arrivalNotice == nil)
+            }
+        }
+
+        @Test("an arrival while Parola is idle runs in the window, as a file the user opened")
+        func idleArrivalRunsInTheWindow() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                let rig = try makeRig("idle")
+                defer { try? FileManager.default.removeItem(at: rig.folder) }
+                let model = rig.model
+                let arrived = try makeWAV("Idle", in: rig.folder)
+
+                await arrive(model, arrived)
+
+                #expect(model.fileTranscribeTask != nil)
+                #expect(model.sourceFileURL == arrived)
+                await gate.open()
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle && model.selectedEntryID != nil })
+                #expect(model.transcript?.segments.first?.text == "from the watched folder")
+                #expect(model.phase == .ready)
+                #expect(model.arrivalNotice == nil)
+                #expect(!model.recentFiles.contains(arrived))
+            }
+        }
+
+        @Test("a transcript open in a window of its own keeps an arrival out of sight")
+        func viewerWindowCountsAsOpen() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let rig = try makeRig("viewer")
+                defer { try? FileManager.default.removeItem(at: rig.folder) }
+                let model = rig.model
+                let viewed = try await model.library.add(
+                    transcript: Transcript(
+                        segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "in its own window")],
+                        language: "en", modelName: "stub"
+                    ),
+                    audioSource: nil
+                )
+                _ = model.entryWindows.session(for: viewed.id, model: model)
+                #expect(!model.arrivalMayTakeWindow)
+
+                await arrive(model, try makeWAV("Beside", in: rig.folder))
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+                #expect(model.transcript == nil)
+                #expect(model.phase == .idle)
+                #expect(model.recentFiles.isEmpty)
+                #expect(await waitUntil(timeoutMs: 10_000) { model.arrivalNotice != nil })
+            }
+        }
+
+        @Test("a burst of five lands every file with the same post-run steps")
+        func burstLandsThroughOnePath() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                let rig = try makeRig("burst")
+                defer { try? FileManager.default.removeItem(at: rig.folder) }
+                let model = rig.model
+                var files: [URL] = []
+                for index in 1...5 {
+                    files.append(try makeWAV("Memo \(index)", in: rig.folder, seconds: 0.2 + Double(index) / 10))
+                }
+
+                for file in files { model.handleWatchedArrival(file) }
+                await model.awaitWatchedImport()
+                #expect(model.watchedArrivals.map(\.url) == files)
+                await gate.open()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 5 })
+                await model.awaitLandingSteps()
+                await model.awaitCardMetadataQueue()
+                #expect(await waitUntil(timeoutMs: 10_000) { await rig.recorder.recorded().count == 5 })
+                let sidecars = try FileManager.default.contentsOfDirectory(atPath: rig.folder.path)
+                    .filter { $0.hasSuffix(".txt") }
+                #expect(Set(sidecars) == Set(files.map { $0.deletingPathExtension().lastPathComponent + ".txt" }))
+                #expect(await rig.tally.cards == 5)
+                #expect(model.batchJobs.isEmpty)
+                #expect(model.route == .transcript)
+                // The first file ran in the window and rang; the rest rang once, when the lane ran dry.
+                #expect(rig.sounds.plays == 2)
+            }
+        }
+
+        @Test("a file the user opens takes the session from a file out of sight, which then finishes")
+        func foregroundPreemptsTheLane() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                let rig = try makeRig("preempt")
+                defer { try? FileManager.default.removeItem(at: rig.folder) }
+                let model = rig.model
+                let own = try await openOwnEntry(rig)
+                let arrived = try makeWAV("Arrived", in: rig.folder)
+                let opened = try makeWAV("Opened", in: rig.folder, seconds: 0.5)
+
+                await arrive(model, arrived)
+                #expect(model.backgroundArrivalID != nil)
+
+                model.transcribe(fileURL: opened)
+                #expect(await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask != nil })
+                #expect(model.watchedLaneTask == nil)
+                #expect(model.watchedArrivals.map(\.url) == [arrived])
+                await gate.open()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle && model.fileTranscribeTask == nil })
+                #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 3 })
+                let titles = Set(await model.library.list().filter { $0.id != own.id }.map(LibraryEntryDisplay.title(for:)))
+                #expect(titles == ["Arrived", "Opened"])
+            }
+        }
+
+        @Test("a file that fails out of sight leaves the line and the toast says why")
+        func backgroundFailureIsAnnounced() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate, failing: true)
+                await gate.open()
+                let rig = try makeRig("failure")
+                defer { try? FileManager.default.removeItem(at: rig.folder) }
+                let model = rig.model
+                _ = try await openOwnEntry(rig)
+                let arrived = try makeWAV("Broken", in: rig.folder)
+
+                await arrive(model, arrived)
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+                #expect(model.arrivalNotice?.name == "Broken")
+                guard case .failed(let reason) = model.arrivalNotice?.state else {
+                    Issue.record("expected a failure notice")
+                    return
+                }
+                #expect(reason.contains("boom"))
+                #expect(model.phase == .ready)
+            }
+        }
+    }
+}

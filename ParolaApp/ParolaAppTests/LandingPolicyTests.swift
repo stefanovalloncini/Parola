@@ -139,6 +139,14 @@ struct LandingPolicyTests {
                 selection: .keep, sound: true, card: true, summary: .never,
                 export: .none, autoSend: false, recents: false
             ),
+            .arrival: LandingPolicy(
+                selection: .unlessNavigated, sound: true, card: true, summary: .whenSelected,
+                export: .rules, autoSend: true, recents: false
+            ),
+            .backgroundArrival: LandingPolicy(
+                selection: .none, sound: false, card: true, summary: .always,
+                export: .rules, autoSend: true, recents: false, announces: true
+            ),
         ]
         #expect(Set(expected.keys) == Set(RunLanding.Kind.allCases))
         for kind in RunLanding.Kind.allCases {
@@ -162,7 +170,8 @@ struct LandingPolicyTests {
         #expect(await rig.tally.cards == (policy.card ? 1 : 0))
         #expect(await rig.recorder.recorded().map(\.entryID) == (policy.autoSend ? [entry.id] : []))
         #expect(try exports(in: rig) == Self.expectedExports(policy.export))
-        if policy.summary == .whenSelected, selected {
+        #expect((rig.model.arrivalNotice?.state == .saved(entry.id)) == policy.announces)
+        if policy.summary == .always || (policy.summary == .whenSelected && selected) {
             #expect(await waitUntil { await rig.tally.summaries == 1 })
         } else {
             await settle()
