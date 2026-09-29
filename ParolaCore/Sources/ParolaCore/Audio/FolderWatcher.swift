@@ -547,9 +547,17 @@ public actor FolderWatcher {
         if listed > recorded {
             let birthShift = listed.timeIntervalSince(recorded)
             let dateShift = item.modified.timeIntervalSince(record.modified)
-            return record.path == item.path && record.size == item.size && abs(birthShift - dateShift) < 0.001
+            return record.path == item.path && record.size == item.size
+                && abs(birthShift - dateShift) < 0.001 && isTimeZoneShift(birthShift)
         }
         return listed == item.modified
+    }
+
+    /// Whole quarter hours up to 26 h, within FAT's 2 s rounding: what a time-zone or DST change can do to a date.
+    static func isTimeZoneShift(_ shift: TimeInterval) -> Bool {
+        let quarterHour: TimeInterval = 15 * 60
+        let offQuarter = abs(shift - (shift / quarterHour).rounded() * quarterHour)
+        return abs(shift) <= 26 * 3600 && offQuarter <= 2
     }
 
     private func resolve(_ item: ScannedFile, vanished: inout [String: FileKey], now: Date) {

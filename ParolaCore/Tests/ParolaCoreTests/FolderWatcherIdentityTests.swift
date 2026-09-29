@@ -237,6 +237,44 @@ struct FolderWatcherIdentityTests {
         #expect(Set(collected.snapshot().map(\.lastPathComponent)) == Set(arrivals))
     }
 
+    @Test(
+        "on a volume that reuses inodes, only a time-zone-sized shift of both dates keeps an unedited file the same",
+        arguments: [
+            (231 * 86_400.0, true),
+            (3600.0, false),
+            (3607.0, true),
+            (27 * 3600.0, true),
+        ]
+    )
+    func shiftedDatesOnAReusedInode(shift: TimeInterval, arrives: Bool) async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        let recording = folder.appendingPathComponent("ZOOM0001.WAV")
+        try Fixture.writeSettled(recording, clock: clock)
+        let dated = Date(timeIntervalSince1970: (clock.start.timeIntervalSince1970 - 3600).rounded())
+        try FileManager.default.setAttributes([.modificationDate: dated, .creationDate: dated], ofItemAtPath: recording.path)
+        let info = try #require(FolderWatcher.FileInfo(recording.path))
+        #expect(info.birth == info.modified, "an unedited recording")
+        let earlier = info.modified.addingTimeInterval(-shift)
+        let seed = FolderWatcher.Baseline(entries: [
+            .init(path: "ZOOM0001.WAV", inode: info.inode, size: info.size, modified: earlier, created: earlier),
+        ])
+
+        let collected = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let watcher = makeWatcher(
+            folder, clock: clock, scheduler: scheduler, observesFileSystem: false, fileSystem: "msdos", collected: collected
+        )
+        await watcher.start(baseline: seed)
+        if arrives {
+            try await scheduler.advance(ticks: 3)
+        }
+        await watcher.stop()
+
+        #expect(collected.snapshot().map(\.lastPathComponent) == (arrives ? ["ZOOM0001.WAV"] : []))
+    }
+
     @Test("a file that was already there, changed in place or saved again with its birth time, doesn't arrive; one replaced by a new file does")
     func sameFileSavedAgainVersusReplaced() async throws {
         let folder = try Fixture.makeTempDir()
