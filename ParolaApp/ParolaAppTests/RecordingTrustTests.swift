@@ -74,6 +74,21 @@ private actor PausingSession: StreamingTranscriber {
     }
 }
 
+/// A live session whose file stopped taking writes before the take ended.
+private actor CutShortSession: StreamingTranscriber {
+    func start(
+        options: TranscriptionOptions,
+        speakerLabeler: (any StreamingSpeakerLabeler)?,
+        downloadProgress: (@Sendable (Double) -> Void)?
+    ) async throws -> AsyncStream<StreamingEvent> {
+        AsyncStream { $0.finish() }
+    }
+    func stop() async {}
+    func cancel() async {}
+    func currentModel() async -> String? { nil }
+    func audioWasCutShort() async -> Bool { true }
+}
+
 /// Whether a quit asked, and the reply it handed back once the take was wound down.
 @MainActor
 private final class QuitReply {
@@ -677,6 +692,25 @@ extension TranscriberMockSuites {
                 return false
             }
             #expect(model.failedTakeAudioURL == wav, "Retry transcribes what was kept")
+        }
+
+        @Test("a live take cut short by a write failure gets its header rewritten before it is saved")
+        func cutShortLiveTakePlays() async throws {
+            let wav = try makeTakeWAV("cut-live")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try zeroSizes(of: wav)
+            let model = makeModel()
+            model.phase = .recording(source: .microphone)
+
+            await model.handleStreamingEvent(.finished(Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 0.2, text: "until the disk filled")],
+                language: "en", modelName: "m", sourceURL: wav
+            )), session: CutShortSession())
+
+            let saved = try #require(await entries(model, count: 1).first)
+            #expect(saved.title.hasSuffix("(interrupted)"))
+            let audio = try #require(try await model.library.load(saved.id).document.audioURL)
+            #expect(try AVAudioFile(forReading: audio).length > 0)
         }
 
         // MARK: - Titles

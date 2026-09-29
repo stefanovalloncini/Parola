@@ -3521,6 +3521,9 @@ final class AppModel {
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let cutShort = await session?.audioWasCutShort() ?? false
         let processed = await postProcessDetached(transcript)
+        if cutShort, let audio = processed.sourceURL {
+            _ = try? await AppModel.offMainIO { WAVHeaderRepair.makeReadable(audio) }
+        }
         let hasContent = !processed.segments.isEmpty || processed.sourceURL != nil
         // Cancelled, or followed by another take, while those ran: it goes to the library without touching the screen.
         if let take, !takeIsCurrent(take) {
