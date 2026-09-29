@@ -13,6 +13,8 @@ struct RunLanding {
         case subtitles
         case captions
         case batchJob
+        /// An entry's own audio run again: the result replaces what the entry held.
+        case rerun
     }
 
     let kind: Kind
@@ -26,6 +28,9 @@ struct RunLanding {
     var consumesAudio = false
     /// The job a `.batchJob` landing finishes.
     var batchJobID: BatchJob.ID?
+    /// The entry a `.rerun` replaces, and the notes it held on the old segments.
+    var rerunEntryID: LibraryEntry.ID?
+    var clearingNotes: [String: String] = [:]
 
     var policy: LandingPolicy { kind.policy }
 
@@ -34,6 +39,10 @@ struct RunLanding {
             kind: .batchJob, transcript: transcript, audioSource: job.url,
             sourceDigest: job.sourceDigest, batchJobID: job.id
         )
+    }
+
+    static func rerun(of entryID: LibraryEntry.ID, transcript: Transcript, clearingNotes: [String: String]) -> RunLanding {
+        RunLanding(kind: .rerun, transcript: transcript, rerunEntryID: entryID, clearingNotes: clearingNotes)
     }
 }
 
@@ -45,6 +54,8 @@ struct LandingPolicy: Equatable, Sendable {
         case unlessNavigated
         /// The batch job's copy, if it is still on screen, becomes the entry; the list waits for the batch's last add.
         case batchCopy
+        /// The entry keeps the selection it had, and shows the new transcript if it is open.
+        case keep
     }
 
     enum Summary: Equatable, Sendable {
@@ -105,6 +116,11 @@ extension RunLanding.Kind {
                 selection: .batchCopy, sound: false, card: true, summary: .never,
                 export: .batchPresets, autoSend: false, recents: false
             )
+        case .rerun:
+            LandingPolicy(
+                selection: .keep, sound: true, card: true, summary: .never,
+                export: .none, autoSend: false, recents: false
+            )
         }
     }
 }
@@ -151,6 +167,7 @@ extension AppModel {
     }
 
     private func saveLanding(_ landing: RunLanding, navigation: Int) -> Task<LibraryEntry, any Error> {
+        if let entryID = landing.rerunEntryID { return replaceEntry(entryID, with: landing) }
         let saving = Task { [weak self, library] in
             do {
                 let entry = try await library.add(
@@ -174,6 +191,31 @@ extension AppModel {
         return saving
     }
 
+    /// Favorites, notes, the speaker map and the card metadata all name segments and labels the re-run replaced.
+    private func replaceEntry(_ entryID: LibraryEntry.ID, with landing: RunLanding) -> Task<LibraryEntry, any Error> {
+        aiJobs.cancelAll(for: entryID)
+        let transcript = landing.transcript
+        return Task { [weak self, library] in
+            do {
+                try await library.updateTranscript(transcript, for: entryID)
+                try await library.setTranscriptionDetails(
+                    modelName: transcript.modelName, language: transcript.language, for: entryID
+                )
+                try await library.setFavoriteSegments([], for: entryID)
+                for segmentID in landing.clearingNotes.keys.compactMap(Int.init) {
+                    try await library.setSegmentNote(nil, segmentID: segmentID, for: entryID)
+                }
+                try await library.mutateSpeakerAssignments(for: entryID) { $0 = [:] }
+                let entry = try await library.setCardMetadata(aiTitle: nil, shortSummary: nil, for: entryID)
+                self?.place(entry, landing, navigation: 0)
+                return entry
+            } catch {
+                self?.reportLandingFailure(landing, error)
+                throw error
+            }
+        }
+    }
+
     /// Where each file's sidecars landed, which is not always `<stem>.<ext>`.
     private func writeBatchSidecars(_ landing: RunLanding) -> Task<Void, Never>? {
         guard let jobID = landing.batchJobID, let source = landing.audioSource,
@@ -188,6 +230,16 @@ extension AppModel {
     }
 
     private func place(_ entry: LibraryEntry, _ landing: RunLanding, navigation: Int) {
+        if landing.policy.selection == .keep {
+            let interval = Self.landingSignposter.beginInterval("install")
+            refreshLibrary()
+            if selectedEntryID == entry.id {
+                installStoredTranscript(landing.transcript)
+                adoptLoadedMediaDuration()
+            }
+            Self.landingSignposter.endInterval("install", interval)
+            return
+        }
         let interval = Self.landingSignposter.beginInterval("entry")
         defer { Self.landingSignposter.endInterval("entry", interval) }
         switch landing.policy.selection {
@@ -199,12 +251,20 @@ extension AppModel {
             if loadEntryGeneration == navigation, selectedEntryID == nil { selectLanded(entry.id) }
         case .batchCopy:
             if let jobID = landing.batchJobID { landBatchJobEntry(entry.id, jobID: jobID) }
+        case .keep:
+            break
         }
     }
 
     private func reportLandingFailure(_ landing: RunLanding, _ error: any Error) {
-        ParolaLog.error(.library, "transcript could not be saved to the library", [.error: .error(error)])
-        if landing.policy.selection == .batchCopy, let source = landing.audioSource {
+        let message: LogMessage = landing.kind == .rerun
+            ? "re-transcription could not be saved" : "transcript could not be saved to the library"
+        ParolaLog.error(.library, message, [.error: .error(error)])
+        if landing.kind == .rerun {
+            nonFatalWarning = String(
+                localized: "The transcript ran again, but Parola couldn't save the result. \(error.localizedDescription)"
+            )
+        } else if landing.policy.selection == .batchCopy, let source = landing.audioSource {
             nonFatalWarning = "\(source.lastPathComponent) was transcribed, but Parola couldn't save it to your library. \(error.localizedDescription)"
         } else {
             nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"

@@ -78,12 +78,19 @@ struct LandingPolicyTests {
         Set(try FileManager.default.contentsOfDirectory(atPath: rig.folder.path)).subtracting(["clip.wav"])
     }
 
-    private func landing(_ kind: RunLanding.Kind, in rig: Rig) -> RunLanding {
+    private func landing(_ kind: RunLanding.Kind, in rig: Rig) async throws -> RunLanding {
         switch kind {
         case .batchJob:
             let job = BatchJob(url: rig.source, status: .transcribing)
             rig.model.batchJobs = [job]
             return .batchJob(job, transcript: Self.transcript())
+        case .rerun:
+            let earlier = try await rig.model.library.add(transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the first run")],
+                language: "en",
+                modelName: "stub"
+            ), audioSource: nil)
+            return .rerun(of: earlier.id, transcript: Self.transcript(), clearingNotes: [:])
         default:
             return RunLanding(kind: kind, transcript: Self.transcript(), audioSource: rig.source)
         }
@@ -128,6 +135,10 @@ struct LandingPolicyTests {
                 selection: .batchCopy, sound: false, card: true, summary: .never,
                 export: .batchPresets, autoSend: false, recents: false
             ),
+            .rerun: LandingPolicy(
+                selection: .keep, sound: true, card: true, summary: .never,
+                export: .none, autoSend: false, recents: false
+            ),
         ]
         #expect(Set(expected.keys) == Set(RunLanding.Kind.allCases))
         for kind in RunLanding.Kind.allCases {
@@ -141,7 +152,7 @@ struct LandingPolicyTests {
         defer { try? FileManager.default.removeItem(at: rig.folder) }
         let policy = kind.policy
 
-        let entry = try await rig.model.land(landing(kind, in: rig)).value
+        let entry = try await rig.model.land(try await landing(kind, in: rig)).value
         await rig.model.awaitLandingSteps()
         await rig.model.awaitCardMetadataQueue()
 
@@ -199,12 +210,42 @@ extension LandingPolicyTests {
         defer { try? FileManager.default.removeItem(at: rig.folder) }
         let refreshes = rig.model.libraryRefreshes
 
-        let entry = try await rig.model.land(landing(.batchJob, in: rig)).value
+        let entry = try await rig.model.land(try await landing(.batchJob, in: rig)).value
 
         #expect(rig.model.batchJobs.first?.entryID == entry.id)
         #expect(rig.model.batchJobs.first?.transcript == nil)
         #expect(rig.model.libraryEntries.isEmpty)
         #expect(rig.model.libraryRefreshes == refreshes)
         #expect(rig.model.batchLibraryAdds.count == 1)
+    }
+}
+
+extension LandingPolicyTests {
+    @Test("a re-run keeps the open entry, shows the new text and clears what named the old segments")
+    func rerunKeepsTheOpenEntry() async throws {
+        let rig = try makeRig("rerun-open")
+        defer { try? FileManager.default.removeItem(at: rig.folder) }
+        let earlier = try await rig.model.library.add(transcript: Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the first run")],
+            language: "en",
+            modelName: "stub"
+        ), audioSource: nil)
+        try await rig.model.library.setFavoriteSegments([0], for: earlier.id)
+        try await rig.model.library.setSegmentNote("keep an eye", segmentID: 0, for: earlier.id)
+        try await rig.model.openEntry(earlier.id)
+        let refreshes = rig.model.libraryRefreshes
+
+        let entry = try await rig.model.land(.rerun(
+            of: earlier.id, transcript: Self.transcript(), clearingNotes: ["0": "keep an eye"]
+        )).value
+
+        #expect(entry.id == earlier.id)
+        #expect(rig.model.selectedEntryID == earlier.id)
+        #expect(rig.model.transcript?.segments.first?.text == Self.text)
+        #expect(rig.model.libraryRefreshes == refreshes + 1)
+        let stored = try await rig.model.library.load(earlier.id)
+        #expect(stored.document.transcript.segments.first?.text == Self.text)
+        #expect(stored.entry.manifest.favoriteSegments.isEmpty)
+        #expect(stored.entry.segmentNotes.isEmpty)
     }
 }

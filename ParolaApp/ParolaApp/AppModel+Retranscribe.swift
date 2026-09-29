@@ -47,6 +47,7 @@ extension AppModel {
         options: TranscriptionOptions,
         runToken: Int
     ) async {
+        var landing: Task<LibraryEntry, any Error>?
         do {
             let loaded = try await library.load(entryID)
             guard let audioURL = loaded.document.audioURL else {
@@ -72,11 +73,16 @@ extension AppModel {
             // Post-processing is a suspension a cancel can land in, and past this line the old
             // transcript is gone: check rather than overwrite a take the user stopped.
             try Task.checkCancellation()
-            await replaceEntry(entryID, with: processed, clearingNotes: loaded.entry.segmentNotes)
+            landing = land(.rerun(of: entryID, transcript: processed, clearingNotes: loaded.entry.segmentNotes))
         } catch {
             // applyTranscriptionError parks a cancelled run at .idle and a failed one at .failed;
             // either way the phase stops reading "transcribing" once this task has let go.
             if fileRunGeneration == runToken { applyTranscriptionError(error) }
+        }
+        if let landing {
+            let saved = (try? await landing.value) != nil
+            // A save that failed leaves nothing else to move the phase off the run.
+            if fileRunGeneration == runToken { phase = saved ? .ready : .idle }
         }
         retranscribeRequest = nil
         guard fileRunGeneration == runToken else { return }
@@ -85,46 +91,5 @@ extension AppModel {
         fileTranscribeStage = nil
         fileTranscribeTask = nil
         retireFileRun(runToken)
-    }
-
-    /// Favorites, notes, the speaker map and the card metadata all name segments and labels this run replaced.
-    private func replaceEntry(
-        _ entryID: LibraryEntry.ID,
-        with transcript: Transcript,
-        clearingNotes notes: [String: String]
-    ) async {
-        guard !Task.isCancelled else { return }
-        aiJobs.cancelAll(for: entryID)
-        do {
-            try await library.updateTranscript(transcript, for: entryID)
-            try await library.setTranscriptionDetails(
-                modelName: transcript.modelName, language: transcript.language, for: entryID
-            )
-            try await library.setFavoriteSegments([], for: entryID)
-            for segmentID in notes.keys.compactMap(Int.init) {
-                try await library.setSegmentNote(nil, segmentID: segmentID, for: entryID)
-            }
-            try await library.mutateSpeakerAssignments(for: entryID) { $0 = [:] }
-            try await library.setCardMetadata(aiTitle: nil, shortSummary: nil, for: entryID)
-        } catch {
-            ParolaLog.error(.library, "re-transcription could not be saved", [.error: .error(error)])
-            nonFatalWarning = String(
-                localized: "The transcript ran again, but Parola couldn't save the result. \(error.localizedDescription)"
-            )
-            // The task is already letting go, so nothing else will move the phase off the run.
-            phase = .idle
-            return
-        }
-        let landing = Self.landingSignposter.beginInterval("install")
-        refreshLibrary()
-        if selectedEntryID == entryID {
-            installStoredTranscript(transcript)
-            adoptLoadedMediaDuration()
-        }
-        phase = .ready
-        Self.landingSignposter.endInterval("install", landing)
-        playCompletionSound()
-        // The card-metadata hook lives in land(_:), which a re-run never passes through.
-        enqueueCardMetadata(for: entryID, transcript: transcript)
     }
 }
