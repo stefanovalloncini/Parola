@@ -66,6 +66,24 @@ struct SubtitleBurnerTests {
         #expect(track.cueIndex(at: 6) == nil)
     }
 
+    @Test("a long cue stays on screen after a shorter one inside it ends")
+    func nestedCues() {
+        let track = captionTrack([
+            BurnCue(start: 0, end: 10, text: "outer"),
+            BurnCue(start: 2, end: 3, text: "inner"),
+            BurnCue(start: 4, end: 5, text: "second inner"),
+            BurnCue(start: 12, end: 13, text: "after"),
+        ])
+        #expect(track.cueIndex(at: 1) == 0)
+        #expect(track.cueIndex(at: 2.5) == 1)
+        #expect(track.cueIndex(at: 3.5) == 0)
+        #expect(track.cueIndex(at: 4.5) == 2)
+        #expect(track.cueIndex(at: 9.9) == 0)
+        #expect(track.cueIndex(at: 10) == nil)
+        #expect(track.cueIndex(at: 11) == nil)
+        #expect(track.cueIndex(at: 12.5) == 3)
+    }
+
     @Test("only the last two cues drawn stay in memory")
     func cacheHoldsTwo() {
         let track = captionTrack((0..<10).map { BurnCue(start: Double($0), end: Double($0) + 0.9, text: "cue \($0)") })

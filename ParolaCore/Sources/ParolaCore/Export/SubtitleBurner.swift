@@ -271,6 +271,8 @@ final class BurnCaptionTrack: Sendable {
 
     private let cues: [BurnCue]
     private let starts: [Double]
+    /// The latest end of any cue up to each index, which bounds the walk back past an inner cue.
+    private let reach: [Double]
     private let metrics: SubtitleBurner.CaptionMetrics
     private let renderSize: CGSize
     private let language: String
@@ -279,6 +281,11 @@ final class BurnCaptionTrack: Sendable {
     init(cues: [BurnCue], language: String, metrics: SubtitleBurner.CaptionMetrics, renderSize: CGSize) {
         self.cues = cues
         starts = cues.map(\.start)
+        var latest = -Double.infinity
+        reach = cues.map { cue in
+            latest = max(latest, cue.end)
+            return latest
+        }
         self.metrics = metrics
         self.renderSize = renderSize
         self.language = language
@@ -298,7 +305,7 @@ final class BurnCaptionTrack: Sendable {
 
     var cachedCueCount: Int { recent.withLock { $0.entries.count } }
 
-    /// The cue that started last at or before `seconds`, if it hasn't ended.
+    /// The latest-starting cue still on screen at `seconds`.
     func cueIndex(at seconds: Double) -> Int? {
         var low = 0
         var high = starts.count
@@ -306,9 +313,13 @@ final class BurnCaptionTrack: Sendable {
             let mid = (low + high) / 2
             if starts[mid] <= seconds { low = mid + 1 } else { high = mid }
         }
-        let index = low - 1
-        guard index >= 0, seconds < cues[index].end else { return nil }
-        return index
+        var index = low - 1
+        // A short cue inside a longer one ends first; the longer one is still on screen after it.
+        while index >= 0, reach[index] > seconds {
+            if seconds < cues[index].end { return index }
+            index -= 1
+        }
+        return nil
     }
 
     private func rasterize(_ cue: BurnCue) -> CIImage? {
