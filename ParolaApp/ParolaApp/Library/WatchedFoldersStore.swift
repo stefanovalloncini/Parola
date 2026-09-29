@@ -257,7 +257,8 @@ final class WatchedFoldersStore {
                 if self.carries[id] == carry { self.carries[id] = nil }
             }
             guard self.starts[id] == start, let current = self.folders.first(where: { $0.id == id }) else {
-                if let carried, self.folders.contains(where: { $0.id == id }) {
+                let sameFolder = self.folders.first { $0.id == id }?.displayPath == folder.displayPath
+                if let carried, sameFolder, self.watchers[id] == nil {
                     baselines.write(carried, for: id)
                 }
                 return

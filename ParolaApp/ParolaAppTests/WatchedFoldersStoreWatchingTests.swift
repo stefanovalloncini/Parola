@@ -358,6 +358,36 @@ struct WatchedFoldersStoreWatchingTests {
         #expect(saved.entries.first?.emittedAt != nil)
         await store.stopWatching()
     }
+
+    @Test("a start that gives way to a reload pointing the folder elsewhere doesn't save the old folder's baseline")
+    func bailingStartKeepsOutOfAMovedFolder() async throws {
+        let rig = try makeRig("bail")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        try writeSettled(rig.folder.appendingPathComponent("old.m4a"))
+        let elsewhere = rig.root.appendingPathComponent("Elsewhere", isDirectory: true)
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+
+        let store = WatchedFoldersStore(
+            defaults: rig.defaults,
+            baselineDirectory: rig.baselineDirectory,
+            watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50)),
+            baselineWriteDelay: .seconds(60)
+        ) { _ in }
+        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        let before = store.watcher(for: rig.folderID)
+
+        store.adopt(rig.folder, for: rig.folderID)
+        let bookmark = try elsewhere.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        let moved = WatchedFolder(id: rig.folderID, bookmark: bookmark, displayPath: elsewhere.path)
+        rig.defaults.set(try JSONEncoder().encode([moved]), forKey: "watchedFolders")
+        store.reloadFromDefaults()
+
+        #expect(await waitUntil { store.watcher(for: rig.folderID).map { $0 !== before } ?? false })
+        try await Task.sleep(for: .milliseconds(100))
+        await WatchedFolderBaselines(directory: rig.baselineDirectory).settle()
+        #expect(!FileManager.default.fileExists(atPath: rig.baselineURL.path))
+        await store.stopWatching()
+    }
 }
 
 private struct DiskImage {
