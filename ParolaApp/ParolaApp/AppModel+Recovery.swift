@@ -189,10 +189,17 @@ extension AppModel {
             recordingRecoveryStartedAt = nil
         }
         guard let id = recoveryFileIDs.removeValue(forKey: generation) else { return }
-        let url = recoveryFileURL(for: id)
+        deleteCheckpointFiles(id)
+    }
+
+    /// Deletes a checkpoint under its own name and wherever it was read from, so a move that failed can't keep it alive.
+    private func deleteCheckpointFiles(_ id: UUID) {
+        let files = [recoveryFileURL(for: id), recoveryLoadedFiles.removeValue(forKey: id)].compactMap { $0 }
         // Synchronous on the same queue the writes use: a checkpoint already queued must land
         // before this delete, or it resurrects the prompt after the recording stopped.
-        recoveryFileQueue.sync { try? FileManager.default.removeItem(at: url) }
+        recoveryFileQueue.sync {
+            for file in files { try? FileManager.default.removeItem(at: file) }
+        }
     }
 
     func endActiveRecovery() {
@@ -348,6 +355,7 @@ extension AppModel {
     /// Claims a checkpoint for this instance, under its own name: the legacy recovery.json moves into the directory.
     private func settleCheckpointFile(_ checkpoint: RecoveryCheckpoint, at file: URL) {
         let target = recoveryFileURL(for: checkpoint.id)
+        if file.standardizedFileURL.path != target.standardizedFileURL.path { recoveryLoadedFiles[checkpoint.id] = file }
         do {
             try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
             try JSONEncoder().encode(checkpoint).write(to: target, options: .atomic)
@@ -367,8 +375,7 @@ extension AppModel {
 
     /// The offer is settled: its own file goes, whatever else is on disk.
     func removeRecoveryFile(of checkpoint: RecoveryCheckpoint) {
-        let url = recoveryFileURL(for: checkpoint.id)
-        recoveryFileQueue.sync { try? FileManager.default.removeItem(at: url) }
+        deleteCheckpointFiles(checkpoint.id)
     }
 
     private nonisolated static func isRestorable(_ checkpoint: RecoveryCheckpoint) -> Bool {

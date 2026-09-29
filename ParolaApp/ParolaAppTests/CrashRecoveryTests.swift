@@ -462,6 +462,25 @@ extension TranscriberMockSuites {
             #expect(model.recoveryCheckpointFiles.isEmpty)
         }
 
+        @Test("a legacy recovery.json that couldn't be moved still goes once its offer is answered")
+        func unmovedLegacyCheckpointStillGoes() async throws {
+            let lib = makeTempLibraryURL("recovery-unmovable")
+            try writeCheckpoint(
+                RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", segments: Self.makeSegments()),
+                libraryURL: lib
+            )
+            // A plain file where the folder should be: the move into it fails.
+            try Data().write(to: lib.appendingPathComponent("recovery"))
+            let model = makeModel(libraryURL: lib)
+            #expect(model.pendingRecovery != nil)
+            #expect(FileManager.default.fileExists(atPath: model.legacyRecoveryFileURL.path))
+
+            model.declinePendingRecovery()
+
+            #expect(await waitUntil { !FileManager.default.fileExists(atPath: model.legacyRecoveryFileURL.path) })
+            #expect(await model.library.list().count == 1)
+        }
+
         @Test("with several checkpoints on disk, the newest is offered and older takes go to the library quietly")
         func newestCheckpointIsOffered() async throws {
             let lib = makeTempLibraryURL("recovery-several")

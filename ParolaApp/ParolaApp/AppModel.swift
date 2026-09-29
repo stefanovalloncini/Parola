@@ -436,6 +436,8 @@ final class AppModel {
     @ObservationIgnored var recoveryReferencedFiles: Set<String> = []
     /// This instance's lock on the library; a checkpoint it writes carries its id.
     @ObservationIgnored var recoveryOwner: RecoveryOwner?
+    /// Where a claimed checkpoint was read from, when that isn't its own name: the legacy recovery.json, say.
+    @ObservationIgnored var recoveryLoadedFiles: [UUID: URL] = [:]
     @ObservationIgnored var inflightSweep: Task<Void, Never>?
     /// Working files whose take is on its way to the library.
     @ObservationIgnored var takeFilesBeingSaved: [URL: Int] = [:]
