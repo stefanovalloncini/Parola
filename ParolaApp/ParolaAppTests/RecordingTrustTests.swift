@@ -49,6 +49,31 @@ private actor AudioOnlySession: StreamingTranscriber {
     func recordingAudioURL() async -> URL? { audio }
 }
 
+/// Holds a live take's last step at its cut-short check until the test lets it go.
+private actor PausingSession: StreamingTranscriber {
+    private var waiting: CheckedContinuation<Void, Never>?
+    private(set) var reached = false
+    func start(
+        options: TranscriptionOptions,
+        speakerLabeler: (any StreamingSpeakerLabeler)?,
+        downloadProgress: (@Sendable (Double) -> Void)?
+    ) async throws -> AsyncStream<StreamingEvent> {
+        AsyncStream { $0.finish() }
+    }
+    func stop() async {}
+    func cancel() async {}
+    func currentModel() async -> String? { nil }
+    func audioWasCutShort() async -> Bool {
+        reached = true
+        await withCheckedContinuation { waiting = $0 }
+        return false
+    }
+    func release() {
+        waiting?.resume()
+        waiting = nil
+    }
+}
+
 /// Whether a quit asked, and the reply it handed back once the take was wound down.
 @MainActor
 private final class QuitReply {
@@ -453,6 +478,32 @@ extension TranscriberMockSuites {
                 await settle()
                 #expect(await model.library.list().isEmpty)
                 model.cancelCurrentWork()
+            }
+        }
+
+        @Test("a live take that lands after a cancel is saved without touching the screen the cancel left", .timeLimit(.minutes(1)))
+        func lateLandingLeavesTheScreen() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel()
+                await startStreamingTake(model)
+                await waitUntil { model.recordingStartedAt != nil }
+                let take = try #require(model.activeTake)
+                let session = PausingSession()
+                let words = Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "late words")], language: "en", modelName: "mock"
+                )
+
+                let landing = Task { await model.handleStreamingEvent(.finished(words), take: take, session: session) }
+                await waitUntil { await session.reached }
+                model.cancelCurrentWork()
+                await session.release()
+                await landing.value
+
+                #expect(model.phase == .idle, "the screen stays as the cancel left it")
+                #expect(model.transcript?.text != "late words")
+                let saved = try #require(await entries(model, count: 1).first)
+                #expect(try await model.library.load(saved.id).document.transcript.text == "late words")
             }
         }
 

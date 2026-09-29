@@ -3169,6 +3169,7 @@ final class AppModel {
                 // A take that already ended in the pane has nobody left to tell.
                 guard takeIsCurrent(take) else { return }
                 await mediaSession.exitRecording()
+                guard takeIsCurrent(take) else { return }
                 stopRecordingWatch()
                 clearTakeReadouts()
                 activeTake = nil
@@ -3207,6 +3208,7 @@ final class AppModel {
         stopRecordingWatch()
         await source.cancel()
         await mediaSession.exitRecording()
+        guard takeIsCurrent(take) else { return false }
         if case .recording = phase { phase = .idle }
         activeTake = nil
         recordingStartInFlight = false
@@ -3471,6 +3473,8 @@ final class AppModel {
             recoveryHeldByTake.remove(recovery)
             endRecovery(recovery)
         }
+        // A take started while this one was being kept owns the screen now; this one is in the library.
+        guard activeTake == nil else { return }
         liveSegments = []
         livePartialText = ""
         phase = .failed(message: message)
@@ -3484,17 +3488,40 @@ final class AppModel {
     /// A live take's final transcript lands on screen and in the library; one with nothing in it says so.
     private func landLiveTake(_ transcript: Transcript, take: TakeContext?, session: (any StreamingTranscriber)?) async {
         let recovery = activeRecoveryGeneration
+        // Held until the save ends it, so a cancel's cleanup during the awaits below leaves it on disk.
+        if let recovery { recoveryHeldByTake.insert(recovery) }
         let arming = takeArming
         stopRecordingWatch()
         let takeCategory = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let cutShort = await session?.audioWasCutShort() ?? false
         let processed = await postProcessDetached(transcript)
+        let hasContent = !processed.segments.isEmpty || processed.sourceURL != nil
+        // Cancelled, or followed by another take, while those ran: it goes to the library without touching the screen.
+        if let take, !takeIsCurrent(take) {
+            if hasContent {
+                let title = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
+                saveTake(
+                    processed,
+                    audio: processed.sourceURL,
+                    title: cutShort ? Self.takeTitle(title, suffix: .interrupted) : title,
+                    source: takeSource,
+                    category: takeCategory,
+                    activate: false,
+                    recovery: recovery
+                )
+            } else if let recovery {
+                recoveryHeldByTake.remove(recovery)
+                endRecovery(recovery)
+            }
+            return
+        }
         livePartialText = ""
         liveSegments = []
         // A take stopped before capture came up (say, during the first model download) has nothing to keep, and says so.
-        guard !processed.segments.isEmpty || processed.sourceURL != nil else {
+        guard hasContent else {
             let message = Self.nothingRecordedMessage(for: arming)
+            if let recovery { recoveryHeldByTake.remove(recovery) }
             endLiveTake(take)
             phase = .failed(message: message)
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
