@@ -134,7 +134,7 @@ extension TranscriberMockSuites {
             #expect(saved.first?.title.hasSuffix("(interrupted)") == true)
         }
 
-        @Test("a take stopped before capture came up saves nothing and leaves recording quietly")
+        @Test("a take stopped before capture came up saves nothing and says so")
         func emptyTakeWithoutAudioIsNotSaved() async {
             let model = makeModel()
             model.phase = .recording(source: .microphone)
@@ -143,7 +143,7 @@ extension TranscriberMockSuites {
                 segments: [], language: "en", modelName: "openai_whisper-tiny"
             )))
 
-            #expect(model.phase == .idle)
+            #expect(model.phase == .failed(message: AppModel.nothingRecordedMessage()))
             #expect(model.transcript == nil)
             try? await Task.sleep(for: .milliseconds(300))
             #expect(await model.library.list().isEmpty)

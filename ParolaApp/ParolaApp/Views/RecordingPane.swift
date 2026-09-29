@@ -6,7 +6,6 @@ struct RecordingPane: View {
     @Environment(AppModel.self) private var model
 
     private var isStreaming: Bool { model.liveTakeIsStreaming }
-    private var stateLabel: String { String(localized: "Recording") }
     private var stopTitle: String {
         isStreaming ? String(localized: "Finish") : String(localized: "Stop")
     }
@@ -15,15 +14,16 @@ struct RecordingPane: View {
     @ViewBuilder
     private var card: some View {
         RecordingCard(
-            stateLabel: stateLabel,
             source: source,
             startedAt: model.recordingStartedAt,
+            arming: model.takeArming,
             isVoiceActive: model.liveVoiceActive,
             stopTitle: stopTitle,
             levelMeter: model.recordingLevelMeter,
             levelTrace: model.recordingLevelTrace,
             showsWaveform: showsWaveform,
-            onStop: { model.stopRecordingAndTranscribe() }
+            onStop: { model.stopRecordingAndTranscribe() },
+            onCancel: { model.cancelRecordingBeforeCapture() }
         )
     }
 
@@ -77,16 +77,17 @@ struct RecordingPane: View {
 }
 
 struct RecordingCard: View {
-    let stateLabel: String
     let source: AppModel.RecordSource
     /// Nil until the take captures its first audio.
     let startedAt: Date?
+    let arming: AppModel.TakeArming?
     let isVoiceActive: Bool
     let stopTitle: String
     var levelMeter: LevelMeter? = nil
     var levelTrace: LevelTrace? = nil
     var showsWaveform: Bool = false
     let onStop: () -> Void
+    let onCancel: () -> Void
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 64
 
     private static let cardRadius: CGFloat = 16
@@ -104,14 +105,18 @@ struct RecordingCard: View {
             }
 
             VStack(spacing: DS.Spacing.small) {
-                clock(from: startedAt)
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(isVoiceActive ? DS.Color.accent : DS.Color.secondaryText.opacity(0.5))
-                        .frame(width: 6, height: 6)
-                    Text(stateLabel)
-                        .font(DS.Font.heading)
-                        .foregroundStyle(DS.Color.secondaryText)
+                if let startedAt {
+                    clock(from: startedAt)
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(isVoiceActive ? DS.Color.accent : DS.Color.secondaryText.opacity(0.5))
+                            .frame(width: 6, height: 6)
+                        Text("Recording")
+                            .font(DS.Font.heading)
+                            .foregroundStyle(DS.Color.secondaryText)
+                    }
+                } else {
+                    armingReadout
                 }
                 if showsWaveform {
                     WaveformHistory(
@@ -132,18 +137,25 @@ struct RecordingCard: View {
                     .foregroundStyle(DS.Color.secondaryText.opacity(0.7))
             }
 
-            Button(action: onStop) {
-                Text(stopTitle)
-                    .font(DS.Font.bodyStrong)
-                    .foregroundStyle(.white)
-                    .frame(width: 120, height: 36)
-                    .background(
-                        Capsule().fill(DS.Color.danger.opacity(0.9))
-                    )
+            if startedAt == nil {
+                Button("Cancel", action: onCancel)
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary))
+                    .keyboardShortcut(.cancelAction)
+                    .axLeaf("Recording.Button.Cancel")
+            } else {
+                Button(action: onStop) {
+                    Text(stopTitle)
+                        .font(DS.Font.bodyStrong)
+                        .foregroundStyle(.white)
+                        .frame(width: 120, height: 36)
+                        .background(
+                            Capsule().fill(DS.Color.danger.opacity(0.9))
+                        )
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.return)
+                .axLeaf("Recording.Button.Stop")
             }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.return)
-            .axLeaf("Recording.Button.Stop")
         }
         .padding(DS.Spacing.xlarge)
         .frame(width: 360)
@@ -157,21 +169,40 @@ struct RecordingCard: View {
         )
     }
 
-    @ViewBuilder
-    private func clock(from startedAt: Date?) -> some View {
-        if let startedAt {
-            TimelineView(.periodic(from: startedAt, by: 1)) { context in
-                Text(verbatim: AppFormat.elapsed(context.date.timeIntervalSince(startedAt)))
-                    .font(DS.Font.timer)
-                    .foregroundStyle(DS.Color.primaryText)
-            }
-            .frame(height: Self.readoutHeight)
-        } else {
-            Text(verbatim: AppFormat.elapsed(0))
+    private func clock(from startedAt: Date) -> some View {
+        TimelineView(.periodic(from: startedAt, by: 1)) { context in
+            Text(verbatim: AppFormat.elapsed(context.date.timeIntervalSince(startedAt)))
                 .font(DS.Font.timer)
                 .foregroundStyle(DS.Color.primaryText)
-                .frame(height: Self.readoutHeight)
         }
+        .frame(height: Self.readoutHeight)
+    }
+
+    /// Where the clock and "Recording" go once audio arrives: until then the take hasn't started, and says why.
+    private var armingReadout: some View {
+        VStack(spacing: DS.Spacing.small) {
+            Group {
+                if case .preparingModel(_, let download?) = arming {
+                    Text(AppFormat.percent(download))
+                        .font(DS.Font.timer)
+                        .foregroundStyle(DS.Color.primaryText)
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .frame(height: Self.readoutHeight)
+            armingLabel
+                .font(DS.Font.heading)
+                .foregroundStyle(DS.Color.secondaryText)
+                .multilineTextAlignment(.center)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var armingLabel: Text {
+        guard case .preparingModel(let name, _) = arming else { return Text("Starting…") }
+        return Text("Preparing \(ModelPickerView.shortLabel(for: AppModel.modelLabel(name)))…")
     }
 }
 

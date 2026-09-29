@@ -123,6 +123,8 @@ extension AppModel {
     func stopRecordingFromIntent() async throws -> String {
         guard case .recording = phase else { throw IntentActionError.notRecording }
         stopRecordingAndTranscribe()
+        // A take stopped before it captured anything ends on the spot, with the reason as its phase.
+        if case .failed(let message) = phase { throw IntentActionError.failed(message) }
         guard streamingConsumer != nil || fileTranscribeTask != nil || stopHeldForStartup else {
             throw IntentActionError.notRecording
         }

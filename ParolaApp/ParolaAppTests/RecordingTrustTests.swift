@@ -65,6 +65,16 @@ extension TranscriberMockSuites {
             await waitUntil { model.phase == .transcribing(file: wav) }
         }
 
+        private func startStreamingTake(_ model: AppModel, gate: MockTranscriberGate, download: Double) async {
+            MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                partials: ["hello"], downloadFractions: [download], delayMs: 5_000, gate: gate
+            ))
+            model.useStreaming = true
+            model.selectedModel = "openai_whisper-tiny"
+            model.startRecording(source: .microphone)
+            await waitUntil { model.phase == .recording(source: .microphone) }
+        }
+
         // MARK: - Stopping a take's transcription
 
         @Test("stopping a take's transcription saves the take and reports nothing")
@@ -121,6 +131,69 @@ extension TranscriberMockSuites {
             let message = AppModel.transcriptionFailureMessage(for: CancellationError())
             #expect(!message.contains("CancellationError"))
             #expect(message == "Transcription stopped.")
+        }
+
+        // MARK: - Arming
+
+        @Test("a live take arms until its first event, then starts its clock", .timeLimit(.minutes(1)))
+        func armingThenRecording() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let gate = MockTranscriberGate()
+                let model = makeModel()
+                await startStreamingTake(model, gate: gate, download: 0.42)
+
+                await waitUntil {
+                    model.takeArming == .preparingModel(name: "openai_whisper-tiny", download: 0.42)
+                }
+                #expect(model.recordingStartedAt == nil)
+
+                await gate.open()
+                await waitUntil { model.recordingStartedAt != nil }
+                #expect(model.takeArming == nil)
+
+                model.cancelCurrentWork()
+                await waitUntil { model.recordingLevelMeter == nil }
+                #expect(model.recordingStartedAt == nil)
+            }
+        }
+
+        @Test("finishing a take while its model loads ends it at once and says nothing was recorded", .timeLimit(.minutes(1)))
+        func finishWhileArmingSaysSo() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel()
+                await startStreamingTake(model, gate: MockTranscriberGate(), download: 0.5)
+                await waitUntil { model.takeArming != nil }
+
+                model.stopRecordingAndTranscribe()
+
+                let expected = AppModel.nothingRecordedMessage(for: .preparingModel(name: "openai_whisper-tiny", download: nil))
+                #expect(expected == "Nothing was recorded — the model was still loading.")
+                #expect(model.phase == .failed(message: expected))
+                await waitUntil { !model.recordingActive }
+                await settle()
+                #expect(model.phase == .failed(message: expected), "the cancelled load must not replace the message")
+                #expect(await model.library.list().isEmpty)
+            }
+        }
+
+        @Test("Cancel while a take arms goes home without a word", .timeLimit(.minutes(1)))
+        func cancelWhileArmingIsQuiet() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel()
+                await startStreamingTake(model, gate: MockTranscriberGate(), download: 0.5)
+                await waitUntil { model.takeArming != nil }
+
+                model.cancelRecordingBeforeCapture()
+
+                #expect(model.phase == .idle)
+                await waitUntil { !model.recordingActive }
+                await settle()
+                #expect(model.phase == .idle)
+                #expect(model.takeArming == nil)
+            }
         }
 
         // MARK: - The take's clock

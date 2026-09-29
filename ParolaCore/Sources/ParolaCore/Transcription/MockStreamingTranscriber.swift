@@ -5,7 +5,14 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
     private let sleeper: @Sendable (Int) async -> Void
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
     private var emitTask: Task<Void, Never>?
+    private var isStarting = false
+    private var endedWhileStarting: EndedWhileStarting?
     public nonisolated let levelMeter = LevelMeter()
+
+    private enum EndedWhileStarting {
+        case stop
+        case cancel
+    }
 
     public init<C: Clock>(response: MockTranscriberResponse, clock: C) where C.Duration == Duration {
         self.response = response
@@ -18,6 +25,18 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
         downloadProgress: (@Sendable (Double) -> Void)?
     ) async throws -> AsyncStream<StreamingEvent> {
         if let fraction = response.downloadFractions.first { downloadProgress?(fraction) }
+        if let gate = response.gate {
+            // The gate stands in for the model load: a stop or a cancel landing meanwhile ends the take
+            // before capture, the way the real session's does.
+            isStarting = true
+            defer { isStarting = false }
+            try await gate.wait()
+            switch endedWhileStarting {
+            case .cancel?: throw CancellationError()
+            case .stop?: return Self.endedBeforeCapture(response)
+            case nil: break
+            }
+        }
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
         continuation = cont
         let response = self.response
@@ -45,7 +64,19 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
         return stream
     }
 
+    private static func endedBeforeCapture(_ response: MockTranscriberResponse) -> AsyncStream<StreamingEvent> {
+        let (stream, continuation) = AsyncStream<StreamingEvent>.makeStream()
+        continuation.yield(.finished(Transcript(segments: [], language: response.language, modelName: response.modelName)))
+        continuation.finish()
+        return stream
+    }
+
     public func stop() async {
+        if isStarting {
+            endedWhileStarting = .stop
+            await response.gate?.open()
+            return
+        }
         await emitTask?.value
         emitTask = nil
         continuation?.yield(.finished(response.materialise(sourceURL: nil)))
@@ -54,6 +85,11 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
     }
 
     public func cancel() async {
+        if isStarting {
+            endedWhileStarting = .cancel
+            await response.gate?.open()
+            return
+        }
         emitTask?.cancel()
         emitTask = nil
         continuation?.finish()

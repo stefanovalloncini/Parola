@@ -8875,6 +8875,28 @@
         }
       }
     },
+    "Nothing was recorded — the model was still loading.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è stato registrato nulla: il modello era ancora in caricamento."
+          }
+        }
+      }
+    },
+    "Nothing was recorded.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è stato registrato nulla."
+          }
+        }
+      }
+    },
     "Nothing's Been Deleted": {
       "extractionState": "manual",
       "localizations": {
