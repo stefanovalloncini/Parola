@@ -43,6 +43,12 @@ struct WatchedArrival: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// A watched file's finished run whose save failed; `install` is set when the window still shows it unsaved.
+struct UnsavedLanding {
+    let landing: RunLanding
+    let install: Int?
+}
+
 /// What the toast says about a watched-folder file out of sight: running, landed or failed.
 struct ArrivalNotice: Equatable, Identifiable {
     enum State: Equatable {
@@ -188,6 +194,10 @@ extension AppModel {
             pumpWatchedLane()
             return
         }
+        if let unsaved = unsavedLandings.removeValue(forKey: next.id) {
+            saveAgain(next, unsaved)
+            return
+        }
         if !next.inBackground, arrivalMayTakeWindow {
             beginFileTranscription(
                 fileURL: next.url, translateOverride: nil, sourceDigest: next.sourceDigest, arrival: next
@@ -318,37 +328,60 @@ extension AppModel {
     }
 
     /// The run in the window reached its landing. One the window already let go is the lane's to run.
-    func visibleArrivalLanded(_ arrival: WatchedArrival, saving: Task<LibraryEntry, any Error>) {
+    func visibleArrivalLanded(_ arrival: WatchedArrival, landing: RunLanding, saving: Task<LibraryEntry, any Error>) {
         guard visibleArrivalID == arrival.id else { return }
         visibleArrivalID = nil
-        holdUntilSaved(arrival, saving, ringsWhenDry: false)
+        holdUntilSaved(arrival, landing, saving, ringsWhenDry: false, install: derivedArtifactsGeneration)
     }
 
     /// The window's run of an arrival finished after the user moved on: it lands like one out of sight.
     func landVisibleArrivalOutOfSight(_ arrival: WatchedArrival, _ transcript: Transcript) {
         guard visibleArrivalID == arrival.id else { return }
         visibleArrivalID = nil
-        let saving = land(RunLanding(
+        let landing = RunLanding(
             kind: .backgroundArrival, transcript: transcript, audioSource: arrival.url,
             sourceDigest: arrival.sourceDigest
-        ))
-        holdUntilSaved(arrival, saving, ringsWhenDry: true)
+        )
+        holdUntilSaved(arrival, landing, land(landing), ringsWhenDry: true)
     }
 
     private func landBackgroundArrival(_ arrival: WatchedArrival, _ transcript: Transcript) {
         watchedLaneTask = nil
         backgroundArrivalID = nil
         runningArrivalNotice = nil
-        let saving = land(RunLanding(
+        let landing = RunLanding(
             kind: .backgroundArrival, transcript: transcript, audioSource: arrival.url,
             sourceDigest: arrival.sourceDigest
-        ))
-        holdUntilSaved(arrival, saving, ringsWhenDry: true)
+        )
+        holdUntilSaved(arrival, landing, land(landing), ringsWhenDry: true)
+        pumpWatchedLane()
+    }
+
+    /// Retry after a failed save lands the transcript it kept. A pane still showing it unsaved becomes the entry,
+    /// edits included; anything else lands out of sight.
+    private func saveAgain(_ arrival: WatchedArrival, _ unsaved: UnsavedLanding) {
+        var landing = unsaved.landing
+        var install: Int?
+        if let shown = unsaved.install, shown == derivedArtifactsGeneration, selectedEntryID == nil, let transcript {
+            landing = RunLanding(
+                kind: .arrival, transcript: transcript, audioSource: landing.audioSource, sourceDigest: landing.sourceDigest
+            )
+            install = shown
+        } else {
+            landing = RunLanding(
+                kind: .backgroundArrival, transcript: landing.transcript, audioSource: landing.audioSource,
+                sourceDigest: landing.sourceDigest
+            )
+        }
+        holdUntilSaved(arrival, landing, land(landing), ringsWhenDry: install == nil, install: install)
         pumpWatchedLane()
     }
 
     /// The file stays in the line until its entry is saved: a quit during the copy runs it again, a failed save hands it back.
-    private func holdUntilSaved(_ arrival: WatchedArrival, _ saving: Task<LibraryEntry, any Error>, ringsWhenDry: Bool) {
+    private func holdUntilSaved(
+        _ arrival: WatchedArrival, _ landing: RunLanding, _ saving: Task<LibraryEntry, any Error>,
+        ringsWhenDry: Bool, install: Int? = nil
+    ) {
         guard let index = watchedArrivals.firstIndex(where: { $0.id == arrival.id }) else { return }
         watchedArrivals[index].isLanding = true
         Task { [weak self] in
@@ -359,8 +392,10 @@ extension AppModel {
                 if ringsWhenDry, watchedArrivals.isEmpty { playCompletionSound() }
                 pumpWatchedLane()
             } catch {
+                guard let self else { return }
                 // Nothing about the file stopped the save, so it waits in the line like a model failure would.
-                self?.pauseWatchedLane(at: arrival, error: error, unsavedOutOfSight: ringsWhenDry)
+                unsavedLandings[arrival.id] = UnsavedLanding(landing: landing, install: install)
+                pauseWatchedLane(at: arrival, error: error, unsaved: true)
             }
         }
     }
@@ -431,7 +466,7 @@ extension AppModel {
 
     /// The file keeps its place; the next foreground run that ends, a model install or Retry starts the lane again.
     private func pauseWatchedLane(
-        at arrival: WatchedArrival, error: any Error, announces: Bool = false, unsavedOutOfSight: Bool = false
+        at arrival: WatchedArrival, error: any Error, announces: Bool = false, unsaved: Bool = false
     ) {
         if backgroundArrivalID == arrival.id || announces {
             if backgroundArrivalID == arrival.id {
@@ -441,7 +476,7 @@ extension AppModel {
             }
             arrivalNotice = ArrivalNotice(paused: arrival.url, reason: Self.transcriptionFailureMessage(for: error))
         }
-        if unsavedOutOfSight {
+        if unsaved {
             arrivalNotice = ArrivalNotice(unsaved: arrival.url, reason: error.localizedDescription)
         }
         if visibleArrivalID == arrival.id { visibleArrivalID = nil }

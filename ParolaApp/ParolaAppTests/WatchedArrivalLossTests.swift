@@ -339,6 +339,51 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Retry after a failed save saves the transcript it kept instead of transcribing again", arguments: [true, false])
+        func retrySavesWhatItKept(outOfSight: Bool) async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let folder = try makeFolder("resave-\(outOfSight)")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let model = makeModel(library: makeTempLibraryURL("loss-resave"), defaults: temporaryDefaults())
+                let runs = Calls()
+                model.postProcessOperation = { transcript in
+                    _ = await runs.next()
+                    return transcript
+                }
+                let own = outOfSight ? try await openOwnEntry(model, in: folder) : nil
+                model.beforeLandingSave = { throw CocoaError(.fileWriteOutOfSpace) }
+                let file = try makeWAV("Kept", in: folder)
+                arrive(model, [file])
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLanePausedAt != nil })
+                #expect(model.unsavedLandings.count == 1)
+                if !outOfSight {
+                    #expect(model.selectedEntryID == nil)
+                    #expect(model.transcript?.segments.first?.text == "kept")
+                    model.transcript?.segments[0].text = "edited while unsaved"
+                }
+
+                model.beforeLandingSave = nil
+                model.resumeWatchedLane()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                #expect(await runs.count == 1, "the file was transcribed once")
+                let saved = await model.library.list().filter { $0.id != own?.id }
+                #expect(saved.count == 1)
+                let entry = try #require(saved.first)
+                if outOfSight {
+                    #expect(model.selectedEntryID == own?.id)
+                    #expect(model.arrivalNotice?.state == .saved(entry.id))
+                } else {
+                    #expect(await waitUntil { model.selectedEntryID == entry.id }, "the pane is the saved entry now")
+                    let stored = try await model.library.load(entry.id).document.transcript
+                    #expect(stored.segments.first?.text == "edited while unsaved")
+                }
+            }
+        }
+
         @Test("a run that stalls on the file or finds it missing waits for the folder, as the check before it would")
         func unreadableDuringTheRunWaits() async throws {
             let folder = try makeFolder("read-stall")

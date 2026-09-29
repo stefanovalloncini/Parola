@@ -688,8 +688,17 @@ final class AppModel {
 
     /// Watched-folder files waiting their turn, the one running included; each leaves when it lands or fails.
     @ObservationIgnored var watchedArrivals: [WatchedArrival] = [] {
-        didSet { if watchedArrivals != oldValue { saveWatchedArrivals() } }
+        didSet {
+            guard watchedArrivals != oldValue else { return }
+            saveWatchedArrivals()
+            if !unsavedLandings.isEmpty {
+                let waiting = Set(watchedArrivals.map(\.id))
+                unsavedLandings = unsavedLandings.filter { waiting.contains($0.key) }
+            }
+        }
     }
+    /// Transcripts whose save failed, kept so Retry saves them again instead of transcribing; this launch only.
+    @ObservationIgnored var unsavedLandings: [WatchedArrival.ID: UnsavedLanding] = [:]
     /// Test seam: when set, replaces telling the watchers that a file they handed over couldn't be used.
     @ObservationIgnored var offerWatchedFileAgain: (@MainActor (URL) -> Void)?
     @ObservationIgnored var watchedLaneTask: Task<Void, Never>?
@@ -2295,7 +2304,7 @@ final class AppModel {
                 phase = .ready
                 let ownedDownload = fetchedLink.flatMap { $0.media.workingDirectory == nil ? nil : $0 }
                 let linkMetadataTitle = fetchedLink?.media.metadata.title
-                let entry = land(RunLanding(
+                let finished = RunLanding(
                     kind: landingKind,
                     transcript: processed,
                     audioSource: fileURL,
@@ -2304,10 +2313,11 @@ final class AppModel {
                     titleSource: linkMetadataTitle == nil ? nil : .source,
                     sourceDigest: sourceDigest,
                     consumesAudio: ownedDownload != nil
-                ))
+                )
+                let entry = land(finished)
                 fileRunLanding = FileRunLanding(runToken: runToken, text: processed.text, entry: entry)
                 if let ownedDownload { followLinkAudioIntoLibrary(ownedDownload, entry: entry) }
-                if let arrival { visibleArrivalLanded(arrival, saving: entry) }
+                if let arrival { visibleArrivalLanded(arrival, landing: finished, saving: entry) }
                 retireFileRun(runToken)
             } catch {
                 if let recoveryToken { endRecovery(recoveryToken) }
