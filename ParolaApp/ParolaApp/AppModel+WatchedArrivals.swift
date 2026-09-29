@@ -366,19 +366,21 @@ extension AppModel {
     }
 
     /// A file that couldn't be transcribed leaves the line and a change brings it back; the error pane or the toast says why.
-    func failArrival(_ arrival: WatchedArrival, error: any Error) {
+    func failArrival(_ arrival: WatchedArrival, error: any Error, announces: Bool = false) {
         if Self.stopsWatchedLane(error) {
-            pauseWatchedLane(at: arrival, error: error)
+            pauseWatchedLane(at: arrival, error: error, announces: announces)
             return
         }
         if Self.waitsForItsFolder(error) {
             waitForFolder(arrival)
             return
         }
-        if backgroundArrivalID == arrival.id {
-            watchedLaneTask = nil
-            backgroundArrivalID = nil
-            runningArrivalNotice = nil
+        if backgroundArrivalID == arrival.id || announces {
+            if backgroundArrivalID == arrival.id {
+                watchedLaneTask = nil
+                backgroundArrivalID = nil
+                runningArrivalNotice = nil
+            }
             arrivalNotice = ArrivalNotice(failed: arrival.url, reason: Self.transcriptionFailureMessage(for: error))
         }
         if visibleArrivalID == arrival.id { visibleArrivalID = nil }
@@ -428,11 +430,15 @@ extension AppModel {
     }
 
     /// The file keeps its place; the next foreground run that ends, a model install or Retry starts the lane again.
-    private func pauseWatchedLane(at arrival: WatchedArrival, error: any Error, unsavedOutOfSight: Bool = false) {
-        if backgroundArrivalID == arrival.id {
-            watchedLaneTask = nil
-            backgroundArrivalID = nil
-            runningArrivalNotice = nil
+    private func pauseWatchedLane(
+        at arrival: WatchedArrival, error: any Error, announces: Bool = false, unsavedOutOfSight: Bool = false
+    ) {
+        if backgroundArrivalID == arrival.id || announces {
+            if backgroundArrivalID == arrival.id {
+                watchedLaneTask = nil
+                backgroundArrivalID = nil
+                runningArrivalNotice = nil
+            }
             arrivalNotice = ArrivalNotice(paused: arrival.url, reason: Self.transcriptionFailureMessage(for: error))
         }
         if unsavedOutOfSight {

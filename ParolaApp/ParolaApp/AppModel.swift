@@ -2271,14 +2271,11 @@ final class AppModel {
                 try Task.checkCancellation()
                 if let fetchedLink { processed.sourceURL = fetchedLink.media.metadata.webpageURL ?? fetchedLink.link }
                 // Idle when it started, busy now: what the user opened meanwhile keeps the window.
-                if let arrival, loadEntryGeneration != windowGeneration || sourceFileURL != fileURL {
+                if let arrival, userMovedOn(from: fileURL, since: windowGeneration) {
                     filePartialText = ""
                     fileTranscribeFraction = nil
                     fileTranscribeStage = nil
-                    switch phase {
-                    case .loadingModel, .downloadingModel, .transcribing: phase = transcript == nil ? .idle : .ready
-                    default: break
-                    }
+                    leaveRunPhase()
                     landVisibleArrivalOutOfSight(arrival, processed)
                     retireFileRun(runToken)
                     if !Task.isCancelled { self.fileTranscribeTask = nil }
@@ -2324,16 +2321,35 @@ final class AppModel {
                     retireFileRun(runToken)
                 }
                 if !Task.isCancelled {
-                    applyTranscriptionError(
-                        error,
-                        source: fetchedLink == nil ? fileURL : nil,
-                        translateOverride: translateOverride,
-                        link: fetchedLink?.retry
-                    )
-                    if let arrival { failArrival(arrival, error: error) }
+                    // An arrival's failure stays out of the way of whatever the user opened while it ran.
+                    let outOfSight = arrival != nil && userMovedOn(from: fileURL, since: windowGeneration)
+                    if outOfSight {
+                        leaveRunPhase()
+                    } else {
+                        applyTranscriptionError(
+                            error,
+                            source: fetchedLink == nil ? fileURL : nil,
+                            translateOverride: translateOverride,
+                            link: fetchedLink?.retry
+                        )
+                    }
+                    if let arrival { failArrival(arrival, error: error, announces: outOfSight) }
                 }
             }
             if !Task.isCancelled { self.fileTranscribeTask = nil }
+        }
+    }
+
+    /// The user opened something else while a run was going: an entry, a document, subtitles.
+    private func userMovedOn(from fileURL: URL, since windowGeneration: Int) -> Bool {
+        loadEntryGeneration != windowGeneration || sourceFileURL != fileURL
+    }
+
+    /// Hands the phase back only while it still shows the run.
+    private func leaveRunPhase() {
+        switch phase {
+        case .loadingModel, .downloadingModel, .transcribing: phase = transcript == nil ? .idle : .ready
+        default: break
         }
     }
 

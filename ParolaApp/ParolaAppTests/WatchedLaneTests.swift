@@ -227,6 +227,34 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("an arrival that took the idle window and then fails says so in a toast, not over what the user opened")
+        func windowRunFailureStaysOutOfTheWay() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate, failing: true)
+                let rig = try makeRig("moved-on-failed")
+                defer { try? FileManager.default.removeItem(at: rig.folder) }
+                let model = rig.model
+                let arrived = try makeWAV("Broken", in: rig.folder)
+                arrive(model, arrived)
+                #expect(await waitUntil(timeoutMs: 10_000) { model.visibleArrivalID != nil })
+
+                let own = try await openOwnEntry(rig)
+                await gate.open()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle && model.fileTranscribeTask == nil })
+                #expect(model.phase == .ready)
+                #expect(model.selectedEntryID == own.id)
+                #expect(model.transcript?.segments.first?.text == "my own notes")
+                #expect(model.failedFileURL == nil)
+                #expect(model.arrivalNotice?.name == "Broken")
+                guard case .failed = model.arrivalNotice?.state else {
+                    Issue.record("expected a failure toast")
+                    return
+                }
+            }
+        }
+
         @Test("a burst of five lands every file with the same post-run steps")
         func burstLandsThroughOnePath() async throws {
             try await withMocksCleared(.transcriber) {
