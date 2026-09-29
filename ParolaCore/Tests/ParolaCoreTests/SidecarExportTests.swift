@@ -231,6 +231,23 @@ struct SidecarExportTests {
         #expect(second.first?.written?.lastPathComponent == "Standup (2).txt")
     }
 
+    @Test("the marker is written under its syncable name, the one it is read back by")
+    func markerIsSyncable() throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("synced.srt")
+        try Data("x".utf8).write(to: file)
+
+        OutputMarker.mark(file, owner: "clip.mov")
+
+        #expect(OutputMarker.attributeName == "app.parola.output#S")
+        #expect(xattr_preserve_for_intent(OutputMarker.attributeName, xattr_operation_intent_t(XATTR_OPERATION_INTENT_SYNC)) == 1)
+        let size = getxattr(file.path, "app.parola.output#S", nil, 0, 0, 0)
+        #expect(size == "clip.mov".utf8.count)
+        #expect(getxattr(file.path, "app.parola.output", nil, 0, 0, 0) == -1)
+        #expect(OutputMarker.owner(of: file) == "clip.mov")
+    }
+
     @Test("the marker round-trips its owner and is absent on a plain file")
     func markerRoundTrip() throws {
         let dir = try scratch()
