@@ -164,12 +164,10 @@ struct TranscriptionCoordinatorTests {
             to: picked
         )
         var landed: LibraryEntry?
-        var transcribing: URL?
         coord.onComplete = { landed = $0 }
 
         coord.startFileTranscription(at: picked)
         for _ in 0..<250 where landed == nil {
-            if case .transcribing(let file) = coord.phase { transcribing = file }
             try await Task.sleep(for: .milliseconds(20))
         }
         await MockTranscriberRegistry.shared.clear()
@@ -177,10 +175,12 @@ struct TranscriptionCoordinatorTests {
         let entry = try #require(landed)
         #expect(entry.title == name)
         #expect(entry.manifest.source == .file)
-        #expect(entry.manifest.originalAudioName == "\(name).wav")
-        let copy = try #require(transcribing)
-        #expect(copy.lastPathComponent == "\(name).wav")
-        #expect(!FileManager.default.fileExists(atPath: copy.deletingLastPathComponent().path))
+        #expect(entry.manifest.originalAudioName == "\(name).wav", "the copy carried the file's own name")
+        let temporary = FileManager.default.temporaryDirectory
+        let leftovers = try FileManager.default.contentsOfDirectory(at: temporary, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("parola-import-") }
+            .filter { FileManager.default.fileExists(atPath: $0.appendingPathComponent("\(name).wav").path) }
+        #expect(leftovers.isEmpty, "the import copy is removed once the entry holds its own")
         #expect(FileManager.default.fileExists(atPath: picked.path), "the user's file stays where it was")
     }
 
