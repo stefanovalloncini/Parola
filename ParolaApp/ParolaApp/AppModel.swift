@@ -211,8 +211,8 @@ final class AppModel {
     @ObservationIgnored private var takeRunCounter = 0
     /// The take transcription in flight, so Stop Transcribing and a new take act on that run alone.
     @ObservationIgnored private(set) var takeRun: Int?
-    /// The take transcription a new take stopped, so its save can say why.
-    @ObservationIgnored private var takeRunStoppedForNewTake: Int?
+    /// The take transcription that new work (a take, a file, a link) stopped, so its save can say why.
+    @ObservationIgnored var takeRunStoppedByNewWork: Int?
     @ObservationIgnored private var takeWorkCounter = 0
     /// A take's prepare and transcription, which a quit stops so the take is saved rather than lost with the process.
     @ObservationIgnored private var takeTask: Task<Void, Never>?
@@ -1587,6 +1587,8 @@ final class AppModel {
             duplicateCheckTask = nil
         }
         if fileTranscribeTask != nil { retireCurrentFileRun() }
+        // New work outranks a take still transcribing: that one is saved as it is, and says so.
+        takeRunStoppedByNewWork = takeRun
         fileTranscribeTask?.cancel()
         fileTranscribeTask = nil
         youtubeTranscribeTask?.cancel()
@@ -3106,8 +3108,6 @@ final class AppModel {
                 resolveRecordingOutcome(.failure(IntentActionError.cancelled))
                 return
             }
-            // A take recording now outranks one still transcribing: that one is saved as it is.
-            takeRunStoppedForNewTake = takeRun
             // A recording replaces any transcription in flight, like a user file-open does;
             // otherwise the old run would finish later and stomp the new take's transcript.
             cancelTranscriptionRuns()
@@ -3748,7 +3748,7 @@ final class AppModel {
         } catch {
             keepUntranscribedTake(
                 url: url, title: title, source: source, category: category, error: error,
-                recovery: recovery, forNewTake: takeRunStoppedForNewTake == run
+                recovery: recovery, forNewWork: takeRunStoppedByNewWork == run
             )
         }
     }
@@ -3756,7 +3756,7 @@ final class AppModel {
     /// A take whose transcription failed or was stopped goes to the library as audio; only a failure reports.
     private func keepUntranscribedTake(
         url: URL, title: String, source: EntrySource, category: EntryCategory, error: any Error,
-        recovery: Int?, forNewTake: Bool
+        recovery: Int?, forNewWork: Bool
     ) {
         let stopped = error is CancellationError || Task.isCancelled
         let saving = saveTake(
@@ -3768,7 +3768,7 @@ final class AppModel {
             activate: false,
             recovery: recovery
         ) { [weak self] _ in
-            guard forNewTake else { return }
+            guard forNewWork else { return }
             self?.exportNotice = ExportNotice(
                 message: String(localized: "Saved the previous recording without transcribing it."),
                 failures: [],

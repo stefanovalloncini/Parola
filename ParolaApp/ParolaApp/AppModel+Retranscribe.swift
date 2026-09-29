@@ -43,6 +43,7 @@ extension AppModel {
             entryID: entryID, modelName: modelName, language: options.language
         )
         let runToken = nextFileRunToken()
+        takeRunStoppedByNewWork = takeRun
         cancelAndTrack(&fileTranscribeTask)
         cancelLinkFetch()
         fileTranscribeTask = Task { [weak self] in

@@ -335,6 +335,32 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("opening a file while a take transcribes keeps the take, untranscribed, and says so")
+        func fileOpenKeepsTheTranscribingTake() async throws {
+            let wav = try makeTakeWAV("take-then-file")
+            let file = try makeTakeWAV("users-file")
+            defer {
+                try? FileManager.default.removeItem(at: wav)
+                try? FileManager.default.removeItem(at: file)
+            }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "never landed")],
+                    gate: MockTranscriberGate()
+                ))
+                let model = makeModel()
+                await transcribingTake(model, wav: wav)
+
+                model.transcribe(fileURL: file)
+
+                let kept = try #require(await entries(model, count: 1).first)
+                #expect(kept.title.hasSuffix("(not transcribed)"))
+                await waitUntil { model.exportNotice != nil }
+                #expect(model.exportNotice?.message == "Saved the previous recording without transcribing it.")
+                model.cancelCurrentWork()
+            }
+        }
+
         // MARK: - A take's category and targets
 
         @Test("a take keeps the category and app targets it started with, whatever is asked for later")
