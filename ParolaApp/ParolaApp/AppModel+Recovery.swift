@@ -476,13 +476,35 @@ extension AppModel {
             == inflightRecordingsURL.resolvingSymlinksInPath().path
     }
 
-    /// Whether this session still reads a working file: playing it, retrying it, recording it, transcribing it, or offering it back.
-    func inflightFileInUse(_ file: URL) -> Bool {
-        let path = file.resolvingSymlinksInPath().path
-        if recoveryReferencedFiles.contains(path) { return true }
+    /// The working files this session still reads: playing, retrying, recording, transcribing, saving, or offering one back.
+    var inflightFilesInUse: Set<String> {
         var readers = [sourceFileURL, failedTakeAudioURL, liveRecordingAudioURL, pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
         if takeRun != nil { readers.append(recordedTake?.file) }
-        return readers.contains { $0?.resolvingSymlinksInPath().path == path }
+        let paths = (readers.compactMap { $0 } + takeFilesBeingSaved.keys).map { $0.resolvingSymlinksInPath().path }
+        return recoveryReferencedFiles.union(paths)
+    }
+
+    func inflightFileInUse(_ file: URL) -> Bool {
+        inflightFilesInUse.contains(file.resolvingSymlinksInPath().path)
+    }
+
+    /// Once a minute, marks the working files in use as just written, so no instance's sweep, this one's or another's, takes them.
+    func startTakeFileHeartbeat() {
+        takeFileHeartbeat?.cancel()
+        let clock = clock
+        takeFileHeartbeat = Task { @MainActor [weak self] in
+            while !Task.isCancelled, self != nil {
+                self?.touchTakeFilesInUse()
+                try? await Task.sleep(for: .seconds(60), clock: clock)
+            }
+        }
+    }
+
+    func touchTakeFilesInUse() {
+        let now = Date()
+        for path in inflightFilesInUse where isInflightFile(URL(fileURLWithPath: path)) {
+            try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: path)
+        }
     }
 
     /// A take's working file goes once its entry holds the audio, unless something here still reads it.
@@ -514,16 +536,17 @@ extension AppModel {
                 }
                 let startedAt = (try? file.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
                 do {
+                    // Copied, not moved: the original goes only once the entry holds the audio.
                     _ = try await library.add(
                         transcript: AppModel.untranscribedTranscript(of: file, language: nil),
                         audioSource: file,
                         category: .transcription,
                         title: AppModel.recoveredRecordingTitle(startedAt: startedAt),
                         sourceDigest: digest,
-                        source: AppModel.inflightTakeSource(file),
-                        consumesAudio: true
+                        source: AppModel.inflightTakeSource(file)
                     )
                     recovered += 1
+                    if self?.inflightFileInUse(file) != true { try? FileManager.default.removeItem(at: file) }
                 } catch {
                     ParolaLog.error(.appRecovery, "an orphaned take could not be brought back", [.error: .error(error)])
                 }

@@ -629,6 +629,56 @@ extension TranscriberMockSuites {
             #expect(FileManager.default.fileExists(atPath: folder.path), "only regular .wav files are swept")
         }
 
+        @Test("the sweep leaves a stale take file alone while this session still uses it, and imports it by copy once it doesn't")
+        func sweepSkipsAFileInUse() async throws {
+            let library = makeTempLibraryURL("sweep-in-use")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let model = makeModel(libraryURL: library)
+            await model.inflightSweep?.value
+            let take = try makeTakeWAV("in-use", seconds: 1, in: inflight, prefix: "parola-mic")
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-3_600)], ofItemAtPath: take.path)
+            model.failedTakeAudioURL = take
+
+            model.sweepInflightRecordings()
+            await model.inflightSweep?.value
+
+            #expect(FileManager.default.fileExists(atPath: take.path))
+            #expect(await model.library.list().isEmpty)
+
+            model.failedTakeAudioURL = nil
+            model.sweepInflightRecordings()
+            await model.inflightSweep?.value
+
+            let imported = await model.library.list()
+            #expect(imported.count == 1)
+            #expect(imported.first?.manifest.originalAudioName.isEmpty == false)
+            #expect(!FileManager.default.fileExists(atPath: take.path), "the original goes once the entry holds its copy")
+        }
+
+        @Test("the heartbeat marks only the working files in use as fresh")
+        func heartbeatTouchesFilesInUse() throws {
+            let library = makeTempLibraryURL("heartbeat")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let model = makeModel(libraryURL: library)
+            let inUse = try makeTakeWAV("heartbeat-used", in: inflight, prefix: "parola-mic")
+            let idle = try makeTakeWAV("heartbeat-idle", in: inflight, prefix: "parola-mic")
+            let hourAgo = Date().addingTimeInterval(-3_600)
+            for file in [inUse, idle] {
+                try FileManager.default.setAttributes([.modificationDate: hourAgo], ofItemAtPath: file.path)
+            }
+            model.liveRecordingAudioURL = inUse
+
+            model.touchTakeFilesInUse()
+
+            func modified(_ file: URL) throws -> Date {
+                try #require(try file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+            }
+            #expect(try modified(inUse) > Date().addingTimeInterval(-60))
+            #expect(try modified(idle) < Date().addingTimeInterval(-3_000))
+        }
+
         @Test("dictation throws away only its own scratch, never a file with another name")
         func dictationDiscardsOnlyItsScratch() throws {
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent("dictation-scratch-\(UUID().uuidString)")

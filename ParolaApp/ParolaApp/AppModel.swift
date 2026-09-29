@@ -430,6 +430,9 @@ final class AppModel {
     /// Working files the checkpoints on disk point at, which the sweep leaves for the offer to settle.
     @ObservationIgnored var recoveryReferencedFiles: Set<String> = []
     @ObservationIgnored var inflightSweep: Task<Void, Never>?
+    /// Working files whose take is on its way to the library.
+    @ObservationIgnored var takeFilesBeingSaved: [URL: Int] = [:]
+    @ObservationIgnored var takeFileHeartbeat: Task<Void, Never>?
     @ObservationIgnored var recordingRecoveryStartedAt: Date?
     @ObservationIgnored var liveRecordingAudioURL: URL?
     @ObservationIgnored var recordingWatchTask: Task<Void, Never>?
@@ -1863,6 +1866,7 @@ final class AppModel {
         restoreWatchedArrivals()
         loadPendingRecovery()
         sweepInflightRecordings()
+        if bootstrap.mode != .test { startTakeFileHeartbeat() }
         if features.isEnabled(.dictation) {
             wireDictationController()
         }
@@ -3794,8 +3798,13 @@ final class AppModel {
             title: title
         ))
         if let recovery { recoveryHeldByTake.insert(recovery) }
+        if let audio { takeFilesBeingSaved[audio, default: 0] += 1 }
         trackTakeWork { [weak self, library] in
             let entry = try? await saving.value
+            if let audio, let self {
+                let left = (self.takeFilesBeingSaved[audio] ?? 1) - 1
+                self.takeFilesBeingSaved[audio] = left > 0 ? left : nil
+            }
             // At once: the entry holds the take now, and a quit may not wait for the rest.
             if let recovery {
                 self?.recoveryHeldByTake.remove(recovery)
