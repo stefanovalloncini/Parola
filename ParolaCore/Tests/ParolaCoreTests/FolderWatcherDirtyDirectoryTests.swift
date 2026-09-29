@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import ParolaCore
 
@@ -153,5 +154,90 @@ struct FolderWatcherDirtyDirectoryTests {
         let resolved = try #require(realpath(url.path, nil))
         defer { free(resolved) }
         return String(cString: resolved)
+    }
+}
+
+@Suite("FolderWatcher when descriptors or listings run out", .tags(.fileSystem))
+struct FolderWatcherResourceTests {
+    private typealias Fixture = WatchedFolderFixture
+
+    private final class Switch: Sendable {
+        private let storage: OSAllocatedUnfairLock<Bool>
+        init(_ isOn: Bool) { storage = OSAllocatedUnfairLock(initialState: isOn) }
+        var isOn: Bool { storage.withLock { $0 } }
+        func set(_ isOn: Bool) { storage.withLock { $0 = isOn } }
+    }
+
+    @Test("a folder whose source couldn't be opened is listed again on the settle tick and gets its source later")
+    func unsourcedFolderIsRelisted() async throws {
+        let clock = FixedClock(start: Date())
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        for name in ["A", "B"] {
+            try FileManager.default.createDirectory(at: folder.appendingPathComponent(name), withIntermediateDirectories: true)
+        }
+        let outOfDescriptors = Switch(true)
+        let scheduler = ManualScheduler()
+        let collected = CollectedURLs()
+        var options = FolderWatcher.Options(recursive: true, settledInterval: .milliseconds(50), clock: clock, scheduler: scheduler)
+        options.openDirectory = { path in
+            if outOfDescriptors.isOn, (path as NSString).lastPathComponent == "B" {
+                return -1
+            }
+            return path.withCString { open($0, O_EVTONLY) }
+        }
+        let watcher = FolderWatcher(folderURL: folder, options: options) { collected.append($0) }
+        await watcher.start()
+        #expect(await Fixture.names(watcher.sourcelessDirectories) == ["B"])
+
+        try Fixture.writeSettled(folder.appendingPathComponent("B/no-event.wav"), clock: clock)
+        try await scheduler.advanceAndWait()
+        await watcher.markDirty([])
+        #expect(Fixture.names(await watcher.pendingPaths) == ["no-event.wav"])
+
+        outOfDescriptors.set(false)
+        try await scheduler.advance(ticks: 2)
+        await watcher.markDirty([])
+        #expect(await watcher.sourcelessDirectories.isEmpty)
+        await watcher.stop()
+        #expect(collected.snapshot().map(\.lastPathComponent) == ["no-event.wav"])
+    }
+
+    @Test("a listing of the watched folder that runs out of descriptors keeps the watch and is tried again")
+    func failedRootListingIsRetried() async throws {
+        let clock = FixedClock(start: Date())
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let failing = Switch(false)
+        let scheduler = ManualScheduler()
+        var options = FolderWatcher.Options(recursive: true, settledInterval: .milliseconds(50), clock: clock, scheduler: scheduler)
+        options.observesFileSystem = false
+        options.lister = { path, recursive in
+            failing.isOn ? .failed : FolderWatcher.list(path, recursive: recursive)
+        }
+        let watcher = FolderWatcher(folderURL: folder, options: options) { _ in }
+        await watcher.start()
+
+        failing.set(true)
+        try Fixture.writeSettled(folder.appendingPathComponent("new.wav"), clock: clock)
+        await watcher.checkForNewFiles()
+        #expect(await watcher.state == .watching)
+        #expect(await watcher.pendingPaths.isEmpty)
+
+        failing.set(false)
+        try await scheduler.advanceAndWait()
+        await watcher.markDirty([])
+        #expect(Fixture.names(await watcher.pendingPaths) == ["new.wav"])
+        await watcher.stop()
+    }
+
+    @Test("only a missing directory counts as gone; running out of descriptors is worth another try")
+    func listingErrorsAreSorted() throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        if case .listed = FolderWatcher.list(folder.path, recursive: true) {} else { Issue.record("an existing folder lists") }
+        if case .missing = FolderWatcher.list(folder.appendingPathComponent("gone").path, recursive: true) {} else {
+            Issue.record("a missing folder is missing")
+        }
     }
 }

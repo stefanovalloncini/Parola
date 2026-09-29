@@ -26,6 +26,8 @@ public actor FolderWatcher {
         public var scanQueue: DispatchQueue
         /// Off in tests that drive every rescan themselves and need a fixed order between folders.
         var observesFileSystem = true
+        var openDirectory: @Sendable (String) -> Int32 = { path in path.withCString { open($0, O_EVTONLY) } }
+        var lister: Lister = { FolderWatcher.list($0, recursive: $1) }
 
         public init(
             recursive: Bool = true,
@@ -134,6 +136,10 @@ public actor FolderWatcher {
     private var pending: [FileKey: PendingCheck] = [:]
     private var watchedAfterEmit: Set<FileKey> = []
     private var dirty: Set<String> = []
+    private var rootInode: UInt64?
+    /// Directories without a source (out of descriptors) or whose last listing failed: relisted on every pass.
+    private var unsourced: Set<String> = []
+    private var unlisted: Set<String> = []
     private var drainTask: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
     private var eventContinuation: AsyncStream<Event>.Continuation?
@@ -172,18 +178,22 @@ public actor FolderWatcher {
         guard fileDescriptor < 0 else { return }
         seed = baseline
         hasScanned = false
-        let fd = folderURL.path.withCString { open($0, O_EVTONLY) }
+        let fd = options.openDirectory(folderURL.path)
         guard fd >= 0 else {
             state = .unavailable
             return
         }
         fileDescriptor = fd
-        let request = ScanRequest(directories: [rootPath], knownSubdirectories: [:], recursive: options.recursive)
+        var rootStat = stat()
+        rootInode = fstat(fd, &rootStat) == 0 ? UInt64(rootStat.st_ino) : nil
+        let request = ScanRequest(
+            directories: [rootPath], knownSubdirectories: [:], recursive: options.recursive, lister: options.lister
+        )
         let scan = await scanOffActor(request)
         // stop() can run on this actor during the await above; if it did, it cleared fileDescriptor
         // and closed our fd — don't resurrect a source on a closed descriptor.
         guard fileDescriptor == fd else { return }
-        guard !scan.missing.contains(rootPath) else {
+        guard !scan.missing.contains(rootPath), !scan.failed.contains(rootPath) else {
             tearDown()
             state = .unavailable
             return
@@ -192,6 +202,7 @@ public actor FolderWatcher {
         pending = [:]
         watchedAfterEmit = []
         directories = [:]
+        unlisted = scan.failed
         listedDirectoryCount += scan.listings.count
 
         let listed = scan.listings.flatMap(\.media)
@@ -249,6 +260,7 @@ public actor FolderWatcher {
         for path in directories.keys where path != rootPath {
             openSource(for: path)
         }
+        scheduleSettleTick()
     }
 
     /// The root also reports being renamed, deleted or unmounted: its path no longer leads to it.
@@ -279,8 +291,12 @@ public actor FolderWatcher {
     private func openSource(for path: String) {
         guard options.recursive, options.observesFileSystem, subdirSources[path] == nil,
               let continuation = eventContinuation else { return }
-        let fd = path.withCString { open($0, O_EVTONLY) }
-        guard fd >= 0 else { return }
+        let fd = options.openDirectory(path)
+        guard fd >= 0 else {
+            unsourced.insert(path)
+            return
+        }
+        unsourced.remove(path)
         subdirSources[path] = Self.makeSource(fd: fd, path: path, continuation: continuation, queue: eventQueue)
         noteDirtyIfChangedSinceListing(path)
     }
@@ -322,6 +338,8 @@ public actor FolderWatcher {
         eventTask?.cancel()
         eventTask = nil
         dirty.removeAll()
+        unsourced.removeAll()
+        unlisted.removeAll()
         settledTask?.cancel()
         settledTask = nil
         pending.removeAll()
@@ -351,7 +369,7 @@ public actor FolderWatcher {
 
     private func drainDirty() async {
         while !dirty.isEmpty, fileDescriptor >= 0 {
-            let batch = dirty
+            let batch = dirty.union(unsourced).union(unlisted)
             dirty = []
             await rescan(batch)
         }
@@ -360,22 +378,29 @@ public actor FolderWatcher {
 
     private func rescan(_ batch: Set<String>) async {
         let known = batch.filter { directories[$0] != nil }
-        guard !known.isEmpty else { return }
+        let walks = batch.filter { directories[$0] == nil && unlisted.contains($0) }
+        guard !known.isEmpty || !walks.isEmpty else { return }
         let ordered = known
             .map { (path: $0, depth: $0.utf8.count { $0 == UInt8(ascii: "/") }) }
             .sorted { ($0.depth, $0.path) < ($1.depth, $1.path) }
         let request = ScanRequest(
             directories: ordered.map(\.path),
+            walks: walks.sorted(),
             knownSubdirectories: known.reduce(into: [:]) { $0[$1] = directories[$1]?.subdirectories },
-            recursive: options.recursive
+            recursive: options.recursive,
+            lister: options.lister
         )
         let scan = await scanOffActor(request)
         guard fileDescriptor >= 0 else { return }
         // A root that can't be listed (renamed away, unmounted) says nothing about its files.
-        guard !scan.missing.contains(rootPath) else {
+        let movedRoot = scan.listings.contains { $0.path == rootPath && rootInode != nil && $0.inode != rootInode }
+        if scan.missing.contains(rootPath) || movedRoot {
             lose()
             return
         }
+        unlisted.subtract(scan.listings.map(\.path))
+        unlisted.subtract(scan.missing)
+        unlisted.formUnion(scan.failed)
         listedDirectoryCount += scan.listings.count
         apply(scan.listings)
         publishBaselineChange()
@@ -414,6 +439,8 @@ public actor FolderWatcher {
     }
 
     private func dropSubtree(_ path: String, departing candidates: inout Set<FileKey>) {
+        unsourced.remove(path)
+        unlisted.remove(path)
         guard let record = directories.removeValue(forKey: path) else { return }
         candidates.formUnion(record.media)
         subdirSources.removeValue(forKey: path)?.cancel()
@@ -565,7 +592,8 @@ public actor FolderWatcher {
     }
 
     private func scheduleSettleTick() {
-        guard settledTask == nil, !pending.isEmpty || !watchedAfterEmit.isEmpty else { return }
+        let waiting = !pending.isEmpty || !watchedAfterEmit.isEmpty || !unsourced.isEmpty || !unlisted.isEmpty
+        guard settledTask == nil, waiting else { return }
         let interval = options.settledInterval
         let scheduler = options.scheduler
         settledTask = Task { [weak self] in
@@ -583,6 +611,9 @@ public actor FolderWatcher {
         }
         for key in watchedAfterEmit {
             recheckEmitted(key, now: now)
+        }
+        for path in unsourced.union(unlisted) {
+            noteDirty(path)
         }
         publishBaselineChange()
         scheduleSettleTick()
@@ -723,6 +754,10 @@ public actor FolderWatcher {
 
     internal var trackedPaths: Set<String> {
         Set(files.values.map(\.path))
+    }
+
+    internal var sourcelessDirectories: Set<String> {
+        unsourced
     }
 
     internal var watchedDirectories: Set<String> {

@@ -13,22 +13,36 @@ extension FolderWatcher {
     /// subdirectories with their identities, so a folder replaced under the same name is noticed.
     struct Listing: Sendable {
         var path: String
+        var inode: UInt64?
         /// Read before the children: a later date means the listing may have missed a change.
         var modified: Date?
         var media: [ScannedFile] = []
         var subdirectories: [String: FileKey] = [:]
     }
 
+    enum ListOutcome: Sendable {
+        case listed(Listing)
+        case missing
+        /// Out of descriptors or interrupted: the directory is still there, try again.
+        case failed
+    }
+
+    typealias Lister = @Sendable (_ path: String, _ recursive: Bool) -> ListOutcome
+
     struct ScanRequest: Sendable {
         /// Parents before children, so a subtree dropped by its parent's listing is rebuilt after it.
         var directories: [String]
+        /// Directories never listed, walked whole.
+        var walks: [String] = []
         var knownSubdirectories: [String: [String: FileKey]]
         var recursive: Bool
+        var lister: Lister
     }
 
     struct ScanResult: Sendable {
         var listings: [Listing] = []
         var missing: Set<String> = []
+        var failed: Set<String> = []
     }
 
     /// Lists each requested directory without descending, and walks once the subdirectories
@@ -36,41 +50,52 @@ extension FolderWatcher {
     static func scan(_ request: ScanRequest) -> ScanResult {
         var result = ScanResult()
         for path in request.directories {
-            guard let listing = list(path, recursive: request.recursive) else {
+            switch request.lister(path, request.recursive) {
+            case .missing:
                 result.missing.insert(path)
-                continue
+            case .failed:
+                result.failed.insert(path)
+            case .listed(let listing):
+                result.listings.append(listing)
+                let known = request.knownSubdirectories[path] ?? [:]
+                for (child, key) in listing.subdirectories.sorted(by: { $0.key < $1.key }) where known[child] != key {
+                    walk(child, request: request, into: &result)
+                }
             }
-            result.listings.append(listing)
-            let known = request.knownSubdirectories[path] ?? [:]
-            for (child, key) in listing.subdirectories.sorted(by: { $0.key < $1.key }) where known[child] != key {
-                walk(child, recursive: request.recursive, into: &result)
-            }
+        }
+        for root in request.walks {
+            walk(root, request: request, into: &result)
         }
         return result
     }
 
-    static func walk(_ root: String, recursive: Bool, into result: inout ScanResult) {
+    static func walk(_ root: String, request: ScanRequest, into result: inout ScanResult) {
         var queue = [root]
         var next = 0
         while next < queue.count {
             let path = queue[next]
             next += 1
-            guard let listing = list(path, recursive: recursive) else {
+            switch request.lister(path, request.recursive) {
+            case .missing:
                 result.missing.insert(path)
-                continue
+            case .failed:
+                result.failed.insert(path)
+            case .listed(let listing):
+                result.listings.append(listing)
+                queue.append(contentsOf: listing.subdirectories.keys.sorted())
             }
-            result.listings.append(listing)
-            queue.append(contentsOf: listing.subdirectories.keys.sorted())
         }
     }
 
     /// `readdir` and one `lstat` per media file or directory: most entries in a big tree are neither,
     /// and this runs for every directory event.
-    static func list(_ path: String, recursive: Bool) -> Listing? {
-        let modified = FileInfo(path)?.modified
-        guard let directory = opendir(path) else { return nil }
+    static func list(_ path: String, recursive: Bool) -> ListOutcome {
+        let info = FileInfo(path)
+        guard let directory = opendir(path) else {
+            return [EMFILE, ENFILE, EINTR, EAGAIN, ENOMEM].contains(errno) ? .failed : .missing
+        }
         defer { closedir(directory) }
-        var listing = Listing(path: path, modified: modified)
+        var listing = Listing(path: path, inode: info?.inode, modified: info?.modified)
         let prefix = path.hasSuffix("/") ? path : path + "/"
         while let entry = readdir(directory) {
             let name = withUnsafeBytes(of: entry.pointee.d_name) { bytes in
@@ -93,7 +118,7 @@ extension FolderWatcher {
                 ))
             }
         }
-        return listing
+        return .listed(listing)
     }
 
     static func isMediaFile(name: String) -> Bool {

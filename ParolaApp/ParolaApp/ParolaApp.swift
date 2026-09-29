@@ -70,6 +70,7 @@ struct ParolaApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
+        FileDescriptorLimit.raise()
         let bootstrap = AppBootstrap.test(from: CommandLine.arguments) ?? .normal
         // First, so everything AppModel.init reaches happens inside the sink's lifetime.
         DiagnosticsInstaller.installIfWanted(sideEffects: bootstrap.sideEffects)
