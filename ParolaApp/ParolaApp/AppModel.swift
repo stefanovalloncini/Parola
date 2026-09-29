@@ -429,6 +429,8 @@ final class AppModel {
     @ObservationIgnored var recoveryHeldByTake: Set<Int> = []
     /// Working files the checkpoints on disk point at, which the sweep leaves for the offer to settle.
     @ObservationIgnored var recoveryReferencedFiles: Set<String> = []
+    /// This instance's lock on the library; a checkpoint it writes carries its id.
+    @ObservationIgnored var recoveryOwner: RecoveryOwner?
     @ObservationIgnored var inflightSweep: Task<Void, Never>?
     /// Working files whose take is on its way to the library.
     @ObservationIgnored var takeFilesBeingSaved: [URL: Int] = [:]
@@ -1827,6 +1829,9 @@ final class AppModel {
         self.library = LibraryStore(libraryURL: bootstrap.library ?? LibraryStore.defaultLibraryURL)
         // Takes must outlive a failed transcription, a crash, and the OS temp purge.
         RecordingScratch.setDirectory(library.libraryURL.appendingPathComponent("inflight", isDirectory: true))
+        self.recoveryOwner = RecoveryOwner(
+            directory: library.libraryURL.appendingPathComponent("recovery/owners", isDirectory: true)
+        )
         // A --library override (tests, sandbox) must keep people suggestions out of the real store too.
         self.peopleStore = PeopleStore(
             storageURL: bootstrap.library.map { $0.appendingPathComponent("People.json") }

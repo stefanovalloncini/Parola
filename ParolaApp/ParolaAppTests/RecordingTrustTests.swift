@@ -890,12 +890,66 @@ extension TranscriberMockSuites {
             try JSONEncoder().encode(checkpoint).write(to: library.appendingPathComponent("recovery.json"))
         }
 
+        /// A take written minutes ago: a checkpoint with no owner treats anything newer as still recording.
+        private func settledTake(_ label: String, in folder: URL) throws -> URL {
+            let take = try makeTakeWAV(label, in: folder, prefix: "parola-mic")
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-300)], ofItemAtPath: take.path)
+            return take
+        }
+
+        @Test("a second instance on the same library leaves a running instance's take alone: no offer, no sweep, no save")
+        func secondInstanceLeavesALiveTakeAlone() async throws {
+            let library = makeTempLibraryURL("two-instances")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let first = makeModel(libraryURL: library)
+            let take = try makeTakeWAV("recording-elsewhere", seconds: 1, in: inflight, prefix: "parola-mic")
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-3_600)], ofItemAtPath: take.path)
+            first.beginRecordingRecovery()
+            first.liveRecordingAudioURL = take
+            first.writeRecordingCheckpoint()
+            await first.pendingRecoveryWrite?.value
+            let checkpoint = try #require(first.activeRecoveryFileURL)
+
+            let second = makeModel(libraryURL: library)
+            await second.inflightSweep?.value
+
+            #expect(second.pendingRecovery == nil, "a live instance's take is not offered")
+            #expect(FileManager.default.fileExists(atPath: checkpoint.path))
+            #expect(FileManager.default.fileExists(atPath: take.path), "nor swept, though an hour quiet")
+            #expect(await second.library.list().isEmpty)
+
+            // The first instance goes away without ending its take, as a crash would.
+            first.recoveryOwner = nil
+            let third = makeModel(libraryURL: library)
+            #expect(third.pendingRecovery?.audioURL == take, "once its instance is gone, the take is offered")
+        }
+
+        @Test("a checkpoint from a build before owners waits a launch while its take was written in the last two minutes")
+        func ownerlessCheckpointWaitsForARecentTake() throws {
+            let library = makeTempLibraryURL("ownerless-recent")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let take = try makeTakeWAV("old-build", in: inflight, prefix: "parola-mic")
+            try writeLegacyCheckpoint(
+                RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", audioURL: take), library: library
+            )
+
+            let model = makeModel(libraryURL: library)
+
+            #expect(model.pendingRecovery == nil)
+            #expect(FileManager.default.fileExists(atPath: model.legacyRecoveryFileURL.path), "left where it is, untouched")
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-300)], ofItemAtPath: take.path)
+            model.recoveryOwner = nil
+            #expect(makeModel(libraryURL: library).pendingRecovery?.audioURL == take)
+        }
+
         @Test("Not Now keeps a take that was transcribing when Parola quit, untranscribed, and the offer names it by its title")
         func notNowKeepsATranscribingTake() async throws {
             let library = makeTempLibraryURL("not-now-take")
             let inflight = library.appendingPathComponent("inflight", isDirectory: true)
             try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
-            let take = try makeTakeWAV("not-now", in: inflight, prefix: "parola-mic")
+            let take = try settledTake("not-now", in: inflight)
             try writeLegacyCheckpoint(RecoveryCheckpoint(
                 kind: .fileTranscription, startedAt: Date(), modelName: "m",
                 sourceURL: take, title: "Recording 29 Sep 2026", source: .systemAudio
@@ -950,7 +1004,7 @@ extension TranscriberMockSuites {
             let library = makeTempLibraryURL("discard-take")
             let inflight = library.appendingPathComponent("inflight", isDirectory: true)
             try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
-            let take = try makeTakeWAV("discarded", in: inflight, prefix: "parola-mic")
+            let take = try settledTake("discarded", in: inflight)
             try writeLegacyCheckpoint(
                 RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", audioURL: take), library: library
             )

@@ -436,6 +436,7 @@ extension TranscriberMockSuites {
             let offered = try #require(model.pendingRecovery)
             #expect(!FileManager.default.fileExists(atPath: model.legacyRecoveryFileURL.path))
             #expect(model.recoveryCheckpointFiles.map(\.lastPathComponent) == ["\(offered.id.uuidString).json"])
+            model.recoveryOwner = nil
             let relaunched = makeModel(libraryURL: lib)
             #expect(relaunched.pendingRecovery?.id == offered.id, "the moved file keeps the id it was given")
         }

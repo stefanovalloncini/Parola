@@ -26,6 +26,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var source: EntrySource?
     /// Nil in a file written before the field, which a restored take files as a transcription.
     var category: EntryCategory?
+    /// The instance that wrote it; nil in a file from a build before owners, which a launch judges by how recently its take was written.
+    var owner: String?
 
     init(
         kind: Kind,
@@ -38,10 +40,12 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         title: String? = nil,
         source: EntrySource? = nil,
         category: EntryCategory? = nil,
+        owner: String? = nil,
         id: UUID = UUID()
     ) {
         self.id = id
         self.category = category
+        self.owner = owner
         self.kind = kind
         self.startedAt = startedAt
         self.modelName = modelName
@@ -66,6 +70,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         title = try c.decodeIfPresent(String.self, forKey: .title)
         source = try c.decodeIfPresent(EntrySource.self, forKey: .source)
         category = try c.decodeIfPresent(EntryCategory.self, forKey: .category)
+        owner = try c.decodeIfPresent(String.self, forKey: .owner)
     }
 
     /// A take by its title, a file by its name; a link by the video's title, or the link itself before the title was known.
@@ -79,6 +84,11 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var isTake: Bool {
         kind == .recording || (title != nil && sourceURL?.isFileURL == true)
     }
+
+    /// The files on disk it points at, as resolved paths.
+    var referencedPaths: [String] {
+        [sourceURL, audioURL].compactMap { $0?.isFileURL == true ? $0?.resolvingSymlinksInPath().path : nil }
+    }
 }
 
 extension AppModel {
@@ -86,6 +96,11 @@ extension AppModel {
     /// One file per take or run, so ending one never removes another's.
     var recoveryDirectoryURL: URL {
         library.libraryURL.appendingPathComponent("recovery", isDirectory: true)
+    }
+
+    /// Where each running instance keeps the lock that says its checkpoints are live.
+    var recoveryOwnersDirectoryURL: URL {
+        recoveryDirectoryURL.appendingPathComponent("owners", isDirectory: true)
     }
 
     /// Where the one checkpoint lived before each run had its own; a launch moves it into the directory.
@@ -187,6 +202,7 @@ extension AppModel {
         guard let generation = activeRecoveryGeneration, let id = recoveryFileIDs[generation] else { return }
         var checkpoint = checkpoint
         checkpoint.id = id
+        checkpoint.owner = recoveryOwner?.id
         let url = recoveryFileURL(for: id)
         let directory = recoveryDirectoryURL
         pendingRecoveryWrite = Task { [weak self, checkpoint] in
@@ -236,21 +252,37 @@ extension AppModel {
 
     // MARK: - Launch offer
 
-    /// Offers the newest checkpoint; older takes go to the library quietly, and older file offers lapse.
+    /// Offers the newest checkpoint an instance left behind; older takes go to the library quietly, and a running instance's are left alone.
     func loadPendingRecovery() {
+        let owners = recoveryOwnersDirectoryURL
+        RecoveryOwner.removeDeadLocks(in: owners)
         var found: [RecoveryCheckpoint] = []
+        var live = Set<String>()
         for file in recoveryCheckpointFiles {
             guard let data = try? Data(contentsOf: file),
-                  let checkpoint = try? JSONDecoder().decode(RecoveryCheckpoint.self, from: data),
-                  Self.isRestorable(checkpoint) else {
+                  let checkpoint = try? JSONDecoder().decode(RecoveryCheckpoint.self, from: data) else {
                 try? FileManager.default.removeItem(at: file)
                 continue
             }
-            settleCheckpointFile(checkpoint, at: file)
-            found.append(checkpoint)
+            if let owner = checkpoint.owner, owner != recoveryOwner?.id, RecoveryOwner.isAlive(owner, in: owners) {
+                live.formUnion(checkpoint.referencedPaths)
+                continue
+            }
+            // Written by a build before owners: a take written in the last two minutes may still be recording there.
+            if checkpoint.owner == nil, isStillBeingWritten(checkpoint, now: Date()) {
+                live.formUnion(checkpoint.referencedPaths)
+                continue
+            }
+            guard Self.isRestorable(checkpoint) else {
+                try? FileManager.default.removeItem(at: file)
+                continue
+            }
+            var claimed = checkpoint
+            claimed.owner = recoveryOwner?.id
+            settleCheckpointFile(claimed, at: file)
+            found.append(claimed)
         }
-        recoveryReferencedFiles = Set(found.flatMap { [$0.sourceURL, $0.audioURL] }
-            .compactMap { $0?.isFileURL == true ? $0?.resolvingSymlinksInPath().path : nil })
+        recoveryReferencedFiles = live.union(found.flatMap(\.referencedPaths))
         guard let newest = found.max(by: { $0.startedAt < $1.startedAt }) else { return }
         for older in found where older.id != newest.id {
             keepRecoveredTake(older, releasingReferencesWhenSaved: true)
@@ -262,14 +294,25 @@ extension AppModel {
         pendingRecovery = newest
     }
 
-    /// A checkpoint whose file isn't named for it, the legacy recovery.json among them, moves under its own name.
+    /// A take's working file written in the last two minutes: a live recording, as far as a checkpoint with no owner can tell.
+    private func isStillBeingWritten(_ checkpoint: RecoveryCheckpoint, now: Date) -> Bool {
+        checkpoint.referencedPaths.contains { path in
+            let url = URL(fileURLWithPath: path)
+            guard isInflightFile(url),
+                  let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else { return false }
+            return modified > now.addingTimeInterval(-2 * 60)
+        }
+    }
+
+    /// Claims a checkpoint for this instance, under its own name: the legacy recovery.json moves into the directory.
     private func settleCheckpointFile(_ checkpoint: RecoveryCheckpoint, at file: URL) {
         let target = recoveryFileURL(for: checkpoint.id)
-        guard file.standardizedFileURL.path != target.standardizedFileURL.path else { return }
         do {
             try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
             try JSONEncoder().encode(checkpoint).write(to: target, options: .atomic)
-            try FileManager.default.removeItem(at: file)
+            if file.standardizedFileURL.path != target.standardizedFileURL.path {
+                try FileManager.default.removeItem(at: file)
+            }
         } catch {
             ParolaLog.error(.appRecovery, "a recovery checkpoint could not be moved", [.error: .error(error)])
         }
@@ -278,7 +321,7 @@ extension AppModel {
     /// The offer is answered: what it points at is no longer held back from the sweep or from release.
     private func answerRecoveryOffer(_ checkpoint: RecoveryCheckpoint) {
         pendingRecovery = nil
-        recoveryReferencedFiles.subtract([checkpoint.sourceURL, checkpoint.audioURL].compactMap { $0?.resolvingSymlinksInPath().path })
+        recoveryReferencedFiles.subtract(checkpoint.referencedPaths)
     }
 
     /// The offer is settled: its own file goes, whatever else is on disk.
@@ -360,7 +403,7 @@ extension AppModel {
             removeRecoveryFile(of: checkpoint)
             return
         }
-        let referenced = [checkpoint.sourceURL, checkpoint.audioURL].compactMap { $0?.resolvingSymlinksInPath().path }
+        let referenced = checkpoint.referencedPaths
         var release: (@MainActor (LibraryEntry) -> Void)?
         if releasingReferencesWhenSaved {
             release = { [weak self] _ in self?.recoveryReferencedFiles.subtract(referenced) }
