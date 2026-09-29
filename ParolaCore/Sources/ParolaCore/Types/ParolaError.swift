@@ -8,6 +8,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     case modelDownloadFailed(String, underlying: String)
     case modelChecksumMismatch(file: String, expected: String, got: String)
     case audioLoadFailed(URL, underlying: String)
+    /// Nothing at the path: deleted, moved, or on a volume that isn't mounted right now.
+    case fileMissing(URL)
     case transcriptionFailed(String)
     /// An engine or the speaker model that couldn't load: the same for every file, so a queue waits on it.
     case engineLoadFailed(String)
@@ -46,6 +48,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
             return "Checksum mismatch for \(file): expected \(expected), got \(got)"
         case .audioLoadFailed(let url, let underlying):
             return "Failed to load audio at \(url.path): \(underlying)"
+        case .fileMissing(let url):
+            return "Parola couldn't find \(url.lastPathComponent)."
         case .transcriptionFailed(let reason), .engineLoadFailed(let reason):
             return "Transcription failed: \(reason)"
         case .unreadableFile(let name, let reason):
@@ -90,6 +94,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
             return "ParolaError.modelChecksumMismatch"
         case .audioLoadFailed:
             return "ParolaError.audioLoadFailed"
+        case .fileMissing:
+            return "ParolaError.fileMissing"
         case .transcriptionFailed:
             return "ParolaError.transcriptionFailed"
         case .engineLoadFailed:

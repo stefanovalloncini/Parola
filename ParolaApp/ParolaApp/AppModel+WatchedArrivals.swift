@@ -439,11 +439,8 @@ extension AppModel {
     /// A read that stalled or found no file is what the pre-run check calls an unreachable folder, and waits the same way.
     nonisolated static func waitsForItsFolder(_ error: any Error) -> Bool {
         switch error as? ParolaError {
-        case .fileReadTimedOut:
+        case .fileReadTimedOut, .fileMissing:
             return true
-        case .audioLoadFailed(_, let underlying):
-            // FileAudioSource's words for a file that isn't there; a pinned test keeps them in step.
-            return underlying == "file does not exist"
         default:
             return false
         }

@@ -57,3 +57,25 @@ struct EngineLoadFailureTests {
         #expect(error.logKind == "ParolaError.engineLoadFailed")
     }
 }
+
+@Suite("A file that isn't there fails as missing")
+struct FileMissingTests {
+    @Test("a file source for a path with nothing at it throws fileMissing, named without its folders")
+    func missingFileIsTyped() async {
+        let gone = FileManager.default.temporaryDirectory.appendingPathComponent("parola-gone-\(UUID().uuidString).wav")
+        do {
+            _ = try await FileAudioSource(url: gone).prepare()
+            Issue.record("a missing file should fail")
+        } catch let error as ParolaError {
+            guard case .fileMissing(let url) = error else {
+                Issue.record("expected fileMissing, got \(error.logKind)")
+                return
+            }
+            #expect(url == gone)
+            #expect(error.description == "Parola couldn't find \(gone.lastPathComponent).")
+            #expect(error.logKind == "ParolaError.fileMissing")
+        } catch {
+            Issue.record("expected a ParolaError, got \(error)")
+        }
+    }
+}

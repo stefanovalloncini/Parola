@@ -12,7 +12,7 @@ public struct FileAudioSource: AudioSource {
 
     public func prepare() async throws -> URL {
         guard FileManager.default.fileExists(atPath: url.path) else {
-            throw ParolaError.audioLoadFailed(url, underlying: "file does not exist")
+            throw ParolaError.fileMissing(url)
         }
         return url
     }

@@ -397,7 +397,7 @@ extension TranscriberMockSuites {
             model.watchedArrivals = [stalled, missing]
 
             model.failArrival(stalled, error: ParolaError.fileReadTimedOut(name: "stalled.wav"))
-            model.failArrival(missing, error: ParolaError.audioLoadFailed(missing.url, underlying: "file does not exist"))
+            model.failArrival(missing, error: ParolaError.fileMissing(missing.url))
 
             #expect(model.watchedArrivals.map(\.id) == [stalled.id, missing.id])
             #expect(model.unreachableArrivalIDs == [stalled.id, missing.id])
@@ -406,16 +406,12 @@ extension TranscriberMockSuites {
             model.fileTranscribeTask = nil
         }
 
-        @Test("the words a missing file fails with are the ones the lane waits on")
-        func missingFileWordsAreKnown() async throws {
-            let gone = FileManager.default.temporaryDirectory.appendingPathComponent("parola-gone-\(UUID().uuidString).wav")
-            do {
-                _ = try await FileAudioSource(url: gone).prepare()
-                Issue.record("a missing file should fail")
-            } catch {
-                #expect(AppModel.waitsForItsFolder(error))
-            }
-            #expect(!AppModel.waitsForItsFolder(ParolaError.audioLoadFailed(gone, underlying: "not audio")))
+        @Test("which failures wait for the folder: a stalled read and a missing file, not a file that won't decode")
+        func whatWaitsForTheFolder() {
+            let url = URL(fileURLWithPath: "/Volumes/Share/memo.wav")
+            #expect(AppModel.waitsForItsFolder(ParolaError.fileMissing(url)))
+            #expect(AppModel.waitsForItsFolder(ParolaError.fileReadTimedOut(name: "memo.wav")))
+            #expect(!AppModel.waitsForItsFolder(ParolaError.audioLoadFailed(url, underlying: "not audio")))
             #expect(!AppModel.waitsForItsFolder(ParolaError.transcriptionFailed("WhisperKit returned no results")))
         }
 
