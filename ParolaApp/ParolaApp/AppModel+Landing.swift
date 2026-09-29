@@ -227,7 +227,11 @@ extension AppModel {
                     try await library.setSegmentNote(nil, segmentID: segmentID, for: entryID)
                 }
                 try await library.mutateSpeakerAssignments(for: entryID) { $0 = [:] }
-                let entry = try await library.setCardMetadata(aiTitle: nil, shortSummary: nil, for: entryID)
+                var entry = try await library.setCardMetadata(aiTitle: nil, shortSummary: nil, for: entryID)
+                // A take saved untranscribed loses its note now that it has words.
+                if let stored = entry.manifest.title, let transcribed = Self.transcribedTitle(from: stored) {
+                    entry = try await library.replaceStoredTitle(transcribed, for: entryID)
+                }
                 self?.place(entry, landing, navigation: 0)
                 return entry
             } catch {

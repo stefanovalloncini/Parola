@@ -845,6 +845,25 @@ public actor LibraryStore {
         try recacheEntry(at: bundleURL)
     }
 
+    /// Replaces a title the app stored, such as a take's, without marking it as one the user typed.
+    @discardableResult
+    public func replaceStoredTitle(_ title: String, for id: LibraryEntry.ID) async throws -> LibraryEntry {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return try recacheEntry(at: bundleURL) }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.title = trimmed
+        }
+        let entry = try recacheEntry(at: bundleURL)
+        if let transcript = await transcriptForReindex(id, at: bundleURL) {
+            await indexEntry(entry, transcript: transcript)
+        }
+        return entry
+    }
+
     /// Changes the category of an entry.
     public func setCategory(_ category: EntryCategory, for id: LibraryEntry.ID) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

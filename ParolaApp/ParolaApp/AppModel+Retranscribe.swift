@@ -17,6 +17,17 @@ extension AppModel {
         return entry.manifest.audioFilename != nil
     }
 
+    /// A take saved as audio alone: no model has run on it, which isn't the same as finding no speech.
+    var transcriptIsUntranscribed: Bool {
+        guard let transcript else { return false }
+        return transcript.modelName.isEmpty && transcript.segments.isEmpty
+    }
+
+    /// Transcribes the loaded entry's audio for the first time, with the model and language the toolbar shows.
+    func transcribeLoadedEntry() {
+        retranscribeCurrentEntry(model: selectedModel, language: selectedLanguage)
+    }
+
     /// Why the inspector's two menus are shut, or nil when they are open for business.
     var retranscribeUnavailableReason: String? {
         guard selectedEntryID != nil, !canRetranscribeSelectedEntry else { return nil }

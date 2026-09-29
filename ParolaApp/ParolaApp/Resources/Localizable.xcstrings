@@ -8864,6 +8864,17 @@
         }
       }
     },
+    "Not Transcribed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non trascritta"
+          }
+        }
+      }
+    },
     "Not a valid settings file.": {
       "extractionState": "manual",
       "localizations": {
@@ -14036,6 +14047,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questo modello è solo inglese."
+          }
+        }
+      }
+    },
+    "This recording is in your library, but it hasn't been transcribed yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa registrazione è nella libreria, ma non è ancora stata trascritta."
           }
         }
       }

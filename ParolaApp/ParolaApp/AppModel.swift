@@ -3589,9 +3589,7 @@ final class AppModel {
         return String(localized: "Nothing was recorded.", bundle: bundle)
     }
 
-    /// Transcribes a finished take from its in-flight file. Unlike a user-opened file the
-    /// audio is irreplaceable, so a failure or a stop saves it to the library and arms
-    /// Retry instead of leaving the file orphaned.
+    /// Transcribes a finished take from its in-flight file; the audio is irreplaceable, so a failure or a stop still saves it.
     func transcribeRecordedTake(
         url: URL, title: String, source: EntrySource, category: EntryCategory = .transcription
     ) async {
@@ -3642,12 +3640,7 @@ final class AppModel {
     ) {
         let stopped = error is CancellationError || Task.isCancelled
         saveTake(
-            Transcript(
-                segments: [],
-                language: currentOptions.language ?? "auto",
-                modelName: selectedModel,
-                sourceURL: url
-            ),
+            Self.untranscribedTranscript(of: url, language: currentOptions.language),
             audio: url,
             title: Self.takeTitle(title, suffix: stopped ? .notTranscribed : .transcriptionFailed),
             source: source,
@@ -3664,9 +3657,7 @@ final class AppModel {
         }
         if stopped {
             // Whatever stopped the run keeps the screen; only the take's own pane gives way to Home.
-            let ownsPhase = phase == .transcribing(file: url) || phase == .idle
             if phase == .transcribing(file: url) { phase = .idle }
-            if ownsPhase { armTakeRetry(url: url, title: title, source: source, category: category) }
             resolveRecordingOutcome(.failure(IntentActionError.cancelled))
             return
         }
@@ -3754,11 +3745,11 @@ final class AppModel {
 
     // MARK: - Take titles
 
-    /// What a take's title says about the audio it holds.
-    enum TakeTitleSuffix {
-        case notTranscribed
-        case transcriptionFailed
-        case interrupted
+    /// What a take's title says about the audio it holds; the raw value is the English text.
+    enum TakeTitleSuffix: String {
+        case notTranscribed = "(not transcribed)"
+        case transcriptionFailed = "(transcription failed)"
+        case interrupted = "(interrupted)"
     }
 
     /// Live takes capture to a temp file whose UUID name would otherwise leak into the
@@ -3780,6 +3771,20 @@ final class AppModel {
         case .transcriptionFailed: return String(localized: "(transcription failed)", bundle: bundle)
         case .interrupted: return String(localized: "(interrupted)", bundle: bundle)
         }
+    }
+
+    /// The title without its "not transcribed" note, for a take that has a transcript now; nil when it carries none.
+    nonisolated static func transcribedTitle(from title: String, bundle: Bundle = .main) -> String? {
+        let notes = [TakeTitleSuffix.notTranscribed, .transcriptionFailed].flatMap { [suffixText($0, bundle: bundle), $0.rawValue] }
+        for note in notes where title.hasSuffix(" " + note) {
+            return String(title.dropLast(note.count + 1))
+        }
+        return nil
+    }
+
+    /// No model ran on it, which is how an entry tells "not transcribed" from "no speech found".
+    nonisolated static func untranscribedTranscript(of audio: URL, language: String?) -> Transcript {
+        Transcript(segments: [], language: language ?? "auto", modelName: "", sourceURL: audio)
     }
 
     // MARK: - Quitting during a take
@@ -3850,7 +3855,7 @@ final class AppModel {
         // Without a file the checkpoint stays, so the next launch offers what it points at.
         guard let url = prepared else { return }
         saveTake(
-            Transcript(segments: [], language: currentOptions.language ?? "auto", modelName: selectedModel, sourceURL: url),
+            Self.untranscribedTranscript(of: url, language: currentOptions.language),
             audio: url,
             title: Self.takeTitle(title, suffix: .notTranscribed),
             source: takeSource,

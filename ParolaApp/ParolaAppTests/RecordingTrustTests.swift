@@ -94,7 +94,7 @@ extension TranscriberMockSuites {
 
         // MARK: - Stopping a take's transcription
 
-        @Test("stopping a take's transcription saves the take and reports nothing")
+        @Test("stopping a take's transcription saves the take untranscribed and reports nothing")
         func stopTranscribingKeepsTheTake() async throws {
             let wav = try makeTakeWAV("stop")
             defer { try? FileManager.default.removeItem(at: wav) }
@@ -112,13 +112,13 @@ extension TranscriberMockSuites {
                 model.stopTranscribingTake()
                 #expect(model.phase == .idle)
 
-                let saved = await entries(model, count: 1)
-                #expect(saved.count == 1)
-                #expect(saved.first?.title == take.title + " (not transcribed)")
-                #expect(saved.first?.manifest.originalAudioName.isEmpty == false)
+                let saved = try #require(await entries(model, count: 1).first)
+                #expect(saved.title == take.title + " (not transcribed)")
+                #expect(saved.manifest.originalAudioName.isEmpty == false)
+                let stored = try await model.library.load(saved.id).document.transcript
+                #expect(stored.modelName.isEmpty, "no model ran on it, so it opens as not transcribed")
                 await settle()
                 #expect(model.phase == .idle, "a stop is not a failure")
-                #expect(model.failedTakeAudioURL == wav, "Retry stays armed for the take")
             }
         }
 
@@ -140,6 +140,36 @@ extension TranscriberMockSuites {
                 #expect(saved.first?.title.hasSuffix("(not transcribed)") == true)
                 await settle()
                 #expect(model.phase == .idle)
+            }
+        }
+
+        @Test("a take saved untranscribed opens as not transcribed; Transcribe fills it in and drops the note")
+        func transcribeANotTranscribedTake() async throws {
+            let wav = try makeTakeWAV("later")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "words at last")],
+                    gate: gate
+                ))
+                let model = makeModel()
+                await transcribingTake(model, wav: wav)
+                let title = try #require(model.recordedTake?.title)
+                model.stopTranscribingTake()
+                let saved = try #require(await entries(model, count: 1).first)
+
+                model.loadEntry(saved.id)
+                await waitUntil { model.selectedEntryID == saved.id && model.transcript != nil }
+                #expect(model.transcriptIsUntranscribed, "it opens as not transcribed, not as no speech")
+                #expect(model.canRetranscribeSelectedEntry)
+
+                await gate.open()
+                model.transcribeLoadedEntry()
+
+                await waitUntil { model.transcript?.text == "words at last" }
+                #expect(!model.transcriptIsUntranscribed)
+                await waitUntil { model.libraryEntry(id: saved.id)?.title == title }
             }
         }
 
@@ -450,6 +480,19 @@ extension TranscriberMockSuites {
             #expect(meeting == "Riunione \(stamp)")
             #expect(AppModel.takeTitle(meeting, suffix: .notTranscribed, bundle: italian) == "Riunione \(stamp) (non trascritta)")
             #expect(AppModel.recoveredRecordingTitle(startedAt: endedAt, bundle: italian) == "Registrazione \(stamp) (recuperata)")
+        }
+
+        @Test("a take's title loses its not-transcribed note once it has words, in either language")
+        func transcribedTitleDropsTheNote() throws {
+            #expect(AppModel.transcribedTitle(from: "Recording 1 (not transcribed)") == "Recording 1")
+            #expect(AppModel.transcribedTitle(from: "Meeting 2 (transcription failed)") == "Meeting 2")
+            #expect(AppModel.transcribedTitle(from: "Recording 3 (interrupted)") == nil)
+            #expect(AppModel.transcribedTitle(from: "Quarterly review") == nil)
+
+            let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+            let italian = try #require(Bundle(path: path))
+            #expect(AppModel.transcribedTitle(from: "Registrazione 1 (non trascritta)", bundle: italian) == "Registrazione 1")
+            #expect(AppModel.transcribedTitle(from: "Recording 2 (not transcribed)", bundle: italian) == "Recording 2")
         }
 
         // MARK: - Quitting during a take
