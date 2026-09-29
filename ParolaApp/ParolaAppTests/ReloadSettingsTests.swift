@@ -69,8 +69,7 @@ struct ReloadSettingsTests {
         #expect(afterChoosingSlateAgain.appAccentRaw == ThemePreset.slate.rawValue)
     }
 
-    /// Excludes `.slate`: that one value is the pre-Sage default written back on every launch, so it's
-    /// migrated instead of surviving untouched — see `slateMigratesToSageOnce`.
+    /// Excludes `.slate`, migrated instead of surviving untouched — see `slateMigratesToSageOnce`.
     @Test("a stored accent survives the change of default", arguments: ThemePreset.allCases.filter { $0 != .slate })
     func storedAccentSurvives(preset: ThemePreset) {
         let previous = DS.theme

@@ -159,9 +159,7 @@ struct SurfaceContrastTests {
         }
     }
 
-    /// Every label set on the accent *fill* — pills, chips, selected rows, the rule filter, the captions mode chip.
-    /// `accentFill` is the opaque fill those surfaces actually draw, so this checks the pair that lands on screen,
-    /// not the raw `accent` a custom or future preset might leave under AA.
+    /// Every label set on the accent fill — the opaque pair actually drawn, not the raw `accent` a custom or future preset might leave under AA.
     @Test("onAccent clears AA on the accent fill actually drawn, every preset, both schemes",
           arguments: ThemePreset.allCases)
     func onAccentClearsAAOnAccentFill(preset: ThemePreset) throws {

@@ -142,8 +142,7 @@ struct ThemePaletteTests {
         }
     }
 
-    /// A custom palette seeded from Sage never keeps its brand fill and ink once its own accent moves on
-    /// (S5): they're matched by the live accent value, never stored on the palette.
+    /// A custom palette seeded from Sage never keeps its brand fill and ink once its own accent moves on — they're matched by the live accent value, never stored on the palette.
     @Test("Sage's brand fill and ink don't outlive a palette's own accent")
     func sageOverrideDoesNotOutliveItsAccent() {
         var palette = ThemePreset.sage.palette
@@ -394,8 +393,7 @@ struct ThemedColorCacheTests {
         #expect(lightSurface.relativeLuminance > darkSurface.relativeLuminance)
     }
 
-    /// Terracotta's ink policy actually differs by appearance (light costs 10% of the fill's value and
-    /// keeps white; dark would cost 30% and takes near-black instead) — `DS.Color.onAccent` has to track it.
+    /// Terracotta's ink policy differs by appearance (light costs 10% and keeps white, dark costs 30% and takes near-black) — `DS.Color.onAccent` has to track it.
     @Test("onAccent resolves the ink the policy actually picked, per appearance")
     func onAccentStaysDynamicThroughAppearance() throws {
         let previous = DS.theme

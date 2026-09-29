@@ -57,9 +57,7 @@ struct SpeakerPaletteTests {
         #expect(DS.speakerPalette.contains(DS.speakerColor(for: "Giulio")))
     }
 
-    /// Steel blue (hue #3, replacing a plum too close to mauve) against every other hue and against
-    /// Sage, in both appearances. Not a full 21-pair mesh: two pre-existing pairs (warm tan/ochre,
-    /// dusty blue/slate-dark) already sit under 10 ΔE and are outside this fix's named scope.
+    /// Steel blue (hue #3) against every other hue and against Sage — not a full mesh: two pre-existing pairs already sit under 10 ΔE, outside this fix's scope.
     @Test("the new speaker hue clears CIEDE2000 10 from every other hue, 20 from the default accent")
     func steelBlueClearsMinimumDistances() throws {
         let steelBlue = try #require(Self.pair(DS.speakerTints[2]))
@@ -95,8 +93,7 @@ struct SpeakerPaletteTests {
         return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
     }
 
-    /// The CIE ΔE2000 colour difference between two sRGB values — the perceptual metric the speaker
-    /// palette's minimum-distance rule is judged by, not a flat Euclidean RGB or Lab distance.
+    /// The CIE ΔE2000 colour difference between two sRGB values — the perceptual metric the speaker palette's minimum-distance rule is judged by.
     private static func ciede2000(_ rgba1: RGBA, _ rgba2: RGBA) -> Double {
         let (l1, a1, b1) = lab(rgba1)
         let (l2, a2, b2) = lab(rgba2)

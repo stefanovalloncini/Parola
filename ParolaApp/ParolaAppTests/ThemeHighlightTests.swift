@@ -24,8 +24,7 @@ struct ThemeHighlightTests {
         #expect(dark.chroma >= 0.15)
     }
 
-    /// Mono's ink chroma (0.047 light / 0.035 dark) sits below the floor; every other preset, Sage
-    /// included (0.129 / 0.110), sits above it — the floor was lowered from 0.15 to 0.08 for exactly this.
+    /// Mono's ink chroma (0.047 light / 0.035 dark) sits below the 0.08 floor; every other preset, including Sage (0.129 / 0.110), sits above it.
     @Test("Mono cannot tint search hits; every other preset, including Sage, can", arguments: ThemePreset.allCases)
     func inkTintabilityByPreset(_ preset: ThemePreset) {
         #expect(preset.palette.accentInk.readsAsTint == (preset != .graphite), "\(preset.rawValue)")

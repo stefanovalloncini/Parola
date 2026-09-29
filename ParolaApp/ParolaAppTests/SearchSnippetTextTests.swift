@@ -49,7 +49,7 @@ struct SearchSnippetTextTests {
         #expect(ranges == [3..<9, 15..<21])
     }
 
-    /// Pinned to Sage: its ink's chroma (0.11 light / 0.11 dark) is the lowest of any preset that must still tint a hit.
+    /// Pinned to Sage: its ink's chroma (0.129 light / 0.110 dark) is the lowest of any preset that must still tint a hit.
     @Test("every marked range survives the round trip into an attributed string")
     @MainActor
     func attributedKeepsEveryRun() {
