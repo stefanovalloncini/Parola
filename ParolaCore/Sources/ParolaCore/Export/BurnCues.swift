@@ -20,7 +20,9 @@ extension SubtitleBurner {
     ) throws -> [BurnCue] {
         let exporter = SrtExporter(spec: ExportSpec(style: .subtitles, format: .srt, options: options).changing(format: .srt))
         let prepared = exporter.spec.prepared(transcript)
-        let font = Format.cascadingFont(name: metrics.fontName, size: metrics.fontSize, language: transcript.language)
+        let font = Format.cascadingFont(
+            name: metrics.fontName, size: metrics.fontSize, language: captionLanguage(of: transcript, options: options)
+        )
         let maxWidth = renderSize.width - metrics.horizontalInset * 2
         var cues: [(order: Int, cue: BurnCue)] = []
         for segment in prepared.segments {
@@ -34,6 +36,14 @@ extension SubtitleBurner {
             }
         }
         return cues.sorted { ($0.cue.start, $0.order) < ($1.cue.start, $1.order) }.map(\.cue)
+    }
+
+    /// The language the cues are written in, which picks the fallback font for their script.
+    static func captionLanguage(of transcript: Transcript, options: ExportOptions) -> String {
+        guard options.content == .translation, let target = transcript.translation?.targetLanguage else {
+            return transcript.language
+        }
+        return target
     }
 
     /// The lines Core Text breaks the text into at this width, which are the lines the burn draws.

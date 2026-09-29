@@ -87,7 +87,7 @@ public enum SubtitleBurner {
         let metrics = CaptionMetrics(style: style, renderSize: renderSize)
         let captions = BurnCaptionTrack(
             cues: try cues(from: transcript, options: options, metrics: metrics, renderSize: renderSize),
-            language: transcript.language,
+            language: captionLanguage(of: transcript, options: options),
             metrics: metrics,
             renderSize: renderSize
         )

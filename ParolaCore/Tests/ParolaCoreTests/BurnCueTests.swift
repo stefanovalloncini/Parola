@@ -115,4 +115,22 @@ struct BurnCueTests {
         )
         #expect(built.map(\.text) == ["Buongiorno."])
     }
+
+    @Test("a translation burn picks its fallback font from the translation's language")
+    func translationUsesItsOwnLanguage() {
+        let translated = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 2, text: "Good morning.")],
+            language: "en", modelName: "test",
+            translation: TranscriptTranslation(targetLanguage: "ja", segments: [0: "おはようございます。"], createdAt: Date(), provider: "test")
+        )
+        var options = ExportSpec.standard(for: .srt).options
+        #expect(SubtitleBurner.captionLanguage(of: translated, options: options) == "en")
+        options.content = .both
+        #expect(SubtitleBurner.captionLanguage(of: translated, options: options) == "en")
+        options.content = .translation
+        #expect(SubtitleBurner.captionLanguage(of: translated, options: options) == "ja")
+        var untranslated = translated
+        untranslated.translation = nil
+        #expect(SubtitleBurner.captionLanguage(of: untranslated, options: options) == "en")
+    }
 }
