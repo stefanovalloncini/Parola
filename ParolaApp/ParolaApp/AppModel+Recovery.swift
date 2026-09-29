@@ -412,13 +412,13 @@ extension AppModel {
         return (try? await AppModel.offMainIO { Self.readableRecordingURL(candidate) }) ?? nil
     }
 
-    /// What a recording checkpoint holds as a transcript; nil when it holds nothing at all.
+    /// What a recording checkpoint holds as a transcript, not transcribed when no words came through; nil when it holds nothing at all.
     nonisolated static func restoredTranscript(_ checkpoint: RecoveryCheckpoint, audioURL: URL?) -> Transcript? {
         guard !checkpoint.segments.isEmpty || audioURL != nil else { return nil }
         return Transcript(
             segments: checkpoint.segments,
             language: checkpoint.language ?? "en",
-            modelName: checkpoint.modelName,
+            modelName: checkpoint.segments.isEmpty ? "" : checkpoint.modelName,
             sourceURL: audioURL,
             durationSeconds: checkpoint.segments.last?.end
         )

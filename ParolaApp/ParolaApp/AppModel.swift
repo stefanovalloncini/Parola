@@ -3452,8 +3452,9 @@ final class AppModel {
         let takeTitle = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
         let savedPartial = !confirmed.isEmpty || audioURL != nil
         if savedPartial {
+            // With no words through, no model ran on it as far as the entry can tell: it opens as not transcribed.
             let finished = await StreamingTranscriptionSession.finishedTake(
-                segments: confirmed, options: currentOptions, modelName: selectedModel, audioURL: audioURL
+                segments: confirmed, options: currentOptions, modelName: confirmed.isEmpty ? "" : selectedModel, audioURL: audioURL
             )
             let partial = await postProcessDetached(finished)
             saveTake(

@@ -31,6 +31,23 @@ private struct InstantClock: Clock {
     }
 }
 
+/// A live session that failed after keeping audio but before confirming a word.
+private actor AudioOnlySession: StreamingTranscriber {
+    let audio: URL
+    init(audio: URL) { self.audio = audio }
+    func start(
+        options: TranscriptionOptions,
+        speakerLabeler: (any StreamingSpeakerLabeler)?,
+        downloadProgress: (@Sendable (Double) -> Void)?
+    ) async throws -> AsyncStream<StreamingEvent> {
+        AsyncStream { $0.finish() }
+    }
+    func stop() async {}
+    func cancel() async {}
+    func currentModel() async -> String? { nil }
+    func recordingAudioURL() async -> URL? { audio }
+}
+
 /// Whether a quit asked, and the reply it handed back once the take was wound down.
 @MainActor
 private final class QuitReply {
@@ -541,6 +558,31 @@ extension TranscriberMockSuites {
                     sourceFileURL: model.sourceFileURL, entry: entry, showsAITitle: model.showAITitles, fallback: "Untitled"
                 ) == title)
             }
+        }
+
+        @Test("a live take that failed before a word came through is saved as not transcribed, not as no speech")
+        func failedLiveTakeWithoutWordsIsNotTranscribed() async throws {
+            let wav = try makeTakeWAV("no-words")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            let model = makeModel()
+            model.phase = .recording(source: .microphone)
+
+            await model.handleStreamingEvent(.failed("the engine stopped"), session: AudioOnlySession(audio: wav))
+
+            let saved = try #require(await entries(model, count: 1).first)
+            #expect(saved.title.hasSuffix("(interrupted)"))
+            #expect(try await model.library.load(saved.id).document.transcript.modelName.isEmpty)
+        }
+
+        @Test("a restored recording with audio but no words opens as not transcribed")
+        func restoredTakeWithoutWordsIsNotTranscribed() {
+            let checkpoint = RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "openai_whisper-base")
+            let audio = URL(fileURLWithPath: "/tmp/parola-restored.wav")
+            #expect(AppModel.restoredTranscript(checkpoint, audioURL: audio)?.modelName == "")
+            var withWords = checkpoint
+            withWords.segments = [TranscriptSegment(id: 0, start: 0, end: 1, text: "salvato")]
+            #expect(AppModel.restoredTranscript(withWords, audioURL: audio)?.modelName == "openai_whisper-base")
+            #expect(AppModel.restoredTranscript(checkpoint, audioURL: nil) == nil)
         }
 
         @Test("a take's title and its notes read in Italian")
