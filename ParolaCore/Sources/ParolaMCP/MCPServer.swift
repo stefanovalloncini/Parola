@@ -288,14 +288,17 @@ public actor MCPServer {
 
     private func summarize(args: [String: Any]) async throws -> MCPToolCallResult {
         try features.require(.ai)
-        guard let path = args["path"] as? String else {
+        guard let path = TranscribeRequest.text(args["path"]) else {
             throw MCPToolError("Missing required argument: path")
         }
         let url = URL(fileURLWithPath: path)
         let source = FileAudioSource(url: url)
         let transcript = try await session.transcribe(
             source: source,
-            options: TranscriptionOptions(model: args["model"] as? String, language: args["language"] as? String)
+            options: TranscriptionOptions(
+                model: TranscribeRequest.text(args["model"]),
+                language: TranscribeRequest.text(args["language"])
+            )
         )
         let summary = try await SummaryService(features: features)
             .summarise(transcript, options: SummaryOptions(actionItems: false))

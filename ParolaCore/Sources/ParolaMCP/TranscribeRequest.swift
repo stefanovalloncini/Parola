@@ -104,7 +104,8 @@ struct TranscribeRequest: Sendable {
         }
     }
 
-    private static func text(_ value: Any?) -> String? {
+    /// An argument's text, trimmed; blank or missing reads as not given, so both engine tools read their options alike.
+    static func text(_ value: Any?) -> String? {
         guard let string = value as? String else { return nil }
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed

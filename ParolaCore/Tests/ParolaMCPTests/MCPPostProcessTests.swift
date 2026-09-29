@@ -65,7 +65,7 @@ struct MCPPostProcessTests {
         #expect(saved.segments.map(\.text) == ["Non so perché.", "Ne voglio un po'."])
     }
 
-    @Test("parola_summarize goes through the summary service and returns the summary with its chapters")
+    @Test("parola_summarize goes through the summary service, reads its options as parola_transcribe does, and returns the summary with its chapters")
     func summarizeUsesTheSummaryService() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-mcp-summarize-\(UUID().uuidString)", isDirectory: true)
@@ -103,7 +103,7 @@ struct MCPPostProcessTests {
             method: "tools/call",
             params: AnyDecodable([
                 "name": "parola_summarize",
-                "arguments": ["path": audio.path, "model": "openai_whisper-tiny"] as [String: Any],
+                "arguments": ["path": audio.path, "model": " openai_whisper-tiny ", "language": ""] as [String: Any],
             ] as [String: Any])
         )
 
