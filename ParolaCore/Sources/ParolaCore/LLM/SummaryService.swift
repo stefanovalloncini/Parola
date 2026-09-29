@@ -19,29 +19,26 @@ public actor SummaryService {
         public var errorDescription: String? { description }
     }
 
-    public static let defaultBudgetTokens = 3500
-
-    private let budgetTokens: Int
+    private let budget: TokenBudget
     private let features: FeatureSet
     /// nil means Apple's on-device model, the only path that can answer in Generable form.
     private let makeModel: (@Sendable (String?) async throws -> any LanguageModel)?
 
-    /// The budget is the prompt-token ceiling (bytes/4 estimate); transcripts over it are
-    /// summarised per time-window and reduced. The default fits Apple's 4096-token context.
-    public init(budgetTokens: Int = SummaryService.defaultBudgetTokens, features: FeatureSet = .resolve()) {
-        self.budgetTokens = budgetTokens
+    /// A transcript over the budget is summarised per time-window and reduced.
+    public init(budget: TokenBudget = .onDevice, features: FeatureSet = .resolve()) {
+        self.budget = budget
         self.features = features
         self.makeModel = nil
     }
 
     /// Summarises through the model `makeModel` builds for the instructions it is handed, instead
-    /// of Apple's on-device model.
+    /// of Apple's on-device model. `budget` is that model's, so the windows match what it can take.
     public init(
-        budgetTokens: Int = SummaryService.defaultBudgetTokens,
+        budget: TokenBudget,
         features: FeatureSet = .resolve(),
         makeModel: @escaping @Sendable (String?) async throws -> any LanguageModel
     ) {
-        self.budgetTokens = budgetTokens
+        self.budget = budget
         self.features = features
         self.makeModel = makeModel
     }
@@ -70,7 +67,7 @@ public actor SummaryService {
     }
 
     private func summarise(_ transcript: Transcript, model: any LanguageModel, options: SummaryOptions) async throws -> Summary {
-        try await summarise(transcript, options: options) { prompt in
+        try await summarise(transcript, options: options, instructions: SummaryService.textInstructions(for: options)) { prompt in
             do {
                 return SummaryService.parse(try await model.respond(to: prompt))
             } catch {
@@ -83,23 +80,43 @@ public actor SummaryService {
     private func summarise(
         _ transcript: Transcript,
         options: SummaryOptions,
+        instructions: String,
         respond: (String) async throws -> Summary
     ) async throws -> Summary {
-        let lines = transcript.segments.map { SummaryService.line(for: $0, options: options) }
-        let prompt = SummaryService.promptHeader + lines.compactMap { $0 }.joined()
-        guard TokenBudget.estimateTokens(prompt) > budgetTokens else {
-            return try await respond(prompt)
+        let windows = await SummaryService.windows(for: transcript, budget: budget, instructions: instructions, options: options)
+        guard windows.count > 1 else {
+            return try await respond(windows[0].text)
         }
-        let windows = SummaryService.windowPrompts(for: transcript, lines: lines, budgetTokens: budgetTokens)
         var parts: [Summary] = []
         for window in windows {
-            parts.append(try await respond(window.prompt))
+            parts.append(try await respond(window.text))
         }
-        let reduced = try await respond(SummaryService.buildReducePrompt(parts.map(\.text)))
+        let reduced = try await reduce(parts.map(\.text), instructions: instructions, respond: respond)
         return Summary(
             text: reduced.text,
             chapters: SummaryService.mergeChapters(parts.flatMap(\.chapters)),
             actionItems: SummaryService.mergeActionItems(parts.flatMap(\.actionItems) + reduced.actionItems)
+        )
+    }
+
+    /// One reduce call when the parts fit together, otherwise each half is reduced first.
+    private func reduce(
+        _ texts: [String],
+        instructions: String,
+        respond: (String) async throws -> Summary
+    ) async throws -> Summary {
+        let prompt = SummaryService.buildReducePrompt(texts)
+        let limit = await TranscriptWindows.inputLimit(budget: budget, instructions: instructions, answer: .brief)
+        guard texts.count > 2, !(await budget.fits(prompt, within: limit)) else {
+            return try await respond(prompt)
+        }
+        let middle = texts.count / 2
+        let head = try await reduce(Array(texts[..<middle]), instructions: instructions, respond: respond)
+        let tail = try await reduce(Array(texts[middle...]), instructions: instructions, respond: respond)
+        let joined = try await respond(SummaryService.buildReducePrompt([head.text, tail.text]))
+        return Summary(
+            text: joined.text,
+            actionItems: SummaryService.mergeActionItems(head.actionItems + tail.actionItems + joined.actionItems)
         )
     }
 
@@ -126,8 +143,9 @@ public actor SummaryService {
             throw FailureReason.notAvailable("Apple Intelligence isn't available right now.")
         }
 
-        return try await summarise(transcript, options: options) { prompt in
-            let session = LanguageModelSession(instructions: SummaryService.structuredInstructions(for: options))
+        let instructions = SummaryService.structuredInstructions(for: options)
+        return try await summarise(transcript, options: options, instructions: instructions) { prompt in
+            let session = LanguageModelSession(instructions: instructions)
             do {
                 let response = try await session.respond(to: prompt, generating: GenerableSummary.self)
                 var summary = response.content.toSummary()
@@ -215,49 +233,23 @@ public actor SummaryService {
 
     static let promptHeader = "Transcript follows. Each line is prefixed with its timestamp.\n\n"
 
-    static func buildPrompt(for transcript: Transcript) -> String {
-        promptHeader + TranscriptPromptContext.timestampedLines(for: transcript)
+    static func buildPrompt(for transcript: Transcript, options: SummaryOptions = .default) -> String {
+        promptHeader + transcript.segments.compactMap { line(for: $0, options: options) }.joined()
     }
 
-    static func windows(for transcript: Transcript, budgetTokens: Int) -> [Transcript] {
-        windowPrompts(
-            for: transcript,
-            lines: transcript.segments.map(TranscriptPromptContext.timestampedLine(for:)),
-            budgetTokens: budgetTokens
-        ).map(\.transcript)
-    }
-
-    static func windowPrompts(
+    static func windows(
         for transcript: Transcript,
-        lines: [String?],
-        budgetTokens: Int
-    ) -> [(transcript: Transcript, prompt: String)] {
-        let lineBudget = max(1, budgetTokens - TokenBudget.estimateTokens(promptHeader))
-        var windows: [(transcript: Transcript, prompt: String)] = []
-        var current: [TranscriptSegment] = []
-        var body = ""
-        var used = 0
-
-        func close() {
-            guard !current.isEmpty else { return }
-            windows.append((
-                Transcript(segments: current, language: transcript.language, modelName: transcript.modelName),
-                promptHeader + body
-            ))
-            current = []
-            body = ""
-            used = 0
-        }
-
-        for (segment, line) in zip(transcript.segments, lines) {
-            let cost = line.map(TokenBudget.estimateTokens) ?? 0
-            if !current.isEmpty && used + cost > lineBudget { close() }
-            current.append(segment)
-            if let line { body += line }
-            used += cost
-        }
-        close()
-        return windows
+        budget: TokenBudget,
+        instructions: String,
+        options: SummaryOptions = .default
+    ) async -> [TranscriptWindows.Window] {
+        await TranscriptWindows.split(
+            transcript,
+            budget: budget,
+            instructions: instructions,
+            line: { line(for: $0, options: options) },
+            render: { buildPrompt(for: $0, options: options) }
+        )
     }
 
     static func buildReducePrompt(_ partSummaries: [String]) -> String {

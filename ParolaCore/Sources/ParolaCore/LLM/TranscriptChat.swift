@@ -10,24 +10,22 @@ public enum TranscriptChatProvider: Sendable, Hashable {
 }
 
 public enum TranscriptChat {
-    public static let defaultBudgetTokens = 3500
-
     public static func makeSession(
         transcript: Transcript,
         history: [ChatMessage] = [],
-        budgetTokens: Int? = nil,
+        budget: TokenBudget? = nil,
         features: FeatureSet = .resolve()
     ) throws -> TranscriptChatSession {
         try features.require(.ai)
-        let budget = budgetTokens ?? defaultBudgetTokens
+        let budget = budget ?? .onDevice
         let model: any LanguageModel
-        if usesCondensedContext(for: transcript, budgetTokens: budget) {
+        if usesCondensedContext(for: transcript, budget: budget) {
             // Probe availability now so an over-budget session fails at creation like the plain path.
             _ = try makeOnDeviceModel(instructions: "")
             model = CondensedChatModel(
                 transcript: transcript,
-                budgetTokens: budget,
-                makeDigest: digestProvider(for: transcript, budgetTokens: budget),
+                budget: budget,
+                makeDigest: digestProvider(for: transcript, budget: budget),
                 makeModel: { try makeOnDeviceModel(instructions: $0) }
             )
         } else {
@@ -42,18 +40,18 @@ public enum TranscriptChat {
         provider: TranscriptChatProvider,
         keyStore: APIKeyStore = KeychainAPIKeyStore.shared,
         managed: ManagedConfiguration = .shared,
-        budgetTokens: Int? = nil,
+        budget: TokenBudget? = nil,
         features: FeatureSet = .resolve()
     ) async throws -> TranscriptChatSession {
         try features.require(.ai)
         switch provider {
         case .onDevice:
-            return try makeSession(transcript: transcript, history: history, budgetTokens: budgetTokens, features: features)
+            return try makeSession(transcript: transcript, history: history, budget: budget, features: features)
         case .cloud(let id):
             return try await makeSession(
                 transcript: transcript,
                 history: history,
-                budgetTokens: budgetTokens ?? cloudBudgetTokens(for: id),
+                budget: budget ?? .cloud(id),
                 features: features,
                 makeModel: { instructions in
                     try await LanguageModelFactory.makeBYOKCloud(
@@ -68,24 +66,23 @@ public enum TranscriptChat {
     }
 
     /// Chat through a model the caller builds for the instructions it is handed. A transcript over
-    /// `budgetTokens` is condensed the same way the on-device and cloud paths condense it.
+    /// `budget` is condensed the same way the on-device and cloud paths condense it.
     public static func makeSession(
         transcript: Transcript,
         history: [ChatMessage] = [],
-        budgetTokens: Int? = nil,
+        budget: TokenBudget,
         features: FeatureSet = .resolve(),
         makeModel: @escaping @Sendable (String) async throws -> any LanguageModel
     ) async throws -> TranscriptChatSession {
         try features.require(.ai)
-        let budget = budgetTokens ?? defaultBudgetTokens
         let model: any LanguageModel
-        if usesCondensedContext(for: transcript, budgetTokens: budget) {
+        if usesCondensedContext(for: transcript, budget: budget) {
             // Probe key/policy now so an over-budget session fails at creation like the plain path.
             _ = try await makeModel("")
             model = CondensedChatModel(
                 transcript: transcript,
-                budgetTokens: budget,
-                makeDigest: digestProvider(for: transcript, budgetTokens: budget, summariseModel: {
+                budget: budget,
+                makeDigest: digestProvider(for: transcript, budget: budget, summariseModel: {
                     try await makeModel(SummaryService.textInstructions(for: SummaryOptions(actionItems: false)))
                 }),
                 makeModel: makeModel
@@ -94,20 +91,6 @@ public enum TranscriptChat {
             model = try await makeModel(systemInstructions(for: transcript))
         }
         return TranscriptChatSession(transcript: transcript, history: history, model: model)
-    }
-
-    /// The prompt ceiling a chat on `choice` can take, so a caller can size the session it asks for.
-    /// Ollama is sized from the context window Parola asks it for; a custom endpoint's is unknown,
-    /// so it gets the same budget the on-device model does.
-    public static func budgetTokens(for choice: LanguageModelProviderChoice) -> Int {
-        switch choice {
-        case .onDevice, .custom:
-            return defaultBudgetTokens
-        case .cloud(let provider, _):
-            return cloudBudgetTokens(for: provider)
-        case .ollama:
-            return max(defaultBudgetTokens, OllamaLanguageModel.defaultContextTokens - 4096)
-        }
     }
 
     /// The system prompt a chat session runs with: the instructions plus the whole transcript,
@@ -125,26 +108,21 @@ public enum TranscriptChat {
         """
 
     /// Sized from the lines' lengths: a long transcript is condensed without ever building its full instructions.
-    static func usesCondensedContext(for transcript: Transcript, budgetTokens: Int) -> Bool {
+    static func usesCondensedContext(for transcript: Transcript, budget: TokenBudget) -> Bool {
         let utf8Count = systemInstructionsHeader.utf8.count + TranscriptPromptContext.timestampedLinesUTF8Count(for: transcript)
-        return TokenBudget.estimateTokens(utf8Count: utf8Count) > budgetTokens
-    }
-
-    static func cloudBudgetTokens(for id: CloudLLMProviderID, responseHeadroom: Int = 4096) -> Int {
-        guard let info = CloudLLMProviderInfo.info(for: id) else { return defaultBudgetTokens }
-        return max(defaultBudgetTokens, info.contextWindowTokens - responseHeadroom)
+        return budget.estimate(utf8Count: utf8Count) > budget.tokens
     }
 
     static func digestProvider(
         for transcript: Transcript,
-        budgetTokens: Int,
+        budget: TokenBudget,
         summariseModel: (@Sendable () async throws -> any LanguageModel)? = nil
     ) -> @Sendable () async throws -> Summary {
         if let summary = transcript.summary, !summary.text.isEmpty {
             return { summary }
         }
         return {
-            let service = SummaryService(budgetTokens: budgetTokens)
+            let service = SummaryService(budget: budget)
             if let summariseModel {
                 return try await service.summarise(transcript, model: try await summariseModel())
             }
@@ -168,13 +146,13 @@ public enum TranscriptChat {
         for transcript: Transcript,
         question: String,
         digest: Summary,
-        budgetTokens: Int
+        budget: TokenBudget
     ) -> String {
         condensedInstructions(
             for: KeywordIndex(transcript),
             question: question,
             digest: digest,
-            budgetTokens: budgetTokens
+            budget: budget
         )
     }
 
@@ -182,7 +160,7 @@ public enum TranscriptChat {
         for index: KeywordIndex,
         question: String,
         digest: Summary,
-        budgetTokens: Int
+        budget: TokenBudget
     ) -> String {
         var out = """
         You answer questions about a transcript. Be concise — one or two sentences unless the user asks for more. When you reference a moment from the audio, include its timestamp in MM:SS or HH:MM:SS form.
@@ -199,8 +177,8 @@ public enum TranscriptChat {
             }
         }
         out += "\nRELEVANT EXCERPTS:\n"
-        let remaining = budgetTokens - TokenBudget.estimateTokens(out)
-        for segment in relevantSegments(in: index, question: question, maxTokens: remaining) {
+        let remaining = budget.tokens - budget.estimate(out)
+        for segment in relevantSegments(in: index, question: question, maxTokens: remaining, budget: budget) {
             let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
             out += "\(Timecode.format(segment.start))  \(body)\n"
         }
@@ -210,15 +188,17 @@ public enum TranscriptChat {
     static func relevantSegments(
         in transcript: Transcript,
         question: String,
-        maxTokens: Int
+        maxTokens: Int,
+        budget: TokenBudget
     ) -> [TranscriptSegment] {
-        relevantSegments(in: KeywordIndex(transcript), question: question, maxTokens: maxTokens)
+        relevantSegments(in: KeywordIndex(transcript), question: question, maxTokens: maxTokens, budget: budget)
     }
 
     static func relevantSegments(
         in index: KeywordIndex,
         question: String,
-        maxTokens: Int
+        maxTokens: Int,
+        budget: TokenBudget
     ) -> [TranscriptSegment] {
         let questionTokens = keywordTokens(question)
         guard !questionTokens.isEmpty, maxTokens > 0 else { return [] }
@@ -228,12 +208,12 @@ public enum TranscriptChat {
                 return overlap > 0 ? (segment, overlap) : nil
             }
             .sorted { $0.score == $1.score ? $0.segment.start < $1.segment.start : $0.score > $1.score }
-        var budget = maxTokens
+        var left = maxTokens
         var picked: [TranscriptSegment] = []
         for (segment, _) in ranked {
-            let cost = TokenBudget.estimateTokens(segment.text) + 4
-            guard cost <= budget else { continue }
-            budget -= cost
+            let cost = budget.estimate(segment.text) + 4
+            guard cost <= left else { continue }
+            left -= cost
             picked.append(segment)
         }
         return picked.sorted { $0.start < $1.start }

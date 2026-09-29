@@ -4,19 +4,19 @@ actor CondensedChatModel: LanguageModel {
     private let transcript: Transcript
     /// Built at the first question, on this actor, rather than wherever the session was made.
     private var index: TranscriptChat.KeywordIndex?
-    private let budgetTokens: Int
+    private let budget: TokenBudget
     private let makeDigest: @Sendable () async throws -> Summary
     private let makeModel: @Sendable (String) async throws -> any LanguageModel
     private var digest: Summary?
 
     init(
         transcript: Transcript,
-        budgetTokens: Int,
+        budget: TokenBudget,
         makeDigest: @escaping @Sendable () async throws -> Summary,
         makeModel: @escaping @Sendable (String) async throws -> any LanguageModel
     ) {
         self.transcript = transcript
-        self.budgetTokens = budgetTokens
+        self.budget = budget
         self.makeDigest = makeDigest
         self.makeModel = makeModel
     }
@@ -50,7 +50,7 @@ actor CondensedChatModel: LanguageModel {
             for: index,
             question: question,
             digest: try await cachedDigest(),
-            budgetTokens: budgetTokens
+            budget: budget
         )
         return try await makeModel(instructions)
     }

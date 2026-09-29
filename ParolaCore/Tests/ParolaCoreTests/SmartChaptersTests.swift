@@ -143,7 +143,7 @@ struct SmartChaptersTests {
             modelName: "tiny"
         )
         let model = MockLanguageModel(scriptedResponses: ["00:00 Intro\n09:00 Late discussion"])
-        let result = try await SmartChapters.generate(for: transcript, model: model)
+        let result = try await SmartChapters.generate(for: transcript, model: model, budget: TokenBudget(tokens: 3500))
         #expect(result.map(\.title) == ["Intro", "Late discussion"])
     }
 }

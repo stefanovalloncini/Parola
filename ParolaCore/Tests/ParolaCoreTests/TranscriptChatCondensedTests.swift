@@ -32,8 +32,8 @@ struct TranscriptChatCondensedTests {
             language: "en",
             modelName: "tiny"
         )
-        #expect(!TranscriptChat.usesCondensedContext(for: small, budgetTokens: TranscriptChat.defaultBudgetTokens))
-        #expect(TranscriptChat.usesCondensedContext(for: seededTranscript(), budgetTokens: 400))
+        #expect(!TranscriptChat.usesCondensedContext(for: small, budget: TokenBudget(tokens: 3500)))
+        #expect(TranscriptChat.usesCondensedContext(for: seededTranscript(), budget: TokenBudget(tokens: 400)))
     }
 
     @Test("the size check reads the lines' lengths and decides as the built instructions did")
@@ -56,9 +56,9 @@ struct TranscriptChatCondensedTests {
                 TranscriptPromptContext.timestampedLinesUTF8Count(for: transcript)
                     == TranscriptPromptContext.timestampedLines(for: transcript).utf8.count
             )
-            for budget in [1, 400, TranscriptChat.defaultBudgetTokens, 20_000, TokenBudget.estimateTokens(built)] {
+            for budget in [1, 400, 3500, 20_000, TokenBudget.estimateTokens(built)] {
                 #expect(
-                    TranscriptChat.usesCondensedContext(for: transcript, budgetTokens: budget)
+                    TranscriptChat.usesCondensedContext(for: transcript, budget: TokenBudget(tokens: budget))
                         == (TokenBudget.estimateTokens(built) > budget),
                     "\(count) segments, budget \(budget)"
                 )
@@ -76,7 +76,7 @@ struct TranscriptChatCondensedTests {
             for: seededTranscript(),
             question: "What happened to BERLIN revenue?",
             digest: digest,
-            budgetTokens: 600
+            budget: TokenBudget(tokens: 600)
         )
         #expect(out.contains("A quarterly review meeting."))
         #expect(out.contains("05:00  Revenue"))
@@ -90,14 +90,16 @@ struct TranscriptChatCondensedTests {
         let picked = TranscriptChat.relevantSegments(
             in: seededTranscript(),
             question: "What happened to BERLIN revenue?",
-            maxTokens: 200
+            maxTokens: 200,
+            budget: TokenBudget(tokens: 200)
         )
         #expect(picked.map(\.id) == [30])
 
         let pasta = TranscriptChat.relevantSegments(
             in: seededTranscript(),
             question: "Tell me that pasta carbonara recipe",
-            maxTokens: 200
+            maxTokens: 200,
+            budget: TokenBudget(tokens: 200)
         )
         #expect(pasta.first?.id == 31)
     }
@@ -107,7 +109,8 @@ struct TranscriptChatCondensedTests {
         let picked = TranscriptChat.relevantSegments(
             in: seededTranscript(),
             question: "quantum entanglement",
-            maxTokens: 200
+            maxTokens: 200,
+            budget: TokenBudget(tokens: 200)
         )
         #expect(picked.isEmpty)
     }
@@ -120,7 +123,7 @@ struct TranscriptChatCondensedTests {
         let digest = Summary(text: "Quarterly digest.", chapters: [])
         let model = CondensedChatModel(
             transcript: transcript,
-            budgetTokens: 600,
+            budget: TokenBudget(tokens: 600),
             makeDigest: {
                 await recorder.bumpDigest()
                 return digest
@@ -155,7 +158,7 @@ struct TranscriptChatCondensedTests {
         let inner = MockLanguageModel(scriptedResponses: ["ok"])
         let model = CondensedChatModel(
             transcript: seededTranscript(),
-            budgetTokens: 600,
+            budget: TokenBudget(tokens: 600),
             makeDigest: { Summary(text: "Digest.", chapters: []) },
             makeModel: { _ in inner }
         )

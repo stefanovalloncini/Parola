@@ -14,12 +14,13 @@ extension AppModel {
         let entryID = selectedEntryID
         let artifacts = derivedArtifactsGeneration
         let makeModel = summaryModelMaker()
+        let budget = tokenBudget(for: .summary)
         let provider = languageModelLabel(for: .summary)
         let summarise = summariseOperation ?? { [features] transcript, options in
             guard let makeModel else {
-                return try await SummaryService(features: features).summarise(transcript, options: options)
+                return try await SummaryService(budget: budget, features: features).summarise(transcript, options: options)
             }
-            return try await SummaryService(features: features, makeModel: makeModel)
+            return try await SummaryService(budget: budget, features: features, makeModel: makeModel)
                 .summarise(transcript, options: options)
         }
         Task { [weak self] in

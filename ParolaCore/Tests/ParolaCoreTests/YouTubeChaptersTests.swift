@@ -23,7 +23,7 @@ struct YouTubeChaptersTests {
     @Test("generator dispatches via the language model and returns its output")
     func generates() async throws {
         let model = makeModel()
-        let result = try await YouTubeChapters.generate(for: makeTranscript(), model: model)
+        let result = try await YouTubeChapters.generate(for: makeTranscript(), model: model, budget: TokenBudget(tokens: 3500))
         #expect(result.contains("00:00 Intro"))
         #expect(result.contains("02:34 Setup"))
     }
@@ -31,7 +31,7 @@ struct YouTubeChaptersTests {
     @Test("prompt embeds timestamped transcript text")
     func promptShape() async throws {
         let model = makeModel()
-        _ = try await YouTubeChapters.generate(for: makeTranscript(), model: model)
+        _ = try await YouTubeChapters.generate(for: makeTranscript(), model: model, budget: TokenBudget(tokens: 3500))
         let prompt = await model.receivedPrompts.last ?? ""
         #expect(prompt.contains("Welcome to the show."))
         #expect(prompt.contains("00:00"))
@@ -51,7 +51,7 @@ struct YouTubeChaptersTests {
             modelName: "tiny"
         )
         let model = makeModel()
-        _ = try await YouTubeChapters.generate(for: transcript, model: model)
+        _ = try await YouTubeChapters.generate(for: transcript, model: model, budget: TokenBudget(tokens: 3500))
         let prompt = await model.receivedPrompts.last ?? ""
         #expect(prompt.contains("1:01:40"))
     }

@@ -18,7 +18,7 @@ struct TranscriptChatTests {
         let chat = try await TranscriptChat.makeSession(
             transcript: makeTranscript(),
             history: [],
-            budgetTokens: 3500,
+            budget: TokenBudget(tokens: 3500),
             features: .all,
             makeModel: { _ in model }
         )
@@ -40,7 +40,7 @@ struct TranscriptChatTests {
         let chat = try await TranscriptChat.makeSession(
             transcript: long,
             history: [],
-            budgetTokens: 3500,
+            budget: TokenBudget(tokens: 3500),
             features: .all,
             makeModel: { instructions in
                 await handedInstructions.record(instructions)
@@ -55,14 +55,6 @@ struct TranscriptChatTests {
         // The digest and the answer both come from the maker: the probe, the summary and the question.
         #expect(await handedInstructions.count >= 3)
         #expect(await handedInstructions.last?.contains("RELEVANT EXCERPTS:") == true)
-    }
-
-    @Test("the budget for a choice follows the model behind it")
-    func budgetPerChoice() {
-        #expect(TranscriptChat.budgetTokens(for: .onDevice) == TranscriptChat.defaultBudgetTokens)
-        #expect(TranscriptChat.budgetTokens(for: .cloud(provider: .openAI, model: "gpt-4o-mini")) > 100_000)
-        #expect(TranscriptChat.budgetTokens(for: .ollama(endpoint: URL(string: "http://127.0.0.1:11434")!, model: "llama3.2:3b")) >= TranscriptChat.defaultBudgetTokens)
-        #expect(TranscriptChat.budgetTokens(for: .custom(baseURL: URL(string: "http://10.0.0.2:8080/v1")!, model: "m")) == TranscriptChat.defaultBudgetTokens)
     }
 
     @Test("first ask records user and assistant messages")

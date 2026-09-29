@@ -28,7 +28,7 @@ extension AppModel {
             guard let self else { return }
             do {
                 let model = try await LanguageModelFactory.makeOnDevice()
-                let result = try await YouTubeChapters.generate(for: transcript, model: model)
+                let result = try await YouTubeChapters.generate(for: transcript, model: model, budget: .onDevice)
                 promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
             } catch {
                 lastError = error.localizedDescription

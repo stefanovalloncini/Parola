@@ -302,7 +302,7 @@ extension AppModel {
         return try await TranscriptChat.makeSession(
             transcript: transcript,
             history: history,
-            budgetTokens: TranscriptChat.budgetTokens(for: choice),
+            budget: TokenBudget(for: choice),
             features: features,
             makeModel: { [weak self] instructions in
                 guard let self else { throw CancellationError() }
@@ -321,6 +321,11 @@ extension AppModel {
             ) else { return nil }
             return try? await PromptRunner.run(prompt, on: input, model: model)
         }
+    }
+
+    /// The window of the model `task` runs on, so a long input is split to fit it.
+    func tokenBudget(for task: LanguageModelTask) -> TokenBudget {
+        TokenBudget(for: resolvedLanguageModelChoice(for: task))
     }
 
     /// The summariser for the current selection, or nil when summaries stay on device and the

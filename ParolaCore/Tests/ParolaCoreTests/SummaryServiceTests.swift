@@ -7,7 +7,7 @@ struct SummaryServiceTests {
     @Test("the injected model maker answers instead of the on-device model")
     func injectedModelMaker() async throws {
         let model = MockLanguageModel(scriptedResponses: ["SUMMARY:\nA short recap.\n\nCHAPTERS:\n00:00  Opening lines\n"])
-        let service = SummaryService(makeModel: { _ in model })
+        let service = SummaryService(budget: TokenBudget(tokens: 3500), makeModel: { _ in model })
         let transcript = Transcript(
             segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "We ship the patch on Friday.")],
             language: "en",
@@ -26,7 +26,7 @@ struct SummaryServiceTests {
     func injectedMakerGetsInstructions() async throws {
         let recorder = InstructionRecorder()
         let model = MockLanguageModel(scriptedResponses: ["SUMMARY:\nRecap.\n"])
-        let service = SummaryService(makeModel: { instructions in
+        let service = SummaryService(budget: TokenBudget(tokens: 3500), makeModel: { instructions in
             await recorder.record(instructions)
             return model
         })

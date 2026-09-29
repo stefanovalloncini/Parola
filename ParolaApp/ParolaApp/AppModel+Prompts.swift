@@ -36,7 +36,9 @@ extension AppModel {
             guard let self else { return }
             do {
                 let model = try await makeLanguageModel(for: .prompts, instructions: prompt.instructions)
-                let result = try await PromptRunner.run(prompt, on: transcript.promptText, model: model, features: features)
+                let result = try await PromptRunner.run(
+                    prompt, on: transcript, model: model, budget: tokenBudget(for: .prompts), features: features
+                )
                 if generation == derivedArtifactsGeneration {
                     promptOutput = PromptOutput(promptName: prompt.name, text: result)
                 }
@@ -66,7 +68,9 @@ extension AppModel {
             guard let self else { return }
             do {
                 let model = try await makeLanguageModel(for: .prompts, instructions: prompt.instructions)
-                let result = try await PromptRunner.run(prompt, on: transcript.promptText, model: model, features: features)
+                let result = try await PromptRunner.run(
+                    prompt, on: transcript, model: model, budget: tokenBudget(for: .prompts), features: features
+                )
                 if generation == derivedArtifactsGeneration {
                     actionItems = ActionItemParser.parse(result)
                 }
@@ -152,7 +156,7 @@ extension AppModel {
             guard let self else { return }
             do {
                 let model = try await makeLanguageModel(for: .summary, instructions: nil)
-                let chapters = try await SmartChapters.generate(for: transcript, model: model)
+                let chapters = try await SmartChapters.generate(for: transcript, model: model, budget: tokenBudget(for: .summary))
                 if generation == derivedArtifactsGeneration {
                     smartChapters = chapters
                     persistChapters(chapters)
@@ -262,7 +266,7 @@ extension AppModel {
             guard let self else { return }
             do {
                 let model = try await makeLanguageModel(for: .summary, instructions: nil)
-                let result = try await YouTubeChapters.generate(for: transcript, model: model)
+                let result = try await YouTubeChapters.generate(for: transcript, model: model, budget: tokenBudget(for: .summary))
                 if generation == derivedArtifactsGeneration {
                     promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
                 }

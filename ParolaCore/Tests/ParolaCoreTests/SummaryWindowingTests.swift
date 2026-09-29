@@ -17,6 +17,19 @@ struct SummaryWindowingTests {
         )
     }
 
+    /// A budget that leaves `promptTokens` for each window once the summary instructions are counted.
+    private func budget(promptTokens: Int) -> TokenBudget {
+        TokenBudget(tokens: promptTokens + TokenBudget.estimateTokens(SummaryService.textInstructions(for: .default)))
+    }
+
+    private func windowsOf(_ transcript: Transcript, promptTokens: Int) async -> [Transcript] {
+        await SummaryService.windows(
+            for: transcript,
+            budget: budget(promptTokens: promptTokens),
+            instructions: SummaryService.textInstructions(for: .default)
+        ).map(\.transcript)
+    }
+
     private func windowResponse(_ i: Int, start: Double) -> String {
         """
         SUMMARY:
@@ -50,8 +63,7 @@ struct SummaryWindowingTests {
     @Test("over budget summarises each window then reduces")
     func overBudgetMapReduce() async throws {
         let transcript = longTranscript()
-        let budget = 200
-        let windows = SummaryService.windows(for: transcript, budgetTokens: budget)
+        let windows = await windowsOf(transcript, promptTokens: 200)
         #expect(windows.count == 4)
 
         var responses = windows.enumerated().map { i, window in
@@ -66,7 +78,7 @@ struct SummaryWindowingTests {
         """)
         let model = MockLanguageModel(scriptedResponses: responses)
 
-        let summary = try await SummaryService(budgetTokens: budget).summarise(transcript, model: model)
+        let summary = try await SummaryService(budget: budget(promptTokens: 200)).summarise(transcript, model: model)
 
         let prompts = await model.receivedPrompts
         #expect(prompts.count == windows.count + 1)
@@ -90,9 +102,9 @@ struct SummaryWindowingTests {
     }
 
     @Test("windows cover all segments in order at segment boundaries")
-    func windowsCoverSegments() {
+    func windowsCoverSegments() async {
         let transcript = longTranscript(segmentCount: 7)
-        let windows = SummaryService.windows(for: transcript, budgetTokens: 400)
+        let windows = await windowsOf(transcript, promptTokens: 400)
         #expect(windows.count > 1)
         #expect(windows.flatMap(\.segments) == transcript.segments)
         for window in windows {
@@ -101,33 +113,31 @@ struct SummaryWindowingTests {
     }
 
     @Test("blank segments cost nothing and never open a window of their own")
-    func blankSegmentsAreFree() throws {
+    func blankSegmentsAreFree() async throws {
         var segments = (0..<4).map(segment)
         for i in 0..<4 {
             segments.insert(TranscriptSegment(id: 100 + i, start: Double(i) * 300 + 250, end: Double(i) * 300 + 260, text: "  \n"), at: i * 2 + 1)
         }
         let transcript = Transcript(segments: segments, language: "en", modelName: "tiny")
-        let windows = SummaryService.windows(for: transcript, budgetTokens: 200)
-        #expect(windows.count == 4)
-        #expect(windows.flatMap(\.segments) == transcript.segments)
-        let prompted = SummaryService.windowPrompts(
+        let prompted = await SummaryService.windows(
             for: transcript,
-            lines: transcript.segments.map(TranscriptPromptContext.timestampedLine(for:)),
-            budgetTokens: 200
+            budget: budget(promptTokens: 200),
+            instructions: SummaryService.textInstructions(for: .default)
         )
-        #expect(prompted.map(\.prompt) == windows.map { SummaryService.buildPrompt(for: $0) })
+        #expect(prompted.count == 4)
+        #expect(prompted.flatMap(\.transcript.segments) == transcript.segments)
+        #expect(prompted.map(\.text) == prompted.map { SummaryService.buildPrompt(for: $0.transcript) })
     }
 
     @Test("a failed window propagates and no reduce call happens")
     func windowFailurePropagates() async throws {
         let transcript = longTranscript()
-        let budget = 200
         let model = MockLanguageModel(
             scriptedResponses: [windowResponse(0, start: 0)],
             failOnCallIndex: 1
         )
         await #expect(throws: SummaryService.FailureReason.self) {
-            _ = try await SummaryService(budgetTokens: budget).summarise(transcript, model: model)
+            _ = try await SummaryService(budget: budget(promptTokens: 200)).summarise(transcript, model: model)
         }
         let count = await model.receivedHistories.count
         #expect(count == 2)
@@ -136,8 +146,7 @@ struct SummaryWindowingTests {
     @Test("windowed summarise merges action items across parts then appends the reduce step's own")
     func actionItemsMergeAcrossWindows() async throws {
         let transcript = longTranscript(segmentCount: 2)
-        let budget = 200
-        let windows = SummaryService.windows(for: transcript, budgetTokens: budget)
+        let windows = await windowsOf(transcript, promptTokens: 200)
         #expect(windows.count == 2)
 
         let responses = [
@@ -177,7 +186,7 @@ struct SummaryWindowingTests {
         ]
         let model = MockLanguageModel(scriptedResponses: responses)
 
-        let summary = try await SummaryService(budgetTokens: budget).summarise(transcript, model: model)
+        let summary = try await SummaryService(budget: budget(promptTokens: 200)).summarise(transcript, model: model)
 
         #expect(summary.actionItems == ["Send the deck", "Book the room", "Email the client", "Follow up next week"])
     }
