@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import ParolaCore
 
@@ -181,14 +182,48 @@ struct FolderWatcherSettleTests {
 
         var empty = steady
         empty.size = 0
-        #expect(verdict(empty, checks: 2, previous: (0, old)) == (.wait, 0))
+        #expect(verdict(empty, checks: 2, previous: (0, old)) == (.hold, 0))
 
         var copying = steady
         copying.created = Date(timeIntervalSince1970: -753_578_704)
-        #expect(verdict(copying, checks: 2) == (.wait, 0))
+        #expect(verdict(copying, checks: 2) == (.hold, 0))
 
         var fresh = steady
         fresh.modified = now.addingTimeInterval(-0.5)
         #expect(verdict(fresh, checks: 2, previous: (10, fresh.modified)) == (.wait, 3))
     }
+
+    @Test("a file Finder is still copying is checked less and less often, and whether it is a cloud file is asked once")
+    func waitingFileBacksOff() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        let lookups = CallCounter()
+        let scheduler = ManualScheduler()
+        var options = FolderWatcher.Options(recursive: true, settledInterval: .seconds(1), clock: clock, scheduler: scheduler)
+        options.observesFileSystem = false
+        options.cloud.isUbiquitous = { _ in
+            lookups.increment()
+            return false
+        }
+        let watcher = FolderWatcher(folderURL: folder, options: options) { _ in }
+        await watcher.start()
+
+        let copying = folder.appendingPathComponent("talk.mov")
+        try Fixture.writeSettled(copying, clock: clock)
+        try FileManager.default.setAttributes([.creationDate: Date(timeIntervalSince1970: -753_578_704)], ofItemAtPath: copying.path)
+        await watcher.checkForNewFiles()
+        try await scheduler.advance(ticks: 8)
+        await watcher.stop()
+
+        let intervals = await scheduler.intervals.map { $0.components.seconds }
+        #expect(intervals == [1, 2, 3, 5, 9, 17, 33, 33, 33])
+        #expect(lookups.count == 1)
+    }
+}
+
+final class CallCounter: Sendable {
+    private let storage = OSAllocatedUnfairLock(initialState: 0)
+    func increment() { storage.withLock { $0 += 1 } }
+    var count: Int { storage.withLock { $0 } }
 }

@@ -29,6 +29,7 @@ public actor FolderWatcher {
         var observesFileSystem = true
         var openDirectory: @Sendable (String) -> Int32 = { path in path.withCString { open($0, O_EVTONLY) } }
         var lister: Lister = { FolderWatcher.list($0, recursive: $1) }
+        var cloud = CloudProbe.system
 
         public init(
             recursive: Bool = true,
@@ -66,6 +67,31 @@ public actor FolderWatcher {
     private struct PendingCheck {
         var stableChecks = 0
         var downloadRequested = false
+        var isUbiquitous: Bool?
+        var ticksToSkip = 0
+        var backoff = 1
+    }
+
+    /// The longest a file waiting on Finder or on a download goes between checks, in settle intervals.
+    static let longestBackoff = 32
+
+    struct CloudProbe: Sendable {
+        var isUbiquitous: @Sendable (String) -> Bool
+        var isDownloaded: @Sendable (String) -> Bool
+        var requestDownload: @Sendable (String) throws -> Void
+
+        static let system = CloudProbe(
+            isUbiquitous: { path in
+                (try? URL(fileURLWithPath: path).resourceValues(forKeys: [.isUbiquitousItemKey]))?.isUbiquitousItem == true
+            },
+            isDownloaded: { path in
+                let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+                return values?.ubiquitousItemDownloadingStatus == .current
+            },
+            requestDownload: { path in
+                try FileManager.default.startDownloadingUbiquitousItem(at: URL(fileURLWithPath: path))
+            }
+        )
     }
 
     private struct TrackedFile {
@@ -148,6 +174,7 @@ public actor FolderWatcher {
     private var eventTask: Task<Void, Never>?
     private var eventContinuation: AsyncStream<Event>.Continuation?
     private var settledTask: Task<Void, Never>?
+    private var scheduledTicks = 1
     private var baselineChanged = false
     private var seed: Baseline?
     private var hasScanned = false
@@ -514,6 +541,10 @@ public actor FolderWatcher {
         }
         known.created = item.created ?? known.created
         files[key] = known
+        if known.status == .pending, changed {
+            pending[key]?.ticksToSkip = 0
+            pending[key]?.backoff = 1
+        }
         if case .emitted(let at) = known.status, changed, arrivesAgain(modified: item.modified, emittedAt: at) {
             setStatus(.pending, for: key, now: now)
         }
@@ -602,9 +633,10 @@ public actor FolderWatcher {
     }
 
     private func scheduleSettleTick() {
-        let waiting = !pending.isEmpty || !watchedAfterEmit.isEmpty || !unsourced.isEmpty || !unlisted.isEmpty
-        guard settledTask == nil, waiting else { return }
-        let interval = options.settledInterval
+        let everyTick = !watchedAfterEmit.isEmpty || !unsourced.isEmpty || !unlisted.isEmpty
+        guard settledTask == nil, everyTick || !pending.isEmpty else { return }
+        scheduledTicks = everyTick ? 1 : (pending.values.map(\.ticksToSkip).min() ?? 0) + 1
+        let interval = options.settledInterval * scheduledTicks
         let scheduler = options.scheduler
         settledTask = Task { [weak self] in
             try? await scheduler.runTick(after: interval) { [weak self] in
@@ -616,8 +648,9 @@ public actor FolderWatcher {
     private func settleTick() {
         settledTask = nil
         let now = options.clock.now()
+        let elapsed = scheduledTicks
         for key in pending.keys {
-            checkPending(key, now: now)
+            checkPending(key, elapsed: elapsed, now: now)
         }
         for key in watchedAfterEmit {
             recheckEmitted(key, now: now)
@@ -629,32 +662,53 @@ public actor FolderWatcher {
         scheduleSettleTick()
     }
 
-    private func checkPending(_ key: FileKey, now: Date) {
+    private func checkPending(_ key: FileKey, elapsed: Int, now: Date) {
         guard let file = files[key], var check = pending[key] else {
             pending[key] = nil
             return
         }
+        guard check.ticksToSkip < elapsed else {
+            check.ticksToSkip -= elapsed
+            pending[key] = check
+            return
+        }
+        check.ticksToSkip = 0
         guard let info = FileInfo(file.path) else {
             forget(key)
             return
+        }
+        if check.isUbiquitous == nil {
+            check.isUbiquitous = options.cloud.isUbiquitous(file.path)
         }
         let observation = SettleObservation(
             size: info.size,
             modified: info.modified,
             created: info.created,
-            isDataless: info.isDataless || Self.isCloudPlaceholder(file.path)
+            isDataless: info.isDataless || (check.isUbiquitous == true && !options.cloud.isDownloaded(file.path))
         )
         let verdict = Self.settle(observation, after: (file.size, file.modified), checks: &check.stableChecks, now: now, options: options)
+        if info.size != file.size || info.modified != file.modified {
+            check.isUbiquitous = nil
+        }
         files[key]?.size = info.size
         files[key]?.modified = info.modified
         switch verdict {
         case .wait:
+            check.backoff = 1
+            pending[key] = check
+        case .hold:
+            backOff(&check)
             pending[key] = check
         case .download:
             if !check.downloadRequested {
                 check.downloadRequested = true
-                try? FileManager.default.startDownloadingUbiquitousItem(at: URL(fileURLWithPath: file.path))
+                do {
+                    try options.cloud.requestDownload(file.path)
+                } catch {
+                    ParolaLog.error(.library, "a watched cloud file's download could not start", [.error: .error(error)])
+                }
             }
+            backOff(&check)
             pending[key] = check
         case .arrive:
             // A move from another watched folder can reach this watcher before that one notices
@@ -668,6 +722,11 @@ public actor FolderWatcher {
                 onNewMediaFile(URL(fileURLWithPath: file.path))
             }
         }
+    }
+
+    private func backOff(_ check: inout PendingCheck) {
+        check.ticksToSkip = check.backoff
+        check.backoff = min(check.backoff * 2, Self.longestBackoff)
     }
 
     private func recheckEmitted(_ key: FileKey, now: Date) {
@@ -694,6 +753,8 @@ public actor FolderWatcher {
 
     enum SettleVerdict: Equatable {
         case wait
+        /// Nothing will change until someone else acts: Finder finishing a copy, a writer adding bytes.
+        case hold
         case download
         case arrive
     }
@@ -717,19 +778,11 @@ public actor FolderWatcher {
         }
         guard observation.size > 0, !finderBusyDays.contains(observation.created) else {
             checks = 0
-            return .wait
+            return .hold
         }
         checks = observation.size == previous.size && observation.modified == previous.modified ? checks + 1 : 1
         let cutoff = now.addingTimeInterval(-seconds(options.settledInterval))
         return checks >= options.stableChecks && observation.modified <= cutoff ? .arrive : .wait
-    }
-
-    private static func isCloudPlaceholder(_ path: String) -> Bool {
-        guard let values = try? URL(fileURLWithPath: path)
-            .resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]),
-              values.isUbiquitousItem == true
-        else { return false }
-        return values.ubiquitousItemDownloadingStatus != .current
     }
 
     private static func seconds(_ duration: Duration) -> Double {

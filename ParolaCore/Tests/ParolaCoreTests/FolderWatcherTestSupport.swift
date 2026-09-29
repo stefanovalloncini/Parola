@@ -36,8 +36,10 @@ actor ManualScheduler: FolderWatcherScheduler {
     private var arrivalWaiters: [ArrivalWaiter] = []
 
     var parkedCount: Int { parked.count }
+    private(set) var intervals: [Duration] = []
 
     func runTick(after interval: Duration, _ body: @Sendable @escaping () async -> Void) async throws {
+        intervals.append(interval)
         guard await park() else { throw CancellationError() }
         await body()
         signalDone()
