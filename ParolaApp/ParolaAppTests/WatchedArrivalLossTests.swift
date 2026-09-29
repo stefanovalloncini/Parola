@@ -300,8 +300,8 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("a file whose entry couldn't be saved is handed back to its watcher", arguments: [false, true])
-        func failedSaveIsHandedBack(outOfSight: Bool) async throws {
+        @Test("a file whose entry couldn't be saved keeps its place and stops the lane until Retry", arguments: [false, true])
+        func failedSaveHoldsTheLine(outOfSight: Bool) async throws {
             try await withMocksCleared(.transcriber) {
                 let gate = MockTranscriberGate()
                 await install(gate)
@@ -311,17 +311,67 @@ extension TranscriberMockSuites {
                 let model = makeModel(library: makeTempLibraryURL("loss-save-failed"), defaults: temporaryDefaults())
                 let handedBack = HandedBack()
                 model.offerWatchedFileAgain = { handedBack.urls.append($0) }
-                if outOfSight { _ = try await openOwnEntry(model, in: folder) }
+                let own = outOfSight ? try await openOwnEntry(model, in: folder) : nil
                 model.beforeLandingSave = { throw CocoaError(.fileWriteOutOfSpace) }
                 let file = try makeWAV("Unsaved", in: folder)
 
                 arrive(model, [file])
 
-                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
-                #expect(handedBack.urls == [file])
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLanePausedAt != nil })
+                #expect(handedBack.urls.isEmpty)
+                #expect(model.watchedArrivals.map(\.url) == [file])
+                #expect(model.watchedArrivals.first?.isLanding == false)
+                #expect(try savedQueue(model) == [file])
                 #expect(model.nonFatalWarning?.contains("couldn't save it to your library") == true)
-                #expect(!FileManager.default.fileExists(atPath: model.watchedArrivalsFileURL.path))
+                if outOfSight {
+                    guard case .unsaved = model.arrivalNotice?.state else {
+                        Issue.record("expected the toast to say the save failed")
+                        return
+                    }
+                }
+
+                model.beforeLandingSave = nil
+                model.resumeWatchedLane()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                let saved = await model.library.list().filter { $0.id != own?.id }
+                #expect(saved.map(LibraryEntryDisplay.title(for:)) == ["Unsaved"])
             }
+        }
+
+        @Test("a run that stalls on the file or finds it missing waits for the folder, as the check before it would")
+        func unreadableDuringTheRunWaits() async throws {
+            let folder = try makeFolder("read-stall")
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let model = makeModel(library: makeTempLibraryURL("loss-read-stall"), defaults: temporaryDefaults())
+            let handedBack = HandedBack()
+            model.offerWatchedFileAgain = { handedBack.urls.append($0) }
+            let stalled = WatchedArrival(url: folder.appendingPathComponent("stalled.wav"))
+            let missing = WatchedArrival(url: folder.appendingPathComponent("missing.wav"))
+            model.fileTranscribeTask = Task {}
+            model.watchedArrivals = [stalled, missing]
+
+            model.failArrival(stalled, error: ParolaError.fileReadTimedOut(name: "stalled.wav"))
+            model.failArrival(missing, error: ParolaError.audioLoadFailed(missing.url, underlying: "file does not exist"))
+
+            #expect(model.watchedArrivals.map(\.id) == [stalled.id, missing.id])
+            #expect(model.unreachableArrivalIDs == [stalled.id, missing.id])
+            #expect(handedBack.urls.isEmpty)
+            model.watchedArrivals = []
+            model.fileTranscribeTask = nil
+        }
+
+        @Test("the words a missing file fails with are the ones the lane waits on")
+        func missingFileWordsAreKnown() async throws {
+            let gone = FileManager.default.temporaryDirectory.appendingPathComponent("parola-gone-\(UUID().uuidString).wav")
+            do {
+                _ = try await FileAudioSource(url: gone).prepare()
+                Issue.record("a missing file should fail")
+            } catch {
+                #expect(AppModel.waitsForItsFolder(error))
+            }
+            #expect(!AppModel.waitsForItsFolder(ParolaError.audioLoadFailed(gone, underlying: "not audio")))
+            #expect(!AppModel.waitsForItsFolder(ParolaError.transcriptionFailed("WhisperKit returned no results")))
         }
 
         @Test("Cancel stops the file in the window for good, hands it back, and lets the rest finish out of sight")

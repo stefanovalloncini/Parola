@@ -43,7 +43,7 @@ struct ArrivalToast: View {
                 }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf("Arrival.Button.Stop")
-            case .paused:
+            case .paused, .unsaved:
                 Button("Retry") {
                     model.resumeWatchedLane()
                 }
@@ -95,6 +95,8 @@ struct ArrivalToast: View {
             return Text("Transcribed \(notice.name) from a watched folder")
         case .failed, .paused:
             return Text("Couldn't transcribe \(notice.name)")
+        case .unsaved:
+            return Text("Couldn't save \(notice.name) to your library")
         }
     }
 
@@ -102,7 +104,7 @@ struct ArrivalToast: View {
         switch notice.state {
         case .running: return "waveform"
         case .saved: return "checkmark.circle.fill"
-        case .failed, .paused: return "exclamationmark.triangle.fill"
+        case .failed, .paused, .unsaved: return "exclamationmark.triangle.fill"
         }
     }
 
@@ -111,7 +113,7 @@ struct ArrivalToast: View {
         case .running: return DS.Color.accent
         case .saved: return DS.Palette.success
         case .failed: return DS.Color.danger
-        case .paused: return DS.Palette.warning
+        case .paused, .unsaved: return DS.Palette.warning
         }
     }
 }

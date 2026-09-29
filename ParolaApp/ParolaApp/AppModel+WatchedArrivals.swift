@@ -51,6 +51,8 @@ struct ArrivalNotice: Equatable, Identifiable {
         case failed(String)
         /// The failure wasn't the file's: the lane stops with it still waiting, and Retry starts it again.
         case paused(String)
+        /// Transcribed but not saved: the lane stops with it waiting, like `paused`.
+        case unsaved(String)
     }
 
     let id = UUID()
@@ -59,7 +61,7 @@ struct ArrivalNotice: Equatable, Identifiable {
 
     var reason: String? {
         switch state {
-        case .failed(let reason), .paused(let reason): reason
+        case .failed(let reason), .paused(let reason), .unsaved(let reason): reason
         case .running, .saved: nil
         }
     }
@@ -68,7 +70,7 @@ struct ArrivalNotice: Equatable, Identifiable {
     var dismissesItself: Bool {
         switch state {
         case .saved, .failed: true
-        case .running, .paused: false
+        case .running, .paused, .unsaved: false
         }
     }
 
@@ -85,6 +87,11 @@ struct ArrivalNotice: Equatable, Identifiable {
     init(paused url: URL, reason: String) {
         name = url.deletingPathExtension().lastPathComponent
         state = .paused(reason)
+    }
+
+    init(unsaved url: URL, reason: String) {
+        name = url.deletingPathExtension().lastPathComponent
+        state = .unsaved(reason)
     }
 
     init(running url: URL) {
@@ -352,7 +359,8 @@ extension AppModel {
                 if ringsWhenDry, watchedArrivals.isEmpty { playCompletionSound() }
                 pumpWatchedLane()
             } catch {
-                self?.failArrival(arrival, error: error)
+                // Nothing about the file stopped the save, so it waits in the line like a model failure would.
+                self?.pauseWatchedLane(at: arrival, error: error, unsavedOutOfSight: ringsWhenDry)
             }
         }
     }
@@ -361,6 +369,10 @@ extension AppModel {
     func failArrival(_ arrival: WatchedArrival, error: any Error) {
         if Self.stopsWatchedLane(error) {
             pauseWatchedLane(at: arrival, error: error)
+            return
+        }
+        if Self.waitsForItsFolder(error) {
+            waitForFolder(arrival)
             return
         }
         if backgroundArrivalID == arrival.id {
@@ -387,13 +399,44 @@ extension AppModel {
         }
     }
 
+    /// A read that stalled or found no file is what the pre-run check calls an unreachable folder, and waits the same way.
+    nonisolated static func waitsForItsFolder(_ error: any Error) -> Bool {
+        switch error as? ParolaError {
+        case .fileReadTimedOut:
+            return true
+        case .audioLoadFailed(_, let underlying):
+            // FileAudioSource's words for a file that isn't there; a pinned test keeps them in step.
+            return underlying == "file does not exist"
+        default:
+            return false
+        }
+    }
+
+    private func waitForFolder(_ arrival: WatchedArrival) {
+        if backgroundArrivalID == arrival.id {
+            watchedLaneTask = nil
+            backgroundArrivalID = nil
+            runningArrivalNotice = nil
+        }
+        if visibleArrivalID == arrival.id { visibleArrivalID = nil }
+        if let index = watchedArrivals.firstIndex(where: { $0.id == arrival.id }) {
+            watchedArrivals[index].isLanding = false
+        }
+        ParolaLog.info(.library, "a watched-folder file couldn't be read and waits for its folder")
+        unreachableArrivalIDs.insert(arrival.id)
+        pumpWatchedLane()
+    }
+
     /// The file keeps its place; the next foreground run that ends, a model install or Retry starts the lane again.
-    private func pauseWatchedLane(at arrival: WatchedArrival, error: any Error) {
+    private func pauseWatchedLane(at arrival: WatchedArrival, error: any Error, unsavedOutOfSight: Bool = false) {
         if backgroundArrivalID == arrival.id {
             watchedLaneTask = nil
             backgroundArrivalID = nil
             runningArrivalNotice = nil
             arrivalNotice = ArrivalNotice(paused: arrival.url, reason: Self.transcriptionFailureMessage(for: error))
+        }
+        if unsavedOutOfSight {
+            arrivalNotice = ArrivalNotice(unsaved: arrival.url, reason: error.localizedDescription)
         }
         if visibleArrivalID == arrival.id { visibleArrivalID = nil }
         if let index = watchedArrivals.firstIndex(where: { $0.id == arrival.id }) {
@@ -405,7 +448,10 @@ extension AppModel {
 
     func resumeWatchedLane() {
         watchedLanePausedAt = nil
-        if case .paused = arrivalNotice?.state { arrivalNotice = nil }
+        switch arrivalNotice?.state {
+        case .paused, .unsaved: arrivalNotice = nil
+        default: break
+        }
         pumpWatchedLane()
     }
 

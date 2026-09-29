@@ -3845,6 +3845,17 @@
         }
       }
     },
+    "Couldn't save %@ to your library": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile salvare %@ nella libreria"
+          }
+        }
+      }
+    },
     "Couldn't save your prompts": {
       "extractionState": "manual",
       "localizations": {
