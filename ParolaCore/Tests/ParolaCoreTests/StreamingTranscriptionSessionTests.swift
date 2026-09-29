@@ -75,10 +75,11 @@ private func eventually(timeoutMs: Int = 5000, _ condition: @escaping @Sendable 
 private func launchTake(
     on session: StreamingTranscriptionSession,
     persister: StreamingAudioPersister,
-    harness: TakeHarness
+    harness: TakeHarness,
+    useVAD: Bool = false
 ) async -> AsyncStream<StreamingEvent> {
     var configuration = StreamingRealtimeLoop.Configuration()
-    configuration.useVAD = false
+    configuration.useVAD = useVAD
     let loopConfiguration = configuration
     return await session.launch(options: TranscriptionOptions(), speakerLabeler: nil, persister: persister) { sink, confirmed in
         StreamingRealtimeLoop(
@@ -207,6 +208,32 @@ struct StreamingTakeEndingTests {
         #expect(!finished)
         #expect(harness.decodes == 0)
         #expect(!FileManager.default.fileExists(atPath: audio.path))
+    }
+
+    /// The app keeps a take "starting" until its first event, so a quiet start must still send one.
+    @Test("a take's first event comes as soon as capture starts, in silence and before any sound")
+    func firstEventArrivesAtCaptureStart() async throws {
+        let session = StreamingTranscriptionSession(persistAudio: true)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        let harness = TakeHarness()
+        let events = await launchTake(on: session, persister: persister, harness: harness, useVAD: true)
+        #expect(await eventually { harness.installed })
+        var iterator = events.makeAsyncIterator()
+
+        let first = await iterator.next()
+        switch first {
+        case .partial?, .voiceActivity?:
+            break
+        default:
+            Issue.record("the first event of a silent start was \(String(describing: first))")
+        }
+        harness.push([Float](repeating: 0, count: 1_600))
+        var heardSilence = false
+        while let event = await iterator.next() {
+            if case .voiceActivity(active: false) = event { heardSilence = true; break }
+        }
+        #expect(heardSilence, "silence reports itself as no voice")
+        await session.cancel()
     }
 
     @Test("stopping the same take decodes its tail and keeps the audio")

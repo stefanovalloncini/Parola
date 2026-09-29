@@ -26,8 +26,7 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
     ) async throws -> AsyncStream<StreamingEvent> {
         if let fraction = response.downloadFractions.first { downloadProgress?(fraction) }
         if let gate = response.gate {
-            // The gate stands in for the model load: a stop or a cancel landing meanwhile ends the take
-            // before capture, the way the real session's does.
+            // The gate stands in for the model load, so a stop or cancel landing now ends the take as a real one would.
             isStarting = true
             defer { isStarting = false }
             try await gate.wait()

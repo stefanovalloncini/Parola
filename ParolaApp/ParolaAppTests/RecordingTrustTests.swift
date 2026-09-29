@@ -304,7 +304,7 @@ extension TranscriberMockSuites {
                 #expect(model.phase == .failed(message: expected))
                 await waitUntil { !model.recordingActive }
                 await settle()
-                #expect(model.phase == .failed(message: expected), "the cancelled load must not replace the message")
+                #expect(model.phase == .failed(message: expected), "the load finishing later must not replace the message")
                 #expect(await model.library.list().isEmpty)
             }
         }

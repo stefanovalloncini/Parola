@@ -3310,8 +3310,12 @@ final class AppModel {
         let labeler = await streamingSpeakerLabeler()
         do {
             let events = try await s.start(options: options, speakerLabeler: labeler, downloadProgress: downloadProgress)
-            // A take cancelled while its model loaded belongs to whoever cancelled it.
-            guard takeIsCurrent(take) else { return }
+            guard takeIsCurrent(take) else {
+                // The take ended while its model loaded; the model stays loaded for the next one.
+                await s.cancel()
+                return
+            }
+            if case .preparingModel = takeArming { takeArming = .startingCapture }
             let audio = await s.recordingAudioURL()
             guard takeIsCurrent(take) else { return }
             liveRecordingAudioURL = audio
@@ -3489,8 +3493,8 @@ final class AppModel {
     func stopRecordingAndTranscribe() {
         recordingAutoStopTask?.cancel()
         recordingAutoStopTask = nil
-        // Nothing has been captured yet, so there is nothing to finish: end the take now and say so.
-        if let arming = takeArming, case .recording = phase {
+        // Nothing captured yet ends here and says so; a live session already capturing stops normally and keeps its file.
+        if let arming = takeArming, case .recording = phase, !(arming == .startingCapture && streamingSession != nil) {
             endTakeBeforeCapture(reporting: Self.nothingRecordedMessage(for: arming))
             return
         }
@@ -3558,8 +3562,13 @@ final class AppModel {
         endTakeBeforeCapture(reporting: nil)
     }
 
-    /// Ends a take in the pane at once; a start in flight drops its capture later.
+    /// Ends a take in the pane at once; a start in flight drops its capture later, and a model still loading finishes for the next take.
     private func endTakeBeforeCapture(reporting message: String?) {
+        if case .preparingModel = takeArming, let s = streamingSession {
+            streamingSession = nil
+            streamingConsumer = nil
+            Task { await s.stop() }
+        }
         activeTake = nil
         recordingStartInFlight = false
         stopRequestedDuringStart = false
