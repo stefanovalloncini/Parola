@@ -72,7 +72,7 @@ struct ContentToolbar: ToolbarContent {
         } label: {
             Image(systemName: "slider.horizontal.3")
                 .font(DS.Font.bodyStrong)
-                .foregroundStyle(DS.Color.accentText)
+                .foregroundStyle(DS.Color.accentInk)
                 .overlay(alignment: .topTrailing) {
                     if optionsActive {
                         Circle()

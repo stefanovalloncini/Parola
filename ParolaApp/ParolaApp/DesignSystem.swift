@@ -169,9 +169,6 @@ enum DS {
         /// The accent as small text or a glyph set directly on a surface, darkened or lightened until it clears AA.
         static var accentInk: SwiftUI.Color { DS.resolved.accentInk }
 
-        /// `accentInk`'s old name; `TranscribingPane.swift` and `ContentToolbar.swift` still read it directly.
-        static var accentText: SwiftUI.Color { DS.resolved.accentInk }
-
         /// The soft accent fill a live readout sits on; `accentInk` is legible on it.
         static var accentWash: SwiftUI.Color { DS.resolved.accentWash }
 
