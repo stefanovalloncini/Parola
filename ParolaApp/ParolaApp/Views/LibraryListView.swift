@@ -39,6 +39,17 @@ enum LibraryListContent {
     /// Shown instead of `emptyTitle` when the category has rows and the filters are what hid them.
     static let filteredEmptyTitle = "No Matches for This Filter"
 
+    /// A person only takes the title over an unset category; narrowed within one, the category keeps it.
+    static func headerTitle(for category: EntryCategory?, person: Person?) -> String {
+        if category == nil, let person { return person.name }
+        switch category {
+        case .transcription: return String(localized: "Transcriptions")
+        case .meeting: return String(localized: "Meetings")
+        case .dictation: return String(localized: "Dictations")
+        case nil: return String(localized: "All")
+        }
+    }
+
     /// A browse list sits under the results only when clearing the query would show it: not on Home, not over a transcript.
     static func showsBrowseList(filter: EntryCategory?, browsingAll: Bool, hasTranscript: Bool) -> Bool {
         !hasTranscript && (filter != nil || browsingAll)
@@ -332,9 +343,9 @@ private struct LibraryBrowseList: View, Equatable {
         )
     }
 
-    /// The filter lives on the model: the sidebar rows and the bridge set it too.
+    /// Narrows the category on screen; unlike a sidebar or bridge pick it never navigates.
     private var personFilterBinding: Binding<UUID?> {
-        Binding(get: { model.personFilter }, set: { model.setPersonFilter($0) })
+        Binding(get: { model.personFilter }, set: { model.personFilter = $0 })
     }
 
     @discardableResult
@@ -412,15 +423,16 @@ private struct LibraryBrowseList: View, Equatable {
         .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeEntries() }
         .onChange(of: category) { _, newCategory in
-            let kept = LibraryListContent.filters(
+            // Navigation owns personFilter now; this only decides what to keep for label/language/date.
+            var kept = LibraryListContent.filters(
                 activeFilters,
                 survivingIn: newCategory,
                 entries: model.libraryEntries
             )
+            kept.person = activeFilters.person
             labelFilter = kept.label
             languageFilter = kept.language
             dateRangeFilter = kept.dateRange
-            model.setPersonFilter(kept.person)
             let newEntries = recomputeEntries(with: kept)
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
@@ -497,6 +509,7 @@ private struct LibraryBrowseList: View, Equatable {
                 labelFilter = nil
                 languageFilter = nil
                 dateRangeFilter = .all
+                model.personFilter = nil
             } label: {
                 Label("Clear Filters", systemImage: "xmark.circle")
             }
@@ -517,13 +530,12 @@ private struct LibraryBrowseList: View, Equatable {
         }
     }
 
-    private var headerTitle: LocalizedStringKey {
-        switch category {
-        case .transcription: return "Transcriptions"
-        case .meeting: return "Meetings"
-        case .dictation: return "Dictations"
-        case nil: return "All"
-        }
+    private var headerTitle: String {
+        LibraryListContent.headerTitle(for: category, person: selectedPerson)
+    }
+
+    private var selectedPerson: Person? {
+        model.personFilter.flatMap(model.person(id:))
     }
 
     private var emptyTitle: LocalizedStringKey {

@@ -60,7 +60,7 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     guard let raw = args.rawValue("personID"), raw != .null else {
-                        ctx.model.setPersonFilter(nil)
+                        ctx.model.browsePerson(nil)
                         return .object(["personFilter": .null, "entryCount": .int(ctx.model.libraryEntries.count)])
                     }
                     guard case .string(let text) = raw, let id = UUID(uuidString: text) else {
@@ -69,7 +69,7 @@ extension ParolaAutomationServer {
                     guard ctx.model.person(id: id) != nil else {
                         throw AutomationError.notFound(kind: "person", id: text)
                     }
-                    ctx.model.setPersonFilter(id)
+                    ctx.model.browsePerson(id)
                     return .object([
                         "personFilter": .string(id.uuidString),
                         "entryCount": .int(ctx.model.entries(withPerson: id).count),

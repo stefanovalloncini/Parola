@@ -9,7 +9,8 @@ struct MacLibrarySidebar: View {
             route: model.route,
             searching: model.hasSearchResults,
             filter: model.libraryFilter,
-            browsingAll: model.libraryBrowsingAll
+            browsingAll: model.libraryBrowsingAll,
+            person: model.personFilter
         )
     }
 
@@ -203,12 +204,14 @@ enum SidebarRoute: Hashable {
     case statistics
     case recentlyDeleted
     case category(EntryCategory)
+    case person(UUID)
 
     static func selected(
         route: AppModel.Route,
         searching: Bool,
         filter: EntryCategory?,
-        browsingAll: Bool
+        browsingAll: Bool,
+        person: UUID? = nil
     ) -> SidebarRoute {
         switch route {
         case .queue: return .queue
@@ -217,6 +220,8 @@ enum SidebarRoute: Hashable {
         case .recentlyDeleted: return .recentlyDeleted
         case .transcript:
             if searching { return .search }
+            // A category narrowed by the filter-bar chip keeps the category row lit, not the person.
+            if let person, filter == nil { return .person(person) }
             if let filter { return .category(filter) }
             return browsingAll ? .all : .home
         }

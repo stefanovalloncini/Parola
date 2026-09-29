@@ -349,11 +349,17 @@ extension AppModel {
 
     // MARK: - The Person filter
 
-    /// The one way the library's Person filter changes. Picking a person brings the list forward,
-    /// since a filtered list is the only place the rows show.
-    func setPersonFilter(_ id: UUID?) {
-        guard personFilter != id else { return }
+    /// A sidebar or bridge destination: shows everything the person has, category cleared to All.
+    /// Re-picking the person a chip has since narrowed to a category still clears back to All.
+    func browsePerson(_ id: UUID?) {
+        guard let id else {
+            guard personFilter != nil else { return }
+            personFilter = nil
+            return
+        }
+        guard personFilter != id || libraryFilter != nil else { return }
+        leaveFailedPhase()
+        browseAll()
         personFilter = id
-        if id != nil, !isBrowsingLibrary { browseAll() }
     }
 }

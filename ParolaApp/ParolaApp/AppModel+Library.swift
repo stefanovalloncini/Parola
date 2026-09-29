@@ -40,6 +40,8 @@ enum LibraryOrigin: Equatable {
         case .all: return .all
         case .category(let category): return .category(category)
         case .home: return homeOnScreen ? .home : nil
+        // The back link reads "All" for a person's list too; personFilter itself isn't part of the origin.
+        case .person(_): return .all
         case .queue, .batch, .statistics, .recentlyDeleted: return nil
         }
     }
@@ -665,20 +667,26 @@ extension AppModel {
 
     /// Sidebar Home: the launcher only renders with nothing loaded, so the transcript has to go.
     func goHome() {
+        leaveFailedPhase()
         libraryFilter = nil
         libraryBrowsingAll = false
+        personFilter = nil
         showList()
     }
 
     func browseAll() {
+        leaveFailedPhase()
         libraryFilter = nil
         libraryBrowsingAll = true
+        personFilter = nil
         showList()
     }
 
     func browseCategory(_ category: EntryCategory) {
+        leaveFailedPhase()
         libraryFilter = category
         libraryBrowsingAll = false
+        personFilter = nil
         showList()
     }
 
@@ -737,7 +745,8 @@ extension AppModel {
                 route: route,
                 searching: hasSearchResults,
                 filter: libraryFilter,
-                browsingAll: libraryBrowsingAll
+                browsingAll: libraryBrowsingAll,
+                person: personFilter
             ),
             homeOnScreen: batchIsEmpty && !hasTranscript
         )
@@ -777,9 +786,11 @@ extension AppModel {
     }
 
     private func openPage(_ page: Route, keepingTranscript: Bool) {
+        leaveFailedPhase()
         leaveList(keepingTranscript: keepingTranscript)
         libraryFilter = nil
         libraryBrowsingAll = false
+        personFilter = nil
         route = page
     }
 

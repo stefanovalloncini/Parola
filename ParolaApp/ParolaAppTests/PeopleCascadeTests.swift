@@ -94,7 +94,7 @@ struct PeopleCascadeTests {
     func deleteClearsTheFilter() async throws {
         let (model, _, _) = try await makeTwoAssignedEntries("cascadefilter")
         let ada = try #require(model.person(forSpeaker: "Ada"))
-        model.setPersonFilter(ada.id)
+        model.browsePerson(ada.id)
 
         await model.deletePerson(ada.id)
 

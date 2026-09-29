@@ -102,18 +102,121 @@ struct PersonFilterTests {
         ))
     }
 
-    @Test("setting the filter brings the library list forward, and clearing it leaves the list alone")
+    @Test("browsing to a person brings the library list forward, and clearing it leaves the list alone")
     func settingTheFilterOpensTheList() async {
         let model = await makeModel()
         model.route = .transcript
 
-        model.setPersonFilter(ada)
+        model.browsePerson(ada)
         #expect(model.personFilter == ada)
         #expect(model.libraryBrowsingAll)
 
-        model.setPersonFilter(nil)
+        model.browsePerson(nil)
         #expect(model.personFilter == nil)
         #expect(model.libraryBrowsingAll)
+    }
+
+    @Test("browsing to a person while on a category switches to All, not an intersection")
+    func personSelectionClearsTheCategory() async {
+        let model = await makeModel()
+        model.browseCategory(.transcription)
+        #expect(model.libraryFilter == .transcription)
+
+        model.browsePerson(ada)
+
+        #expect(model.personFilter == ada)
+        #expect(model.libraryFilter == nil)
+        #expect(model.libraryBrowsingAll)
+    }
+
+    @Test("re-picking a person the chip narrowed to a category clears back to All")
+    func repickingANarrowedPersonClearsTheCategory() async {
+        let model = await makeModel()
+        model.browsePerson(ada)
+        model.libraryFilter = .meeting
+        model.libraryBrowsingAll = false
+        #expect(model.personFilter == ada)
+
+        model.browsePerson(ada)
+
+        #expect(model.personFilter == ada)
+        #expect(model.libraryFilter == nil)
+        #expect(model.libraryBrowsingAll)
+    }
+
+    @Test("choosing a category clears the person filter")
+    func categorySelectionClearsThePerson() async {
+        let model = await makeModel()
+        model.browsePerson(ada)
+        #expect(model.personFilter == ada)
+
+        model.browseCategory(.meeting)
+
+        #expect(model.personFilter == nil)
+        #expect(model.libraryFilter == .meeting)
+    }
+
+    @Test("a person filter is the only sidebar row selected when no category is set")
+    func personFilterIsTheOnlySidebarSelection() async {
+        let model = await makeModel()
+        model.libraryFilter = nil
+        model.libraryBrowsingAll = true
+        model.personFilter = grace
+
+        let selected = SidebarRoute.selected(
+            route: model.route, searching: model.hasSearchResults,
+            filter: model.libraryFilter, browsingAll: model.libraryBrowsingAll, person: model.personFilter
+        )
+
+        #expect(selected == .person(grace))
+        #expect(selected != .all)
+    }
+
+    @Test("a person narrowing a category leaves the category row lit, not the person's")
+    func chipNarrowingKeepsTheCategoryLit() async {
+        let model = await makeModel()
+        model.libraryFilter = .meeting
+        model.libraryBrowsingAll = false
+        model.personFilter = grace
+
+        let selected = SidebarRoute.selected(
+            route: model.route, searching: model.hasSearchResults,
+            filter: model.libraryFilter, browsingAll: model.libraryBrowsingAll, person: model.personFilter
+        )
+
+        #expect(selected == .category(.meeting))
+        #expect(selected != .person(grace))
+    }
+
+    @Test("a person filter never lights the sidebar row while on another route, like a batch")
+    func personFilterIgnoredOffTheLibraryRoute() async {
+        let model = await makeModel()
+        model.route = .batch
+        model.personFilter = grace
+
+        let selected = SidebarRoute.selected(
+            route: model.route, searching: model.hasSearchResults,
+            filter: model.libraryFilter, browsingAll: model.libraryBrowsingAll, person: model.personFilter
+        )
+
+        #expect(selected == .batch)
+        #expect(selected != .person(grace))
+    }
+
+    @Test("the list's page title names the selected person only when no category is set")
+    func headerTitleNamesThePerson() {
+        let person = Person(name: "Ada Lovelace")
+        #expect(LibraryListContent.headerTitle(for: .meeting, person: person) == "Meetings")
+        #expect(LibraryListContent.headerTitle(for: nil, person: person) == "Ada Lovelace")
+        #expect(LibraryListContent.headerTitle(for: .meeting, person: nil) == "Meetings")
+        #expect(LibraryListContent.headerTitle(for: nil, person: nil) == "All")
+    }
+
+    @Test("the person chip stays up when the filter is active, even with no options to switch to")
+    func personChipSurvivesAnEmptyCategory() {
+        #expect(!LibraryFilterBar.showsPersonFilter(peopleOptions: [], personFilter: nil))
+        #expect(LibraryFilterBar.showsPersonFilter(peopleOptions: [], personFilter: grace))
+        #expect(LibraryFilterBar.showsPersonFilter(peopleOptions: [Person(name: "Ada")], personFilter: nil))
     }
 
     @Test("the filter offers only people with an entry in the category on screen")

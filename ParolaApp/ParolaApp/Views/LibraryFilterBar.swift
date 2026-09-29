@@ -26,6 +26,7 @@ enum LibraryDateRangeFilter: String, CaseIterable, Identifiable {
 }
 
 struct LibraryFilterBar: View {
+    @Environment(AppModel.self) private var model
     @Binding var labelFilter: String?
     @Binding var languageFilter: String?
     @Binding var dateRangeFilter: LibraryDateRangeFilter
@@ -33,6 +34,11 @@ struct LibraryFilterBar: View {
     let labelOptions: [String]
     let languageOptions: [String]
     let peopleOptions: [Person]
+
+    /// A category with no speakers (Dictations) must not make an active person filter disappear.
+    static func showsPersonFilter(peopleOptions: [Person], personFilter: UUID?) -> Bool {
+        !peopleOptions.isEmpty || personFilter != nil
+    }
 
     var body: some View {
         Group {
@@ -54,14 +60,16 @@ struct LibraryFilterBar: View {
                 .fixedSize()
                 .axLeaf("Filter.Menu.Label")
             }
-            if !peopleOptions.isEmpty {
+            if Self.showsPersonFilter(peopleOptions: peopleOptions, personFilter: personFilter) {
                 Menu {
                     Button("All People") { personFilter = nil }
                         .axLeaf("Filter.MenuItem.AllPeople")
-                    Divider()
-                    ForEach(peopleOptions) { person in
-                        Button(person.name) { personFilter = person.id }
-                            .axLeaf("Filter.MenuItem.Person.\(person.name)")
+                    if !peopleOptions.isEmpty {
+                        Divider()
+                        ForEach(peopleOptions) { person in
+                            Button(person.name) { personFilter = person.id }
+                                .axLeaf("Filter.MenuItem.Person.\(person.name)")
+                        }
                     }
                 } label: {
                     FilterPillLabel(
@@ -112,8 +120,10 @@ struct LibraryFilterBar: View {
         }
     }
 
+    /// Falls back to the full directory: a filtered person can be absent from this category's own options.
     private var selectedPerson: Person? {
-        personFilter.flatMap { id in peopleOptions.first { $0.id == id } }
+        guard let personFilter else { return nil }
+        return peopleOptions.first { $0.id == personFilter } ?? model.person(id: personFilter)
     }
 
     private func languageName(_ code: String) -> String {

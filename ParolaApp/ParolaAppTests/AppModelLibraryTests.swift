@@ -682,28 +682,38 @@ struct AppModelLibraryTests {
         }
     }
 
-    @Test("renaming through the model sets a title an AI title cannot outrank")
-    func renameBeatsTheAITitle() async throws {
+    /// The pane a stale error gated must show whatever the user just asked for instead.
+    @Test("every sidebar destination clears a stale failure behind it")
+    func destinationsClearTheFailedState() {
+        let destinations: [(String, AppModel.Route, (AppModel) -> Void)] = [
+            ("Home", .transcript, { $0.goHome() }),
+            ("All", .transcript, { $0.browseAll() }),
+            ("a category", .transcript, { $0.browseCategory(.meeting) }),
+            ("Queue", .queue, { $0.openQueue() }),
+            ("Batch", .batch, { $0.openBatch() }),
+            ("Statistics", .statistics, { $0.openStatistics() }),
+            ("Recently Deleted", .recentlyDeleted, { $0.openRecentlyDeleted() }),
+        ]
+        for (name, route, open) in destinations {
+            let model = makeModel()
+            model.phase = .failed(message: "Couldn't transcribe Voice note 17.m4a")
+
+            open(model)
+
+            #expect(model.route == route, "\(name)")
+            #expect(model.phase == .idle, "\(name)")
+        }
+    }
+
+    @Test("browsing a category after a transcription failure shows the list, not the error card")
+    func categoryAfterFailureShowsTheList() {
         let model = makeModel()
-        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
-        let seeded = try await seedStore.add(
-            transcript: Transcript(
-                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
-                language: "en",
-                modelName: "stub"
-            ),
-            audioSource: nil,
-            category: .transcription
-        )
-        _ = try await seedStore.setCardMetadata(aiTitle: "Generated title", shortSummary: nil, for: seeded.id)
-        await model.refreshLibraryAndWait()
+        model.phase = .failed(message: "Couldn't transcribe Voice note 17.m4a")
 
-        model.renameEntry(seeded.id, to: "My real title")
-        #expect(await waitUntil { model.libraryEntry(id: seeded.id)?.manifest.title == "My real title" })
+        model.browseCategory(.meeting)
 
-        let renamed = try #require(model.libraryEntry(id: seeded.id))
-        #expect(renamed.manifest.titleSource == .user)
-        #expect(LibraryEntryDisplay.listTitle(for: renamed, showsAITitle: true) == "My real title")
+        #expect(model.isBrowsingLibrary)
+        #expect(model.libraryFilter == .meeting)
     }
 
     @Test("a search after a transcription failure clears it and shows results")
@@ -776,6 +786,30 @@ struct AppModelLibraryTests {
         #expect(await waitUntil { model.exportNotice != nil })
         #expect(model.isBrowsingLibrary)
         #expect(model.phase == .idle)
+    }
+
+    @Test("renaming through the model sets a title an AI title cannot outrank")
+    func renameBeatsTheAITitle() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        _ = try await seedStore.setCardMetadata(aiTitle: "Generated title", shortSummary: nil, for: seeded.id)
+        await model.refreshLibraryAndWait()
+
+        model.renameEntry(seeded.id, to: "My real title")
+        #expect(await waitUntil { model.libraryEntry(id: seeded.id)?.manifest.title == "My real title" })
+
+        let renamed = try #require(model.libraryEntry(id: seeded.id))
+        #expect(renamed.manifest.titleSource == .user)
+        #expect(LibraryEntryDisplay.listTitle(for: renamed, showsAITitle: true) == "My real title")
     }
 
     @Test("LibrarySortOrder exposes a label for every case")

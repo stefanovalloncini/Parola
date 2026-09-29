@@ -54,7 +54,8 @@ struct LibraryOriginTests {
             route: model.route,
             searching: model.searchRanking != nil,
             filter: model.libraryFilter,
-            browsingAll: model.libraryBrowsingAll
+            browsingAll: model.libraryBrowsingAll,
+            person: model.personFilter
         )
     }
 

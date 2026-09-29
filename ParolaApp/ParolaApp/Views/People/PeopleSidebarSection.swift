@@ -12,6 +12,16 @@ struct PeopleSidebarSection: View {
         showMostUsed && !people.isEmpty
     }
 
+    private var selectedRoute: SidebarRoute {
+        SidebarRoute.selected(
+            route: model.route,
+            searching: model.hasSearchResults,
+            filter: model.libraryFilter,
+            browsingAll: model.libraryBrowsingAll,
+            person: model.personFilter
+        )
+    }
+
     var body: some View {
         if Self.isVisible(showMostUsed: model.showMostUsedPeople, people: model.people) {
             SidebarSectionLabel("People")
@@ -21,9 +31,9 @@ struct PeopleSidebarSection: View {
                 SidebarRow(
                     titleVerbatim: person.name,
                     systemImage: "person.crop.circle",
-                    isSelected: model.personFilter == person.id
+                    isSelected: selectedRoute == .person(person.id)
                 ) {
-                    model.setPersonFilter(model.personFilter == person.id ? nil : person.id)
+                    model.browsePerson(person.id)
                 }
                 .accessibilityIdentifier("library.person.\(person.id.uuidString)")
                 .axLeaf("Sidebar.Button.Person.\(person.name)")
