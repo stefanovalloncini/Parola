@@ -141,6 +141,7 @@ struct MacLibrarySidebar: View {
                     Text(LocalizedStringKey(order.label)).tag(order)
                 }
             }
+            .pickerStyle(.inline)
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }

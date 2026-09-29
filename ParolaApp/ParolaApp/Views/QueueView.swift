@@ -55,6 +55,7 @@ struct QueueView: View {
                     Text(option.rawValue).tag(option)
                 }
             }
+            .pickerStyle(.inline)
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }

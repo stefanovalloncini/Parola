@@ -141,6 +141,7 @@ struct ModelsSettingsPane: View {
                     Text(option.label).tag(option)
                 }
             }
+            .pickerStyle(.inline)
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
