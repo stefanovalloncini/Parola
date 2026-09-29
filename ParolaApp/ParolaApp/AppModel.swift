@@ -418,7 +418,7 @@ final class AppModel {
     var selectedBatchJobID: BatchJob.ID?
     @ObservationIgnored var batchTask: Task<Void, Never>? {
         didSet {
-            if oldValue == nil, batchTask != nil { preemptWatchedLane() }
+            if oldValue == nil, batchTask != nil { foregroundClaimedSession() }
             if oldValue != nil, batchTask == nil { foregroundLetGo() }
         }
     }
@@ -694,6 +694,9 @@ final class AppModel {
     @ObservationIgnored var offerWatchedFileAgain: (@MainActor (URL) -> Void)?
     @ObservationIgnored var watchedLaneTask: Task<Void, Never>?
     @ObservationIgnored var backgroundArrivalID: WatchedArrival.ID?
+    /// Set when a failure that isn't the file's own stopped the lane: the number of foreground claims at that moment.
+    @ObservationIgnored var watchedLanePausedAt: Int?
+    @ObservationIgnored var foregroundClaims = 0
     /// Files whose folder didn't answer: they keep their place and wait for the folder to come back.
     @ObservationIgnored var unreachableArrivalIDs: Set<WatchedArrival.ID> = []
     /// Test seam: where a watched file stands, given the folder it came from.
@@ -1409,7 +1412,7 @@ final class AppModel {
     @ObservationIgnored var fileTranscribeTask: Task<Void, Never>? {
         didSet {
             guard oldValue != fileTranscribeTask else { return }
-            if oldValue == nil { preemptWatchedLane() }
+            if oldValue == nil { foregroundClaimedSession() }
             visibleArrivalLostTheWindow()
             if fileTranscribeTask == nil { foregroundLetGo() }
         }
@@ -1434,7 +1437,7 @@ final class AppModel {
     }
     @ObservationIgnored private var recordingStartInFlight = false {
         didSet {
-            if !oldValue, recordingStartInFlight { preemptWatchedLane() }
+            if !oldValue, recordingStartInFlight { foregroundClaimedSession() }
             if oldValue, !recordingStartInFlight { foregroundLetGo() }
         }
     }
@@ -2074,6 +2077,7 @@ final class AppModel {
     func finishModelDownload() {
         if !runOwnsPhase, case .downloadingModel = phase { phase = .idle }
         refreshModelList()
+        if watchedLanePausedAt != nil { resumeWatchedLane() }
     }
 
     func cancelModelDownload() {
@@ -3390,6 +3394,12 @@ final class AppModel {
             return
         }
         guard let url = failedFileURL else { return }
+        // A watched file that stopped the lane is still in it: Retry starts the lane, not a second copy.
+        if watchedLanePausedAt != nil, watchedArrivals.contains(where: { $0.url == url }) {
+            phase = transcript == nil ? .idle : .ready
+            resumeWatchedLane()
+            return
+        }
         beginFileTranscription(fileURL: url, translateOverride: failedTranslateOverride)
     }
 

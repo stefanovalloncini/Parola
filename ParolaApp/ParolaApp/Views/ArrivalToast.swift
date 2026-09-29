@@ -1,7 +1,7 @@
 import SwiftUI
 import ParolaCore
 
-/// Says a watched-folder file was transcribed out of sight; it never takes the window and goes away on its own.
+/// Says what a watched-folder file out of sight is doing; it never takes the window.
 struct ArrivalToast: View {
     @Environment(AppModel.self) private var model
     let notice: ArrivalNotice
@@ -20,7 +20,7 @@ struct ArrivalToast: View {
                 title
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.primaryText)
-                if case .failed(let reason) = notice.state {
+                if let reason = notice.reason {
                     // The reason comes from the failure, and a path in it must not be read as markdown.
                     Text(verbatim: reason)
                         .font(DS.Font.caption)
@@ -43,6 +43,12 @@ struct ArrivalToast: View {
                 }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf("Arrival.Button.Stop")
+            case .paused:
+                Button("Retry") {
+                    model.resumeWatchedLane()
+                }
+                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                .axLeaf("Arrival.Button.Retry")
             case .failed:
                 EmptyView()
             }
@@ -73,7 +79,7 @@ struct ArrivalToast: View {
         )
         .padding(DS.Spacing.regular)
         .task(id: notice) {
-            guard notice.state != .running else { return }
+            guard notice.dismissesItself else { return }
             try? await Task.sleep(for: DeliveryToast.dismissAfter)
             guard !Task.isCancelled, model.arrivalNotice == notice else { return }
             model.dismissArrivalNotice()
@@ -87,7 +93,7 @@ struct ArrivalToast: View {
             return Text("Transcribing \(notice.name) from a watched folder")
         case .saved:
             return Text("Transcribed \(notice.name) from a watched folder")
-        case .failed:
+        case .failed, .paused:
             return Text("Couldn't transcribe \(notice.name)")
         }
     }
@@ -96,7 +102,7 @@ struct ArrivalToast: View {
         switch notice.state {
         case .running: return "waveform"
         case .saved: return "checkmark.circle.fill"
-        case .failed: return "exclamationmark.triangle.fill"
+        case .failed, .paused: return "exclamationmark.triangle.fill"
         }
     }
 
@@ -105,6 +111,7 @@ struct ArrivalToast: View {
         case .running: return DS.Color.accent
         case .saved: return DS.Palette.success
         case .failed: return DS.Color.danger
+        case .paused: return DS.Palette.warning
         }
     }
 }

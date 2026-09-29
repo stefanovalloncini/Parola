@@ -453,6 +453,106 @@ extension TranscriberMockSuites {
             model.watchedArrivals = []
         }
 
+        private func installChecksumFailure() async {
+            await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                failure: MockTranscriberFailure(code: .modelChecksumMismatch, message: "weights")
+            ))
+        }
+
+        @Test("a model failure stops the lane with every file still waiting, and Retry lands them all")
+        func modelFailurePausesTheLane() async throws {
+            try await withMocksCleared(.transcriber) {
+                await installChecksumFailure()
+                let folder = try makeFolder("paused")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let model = makeModel(library: makeTempLibraryURL("loss-paused"), defaults: temporaryDefaults())
+                let handedBack = HandedBack()
+                model.offerWatchedFileAgain = { handedBack.urls.append($0) }
+                let own = try await openOwnEntry(model, in: folder)
+                let files = [try makeWAV("First", in: folder), try makeWAV("Second", in: folder, seconds: 0.4)]
+
+                arrive(model, files)
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLanePausedAt != nil })
+                await settle()
+                #expect(model.watchedArrivals.map(\.url) == files)
+                #expect(model.watchedLaneTask == nil)
+                #expect(handedBack.urls.isEmpty)
+                guard case .paused = model.arrivalNotice?.state else {
+                    Issue.record("expected the lane to say it stopped")
+                    return
+                }
+                #expect(model.arrivalNotice?.name == "First")
+
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                // The session keeps the engine it loaded; dropping it picks up the working mock.
+                await model.unloadTranscriptionSession()
+                model.resumeWatchedLane()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                let titles = await model.library.list().filter { $0.id != own.id }.map(LibraryEntryDisplay.title(for:))
+                #expect(Set(titles) == ["First", "Second"])
+            }
+        }
+
+        @Test("a stopped lane starts again once a later foreground run lets go, not on the let-go of the run that failed")
+        func pausedLaneResumesOnTheNextLetGo() async throws {
+            try await withMocksCleared(.transcriber) {
+                await installChecksumFailure()
+                let folder = try makeFolder("paused-letgo")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let model = makeModel(library: makeTempLibraryURL("loss-paused-letgo"), defaults: temporaryDefaults())
+                let file = try makeWAV("Waiting", in: folder)
+
+                arrive(model, [file])
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLanePausedAt != nil })
+                await model.awaitArrivalDrain()
+                #expect(model.watchedLanePausedAt != nil, "the failing run's own let-go leaves the lane stopped")
+                #expect(model.watchedArrivals.map(\.url) == [file])
+                #expect(model.failedFileURL == file)
+
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                await model.unloadTranscriptionSession()
+                model.fileTranscribeTask = Task {}
+                model.fileTranscribeTask = nil
+                await model.awaitArrivalDrain()
+
+                #expect(model.watchedLanePausedAt == nil)
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                #expect(await model.library.list().count == 1)
+            }
+        }
+
+        @Test("Retry on the error pane of a watched file that stopped the lane starts the lane, not a second copy")
+        func errorPaneRetryResumesTheLane() async throws {
+            try await withMocksCleared(.transcriber) {
+                await installChecksumFailure()
+                let folder = try makeFolder("paused-retry")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let model = makeModel(library: makeTempLibraryURL("loss-paused-retry"), defaults: temporaryDefaults())
+                let file = try makeWAV("Retried", in: folder)
+                arrive(model, [file])
+                #expect(await waitUntil(timeoutMs: 10_000) {
+                    model.watchedLanePausedAt != nil && model.canRetryFailedTranscription
+                })
+
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                await model.unloadTranscriptionSession()
+                model.retryFailedTranscription()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                #expect(await model.library.list().count == 1)
+                #expect(!model.recentFiles.contains(file))
+            }
+        }
+
         @Test("a settings reset leaves the files waiting in the line")
         func settingsResetKeepsTheLine() async throws {
             let folder = try makeFolder("reset")

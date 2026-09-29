@@ -206,6 +206,7 @@ extension AppModel {
             arrivalDrain = nil
             guard !foregroundIsHeld else { return }
             drainDeferredArrivals()
+            if let pausedAt = watchedLanePausedAt, foregroundClaims != pausedAt { resumeWatchedLane() }
             pumpWatchedLane()
         }
     }

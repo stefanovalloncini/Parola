@@ -40,11 +40,28 @@ struct ArrivalNotice: Equatable, Identifiable {
         case running
         case saved(LibraryEntry.ID)
         case failed(String)
+        /// The failure wasn't the file's: the lane stops with it still waiting, and Retry starts it again.
+        case paused(String)
     }
 
     let id = UUID()
     let name: String
     let state: State
+
+    var reason: String? {
+        switch state {
+        case .failed(let reason), .paused(let reason): reason
+        case .running, .saved: nil
+        }
+    }
+
+    /// A running file and a stopped lane stay up until something changes; the rest go after a few seconds.
+    var dismissesItself: Bool {
+        switch state {
+        case .saved, .failed: true
+        case .running, .paused: false
+        }
+    }
 
     init(landed entry: LibraryEntry) {
         name = LibraryEntryDisplay.title(for: entry)
@@ -54,6 +71,11 @@ struct ArrivalNotice: Equatable, Identifiable {
     init(failed url: URL, reason: String) {
         name = url.deletingPathExtension().lastPathComponent
         state = .failed(reason)
+    }
+
+    init(paused url: URL, reason: String) {
+        name = url.deletingPathExtension().lastPathComponent
+        state = .paused(reason)
     }
 
     init(running url: URL) {
@@ -85,7 +107,7 @@ extension AppModel {
 
     /// Starts the next watched file when the foreground is free: in the window when Parola is idle, out of sight otherwise.
     func pumpWatchedLane() {
-        guard watchedLaneTask == nil, visibleArrivalID == nil, !foregroundIsHeld,
+        guard watchedLaneTask == nil, visibleArrivalID == nil, watchedLanePausedAt == nil, !foregroundIsHeld,
               let next = nextWatchedArrival else { return }
         let deadline = fileReadDeadline
         let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
@@ -202,6 +224,12 @@ extension AppModel {
         }
     }
 
+    /// A run, a batch or a take claimed the session: counted, so a paused lane knows a later let-go is news.
+    func foregroundClaimedSession() {
+        foregroundClaims &+= 1
+        preemptWatchedLane()
+    }
+
     /// The foreground needs the session: the file out of sight stops and waits at the head of the line.
     func preemptWatchedLane() {
         guard let task = watchedLaneTask else { return }
@@ -299,6 +327,10 @@ extension AppModel {
 
     /// A file that couldn't be transcribed leaves the line and a change brings it back; the error pane or the toast says why.
     func failArrival(_ arrival: WatchedArrival, error: any Error) {
+        if Self.stopsWatchedLane(error) {
+            pauseWatchedLane(at: arrival, error: error)
+            return
+        }
         if backgroundArrivalID == arrival.id {
             watchedLaneTask = nil
             backgroundArrivalID = nil
@@ -308,6 +340,40 @@ extension AppModel {
         if visibleArrivalID == arrival.id { visibleArrivalID = nil }
         watchedArrivals.removeAll { $0.id == arrival.id }
         handBack(arrival.url)
+        pumpWatchedLane()
+    }
+
+    /// A model, download or engine failure would fail every file in turn, so the line waits instead of emptying.
+    nonisolated static func stopsWatchedLane(_ error: any Error) -> Bool {
+        if offlineMessage(for: error) != nil { return true }
+        switch error as? ParolaError {
+        case .modelNotFound, .unknownModel, .policyRestricted, .featureDisabled, .modelDownloadFailed,
+             .modelChecksumMismatch, .engineNotRegistered, .unsupportedForEngine, .invalidLanguage:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// The file keeps its place; the next foreground run that ends, a model install or Retry starts the lane again.
+    private func pauseWatchedLane(at arrival: WatchedArrival, error: any Error) {
+        if backgroundArrivalID == arrival.id {
+            watchedLaneTask = nil
+            backgroundArrivalID = nil
+            runningArrivalNotice = nil
+            arrivalNotice = ArrivalNotice(paused: arrival.url, reason: Self.transcriptionFailureMessage(for: error))
+        }
+        if visibleArrivalID == arrival.id { visibleArrivalID = nil }
+        if let index = watchedArrivals.firstIndex(where: { $0.id == arrival.id }) {
+            watchedArrivals[index].isLanding = false
+        }
+        watchedLanePausedAt = foregroundClaims
+        ParolaLog.notice(.library, "watched-folder files wait on a failure that isn't the file's", [.error: .error(error)])
+    }
+
+    func resumeWatchedLane() {
+        watchedLanePausedAt = nil
+        if case .paused = arrivalNotice?.state { arrivalNotice = nil }
         pumpWatchedLane()
     }
 
