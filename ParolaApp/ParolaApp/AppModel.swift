@@ -901,7 +901,7 @@ final class AppModel {
         self.appTheme = defaults.string(forKey: "appTheme") ?? "system"
         self.monospacedTimestamps = readBool("monospacedTimestamps", default: true)
         self.sidebarDensity = defaults.string(forKey: "sidebarDensity") ?? "comfortable"
-        self.appAccentRaw = defaults.string(forKey: AppAccent.storageKey) ?? AppAccent.defaultAccent.rawValue
+        self.appAccentRaw = Self.migratedAccentRaw(from: defaults)
         self.themeIsCustom = defaults.bool(forKey: "themeIsCustom")
         self.themeCustomPaletteJSON = defaults.string(forKey: "themeCustomPaletteJSON") ?? ""
         self.automationBridgeEnabled = readBool("automationBridgeEnabled", default: AppModel.defaultBridgeEnabled)
@@ -968,6 +968,20 @@ final class AppModel {
     }
     var appAccentRaw: String = AppAccent.defaultAccent.rawValue { didSet { defaults.set(appAccentRaw, forKey: AppAccent.storageKey) } }
 
+    /// Every pre-Sage install wrote "slate" back on each launch, so nil-means-unset would never surface Sage; migrates that one value once, behind a flag a later explicit pick of Slate won't retrigger.
+    private static func migratedAccentRaw(from defaults: UserDefaults) -> String {
+        let migrationKey = "didMigrateSlateAccentToSage"
+        guard !defaults.bool(forKey: migrationKey) else {
+            return defaults.string(forKey: AppAccent.storageKey) ?? AppAccent.defaultAccent.rawValue
+        }
+        defaults.set(true, forKey: migrationKey)
+        guard defaults.string(forKey: AppAccent.storageKey) == ThemePreset.slate.rawValue else {
+            return defaults.string(forKey: AppAccent.storageKey) ?? AppAccent.defaultAccent.rawValue
+        }
+        defaults.set(ThemePreset.sage.rawValue, forKey: AppAccent.storageKey)
+        return ThemePreset.sage.rawValue
+    }
+
     var appAccent: AppAccent {
         get { AppAccent(rawValue: appAccentRaw) ?? .defaultAccent }
         set { appAccentRaw = newValue.rawValue }
@@ -997,7 +1011,6 @@ final class AppModel {
     func applyTheme() -> ThemePalette {
         let palette = themeSelection.palette
         DS.theme = palette
-        DockIcon.refresh()
         return palette
     }
 

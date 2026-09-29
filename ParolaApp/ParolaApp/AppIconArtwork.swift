@@ -1,9 +1,9 @@
 import AppKit
 import CoreGraphics
 
-/// The app icon's drawing, shared by the running app (which tints it to the theme accent) and
-/// `scripts/build-icon.swift` (which renders the sage brand icon into the asset catalog). Both
-/// compile this file, so the waveform can never drift between the Finder icon and the Dock icon.
+/// The app icon's drawing, shared by `scripts/build-icon.swift` (which renders the sage brand icon
+/// into the asset catalog) and the introduction's `BrandWaveform`. Both compile this file, so the
+/// waveform can never drift between the Finder icon and the intro screen.
 enum AppIconArtwork {
     static var brandBackground: NSColor { NSColor(srgbRed: 0.42, green: 0.54, blue: 0.42, alpha: 1) }
     static var brandForeground: NSColor { NSColor(srgbRed: 0.99, green: 0.95, blue: 0.90, alpha: 1) }

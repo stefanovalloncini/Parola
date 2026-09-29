@@ -12,6 +12,9 @@ struct SurfaceContrastTests {
     /// What paints the main window behind every card; the app never sets it, AppKit does.
     private static let darkWindowBackdrop = RGBA(0.1176, 0.1176, 0.1176)
 
+    /// The inspector and menu chrome measure darker than any flat token — no token matches them.
+    private static let chromeMaterial = ThemeColor.dynamic(light: RGBA(0.898, 0.898, 0.906), dark: RGBA(0.173, 0.169, 0.165))
+
     private static func pair(_ color: ThemeColor) -> (light: RGBA, dark: RGBA)? {
         guard case .dynamic(let light, let dark) = color else { return nil }
         return (light, dark)
@@ -64,17 +67,17 @@ struct SurfaceContrastTests {
         #expect(overlay.light.contrast(against: scrim) >= Self.minimum)
     }
 
-    @Test("accent text clears AA on the card fill for every preset", arguments: ThemePreset.allCases)
-    func accentTextContrast(preset: ThemePreset) throws {
+    @Test("accent ink clears AA on the card fill for every preset", arguments: ThemePreset.allCases)
+    func accentInkContrast(preset: ThemePreset) throws {
         let palette = preset.palette
-        let text = try #require(Self.pair(palette.accentText))
+        let text = try #require(Self.pair(palette.accentInk))
         let fill = try #require(Self.pair(palette.surfaceElevated))
         #expect(text.light.contrast(against: fill.light) >= Self.minimum, "\(preset.rawValue) light")
         #expect(text.dark.contrast(against: fill.dark) >= Self.minimum, "\(preset.rawValue) dark")
     }
 
     /// Every fill an accent-coloured label is set on. A new one belongs here, not on an eyeballed pair.
-    private static func accentTextBackdrops(_ palette: ThemePalette) -> [(String, ThemeColor)] {
+    private static func accentInkBackdrops(_ palette: ThemePalette) -> [(String, ThemeColor)] {
         [
             ("the run readout", palette.accentWash),
             ("the inspector's label chips", palette.accentWash),
@@ -85,14 +88,15 @@ struct SurfaceContrastTests {
             ("the inspector's chapter timecodes", palette.surfaceElevated),
             ("the streaming caret", palette.surface),
             ("the About sheet's channel badge", palette.accentWash),
+            ("the inspector's material chrome", Self.chromeMaterial),
         ]
     }
 
-    @Test("accent text clears AA on every fill it is set on", arguments: ThemePreset.allCases)
+    @Test("accent ink clears AA on every fill it is set on", arguments: ThemePreset.allCases)
     func accentPillContrast(preset: ThemePreset) throws {
         let palette = preset.palette
-        let text = try #require(Self.pair(palette.accentText))
-        for (site, backdrop) in Self.accentTextBackdrops(palette) {
+        let text = try #require(Self.pair(palette.accentInk))
+        for (site, backdrop) in Self.accentInkBackdrops(palette) {
             let fill = try #require(Self.pair(backdrop))
             #expect(
                 text.light.contrast(against: fill.light) >= Self.minimum,
@@ -156,17 +160,31 @@ struct SurfaceContrastTests {
     }
 
     /// Every label set on the accent *fill* — pills, chips, selected rows, the rule filter, the captions mode chip.
-    @Test("a label on the accent fill never reads worse than a hard-coded white one",
+    /// `accentFill` is the opaque fill those surfaces actually draw, so this checks the pair that lands on screen,
+    /// not the raw `accent` a custom or future preset might leave under AA.
+    @Test("onAccent clears AA on the accent fill actually drawn, every preset, both schemes",
           arguments: ThemePreset.allCases)
-    func onAccentBeatsAHardCodedWhite(preset: ThemePreset) throws {
-        let white = RGBA(1, 1, 1)
-        let accent = try #require(Self.pair(preset.palette.accent))
-        for (scheme, fill) in [("light", accent.light), ("dark", accent.dark)] {
-            #expect(
-                fill.legibleForeground.contrast(against: fill) >= white.contrast(against: fill),
-                "\(preset.rawValue) \(scheme)"
-            )
-        }
+    func onAccentClearsAAOnAccentFill(preset: ThemePreset) throws {
+        let fill = try #require(Self.pair(preset.palette.accentFill))
+        let ink = try #require(Self.pair(preset.palette.onAccent))
+        #expect(ink.light.contrast(against: fill.light) >= Self.minimum, "\(preset.rawValue) light")
+        #expect(ink.dark.contrast(against: fill.dark) >= Self.minimum, "\(preset.rawValue) dark")
+    }
+
+    @Test("the default preset's accent fill and ink are pinned to the brand hex")
+    func defaultPresetAccentValuesArePinned() throws {
+        let palette = ThemePreset.defaultPreset.palette
+        let fill = try #require(Self.pair(palette.accentFill))
+        let ink = try #require(Self.pair(palette.accentInk))
+
+        #expect(fill.light.hex == "#4A7056")
+        #expect(fill.dark.hex == "#5F7D68")
+        #expect(ink.light.hex == "#3F6048")
+        #expect(ink.dark.hex == "#A9C2A6")
+
+        #expect(fill.light.contrast(against: RGBA(1, 1, 1)) >= Self.minimum)
+        #expect(fill.dark.contrast(against: RGBA(1, 1, 1)) >= Self.minimum)
+        #expect(fill.dark.contrast(against: RGBA(0.157, 0.157, 0.157)) >= 3.0)
     }
 
     /// Amber is the pale accent white collapses on: 1.6:1 against the near-black the token picks instead.
@@ -276,28 +294,22 @@ struct SurfaceContrastTests {
         #expect(light >= 3, "light playhead word: \(light)")
     }
 
-    /// A solid-accent selection is under text AA by ruling, so the inks below its title carry floors of their
-    /// own: the subtitle tier on `accent × selectionProminentTint`, and the count badge set straight on it.
-    @Test("the ink tiers on a chosen row each keep their floor")
-    func inkTiersOnTheProminentFill() throws {
-        let accent = try #require(Self.pair(ThemePreset.defaultPreset.palette.accent))
-        let ground = try #require(Self.pair(ThemePalette.sharedNeutrals.surfaceElevated))
-        for (scheme, behind, tint) in [
-            ("light", ground.light, accent.light),
-            ("dark", ground.dark, accent.dark),
-        ] {
-            let fill = behind.blended(toward: tint, amount: DS.Color.selectionProminentTint)
-            let second = fill.blended(toward: tint.legibleForeground, amount: DS.Color.onAccentSecondaryTint)
-            #expect(second.contrast(against: fill) >= 2.75, "\(scheme): \(second.contrast(against: fill))")
+    /// `selectionProminent` is `accentFill` outright now, so the badge set straight on it clears full text AA;
+    /// the softened secondary tier keeps a lower floor since it's deliberately a notch quieter.
+    @Test("the ink tiers on a chosen row clear AA now that the fill is opaque", arguments: ThemePreset.allCases)
+    func inkTiersOnTheProminentFill(preset: ThemePreset) throws {
+        let fill = try #require(Self.pair(preset.palette.accentFill))
+        let ink = try #require(Self.pair(preset.palette.onAccent))
+        for (scheme, drawn, badge) in [("light", fill.light, ink.light), ("dark", fill.dark, ink.dark)] {
+            #expect(badge.contrast(against: drawn) >= Self.minimum, "\(preset.rawValue) \(scheme) badge")
 
-            // A chosen row's count badge has no pill of its own: the digit is set straight on the fill.
-            let badge = tint.legibleForeground
-            #expect(badge.contrast(against: fill) >= 3, "\(scheme) badge: \(badge.contrast(against: fill))")
+            let second = drawn.blended(toward: badge, amount: DS.Color.onAccentSecondaryTint)
+            #expect(second.contrast(against: drawn) >= 3.5, "\(preset.rawValue) \(scheme): \(second.contrast(against: drawn))")
         }
     }
 
-    @Test("accent text leaves an accent that already clears AA alone")
-    func accentTextKeepsLegibleAccents() {
+    @Test("accent ink leaves an accent that already clears AA alone")
+    func accentInkKeepsLegibleAccents() {
         let dark = RGBA(0.1, 0.1, 0.1)
         #expect(dark.legible(on: RGBA(1, 1, 1)) == dark)
     }

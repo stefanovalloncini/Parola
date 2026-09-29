@@ -21,18 +21,6 @@ enum ThemeColor: Sendable, Codable, Equatable {
             })
         }
     }
-
-    /// White or near-black, chosen per appearance for legibility on top of this color.
-    var legibleForeground: Color {
-        Color(nsColor: NSColor(name: nil) { [self] appearance in
-            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            let base: RGBA = switch self {
-            case .dynamic(let light, let dark): isDark ? dark : light
-            case .system(let semantic): RGBA(semantic.color)
-            }
-            return base.legibleForeground.nsColor
-        })
-    }
 }
 
 struct RGBA: Sendable, Codable, Equatable {
@@ -47,13 +35,14 @@ struct RGBA: Sendable, Codable, Equatable {
 
     var nsColor: NSColor { NSColor(srgbRed: r, green: g, blue: b, alpha: a) }
 
-    /// Above this relative luminance a fill wants a dark foreground instead of a light one.
-    static let darkForegroundLuminance = 0.55
-
-    /// White or near-black, whichever reads on this fill: what every label on an accent capsule is painted in.
+    /// White or near-black, whichever gives the higher contrast against this fill.
     var legibleForeground: RGBA {
-        relativeLuminance > Self.darkForegroundLuminance ? RGBA(0.08, 0.08, 0.08) : RGBA(1, 1, 1)
+        contrast(against: Self.white) >= contrast(against: Self.nearBlack) ? Self.white : Self.nearBlack
     }
+
+    static let white = RGBA(1, 1, 1)
+    /// #141414 — the relative luminance crossover against this ink sits at ≈0.195, not the visual midpoint.
+    static let nearBlack = RGBA(0.08, 0.08, 0.08)
 
     /// WCAG relative luminance in [0, 1]; used to pick a legible foreground on a colored fill.
     var relativeLuminance: Double {
@@ -95,6 +84,65 @@ struct RGBA: Sendable, Codable, Equatable {
             }
         }
         return blended(toward: target, amount: high)
+    }
+
+    /// Hue (0–360) and saturation/value from HSV, so a fill can be darkened without shifting its hue.
+    private var hsv: (h: Double, s: Double, v: Double) {
+        let maxC = Swift.max(r, g, b), minC = Swift.min(r, g, b)
+        let delta = maxC - minC
+        let v = maxC
+        let s = maxC == 0 ? 0 : delta / maxC
+        guard delta > 0 else { return (0, s, v) }
+        var h: Double
+        if maxC == r {
+            h = ((g - b) / delta).truncatingRemainder(dividingBy: 6)
+        } else if maxC == g {
+            h = (b - r) / delta + 2
+        } else {
+            h = (r - g) / delta + 4
+        }
+        h *= 60
+        if h < 0 { h += 360 }
+        return (h, s, v)
+    }
+
+    /// The inverse of `hsv`: rebuilds an opaque color from hue/saturation/value.
+    private static func fromHSV(h: Double, s: Double, v: Double) -> RGBA {
+        let c = v * s
+        let x = c * (1 - abs((h / 60).truncatingRemainder(dividingBy: 2) - 1))
+        let m = v - c
+        let parts: (Double, Double, Double)
+        switch h {
+        case 0..<60: parts = (c, x, 0)
+        case 60..<120: parts = (x, c, 0)
+        case 120..<180: parts = (0, c, x)
+        case 180..<240: parts = (0, x, c)
+        case 240..<300: parts = (x, 0, c)
+        default: parts = (c, 0, x)
+        }
+        return RGBA(parts.0 + m, parts.1 + m, parts.2 + m)
+    }
+
+    /// White ink by default: darkens this fill (same hue/saturation) until white clears AA, unless that costs more than `maxCost` of its own value (Amber and its neighbours), in which case near-black inks the fill unchanged.
+    func solvedForOnAccent(maxCost: Double = 0.26) -> (fill: RGBA, ink: RGBA) {
+        let opaque = RGBA(r, g, b, 1)
+        if opaque.contrast(against: Self.white) >= Self.textContrastMinimum {
+            return (opaque, Self.white)
+        }
+        let (h, s, v) = hsv
+        guard v > 0 else { return (opaque, Self.nearBlack) }
+        var low = 0.0
+        var high = v
+        for _ in 0..<40 {
+            let mid = (low + high) / 2
+            if RGBA.fromHSV(h: h, s: s, v: mid).contrast(against: Self.white) >= Self.textContrastMinimum {
+                low = mid
+            } else {
+                high = mid
+            }
+        }
+        guard (v - low) / v <= maxCost else { return (opaque, Self.nearBlack) }
+        return (RGBA.fromHSV(h: h, s: s, v: low), Self.white)
     }
 
     /// Parses `#RRGGBB` / `#RRGGBBAA` (with or without the leading `#`). Returns nil on malformed input.
@@ -194,10 +242,34 @@ extension ThemePalette {
         )
     }
 
-    /// The accent as small text, legible on both surfaces it's set on — the card fill and `accentWash`.
-    var accentText: ThemeColor {
-        accent.legibleText(on: surfaceElevated).legibleText(on: accentWash)
+    /// The opaque fill every surface draws under `onAccent`. Matched against Sage by accent value, not stored, so a custom palette never keeps Sage's fill after its own accent changes.
+    var accentFill: ThemeColor {
+        accent == ThemePreset.sage.accent ? Self.sageAccentFill : solvedAccent.fill
     }
+
+    /// The ink `accentFill` was solved for, alongside it so the two can't disagree.
+    var onAccent: ThemeColor {
+        accent == ThemePreset.sage.accent ? .uniform(.white) : solvedAccent.ink
+    }
+
+    private var solvedAccent: (fill: ThemeColor, ink: ThemeColor) {
+        let variants = accent.appearanceVariants
+        let light = variants.light.solvedForOnAccent()
+        let dark = variants.dark.solvedForOnAccent()
+        return (.dynamic(light: light.fill, dark: dark.fill), .dynamic(light: light.ink, dark: dark.ink))
+    }
+
+    private static let sageAccentFill = ThemeColor.dynamic(light: RGBA(0.290, 0.439, 0.337), dark: RGBA(0.373, 0.490, 0.408))
+    private static let sageAccentInk = ThemeColor.dynamic(light: RGBA(0.247, 0.376, 0.282), dark: RGBA(0.663, 0.761, 0.651))
+
+    /// The accent as small text on a surface: legible on the card fill, the accent wash, and the darkest material chrome composites to (#E5E5E7 light / #2C2B2A dark — no token matches it).
+    var accentInk: ThemeColor {
+        accent == ThemePreset.sage.accent
+            ? Self.sageAccentInk
+            : accent.legibleText(on: surfaceElevated).legibleText(on: accentWash).legibleText(on: Self.chromeMaterial)
+    }
+
+    private static let chromeMaterial = ThemeColor.dynamic(light: RGBA(0.898, 0.898, 0.906), dark: RGBA(0.173, 0.169, 0.165))
 
     /// Red, green and amber as small text — the raw system red only reaches 3.7 on a card, green was under AA in light mode.
     var dangerText: ThemeColor { danger.legibleText(on: surfaceElevated) }
@@ -244,8 +316,8 @@ extension ThemeColor {
         }
     }
 
-    /// Accents below this RGB chroma read as grey and fail as a highlight; substitute azure instead.
-    private static let highlightChromaFloor = 0.15
+    /// Below this RGB chroma a colour reads as grey, not a tint — Mono 0.035–0.047, Sage ink 0.110–0.129.
+    private static let highlightChromaFloor = 0.08
     private static let highlightFallback = RGBA(0.30, 0.56, 0.98)
 
     /// True when this color is saturated enough to read as a tint on text rather than as lighter body text.
@@ -269,11 +341,11 @@ extension ThemeColor {
 
 /// The built-in accents, in the order the Customization pane's swatch row shows them: the default first.
 enum ThemePreset: String, CaseIterable, Codable, Identifiable, Sendable {
+    case sage
     case slate
     case terracotta
     case blue
     case teal
-    case sage
     case indigo
     case mint
     case purple
@@ -281,18 +353,18 @@ enum ThemePreset: String, CaseIterable, Codable, Identifiable, Sendable {
     case yellow
     case graphite
 
-    /// What the app paints with until somebody stores a choice.
-    static let defaultPreset: ThemePreset = .slate
+    /// What the app paints with until somebody stores a choice: the brand colour on the icon and the site.
+    static let defaultPreset: ThemePreset = .sage
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
+        case .sage: return "Sage"
         case .slate: return "Slate"
         case .terracotta: return "Terracotta"
         case .blue: return "Ocean"
         case .teal: return "Sea"
-        case .sage: return "Sage"
         case .indigo: return "Indigo"
         case .mint: return "Forest"
         case .purple: return "Purple"
@@ -306,11 +378,11 @@ enum ThemePreset: String, CaseIterable, Codable, Identifiable, Sendable {
 
     var accent: ThemeColor {
         switch self {
+        case .sage: return .dynamic(light: RGBA(0.36, 0.53, 0.42), dark: RGBA(0.55, 0.72, 0.60))
         case .slate: return .dynamic(light: RGBA(0.33, 0.45, 0.62), dark: RGBA(0.52, 0.64, 0.80))
         case .terracotta: return .dynamic(light: RGBA(0.78, 0.42, 0.25), dark: RGBA(0.93, 0.58, 0.41))
         case .blue: return .uniform(RGBA(0.20, 0.49, 0.96))
         case .teal: return .dynamic(light: RGBA(0.13, 0.52, 0.58), dark: RGBA(0.33, 0.70, 0.76))
-        case .sage: return .dynamic(light: RGBA(0.36, 0.53, 0.42), dark: RGBA(0.55, 0.72, 0.60))
         case .indigo: return .dynamic(light: RGBA(0.35, 0.34, 0.84), dark: RGBA(0.49, 0.48, 0.93))
         case .mint: return .uniform(RGBA(0.20, 0.70, 0.55))
         case .purple: return .uniform(RGBA(0.55, 0.35, 0.84))

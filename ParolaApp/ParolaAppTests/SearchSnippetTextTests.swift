@@ -49,8 +49,14 @@ struct SearchSnippetTextTests {
         #expect(ranges == [3..<9, 15..<21])
     }
 
+    /// Pinned to Sage: its ink's chroma (0.11 light / 0.11 dark) is the lowest of any preset that must still tint a hit.
     @Test("every marked range survives the round trip into an attributed string")
+    @MainActor
     func attributedKeepsEveryRun() {
+        let previous = DS.theme
+        defer { DS.theme = previous }
+        DS.theme = ThemePreset.sage.palette
+
         let text = SearchSnippetText.attributed(match("il lancio e il lancio", [(3, 6), (15, 6)]))
         let marked = text.runs.filter { $0.foregroundColor != nil }.map { String(text[$0.range].characters) }
         #expect(marked == ["lancio", "lancio"])

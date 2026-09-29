@@ -114,11 +114,11 @@ struct ThemePaletteTests {
     }
 
     /// The Customization pane draws `allCases` in order, so declaration order is the swatch order: the default first.
-    @Test("slate is the default and leads the swatch row")
+    @Test("sage is the default and leads the swatch row")
     func defaultPresetLeadsTheRow() {
-        #expect(ThemePreset.defaultPreset == .slate)
+        #expect(ThemePreset.defaultPreset == .sage)
         #expect(ThemePreset.allCases.map(\.rawValue) == [
-            "slate", "terracotta", "blue", "teal", "sage", "indigo",
+            "sage", "slate", "terracotta", "blue", "teal", "indigo",
             "mint", "purple", "pink", "yellow", "graphite",
         ])
     }
@@ -140,6 +140,20 @@ struct ThemePaletteTests {
             #expect(light == values.light, "\(preset.rawValue) light")
             #expect(dark == values.dark, "\(preset.rawValue) dark")
         }
+    }
+
+    /// A custom palette seeded from Sage never keeps its brand fill and ink once its own accent moves on
+    /// (S5): they're matched by the live accent value, never stored on the palette.
+    @Test("Sage's brand fill and ink don't outlive a palette's own accent")
+    func sageOverrideDoesNotOutliveItsAccent() {
+        var palette = ThemePreset.sage.palette
+        #expect(palette.accentFill == ThemePreset.sage.palette.accentFill)
+        #expect(palette.accentInk == ThemePreset.sage.palette.accentInk)
+
+        palette.accent = ThemePreset.teal.accent
+        #expect(palette.accentFill != ThemePreset.sage.palette.accentFill)
+        #expect(palette.accentInk != ThemePreset.sage.palette.accentInk)
+        #expect(palette.accentFill == ThemePreset.teal.palette.accentFill)
     }
 
     @Test("a preset palette uses the system primary color and the shared neutrals")
@@ -230,52 +244,51 @@ struct ThemePaletteTests {
         #expect(selection.isCustom)
     }
 
-    @Test("legible-foreground luminance stays on the right side of the threshold per preset")
-    func onAccentLuminanceThreshold() throws {
+    @Test("legible foreground picks whichever ink wins the direct contrast comparison, not a fixed luminance line")
+    func legibleForegroundPicksTheHigherContrastInk() throws {
         guard case .dynamic(let amberLight, _) = ThemePreset.yellow.accent,
               case .dynamic(_, let terracottaDark) = ThemePreset.terracotta.accent,
-              case .dynamic(_, let graphiteDark) = ThemePreset.graphite.accent else {
+              case .dynamic(_, let graphiteDark) = ThemePreset.graphite.accent,
+              case .dynamic(_, let slateDark) = ThemePreset.slate.accent else {
             Issue.record("preset accents are expected to be dynamic colors")
             return
         }
-        #expect(amberLight.relativeLuminance > 0.55)
-        #expect(terracottaDark.relativeLuminance < 0.55)
-        #expect(graphiteDark.relativeLuminance < 0.55)
+        let white = RGBA(1, 1, 1)
+        let black = RGBA(0.08, 0.08, 0.08)
+        for (name, rgba) in [("amber light", amberLight), ("terracotta dark", terracottaDark), ("graphite dark", graphiteDark)] {
+            let chosen = rgba.legibleForeground
+            let alternative = chosen.hex == white.hex ? black : white
+            #expect(chosen.contrast(against: rgba) >= alternative.contrast(against: rgba), "\(name)")
+        }
+
+        // Slate-dark's luminance (~0.356) sits above the true white/black crossover (~0.195 for #141414).
+        #expect(slateDark.relativeLuminance < 0.55)
+        #expect(slateDark.legibleForeground.hex == black.hex)
+        #expect(slateDark.legibleForeground.contrast(against: slateDark) >= 4.5)
     }
 
-    /// Owner's call: keep white on light terracotta (matches the platform's own accent buttons; a darker preset would change filmed demos) — floors it at the WCAG UI-component bar so a future edit can't silently drop lower.
-    @Test("light terracotta keeps a white foreground, at or above the UI-component contrast floor")
-    func lightTerracottaKeepsWhiteForeground() throws {
+    /// Terracotta light's raw contrast is white 3.75 / black 4.90 — `legibleForeground` must pick the higher one.
+    @Test("light terracotta's raw accent takes a dark foreground, clearing full text AA")
+    func lightTerracottaTakesADarkForeground() throws {
         guard case .dynamic(let terracottaLight, _) = ThemePreset.terracotta.accent else {
             Issue.record("terracotta's accent is expected to be a dynamic color")
             return
         }
-        let light = try #require(NSAppearance(named: .aqua))
-        var foreground = RGBA(0, 0, 0)
-        light.performAsCurrentDrawingAppearance {
-            foreground = RGBA(ThemePreset.terracotta.accent.legibleForeground)
-        }
-        #expect(foreground.hex == RGBA(1, 1, 1).hex)
-        #expect(terracottaLight.contrast(against: foreground) >= 3.0)
+        let chosen = terracottaLight.legibleForeground
+        #expect(chosen.hex == RGBA(0.08, 0.08, 0.08).hex)
+        #expect(chosen.contrast(against: terracottaLight) >= 4.5)
     }
 
-    /// Same floor for the preset almost everyone reads, on what a chosen row really draws: the accent at
-    /// `selectionProminentTint` over the page, which is 3.64 today against the flat fill's 4.87.
-    @Test("the default accent keeps a white foreground on the fill a chosen row draws, above the UI-component floor")
+    @Test("the default accent keeps a white foreground on the fill a chosen row draws")
     func defaultPresetKeepsWhiteForeground() throws {
-        guard case .dynamic(let defaultLight, _) = ThemePreset.defaultPreset.accent,
-              case .dynamic(let behind, _) = ThemePalette.sharedNeutrals.surface else {
-            Issue.record("the default accent and the page behind it are expected to be dynamic colors")
+        guard case .dynamic(let fillLight, let fillDark) = ThemePreset.defaultPreset.palette.accentFill else {
+            Issue.record("the default accent fill is expected to be a dynamic color")
             return
         }
-        let light = try #require(NSAppearance(named: .aqua))
-        var foreground = RGBA(0, 0, 0)
-        light.performAsCurrentDrawingAppearance {
-            foreground = RGBA(ThemePreset.defaultPreset.accent.legibleForeground)
-        }
-        let drawn = behind.blended(toward: defaultLight, amount: DS.Color.selectionProminentTint)
-        #expect(foreground.hex == RGBA(1, 1, 1).hex)
-        #expect(drawn.contrast(against: foreground) >= 3.0, "drawn: \(drawn.contrast(against: foreground))")
+        #expect(fillLight.hex == "#4A7056")
+        #expect(fillDark.hex == "#5F7D68")
+        #expect(fillLight.contrast(against: RGBA(1, 1, 1)) >= 4.5)
+        #expect(fillDark.contrast(against: RGBA(1, 1, 1)) >= 4.5)
     }
 
     @Test("a palette round-trips through Codable")
@@ -379,5 +392,24 @@ struct ThemedColorCacheTests {
         #expect(lightAccent.hex == expectedLight.hex)
         #expect(darkAccent.hex == expectedDark.hex)
         #expect(lightSurface.relativeLuminance > darkSurface.relativeLuminance)
+    }
+
+    /// Terracotta's ink policy actually differs by appearance (light costs 10% of the fill's value and
+    /// keeps white; dark would cost 30% and takes near-black instead) — `DS.Color.onAccent` has to track it.
+    @Test("onAccent resolves the ink the policy actually picked, per appearance")
+    func onAccentStaysDynamicThroughAppearance() throws {
+        let previous = DS.theme
+        defer { DS.theme = previous }
+        DS.theme = ThemePreset.terracotta.palette
+        let onAccent = DS.Color.onAccent
+
+        let light = try #require(NSAppearance(named: .aqua))
+        let dark = try #require(NSAppearance(named: .darkAqua))
+        var lightInk = RGBA(0, 0, 0), darkInk = RGBA(0, 0, 0)
+        light.performAsCurrentDrawingAppearance { lightInk = RGBA(onAccent) }
+        dark.performAsCurrentDrawingAppearance { darkInk = RGBA(onAccent) }
+
+        #expect(lightInk.hex == RGBA(1, 1, 1).hex)
+        #expect(darkInk.hex == RGBA(0.08, 0.08, 0.08).hex)
     }
 }

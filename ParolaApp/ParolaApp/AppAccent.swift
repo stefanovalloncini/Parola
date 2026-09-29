@@ -1,11 +1,11 @@
 import Foundation
 
 enum AppAccent: String, CaseIterable, Identifiable {
+    case sage
     case slate
     case terracotta
     case blue
     case teal
-    case sage
     case indigo
     case mint
     case purple
@@ -14,7 +14,7 @@ enum AppAccent: String, CaseIterable, Identifiable {
     case graphite
 
     /// The preset the app opens on, in this enum's terms; `AppAccentTests.presetsAgree` pins the two in sync.
-    static var defaultAccent: AppAccent { AppAccent(rawValue: ThemePreset.defaultPreset.rawValue) ?? .slate }
+    static var defaultAccent: AppAccent { AppAccent(rawValue: ThemePreset.defaultPreset.rawValue) ?? .sage }
 
     var id: String { rawValue }
 

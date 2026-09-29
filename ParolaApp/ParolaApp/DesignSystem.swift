@@ -91,7 +91,8 @@ enum DS {
     /// One instance per palette, so repeated reads compare equal and SwiftUI can skip redraws; a dynamic NSColor re-runs its provider per draw, so the cached instance still follows the appearance.
     private struct Resolved {
         let accent: SwiftUI.Color
-        let accentText: SwiftUI.Color
+        let accentFill: SwiftUI.Color
+        let accentInk: SwiftUI.Color
         let accentWash: SwiftUI.Color
         let dangerText: SwiftUI.Color
         let warningText: SwiftUI.Color
@@ -114,7 +115,8 @@ enum DS {
 
         init(_ palette: ThemePalette) {
             accent = palette.accent.color
-            accentText = palette.accentText.color
+            accentFill = palette.accentFill.color
+            accentInk = palette.accentInk.color
             accentWash = palette.accentWash.color
             dangerText = palette.dangerText.color
             warningText = palette.warningText.color
@@ -127,7 +129,7 @@ enum DS {
             surfaceElevated = palette.surfaceElevated.color
             divider = palette.divider.color
             danger = palette.danger.color
-            onAccent = palette.accent.legibleForeground
+            onAccent = palette.onAccent.color
             canvas = palette.canvas.color
             success = palette.success.color
             warning = palette.warning.color
@@ -143,6 +145,10 @@ enum DS {
 
     enum Color {
         static var accent: SwiftUI.Color { DS.resolved.accent }
+
+        /// The opaque fill every surface draws under `onAccent` text or glyphs; solved per preset and appearance so `onAccent` clears AA on it.
+        static var accentFill: SwiftUI.Color { DS.resolved.accentFill }
+
         static var highlight: SwiftUI.Color { DS.resolved.highlight }
         static var primaryText: SwiftUI.Color { DS.resolved.primaryText }
         static var secondaryText: SwiftUI.Color { DS.resolved.secondaryText }
@@ -151,8 +157,7 @@ enum DS {
         static var separator: SwiftUI.Color { DS.resolved.divider }
         static var danger: SwiftUI.Color { DS.resolved.danger }
 
-        /// A legible foreground for text/glyphs drawn on top of `accent`: near-black on light
-        /// accents (Amber, Mint, custom), white on dark ones. Resolves per appearance.
+        /// The ink `accentFill` was solved for — white unless that cost too much of the accent's value.
         static var onAccent: SwiftUI.Color { DS.resolved.onAccent }
 
         /// The second text tier on an accent fill: `onAccent`, softened just enough to rank below it.
@@ -164,10 +169,13 @@ enum DS {
         /// The backing a badge, tile or glyph keeps when it sits on an accent fill.
         static var onAccentWash: SwiftUI.Color { DS.resolved.onAccent.opacity(0.18) }
 
-        /// The accent as small text on a surface, darkened or lightened until it clears AA.
-        static var accentText: SwiftUI.Color { DS.resolved.accentText }
+        /// The accent as small text or a glyph set directly on a surface, darkened or lightened until it clears AA.
+        static var accentInk: SwiftUI.Color { DS.resolved.accentInk }
 
-        /// The soft accent fill a live readout sits on; `accentText` is legible on it.
+        /// `accentInk`'s old name; `TranscribingPane.swift` and `ContentToolbar.swift` still read it directly.
+        static var accentText: SwiftUI.Color { DS.resolved.accentInk }
+
+        /// The soft accent fill a live readout sits on; `accentInk` is legible on it.
         static var accentWash: SwiftUI.Color { DS.resolved.accentWash }
 
         /// What a selected content row or card carries, where a solid accent would swallow its text.
@@ -177,10 +185,7 @@ enum DS {
         static let selectionWashTint = 0.12
 
         /// What a chosen sidebar row, menu row or preset chip is filled with; `onAccent` is its ink.
-        static var selectionProminent: SwiftUI.Color { DS.resolved.accent.opacity(selectionProminentTint) }
-
-        /// The prominent fill's strength on its own, for the contrast tests that blend it themselves.
-        static let selectionProminentTint = 0.85
+        static var selectionProminent: SwiftUI.Color { DS.resolved.accentFill }
 
         /// `danger` / `success` as small text, adjusted until they clear AA on the card fill.
         static var dangerText: SwiftUI.Color { DS.resolved.dangerText }
@@ -224,7 +229,7 @@ enum DS {
     static let speakerTints: [ThemeColor] = [
         .dynamic(light: RGBA(0.272, 0.407, 0.616), dark: RGBA(0.538, 0.640, 0.796)),  // dusty blue
         .dynamic(light: RGBA(0.539, 0.365, 0.261), dark: RGBA(0.761, 0.601, 0.506)),  // warm tan
-        .dynamic(light: RGBA(0.346, 0.428, 0.297), dark: RGBA(0.568, 0.662, 0.512)),  // sage
+        .dynamic(light: RGBA(0.067, 0.439, 0.561), dark: RGBA(0.451, 0.663, 0.765)),  // steel blue
         .dynamic(light: RGBA(0.529, 0.347, 0.475), dark: RGBA(0.733, 0.593, 0.691)),  // mauve
         .dynamic(light: RGBA(0.370, 0.406, 0.476), dark: RGBA(0.606, 0.635, 0.694)),  // slate
         .dynamic(light: RGBA(0.503, 0.381, 0.259), dark: RGBA(0.736, 0.612, 0.488)),  // ochre
@@ -312,10 +317,10 @@ extension View {
         )
     }
 
-    /// A live readout that must hold the accent on video — `onAccent` fill lands under AA on five of seven presets.
+    /// A live readout that must hold the accent on video: a soft wash rather than a solid pill.
     func accentPill(font: SwiftUI.Font = DS.Font.mono) -> some View {
         self.font(font)
-            .foregroundStyle(DS.Color.accentText)
+            .foregroundStyle(DS.Color.accentInk)
             .padding(.horizontal, DS.Spacing.small)
             .padding(.vertical, DS.Spacing.hair)
             .background(Capsule(style: .continuous).fill(DS.Color.accentWash))

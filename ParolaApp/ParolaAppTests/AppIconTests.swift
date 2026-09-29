@@ -6,14 +6,6 @@ import Testing
 @Suite("App icon")
 struct AppIconTests {
 
-    private func variants(_ color: ThemeColor) -> (light: RGBA, dark: RGBA) {
-        guard case .dynamic(let light, let dark) = color else {
-            Issue.record("preset accents are expected to be dynamic, got a system color")
-            return (RGBA(0, 0, 0), RGBA(0, 0, 0))
-        }
-        return (light, dark)
-    }
-
     private func sample(_ rep: NSBitmapImageRep, xFraction: Double, yFraction: Double) -> RGBA {
         let x = Int(Double(rep.pixelsWide) * xFraction)
         let y = Int(Double(rep.pixelsHigh) * yFraction)
@@ -31,16 +23,6 @@ struct AppIconTests {
 
     private func pixel(_ image: CGImage, xFraction: Double, yFraction: Double) -> RGBA {
         sample(NSBitmapImageRep(cgImage: image), xFraction: xFraction, yFraction: yFraction)
-    }
-
-    /// The `applicationIconImage` getter hands back an image whose representations aren't
-    /// `NSBitmapImageRep`, so sampling has to go through a rasterization rather than the reps.
-    private func pixel(_ image: NSImage, xFraction: Double, yFraction: Double) -> RGBA {
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            Issue.record("icon could not be rasterized")
-            return RGBA(0, 0, 0)
-        }
-        return sample(NSBitmapImageRep(cgImage: cgImage), xFraction: xFraction, yFraction: yFraction)
     }
 
     private func rgba(_ color: NSColor) -> RGBA {
@@ -61,30 +43,6 @@ struct AppIconTests {
         #expect(abs(actual.r - expected.r) < tolerance, comment)
         #expect(abs(actual.g - expected.g) < tolerance, comment)
         #expect(abs(actual.b - expected.b) < tolerance, comment)
-    }
-
-    @Test("Amber is the one preset light enough to need dark bars")
-    @MainActor
-    func amberFlipsTheBars() {
-        for preset in ThemePreset.allCases {
-            let (light, dark) = variants(preset.accent)
-            let expected = preset == .yellow ? DockIcon.ink : DockIcon.cream
-            #expect(DockIcon.colors(accent: light).foreground == expected,
-                    "\(preset.rawValue) light variant")
-            if preset != .yellow {
-                #expect(DockIcon.colors(accent: dark).foreground == DockIcon.cream,
-                        "\(preset.rawValue) dark variant")
-            }
-        }
-    }
-
-    @Test("bars flip at the shared luminance threshold")
-    @MainActor
-    func flipsAtThreshold() {
-        #expect(DockIcon.colors(accent: RGBA(1, 1, 1)).foreground == DockIcon.ink)
-        #expect(DockIcon.colors(accent: RGBA(0, 0, 0)).foreground == DockIcon.cream)
-        #expect(RGBA(1, 1, 1).relativeLuminance > RGBA.darkForegroundLuminance)
-        #expect(RGBA(0, 0, 0).relativeLuminance < RGBA.darkForegroundLuminance)
     }
 
     @Test("the accent fills the icon background and the bars sit on top")
@@ -143,62 +101,5 @@ struct AppIconTests {
         expectClose(rgba(AppIconArtwork.brandForeground), RGBA(0.99, 0.95, 0.90), "cream foreground")
         #expect(AppIconArtwork.sizes.count == 10)
         #expect(AppIconArtwork.sizes.contains { $0.pixels == 1024 })
-    }
-
-    private func distance(_ a: RGBA, _ b: RGBA) -> Double {
-        ((a.r - b.r) * (a.r - b.r) + (a.g - b.g) * (a.g - b.g) + (a.b - b.b) * (a.b - b.b)).squareRoot()
-    }
-
-    /// Only the presets the caller is distinguishing: across all eleven, indigo sits inside blue's drift allowance.
-    private func nearestPreset(to sampled: RGBA, among presets: [ThemePreset]) -> ThemePreset? {
-        presets.min { lhs, rhs in
-            distance(sampled, variants(lhs.accent).light) < distance(sampled, variants(rhs.accent).light)
-        }
-    }
-
-    /// End-to-end through the real assignment. `applicationIconImage` round-trips through AppKit's
-    /// own color handling, which shifts components by up to ~0.15 — so this classifies the sampled
-    /// color against the preset palette rather than asserting exact sRGB.
-    @Test("refreshing hands the running application an icon tinted to the current accent")
-    @MainActor
-    func refreshAssignsTintedIcon() throws {
-        let app = try #require(NSApp, "this suite needs the app test host")
-        let previousTheme = DS.theme
-        defer {
-            DS.theme = previousTheme
-            DockIcon.refresh()
-        }
-
-        let sampled: [ThemePreset] = [.blue, .yellow, .pink]
-        let among = sampled.map(\.rawValue).joined(separator: ", ")
-        var backgrounds: [ThemePreset: RGBA] = [:]
-        for preset in sampled {
-            DS.theme = preset.palette
-            DockIcon.refresh()
-            let icon = try #require(app.applicationIconImage, "no icon assigned for \(preset.rawValue)")
-            let background = pixel(icon, xFraction: 0.15, yFraction: 0.5)
-            backgrounds[preset] = background
-            #expect(nearestPreset(to: background, among: sampled) == preset,
-                    "\(preset.rawValue) icon sampled \(background.hex); of \(among) the nearest is \(nearestPreset(to: background, among: sampled)?.rawValue ?? "none")")
-
-            let bar = pixel(icon, xFraction: 0.5, yFraction: 0.5)
-            let expectedBar = preset == .yellow ? DockIcon.ink : DockIcon.cream
-            let otherBar = preset == .yellow ? DockIcon.cream : DockIcon.ink
-            #expect(distance(bar, expectedBar) < distance(bar, otherBar),
-                    "\(preset.rawValue) bars sampled \(bar.hex)")
-        }
-
-        // A stuck icon would sample identically for every accent.
-        #expect(distance(backgrounds[.blue]!, backgrounds[.yellow]!) > 0.2)
-        #expect(distance(backgrounds[.blue]!, backgrounds[.pink]!) > 0.2)
-    }
-
-    @Test("the rendered icon carries a ladder of representations up to what the Dock draws")
-    @MainActor
-    func imageHasRepresentations() {
-        let image = DockIcon.image(DockIcon.colors(accent: RGBA(0.20, 0.49, 0.96)))
-        let sizes = Set(image.representations.map(\.pixelsWide)).sorted()
-        #expect(sizes == [16, 32, 64, 128, 256, 512])
-        #expect(image.size.width == 512)
     }
 }

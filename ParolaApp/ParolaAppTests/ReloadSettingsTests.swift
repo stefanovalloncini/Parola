@@ -48,11 +48,30 @@ struct ReloadSettingsTests {
         let model = makeModel(defaults)
 
         #expect(model.appAccentRaw == ThemePreset.defaultPreset.rawValue)
-        #expect(model.themeSelection == .preset(.slate))
-        #expect(model.themeSelection.palette.accent == ThemePreset.slate.accent)
+        #expect(model.themeSelection == .preset(ThemePreset.defaultPreset))
+        #expect(model.themeSelection.palette.accent == ThemePreset.defaultPreset.accent)
     }
 
-    @Test("a stored accent survives the change of default", arguments: ThemePreset.allCases)
+    @Test("a stored Slate accent migrates to Sage once, behind a flag")
+    func slateMigratesToSageOnce() {
+        let previous = DS.theme
+        defer { DS.theme = previous }
+        let defaults = temporaryDefaults()
+        defaults.set(ThemePreset.slate.rawValue, forKey: AppAccent.storageKey)
+
+        let migrated = makeModel(defaults)
+        #expect(migrated.appAccentRaw == ThemePreset.sage.rawValue)
+        #expect(defaults.bool(forKey: "didMigrateSlateAccentToSage"))
+
+        // A user who explicitly picks Slate again afterwards keeps it: the flag stops a second migration.
+        defaults.set(ThemePreset.slate.rawValue, forKey: AppAccent.storageKey)
+        let afterChoosingSlateAgain = makeModel(defaults)
+        #expect(afterChoosingSlateAgain.appAccentRaw == ThemePreset.slate.rawValue)
+    }
+
+    /// Excludes `.slate`: that one value is the pre-Sage default written back on every launch, so it's
+    /// migrated instead of surviving untouched — see `slateMigratesToSageOnce`.
+    @Test("a stored accent survives the change of default", arguments: ThemePreset.allCases.filter { $0 != .slate })
     func storedAccentSurvives(preset: ThemePreset) {
         let previous = DS.theme
         defer { DS.theme = previous }

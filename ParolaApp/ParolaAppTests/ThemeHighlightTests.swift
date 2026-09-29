@@ -24,19 +24,11 @@ struct ThemeHighlightTests {
         #expect(dark.chroma >= 0.15)
     }
 
-    /// Sage joins Mono on the other side of the floor: darkening its light value to clear AA costs it the chroma a tint needs.
-    @Test("Mono and Sage cannot tint text")
-    func greyAccentsCannotTint() {
-        #expect(ThemePreset.graphite.palette.accentText.readsAsTint == false)
-        #expect(ThemePreset.sage.palette.accentText.readsAsTint == false)
-    }
-
-    @Test(
-        "a vivid accent can tint text",
-        arguments: ThemePreset.allCases.filter { $0 != .graphite && $0 != .sage }
-    )
-    func vividAccentsReadAsATint(_ preset: ThemePreset) {
-        #expect(preset.palette.accentText.readsAsTint)
+    /// Mono's ink chroma (0.047 light / 0.035 dark) sits below the floor; every other preset, Sage
+    /// included (0.129 / 0.110), sits above it — the floor was lowered from 0.15 to 0.08 for exactly this.
+    @Test("Mono cannot tint search hits; every other preset, including Sage, can", arguments: ThemePreset.allCases)
+    func inkTintabilityByPreset(_ preset: ThemePreset) {
+        #expect(preset.palette.accentInk.readsAsTint == (preset != .graphite), "\(preset.rawValue)")
     }
 
     @Test("chroma is near zero for greys and large for saturated colors")
