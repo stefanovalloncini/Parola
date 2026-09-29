@@ -577,6 +577,13 @@ public actor LibraryStore {
         return (cachedActive ?? []).first { $0.manifest.sourceDigest == digest }
     }
 
+    /// Whether any entry, in the library or in Recently Deleted, was made from these exact bytes.
+    public func hasEntry(digest: String) async -> Bool {
+        guard !digest.isEmpty else { return false }
+        if cachedActive == nil || cachedDeleted == nil { await primeCaches() }
+        return ((cachedActive ?? []) + (cachedDeleted ?? [])).contains { $0.manifest.sourceDigest == digest }
+    }
+
     public func add(
         transcript: Transcript,
         audioSource: URL?,

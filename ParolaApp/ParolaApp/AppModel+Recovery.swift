@@ -219,10 +219,14 @@ extension AppModel {
         }
     }
 
+    /// Declining discards the take: its working file goes too, so the sweep doesn't bring it back.
     func declinePendingRecovery() {
-        guard pendingRecovery != nil else { return }
+        guard let checkpoint = pendingRecovery else { return }
         pendingRecovery = nil
         try? FileManager.default.removeItem(at: recoveryFileURL)
+        for file in [checkpoint.audioURL, checkpoint.sourceURL].compactMap({ $0 }) where isInflightFile(file) {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 
     private func restoreRecoveredRecording(_ checkpoint: RecoveryCheckpoint) {
@@ -288,42 +292,100 @@ extension AppModel {
         library.libraryURL.appendingPathComponent("inflight", isDirectory: true)
     }
 
-    /// Deletes in-flight take files that nothing references anymore. Files under 48h
-    /// stay: an active take is always younger, and a fresh orphan may still be wanted.
+    /// A take's working file, as opposed to a user's own file a recovery points at.
+    func isInflightFile(_ file: URL) -> Bool {
+        file.deletingLastPathComponent().resolvingSymlinksInPath().path
+            == inflightRecordingsURL.resolvingSymlinksInPath().path
+    }
+
+    /// Whether this session still reads a working file: playing it, retrying it, recording it, transcribing it, or offering it back.
+    func inflightFileInUse(_ file: URL) -> Bool {
+        var readers = [sourceFileURL, failedTakeAudioURL, liveRecordingAudioURL, pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
+        if takeRun != nil { readers.append(recordedTake?.file) }
+        let path = file.resolvingSymlinksInPath().path
+        return readers.contains { $0?.resolvingSymlinksInPath().path == path }
+    }
+
+    /// A take's working file goes once its entry holds the audio, unless something here still reads it.
+    func releaseTakeFile(_ file: URL) {
+        guard isInflightFile(file), !inflightFileInUse(file) else { return }
+        try? FileManager.default.removeItem(at: file)
+    }
+
+    /// Copies of takes already in the library go; a take that never reached it comes back as a "(recovered)" entry.
     func sweepInflightRecordings() {
         let dir = inflightRecordingsURL
         let keep = Set([pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
-            .compactMap { $0?.standardizedFileURL.path })
-        Task {
-            try? await AppModel.offMainIO(qos: .utility, {
-                let fm = FileManager.default
-                guard let files = try? fm.contentsOfDirectory(
-                    at: dir,
-                    includingPropertiesForKeys: [.contentModificationDateKey]
-                ) else { return }
-                let entries = files.map { url in
-                    (url: url,
-                     modified: (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
+            .compactMap { $0?.resolvingSymlinksInPath().path })
+        inflightSweep = Task { [weak self, library] in
+            let found = (try? await AppModel.offMainIO(qos: .utility) { AppModel.inflightFiles(in: dir) }) ?? []
+            var recovered = 0
+            var deleted = 0
+            for file in AppModel.staleInflightFiles(in: found, keeping: keep, now: Date()) {
+                if self?.inflightFileInUse(file) == true { continue }
+                let bytes = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                guard bytes > AppModel.emptyTakeBytes else {
+                    if (try? FileManager.default.removeItem(at: file)) != nil { deleted += 1 }
+                    continue
                 }
-                let stale = AppModel.staleInflightFiles(in: entries, keeping: keep, now: Date())
-                for file in stale {
-                    try? fm.removeItem(at: file)
+                let digest = await SourceDigest.digest(of: file)
+                if let digest, await library.hasEntry(digest: digest) {
+                    if (try? FileManager.default.removeItem(at: file)) != nil { deleted += 1 }
+                    continue
                 }
-                if !stale.isEmpty {
-                    ParolaLog.notice(.appRecovery, "stale in-flight takes deleted", [.count: .int(stale.count)])
+                let startedAt = (try? file.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
+                do {
+                    _ = try await library.add(
+                        transcript: AppModel.untranscribedTranscript(of: file, language: nil),
+                        audioSource: file,
+                        category: .transcription,
+                        title: AppModel.recoveredRecordingTitle(startedAt: startedAt),
+                        sourceDigest: digest,
+                        source: AppModel.inflightTakeSource(file),
+                        consumesAudio: true
+                    )
+                    recovered += 1
+                } catch {
+                    ParolaLog.error(.appRecovery, "an orphaned take could not be brought back", [.error: .error(error)])
                 }
-            })
+            }
+            if deleted > 0 {
+                ParolaLog.notice(.appRecovery, "stale in-flight takes deleted", [.count: .int(deleted)])
+            }
+            if recovered > 0 {
+                ParolaLog.notice(.appRecovery, "orphaned takes brought back", [.count: .int(recovered)])
+                self?.refreshLibrary()
+            }
         }
     }
 
+    /// A WAV header and next to nothing after it: nothing was recorded.
+    nonisolated static let emptyTakeBytes = 8_192
+
+    nonisolated static func inflightFiles(in dir: URL) -> [(url: URL, modified: Date)] {
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [.contentModificationDateKey]
+        )) ?? []
+        return files.map { url in
+            (url: url,
+             modified: (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
+        }
+    }
+
+    nonisolated static func inflightTakeSource(_ file: URL) -> EntrySource {
+        file.lastPathComponent.hasPrefix("parola-system") ? .systemAudio : .microphone
+    }
+
+    /// Files left alone for ten minutes and not kept for a recovery offer; a take still writing is never that quiet.
     nonisolated static func staleInflightFiles(
         in files: [(url: URL, modified: Date)],
         keeping: Set<String>,
         now: Date
     ) -> [URL] {
-        let cutoff = now.addingTimeInterval(-48 * 3600)
+        let cutoff = now.addingTimeInterval(-10 * 60)
         return files
-            .filter { !keeping.contains($0.url.standardizedFileURL.path) && $0.modified < cutoff }
+            .filter { !keeping.contains($0.url.resolvingSymlinksInPath().path) && $0.modified < cutoff }
             .map(\.url)
     }
 }

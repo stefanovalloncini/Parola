@@ -293,7 +293,7 @@ extension TranscriberMockSuites {
             let young = URL(fileURLWithPath: "/tmp/inflight/young.wav")
             let picked = AppModel.staleInflightFiles(
                 in: [(stale, old), (referenced, old), (young, now)],
-                keeping: [referenced.standardizedFileURL.path],
+                keeping: [referenced.resolvingSymlinksInPath().path],
                 now: now
             )
             #expect(picked == [stale])

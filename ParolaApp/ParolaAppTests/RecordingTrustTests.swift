@@ -27,7 +27,7 @@ private final class QuitReply {
     var asked = false
 }
 
-private func makeTakeWAV(_ label: String, seconds: Double = 0.3) throws -> URL {
+private func makeTakeWAV(_ label: String, seconds: Double = 0.3, in directory: URL? = nil) throws -> URL {
     let sampleRate = 16_000, channels = 1, bytesPerSample = 2
     let frames = Int(Double(sampleRate) * seconds)
     let dataBytes = frames * channels * bytesPerSample
@@ -41,7 +41,8 @@ private func makeTakeWAV(_ label: String, seconds: Double = 0.3) throws -> URL {
     le16(UInt16(channels * bytesPerSample)); le16(UInt16(bytesPerSample * 8))
     ascii("data"); le32(UInt32(dataBytes))
     data.append(Data(count: dataBytes))
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-trust-\(label)-\(UUID().uuidString).wav")
+    let folder = directory ?? FileManager.default.temporaryDirectory
+    let url = folder.appendingPathComponent("parola-trust-\(label)-\(UUID().uuidString).wav")
     try data.write(to: url)
     return url
 }
@@ -51,10 +52,10 @@ extension TranscriberMockSuites {
     @Suite("Recording trust", .serialized)
     struct RecordingTrustTests {
 
-        private func makeModel() -> AppModel {
+        private func makeModel(libraryURL: URL = makeTempLibraryURL("recording-trust")) -> AppModel {
             let model = AppModel(bootstrap: AppBootstrap(
                 mode: .test,
-                library: makeTempLibraryURL("recording-trust"),
+                library: libraryURL,
                 defaultsOverride: temporaryDefaults(),
                 sideEffects: [],
                 filePicker: TestFilePicker(),
@@ -524,6 +525,54 @@ extension TranscriberMockSuites {
             let italian = try #require(Bundle(path: path))
             #expect(AppModel.transcribedTitle(from: "Registrazione 1 (non trascritta)", bundle: italian) == "Registrazione 1")
             #expect(AppModel.transcribedTitle(from: "Recording 2 (not transcribed)", bundle: italian) == "Recording 2")
+        }
+
+        // MARK: - Working files the library never got
+
+        @Test("the sweep brings back a take that never reached the library and drops copies of saved ones")
+        func sweepImportsOrphanedTakes() async throws {
+            let library = makeTempLibraryURL("sweep-import")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let orphan = try makeTakeWAV("orphan", seconds: 1, in: inflight)
+            let savedCopy = try makeTakeWAV("saved", seconds: 1.1, in: inflight)
+            let fresh = try makeTakeWAV("fresh", seconds: 1.2, in: inflight)
+            let seed = LibraryStore(libraryURL: library, extraIndexer: nil)
+            _ = try await seed.add(
+                transcript: AppModel.untranscribedTranscript(of: savedCopy, language: nil),
+                audioSource: savedCopy
+            )
+            let old = Date().addingTimeInterval(-3_600)
+            for file in [orphan, savedCopy] {
+                try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: file.path)
+            }
+
+            let model = makeModel(libraryURL: library)
+            await model.inflightSweep?.value
+
+            let listed = await model.library.list()
+            #expect(listed.count == 2, "the saved take isn't imported a second time")
+            let recovered = try #require(listed.first { $0.title.hasSuffix("(recovered)") })
+            #expect(try await model.library.load(recovered.id).document.transcript.modelName.isEmpty)
+            #expect(!FileManager.default.fileExists(atPath: orphan.path), "the orphan moved into its entry")
+            #expect(!FileManager.default.fileExists(atPath: savedCopy.path))
+            #expect(FileManager.default.fileExists(atPath: fresh.path), "a file written minutes ago is left alone")
+        }
+
+        @Test("declining a recovery discards the take's working file, so the sweep can't bring it back")
+        func declineDiscardsTheTakeFile() throws {
+            let library = makeTempLibraryURL("decline-take")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let take = try makeTakeWAV("declined", in: inflight)
+            let checkpoint = RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", audioURL: take)
+            try JSONEncoder().encode(checkpoint).write(to: library.appendingPathComponent("recovery.json"))
+            let model = makeModel(libraryURL: library)
+            #expect(model.pendingRecovery != nil)
+
+            model.declinePendingRecovery()
+
+            #expect(!FileManager.default.fileExists(atPath: take.path))
         }
 
         // MARK: - Quitting during a take

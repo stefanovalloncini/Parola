@@ -201,7 +201,7 @@ final class AppModel {
     @ObservationIgnored private(set) var activeTake: TakeContext?
     @ObservationIgnored private var takeRunCounter = 0
     /// The take transcription in flight, so Stop Transcribing and a new take act on that run alone.
-    @ObservationIgnored private var takeRun: Int?
+    @ObservationIgnored private(set) var takeRun: Int?
     /// The take transcription a new take stopped, so its save can say why.
     @ObservationIgnored private var takeRunStoppedForNewTake: Int?
     @ObservationIgnored private var takeWorkCounter = 0
@@ -414,6 +414,7 @@ final class AppModel {
     @ObservationIgnored var activeRecoveryGeneration: Int?
     /// Checkpoints a take's save still needs: cleanup leaves them on disk until the entry exists.
     @ObservationIgnored var recoveryHeldBySave: Set<Int> = []
+    @ObservationIgnored var inflightSweep: Task<Void, Never>?
     @ObservationIgnored var recordingRecoveryStartedAt: Date?
     @ObservationIgnored var liveRecordingAudioURL: URL?
     @ObservationIgnored var recordingWatchTask: Task<Void, Never>?
@@ -3718,7 +3719,7 @@ final class AppModel {
         phase = .idle
     }
 
-    /// A take's library save: the checkpoint stays until the entry exists, and a quit waits for it.
+    /// A take's library save: the checkpoint and working file stay until the entry exists, and a quit waits for it.
     @discardableResult
     private func saveTake(
         _ transcript: Transcript,
@@ -3749,8 +3750,11 @@ final class AppModel {
                 if entry != nil { self.endRecovery(recovery) }
             }
             guard let entry else { return }
-            if let audio, let entryAudio, self.sourceFileURL == audio, self.selectedEntryID == entry.id {
-                self.movePlayback(to: entryAudio)
+            if let audio {
+                if let entryAudio, self.sourceFileURL == audio, self.selectedEntryID == entry.id {
+                    self.movePlayback(to: entryAudio)
+                }
+                self.releaseTakeFile(audio)
             }
             onSaved?(entry)
         }
