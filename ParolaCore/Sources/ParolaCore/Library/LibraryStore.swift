@@ -582,6 +582,7 @@ public actor LibraryStore {
         audioSource: URL?,
         category: EntryCategory = .transcription,
         title: String? = nil,
+        titleSource: TitleSource? = nil,
         sourceDigest: String? = nil,
         source: EntrySource? = nil,
         consumesAudio: Bool = false
@@ -602,6 +603,7 @@ public actor LibraryStore {
                     to: bundleURL,
                     category: category,
                     titleOverride: title,
+                    titleSource: titleSource,
                     sourceDigest: digest,
                     entrySource: source,
                     movesAudio: consumesAudio
@@ -878,6 +880,7 @@ public actor LibraryStore {
         guard !trimmed.isEmpty else { return }
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
             manifest.title = trimmed
+            manifest.titleSource = .user
         }
         let entry = try recacheEntry(at: bundleURL)
         if let transcript = await transcriptForReindex(id, at: bundleURL) {

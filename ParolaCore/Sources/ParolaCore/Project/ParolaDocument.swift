@@ -8,9 +8,11 @@ public struct ParolaDocument: Sendable {
         public var version: Int
         public var createdAt: Date
         public var originalAudioName: String
-        /// A user-authored display title. When nil, the title is derived from `originalAudioName`
+        /// A stored display title. When nil, the title is derived from `originalAudioName`
         /// (with the audio extension stripped). Kept separate so titles with dots survive.
         public var title: String?
+        /// Where `title` came from. Nil on a generated stamp or a bundle written before this field existed.
+        public var titleSource: TitleSource?
         public var modelName: String
         public var language: String
         public var category: EntryCategory
@@ -49,6 +51,7 @@ public struct ParolaDocument: Sendable {
             createdAt: Date = Date(),
             originalAudioName: String,
             title: String? = nil,
+            titleSource: TitleSource? = nil,
             modelName: String,
             language: String,
             category: EntryCategory = .transcription,
@@ -74,6 +77,7 @@ public struct ParolaDocument: Sendable {
             self.createdAt = createdAt
             self.originalAudioName = originalAudioName
             self.title = title
+            self.titleSource = titleSource
             self.modelName = modelName
             self.language = language
             self.category = category
@@ -106,6 +110,7 @@ public struct ParolaDocument: Sendable {
             case createdAt
             case originalAudioName
             case title
+            case titleSource
             case modelName
             case language
             case category
@@ -134,6 +139,7 @@ public struct ParolaDocument: Sendable {
             createdAt = try c.decode(Date.self, forKey: .createdAt)
             originalAudioName = try c.decode(String.self, forKey: .originalAudioName)
             title = try c.decodeIfPresent(String.self, forKey: .title)
+            titleSource = try c.decodeIfPresent(TitleSource.self, forKey: .titleSource)
             modelName = try c.decode(String.self, forKey: .modelName)
             language = try c.decode(String.self, forKey: .language)
             category = try c.decodeIfPresent(EntryCategory.self, forKey: .category) ?? .transcription
@@ -163,6 +169,7 @@ public struct ParolaDocument: Sendable {
             try c.encode(createdAt, forKey: .createdAt)
             try c.encode(originalAudioName, forKey: .originalAudioName)
             try c.encodeIfPresent(title, forKey: .title)
+            try c.encodeIfPresent(titleSource, forKey: .titleSource)
             try c.encode(modelName, forKey: .modelName)
             try c.encode(language, forKey: .language)
             try c.encode(category, forKey: .category)
@@ -218,6 +225,7 @@ public struct ParolaDocument: Sendable {
         category: EntryCategory = .transcription,
         deletedAt: Date? = nil,
         titleOverride: String? = nil,
+        titleSource: TitleSource? = nil,
         sourceDigest: String? = nil,
         entrySource: EntrySource? = nil,
         movesAudio: Bool = false
@@ -255,6 +263,7 @@ public struct ParolaDocument: Sendable {
             let manifest = Manifest(
                 originalAudioName: originalAudioName,
                 title: title,
+                titleSource: title == nil ? nil : titleSource,
                 modelName: transcript.modelName,
                 language: transcript.language,
                 category: category,

@@ -360,6 +360,19 @@ struct LibraryStoreTests {
         #expect(afterPlain.first?.title == "Standup")
     }
 
+    @Test("renaming an entry marks the title as user-set")
+    func renameSetsTitleSource() async throws {
+        let (store, _) = try makeTempLibrary()
+        let audio = try makeFakeAudio()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
+        #expect(entry.manifest.titleSource == nil)
+
+        try await store.renameEntry(entry.id, to: "Standup")
+
+        let renamed = try #require(await store.list().first)
+        #expect(renamed.manifest.titleSource == .user)
+    }
+
     @Test("setLabels trims, drops empties, and dedupes")
     func setLabelsNormalizes() async throws {
         let (store, _) = try makeTempLibrary()
