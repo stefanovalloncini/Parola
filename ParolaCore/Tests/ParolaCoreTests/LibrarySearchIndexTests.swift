@@ -993,6 +993,24 @@ final class LibrarySearchIndexTests {
         #expect(await keyed(reader.search("delta")) == keyed(fresh.search("delta")))
     }
 
+    @Test("an entry file stamped in the same instant as the manifest the reader read is decoded again")
+    func readerRefreshTakesATiedEntry() async throws {
+        let (owner, url) = makeTempIndex()
+        await owner.index(id: "e1", title: "One", text: "alpha", fingerprint: "f1", createdAt: Date())
+        await owner.flush()
+        let instant = Date(timeIntervalSince1970: 1_800_000_000)
+        try FileManager.default.setAttributes([.modificationDate: instant], ofItemAtPath: manifestURL(in: url).path)
+        let reader = LibrarySearchIndex(readingSnapshotIn: url)
+        #expect(await reader.search("alpha").count == 1)
+
+        await owner.index(id: "e1", title: "One qqxwtitle", text: "alpha", fingerprint: "f1", createdAt: Date())
+        await owner.flush()
+        try FileManager.default.setAttributes([.modificationDate: instant], ofItemAtPath: entryURL("e1", in: url).path)
+
+        #expect(await reader.refreshFromSnapshot())
+        #expect(await reader.search("qqxwtitle").map(\.entryID) == ["e1"])
+    }
+
     @Test("a snapshot a reader can't refresh from sends it back to a whole load")
     func readerRefreshFallsBack() async throws {
         let (owner, url) = makeTempIndex()

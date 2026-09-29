@@ -692,7 +692,8 @@ public actor LibrarySearchIndex {
         let entriesDirectory = entriesDirectory(in: directory)
         let ids = manifest.entries.keys.filter { id in
             guard let since, known.contains(id) else { return true }
-            return modificationDate(of: entryURL(id, in: entriesDirectory)).map { $0 > since } ?? true
+            // A tie decodes again: an entry written in the same instant as the manifest last read may be newer than it.
+            return modificationDate(of: entryURL(id, in: entriesDirectory)).map { $0 >= since } ?? true
         }.sorted()
         guard let decoded = decodeEntries(ids, in: entriesDirectory) else { return nil }
         var prepared: [PreparedEntry] = []
