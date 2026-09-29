@@ -52,7 +52,6 @@ struct MacRecentlyDeletedView: View {
         .task(id: searchText.isEmpty ? "" : categoryFilter.rawValue) { await loadPreviewsForSearch() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
-        .tint(DS.Color.accent)
         .confirmationDialog(
             "Delete permanently?",
             isPresented: isPurgingSingle
