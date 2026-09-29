@@ -17,27 +17,28 @@ struct LanguageProbeScratchTests {
     @Test("a source that never opens times the probe out instead of parking it")
     func stalledSourceTimesOut() async throws {
         let dir = try Self.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
         let fifo = dir.appendingPathComponent("stalled.wav")
         #expect(mkfifo(fifo.path, 0o644) == 0)
-        defer {
-            FIFOFixture.release(fifo)
-            try? FileManager.default.removeItem(at: dir)
-        }
 
-        let startedAt = ContinuousClock.now
         var bodyRan = false
         var timedOut = false
-        do {
-            _ = try await LanguageProbeScratch.withScratch(from: fifo, deadline: .milliseconds(300)) { _ in
-                bodyRan = true
+        var elapsed = Duration.zero
+        try await FIFOFixture.holding(fifo) {
+            let startedAt = ContinuousClock.now
+            defer { elapsed = startedAt.duration(to: .now) }
+            do {
+                _ = try await LanguageProbeScratch.withScratch(from: fifo, deadline: .milliseconds(300)) { _ in
+                    bodyRan = true
+                }
+            } catch ParolaError.fileReadTimedOut(let name) {
+                timedOut = name == "stalled.wav"
             }
-        } catch ParolaError.fileReadTimedOut(let name) {
-            timedOut = name == "stalled.wav"
         }
 
         #expect(timedOut)
         #expect(!bodyRan)
-        #expect(startedAt.duration(to: .now) < .seconds(5))
+        #expect(elapsed < .seconds(5))
     }
 
     @Test("a read that resumes after the deadline deletes the scratch it went on to write")

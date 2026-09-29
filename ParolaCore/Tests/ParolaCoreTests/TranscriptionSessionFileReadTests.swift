@@ -90,7 +90,6 @@ struct TranscriptionSessionFileReadTests {
 
         let wedged = dir.appendingPathComponent("wedged.wav")
         #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
-        defer { FIFOFixture.release(wedged) }
 
         let readable = dir.appendingPathComponent("readable.wav")
         try Data("RIFFstub".utf8).write(to: readable)
@@ -98,18 +97,20 @@ struct TranscriptionSessionFileReadTests {
         let session = try await makeSession(in: dir)
         let options = TranscriptionOptions(model: "openai_whisper-tiny")
 
-        do {
-            _ = try await session.transcribe(source: FileAudioSource(url: wedged), options: options)
-            Issue.record("a run on a file that never opens should fail")
-        } catch let error as ParolaError {
-            guard case .fileReadTimedOut(let name) = error else {
+        await FIFOFixture.holding(wedged) {
+            do {
+                _ = try await session.transcribe(source: FileAudioSource(url: wedged), options: options)
+                Issue.record("a run on a file that never opens should fail")
+            } catch let error as ParolaError {
+                guard case .fileReadTimedOut(let name) = error else {
+                    Issue.record("expected fileReadTimedOut, got \(error)")
+                    return
+                }
+                #expect(name == "wedged.wav")
+            } catch {
                 Issue.record("expected fileReadTimedOut, got \(error)")
                 return
             }
-            #expect(name == "wedged.wav")
-        } catch {
-            Issue.record("expected fileReadTimedOut, got \(error)")
-            return
         }
 
         let started = ContinuousClock.now
@@ -130,7 +131,6 @@ struct TranscriptionSessionFileReadTests {
 
         let wedged = dir.appendingPathComponent("wedged.wav")
         #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
-        defer { FIFOFixture.release(wedged) }
         let readable = dir.appendingPathComponent("readable.wav")
         try Data("RIFFstub".utf8).write(to: readable)
 
@@ -139,11 +139,13 @@ struct TranscriptionSessionFileReadTests {
         )
         let options = TranscriptionOptions(model: "openai_whisper-tiny")
 
-        let cancelled = Task {
-            try await session.transcribe(source: FileAudioSource(url: wedged), options: options)
+        try await FIFOFixture.holding(wedged) {
+            let cancelled = Task {
+                try await session.transcribe(source: FileAudioSource(url: wedged), options: options)
+            }
+            try await Task.sleep(for: .milliseconds(300))
+            cancelled.cancel()
         }
-        try await Task.sleep(for: .milliseconds(300))
-        cancelled.cancel()
 
         let started = ContinuousClock.now
         let transcript = try await session.transcribe(
@@ -163,15 +165,17 @@ struct TranscriptionSessionFileReadTests {
 
         let audioURL = dir.appendingPathComponent("vanishes.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)
-        defer { FIFOFixture.release(audioURL) }
 
         let session = try await makeSession(in: dir, transcriber: SwapsTheFileForAFifo())
-        let started = ContinuousClock.now
-        let transcript = try await session.transcribe(
-            source: FileAudioSource(url: audioURL),
-            options: TranscriptionOptions(model: "openai_whisper-tiny")
-        )
-        let elapsed = started.duration(to: .now)
+        var elapsed = Duration.zero
+        let transcript = try await FIFOFixture.holding(audioURL) {
+            let started = ContinuousClock.now
+            defer { elapsed = started.duration(to: .now) }
+            return try await session.transcribe(
+                source: FileAudioSource(url: audioURL),
+                options: TranscriptionOptions(model: "openai_whisper-tiny")
+            )
+        }
         #expect(transcript.segments.count == 1)
         #expect(elapsed < .seconds(10), "the run took \(elapsed); the energy probe was not bounded")
     }

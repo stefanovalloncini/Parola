@@ -46,19 +46,20 @@ struct WhisperAudioLoadTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("wedged.wav")
         #expect(mkfifo(url.path, 0o644) == 0, "could not create the FIFO the test needs")
-        defer { FIFOFixture.release(url) }
 
-        do {
-            _ = try await WhisperKitTranscriber.loadSamples(
-                url: url, channelMode: .sumChannels(nil), deadline: .seconds(3)
-            )
-            Issue.record("a load that never returns should fail")
-        } catch let error as ParolaError {
-            guard case .fileReadTimedOut(let name) = error else {
-                Issue.record("expected fileReadTimedOut, got \(error)")
-                return
+        try await FIFOFixture.holding(url) {
+            do {
+                _ = try await WhisperKitTranscriber.loadSamples(
+                    url: url, channelMode: .sumChannels(nil), deadline: .seconds(3)
+                )
+                Issue.record("a load that never returns should fail")
+            } catch let error as ParolaError {
+                guard case .fileReadTimedOut(let name) = error else {
+                    Issue.record("expected fileReadTimedOut, got \(error)")
+                    return
+                }
+                #expect(name == "wedged.wav")
             }
-            #expect(name == "wedged.wav")
         }
     }
 
