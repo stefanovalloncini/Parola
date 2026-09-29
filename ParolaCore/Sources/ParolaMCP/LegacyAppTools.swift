@@ -1,8 +1,6 @@
 import Foundation
 
-/// Tool names from before the typed tools. `tools/list` no longer offers them, but client configs and
-/// scripts written against them still work: each runs the typed tool for its bridge command when there
-/// is one, and otherwise sends the command with the caller's arguments, as `parola_app_dispatch` does.
+/// Pre-typed-tool names, still callable: each runs its typed tool, or dispatches its command.
 enum LegacyAppTools {
     static let commands: [String: String] = [
         "parola_app_ping": "ping",

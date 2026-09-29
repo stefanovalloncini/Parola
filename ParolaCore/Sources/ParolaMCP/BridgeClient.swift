@@ -95,8 +95,7 @@ public struct BridgeClient: BridgeProtocol {
     /// The longest a `wait…` command runs on its own default, which a call that names no `timeoutMs` gets.
     static let longestWaitDefault: TimeInterval = 600
 
-    /// A long-poll command (waitForPhase, waitForBatchJob, ...) legally runs past `floor`, so the
-    /// socket waits out the command's own `timeoutMs` plus slack.
+    /// A long-poll command legally runs past `floor`, so the socket waits out its `timeoutMs` plus slack.
     static func socketTimeout(cmd: String, argsJSON: Data, floor: TimeInterval) -> TimeInterval {
         if let requested = requestedTimeout(argsJSON: argsJSON) {
             return max(floor, requested + 5)

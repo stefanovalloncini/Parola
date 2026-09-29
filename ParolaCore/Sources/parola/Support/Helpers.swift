@@ -57,8 +57,7 @@ extension JSONEncoder {
     }
 }
 
-/// A download bar on stderr, drawn once per whole percent. It writes as it is called, under a lock,
-/// so the bar and its closing newline land in the order they were called.
+/// A download bar on stderr, drawn once per whole percent and written under a lock, so the closing newline lands last.
 final class ProgressReporter: Sendable {
     private struct State {
         var percent = -1

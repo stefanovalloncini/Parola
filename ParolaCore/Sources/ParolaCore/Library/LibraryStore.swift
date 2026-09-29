@@ -264,8 +264,7 @@ public actor LibraryStore {
         await ensureSearchIndexReady()
     }
 
-    /// The index a caller reads, once caught up. A reader can swap its index while a catch-up runs,
-    /// so the one handed back is the one that was ready, and every read after it goes to that one.
+    /// A reader can swap its index mid catch-up, so callers read only the one this hands back once it is ready.
     private func readySearchIndex() async -> LibrarySearchIndex {
         var index = searchIndex
         for _ in 0..<8 {
@@ -296,8 +295,7 @@ public actor LibraryStore {
 
     var hasRequestedSearchIndex: Bool { indexReadyTask != nil }
 
-    /// Reads again only the bundles the index is missing or holds an older copy of, or every one
-    /// when the snapshot was unusable. False when the library folder would not list, so the next caller tries again.
+    /// Reads only the bundles the index lacks or holds older copies of; false when the folder would not list.
     private func catchUpSearchIndex() async -> Bool {
         let index = searchIndex
         await willCatchUpSearchIndex?()

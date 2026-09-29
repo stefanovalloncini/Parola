@@ -529,8 +529,7 @@ public actor LibrarySearchIndex {
         await saveSnapshot()
     }
 
-    /// Replaces the entries a scan found changed and drops the ones it found gone. Callers hold off
-    /// `index` and `remove` across it, as for `rebuild`.
+    /// Replaces the entries a scan found changed and drops the gone ones; callers hold off `index` and `remove`, as for `rebuild`.
     func reconcile(entries changed: [RebuildEntry], removing removed: Set<String>) async {
         await ensureLoaded()
         let prepared = await Self.tokenizeOffActor(changed)

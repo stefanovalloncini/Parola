@@ -58,8 +58,7 @@ public struct TypedTool: Sendable {
     public let properties: [Property]
     public let required: [String]
     public let additionalProperties: Bool
-    /// Sent when a call leaves `timeoutMs` out, so the app waits as long as the description says and
-    /// the client's socket, sized from the request, outlasts the wait.
+    /// Sent when a call leaves `timeoutMs` out, so the client's socket is sized from the wait the app runs.
     public let defaultTimeoutMs: Int?
 
     public init(
