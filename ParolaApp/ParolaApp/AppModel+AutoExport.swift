@@ -121,14 +121,33 @@ extension AppModel {
         case none
     }
 
-    /// Fetched captions have no audio: they take the folder route, as their link would.
+    /// A file the system or Parola clears later, such as a Shortcuts input in the temporary folder, goes
+    /// the folder route like a take. Fetched captions have no audio and follow their link.
     func sidecarRoute(audioSource: URL?, source: EntrySource) -> SidecarRoute {
         switch source {
         case .file:
-            return audioSource.map(SidecarRoute.besideSource) ?? .none
+            guard let audioSource else { return .none }
+            return Self.isInside(audioSource, anyOf: sweptFolders()) ? .autoExportFolder : .besideSource(audioSource)
         case .microphone, .systemAudio, .web:
             return .autoExportFolder
         }
+    }
+
+    nonisolated static func isInside(_ url: URL, anyOf folders: [URL]) -> Bool {
+        let path = comparablePath(url)
+        return folders.contains { folder in
+            let prefix = comparablePath(folder)
+            return path.hasPrefix(prefix.hasSuffix("/") ? prefix : prefix + "/")
+        }
+    }
+
+    /// `/var` and `/tmp` are links into `/private`, and a path reaches us spelled either way.
+    private nonisolated static func comparablePath(_ url: URL) -> String {
+        let path = url.standardizedFileURL.path
+        for linked in ["/private/var/", "/private/tmp/"] where path.hasPrefix(linked) {
+            return String(path.dropFirst("/private".count))
+        }
+        return path
     }
 
     /// Once per launch, and again after a new folder is chosen: every take would otherwise say the same thing.

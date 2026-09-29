@@ -216,6 +216,10 @@ final class AppModel {
         }
     }
     @ObservationIgnored var autoExportNoticeShown = false
+    /// Folders whose files are cleared later, so nothing is written beside them. A test seam.
+    @ObservationIgnored var sweptFolders: @MainActor () -> [URL] = {
+        [FileManager.default.temporaryDirectory, RecordingScratch.directory]
+    }
     var dictationHudOpacity: Double = 1.0 { didSet { defaults.set(dictationHudOpacity, forKey: "dictationHudOpacity") } }
     var lastFindQuery: String = "" { didSet { defaults.set(lastFindQuery, forKey: "lastFindQuery") } }
     var userPrivacyMode: Bool = false { didSet { defaults.set(userPrivacyMode, forKey: "parola.userPrivacyMode") } }

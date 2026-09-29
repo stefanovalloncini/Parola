@@ -168,6 +168,7 @@ struct CardMetadataQueueTests {
         let source = scratch.appendingPathComponent("memo.wav")
         try Data("fake".utf8).write(to: source)
         let model = makeModel()
+        model.sweptFolders = { [] }
         model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])]
         let (release, releaser) = AsyncStream<Void>.makeStream()
         model.cardMetadataOperation = { _ in

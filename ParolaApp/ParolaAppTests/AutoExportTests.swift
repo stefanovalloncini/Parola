@@ -328,11 +328,47 @@ struct AutoExportTests {
         let audio = scratch.appendingPathComponent("interview.m4a")
         try Data("fake".utf8).write(to: audio)
         let model = exportModel("autoexport-file")
+        model.sweptFolders = { [] }
         model.autoExportRules = [AutoExportRule(sourceExtensions: ["m4a"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])]
 
         await model.runAutoExports(transcript: Self.sampleTranscript(), audioSource: audio, source: .file, entry: nil)?.value
 
         #expect(OutputMarker.isMarked(scratch.appendingPathComponent("interview.txt")))
         #expect(model.exportNotice == nil)
+    }
+
+    @MainActor
+    @Test("a file in a folder that gets cleared, like a Shortcuts input, exports to the chosen folder")
+    func sweptFileGoesToTheFolder() async throws {
+        let shortcutsInput = try makeFolder("parola-intent")
+        let chosen = try makeFolder("swept-chosen")
+        defer {
+            try? FileManager.default.removeItem(at: shortcutsInput)
+            try? FileManager.default.removeItem(at: chosen)
+        }
+        let audio = shortcutsInput.appendingPathComponent("Recording.m4a")
+        try Data("fake".utf8).write(to: audio)
+        let model = exportModel("autoexport-swept")
+        #expect(model.setAutoExportFolder(chosen))
+        model.autoExportRules = Self.txtEverywhere
+        #expect(model.sidecarRoute(audioSource: audio, source: .file) == .autoExportFolder)
+
+        await model.runAutoExports(
+            transcript: Self.sampleTranscript(), audioSource: audio, source: .file, entry: nil, title: "Voice memo"
+        )?.value
+
+        #expect(OutputMarker.isMarked(chosen.appendingPathComponent("Voice memo.txt")))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: shortcutsInput.path) == ["Recording.m4a"])
+    }
+
+    @Test("a swept folder matches through /var and /private/var alike, and only below itself")
+    func sweptFolderMatching() {
+        let temp = URL(fileURLWithPath: "/var/folders/xy/T", isDirectory: true)
+        #expect(AppModel.isInside(URL(fileURLWithPath: "/private/var/folders/xy/T/a/b.wav"), anyOf: [temp]))
+        #expect(AppModel.isInside(URL(fileURLWithPath: "/var/folders/xy/T/b.wav"), anyOf: [temp]))
+        #expect(!AppModel.isInside(URL(fileURLWithPath: "/var/folders/xy/Tother/b.wav"), anyOf: [temp]))
+        #expect(!AppModel.isInside(URL(fileURLWithPath: "/Users/me/Music/b.wav"), anyOf: [temp]))
+        let privateTemp = URL(fileURLWithPath: "/private/var/folders/xy/T", isDirectory: true)
+        #expect(AppModel.isInside(URL(fileURLWithPath: "/var/folders/xy/T/b.wav"), anyOf: [privateTemp]))
     }
 }

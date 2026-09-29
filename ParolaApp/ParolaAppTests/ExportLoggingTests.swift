@@ -123,6 +123,7 @@ struct ExportLoggingTests {
         defer { ParolaLog.uninstall() }
 
         let model = makeModel()
+        model.sweptFolders = { [] }
         model.autoExportRules = [
             AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])
         ]
