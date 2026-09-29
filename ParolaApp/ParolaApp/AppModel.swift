@@ -71,7 +71,10 @@ final class AppModel {
     var dropHighlight: DropHalf?
     var dragOverComposer = false
     var phase: Phase = .idle {
-        didSet { forgetFailedSource() }
+        didSet {
+            forgetFailedSource()
+            if case .recording = oldValue, !phaseDefersArrivals { foregroundLetGo() }
+        }
     }
     var transcript: Transcript? {
         didSet {
@@ -118,14 +121,18 @@ final class AppModel {
         return !transcript.segments.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
     /// The import waiting on the "Already in your library" sheet. Nil the rest of the time.
-    var duplicateImport: DuplicateImport?
+    var duplicateImport: DuplicateImport? {
+        didSet { if oldValue != nil, duplicateImport == nil { foregroundLetGo() } }
+    }
     /// The re-transcription in flight. Nil the rest of the time; the inspector menus watch it.
     var retranscribeRequest: RetranscribeRequest?
     /// How many files the last batch import dropped because the library already had them.
     var batchDuplicatesSkipped: Int = 0
     /// Dropped files still being hashed against the library before they join the batch.
     var batchFilesBeingChecked: Int = 0
-    @ObservationIgnored var duplicateCheckTask: Task<Void, Never>?
+    @ObservationIgnored var duplicateCheckTask: Task<Void, Never>? {
+        didSet { if oldValue != nil, duplicateCheckTask == nil { foregroundLetGo() } }
+    }
     @ObservationIgnored var batchImportTask: Task<Void, Never>?
     @ObservationIgnored var watchedImportTask: Task<Void, Never>?
     /// A run the user stopped does not ring when its queue unwinds. Cleared when a wave starts.
@@ -294,7 +301,9 @@ final class AppModel {
     var recordingCountInSeconds: Int = 0 { didSet { defaults.set(recordingCountInSeconds, forKey: "recordingCountInSeconds") } }
     var autoMuteWhileRecording: Bool = false { didSet { defaults.set(autoMuteWhileRecording, forKey: "autoMuteWhileRecording") } }
     var autoPauseMediaWhileRecording: Bool = false { didSet { defaults.set(autoPauseMediaWhileRecording, forKey: "autoPauseMediaWhileRecording") } }
-    var recordingCountdown: Int? = nil
+    var recordingCountdown: Int? = nil {
+        didSet { if oldValue != nil, recordingCountdown == nil { foregroundLetGo() } }
+    }
     @ObservationIgnored private(set) var countdownTask: Task<Void, Never>?
 
     @ObservationIgnored private var cachedRecentFiles: [URL]?
@@ -408,7 +417,9 @@ final class AppModel {
     /// Where each finished job's sidecars landed, which is not always `<stem>.<ext>`.
     @ObservationIgnored var batchSidecars: [BatchJob.ID: [URL]] = [:]
     var selectedBatchJobID: BatchJob.ID?
-    @ObservationIgnored var batchTask: Task<Void, Never>?
+    @ObservationIgnored var batchTask: Task<Void, Never>? {
+        didSet { if oldValue != nil, batchTask == nil { foregroundLetGo() } }
+    }
     @ObservationIgnored var lastSavedBatchQueueURLs: [URL]?
 
     var exportPresets: [ExportPreset] = ExportPreset.builtIns { didSet { saveExportPresets() } }
@@ -1398,15 +1409,22 @@ final class AppModel {
         source == .microphone ? mediaSessionConfig(allowMute: true) : .none
     }
 
-    @ObservationIgnored var liveSource: AudioSource?
+    @ObservationIgnored var liveSource: AudioSource? {
+        didSet { if oldValue != nil, liveSource == nil { foregroundLetGo() } }
+    }
     @ObservationIgnored var deferredArrivals: [URL] = []
     @ObservationIgnored var deferredLinks: [DeferredLink] = []
+    @ObservationIgnored var arrivalDrain: Task<Void, Never>?
     @ObservationIgnored var pendingOpenedFiles: [URL] = []
     var pendingLargeDrop: PendingLargeDrop?
     @ObservationIgnored var openedFilesFlushTask: Task<Void, Never>?
-    @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
+    @ObservationIgnored private var streamingSession: (any StreamingTranscriber)? {
+        didSet { if oldValue != nil, streamingSession == nil { foregroundLetGo() } }
+    }
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?
-    @ObservationIgnored var fileTranscribeTask: Task<Void, Never>?
+    @ObservationIgnored var fileTranscribeTask: Task<Void, Never>? {
+        didSet { if oldValue != nil, fileTranscribeTask == nil { foregroundLetGo() } }
+    }
     @ObservationIgnored var fileRunLanding: FileRunLanding?
     @ObservationIgnored var landingSteps: Task<Void, Never>?
     @ObservationIgnored let fileReadDeadline: Duration
@@ -1417,9 +1435,15 @@ final class AppModel {
     @ObservationIgnored private(set) var fileRunGeneration = 0
     @ObservationIgnored var recordingOutcomeWaiters: [CheckedContinuation<String, any Error>] = []
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
-    @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
-    @ObservationIgnored private(set) var youtubeSubsTask: Task<Void, Never>?
-    @ObservationIgnored private var recordingStartInFlight = false
+    @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>? {
+        didSet { if oldValue != nil, youtubeTranscribeTask == nil { foregroundLetGo() } }
+    }
+    @ObservationIgnored private(set) var youtubeSubsTask: Task<Void, Never>? {
+        didSet { if oldValue != nil, youtubeSubsTask == nil { foregroundLetGo() } }
+    }
+    @ObservationIgnored private var recordingStartInFlight = false {
+        didSet { if oldValue, !recordingStartInFlight { foregroundLetGo() } }
+    }
     @ObservationIgnored private var stopRequestedDuringStart = false
     @ObservationIgnored var derivedArtifactsGeneration = 0
     @ObservationIgnored var loadEntryGeneration = 0
@@ -2286,10 +2310,7 @@ final class AppModel {
                     )
                 }
             }
-            if !Task.isCancelled {
-                self.fileTranscribeTask = nil
-                self.drainDeferredArrivals()
-            }
+            if !Task.isCancelled { self.fileTranscribeTask = nil }
         }
     }
 
@@ -2603,7 +2624,6 @@ final class AppModel {
                 guard !Task.isCancelled else { return }
                 self.applyTranscriptionError(error, link: .transcribe(url.absoluteString))
                 self.youtubeTranscribeTask = nil
-                self.drainDeferredArrivals()
             }
         }
         return .started
@@ -2680,10 +2700,7 @@ final class AppModel {
             } catch {
                 if !Task.isCancelled { applyTranscriptionError(error, link: .subtitles(url.absoluteString)) }
             }
-            if !Task.isCancelled {
-                self.youtubeSubsTask = nil
-                self.drainDeferredArrivals()
-            }
+            if !Task.isCancelled { self.youtubeSubsTask = nil }
         }
         return .started
     }
@@ -2926,7 +2943,6 @@ final class AppModel {
                     recordingStartInFlight = false
                     phase = .idle
                     resolveRecordingOutcome(.failure(IntentActionError.cancelled))
-                    drainDeferredArrivals()
                     return
                 }
                 startStreamingMic()
@@ -2974,7 +2990,6 @@ final class AppModel {
                 if case .recording = phase { phase = .failed(message: message) }
                 recordingStartInFlight = false
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
-                drainDeferredArrivals()
             }
         }
     }
@@ -2999,10 +3014,8 @@ final class AppModel {
         await mediaSession.exitRecording()
         pendingRecordingCategory = .transcription
         if case .recording = phase { phase = .idle }
-        // Clear before draining: a drained batch reads recordingActive to decide whether it owns the phase.
         recordingStartInFlight = false
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
-        drainDeferredArrivals()
         return false
     }
 
@@ -3087,7 +3100,6 @@ final class AppModel {
                 let message = Self.transcriptionFailureMessage(for: error)
                 phase = .failed(message: message)
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
-                drainDeferredArrivals()
             }
             await mediaSession.exitRecording()
         }
@@ -3173,7 +3185,6 @@ final class AppModel {
                 failedTakeSource = takeSource
             }
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
-            drainDeferredArrivals()
         case .finished(let transcript):
             stopRecordingWatch()
             endActiveRecovery()
@@ -3184,7 +3195,6 @@ final class AppModel {
             guard !processed.segments.isEmpty || processed.sourceURL != nil else {
                 phase = .idle
                 resolveRecordingOutcome(.success(processed.text))
-                drainDeferredArrivals()
                 return
             }
             let landing = Self.landingSignposter.beginInterval("install")
@@ -3208,7 +3218,6 @@ final class AppModel {
                 title: Self.liveRecordingTitle(category: category, endedAt: Date())
             ))
             resolveRecordingOutcome(.success(processed.text))
-            drainDeferredArrivals()
         }
     }
 
@@ -3259,10 +3268,7 @@ final class AppModel {
                 phase = .failed(message: message)
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             }
-            if !Task.isCancelled {
-                self.fileTranscribeTask = nil
-                self.drainDeferredArrivals()
-            }
+            if !Task.isCancelled { self.fileTranscribeTask = nil }
         }
     }
 
@@ -3383,10 +3389,7 @@ final class AppModel {
         fileTranscribeTask?.cancel()
         fileTranscribeTask = Task {
             await transcribeRecordedTake(url: url, title: title, source: source)
-            if !Task.isCancelled {
-                self.fileTranscribeTask = nil
-                self.drainDeferredArrivals()
-            }
+            if !Task.isCancelled { self.fileTranscribeTask = nil }
         }
     }
 

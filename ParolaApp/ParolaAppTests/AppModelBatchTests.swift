@@ -1112,6 +1112,7 @@ struct AppModelBatchTests {
 
         await model.handleBatchEvent(.completed(jobID: jobID, transcript: Self.makeTranscript()))
         await model.handleBatchEvent(.finished)
+        await model.awaitArrivalDrain()
         await model.awaitBatchImport()
 
         #expect(model.deferredArrivals.isEmpty)
@@ -1131,6 +1132,7 @@ struct AppModelBatchTests {
         await model.handleBatchEvent(.failed(jobID: failed, reason: "boom"))
         await model.handleBatchEvent(.cancelled(jobID: cancelled))
         await model.handleBatchEvent(.finished)
+        await model.awaitArrivalDrain()
         await model.awaitBatchImport()
 
         #expect(model.deferredArrivals.isEmpty)
@@ -1156,6 +1158,7 @@ struct AppModelBatchTests {
 
         model.batchJobs[1].status = .done
         await model.handleBatchEvent(.finished)
+        await model.awaitArrivalDrain()
         await model.awaitBatchImport()
 
         #expect(model.deferredArrivals.isEmpty)
@@ -1200,6 +1203,7 @@ struct AppModelBatchTests {
         model.transcribe(fileURL: url)
         let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
         await model.handleStreamingEvent(.finished(final))
+        await model.awaitArrivalDrain()
         await model.awaitBatchImport()
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.contains { $0.url == url })
@@ -1250,6 +1254,7 @@ struct AppModelBatchTests {
         #expect(model.deferredArrivals == [audio, parola])
         let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
         await model.handleStreamingEvent(.finished(final))
+        await model.awaitArrivalDrain()
         await model.awaitBatchImport()
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.contains { $0.url == audio })

@@ -177,6 +177,7 @@ struct SubtitleImportTests {
 
         let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
         await model.handleStreamingEvent(.finished(final))
+        await model.awaitArrivalDrain()
         await model.awaitBatchImport()
 
         #expect(model.deferredArrivals.isEmpty)

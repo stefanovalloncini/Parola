@@ -41,7 +41,6 @@ extension AppModel {
                 return
             case .openExisting:
                 self.loadEntry(existing.id)
-                self.drainArrivalsIfIdle()
                 return
             case .alwaysAsk:
                 break
@@ -72,7 +71,6 @@ extension AppModel {
         if remember { duplicateImportPolicy = .openExisting }
         duplicateImport = nil
         loadEntry(pending.entryID)
-        drainArrivalsIfIdle()
     }
 
     func transcribeDuplicateAgain(remembering remember: Bool) {
@@ -90,13 +88,6 @@ extension AppModel {
     /// starting it anyway would make the Escape key mean Transcribe Again.
     func dismissDuplicateImport() {
         duplicateImport = nil
-        drainArrivalsIfIdle()
-    }
-
-    /// An arrival that settled without starting a run hands the turn to whatever waited behind it.
-    func drainArrivalsIfIdle() {
-        guard !linkArrivalsDeferred else { return }
-        drainDeferredArrivals()
     }
 
     /// Batch imports never prompt. Unless the policy is Transcribe it again, files the library
@@ -137,7 +128,8 @@ extension AppModel {
             self.batchDuplicatesSkipped = skipped
             if keep.isEmpty {
                 if skipped > 0, self.features.isEnabled(.batch) { self.route = .batch }
-                self.drainArrivalsIfIdle()
+                // Links dropped beside these files waited for a batch that never starts.
+                self.foregroundLetGo()
                 return
             }
             self.addBatchJobs(keep)

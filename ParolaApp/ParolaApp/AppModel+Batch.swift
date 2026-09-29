@@ -75,17 +75,12 @@ extension AppModel {
                 phase = .ready
             }
             refreshLibraryOnceBatchAddsLand()
-            // Draining alongside a resume would hand the queue two competing batch tasks; the
-            // pending wave ends in another .finished, and the parked files drain there.
+            // The pending wave ends in another .finished, and the batch lets go of the foreground there.
             let pending = batchJobs.filter { $0.status == .pending }
             if pending.isEmpty {
-                // Read before the drain: a wave it starts resets the flag, and a run the user
-                // cancelled would then ring.
-                let wasCancelled = batchRunCancelled
-                drainDeferredArrivals()
-                // One sound for the run that just ended, whatever mix of done and failed it ended
-                // with. Files the drain picked up are a run of their own and ring when they finish.
-                if !wasCancelled { playCompletionSound() }
+                batchTask = nil
+                // One sound for the run that just ended, whatever mix of done and failed it ended with.
+                if !batchRunCancelled { playCompletionSound() }
             } else {
                 resumeBatch(pendingJobs: pending)
             }
@@ -194,6 +189,30 @@ extension AppModel {
         } else {
             batchJobs.append(contentsOf: jobs)
             resumeBatch(pendingJobs: jobs)
+        }
+    }
+
+    /// A run, a take, a batch in flight or the duplicate sheet: what the parked arrivals wait for.
+    var foregroundIsHeld: Bool {
+        linkArrivalsDeferred || recordingActive || duplicateImport != nil
+    }
+
+    /// The one place a drain is scheduled. Whatever held the foreground has let go; on the next turn,
+    /// if nothing holds it by then, the arrivals parked behind it get their turn.
+    func foregroundLetGo() {
+        guard arrivalDrain == nil else { return }
+        arrivalDrain = Task { [weak self] in
+            guard let self else { return }
+            arrivalDrain = nil
+            guard !foregroundIsHeld else { return }
+            drainDeferredArrivals()
+        }
+    }
+
+    /// Waits for a scheduled drain, and for any drain it scheduled in turn.
+    func awaitArrivalDrain() async {
+        while let drain = arrivalDrain {
+            await drain.value
         }
     }
 

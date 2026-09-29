@@ -208,10 +208,7 @@ extension AppModel {
                 fileTranscribeTask = Task { [weak self] in
                     guard let self else { return }
                     await transcribeRecordedTake(url: url, title: title, source: checkpoint.source ?? .microphone)
-                    if !Task.isCancelled {
-                        self.fileTranscribeTask = nil
-                        self.drainDeferredArrivals()
-                    }
+                    if !Task.isCancelled { self.fileTranscribeTask = nil }
                 }
             } else {
                 transcribe(fileURL: url)
