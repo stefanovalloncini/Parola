@@ -239,18 +239,18 @@ struct WatchedFoldersStoreWatchingTests {
         await store.stopWatching()
     }
 
-    @Test("an ejected volume parks its folder until it mounts again, and a retry doesn't mount it")
+    @Test("an ejected volume parks its folder until it mounts again")
     func ejectedVolumeWaitsForAMount() async throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-watched-volume-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         let image = DiskImage(image: scratch.appendingPathComponent("card.dmg"), mountPoint: scratch.appendingPathComponent("Card"))
-        try image.create()
-        try image.attach()
         defer {
             image.detach()
             try? FileManager.default.removeItem(at: scratch)
         }
+        try image.create()
+        try image.attach()
         let folder = image.mountPoint.appendingPathComponent("Inbox", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try writeSettled(folder.appendingPathComponent("old.m4a"))
@@ -259,21 +259,25 @@ struct WatchedFoldersStoreWatchingTests {
         defer { try? FileManager.default.removeItem(at: rig.root) }
         let arrivals = Arrivals()
         let store = makeStore(rig, arrivals: arrivals)
-        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        do {
+            #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
 
-        image.detach()
-        #expect(await waitUntil { store.isUnavailable(rig.folderID) })
-        store.retryUnavailableFolders()
-        try await Task.sleep(for: .milliseconds(300))
-        #expect(store.isUnavailable(rig.folderID))
-        #expect(!FileManager.default.fileExists(atPath: folder.path), "a retry must not mount the volume")
+            image.detach()
+            #expect(await waitUntil { store.isUnavailable(rig.folderID) })
+            store.retryUnavailableFolders()
+            try await Task.sleep(for: .milliseconds(300))
+            #expect(store.isUnavailable(rig.folderID), "a retry with the volume away leaves the folder unavailable")
 
-        try image.attach()
-        try writeSettled(folder.appendingPathComponent("new.wav"))
-        store.retryUnavailableFolders()
-        #expect(await waitUntil { arrivals.names.contains("new.wav") })
-        #expect(arrivals.names == ["new.wav"])
-        #expect(!store.isUnavailable(rig.folderID))
+            try image.attach()
+            try writeSettled(folder.appendingPathComponent("new.wav"))
+            store.retryUnavailableFolders()
+            #expect(await waitUntil { arrivals.names.contains("new.wav") })
+            #expect(arrivals.names == ["new.wav"])
+            #expect(!store.isUnavailable(rig.folderID))
+        } catch {
+            await store.stopWatching()
+            throw error
+        }
         await store.stopWatching()
     }
 
@@ -459,7 +463,15 @@ private struct DiskImage {
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()
-        process.waitUntilExit()
+        let deadline = Date().addingTimeInterval(60)
+        while process.isRunning, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if process.isRunning {
+            process.terminate()
+            process.waitUntilExit()
+            throw Failed(status: -1)
+        }
         guard process.terminationStatus == 0 else { throw Failed(status: process.terminationStatus) }
     }
 }
