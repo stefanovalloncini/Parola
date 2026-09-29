@@ -483,12 +483,14 @@ public actor FolderWatcher {
     }
 
     private func depart(_ keys: Set<FileKey>, now: Date) {
+        var departures: [FileKey: FolderWatcherLedger.Departure] = [:]
         for key in keys {
             guard let gone = forget(key) else { continue }
-            options.ledger.depart(key, .init(
+            departures[key] = .init(
                 size: gone.size, modified: gone.modified, created: gone.created, status: gone.status, departedAt: now
-            ))
+            )
         }
+        options.ledger.depart(departures, now: now)
     }
 
     @discardableResult

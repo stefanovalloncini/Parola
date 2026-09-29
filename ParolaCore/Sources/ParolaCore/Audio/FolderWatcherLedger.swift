@@ -24,12 +24,18 @@ public final class FolderWatcherLedger: Sendable {
         self.retention = Double(parts.seconds) + Double(parts.attoseconds) / 1e18
     }
 
-    func depart(_ key: FolderWatcher.FileKey, _ departure: Departure) {
-        let horizon = departure.departedAt.addingTimeInterval(-retention)
+    /// One prune per batch, so a whole subtree leaving costs one pass over what the ledger holds.
+    func depart(_ departures: [FolderWatcher.FileKey: Departure], now: Date) {
+        guard !departures.isEmpty else { return }
+        let horizon = now.addingTimeInterval(-retention)
         state.withLock { state in
             state.departures = state.departures.filter { $0.value.departedAt >= horizon }
-            state.departures[key] = departure
+            state.departures.merge(departures) { _, new in new }
         }
+    }
+
+    var count: Int {
+        state.withLock { $0.departures.count }
     }
 
     static func isLater(_ listed: Date?, than recorded: Date?) -> Bool {
