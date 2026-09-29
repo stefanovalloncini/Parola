@@ -538,8 +538,8 @@ final class DeliveryEngineTests {
         )
 
         let outcome = await engine.send(entryID: "entry-1", to: destination.id)
-        guard case .queued(1, _) = outcome else {
-            Issue.record("expected the send to be queued, got \(outcome)")
+        guard case .queued(0, _) = outcome else {
+            Issue.record("expected the send to wait for its destination, got \(outcome)")
             return
         }
         #expect(await poll { clock.sleeperCount == 1 })
@@ -548,7 +548,39 @@ final class DeliveryEngineTests {
         await timer?.value
 
         #expect(await payloads.calls == 0)
-        #expect(try #require(await engine.pending().first).attempt == 2)
+        let waiting = try #require(await engine.pending().first)
+        #expect(waiting.attempt == 0, "a destination out of reach counts no attempt")
+        #expect(waiting.unreachableChecks == 2)
+        #expect(abs(waiting.nextAttemptAt.timeIntervalSinceNow - DeliveryEngine.delay(forAttempt: 2).wallSeconds) < 5)
+    }
+
+    @Test("a destination out of reach for every check is given up on at the last one")
+    func unreachableIsGivenUpOnEventually() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let store = try makeStore()
+        let destination = await mock(recorder: recorder)
+        await recorder.setReachable(false, for: destination.id)
+        store.save(queue: [
+            QueuedDelivery(
+                entryID: "entry-1", destinationID: destination.id, attempt: 2,
+                nextAttemptAt: Date().addingTimeInterval(-1), unreachableChecks: DeliveryEngine.maxUnreachableChecks
+            )
+        ])
+        let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
+
+        #expect(await poll { await engine.pending().isEmpty })
+        #expect(await engine.recentLog().last?.event == .dropped)
+    }
+
+    @Test("a queue written before the reachability count reads as not waiting")
+    func olderQueueDecodes() throws {
+        let json = #"[{"entryID":"e","destinationID":"6C9C1E1E-0000-0000-0000-00000000000A","attempt":3,"nextAttemptAt":"2026-09-01T10:00:00Z"}]"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let queue = try decoder.decode([QueuedDelivery].self, from: Data(json.utf8))
+        #expect(queue.first?.attempt == 3)
+        #expect(queue.first?.isWaitingForDestination == false)
     }
 
     @Test("one failed check reschedules every delivery to that destination that was due, and nothing else")
@@ -571,12 +603,13 @@ final class DeliveryEngineTests {
             payload: { try await payloads.build($0) }
         )
 
-        #expect(await poll { await engine.pending().first { $0.entryID == "entry-1" }?.attempt == 2 })
+        #expect(await poll { await engine.pending().first { $0.entryID == "entry-1" }?.unreachableChecks == 1 })
 
         let pending = await engine.pending()
-        #expect(pending.first { $0.entryID == "entry-2" }?.attempt == 2, "the other due delivery moved with it")
-        #expect(pending.first { $0.entryID == "entry-3" }?.attempt == 1, "a delivery not yet due keeps its turn")
-        #expect(pending.first { $0.entryID == "entry-4" }?.attempt == 1, "another destination is left alone")
+        #expect(pending.first { $0.entryID == "entry-2" }?.unreachableChecks == 1, "the other due delivery moved with it")
+        #expect(pending.allSatisfy { $0.attempt == 1 }, "being out of reach counts no attempt")
+        #expect(pending.first { $0.entryID == "entry-3" }?.unreachableChecks == 0, "a delivery not yet due keeps its turn")
+        #expect(pending.first { $0.entryID == "entry-4" }?.unreachableChecks == 0, "another destination is left alone")
         #expect(await recorder.reachabilityChecks() == 1)
         #expect(await payloads.calls == 0)
     }
@@ -646,6 +679,31 @@ final class DeliveryEngineTests {
         await second?.value
         #expect(await recorder.recorded().map(\.entryID) == ["entry-1", "entry-2"])
         #expect(await engine.pending().isEmpty)
+    }
+
+    @Test("a mount or an edit brings forward only deliveries that were waiting for the destination")
+    func retryNowSkipsOtherFailures() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let store = try makeStore()
+        let destination = await mock(recorder: recorder)
+        store.save(queue: [
+            queued("write-failed", to: destination, attempt: 1, dueIn: 3600),
+            QueuedDelivery(
+                entryID: "was-away", destinationID: destination.id, attempt: 0,
+                nextAttemptAt: Date().addingTimeInterval(3600), unreachableChecks: 1
+            ),
+        ])
+        let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
+        #expect(await poll { clock.sleeperCount == 2 })
+
+        await engine.retryNow(destinationID: destination.id)
+
+        #expect(await poll { await recorder.recorded().count == 1 })
+        #expect(await recorder.recorded().map(\.entryID) == ["was-away"])
+        let left = try #require(await engine.pending().first)
+        #expect(left.entryID == "write-failed")
+        #expect(left.attempt == 1, "an ordinary failure keeps its backoff and its count")
     }
 
     @Test("retrying a destination that is still unreachable changes nothing and counts no attempt")

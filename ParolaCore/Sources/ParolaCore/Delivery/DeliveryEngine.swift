@@ -66,12 +66,27 @@ public struct QueuedDelivery: Codable, Sendable, Equatable {
     /// How many attempts have already been made.
     public var attempt: Int
     public var nextAttemptAt: Date
+    /// How many checks in a row found the destination out of reach. These count no attempt, and a
+    /// delivery with any is one that a fixed destination or a mounted drive brings forward.
+    public var unreachableChecks: Int
 
-    public init(entryID: LibraryEntry.ID, destinationID: UUID, attempt: Int, nextAttemptAt: Date) {
+    public var isWaitingForDestination: Bool { unreachableChecks > 0 }
+
+    public init(entryID: LibraryEntry.ID, destinationID: UUID, attempt: Int, nextAttemptAt: Date, unreachableChecks: Int = 0) {
         self.entryID = entryID
         self.destinationID = destinationID
         self.attempt = attempt
         self.nextAttemptAt = nextAttemptAt
+        self.unreachableChecks = unreachableChecks
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        entryID = try c.decode(LibraryEntry.ID.self, forKey: .entryID)
+        destinationID = try c.decode(UUID.self, forKey: .destinationID)
+        attempt = try c.decode(Int.self, forKey: .attempt)
+        nextAttemptAt = try c.decode(Date.self, forKey: .nextAttemptAt)
+        unreachableChecks = try c.decodeIfPresent(Int.self, forKey: .unreachableChecks) ?? 0
     }
 }
 
@@ -200,6 +215,8 @@ public struct DeliveryQueueStore: Sendable {
 /// outlives the launch that started it; the waiting goes through the injected clock.
 public actor DeliveryEngine {
     public static let maxAttempts = 10
+    /// A destination out of reach this many checks in a row, the last ones a day apart, is given up on.
+    public static let maxUnreachableChecks = 30
     /// A minute, five, half an hour, then once a day.
     public static let retryDelays: [Duration] = [.seconds(60), .seconds(300), .seconds(1800), .seconds(86_400)]
     /// The gap between retries that come due at once: at launch, or when a destination is fixed.
@@ -275,7 +292,7 @@ public actor DeliveryEngine {
                     entryID: entryID, destinationID: destinationID, name: destination.name
                 )
             }
-            return failed(key, destination: destination, attempt: queueAttempt(key) + 1, error: error)
+            return waitForDestination(key, destination: destination, error: error)
         }
         do {
             let payload = try await payloadProvider(entryID)
@@ -359,7 +376,7 @@ public actor DeliveryEngine {
               (try? await destination.checkReachable()) != nil
         else { return }
         let keys = queue
-            .filter { $0.destinationID == destinationID }
+            .filter { $0.destinationID == destinationID && $0.isWaitingForDestination }
             .map { QueueKey(entryID: $0.entryID, destinationID: $0.destinationID) }
         for (index, key) in keys.enumerated() {
             schedule(key, after: Self.catchUpSpacing * index)
@@ -411,6 +428,9 @@ public actor DeliveryEngine {
         attempt: Int,
         error: any Error
     ) -> DeliveryOutcome {
+        if case DeliveryError.vaultUnavailable = error {
+            return waitForDestination(key, destination: destination, error: error)
+        }
         guard attempt < Self.maxAttempts else {
             dequeue(key)
             append(
@@ -495,8 +515,32 @@ public actor DeliveryEngine {
         }
     }
 
-    /// One failed check stands for every delivery to that destination that was due by the time this one
-    /// was: each moves to its next step without a transcript read or a check of its own.
+    /// Out of reach is not an attempt: the delivery keeps its count and backs off on a clock of its own.
+    private func waitForDestination(
+        _ key: QueueKey, destination: any DeliveryDestination, error: any Error
+    ) -> DeliveryOutcome {
+        let current = queue.first { $0.entryID == key.entryID && $0.destinationID == key.destinationID }
+        let attempts = current?.attempt ?? 0
+        let checks = (current?.unreachableChecks ?? 0) + 1
+        guard checks <= Self.maxUnreachableChecks else {
+            dequeue(key)
+            append(.dropped, entryID: key.entryID, destination: destination, attempt: attempts, detail: error.localizedDescription)
+            return .skipped(reason: .givenUp(destination.name))
+        }
+        let delay = Self.delay(forAttempt: checks)
+        let nextAt = Date().addingTimeInterval(delay.wallSeconds)
+        enqueue(
+            QueuedDelivery(
+                entryID: key.entryID, destinationID: key.destinationID,
+                attempt: attempts, nextAttemptAt: nextAt, unreachableChecks: checks
+            )
+        )
+        append(.queued, entryID: key.entryID, destination: destination, attempt: attempts, detail: error.localizedDescription)
+        schedule(key, after: delay)
+        return .queued(attempt: attempts, nextAt: nextAt)
+    }
+
+    /// One failed check stands for every delivery to that destination that was due by the time this one was.
     private func deferDueDeliveries(to destination: any DeliveryDestination, after key: QueueKey, error: any Error) {
         let firedAt = queue.first { $0.entryID == key.entryID && $0.destinationID == key.destinationID }?.nextAttemptAt
         let dueBy = max(Date(), firedAt ?? Date())
@@ -505,7 +549,7 @@ public actor DeliveryEngine {
             .map { QueueKey(entryID: $0.entryID, destinationID: $0.destinationID) }
             .filter { !inFlight.contains($0) }
         for dueKey in due {
-            _ = failed(dueKey, destination: destination, attempt: queueAttempt(dueKey) + 1, error: error)
+            _ = waitForDestination(dueKey, destination: destination, error: error)
         }
     }
 
