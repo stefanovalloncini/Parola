@@ -86,8 +86,8 @@ struct TypedToolRegistryTests {
         #expect(required == nil || required?.isEmpty == true)
     }
 
-    @Test("parola_wait_for_phase enum includes the exporting phase")
-    func waitForPhaseIncludesExporting() throws {
+    @Test("parola_wait_for_phase offers the app's phases, and a burn is not one of them")
+    func waitForPhaseMatchesTheAppPhases() throws {
         let tool = try #require(TypedToolRegistry.byName["parola_wait_for_phase"])
         let data = try JSONEncoder().encode(tool.mcpTool)
         let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -95,7 +95,7 @@ struct TypedToolRegistryTests {
         let props = schema?["properties"] as? [String: Any]
         let phase = props?["phase"] as? [String: Any]
         let values = try #require(phase?["enum"] as? [String])
-        #expect(values.contains("exporting"))
+        #expect(values == ["idle", "downloadingModel", "loadingModel", "fetchingLink", "transcribing", "recording", "ready", "failed"])
     }
 
     @Test("parola_app_dispatch is registered with an opaque command + args schema")

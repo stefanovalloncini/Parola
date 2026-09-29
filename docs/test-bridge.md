@@ -113,6 +113,8 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 
 The five introduction commands and `getState.introduction` all reply `{visible, step, steps, engine, engineChoices}`.
 
+`getState.burn` is the subtitle burn running beside the phase, `{state, progress, output}` with `state` one of
+`running` / `finished` / `failed` (a failed one adds `message`), or `null` when there is none.
 `getState.exportPresets` carries the whole preset library (`{id, name, spec, isBuiltIn}` each) and
 `getState.exportSpec` the sheet's current spec, or `null` while the sheet is shut.
 `getState.translation` is `{targetLanguage, segmentCount, inProgress, provider}` for a translated transcript and
