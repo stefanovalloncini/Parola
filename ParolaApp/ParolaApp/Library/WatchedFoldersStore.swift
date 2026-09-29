@@ -156,6 +156,11 @@ final class WatchedFoldersStore {
         unavailableFolderIDs.contains(id)
     }
 
+    /// In the order the folders were added, for the sidebar's warning.
+    var unavailableFolders: [WatchedFolder] {
+        folders.filter { unavailableFolderIDs.contains($0.id) }
+    }
+
     /// Never mounts or prompts: an ejected share stays ejected and an offline server gets no attempt at each wake.
     func retryUnavailableFolders() {
         for folder in folders where unavailableFolderIDs.contains(folder.id)

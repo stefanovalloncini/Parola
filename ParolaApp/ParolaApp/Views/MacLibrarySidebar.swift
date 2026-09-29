@@ -95,6 +95,10 @@ struct MacLibrarySidebar: View {
                         .accessibilityIdentifier("library.batch")
                         .axLeaf("Sidebar.Button.Batch")
                     }
+
+                    if let store = model.watchedFoldersIfWatching {
+                        UnavailableWatchedFolders(store: store)
+                    }
                 }
                 .padding(.horizontal, DS.Spacing.small)
                 .padding(.top, DS.Spacing.regular)

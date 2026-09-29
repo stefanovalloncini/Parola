@@ -7328,6 +7328,17 @@
         }
       }
     },
+    "Locate…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Individua…"
+          }
+        }
+      }
+    },
     "Long (movie)": {
       "extractionState": "manual",
       "localizations": {

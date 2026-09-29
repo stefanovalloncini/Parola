@@ -675,6 +675,11 @@ final class AppModel {
         self?.handleWatchedArrival(url)
     }
 
+    /// Nil when this launch doesn't watch folders, so a view never builds the store and starts its watchers.
+    var watchedFoldersIfWatching: WatchedFoldersStore? {
+        activeSideEffects.contains(.watchedFolders) ? watchedFolders : nil
+    }
+
     /// Nil when this launch doesn't watch folders, so quitting never builds the store just to flush it.
     func watchedFolderBaselineFlush() -> (@Sendable () async -> Void)? {
         guard activeSideEffects.contains(.watchedFolders) else { return nil }
