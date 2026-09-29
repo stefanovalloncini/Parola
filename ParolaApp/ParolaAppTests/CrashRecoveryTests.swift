@@ -233,7 +233,7 @@ extension TranscriberMockSuites {
             #expect(!recoveryFileExists(model))
         }
 
-        @Test("a finished stream clears the recovery file and stops the watch")
+        @Test("a finished stream stops the watch and clears the recovery file once the take is in the library")
         func streamingFinishedClearsRecovery() async {
             let model = makeModel()
             model.beginRecordingRecovery()
@@ -246,11 +246,13 @@ extension TranscriberMockSuites {
             let final = Transcript(segments: Self.makeSegments(), language: "en", modelName: "m")
             await model.handleStreamingEvent(.finished(final))
 
-            #expect(!recoveryFileExists(model))
             #expect(model.recordingWatchTask == nil)
+            let cleared = await waitUntil { !self.recoveryFileExists(model) }
+            #expect(cleared)
+            #expect(await !model.library.list().isEmpty, "the checkpoint only goes once the take has its entry")
         }
 
-        @Test("a failed stream clears the recovery file")
+        @Test("a failed stream clears the recovery file once its interrupted take is in the library")
         func streamingFailureClearsRecovery() async {
             let model = makeModel()
             model.beginRecordingRecovery()
@@ -261,7 +263,9 @@ extension TranscriberMockSuites {
 
             await model.handleStreamingEvent(.failed("boom"))
 
-            #expect(!recoveryFileExists(model))
+            let cleared = await waitUntil { !self.recoveryFileExists(model) }
+            #expect(cleared)
+            #expect(await !model.library.list().isEmpty, "the checkpoint only goes once the take has its entry")
         }
 
         @Test("cancelling a recording clears the recovery file")

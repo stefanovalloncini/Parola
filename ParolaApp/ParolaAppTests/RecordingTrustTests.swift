@@ -19,9 +19,9 @@ private final class QuitReply {
     var asked = false
 }
 
-private func makeTakeWAV(_ label: String) throws -> URL {
+private func makeTakeWAV(_ label: String, seconds: Double = 0.3) throws -> URL {
     let sampleRate = 16_000, channels = 1, bytesPerSample = 2
-    let frames = Int(Double(sampleRate) * 0.3)
+    let frames = Int(Double(sampleRate) * seconds)
     let dataBytes = frames * channels * bytesPerSample
     var data = Data()
     func ascii(_ s: String) { data.append(contentsOf: Array(s.utf8)) }
@@ -138,6 +138,51 @@ extension TranscriberMockSuites {
             let message = AppModel.transcriptionFailureMessage(for: CancellationError())
             #expect(!message.contains("CancellationError"))
             #expect(message == "Transcription stopped.")
+        }
+
+        @Test("a take stopped before transcribing keeps its checkpoint until its entry exists")
+        func checkpointOutlivesTheSaveOnly() async throws {
+            let wav = try makeTakeWAV("checkpoint", seconds: 3)
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "never landed")],
+                    gate: MockTranscriberGate()
+                ))
+                let model = makeModel()
+                await transcribingTake(model, wav: wav)
+                await model.pendingRecoveryWrite?.value
+                #expect(FileManager.default.fileExists(atPath: model.recoveryFileURL.path))
+
+                model.stopTranscribingTake()
+
+                var savedWithoutCheckpointFirst = false
+                await waitUntil {
+                    let checkpointGone = !FileManager.default.fileExists(atPath: model.recoveryFileURL.path)
+                    let saved = await !model.library.list().isEmpty
+                    if checkpointGone, !saved { savedWithoutCheckpointFirst = true }
+                    return saved
+                }
+                #expect(!savedWithoutCheckpointFirst, "the checkpoint went before the take was in the library")
+                await waitUntil { !FileManager.default.fileExists(atPath: model.recoveryFileURL.path) }
+            }
+        }
+
+        @Test("a checkpoint a save still needs stays through cleanup, and goes when the save releases it")
+        func heldCheckpointSurvivesCleanup() async throws {
+            let model = makeModel()
+            let generation = model.beginRecordingRecovery()
+            model.liveRecordingAudioURL = URL(fileURLWithPath: "/tmp/parola-held-checkpoint.wav")
+            model.writeRecordingCheckpoint()
+            await model.pendingRecoveryWrite?.value
+            model.recoveryHeldBySave.insert(generation)
+
+            model.endActiveRecovery()
+            #expect(FileManager.default.fileExists(atPath: model.recoveryFileURL.path))
+
+            model.recoveryHeldBySave.remove(generation)
+            model.endRecovery(generation)
+            #expect(!FileManager.default.fileExists(atPath: model.recoveryFileURL.path))
         }
 
         // MARK: - A take's category and targets

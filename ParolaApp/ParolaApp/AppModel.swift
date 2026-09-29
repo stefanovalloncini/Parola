@@ -403,6 +403,8 @@ final class AppModel {
     var pendingRecovery: RecoveryCheckpoint?
     @ObservationIgnored var recoveryGeneration: Int = 0
     @ObservationIgnored var activeRecoveryGeneration: Int?
+    /// Checkpoints a take's save still needs: cleanup leaves them on disk until the entry exists.
+    @ObservationIgnored var recoveryHeldBySave: Set<Int> = []
     @ObservationIgnored var recordingRecoveryStartedAt: Date?
     @ObservationIgnored var liveRecordingAudioURL: URL?
     @ObservationIgnored var recordingWatchTask: Task<Void, Never>?
@@ -3390,6 +3392,9 @@ final class AppModel {
 
     /// A live take that failed keeps what it heard: its confirmed words and its audio, as an interrupted entry.
     private func keepFailedLiveTake(_ reason: String, take: TakeContext?, session: (any StreamingTranscriber)?) async {
+        let recovery = activeRecoveryGeneration
+        // Held first, so the teardown below leaves the checkpoint for the save to end.
+        if let recovery { recoveryHeldBySave.insert(recovery) }
         let confirmed = liveSegments
         teardownStreaming()
         let audioURL = await session?.recordingAudioURL()
@@ -3403,15 +3408,19 @@ final class AppModel {
                 segments: confirmed, options: currentOptions, modelName: selectedModel, audioURL: audioURL
             )
             let partial = await postProcessDetached(finished)
-            land(RunLanding(
-                kind: .salvagedTake,
-                transcript: partial,
-                audioSource: audioURL,
+            saveTake(
+                partial,
+                audio: audioURL,
+                title: Self.takeTitle(takeTitle, suffix: .interrupted),
                 source: takeSource,
                 category: takeCategory,
-                title: Self.takeTitle(takeTitle, suffix: .interrupted)
-            ))
+                activate: false,
+                recovery: recovery
+            )
             message += " " + String(localized: "The recording up to this point was saved to your library.")
+        } else if let recovery {
+            recoveryHeldBySave.remove(recovery)
+            endRecovery(recovery)
         }
         liveSegments = []
         livePartialText = ""
@@ -3425,6 +3434,7 @@ final class AppModel {
 
     /// A live take's final transcript lands on screen and in the library; one with nothing in it says so.
     private func landLiveTake(_ transcript: Transcript, take: TakeContext?) async {
+        let recovery = activeRecoveryGeneration
         let arming = takeArming
         stopRecordingWatch()
         let takeCategory = take?.category ?? pendingRecordingCategory
@@ -3453,16 +3463,15 @@ final class AppModel {
             installPlayer(for: audioURL)
             adoptLoadedMediaDuration()
         }
-        let saving = land(RunLanding(
-            kind: .recording,
-            transcript: processed,
-            audioSource: processed.sourceURL,
+        takeSave = saveTake(
+            processed,
+            audio: processed.sourceURL,
+            title: title,
             source: takeSource,
             category: takeCategory,
-            title: title
-        ))
-        takeSave = saving
-        if let audioURL = processed.sourceURL { followTakeIntoLibrary(audioURL, entry: saving) }
+            activate: true,
+            recovery: recovery
+        )
         endLiveTake(take)
         resolveRecordingOutcome(.success(processed.text))
     }
@@ -3572,7 +3581,7 @@ final class AppModel {
         let run = takeRunCounter
         takeRun = run
         defer { if takeRun == run { takeRun = nil } }
-        let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, title: title, source: source)
+        let recovery = beginFileTranscribeRecovery(sourceURL: url, title: title, source: source)
         recordedTake = RecordedTake(file: url, title: title)
         sourceFileURL = url
         installPlayer(for: url)
@@ -3590,38 +3599,35 @@ final class AppModel {
             restorePlaybackSource(url)
             transcript = processed
             adoptLoadedMediaDuration()
-            endRecovery(recoveryToken)
             phase = .ready
-                let saving = land(RunLanding(
-                kind: .recording, transcript: processed, audioSource: url, source: source,
-                category: category, title: title
-            ))
-            followTakeIntoLibrary(url, entry: saving)
+            saveTake(processed, audio: url, title: title, source: source, category: category, activate: true, recovery: recovery)
             resolveRecordingOutcome(.success(processed.text))
         } catch {
-            endRecovery(recoveryToken)
-            keepUntranscribedTake(url: url, title: title, source: source, category: category, error: error)
+            keepUntranscribedTake(
+                url: url, title: title, source: source, category: category, error: error, recovery: recovery
+            )
         }
     }
 
     /// A take whose transcription failed or was stopped goes to the library as audio; only a failure reports.
     private func keepUntranscribedTake(
-        url: URL, title: String, source: EntrySource, category: EntryCategory, error: any Error
+        url: URL, title: String, source: EntrySource, category: EntryCategory, error: any Error, recovery: Int?
     ) {
         let stopped = error is CancellationError || Task.isCancelled
-        land(RunLanding(
-            kind: .salvagedTake,
-            transcript: Transcript(
+        saveTake(
+            Transcript(
                 segments: [],
                 language: currentOptions.language ?? "auto",
                 modelName: selectedModel,
                 sourceURL: url
             ),
-            audioSource: url,
+            audio: url,
+            title: Self.takeTitle(title, suffix: stopped ? .notTranscribed : .transcriptionFailed),
             source: source,
             category: category,
-            title: Self.takeTitle(title, suffix: stopped ? .notTranscribed : .transcriptionFailed)
-        ))
+            activate: false,
+            recovery: recovery
+        )
         if stopped {
             // Whatever stopped the run keeps the screen; only the take's own pane gives way to Home.
             let ownsPhase = phase == .transcribing(file: url) || phase == .idle
@@ -3653,14 +3659,41 @@ final class AppModel {
         phase = .idle
     }
 
-    /// Playback follows a saved take into its entry, so the header reads the entry's title from then on.
-    private func followTakeIntoLibrary(_ takeURL: URL, entry saving: Task<LibraryEntry, any Error>) {
+    /// A take's library save: the checkpoint stays until the entry exists, and playback follows the take into it.
+    @discardableResult
+    private func saveTake(
+        _ transcript: Transcript,
+        audio: URL?,
+        title: String,
+        source: EntrySource,
+        category: EntryCategory,
+        activate: Bool,
+        recovery: Int?
+    ) -> Task<LibraryEntry, any Error> {
+        let saving = land(RunLanding(
+            kind: activate ? .recording : .salvagedTake,
+            transcript: transcript,
+            audioSource: audio,
+            source: source,
+            category: category,
+            title: title
+        ))
+        if let recovery { recoveryHeldBySave.insert(recovery) }
         Task { [weak self, library] in
-            guard let entry = try? await saving.value,
-                  let audio = try? await library.load(entry.id).document.audioURL else { return }
-            guard let self, self.sourceFileURL == takeURL, self.selectedEntryID == entry.id else { return }
-            self.movePlayback(to: audio)
+            let entry = try? await saving.value
+            var entryAudio: URL?
+            if let entry, audio != nil { entryAudio = try? await library.load(entry.id).document.audioURL }
+            guard let self else { return }
+            if let recovery {
+                self.recoveryHeldBySave.remove(recovery)
+                if entry != nil { self.endRecovery(recovery) }
+            }
+            guard let entry, let audio, let entryAudio else { return }
+            if self.sourceFileURL == audio, self.selectedEntryID == entry.id {
+                self.movePlayback(to: entryAudio)
+            }
         }
+        return saving
     }
 
     /// The take's title while its own working file is what's loaded; nil once playback moves into its entry.
@@ -3742,6 +3775,7 @@ final class AppModel {
         stopSilenceWatch()
         let category = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
+        let recovery = activeRecoveryGeneration
         let title = Self.liveRecordingTitle(category: category, endedAt: Date())
         await mediaSession.exitRecording()
         let prepared = try? await source.prepare()
@@ -3749,15 +3783,15 @@ final class AppModel {
         phase = .idle
         // Without a file the recovery checkpoint stays, so the next launch offers what it points at.
         guard let url = prepared else { return }
-        let saving = land(RunLanding(
-            kind: .salvagedTake,
-            transcript: Transcript(segments: [], language: currentOptions.language ?? "auto", modelName: selectedModel, sourceURL: url),
-            audioSource: url,
+        _ = try? await saveTake(
+            Transcript(segments: [], language: currentOptions.language ?? "auto", modelName: selectedModel, sourceURL: url),
+            audio: url,
+            title: Self.takeTitle(title, suffix: .notTranscribed),
             source: takeSource,
             category: category,
-            title: Self.takeTitle(title, suffix: .notTranscribed)
-        ))
-        if (try? await saving.value) != nil { endActiveRecovery() }
+            activate: false,
+            recovery: recovery
+        ).value
     }
 
     private func discardTakeForQuit() async {

@@ -103,8 +103,9 @@ extension AppModel {
         endActiveRecovery()
     }
 
+    /// Leaves a checkpoint a take's save still needs; that save ends it once the entry exists.
     func endActiveRecovery() {
-        guard activeRecoveryGeneration != nil else { return }
+        guard let active = activeRecoveryGeneration, !recoveryHeldBySave.contains(active) else { return }
         activeRecoveryGeneration = nil
         recordingRecoveryStartedAt = nil
         let url = recoveryFileURL
