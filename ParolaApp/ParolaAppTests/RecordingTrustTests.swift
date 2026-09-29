@@ -12,6 +12,13 @@ private struct StubTake: LiveAudioSource {
     func cancel() async {}
 }
 
+/// Whether a quit asked, and the reply it handed back once the take was wound down.
+@MainActor
+private final class QuitReply {
+    var value: Bool?
+    var asked = false
+}
+
 private func makeTakeWAV(_ label: String) throws -> URL {
     let sampleRate = 16_000, channels = 1, bytesPerSample = 2
     let frames = Int(Double(sampleRate) * 0.3)
@@ -147,10 +154,12 @@ extension TranscriberMockSuites {
                     model.takeArming == .preparingModel(name: "openai_whisper-tiny", download: 0.42)
                 }
                 #expect(model.recordingStartedAt == nil)
+                #expect(!model.takeInProgress, "nothing captured yet, so quitting asks nothing")
 
                 await gate.open()
                 await waitUntil { model.recordingStartedAt != nil }
                 #expect(model.takeArming == nil)
+                #expect(model.takeInProgress)
 
                 model.cancelCurrentWork()
                 await waitUntil { model.recordingLevelMeter == nil }
@@ -279,6 +288,82 @@ extension TranscriberMockSuites {
                 #expect(AppModel.transcriptDisplayTitle(
                     sourceFileURL: model.sourceFileURL, entry: entry, showsAITitle: model.showAITitles, fallback: "Untitled"
                 ) == title)
+            }
+        }
+
+        // MARK: - Quitting during a take
+
+        @Test("quitting with no take in progress goes at once and asks nothing")
+        func quitWithoutATakeAsksNothing() {
+            let model = makeModel()
+            let quit = QuitReply()
+            let reply = AppDelegate.terminateReply(for: model, ask: { quit.asked = true; return .keepRecording }) { _ in }
+            #expect(reply == .terminateNow)
+            #expect(!quit.asked)
+            #expect(AppDelegate.terminateReply(for: nil, ask: { .discard }) { _ in } == .terminateNow)
+        }
+
+        private func capturingTake(_ fixture: URL) async -> AppModel {
+            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+            let model = makeModel()
+            model.useStreaming = false
+            model.startRecording(source: .microphone)
+            await waitUntil { model.takeInProgress }
+            return model
+        }
+
+        @Test("Keep Recording cancels the quit and leaves the take running")
+        func keepRecordingCancelsTheQuit() async throws {
+            let fixture = try makeTakeWAV("keep")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared(.audioSource) {
+                let model = await capturingTake(fixture)
+                let quit = QuitReply()
+                let reply = AppDelegate.terminateReply(for: model, ask: { .keepRecording }) { quit.value = $0 }
+                #expect(reply == .terminateCancel)
+                await settle()
+                #expect(quit.value == nil)
+                #expect(model.takeInProgress)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("Stop and Save puts the take in the library, then lets the app quit")
+        func stopAndSaveKeepsTheTake() async throws {
+            let fixture = try makeTakeWAV("save")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared(.audioSource) {
+                let model = await capturingTake(fixture)
+                let quit = QuitReply()
+                let reply = AppDelegate.terminateReply(for: model, ask: { .stopAndSave }) { quit.value = $0 }
+                #expect(reply == .terminateLater)
+
+                await waitUntil { quit.value != nil }
+                #expect(quit.value == true)
+                let listed = await model.library.list()
+                #expect(listed.count == 1, "the take is saved before the app is told it may quit")
+                #expect(listed.first?.title.hasSuffix("(not transcribed)") == true)
+                #expect(listed.first?.manifest.originalAudioName.isEmpty == false)
+                #expect(!model.takeInProgress)
+            }
+        }
+
+        @Test("Discard drops the take, then lets the app quit")
+        func discardDropsTheTake() async throws {
+            let fixture = try makeTakeWAV("discard")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared(.audioSource) {
+                let model = await capturingTake(fixture)
+                let quit = QuitReply()
+                let reply = AppDelegate.terminateReply(for: model, ask: { .discard }) { quit.value = $0 }
+                #expect(reply == .terminateLater)
+
+                await waitUntil { quit.value != nil }
+                #expect(quit.value == true)
+                #expect(!model.takeInProgress)
+                #expect(model.phase == .idle)
+                await settle()
+                #expect(await model.library.list().isEmpty)
             }
         }
 

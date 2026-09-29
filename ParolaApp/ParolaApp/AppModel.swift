@@ -71,6 +71,13 @@ final class AppModel {
         let title: String
     }
 
+    /// The answers the quit prompt offers while a take is capturing.
+    enum QuitDuringTake {
+        case stopAndSave
+        case keepRecording
+        case discard
+    }
+
     enum Route: String, Hashable, CaseIterable {
         case transcript
         case batch
@@ -178,6 +185,8 @@ final class AppModel {
     /// The take transcribing or just transcribed. Matched by file, so a stale one names nothing.
     private(set) var recordedTake: RecordedTake?
     @ObservationIgnored private var takeTranscriptionRunning = false
+    /// The library save of the last live take, which a quit waits for.
+    @ObservationIgnored private var takeSave: Task<LibraryEntry, any Error>?
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
@@ -3133,6 +3142,7 @@ final class AppModel {
     private func beginTakeArming(_ arming: TakeArming) {
         recordingStartedAt = nil
         takeArming = arming
+        takeSave = nil
     }
 
     /// The take's audio is arriving, so its clock starts now rather than when Record was pressed.
@@ -3368,6 +3378,7 @@ final class AppModel {
                 category: takeRecordingCategory(),
                 title: title
             ))
+            takeSave = saving
             if let audioURL = processed.sourceURL { followTakeIntoLibrary(audioURL, entry: saving) }
             resolveRecordingOutcome(.success(processed.text))
         }
@@ -3383,17 +3394,7 @@ final class AppModel {
         }
         if let s = streamingSession {
             Task { @MainActor in
-                await s.stop()
-                streamingSession = nil
-                // Await delivery of the final .finished event; cancelling here can drop the whole recording.
-                await streamingConsumer?.value
-                streamingConsumer = nil
-                clearTakeReadouts()
-                stopSilenceWatch()
-                stopRecordingWatch()
-                // Both no-op when .finished already ran; they cover a stream that ends without one.
-                endActiveRecovery()
-                liveRecordingAudioURL = nil
+                await finishStreamingTake(s)
                 resolveRecordingOutcome(.failure(IntentActionError.failed("The recording ended without a transcript.")))
             }
             return
@@ -3431,6 +3432,21 @@ final class AppModel {
             }
             if !Task.isCancelled { self.fileTranscribeTask = nil }
         }
+    }
+
+    /// Stops a live take and waits for its last event, which saves it.
+    private func finishStreamingTake(_ s: any StreamingTranscriber) async {
+        await s.stop()
+        streamingSession = nil
+        // Await delivery of the final .finished event; cancelling here can drop the whole recording.
+        await streamingConsumer?.value
+        streamingConsumer = nil
+        clearTakeReadouts()
+        stopSilenceWatch()
+        stopRecordingWatch()
+        // Both no-op when .finished already ran; they cover a stream that ends without one.
+        endActiveRecovery()
+        liveRecordingAudioURL = nil
     }
 
     /// Cancel on a take that has captured nothing: there is nothing to lose, so it ends without a word.
@@ -3563,6 +3579,78 @@ final class AppModel {
     func recordedTakeTitle(playing file: URL?) -> String? {
         guard let file, let recordedTake, recordedTake.file == file else { return nil }
         return recordedTake.title
+    }
+
+    // MARK: - Quitting during a take
+
+    /// A take is capturing, so quitting now would drop what it holds. One still arming has nothing to lose.
+    var takeInProgress: Bool {
+        recordingStartedAt != nil && (liveSource != nil || streamingSession != nil)
+    }
+
+    /// Acts on the answer to the quit prompt; true when the app may quit.
+    func resolveQuitDuringTake(_ choice: QuitDuringTake) async -> Bool {
+        switch choice {
+        case .keepRecording:
+            return false
+        case .discard:
+            await discardTakeForQuit()
+            return true
+        case .stopAndSave:
+            await saveTakeForQuit()
+            return true
+        }
+    }
+
+    /// A quit can't wait for a model, so a file take is saved as audio; a live take keeps what it transcribed.
+    private func saveTakeForQuit() async {
+        recordingAutoStopTask?.cancel()
+        recordingAutoStopTask = nil
+        if takeArming != nil, case .recording = phase {
+            endTakeBeforeCapture(reporting: nil)
+            return
+        }
+        if let s = streamingSession {
+            await finishStreamingTake(s)
+            _ = try? await takeSave?.value
+            return
+        }
+        guard let source = liveSource else { return }
+        liveSource = nil
+        stopRecordingWatch()
+        stopSilenceWatch()
+        let category = pendingRecordingCategory
+        let takeSource = pendingRecordingSource
+        let title = Self.liveRecordingTitle(category: category, endedAt: Date())
+        await mediaSession.exitRecording()
+        let prepared = try? await source.prepare()
+        clearTakeReadouts()
+        phase = .idle
+        // Without a file the recovery checkpoint stays, so the next launch offers what it points at.
+        guard let url = prepared else { return }
+        pendingRecordingCategory = .transcription
+        let saving = land(RunLanding(
+            kind: .salvagedTake,
+            transcript: Transcript(segments: [], language: currentOptions.language ?? "auto", modelName: selectedModel, sourceURL: url),
+            audioSource: url,
+            source: takeSource,
+            category: category,
+            title: title + " (not transcribed)"
+        ))
+        if (try? await saving.value) != nil { endActiveRecovery() }
+    }
+
+    private func discardTakeForQuit() async {
+        let streaming = streamingSession
+        let capture = liveSource
+        streamingSession = nil
+        liveSource = nil
+        teardownActiveCapture()
+        await streaming?.cancel()
+        await capture?.cancel()
+        await mediaSession.exitRecording()
+        phase = .idle
+        resolveRecordingOutcome(.failure(IntentActionError.cancelled))
     }
 
     /// A phase change means the last failure's file is no longer what the error card is about.

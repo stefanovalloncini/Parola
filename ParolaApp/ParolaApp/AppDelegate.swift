@@ -76,6 +76,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        Self.terminateReply(for: model, ask: Self.presentQuitDuringTakeAlert) { quits in
+            sender.reply(toApplicationShouldTerminate: quits)
+        }
+    }
+
+    /// A take in progress asks first. Keep Recording stays; the other two wind the take down, then let the app go.
+    static func terminateReply(
+        for model: AppModel?,
+        ask: @MainActor () -> AppModel.QuitDuringTake,
+        reply: @escaping @MainActor (Bool) -> Void
+    ) -> NSApplication.TerminateReply {
+        guard let model, model.takeInProgress else { return .terminateNow }
+        let choice = ask()
+        guard choice != .keepRecording else { return .terminateCancel }
+        Task { @MainActor in
+            reply(await model.resolveQuitDuringTake(choice))
+        }
+        return .terminateLater
+    }
+
+    static func presentQuitDuringTakeAlert() -> AppModel.QuitDuringTake {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = String(localized: "A recording is in progress")
+        alert.informativeText = String(localized: "Stop and Save keeps what you've recorded so far in your library.")
+        alert.addButton(withTitle: String(localized: "Stop and Save"))
+        alert.addButton(withTitle: String(localized: "Keep Recording")).keyEquivalent = "\u{1b}"
+        alert.addButton(withTitle: String(localized: "Discard")).hasDestructiveAction = true
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return .stopAndSave
+        case .alertThirdButtonReturn: return .discard
+        default: return .keepRecording
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         ParolaLog.info(.appLifecycle, "app terminating in phase \(model?.phase)")
         let diagnostics = DiagnosticsInstaller.current

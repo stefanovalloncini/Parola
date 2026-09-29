@@ -985,6 +985,17 @@
         }
       }
     },
+    "A recording is in progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "È in corso una registrazione"
+          }
+        }
+      }
+    },
     "A sample Parola writes to check a destination.": {
       "extractionState": "manual",
       "localizations": {
@@ -4603,6 +4614,17 @@
         }
       }
     },
+    "Discard": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarta"
+          }
+        }
+      }
+    },
     "Discreet bar pinned under the MacBook notch.": {
       "extractionState": "manual",
       "localizations": {
@@ -6788,6 +6810,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salta al tempo"
+          }
+        }
+      }
+    },
+    "Keep Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continua a registrare"
           }
         }
       }
@@ -12942,6 +12975,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Interrompi trascrizione"
+          }
+        }
+      }
+    },
+    "Stop and Save": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferma e salva"
+          }
+        }
+      }
+    },
+    "Stop and Save keeps what you've recorded so far in your library.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferma e salva mette nella libreria quello che hai registrato finora."
           }
         }
       }
