@@ -12,17 +12,26 @@ extension AppModel {
     /// The one way a summary starts: it lands on `entryID` whatever is on screen by then (nil: an unsaved transcript).
     @discardableResult
     func summarise(entry entryID: LibraryEntry.ID?, transcript: Transcript, options: SummaryOptions? = nil) -> Task<Summary, any Error>? {
+        startSummary(for: entryID, transcript: transcript, options: options ?? summaryOptions, summarise: makeSummariser(), forChat: false)
+    }
+
+    /// A summary a chat starts keeps the chapters the entry already has.
+    private func startSummary(
+        for entryID: LibraryEntry.ID?,
+        transcript: Transcript,
+        options: SummaryOptions,
+        summarise: @escaping @Sendable (Transcript, SummaryOptions) async throws -> Summary,
+        forChat: Bool
+    ) -> Task<Summary, any Error>? {
         guard features.isEnabled(.ai) else { return nil }
-        let resolvedOptions = options ?? summaryOptions
-        let summarise = makeSummariser()
         let artifacts = derivedArtifactsGeneration
         if entryID == selectedEntryID { summaryError = nil }
         return aiJobs.start(
             .summary,
             for: entryID,
-            work: { try await summarise(transcript, resolvedOptions) },
+            work: { try await summarise(transcript, options) },
             land: { [weak self] summary, entryID in
-                await self?.landSummary(summary, for: entryID, askedAt: artifacts)
+                await self?.landSummary(summary, for: entryID, askedAt: artifacts, keepingChapters: forChat)
             },
             fail: { [weak self] error, entryID in
                 guard let self else { return }
@@ -41,16 +50,21 @@ extension AppModel {
     }
 
     /// Disk first, then the pane if the entry is on screen by then, so an open racing the landing can't keep a copy without it.
-    private func landSummary(_ summary: Summary, for entryID: LibraryEntry.ID?, askedAt artifacts: Int) async {
+    private func landSummary(
+        _ summary: Summary,
+        for entryID: LibraryEntry.ID?,
+        askedAt artifacts: Int,
+        keepingChapters: Bool
+    ) async {
         if let entryID {
             do {
-                try await library.mutateTranscript(for: entryID) { $0.install(summary: summary) }
+                try await library.mutateTranscript(for: entryID) { $0.install(summary: summary, keepingChapters: keepingChapters) }
             } catch {
                 ParolaLog.error(.library, "summary could not be saved to the library", [.error: .error(error)])
             }
         }
         guard isOnScreen(entryID, askedAt: artifacts) else { return }
-        transcript?.install(summary: summary)
+        transcript?.install(summary: summary, keepingChapters: keepingChapters)
         adoptSavedChapters()
     }
 
@@ -60,11 +74,11 @@ extension AppModel {
         return entryID == selectedEntryID
     }
 
-    /// Writes a summary with the model the summary task is set to, labelled with that model.
-    func makeSummariser() -> @Sendable (Transcript, SummaryOptions) async throws -> Summary {
-        let makeModel = summaryModelMaker()
-        let budget = tokenBudget(for: .summary)
-        let provider = languageModelLabel(for: .summary)
+    /// Writes a summary with the model `task` is set to, labelled with that model.
+    func makeSummariser(for task: LanguageModelTask = .summary) -> @Sendable (Transcript, SummaryOptions) async throws -> Summary {
+        let makeModel = summaryModelMaker(for: task)
+        let budget = tokenBudget(for: task)
+        let provider = languageModelLabel(for: task)
         let summarise = summariseOperation ?? { [features] transcript, options in
             guard let makeModel else {
                 return try await SummaryService(budget: budget, features: features).summarise(transcript, options: options)
@@ -89,10 +103,20 @@ extension AppModel {
 
     private func summaryForChat(entryID: LibraryEntry.ID?, transcript: Transcript) async throws -> Summary {
         if entryID == selectedEntryID, let shown = self.transcript?.summary, !shown.text.isEmpty { return shown }
-        let run = aiJobs.running(.summary, for: entryID, as: Summary.self)
-            ?? summarise(entry: entryID, transcript: transcript)
+        let run = aiJobs.running(.summary, for: entryID, as: Summary.self) ?? startSummary(
+            for: entryID,
+            transcript: transcript,
+            options: summaryOptions,
+            summarise: makeSummariser(for: digestTask),
+            forChat: true
+        )
         guard let run else { throw CancellationError() }
         return try await run.value
+    }
+
+    /// The summary model writes the digest, unless it would take the transcript somewhere the chat's model doesn't.
+    var digestTask: LanguageModelTask {
+        resolvedLanguageModelChoice(for: .summary).isRemote == resolvedLanguageModelChoice(for: .chat).isRemote ? .summary : .chat
     }
 
     /// The bridge's write path for the saved options, so it goes through a seam like its four
@@ -138,6 +162,13 @@ extension AppModel {
 }
 
 extension Transcript {
+    /// With `keepingChapters`, chapters the transcript already has win over the summary's.
+    mutating func install(summary: Summary, keepingChapters: Bool) {
+        var summary = summary
+        if keepingChapters, !(chapters ?? []).isEmpty { summary.chapters = [] }
+        install(summary: summary)
+    }
+
     /// One chapter list from the moment a summary lands: the summary's own chapters, or the ones already kept when it brought none.
     mutating func install(summary: Summary) {
         var summary = summary

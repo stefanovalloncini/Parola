@@ -258,6 +258,63 @@ struct AICallSiteTests {
         }
     }
 
+    @Test("a chat's digest fills the summary but leaves the chapters the entry already had")
+    func chatDigestKeepsChapters() async throws {
+        try await withInstalledMocks([.ollama: "the answer"]) {
+            let model = makeModel()
+            var long = Transcript(
+                segments: (0..<400).map {
+                    TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "parola parola parola parola parola")
+                },
+                language: "it",
+                modelName: "stub"
+            )
+            long.chapters = [Chapter(title: "Generated", start: 0)]
+            let entry = try await model.library.add(transcript: long, audioSource: nil, category: .transcription)
+            model.selectedEntryID = entry.id
+            model.transcript = long
+            pick(ollama(), for: .chat, on: model)
+            model.summariseOperation = { _, _ in Summary(text: "the digest", chapters: [Chapter(title: "Digest start", start: 0)]) }
+
+            let session = try await model.makeChatSession(transcript: long, history: [], entryID: entry.id)
+            _ = try await session.ask("di cosa si parla?")
+
+            #expect(await waitUntil { model.transcript?.summary?.text == "the digest" })
+            #expect(model.transcript?.chapters?.map(\.title) == ["Generated"])
+            let stored = try await model.library.load(entry.id).document.transcript
+            #expect(stored.summary?.text == "the digest")
+            #expect(stored.chapters?.map(\.title) == ["Generated"])
+        }
+    }
+
+    @Test("a chat on this Mac never sends its digest to a cloud summary model")
+    func chatDigestStaysWithTheChatsLocality() async throws {
+        try await withInstalledMocks([.ollama: "SUMMARY:\nfrom ollama"]) {
+            let model = makeModel()
+            let long = Transcript(
+                segments: (0..<400).map {
+                    TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "parola parola parola parola parola")
+                },
+                language: "it",
+                modelName: "stub"
+            )
+            let entry = try await model.library.add(transcript: long, audioSource: nil, category: .transcription)
+            model.selectedEntryID = entry.id
+            model.transcript = long
+            pick(ollama(), for: .chat, on: model)
+            pick(openAI(), for: .summary, on: model)
+            #expect(model.digestTask == .chat)
+
+            let session = try await model.makeChatSession(transcript: long, history: [], entryID: entry.id)
+            _ = try await session.ask("di cosa si parla?")
+
+            #expect(await waitUntil { model.transcript?.summary != nil })
+            #expect(model.transcript?.summary?.text == "from ollama")
+            #expect(model.transcript?.summary?.provider == model.languageModelLabel(for: .chat))
+            #expect(await MockLanguageModelStore.shared.lastPrompt(for: .openAI) == nil)
+        }
+    }
+
     @Test("a chat digest waits on the summary already running instead of starting another")
     func chatDigestJoinsTheRunningSummary() async throws {
         let model = makeModel()

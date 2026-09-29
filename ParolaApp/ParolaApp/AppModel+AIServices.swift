@@ -336,11 +336,11 @@ extension AppModel {
 
     /// The summariser for the current selection, or nil when summaries stay on device and the
     /// service's own on-device path (structured output included) should run.
-    func summaryModelMaker() -> (@Sendable (String?) async throws -> any LanguageModel)? {
-        guard resolvedLanguageModelChoice(for: .summary) != .onDevice else { return nil }
+    func summaryModelMaker(for task: LanguageModelTask = .summary) -> (@Sendable (String?) async throws -> any LanguageModel)? {
+        guard resolvedLanguageModelChoice(for: task) != .onDevice else { return nil }
         return { [weak self] instructions in
             guard let self else { throw CancellationError() }
-            return try await self.makeLanguageModel(for: .summary, instructions: instructions)
+            return try await self.makeLanguageModel(for: task, instructions: instructions)
         }
     }
 }
