@@ -515,6 +515,7 @@ extension AppModel {
     /// Copies of takes already in the library go, and so does old scratch; a take that never reached the library comes back as a "(recovered)" entry.
     func sweepInflightRecordings() {
         let dir = inflightRecordingsURL
+        let root = library.libraryURL
         let keep = recoveryReferencedFiles.union([pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
             .compactMap { $0?.resolvingSymlinksInPath().path })
         inflightSweep = Task { [weak self, library] in
@@ -552,6 +553,10 @@ extension AppModel {
                     ParolaLog.error(.appRecovery, "an orphaned take could not be brought back", [.error: .error(error)])
                 }
             }
+            let staging = (try? await AppModel.offMainIO(qos: .utility) { AppModel.staleStagingFolders(in: root, now: Date()) }) ?? []
+            for folder in staging where await AppModel.salvageStagingFolder(folder, into: library) {
+                recovered += 1
+            }
             if deleted > 0 {
                 ParolaLog.notice(.appRecovery, "stale in-flight takes deleted", [.count: .int(deleted)])
             }
@@ -560,6 +565,50 @@ extension AppModel {
                 self?.refreshLibrary()
             }
         }
+    }
+
+    /// The `.parola.tmp` folders a save left in the library when it was cut off, once ten minutes quiet.
+    nonisolated static func staleStagingFolders(in root: URL, now: Date) -> [URL] {
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .isDirectoryKey]
+        let listed = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: keys)) ?? []
+        return listed.filter { url in
+            guard url.lastPathComponent.hasSuffix(".parola.tmp"),
+                  let values = try? url.resourceValues(forKeys: Set(keys)), values.isDirectory == true else { return false }
+            return (values.contentModificationDate ?? .distantPast) < now.addingTimeInterval(-10 * 60)
+        }
+    }
+
+    /// Whatever a cut-off save's folder holds becomes an entry, the whole document if it was complete; the folder goes only once the entry exists.
+    nonisolated static func salvageStagingFolder(_ folder: URL, into library: LibraryStore) async -> Bool {
+        let fm = FileManager.default
+        let entry: LibraryEntry?
+        if let document = try? ParolaDocument.read(at: folder) {
+            entry = try? await library.add(
+                transcript: document.transcript,
+                audioSource: document.audioURL,
+                category: document.manifest.category,
+                title: document.manifest.title,
+                titleSource: document.manifest.titleSource,
+                source: document.manifest.source
+            )
+        } else if let audio = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil))?
+            .first(where: { $0.lastPathComponent.hasPrefix("audio.") }) {
+            let startedAt = (try? folder.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
+            entry = try? await library.add(
+                transcript: untranscribedTranscript(of: audio, language: nil),
+                audioSource: audio,
+                title: recoveredRecordingTitle(startedAt: startedAt)
+            )
+        } else {
+            try? fm.removeItem(at: folder)
+            return false
+        }
+        guard entry != nil else {
+            ParolaLog.error(.appRecovery, "a save cut off mid-write could not be brought back")
+            return false
+        }
+        try? fm.removeItem(at: folder)
+        return true
     }
 
     /// A WAV header and next to nothing after it: nothing was recorded.

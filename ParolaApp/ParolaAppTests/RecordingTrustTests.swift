@@ -713,6 +713,44 @@ extension TranscriberMockSuites {
             #expect(!FileManager.default.fileExists(atPath: take.path), "the original goes once the entry holds its copy")
         }
 
+        @Test("the sweep turns a save cut off mid-write back into an entry: the whole document, or at least its audio")
+        func sweepSalvagesStagingFolders() async throws {
+            let library = makeTempLibraryURL("sweep-staging")
+            try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+            let hourAgo = Date().addingTimeInterval(-3_600)
+
+            let audioOnly = library.appendingPathComponent("\(UUID().uuidString).parola.tmp", isDirectory: true)
+            try FileManager.default.createDirectory(at: audioOnly, withIntermediateDirectories: true)
+            let take = try makeTakeWAV("staged", seconds: 1)
+            try FileManager.default.moveItem(at: take, to: audioOnly.appendingPathComponent("audio.wav"))
+
+            let words = try makeTakeWAV("staged-words", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: words) }
+            let written = try ParolaDocument.write(
+                transcript: Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "almost saved")], language: "en", modelName: "m"),
+                audioURL: words,
+                to: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString),
+                titleOverride: "Meeting notes"
+            )
+            let complete = library.appendingPathComponent("\(UUID().uuidString).parola.tmp", isDirectory: true)
+            try FileManager.default.moveItem(at: written, to: complete)
+            for folder in [audioOnly, complete] {
+                try FileManager.default.setAttributes([.modificationDate: hourAgo], ofItemAtPath: folder.path)
+            }
+
+            let model = makeModel(libraryURL: library)
+            await model.inflightSweep?.value
+
+            let listed = await model.library.list()
+            #expect(listed.count == 2)
+            let notes = try #require(listed.first { $0.title == "Meeting notes" })
+            #expect(try await model.library.load(notes.id).document.transcript.text == "almost saved")
+            let recovered = try #require(listed.first { $0.title.hasSuffix("(recovered)") })
+            #expect(recovered.manifest.originalAudioName.isEmpty == false)
+            #expect(!FileManager.default.fileExists(atPath: audioOnly.path))
+            #expect(!FileManager.default.fileExists(atPath: complete.path))
+        }
+
         @Test("the heartbeat marks only the working files in use as fresh")
         func heartbeatTouchesFilesInUse() throws {
             let library = makeTempLibraryURL("heartbeat")
