@@ -98,4 +98,29 @@ struct FolderWatcherAvailabilityTests {
         #expect(await watcher.state == .unavailable)
         #expect(states.all.isEmpty)
     }
+
+    @Test("an unmount is told apart from a rename or a delete")
+    func rootEventsAreSorted() {
+        #expect(FolderWatcher.event(for: [.revoke], at: "/Volumes/Card") == .rootUnmounted)
+        #expect(FolderWatcher.event(for: [.revoke, .delete], at: "/Volumes/Card") == .rootUnmounted)
+        #expect(FolderWatcher.event(for: [.rename], at: "/Inbox") == .rootLost)
+        #expect(FolderWatcher.event(for: [.delete], at: "/Inbox") == .rootLost)
+        #expect(FolderWatcher.event(for: [.write], at: "/Inbox") == .changed("/Inbox"))
+    }
+
+    @Test("an unmounted folder stops its watch, says so, and keeps what it knew")
+    func unmountedRootKeepsItsBaseline() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        try Fixture.writeSettled(folder.appendingPathComponent("kept.m4a"), clock: clock)
+        let states = States()
+        let watcher = makeWatcher(folder, clock: clock, states: states, collected: CollectedURLs())
+        await watcher.start()
+
+        await watcher.lose(.unmounted)
+        #expect(await watcher.state == .unmounted)
+        #expect(states.all == [.unmounted])
+        #expect(await watcher.baseline()?.entries.map(\.path) == ["kept.m4a"])
+    }
 }

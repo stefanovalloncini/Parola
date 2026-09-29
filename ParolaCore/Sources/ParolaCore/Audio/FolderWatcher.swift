@@ -107,14 +107,17 @@ public actor FolderWatcher {
         case watching
         /// The folder couldn't be opened or listed when the watch started.
         case unavailable
-        /// The folder was renamed, moved, deleted or unmounted while watched. The watcher stops
-        /// looking and keeps what it knew, for a new watcher started wherever the folder is now.
+        /// The folder was renamed, moved or deleted while watched. The watcher stops looking and keeps
+        /// what it knew, for a new watcher started wherever the folder is now.
         case lost
+        /// The folder's volume was unmounted while watched; like `lost`, but only a mount brings it back.
+        case unmounted
     }
 
-    enum Event: Sendable {
+    enum Event: Sendable, Equatable {
         case changed(String)
         case rootLost
+        case rootUnmounted
     }
 
     private let folderURL: URL
@@ -248,7 +251,8 @@ public actor FolderWatcher {
             for await event in stream {
                 switch event {
                 case .changed(let directory): await self?.noteDirty(directory)
-                case .rootLost: await self?.lose()
+                case .rootLost: await self?.lose(.lost)
+                case .rootUnmounted: await self?.lose(.unmounted)
                 }
             }
         }
@@ -271,21 +275,26 @@ public actor FolderWatcher {
         continuation: AsyncStream<Event>.Continuation,
         queue: DispatchQueue
     ) -> DispatchSourceFileSystemObject {
-        let lostMask: DispatchSource.FileSystemEvent = [.rename, .delete, .revoke]
         let src = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
-            eventMask: isRoot ? lostMask.union(.write) : .write,
+            eventMask: isRoot ? [.write, .rename, .delete, .revoke] : .write,
             queue: queue
         )
         src.setEventHandler { [weak src] in
             guard let src else { return }
-            continuation.yield(src.data.isDisjoint(with: lostMask) ? .changed(path) : .rootLost)
+            continuation.yield(event(for: src.data, at: path))
         }
         src.setCancelHandler { [fd] in
             close(fd)
         }
         src.resume()
         return src
+    }
+
+    static func event(for data: DispatchSource.FileSystemEvent, at path: String) -> Event {
+        if data.contains(.revoke) { return .rootUnmounted }
+        if !data.isDisjoint(with: [.rename, .delete]) { return .rootLost }
+        return .changed(path)
     }
 
     private func openSource(for path: String) {
@@ -312,11 +321,11 @@ public actor FolderWatcher {
         state = .idle
     }
 
-    private func lose() {
+    func lose(_ reason: State) {
         guard state == .watching else { return }
         tearDown()
-        state = .lost
-        onStateChange?(.lost)
+        state = reason
+        onStateChange?(reason)
     }
 
     private func tearDown() {
@@ -395,7 +404,7 @@ public actor FolderWatcher {
         // A root that can't be listed (renamed away, unmounted) says nothing about its files.
         let movedRoot = scan.listings.contains { $0.path == rootPath && rootInode != nil && $0.inode != rootInode }
         if scan.missing.contains(rootPath) || movedRoot {
-            lose()
+            lose(.lost)
             return
         }
         unlisted.subtract(scan.listings.map(\.path))

@@ -151,10 +151,11 @@ final class WatchedFoldersStore {
         unavailableFolderIDs.contains(id)
     }
 
+    /// Never mounts or prompts: an ejected share stays ejected and an offline server gets no attempt at each wake.
     func retryUnavailableFolders() {
         for folder in folders where unavailableFolderIDs.contains(folder.id)
             && watchers[folder.id] == nil && starts[folder.id] == nil {
-            startWatcher(for: folder)
+            startWatcher(for: folder, mounting: false)
         }
     }
 
@@ -225,7 +226,8 @@ final class WatchedFoldersStore {
         for folder: WatchedFolder,
         replacing previous: FolderWatcher? = nil,
         releasing previousScope: URL? = nil,
-        carriesBaseline: Bool = true
+        carriesBaseline: Bool = true,
+        mounting: Bool = true
     ) {
         let id = folder.id
         let start = UUID()
@@ -236,7 +238,7 @@ final class WatchedFoldersStore {
             let carried = carriesBaseline ? await previous?.baseline() : nil
             await previous?.stop()
             previousScope?.stopAccessingSecurityScopedResource()
-            let resolved = await Self.resolveBookmark(bookmark)
+            let resolved = await Self.resolveBookmark(bookmark, mounting: mounting)
             var baseline = carried
             if baseline == nil {
                 baseline = await baselines.read(id)
@@ -260,8 +262,7 @@ final class WatchedFoldersStore {
                     Task { @MainActor in self?.scheduleBaselineWrite(for: id) }
                 },
                 onStateChange: { [weak self] state in
-                    guard state == .lost else { return }
-                    Task { @MainActor in await self?.restartLostWatcher(id) }
+                    Task { @MainActor in await self?.watcherStopped(id, state: state) }
                 },
                 onNewMediaFile: { newURL in
                     Task { @MainActor in handler(newURL) }
@@ -298,12 +299,22 @@ final class WatchedFoldersStore {
         save()
     }
 
-    private func restartLostWatcher(_ id: UUID) async {
-        guard let watcher = watchers[id], await watcher.state == .lost, watchers[id] === watcher,
-              let folder = folders.first(where: { $0.id == id }) else { return }
+    /// A renamed or deleted folder is looked for at once; an unmounted one waits for a mount.
+    private func watcherStopped(_ id: UUID, state: FolderWatcher.State) async {
+        guard state == .lost || state == .unmounted, let watcher = watchers[id], await watcher.state == state,
+              watchers[id] === watcher, let folder = folders.first(where: { $0.id == id }) else { return }
         watchers[id] = nil
         baselineWrites.removeValue(forKey: id)?.cancel()
-        startWatcher(for: folder, replacing: watcher, releasing: scopedURLs.removeValue(forKey: id))
+        let scopedURL = scopedURLs.removeValue(forKey: id)
+        if state == .lost {
+            startWatcher(for: folder, replacing: watcher, releasing: scopedURL, mounting: false)
+            return
+        }
+        unavailableFolderIDs.insert(id)
+        if let baseline = await watcher.baseline() {
+            baselines.write(baseline, for: id)
+        }
+        scopedURL?.stopAccessingSecurityScopedResource()
     }
 
     private static func isInTrash(_ url: URL) -> Bool {
@@ -337,13 +348,16 @@ final class WatchedFoldersStore {
 
     // Off the main thread: resolving a security-scoped bookmark can block on mounting its volume,
     // which would hang launch for a watched folder on a disconnected drive.
-    private nonisolated static func resolveBookmark(_ bookmark: Data) async -> ResolvedBookmark? {
-        await withCheckedContinuation { continuation in
+    private nonisolated static func resolveBookmark(_ bookmark: Data, mounting: Bool) async -> ResolvedBookmark? {
+        let options: URL.BookmarkResolutionOptions = mounting
+            ? .withSecurityScope
+            : [.withSecurityScope, .withoutMounting, .withoutUI]
+        return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 var isStale = false
                 guard let url = try? URL(
                     resolvingBookmarkData: bookmark,
-                    options: .withSecurityScope,
+                    options: options,
                     relativeTo: nil,
                     bookmarkDataIsStale: &isStale
                 ) else {

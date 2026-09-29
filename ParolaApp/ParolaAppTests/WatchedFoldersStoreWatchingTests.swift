@@ -23,10 +23,10 @@ struct WatchedFoldersStoreWatchingTests {
         var baselineURL: URL { baselineDirectory.appendingPathComponent("\(folderID.uuidString).json") }
     }
 
-    private func makeRig(_ label: String) throws -> Rig {
+    private func makeRig(_ label: String, folder watched: URL? = nil) throws -> Rig {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-watched-store-\(label)-\(UUID().uuidString)", isDirectory: true)
-        let folder = root.appendingPathComponent("Inbox", isDirectory: true)
+        let folder = watched ?? root.appendingPathComponent("Inbox", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let defaults = temporaryDefaults()
         let bookmark = try folder.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
@@ -237,5 +237,75 @@ struct WatchedFoldersStoreWatchingTests {
 
         #expect(store.watcher(for: rig.folderID) === before)
         await store.stopWatching()
+    }
+
+    @Test("an ejected volume parks its folder until it mounts again, and a retry doesn't mount it")
+    func ejectedVolumeWaitsForAMount() async throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-watched-volume-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let image = DiskImage(image: scratch.appendingPathComponent("card.dmg"), mountPoint: scratch.appendingPathComponent("Card"))
+        try image.create()
+        try image.attach()
+        defer {
+            image.detach()
+            try? FileManager.default.removeItem(at: scratch)
+        }
+        let folder = image.mountPoint.appendingPathComponent("Inbox", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try writeSettled(folder.appendingPathComponent("old.m4a"))
+
+        let rig = try makeRig("volume", folder: folder)
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let arrivals = Arrivals()
+        let store = makeStore(rig, arrivals: arrivals)
+        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+
+        image.detach()
+        #expect(await waitUntil { store.isUnavailable(rig.folderID) })
+        store.retryUnavailableFolders()
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(store.isUnavailable(rig.folderID))
+        #expect(!FileManager.default.fileExists(atPath: folder.path), "a retry must not mount the volume")
+
+        try image.attach()
+        try writeSettled(folder.appendingPathComponent("new.wav"))
+        store.retryUnavailableFolders()
+        #expect(await waitUntil { arrivals.names.contains("new.wav") })
+        #expect(arrivals.names == ["new.wav"])
+        #expect(!store.isUnavailable(rig.folderID))
+        await store.stopWatching()
+    }
+}
+
+private struct DiskImage {
+    let image: URL
+    let mountPoint: URL
+
+    func create() throws {
+        try run(["create", "-size", "4m", "-fs", "HFS+", "-volname", "ParolaTest", image.path])
+    }
+
+    func attach() throws {
+        try run(["attach", image.path, "-mountpoint", mountPoint.path, "-nobrowse"])
+    }
+
+    func detach() {
+        try? run(["detach", mountPoint.path, "-force"])
+    }
+
+    private struct Failed: Error {
+        let status: Int32
+    }
+
+    private func run(_ arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+        process.arguments = arguments + ["-quiet"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { throw Failed(status: process.terminationStatus) }
     }
 }
