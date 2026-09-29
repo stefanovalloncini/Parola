@@ -42,6 +42,11 @@ struct ContentView: View {
                 CountInOverlay(count: count) { model.cancelRecordingCountdown() }
             }
         }
+        .overlay(alignment: .bottom) {
+            if model.savingTakesBeforeQuit {
+                SavingBeforeQuitNotice()
+            }
+        }
         .alert(
             "Couldn't save to your library",
             isPresented: Binding(
@@ -71,6 +76,26 @@ struct ContentView: View {
         .onChange(of: windowUndoManager) { _, newValue in model.undoManager = newValue }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
         .environment(\.mainWindowWidth, windowWidth)
+    }
+}
+
+/// What a quit is waiting for, so a window that hasn't closed yet doesn't look stuck.
+private struct SavingBeforeQuitNotice: View {
+    var body: some View {
+        HStack(spacing: DS.Spacing.small) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Saving your recording before Parola quits…")
+                .font(DS.Font.bodyStrong)
+                .foregroundStyle(DS.Color.primaryText)
+        }
+        .padding(.horizontal, DS.Spacing.medium)
+        .padding(.vertical, DS.Spacing.small)
+        .background(Capsule().fill(DS.Color.surfaceElevated))
+        .overlay(Capsule().strokeBorder(DS.Color.separator, lineWidth: 1))
+        .padding(.bottom, DS.Spacing.large)
+        .accessibilityElement(children: .combine)
+        .axLeaf("App.Text.SavingBeforeQuit")
     }
 }
 

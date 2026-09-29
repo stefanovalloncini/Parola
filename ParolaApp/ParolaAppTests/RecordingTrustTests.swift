@@ -72,9 +72,19 @@ extension TranscriberMockSuites {
             await waitUntil { model.phase == .transcribing(file: wav) }
         }
 
-        private func startStreamingTake(_ model: AppModel, gate: MockTranscriberGate? = nil, download: Double? = nil) async {
+        private func startStreamingTake(
+            _ model: AppModel,
+            gate: MockTranscriberGate? = nil,
+            download: Double? = nil,
+            segments: [TranscriptSegmentSeed] = [],
+            delayMs: Int = 5_000
+        ) async {
             MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
-                partials: ["hello"], downloadFractions: download.map { [$0] } ?? [], delayMs: 5_000, gate: gate
+                segments: segments,
+                partials: ["hello"],
+                downloadFractions: download.map { [$0] } ?? [],
+                delayMs: delayMs,
+                gate: gate
             ))
             model.useStreaming = true
             model.selectedModel = "openai_whisper-tiny"
@@ -479,8 +489,8 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("Stop and Save puts the take in the library, then lets the app quit")
-        func stopAndSaveKeepsTheTake() async throws {
+        @Test("Stop and Save puts a file take in the library, then lets the app quit; a second quit meanwhile is ignored")
+        func stopAndSaveKeepsAFileTake() async throws {
             let fixture = try makeTakeWAV("save")
             defer { try? FileManager.default.removeItem(at: fixture) }
             try await withMocksCleared(.audioSource) {
@@ -488,6 +498,7 @@ extension TranscriberMockSuites {
                 let quit = QuitReply()
                 let reply = AppDelegate.terminateReply(for: model, ask: { .stopAndSave }) { quit.value = $0 }
                 #expect(reply == .terminateLater)
+                #expect(AppDelegate.terminateReply(for: model, ask: { .discard }) { _ in } == .terminateCancel)
 
                 await waitUntil { quit.value != nil }
                 #expect(quit.value == true)
@@ -495,7 +506,31 @@ extension TranscriberMockSuites {
                 #expect(listed.count == 1, "the take is saved before the app is told it may quit")
                 #expect(listed.first?.title.hasSuffix("(not transcribed)") == true)
                 #expect(listed.first?.manifest.originalAudioName.isEmpty == false)
+                #expect(!FileManager.default.fileExists(atPath: model.recoveryFileURL.path))
                 #expect(!model.takeInProgress)
+            }
+        }
+
+        @Test("Stop and Save keeps a live take's words and audio, then lets the app quit", .timeLimit(.minutes(1)))
+        func stopAndSaveKeepsALiveTake() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel()
+                await startStreamingTake(
+                    model, segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "said before quitting")], delayMs: 300
+                )
+                await waitUntil { model.takeInProgress }
+                let quit = QuitReply()
+
+                let reply = AppDelegate.terminateReply(for: model, ask: { .stopAndSave }) { quit.value = $0 }
+                #expect(reply == .terminateLater)
+
+                await waitUntil { quit.value != nil }
+                #expect(quit.value == true)
+                let saved = try #require(await model.library.list().first)
+                #expect(!saved.title.contains("("), "a live take keeps its words, so its title carries no note")
+                let stored = try await model.library.load(saved.id).document.transcript
+                #expect(stored.text.contains("said before quitting"))
             }
         }
 

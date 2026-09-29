@@ -192,6 +192,10 @@ final class AppModel {
     private(set) var takeArming: TakeArming?
     /// The take transcribing or just transcribed. Matched by file, so a stale one names nothing.
     private(set) var recordedTake: RecordedTake?
+    /// True while a quit waits for takes to reach the library; the window says so.
+    private(set) var savingTakesBeforeQuit = false
+    /// A quit already winding the takes down; the app delegate answers any other quit with a no.
+    @ObservationIgnored var quitPending = false
     @ObservationIgnored private var takeCounter = 0
     /// The take that owns the capture, the clock and the checkpoint; work an older take left running checks it first.
     @ObservationIgnored private(set) var activeTake: TakeContext?
@@ -200,8 +204,9 @@ final class AppModel {
     @ObservationIgnored private var takeRun: Int?
     /// The take transcription a new take stopped, so its save can say why.
     @ObservationIgnored private var takeRunStoppedForNewTake: Int?
-    /// The library save of the last live take, which a quit waits for.
-    @ObservationIgnored private var takeSave: Task<LibraryEntry, any Error>?
+    @ObservationIgnored private var takeWorkCounter = 0
+    /// A live take finishing and every take's save, until its entry exists: what a quit waits for.
+    @ObservationIgnored private var takeWork: [Int: Task<Void, Never>] = [:]
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
@@ -1578,7 +1583,7 @@ final class AppModel {
             || youtubeTranscribeTask != nil || youtubeSubsTask != nil
     }
 
-    private func teardownActiveCapture() {
+    private func teardownActiveCapture(exitsMedia: Bool = true) {
         if recordingStartInFlight, liveSource == nil {
             stopRequestedDuringStart = true
         } else {
@@ -1600,7 +1605,7 @@ final class AppModel {
             liveSource = nil
             Task { await source.cancel() }
         }
-        Task { await mediaSession.exitRecording() }
+        if exitsMedia { Task { await mediaSession.exitRecording() } }
         pendingRecordingCategory = .transcription
     }
 
@@ -3203,7 +3208,6 @@ final class AppModel {
     private func beginTakeArming(_ arming: TakeArming) {
         recordingStartedAt = nil
         takeArming = arming
-        takeSave = nil
     }
 
     /// The take's audio is arriving, so its clock starts now rather than when Record was pressed.
@@ -3469,7 +3473,7 @@ final class AppModel {
             installPlayer(for: audioURL)
             adoptLoadedMediaDuration()
         }
-        takeSave = saveTake(
+        saveTake(
             processed,
             audio: processed.sourceURL,
             title: title,
@@ -3494,9 +3498,9 @@ final class AppModel {
             let take = activeTake
             // Let go now, so a second Stop finds nothing left to stop.
             streamingSession = nil
-            Task { @MainActor in
-                await finishStreamingTake(s, take: take)
-                resolveRecordingOutcome(.failure(IntentActionError.failed("The recording ended without a transcript.")))
+            trackTakeWork { [weak self] in
+                await self?.finishStreamingTake(s, take: take)
+                self?.resolveRecordingOutcome(.failure(IntentActionError.failed("The recording ended without a transcript.")))
             }
             return
         }
@@ -3685,7 +3689,7 @@ final class AppModel {
         phase = .idle
     }
 
-    /// A take's library save: the checkpoint stays until the entry exists, and playback follows the take into it.
+    /// A take's library save: the checkpoint stays until the entry exists, and a quit waits for it.
     @discardableResult
     private func saveTake(
         _ transcript: Transcript,
@@ -3706,7 +3710,7 @@ final class AppModel {
             title: title
         ))
         if let recovery { recoveryHeldBySave.insert(recovery) }
-        Task { [weak self, library] in
+        trackTakeWork { [weak self, library] in
             let entry = try? await saving.value
             var entryAudio: URL?
             if let entry, audio != nil { entryAudio = try? await library.load(entry.id).document.audioURL }
@@ -3722,6 +3726,15 @@ final class AppModel {
             onSaved?(entry)
         }
         return saving
+    }
+
+    private func trackTakeWork(_ work: @escaping @MainActor () async -> Void) {
+        takeWorkCounter &+= 1
+        let id = takeWorkCounter
+        takeWork[id] = Task { [weak self] in
+            await work()
+            self?.takeWork[id] = nil
+        }
     }
 
     /// The take's title while its own working file is what's loaded; nil once playback moves into its entry.
@@ -3767,17 +3780,33 @@ final class AppModel {
         recordingStartedAt != nil && (liveSource != nil || streamingSession != nil)
     }
 
-    /// Acts on the answer to the quit prompt; true when the app may quit.
+    /// A live take finishing or a take's save still on its way to the library.
+    var hasPendingTakeWork: Bool {
+        !takeWork.isEmpty
+    }
+
+    /// Acts on the answer to the quit prompt, then waits for every take's save; true when the app may quit.
     func resolveQuitDuringTake(_ choice: QuitDuringTake) async -> Bool {
         switch choice {
         case .keepRecording:
             return false
         case .discard:
             await discardTakeForQuit()
-            return true
         case .stopAndSave:
             await saveTakeForQuit()
-            return true
+        }
+        await finishTakeWorkForQuit()
+        return true
+    }
+
+    /// Holds a quit, with the window saying so, until every take is in the library or 30 seconds pass.
+    func finishTakeWorkForQuit() async {
+        guard !takeWork.isEmpty else { return }
+        savingTakesBeforeQuit = true
+        let deadline = ContinuousClock.now + .seconds(30)
+        while let work = takeWork.values.first {
+            let left = deadline - ContinuousClock.now
+            guard left > .zero, await AsyncTimeout.run(left, operation: { await work.value }) != nil else { break }
         }
     }
 
@@ -3792,7 +3821,6 @@ final class AppModel {
         if let s = streamingSession {
             streamingSession = nil
             await finishStreamingTake(s, take: activeTake)
-            _ = try? await takeSave?.value
             return
         }
         guard let source = liveSource else { return }
@@ -3809,9 +3837,10 @@ final class AppModel {
         let prepared = try? await source.prepare()
         clearTakeReadouts()
         phase = .idle
-        // Without a file the recovery checkpoint stays, so the next launch offers what it points at.
+        resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+        // Without a file the checkpoint stays, so the next launch offers what it points at.
         guard let url = prepared else { return }
-        _ = try? await saveTake(
+        saveTake(
             Transcript(segments: [], language: currentOptions.language ?? "auto", modelName: selectedModel, sourceURL: url),
             audio: url,
             title: Self.takeTitle(title, suffix: .notTranscribed),
@@ -3819,17 +3848,20 @@ final class AppModel {
             category: category,
             activate: false,
             recovery: recovery
-        ).value
+        )
     }
 
     private func discardTakeForQuit() async {
         let streaming = streamingSession
         let capture = liveSource
+        let consumer = streamingConsumer
         streamingSession = nil
         liveSource = nil
-        teardownActiveCapture()
+        teardownActiveCapture(exitsMedia: false)
         await streaming?.cancel()
         await capture?.cancel()
+        // After the consumer's own exit, so this one is the exit that restores muted or paused media before the reply.
+        await consumer?.value
         await mediaSession.exitRecording()
         phase = .idle
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))

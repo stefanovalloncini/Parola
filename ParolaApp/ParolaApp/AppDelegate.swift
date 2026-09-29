@@ -82,17 +82,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// A take in progress asks first. Keep Recording stays; the other two wind the take down, then let the app go.
+    /// A take capturing asks first; a quit then waits until every take is in the library, and a second quit meanwhile is refused.
     static func terminateReply(
         for model: AppModel?,
         ask: @MainActor () -> AppModel.QuitDuringTake,
         reply: @escaping @MainActor (Bool) -> Void
     ) -> NSApplication.TerminateReply {
-        guard let model, model.takeInProgress else { return .terminateNow }
-        let choice = ask()
-        guard choice != .keepRecording else { return .terminateCancel }
+        guard let model else { return .terminateNow }
+        if model.quitPending { return .terminateCancel }
+        if model.takeInProgress {
+            let choice = ask()
+            guard choice != .keepRecording else { return .terminateCancel }
+            model.quitPending = true
+            Task { @MainActor in
+                reply(await model.resolveQuitDuringTake(choice))
+            }
+            return .terminateLater
+        }
+        guard model.hasPendingTakeWork else { return .terminateNow }
+        model.quitPending = true
         Task { @MainActor in
-            reply(await model.resolveQuitDuringTake(choice))
+            await model.finishTakeWorkForQuit()
+            reply(true)
         }
         return .terminateLater
     }
