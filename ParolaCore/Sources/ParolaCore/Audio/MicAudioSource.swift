@@ -105,6 +105,7 @@ public actor MicAudioSource: LiveAudioSource {
             cont.finish()
             consumer.cancel()
             session = nil
+            try? FileManager.default.removeItem(at: url)
             throw error
         }
     }
