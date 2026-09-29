@@ -221,6 +221,70 @@ struct SidecarExportTests {
         #expect(results.map(\.written?.lastPathComponent) == ["Talk (3).srt", "Talk (3).txt", "Talk (3).Reels.srt"])
     }
 
+    @Test("when a new format's name is taken, the source's own plain files move with it instead of staying behind")
+    func movingNumberSweepsOwnPlainFiles() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = SidecarSource(fileExtension: "m4a", folder: dir, baseName: "Talk", owner: "entry-1")
+        _ = await ExportRunner.run(SidecarExportPlanner.plan(presets: [txt], source: source), transcript: transcript())
+        #expect(OutputMarker.owner(of: dir.appendingPathComponent("Talk.txt")) == "entry-1")
+        try Data("theirs".utf8).write(to: dir.appendingPathComponent("Talk.srt"))
+
+        let results = await ExportRunner.run(
+            SidecarExportPlanner.plan(presets: [srt, txt], source: source), transcript: transcript()
+        )
+
+        #expect(results.map(\.written?.lastPathComponent) == ["Talk (2).srt", "Talk (2).txt"])
+        let files = try FileManager.default.contentsOfDirectory(atPath: dir.path).sorted()
+        #expect(files == ["Talk (2).srt", "Talk (2).txt", "Talk.srt"])
+        #expect(try String(contentsOf: dir.appendingPathComponent("Talk.srt"), encoding: .utf8) == "theirs")
+    }
+
+    @Test("once the other file is gone, a re-run settles on the plain name and leaves one copy of each")
+    func settlingBackSweepsNumberedCopies() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let foreign = dir.appendingPathComponent("Talk.srt")
+        try Data("theirs".utf8).write(to: foreign)
+        let neighbour = dir.appendingPathComponent("Talk (3).txt")
+        try Data("another entry's".utf8).write(to: neighbour)
+        OutputMarker.mark(neighbour, owner: "entry-2")
+        let unmarked = dir.appendingPathComponent("Talk (4).srt")
+        try Data("someone's".utf8).write(to: unmarked)
+        let source = SidecarSource(fileExtension: "m4a", folder: dir, baseName: "Talk", owner: "entry-1")
+        let jobs = SidecarExportPlanner.plan(presets: [srt, txt], source: source)
+
+        let first = await ExportRunner.run(jobs, transcript: transcript())
+        #expect(first.map(\.written?.lastPathComponent) == ["Talk (2).srt", "Talk (2).txt"])
+        try FileManager.default.removeItem(at: foreign)
+        let second = await ExportRunner.run(jobs, transcript: transcript())
+
+        #expect(second.map(\.written?.lastPathComponent) == ["Talk.srt", "Talk.txt"])
+        let files = try FileManager.default.contentsOfDirectory(atPath: dir.path).sorted()
+        #expect(files == ["Talk (3).txt", "Talk (4).srt", "Talk.srt", "Talk.txt"])
+    }
+
+    @Test("a job reads its own numbered names and nothing else")
+    func jobNumberParsing() {
+        let plain = ExportJob(
+            spec: srt.spec, directory: URL(fileURLWithPath: "/tmp"), baseName: "Talk", nameTail: "",
+            owner: "o", createsDirectory: false
+        )
+        let slugged = ExportJob(
+            spec: srt.spec, directory: URL(fileURLWithPath: "/tmp"), baseName: "Talk", nameTail: ".Reels",
+            owner: "o", createsDirectory: false
+        )
+        #expect(plain.number(ofFileNamed: "Talk.srt") == 1)
+        #expect(plain.number(ofFileNamed: "Talk (12).srt") == 12)
+        #expect(plain.number(ofFileNamed: "Talk.Reels.srt") == nil)
+        #expect(plain.number(ofFileNamed: "Talk (2).Reels.srt") == nil)
+        #expect(plain.number(ofFileNamed: "Talk 2.srt") == nil)
+        #expect(plain.number(ofFileNamed: "Talk (1).srt") == nil)
+        #expect(plain.number(ofFileNamed: "Talk.txt") == nil)
+        #expect(slugged.number(ofFileNamed: "Talk (2).Reels.srt") == 2)
+        #expect(slugged.number(ofFileNamed: "Talk.srt") == nil)
+    }
+
     @Test("two sources with one stem in one folder keep their own sidecars")
     func sameStemDifferentSources() async throws {
         let dir = try scratch()

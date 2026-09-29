@@ -74,6 +74,19 @@ public struct ExportJob: Sendable, Hashable {
         let base = number == 1 ? baseName : "\(baseName) (\(number))"
         return directory.appendingPathComponent(base + nameTail).appendingPathExtension(spec.format.fileExtension)
     }
+
+    /// The number a file name carries as one of this job's targets, or nil when it isn't one.
+    func number(ofFileNamed name: String) -> Int? {
+        let suffix = nameTail + "." + spec.format.fileExtension
+        guard name.hasPrefix(baseName), name.hasSuffix(suffix), name.count >= baseName.count + suffix.count else {
+            return nil
+        }
+        let middle = name.dropFirst(baseName.count).dropLast(suffix.count)
+        if middle.isEmpty { return 1 }
+        guard middle.hasPrefix(" ("), middle.hasSuffix(")"), let number = Int(middle.dropFirst(2).dropLast()),
+              number >= 2 else { return nil }
+        return number
+    }
 }
 
 /// What came of one ``ExportJob``. `written` differs from the job's target when a file Parola did not
@@ -146,33 +159,61 @@ public enum SidecarExportPlanner {
 public enum ExportRunner {
     @concurrent
     public static func run(_ jobs: [ExportJob], transcript: Transcript) async -> [ExportJobResult] {
-        var numbers: [SourceKey: Int] = [:]
-        return jobs.map { job in
-            do {
-                let data = try Exporters.exporter(for: job.spec).render(transcript)
-                if job.createsDirectory {
-                    try FileManager.default.createDirectory(at: job.directory, withIntermediateDirectories: true)
+        var groups: [SourceKey: [Int]] = [:]
+        var order: [SourceKey] = []
+        for (index, job) in jobs.enumerated() {
+            let key = SourceKey(job)
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(index)
+        }
+        var results = [ExportJobResult?](repeating: nil, count: jobs.count)
+        for key in order {
+            let indices = groups[key] ?? []
+            let number = claim(indices.map { jobs[$0] })
+            if number > 1 {
+                ParolaLog.notice(
+                    .export, "sidecar target holds a file Parola didn't write; wrote a numbered copy as \(jobs[indices[0]].spec.format)"
+                )
+            }
+            for index in indices {
+                results[index] = write(jobs[index], number: number, transcript: transcript)
+            }
+            sweepOlderCopies(of: indices.filter { results[$0]?.error == nil }.map { jobs[$0] }, keeping: number)
+        }
+        return results.compactMap { $0 }
+    }
+
+    private static func write(_ job: ExportJob, number: Int, transcript: Transcript) -> ExportJobResult {
+        do {
+            let data = try Exporters.exporter(for: job.spec).render(transcript)
+            if job.createsDirectory {
+                try FileManager.default.createDirectory(at: job.directory, withIntermediateDirectories: true)
+            }
+            let target = job.target(number: number)
+            try data.write(to: target, options: .atomic)
+            OutputMarker.mark(target, owner: job.owner)
+            return ExportJobResult(job: job, written: target, error: nil)
+        } catch {
+            ParolaLog.error(.export, "sidecar export failed as \(job.spec.format)", [.error: .error(error)])
+            return ExportJobResult(job: job, written: nil, error: error)
+        }
+    }
+
+    /// A source that moved to another number leaves its own files at the old one; only files carrying
+    /// its owner's mark are removed, and only once the new copy is written.
+    private static func sweepOlderCopies(of written: [ExportJob], keeping number: Int) {
+        guard let directory = written.first?.directory,
+              let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return }
+        for job in written {
+            for name in names {
+                guard let other = job.number(ofFileNamed: name), other != number else { continue }
+                let url = directory.appendingPathComponent(name)
+                guard OutputMarker.owner(of: url) == job.owner else { continue }
+                do {
+                    try FileManager.default.removeItem(at: url)
+                } catch {
+                    ParolaLog.error(.export, "an older sidecar could not be removed as \(job.spec.format)", [.error: .error(error)])
                 }
-                let key = SourceKey(job)
-                let number: Int
-                if let claimed = numbers[key] {
-                    number = claimed
-                } else {
-                    number = claim(jobs.filter { SourceKey($0) == key })
-                    numbers[key] = number
-                    if number > 1 {
-                        ParolaLog.notice(
-                            .export, "sidecar target holds a file Parola didn't write; wrote a numbered copy as \(job.spec.format)"
-                        )
-                    }
-                }
-                let target = job.target(number: number)
-                try data.write(to: target, options: .atomic)
-                OutputMarker.mark(target, owner: job.owner)
-                return ExportJobResult(job: job, written: target, error: nil)
-            } catch {
-                ParolaLog.error(.export, "sidecar export failed as \(job.spec.format)", [.error: .error(error)])
-                return ExportJobResult(job: job, written: nil, error: error)
             }
         }
     }
