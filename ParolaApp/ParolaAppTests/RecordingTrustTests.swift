@@ -918,7 +918,7 @@ extension TranscriberMockSuites {
             let take = try makeTakeWAV("staged", seconds: 1)
             try FileManager.default.moveItem(at: take, to: audioOnly.appendingPathComponent("audio.wav"))
 
-            let words = try makeTakeWAV("staged-words", seconds: 1)
+            let words = try makeTakeWAV("staged-words", seconds: 1.1)
             defer { try? FileManager.default.removeItem(at: words) }
             let written = try ParolaDocument.write(
                 transcript: Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "almost saved")], language: "en", modelName: "m"),
@@ -932,11 +932,25 @@ extension TranscriberMockSuites {
                 try FileManager.default.setAttributes([.modificationDate: hourAgo], ofItemAtPath: folder.path)
             }
 
+            let alreadySaved = library.appendingPathComponent("\(UUID().uuidString).parola.tmp", isDirectory: true)
+            try FileManager.default.createDirectory(at: alreadySaved, withIntermediateDirectories: true)
+            let savedTake = try makeTakeWAV("saved-elsewhere", seconds: 1.3)
+            defer { try? FileManager.default.removeItem(at: savedTake) }
+            _ = try await LibraryStore(libraryURL: library, extraIndexer: nil).add(
+                transcript: AppModel.untranscribedTranscript(of: savedTake, language: nil), audioSource: savedTake
+            )
+            try FileManager.default.copyItem(at: savedTake, to: alreadySaved.appendingPathComponent("audio.wav"))
+            try FileManager.default.setAttributes([.modificationDate: hourAgo], ofItemAtPath: alreadySaved.path)
+            try FileManager.default.setAttributes(
+                [.modificationDate: hourAgo], ofItemAtPath: alreadySaved.appendingPathComponent("audio.wav").path
+            )
+
             let model = makeModel(libraryURL: library)
             await model.inflightSweep?.value
 
             let listed = await model.library.list()
-            #expect(listed.count == 2)
+            #expect(listed.count == 3, "the two cut-off saves, and the take that was already there: no twin of it")
+            #expect(!FileManager.default.fileExists(atPath: alreadySaved.path))
             let notes = try #require(listed.first { $0.title == "Meeting notes" })
             #expect(try await model.library.load(notes.id).document.transcript.text == "almost saved")
             let recovered = try #require(listed.first { $0.title.hasSuffix("(recovered)") })
@@ -1154,6 +1168,65 @@ extension TranscriberMockSuites {
                 #expect(await waitUntil { !FileManager.default.fileExists(atPath: takeCheckpoint.path) })
                 #expect(FileManager.default.fileExists(atPath: otherCheckpoint.path), "the other run's checkpoint is its own to end")
                 model.endRecovery(other)
+            }
+        }
+
+        @Test("a checkpoint whose take already reached the library adds no twin, kept or restored, and two checkpoints for one take come down to one")
+        func recoveredTakesNeverTwin() async throws {
+            let library = makeTempLibraryURL("no-twins")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let take = try settledTake("saved-before-the-crash", in: inflight)
+            let seed = LibraryStore(libraryURL: library, extraIndexer: nil)
+            let existing = try await seed.add(
+                transcript: AppModel.untranscribedTranscript(of: take, language: nil), audioSource: take, title: "Recording 1 (not transcribed)"
+            )
+            let folder = library.appendingPathComponent("recovery", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let capture = RecoveryCheckpoint(kind: .recording, startedAt: Date().addingTimeInterval(-60), modelName: "m", audioURL: take)
+            let transcribing = RecoveryCheckpoint(
+                kind: .fileTranscription, startedAt: Date(), modelName: "m", sourceURL: take, title: "Recording 1"
+            )
+            for checkpoint in [capture, transcribing] {
+                try JSONEncoder().encode(checkpoint).write(to: folder.appendingPathComponent("\(checkpoint.id.uuidString).json"))
+            }
+
+            let model = makeModel(libraryURL: library)
+            #expect(model.pendingRecovery?.id == transcribing.id)
+            #expect(model.recoveryCheckpointFiles.count == 1, "the capture's checkpoint for the same file is dropped")
+
+            model.declinePendingRecovery()
+
+            #expect(await waitUntil { model.recoveryCheckpointFiles.isEmpty })
+            await settle()
+            let listed = await model.library.list()
+            #expect(listed.map(\.id) == [existing.id], "Not Now adds no twin of a take already in the library")
+        }
+
+        @Test("Transcribe on a take the library already holds opens that entry and transcribes it there")
+        func acceptOpensTheSavedTake() async throws {
+            let library = makeTempLibraryURL("accept-saved")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let take = try settledTake("saved-then-crashed", in: inflight)
+            let seed = LibraryStore(libraryURL: library, extraIndexer: nil)
+            let existing = try await seed.add(
+                transcript: AppModel.untranscribedTranscript(of: take, language: nil), audioSource: take, title: "Recording 2 (not transcribed)"
+            )
+            try writeLegacyCheckpoint(RecoveryCheckpoint(
+                kind: .fileTranscription, startedAt: Date(), modelName: "m", sourceURL: take, title: "Recording 2"
+            ), library: library)
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "at last")]
+                ))
+                let model = makeModel(libraryURL: library)
+
+                model.acceptPendingRecovery()
+
+                #expect(await waitUntil { model.selectedEntryID == existing.id && model.transcript?.text == "at last" })
+                #expect(await model.library.list().map(\.id) == [existing.id])
+                #expect(await waitUntil { model.recoveryCheckpointFiles.isEmpty })
             }
         }
 

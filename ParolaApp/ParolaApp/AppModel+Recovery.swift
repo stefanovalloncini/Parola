@@ -291,6 +291,7 @@ extension AppModel {
             settleCheckpointFile(claimed, at: file)
             found.append(claimed)
         }
+        found = collapsingShared(found)
         recoveryReferencedFiles = live.union(found.flatMap(\.referencedPaths))
         guard let newest = found.max(by: { $0.startedAt < $1.startedAt }) else { return }
         for older in found where older.id != newest.id {
@@ -301,6 +302,37 @@ extension AppModel {
             [.count: .int(newest.segments.count)]
         )
         pendingRecovery = newest
+    }
+
+    /// Checkpoints that point at the same file, a take's capture and its transcription say, come down to the newest.
+    private func collapsingShared(_ checkpoints: [RecoveryCheckpoint]) -> [RecoveryCheckpoint] {
+        var newest: [String: RecoveryCheckpoint] = [:]
+        var kept: [RecoveryCheckpoint] = []
+        for checkpoint in checkpoints.sorted(by: { $0.startedAt > $1.startedAt }) {
+            guard let file = checkpoint.referencedPaths.first else {
+                kept.append(checkpoint)
+                continue
+            }
+            if newest[file] == nil {
+                newest[file] = checkpoint
+                kept.append(checkpoint)
+            } else {
+                removeRecoveryFile(of: checkpoint)
+            }
+        }
+        return kept
+    }
+
+    /// The entry already holding these exact bytes, when a crash came after the save but before its checkpoint went.
+    func entryHolding(_ audio: URL) async -> LibraryEntry? {
+        guard let digest = await SourceDigest.digest(of: audio) else { return nil }
+        return await library.findEntry(digest: digest)
+    }
+
+    /// Whether the library, Recently Deleted included, already holds these exact bytes.
+    func libraryHolds(_ audio: URL) async -> Bool {
+        guard let digest = await SourceDigest.digest(of: audio) else { return false }
+        return await library.hasEntry(digest: digest)
     }
 
     /// A take's working file written in the last two minutes: a live recording, as far as a checkpoint with no owner can tell.
@@ -382,12 +414,20 @@ extension AppModel {
             if let title = checkpoint.title {
                 // A recorded take mid-transcription when the app died: the take path keeps
                 // its title and saves the audio if this run fails too.
-                let adopted = adoptRecovery(checkpoint)
-                startTakeTask { [weak self] in
-                    await self?.transcribeRecordedTake(
-                        url: url, title: title, source: checkpoint.source ?? .microphone,
-                        category: checkpoint.category ?? .transcription, replacing: adopted
-                    )
+                Task { [weak self] in
+                    guard let self else { return }
+                    if let entry = await self.entryHolding(url) {
+                        self.removeRecoveryFile(of: checkpoint)
+                        await self.openRecoveredEntry(entry)
+                        return
+                    }
+                    let adopted = self.adoptRecovery(checkpoint)
+                    self.startTakeTask { [weak self] in
+                        await self?.transcribeRecordedTake(
+                            url: url, title: title, source: checkpoint.source ?? .microphone,
+                            category: checkpoint.category ?? .transcription, replacing: adopted
+                        )
+                    }
                 }
             } else {
                 removeRecoveryFile(of: checkpoint)
@@ -426,6 +466,10 @@ extension AppModel {
         if releasingReferencesWhenSaved {
             release = { [weak self] _ in self?.recoveryReferencedFiles.subtract(referenced) }
         }
+        let alreadySaved: @MainActor () -> Void = { [weak self] in
+            self?.removeRecoveryFile(of: checkpoint)
+            if releasingReferencesWhenSaved { self?.recoveryReferencedFiles.subtract(referenced) }
+        }
         switch checkpoint.kind {
         case .fileTranscription:
             guard let url = checkpoint.sourceURL, let title = checkpoint.title,
@@ -433,20 +477,25 @@ extension AppModel {
                 removeRecoveryFile(of: checkpoint)
                 return
             }
-            saveTake(
-                Self.untranscribedTranscript(of: url, language: checkpoint.language),
-                audio: url,
-                title: Self.takeTitle(title, suffix: .notTranscribed),
-                source: checkpoint.source ?? .microphone,
-                category: checkpoint.category ?? .transcription,
-                activate: false,
-                recovery: adoptRecovery(checkpoint),
-                onSaved: release
-            )
+            Task { [weak self] in
+                guard let self else { return }
+                guard await !self.libraryHolds(url) else { return alreadySaved() }
+                self.saveTake(
+                    Self.untranscribedTranscript(of: url, language: checkpoint.language),
+                    audio: url,
+                    title: Self.takeTitle(title, suffix: .notTranscribed),
+                    source: checkpoint.source ?? .microphone,
+                    category: checkpoint.category ?? .transcription,
+                    activate: false,
+                    recovery: self.adoptRecovery(checkpoint),
+                    onSaved: release
+                )
+            }
         case .recording:
             Task { [weak self] in
                 let audioURL = await Self.probedRecordingURL(checkpoint.audioURL)
                 guard let self else { return }
+                if let audioURL, await self.libraryHolds(audioURL) { return alreadySaved() }
                 guard let restored = Self.restoredTranscript(checkpoint, audioURL: audioURL) else {
                     self.removeRecoveryFile(of: checkpoint)
                     return
@@ -473,8 +522,20 @@ extension AppModel {
         }
         Task { [weak self] in
             let audioURL = await Self.probedRecordingURL(checkpoint.audioURL)
-            self?.finishRecordingRestore(checkpoint, audioURL: audioURL, pageAtStart: pageAtStart)
+            guard let self else { return }
+            if let audioURL, let entry = await self.entryHolding(audioURL) {
+                self.removeRecoveryFile(of: checkpoint)
+                await self.openRecoveredEntry(entry)
+                return
+            }
+            self.finishRecordingRestore(checkpoint, audioURL: audioURL, pageAtStart: pageAtStart)
         }
+    }
+
+    /// A recovered take that already has its entry opens that entry, and one saved as audio alone gets transcribed there.
+    private func openRecoveredEntry(_ entry: LibraryEntry) async {
+        guard (try? await openEntry(entry.id)) != nil else { return }
+        if transcriptIsUntranscribed { transcribeLoadedEntry() }
     }
 
     /// A crash can leave the in-flight WAV with a stale header, so a take's audio is attached only when it still opens; probed off-main, since AVAudioFile can block.
@@ -657,6 +718,12 @@ extension AppModel {
     /// Whatever a cut-off save's folder holds becomes an entry, the whole document if it was complete; the folder goes only once the entry exists.
     nonisolated static func salvageStagingFolder(_ folder: URL, into library: LibraryStore) async -> Bool {
         let fm = FileManager.default
+        let staged = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil))?
+            .first(where: { $0.lastPathComponent.hasPrefix("audio.") })
+        if let staged, let digest = await SourceDigest.digest(of: staged), await library.hasEntry(digest: digest) {
+            try? fm.removeItem(at: folder)
+            return false
+        }
         let entry: LibraryEntry?
         if let document = try? ParolaDocument.read(at: folder) {
             entry = try? await library.add(
@@ -667,8 +734,7 @@ extension AppModel {
                 titleSource: document.manifest.titleSource,
                 source: document.manifest.source
             )
-        } else if let audio = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil))?
-            .first(where: { $0.lastPathComponent.hasPrefix("audio.") }) {
+        } else if let audio = staged {
             let startedAt = (try? folder.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
             entry = try? await library.add(
                 transcript: untranscribedTranscript(of: audio, language: nil),
