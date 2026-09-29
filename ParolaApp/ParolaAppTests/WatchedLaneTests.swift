@@ -233,6 +233,30 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a file offered again while it runs waits once behind itself, however often it is offered")
+        func reofferedFileWaitsOnce() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                let rig = try makeRig("reoffer")
+                defer { try? FileManager.default.removeItem(at: rig.folder) }
+                let model = rig.model
+                _ = try await openOwnEntry(rig)
+                let file = try makeWAV("Growing", in: rig.folder)
+                let other = try makeWAV("Other", in: rig.folder, seconds: 0.5)
+                await arrive(model, file)
+                #expect(await waitUntil { model.backgroundArrivalID != nil })
+
+                await arrive(model, file)
+                await arrive(model, other)
+                await arrive(model, file)
+
+                #expect(model.watchedArrivals.map(\.url) == [file, file, other])
+                await gate.open()
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+            }
+        }
+
         @Test("a file the user opens takes the session from a file out of sight, which then finishes")
         func foregroundPreemptsTheLane() async throws {
             try await withMocksCleared(.transcriber) {

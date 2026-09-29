@@ -67,10 +67,12 @@ extension AppModel {
         }
     }
 
-    /// A file offered again before its turn keeps its place in the line.
+    /// A file offered again before its turn keeps its place in the line; one offered while it runs waits once behind it.
     func enqueueWatchedArrival(_ arrival: WatchedArrival) {
-        if let index = watchedArrivals.firstIndex(where: { $0.url == arrival.url }),
-           watchedArrivals[index].id != backgroundArrivalID, watchedArrivals[index].id != visibleArrivalID {
+        let waiting = watchedArrivals.firstIndex {
+            $0.url == arrival.url && $0.id != backgroundArrivalID && $0.id != visibleArrivalID
+        }
+        if let index = waiting {
             watchedArrivals[index].sourceDigest = arrival.sourceDigest
         } else {
             watchedArrivals.append(arrival)
