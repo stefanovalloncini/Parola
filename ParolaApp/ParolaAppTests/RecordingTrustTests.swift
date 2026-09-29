@@ -72,9 +72,9 @@ extension TranscriberMockSuites {
             await waitUntil { model.phase == .transcribing(file: wav) }
         }
 
-        private func startStreamingTake(_ model: AppModel, gate: MockTranscriberGate, download: Double) async {
+        private func startStreamingTake(_ model: AppModel, gate: MockTranscriberGate? = nil, download: Double? = nil) async {
             MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
-                partials: ["hello"], downloadFractions: [download], delayMs: 5_000, gate: gate
+                partials: ["hello"], downloadFractions: download.map { [$0] } ?? [], delayMs: 5_000, gate: gate
             ))
             model.useStreaming = true
             model.selectedModel = "openai_whisper-tiny"
@@ -140,6 +140,38 @@ extension TranscriberMockSuites {
             #expect(message == "Transcription stopped.")
         }
 
+        // MARK: - A take's category and targets
+
+        @Test("a take keeps the category and app targets it started with, whatever is asked for later")
+        func takeKeepsItsCategoryAndTargets() async throws {
+            let fixture = try makeTakeWAV("meeting")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "meeting words")]
+                ))
+                let model = makeModel()
+                model.meetingCaptureAppOnly = true
+
+                model.startMeetingRecording(appName: "Microsoft Teams")
+                await waitUntil { model.liveSource != nil }
+                let teams: Set<String> = ["com.microsoft.teams", "com.microsoft.teams2"]
+                #expect(model.activeTake?.category == .meeting)
+                #expect(model.activeTake?.captureTargets == teams)
+
+                model.startMeetingRecording(appName: "Zoom")
+                #expect(model.activeTake?.captureTargets == teams, "a refused request never reaches the running take")
+                #expect(model.pendingRecordingCategory == .transcription)
+                #expect(model.pendingCaptureBundleIDs == nil)
+
+                model.stopRecordingAndTranscribe()
+                let saved = try #require(await entries(model, count: 1).first)
+                #expect(saved.category == .meeting)
+                #expect(saved.title.hasPrefix("Meeting "))
+            }
+        }
+
         // MARK: - Arming
 
         @Test("a live take arms until its first event, then starts its clock", .timeLimit(.minutes(1)))
@@ -187,7 +219,7 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("Cancel while a take arms goes home without a word", .timeLimit(.minutes(1)))
+        @Test("Cancel while a take arms goes home without a word, and Record works again at once", .timeLimit(.minutes(1)))
         func cancelWhileArmingIsQuiet() async throws {
             try await withMocksCleared([.audioSource, .streaming]) {
                 await MockAudioSourceRegistry.shared.clear()
@@ -198,10 +230,36 @@ extension TranscriberMockSuites {
                 model.cancelRecordingBeforeCapture()
 
                 #expect(model.phase == .idle)
-                await waitUntil { !model.recordingActive }
+                #expect(!model.recordingActive, "a cancelled take doesn't hold the next one back")
                 await settle()
                 #expect(model.phase == .idle)
                 #expect(model.takeArming == nil)
+            }
+        }
+
+        @Test("events a finished take's session still sends never reach the take recording now", .timeLimit(.minutes(1)))
+        func staleTakeEventsSpareTheNewTake() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel()
+                await startStreamingTake(model)
+                await waitUntil { model.recordingStartedAt != nil }
+                let startedAt = model.recordingStartedAt
+                let ended = AppModel.TakeContext(id: -1, source: .microphone, category: .transcription, captureTargets: [])
+
+                await model.handleStreamingEvent(.partial(text: "an older take"), take: ended)
+                await model.handleStreamingEvent(.finished(Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "an older take")],
+                    language: "en", modelName: "mock"
+                )), take: ended)
+
+                #expect(model.phase == .recording(source: .microphone))
+                #expect(model.recordingStartedAt == startedAt)
+                #expect(model.livePartialText != "an older take")
+                #expect(model.takeInProgress)
+                await settle()
+                #expect(await model.library.list().isEmpty)
+                model.cancelCurrentWork()
             }
         }
 

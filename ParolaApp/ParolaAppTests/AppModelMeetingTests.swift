@@ -62,10 +62,12 @@ extension TranscriberMockSuites {
 
                 model.startMeetingRecording()
 
-                #expect(model.pendingRecordingCategory == .meeting)
+                #expect(model.activeTake?.category == .meeting)
+                #expect(model.pendingRecordingCategory == .transcription, "the take carries its category; the request slot is spent")
                 #expect(model.meetingDetectedApp == nil)
 
                 model.cancelCurrentWork()
+                await waitUntil { model.activeTake == nil }
                 #expect(model.pendingRecordingCategory == .transcription)
             }
         }
@@ -84,7 +86,8 @@ extension TranscriberMockSuites {
 
                 model.startMeetingRecording()
 
-                #expect(model.pendingCaptureBundleIDs == ["com.microsoft.teams", "com.microsoft.teams2"])
+                #expect(model.activeTake?.captureTargets == ["com.microsoft.teams", "com.microsoft.teams2"])
+                #expect(model.pendingCaptureBundleIDs == nil)
                 model.cancelCurrentWork()
             }
         }
@@ -103,6 +106,7 @@ extension TranscriberMockSuites {
 
                 model.startMeetingRecording()
 
+                #expect(model.activeTake?.captureTargets.isEmpty == true)
                 #expect(model.pendingCaptureBundleIDs == nil)
                 model.cancelCurrentWork()
             }
@@ -122,9 +126,9 @@ extension TranscriberMockSuites {
 
                 model.startMeetingRecording(appName: "Microsoft Teams")
 
-                #expect(model.pendingRecordingCategory == .meeting)
+                #expect(model.activeTake?.category == .meeting)
                 #expect(model.meetingDetectedApp == nil)
-                #expect(model.pendingCaptureBundleIDs == ["com.microsoft.teams", "com.microsoft.teams2"])
+                #expect(model.activeTake?.captureTargets == ["com.microsoft.teams", "com.microsoft.teams2"])
                 model.cancelCurrentWork()
             }
         }

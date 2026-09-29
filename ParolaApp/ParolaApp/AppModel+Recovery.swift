@@ -93,7 +93,7 @@ extension AppModel {
             language: selectedLanguage,
             segments: liveSegments,
             audioURL: liveRecordingAudioURL,
-            source: pendingRecordingSource
+            source: activeTake?.source.entrySource ?? pendingRecordingSource
         ))
     }
 
