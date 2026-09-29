@@ -48,6 +48,7 @@ struct MacRecentlyDeletedView: View {
         }
         // One rebuild for the previews that arrived together, not one per row.
         .onChange(of: previews) { recomputeRows() }
+        .onChange(of: model.showAITitles) { recomputeRows() }
         .task(id: searchText.isEmpty ? "" : categoryFilter.rawValue) { await loadPreviewsForSearch() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
@@ -282,7 +283,8 @@ struct MacRecentlyDeletedView: View {
                 for: entry,
                 excerpt: RecentlyDeletedRow.previewText(previews[entry.id]),
                 date: entry.deletedAt,
-                dateLabel: RecentlyDeletedCopy.deletedOn(entry.deletedAt)
+                dateLabel: RecentlyDeletedCopy.deletedOn(entry.deletedAt),
+                showsAITitle: model.showAITitles
             )
         }
         displayCache = cache

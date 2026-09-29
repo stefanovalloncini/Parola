@@ -682,6 +682,30 @@ struct AppModelLibraryTests {
         }
     }
 
+    @Test("renaming through the model sets a title an AI title cannot outrank")
+    func renameBeatsTheAITitle() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        _ = try await seedStore.setCardMetadata(aiTitle: "Generated title", shortSummary: nil, for: seeded.id)
+        await model.refreshLibraryAndWait()
+
+        model.renameEntry(seeded.id, to: "My real title")
+        #expect(await waitUntil { model.libraryEntry(id: seeded.id)?.manifest.title == "My real title" })
+
+        let renamed = try #require(model.libraryEntry(id: seeded.id))
+        #expect(renamed.manifest.titleSource == .user)
+        #expect(LibraryEntryDisplay.listTitle(for: renamed, showsAITitle: true) == "My real title")
+    }
+
     @Test("LibrarySortOrder exposes a label for every case")
     func sortOrderLabels() {
         for order in LibrarySortOrder.allCases {

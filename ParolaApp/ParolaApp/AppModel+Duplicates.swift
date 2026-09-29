@@ -48,7 +48,7 @@ extension AppModel {
             }
             self.duplicateImport = DuplicateImport(
                 entryID: existing.id,
-                entryTitle: LibraryEntryDisplay.title(for: existing),
+                entryTitle: LibraryEntryDisplay.listTitle(for: existing, showsAITitle: self.showAITitles),
                 modelName: existing.modelName,
                 createdAt: existing.createdAt,
                 durationSeconds: existing.durationSeconds,

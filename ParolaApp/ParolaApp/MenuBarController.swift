@@ -98,13 +98,13 @@ final class MenuBarController: NSObject {
         snapshot.showsUpdateCheck = SparkleUpdater.feedURLConfigured
         snapshot.showsMicrophonePicker = SettingsRoute.microphone.isVisible(features: model.features)
         let entries = model.libraryEntries
-        snapshot.pinned = entries.lazy.filter(\.pinned).prefix(5).map(Self.item)
-        snapshot.recents = RecentEntries.most(of: entries, limit: 8).map(Self.item)
+        snapshot.pinned = entries.lazy.filter(\.pinned).prefix(5).map { Self.item($0, showsAITitle: model.showAITitles) }
+        snapshot.recents = RecentEntries.most(of: entries, limit: 8).map { Self.item($0, showsAITitle: model.showAITitles) }
         return snapshot
     }
 
-    private static func item(_ entry: LibraryEntry) -> MenuSnapshot.Item {
-        MenuSnapshot.Item(id: entry.id, title: LibraryEntryDisplay.title(for: entry))
+    private static func item(_ entry: LibraryEntry, showsAITitle: Bool) -> MenuSnapshot.Item {
+        MenuSnapshot.Item(id: entry.id, title: LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showsAITitle))
     }
 
     private func refresh() {

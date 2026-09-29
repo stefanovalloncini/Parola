@@ -1830,6 +1830,7 @@ final class AppModel {
         audioSource: URL?,
         source: EntrySource,
         title: String? = nil,
+        titleSource: TitleSource? = nil,
         activate: Bool = true,
         sourceDigest: String? = nil,
         playsCompletionSound: Bool = true,
@@ -1844,6 +1845,7 @@ final class AppModel {
                 audioSource: audioSource,
                 category: category,
                 title: title,
+                titleSource: titleSource,
                 sourceDigest: sourceDigest,
                 source: source,
                 consumesAudio: consumesAudio
@@ -2309,11 +2311,13 @@ final class AppModel {
                 endRecovery(recoveryToken)
                 phase = .ready
                 let ownedDownload = fetchedLink.flatMap { $0.media.workingDirectory == nil ? nil : $0 }
+                let linkMetadataTitle = fetchedLink?.media.metadata.title
                 let entry = persistToLibrary(
                     processed,
                     audioSource: fileURL,
                     source: fetchedLink == nil ? .file : .web,
-                    title: fetchedLink.map { $0.media.metadata.title ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()) },
+                    title: fetchedLink.map { _ in linkMetadataTitle ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()) },
+                    titleSource: linkMetadataTitle == nil ? nil : .source,
                     sourceDigest: sourceDigest,
                     consumesAudio: ownedDownload != nil
                 )
@@ -2729,6 +2733,7 @@ final class AppModel {
                     audioSource: nil,
                     source: .web,
                     title: result.videoTitle ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()),
+                    titleSource: result.videoTitle == nil ? nil : .source,
                     playsCompletionSound: false
                 )
             } catch {
@@ -2848,15 +2853,16 @@ final class AppModel {
     nonisolated static func transcriptDisplayTitle(
         sourceFileURL: URL?,
         entry: LibraryEntry?,
+        showsAITitle: Bool,
         fallback: String
     ) -> String {
         if let entry, sourceBelongsToEntry(sourceFileURL, bundleURL: entry.bundleURL) {
-            return LibraryEntryDisplay.title(for: entry)
+            return LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showsAITitle)
         }
         if let sourceFileURL {
             return sourceFileURL.deletingPathExtension().lastPathComponent
         }
-        return entry.map { LibraryEntryDisplay.title(for: $0) } ?? fallback
+        return entry.map { LibraryEntryDisplay.listTitle(for: $0, showsAITitle: showsAITitle) } ?? fallback
     }
 
     private nonisolated static func sourceBelongsToEntry(_ source: URL?, bundleURL: URL) -> Bool {

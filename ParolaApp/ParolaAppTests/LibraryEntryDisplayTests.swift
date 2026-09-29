@@ -114,6 +114,43 @@ struct LibraryEntryDisplayTests {
         #expect(LibraryEntryDisplay.title(for: entry) == "Audio")
     }
 
+    @Test("the list resolver orders a real title over the AI title over a generated stamp")
+    func listTitleOrder() {
+        let base = ParolaDocument.Manifest(
+            createdAt: date, originalAudioName: "meeting.wav", modelName: "stub", language: "en"
+        )
+        let bundle = URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/e.parola")
+
+        var userTitled = base
+        userTitled.title = "Weekly sync"
+        userTitled.titleSource = .user
+        userTitled.aiTitle = "Planning and roadmap"
+        let userEntry = LibraryEntry(id: "e", bundleURL: bundle, manifest: userTitled)
+        #expect(LibraryEntryDisplay.listTitle(for: userEntry, showsAITitle: true) == "Weekly sync")
+        #expect(LibraryEntryDisplay.listTitle(for: userEntry, showsAITitle: false) == "Weekly sync")
+
+        var sourceTitled = base
+        sourceTitled.title = "Keynote: What's New"
+        sourceTitled.titleSource = .source
+        sourceTitled.aiTitle = "Product announcements"
+        let sourceEntry = LibraryEntry(id: "e", bundleURL: bundle, manifest: sourceTitled)
+        #expect(LibraryEntryDisplay.listTitle(for: sourceEntry, showsAITitle: true) == "Keynote: What's New")
+
+        // A generated stamp with no recorded source loses to the AI title, same as no stored title at all.
+        var stampedNoSource = base
+        stampedNoSource.title = "Recording 18 May 2026 at 09:00"
+        stampedNoSource.aiTitle = "Planning and roadmap"
+        let stampedEntry = LibraryEntry(id: "e", bundleURL: bundle, manifest: stampedNoSource)
+        #expect(LibraryEntryDisplay.listTitle(for: stampedEntry, showsAITitle: true) == "Planning and roadmap")
+        #expect(LibraryEntryDisplay.listTitle(for: stampedEntry, showsAITitle: false) == "Recording 18 May 2026 at 09:00")
+
+        var aiOnly = base
+        aiOnly.aiTitle = "Planning and roadmap"
+        let aiEntry = LibraryEntry(id: "e", bundleURL: bundle, manifest: aiOnly)
+        #expect(LibraryEntryDisplay.listTitle(for: aiEntry, showsAITitle: true) == "Planning and roadmap")
+        #expect(LibraryEntryDisplay.listTitle(for: aiEntry, showsAITitle: false) == "meeting")
+    }
+
     @Test("fallback title carries the creation date")
     func fallbackCarriesDate() {
         let title = LibraryEntryDisplay.title(raw: "6E1B2020-2CB5-4359-A6B2-CBE5B9C25199", createdAt: date)
@@ -292,5 +329,24 @@ struct LibraryEntryDisplayTests {
         #expect(lines.first == "Weekly sync")
         #expect(lines.contains("Labels: work, urgent"))
         #expect(lines.last == "Pinned")
+    }
+
+    @Test("a Recently Deleted row is named through the same resolver as every other list")
+    func recentlyDeletedRowUsesTheResolver() {
+        var manifest = ParolaDocument.Manifest(
+            createdAt: date, originalAudioName: "call.wav", modelName: "stub", language: "en"
+        )
+        manifest.title = "Grocery list"
+        manifest.titleSource = .user
+        manifest.aiTitle = "Weekly shopping"
+        manifest.deletedAt = date
+        let entry = LibraryEntry(
+            id: "e", bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/e.parola"), manifest: manifest
+        )
+
+        var cache = LibraryRowDisplayCache()
+        let row = cache.display(for: entry, date: entry.deletedAt, dateLabel: "Deleted 12 Sep", showsAITitle: true)
+
+        #expect(row.title == "Grocery list")
     }
 }

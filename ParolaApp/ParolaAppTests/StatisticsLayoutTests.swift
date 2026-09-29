@@ -91,13 +91,18 @@ struct StatisticsRecordsTests {
         var manifest = ParolaDocument.Manifest(
             createdAt: Self.reference, originalAudioName: "board.wav", title: "Board call", modelName: "whisper", language: "en"
         )
+        manifest.titleSource = .user
         manifest.aiTitle = "Quarterly board call"
         let entry = LibraryEntry(id: "board", bundleURL: URL(fileURLWithPath: "/tmp/board.parola"), manifest: manifest)
 
-        #expect(LibraryEntryDisplay.listTitle(for: entry, showsAITitle: true) == "Quarterly board call")
+        // A title the user typed outranks the generated one, whatever "Show AI Titles" is set to.
+        #expect(LibraryEntryDisplay.listTitle(for: entry, showsAITitle: true) == "Board call")
         #expect(LibraryEntryDisplay.listTitle(for: entry, showsAITitle: false) == "Board call")
-        manifest.aiTitle = nil
-        let plain = LibraryEntry(id: "board", bundleURL: entry.bundleURL, manifest: manifest)
-        #expect(LibraryEntryDisplay.listTitle(for: plain, showsAITitle: true) == "Board call")
+
+        manifest.title = nil
+        manifest.titleSource = nil
+        let untitled = LibraryEntry(id: "board", bundleURL: entry.bundleURL, manifest: manifest)
+        #expect(LibraryEntryDisplay.listTitle(for: untitled, showsAITitle: true) == "Quarterly board call")
+        #expect(LibraryEntryDisplay.listTitle(for: untitled, showsAITitle: false) == "board")
     }
 }

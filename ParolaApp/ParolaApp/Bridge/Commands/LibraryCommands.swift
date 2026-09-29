@@ -24,7 +24,7 @@ extension ParolaAutomationServer {
                         .object([
                             "id": .string(entry.id),
                             "title": .string(entry.title),
-                            "displayTitle": .string(LibraryEntryDisplay.title(for: entry)),
+                            "displayTitle": .string(LibraryEntryDisplay.listTitle(for: entry, showsAITitle: ctx.model.showAITitles)),
                             "category": .string(entry.category.rawValue),
                             "createdAt": .double(entry.createdAt.timeIntervalSince1970),
                             "durationSeconds": entry.durationSeconds.map { .double($0) } ?? .null,

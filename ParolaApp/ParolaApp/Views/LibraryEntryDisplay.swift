@@ -7,9 +7,21 @@ enum LibraryEntryDisplay {
         return title(raw: entry.title, createdAt: entry.createdAt, fromFileName: stored.isEmpty)
     }
 
-    /// The title a library row shows: the generated one when the setting asks for it and the entry has one.
+    /// A title with no recorded source loses to the AI one, so a generated stamp never outranks it.
     static func listTitle(for entry: LibraryEntry, showsAITitle: Bool) -> String {
-        showsAITitle ? (entry.aiTitle ?? title(for: entry)) : title(for: entry)
+        if let real = realTitle(for: entry) { return real }
+        if showsAITitle, let aiTitle = entry.aiTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !aiTitle.isEmpty {
+            return aiTitle
+        }
+        return title(for: entry)
+    }
+
+    /// nil unless the stored title is known real (typed by the user, or read from the source itself).
+    private static func realTitle(for entry: LibraryEntry) -> String? {
+        guard entry.manifest.titleSource != nil else { return nil }
+        let stored = entry.manifest.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !stored.isEmpty, !isMachineName(stored) else { return nil }
+        return stored
     }
 
     /// The catalogue's name for the model an entry was transcribed with, falling back to the

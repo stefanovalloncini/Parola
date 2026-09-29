@@ -189,7 +189,7 @@ extension AppModel {
     /// Keyed once per entry: the displayed title runs a regex, and a comparator would run it per comparison.
     private func entriesSortedByTitle(_ entries: [LibraryEntry], ascending: Bool) -> [LibraryEntry] {
         entries
-            .map { (title: LibraryEntryDisplay.title(for: $0), entry: $0) }
+            .map { (title: LibraryEntryDisplay.listTitle(for: $0, showsAITitle: showAITitles), entry: $0) }
             .sorted {
                 let order = $0.title.localizedCaseInsensitiveCompare($1.title)
                 return ascending ? order == .orderedAscending : order == .orderedDescending
@@ -533,7 +533,7 @@ extension AppModel {
             do {
                 let loaded = try await library.load(entry.id)
                 let transcript = loaded.document.transcript
-                let safe = TranscriptShareFile.safeName(for: LibraryEntryDisplay.title(for: entry))
+                let safe = TranscriptShareFile.safeName(for: LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showAITitles))
                 var name = safe
                 var suffix = 2
                 while usedNames.contains(name) {
@@ -555,7 +555,10 @@ extension AppModel {
                 }
                 ParolaLog.error(.export, "library export failed as \(format)", fields)
                 failures.append(
-                    ExportNotice.Failure(name: LibraryEntryDisplay.title(for: entry), reason: error.localizedDescription)
+                    ExportNotice.Failure(
+                        name: LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showAITitles),
+                        reason: error.localizedDescription
+                    )
                 )
             }
         }

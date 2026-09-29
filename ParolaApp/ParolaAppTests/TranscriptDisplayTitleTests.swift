@@ -25,7 +25,7 @@ struct TranscriptDisplayTitleTests {
         let bundle = URL(fileURLWithPath: "/lib/20260624-abc.parola")
         let audio = bundle.appendingPathComponent("audio.wav")
         let e = entry(id: "20260624-abc", original: "jfk.wav", bundle: bundle)
-        let title = AppModel.transcriptDisplayTitle(sourceFileURL: audio, entry: e, fallback: "Untitled")
+        let title = AppModel.transcriptDisplayTitle(sourceFileURL: audio, entry: e, showsAITitle: false, fallback: "Untitled")
         #expect(title == "jfk")
     }
 
@@ -34,8 +34,28 @@ struct TranscriptDisplayTitleTests {
         let bundle = URL(fileURLWithPath: "/lib/20260624-abc.parola")
         let audio = bundle.appendingPathComponent("audio.wav")
         let e = entry(id: "20260624-abc", original: "jfk.wav", title: "Quarterly Review", bundle: bundle)
-        let title = AppModel.transcriptDisplayTitle(sourceFileURL: audio, entry: e, fallback: "Untitled")
+        let title = AppModel.transcriptDisplayTitle(sourceFileURL: audio, entry: e, showsAITitle: false, fallback: "Untitled")
         #expect(title == "Quarterly Review")
+    }
+
+    @Test("a manifest title wins over the AI title on reopen, but the AI title stands in for an untitled entry")
+    func reopenedEntryPrefersManifestOverAITitle() {
+        let bundle = URL(fileURLWithPath: "/lib/20260624-abc.parola")
+        let audio = bundle.appendingPathComponent("audio.wav")
+        var manifest = ParolaDocument.Manifest(
+            originalAudioName: "jfk.wav", title: "Quarterly Review", modelName: "Whisper Tiny", language: "en",
+            audioFilename: "audio.wav"
+        )
+        manifest.titleSource = .user
+        manifest.aiTitle = "State of the union"
+        let titled = LibraryEntry(id: "20260624-abc", bundleURL: bundle, manifest: manifest)
+        #expect(AppModel.transcriptDisplayTitle(sourceFileURL: audio, entry: titled, showsAITitle: true, fallback: "Untitled") == "Quarterly Review")
+
+        manifest.title = nil
+        manifest.titleSource = nil
+        let untitled = LibraryEntry(id: "20260624-abc", bundleURL: bundle, manifest: manifest)
+        #expect(AppModel.transcriptDisplayTitle(sourceFileURL: audio, entry: untitled, showsAITitle: true, fallback: "Untitled") == "State of the union")
+        #expect(AppModel.transcriptDisplayTitle(sourceFileURL: audio, entry: untitled, showsAITitle: false, fallback: "Untitled") == "jfk")
     }
 
     @Test("a fresh transcribe keeps the source filename even if a stale entry is still selected")
@@ -43,7 +63,7 @@ struct TranscriptDisplayTitleTests {
         let staleBundle = URL(fileURLWithPath: "/lib/20260624-abc.parola")
         let stale = entry(id: "20260624-abc", original: "jfk.wav", bundle: staleBundle)
         let source = URL(fileURLWithPath: "/Users/me/Downloads/New Recording 133.m4a")
-        let title = AppModel.transcriptDisplayTitle(sourceFileURL: source, entry: stale, fallback: "Untitled")
+        let title = AppModel.transcriptDisplayTitle(sourceFileURL: source, entry: stale, showsAITitle: false, fallback: "Untitled")
         #expect(title == "New Recording 133")
     }
 
@@ -51,20 +71,20 @@ struct TranscriptDisplayTitleTests {
     func entryWithoutAudioUsesTitle() {
         let bundle = URL(fileURLWithPath: "/lib/20260624-mtg.parola")
         let e = entry(id: "20260624-mtg", original: "", title: "Team Standup", bundle: bundle)
-        let title = AppModel.transcriptDisplayTitle(sourceFileURL: nil, entry: e, fallback: "Untitled")
+        let title = AppModel.transcriptDisplayTitle(sourceFileURL: nil, entry: e, showsAITitle: false, fallback: "Untitled")
         #expect(title == "Team Standup")
     }
 
     @Test("a fresh transcribe with no entry uses the source filename")
     func freshTranscribeNoEntry() {
         let source = URL(fileURLWithPath: "/tmp/Interview.wav")
-        let title = AppModel.transcriptDisplayTitle(sourceFileURL: source, entry: nil, fallback: "Untitled")
+        let title = AppModel.transcriptDisplayTitle(sourceFileURL: source, entry: nil, showsAITitle: false, fallback: "Untitled")
         #expect(title == "Interview")
     }
 
     @Test("no source and no entry uses the fallback")
     func emptyUsesFallback() {
-        let title = AppModel.transcriptDisplayTitle(sourceFileURL: nil, entry: nil, fallback: "Untitled")
+        let title = AppModel.transcriptDisplayTitle(sourceFileURL: nil, entry: nil, showsAITitle: false, fallback: "Untitled")
         #expect(title == "Untitled")
     }
 }
@@ -101,6 +121,25 @@ struct CurrentTranscriptTitleTests {
         model.libraryEntries = [e]
         model.selectedEntryID = e.id
         model.sourceFileURL = e.bundleURL.appendingPathComponent("audio.wav")
+        #expect(model.currentTranscriptTitle == "jfk")
+    }
+
+    @Test("share and export naming pick up the AI title for an untitled entry, honouring the setting")
+    func aiTitleFeedsShareAndExportNaming() {
+        let model = makeModel()
+        var manifest = ParolaDocument.Manifest(
+            originalAudioName: "jfk.wav", modelName: "stub", language: "en", audioFilename: "audio.wav"
+        )
+        manifest.aiTitle = "Ask not"
+        let e = LibraryEntry(id: "20260624-abc", bundleURL: URL(fileURLWithPath: "/lib/20260624-abc.parola"), manifest: manifest)
+        model.libraryEntries = [e]
+        model.selectedEntryID = e.id
+        model.sourceFileURL = e.bundleURL.appendingPathComponent("audio.wav")
+
+        #expect(model.showAITitles)
+        #expect(model.currentTranscriptTitle == "Ask not")
+
+        model.showAITitles = false
         #expect(model.currentTranscriptTitle == "jfk")
     }
 

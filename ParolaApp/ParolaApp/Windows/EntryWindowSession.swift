@@ -56,7 +56,7 @@ final class EntryWindowSession {
         self.rate = (stored ?? 0) > 0 ? (stored ?? 1) : 1
         // The title the main window's header and the bridge's displayTitle use, so a driver finds it by name.
         self.title = model.libraryEntry(id: entryID)
-            .map { LibraryEntryDisplay.title(for: $0) }
+            .map { LibraryEntryDisplay.listTitle(for: $0, showsAITitle: model.showAITitles) }
             ?? String(localized: "Transcript")
         load()
     }
@@ -171,7 +171,7 @@ final class EntryWindowSession {
 
     private func apply(_ loaded: LoadedEntry, keepingPlace: Bool) {
         document = loaded.document
-        title = LibraryEntryDisplay.title(for: loaded.entry)
+        title = LibraryEntryDisplay.listTitle(for: loaded.entry, showsAITitle: model.showAITitles)
         appliedUpdatedAt = loaded.entry.updatedAt
         appliedDurationSeconds = loaded.entry.durationSeconds
         isLoading = false

@@ -91,7 +91,7 @@ struct LibrarySearchResults: View {
                     )),
                     animatesRows: animatesRows,
                     rename: { entry in
-                        renameDraft = LibraryEntryDisplay.title(for: entry)
+                        renameDraft = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: model.showAITitles)
                         renamingEntry = entry
                     },
                     focus: focus,

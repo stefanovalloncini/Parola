@@ -78,7 +78,7 @@ extension AppModel {
         }
         let notes = entry.segmentNotes
         // The heading is read, the file name is written: only the latter has characters to lose.
-        let title = LibraryEntryDisplay.title(for: entry)
+        let title = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showAITitles)
         let fileName = TranscriptShareFile.safeName(for: title)
         Task { [weak self] in
             guard let self else { return }
@@ -127,6 +127,7 @@ extension AppModel {
         Self.transcriptDisplayTitle(
             sourceFileURL: sourceFileURL,
             entry: selectedEntryID.flatMap { libraryEntry(id: $0) },
+            showsAITitle: showAITitles,
             fallback: String(localized: "Transcript")
         )
     }

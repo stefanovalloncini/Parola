@@ -115,6 +115,7 @@ struct TranscriptPane: View {
         AppModel.transcriptDisplayTitle(
             sourceFileURL: model.sourceFileURL,
             entry: model.selectedEntryID.flatMap { model.libraryEntry(id: $0) },
+            showsAITitle: model.showAITitles,
             fallback: String(localized: "Untitled")
         )
     }
