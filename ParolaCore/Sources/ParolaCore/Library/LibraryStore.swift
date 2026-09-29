@@ -272,7 +272,9 @@ public actor LibraryStore {
             guard index !== searchIndex else { return index }
             index = searchIndex
         }
-        return index
+        // Only exists to terminate: whatever is current gets one more catch-up before anyone reads it.
+        await ensureSearchIndexReady()
+        return searchIndex
     }
 
     private func ensureSearchIndexReady() async {
@@ -462,9 +464,15 @@ public actor LibraryStore {
         dropCaches()
         let index = searchIndex
         if snapshotMoved, indexReadyTask != nil, await !index.refreshFromSnapshot(), index === searchIndex {
-            searchIndex = LibrarySearchIndex(readingSnapshotIn: Self.indexDirectory(in: libraryURL))
+            replaceSearchIndex()
         }
         return true
+    }
+
+    /// A fresh reader index that loads the snapshot on its next use, caught up by the next reader of it.
+    func replaceSearchIndex() {
+        searchIndex = LibrarySearchIndex(readingSnapshotIn: Self.indexDirectory(in: libraryURL))
+        searchIndexNeedsCheck = true
     }
 
     private nonisolated static func indexDirectory(in libraryURL: URL) -> URL {

@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import os
 @testable import ParolaCore
 
 @Suite("LibraryStore roles", .tags(.fileSystem))
@@ -247,6 +248,35 @@ struct LibraryReaderTests {
         #expect(await first.value == ["seeded"])
         #expect(await second.value == ["seeded"])
         #expect(await store.search("minutes").count == 2)
+    }
+
+    @Test("a search that loses the race eight times still reads a caught-up index")
+    func searchLosingEveryRoundStillCatchesUp() async throws {
+        let dir = try makeTempLibraryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let app = owner(dir)
+        _ = try await app.add(transcript: transcript("alpha minutes"), audioSource: nil)
+        await app.flush()
+        let box = OSAllocatedUnfairLock<(store: LibraryStore?, swaps: Int)>(initialState: (nil, 0))
+        let store = LibraryStore(
+            storeAt: dir, extraIndexer: nil,
+            seams: LibraryStore.TestSeams(willCatchUpSearchIndex: {
+                let target = box.withLock { state -> LibraryStore? in
+                    guard state.swaps < 8, let store = state.store else { return nil }
+                    state.swaps += 1
+                    return store
+                }
+                await target?.replaceSearchIndex()
+            }),
+            role: .reader
+        )
+        #expect(await store.search("alpha").count == 1)
+        try seedBundle(in: dir, named: "seeded", text: "zzyzxmarker minutes")
+        await store.dropCaches()
+        box.withLock { $0.store = store }
+
+        #expect(await store.search("zzyzxmarker").map(\.entryID) == ["seeded"])
+        #expect(box.withLock { $0.swaps } == 8)
     }
 
     @Test("a reader leaves each bundle's manifest as it found it")
