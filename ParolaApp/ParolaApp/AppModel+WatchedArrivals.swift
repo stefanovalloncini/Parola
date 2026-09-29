@@ -176,9 +176,12 @@ extension AppModel {
         }
     }
 
-    /// The first file in the line that still has to run and whose folder answered.
+    /// The first file in the line that still has to run, whose folder answered, and that isn't being saved already.
     var nextWatchedArrival: WatchedArrival? {
-        watchedArrivals.first { !$0.isLanding && !unreachableArrivalIDs.contains($0.id) }
+        let saving = Set(watchedArrivals.filter(\.isLanding).map(\.url))
+        return watchedArrivals.first {
+            !$0.isLanding && !saving.contains($0.url) && !unreachableArrivalIDs.contains($0.id)
+        }
     }
 
     /// A folder is back: the files that waited on it try again, in their places.
@@ -324,6 +327,7 @@ extension AppModel {
                 guard let self else { return }
                 watchedArrivals.removeAll { $0.id == arrival.id }
                 if ringsWhenDry, watchedArrivals.isEmpty { playCompletionSound() }
+                pumpWatchedLane()
             } catch {
                 self?.failArrival(arrival, error: error)
             }

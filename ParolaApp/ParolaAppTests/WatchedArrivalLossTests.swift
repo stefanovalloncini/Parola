@@ -266,6 +266,40 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a copy of a file offered again while its entry is saved waits for the save, then the check drops it")
+        func reofferWaitsForTheSave() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let folder = try makeFolder("reoffer-saving")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let model = makeModel(library: makeTempLibraryURL("loss-reoffer-saving"), defaults: temporaryDefaults())
+                let own = try await openOwnEntry(model, in: folder)
+                let (held, release) = AsyncStream<Void>.makeStream()
+                defer { release.finish() }
+                model.beforeLandingSave = {
+                    for await _ in held { break }
+                }
+                let file = try makeWAV("Saving", in: folder)
+                arrive(model, [file])
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedArrivals.first?.isLanding == true })
+
+                arrive(model, [file])
+                await settle()
+                #expect(model.watchedArrivals.map(\.url) == [file, file])
+                #expect(model.watchedLaneTask == nil)
+                #expect(model.backgroundArrivalID == nil)
+
+                release.yield()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                let saved = await model.library.list().filter { $0.id != own.id }
+                #expect(saved.map(LibraryEntryDisplay.title(for:)) == ["Saving"])
+                #expect(model.batchDuplicatesSkipped == 1)
+            }
+        }
+
         @Test("a file whose entry couldn't be saved is handed back to its watcher", arguments: [false, true])
         func failedSaveIsHandedBack(outOfSight: Bool) async throws {
             try await withMocksCleared(.transcriber) {
