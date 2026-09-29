@@ -212,6 +212,8 @@ final class AppModel {
     /// The take transcription a new take stopped, so its save can say why.
     @ObservationIgnored private var takeRunStoppedForNewTake: Int?
     @ObservationIgnored private var takeWorkCounter = 0
+    /// A take's prepare and transcription, which a quit stops so the take is saved rather than lost with the process.
+    @ObservationIgnored private var takeTask: Task<Void, Never>?
     /// A live take finishing and every take's save, until its entry exists: what a quit waits for.
     @ObservationIgnored private var takeWork: [Int: Task<Void, Never>] = [:]
     var livePartialText: String = ""
@@ -3550,8 +3552,8 @@ final class AppModel {
         let category = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let recovery = activeRecoveryGeneration
-        fileTranscribeTask?.cancel()
-        fileTranscribeTask = Task {
+        startTakeTask { [weak self] in
+            guard let self else { return }
             await mediaSession.exitRecording()
             let title = Self.liveRecordingTitle(category: category, endedAt: Date())
             do {
@@ -3572,7 +3574,22 @@ final class AppModel {
                 phase = .failed(message: message)
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             }
-            if !Task.isCancelled { self.fileTranscribeTask = nil }
+        }
+    }
+
+    /// A take's prepare and transcription run as the file run, and as take work, so a quit stops them and waits for the save they leave.
+    func startTakeTask(_ body: @escaping @MainActor () async -> Void) {
+        fileTranscribeTask?.cancel()
+        let task = Task { @MainActor [weak self] in
+            await body()
+            guard let self, !Task.isCancelled else { return }
+            self.fileTranscribeTask = nil
+        }
+        fileTranscribeTask = task
+        takeTask = task
+        trackTakeWork { [weak self] in
+            await task.value
+            if self?.takeTask == task { self?.takeTask = nil }
         }
     }
 
@@ -3661,6 +3678,8 @@ final class AppModel {
             endRecovery(previous)
         }
         do {
+            // A take stopped before its run began, by a quit say, goes straight to its save.
+            try Task.checkCancellation()
             let result = try await session.transcribe(
                 source: FileAudioSource(url: url),
                 options: currentOptions
@@ -3854,7 +3873,7 @@ final class AppModel {
         recordingStartedAt != nil && (liveSource != nil || streamingSession != nil)
     }
 
-    /// A live take finishing or a take's save still on its way to the library.
+    /// A live take finishing, a take transcribing, or a take's save still on its way to the library.
     var hasPendingTakeWork: Bool {
         !takeWork.isEmpty
     }
@@ -3873,8 +3892,9 @@ final class AppModel {
         return true
     }
 
-    /// Holds a quit, with the window saying so, until every take is in the library or 30 seconds pass.
+    /// Holds a quit, with the window saying so, until every take is in the library or 30 seconds pass; a take still transcribing stops and is saved as audio.
     func finishTakeWorkForQuit() async {
+        takeTask?.cancel()
         guard !takeWork.isEmpty else { return }
         savingTakesBeforeQuit = true
         let deadline = ContinuousClock.now + .seconds(30)
@@ -4007,10 +4027,8 @@ final class AppModel {
         let title = failedTakeTitle ?? Self.liveRecordingTitle(category: .transcription, endedAt: Date())
         let source = failedTakeSource ?? .microphone
         let category = failedTakeCategory ?? .transcription
-        fileTranscribeTask?.cancel()
-        fileTranscribeTask = Task {
-            await transcribeRecordedTake(url: url, title: title, source: source, category: category)
-            if !Task.isCancelled { self.fileTranscribeTask = nil }
+        startTakeTask { [weak self] in
+            await self?.transcribeRecordedTake(url: url, title: title, source: source, category: category)
         }
     }
 

@@ -742,6 +742,33 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("quitting while a take transcribes stops the run, saves the take untranscribed, then lets the app quit")
+        func quitWhileATakeTranscribes() async throws {
+            let wav = try makeTakeWAV("quit-transcribing")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "never landed")],
+                    gate: MockTranscriberGate()
+                ))
+                let model = makeModel()
+                await transcribingTake(model, wav: wav)
+                #expect(!model.takeInProgress)
+                #expect(model.hasPendingTakeWork, "a take's transcription is work a quit waits for")
+                let quit = QuitReply()
+
+                let reply = AppDelegate.terminateReply(for: model, ask: { quit.asked = true; return .keepRecording }) { quit.value = $0 }
+
+                #expect(reply == .terminateLater)
+                #expect(!quit.asked, "nothing is capturing, so there is nothing to ask")
+                await waitUntil { quit.value != nil }
+                #expect(quit.value == true)
+                let saved = await model.library.list()
+                #expect(saved.count == 1, "the take is in the library before the app is told it may quit")
+                #expect(saved.first?.title.hasSuffix("(not transcribed)") == true)
+            }
+        }
+
         @Test("Discard drops the take, then lets the app quit")
         func discardDropsTheTake() async throws {
             let fixture = try makeTakeWAV("discard")

@@ -313,13 +313,10 @@ extension AppModel {
                 // A recorded take mid-transcription when the app died: the take path keeps
                 // its title and saves the audio if this run fails too.
                 let adopted = adoptRecovery(checkpoint)
-                fileTranscribeTask?.cancel()
-                fileTranscribeTask = Task { [weak self] in
-                    guard let self else { return }
-                    await transcribeRecordedTake(
+                startTakeTask { [weak self] in
+                    await self?.transcribeRecordedTake(
                         url: url, title: title, source: checkpoint.source ?? .microphone, replacing: adopted
                     )
-                    if !Task.isCancelled { self.fileTranscribeTask = nil }
                 }
             } else {
                 removeRecoveryFile(of: checkpoint)
