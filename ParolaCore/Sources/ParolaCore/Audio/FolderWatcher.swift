@@ -71,7 +71,7 @@ public actor FolderWatcher {
         var stableChecks = 0
         var downloadRequested = false
         var isUbiquitous: Bool?
-        var ticksToSkip = 0
+        var dueTick: Int
         var backoff = 1
         var downloadChecks = 0
         var materializing = false
@@ -187,7 +187,10 @@ public actor FolderWatcher {
     private var eventTask: Task<Void, Never>?
     private var eventContinuation: AsyncStream<Event>.Continuation?
     private var settledTask: Task<Void, Never>?
-    private var scheduledTicks = 1
+    /// Settle intervals since the watch began; files and polls come due at a tick number.
+    private var currentTick = 0
+    private var armedTick: Int?
+    private var tickGeneration = 0
     private var baselineChanged = false
     private var seed: Baseline?
     private var hasScanned = false
@@ -395,6 +398,8 @@ public actor FolderWatcher {
         unlisted.removeAll()
         settledTask?.cancel()
         settledTask = nil
+        armedTick = nil
+        tickGeneration += 1
         pending.removeAll()
         watchedAfterEmit.removeAll()
     }
@@ -569,7 +574,7 @@ public actor FolderWatcher {
         known.created = item.created ?? known.created
         files[key] = known
         if known.status == .pending, changed {
-            pending[key]?.ticksToSkip = 0
+            pending[key]?.dueTick = currentTick + 1
             pending[key]?.backoff = 1
         }
         if case .emitted(let at) = known.status, changed, arrivesAgain(modified: item.modified, emittedAt: at) {
@@ -612,7 +617,7 @@ public actor FolderWatcher {
         }
         switch status {
         case .pending:
-            if pending[key] == nil { pending[key] = PendingCheck() }
+            if pending[key] == nil { pending[key] = PendingCheck(dueTick: currentTick + 1) }
             watchedAfterEmit.remove(key)
         case .emitted(let at):
             pending[key] = nil
@@ -659,25 +664,34 @@ public actor FolderWatcher {
         onBaselineChange?()
     }
 
+    /// Arms the tick for whatever comes due first, and re-arms when something new comes due sooner.
     private func scheduleSettleTick() {
         let everyTick = !watchedAfterEmit.isEmpty || !unsourced.isEmpty || !unlisted.isEmpty
-        guard settledTask == nil, everyTick || !pending.isEmpty else { return }
-        scheduledTicks = everyTick ? 1 : (pending.values.map(\.ticksToSkip).min() ?? 0) + 1
-        let interval = options.settledInterval * scheduledTicks
+        let firstDue = everyTick ? currentTick + 1 : pending.values.map(\.dueTick).min()
+        guard let firstDue else { return }
+        let due = max(firstDue, currentTick + 1)
+        if settledTask != nil, let armedTick, armedTick <= due { return }
+        settledTask?.cancel()
+        tickGeneration += 1
+        let generation = tickGeneration
+        armedTick = due
+        let interval = options.settledInterval * (due - currentTick)
         let scheduler = options.scheduler
         settledTask = Task { [weak self] in
             try? await scheduler.runTick(after: interval) { [weak self] in
-                await self?.settleTick()
+                await self?.settleTick(generation, reaching: due)
             }
         }
     }
 
-    private func settleTick() {
+    private func settleTick(_ generation: Int, reaching tick: Int) {
+        guard generation == tickGeneration else { return }
         settledTask = nil
+        armedTick = nil
+        currentTick = tick
         let now = options.clock.now()
-        let elapsed = scheduledTicks
         for key in pending.keys {
-            checkPending(key, elapsed: elapsed, now: now)
+            checkPending(key, now: now)
         }
         for key in watchedAfterEmit {
             recheckEmitted(key, now: now)
@@ -689,17 +703,13 @@ public actor FolderWatcher {
         scheduleSettleTick()
     }
 
-    private func checkPending(_ key: FileKey, elapsed: Int, now: Date) {
+    private func checkPending(_ key: FileKey, now: Date) {
         guard let file = files[key], var check = pending[key] else {
             pending[key] = nil
             return
         }
-        guard check.ticksToSkip < elapsed else {
-            check.ticksToSkip -= elapsed
-            pending[key] = check
-            return
-        }
-        check.ticksToSkip = 0
+        guard check.dueTick <= currentTick else { return }
+        check.dueTick = currentTick + 1
         guard let info = FileInfo(file.path) else {
             forget(key)
             return
@@ -770,8 +780,9 @@ public actor FolderWatcher {
         guard files[key]?.path == path, files[key]?.status == .pending else { return }
         switch result {
         case .success:
-            pending[key]?.ticksToSkip = 0
+            pending[key]?.dueTick = currentTick + 1
             pending[key]?.backoff = 1
+            scheduleSettleTick()
         case .failure(let error):
             ParolaLog.error(.library, "a watched cloud file never downloaded; handing it over as it is", [.error: .error(error)])
             let now = options.clock.now()
@@ -782,7 +793,7 @@ public actor FolderWatcher {
     }
 
     private func backOff(_ check: inout PendingCheck) {
-        check.ticksToSkip = check.backoff
+        check.dueTick = currentTick + check.backoff + 1
         check.backoff = min(check.backoff * 2, Self.longestBackoff)
     }
 

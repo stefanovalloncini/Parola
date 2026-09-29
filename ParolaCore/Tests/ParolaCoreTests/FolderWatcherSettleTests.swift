@@ -221,6 +221,40 @@ struct FolderWatcherSettleTests {
         #expect(lookups.count == 1)
     }
 
+    @Test("a new file is checked on the next tick even while another file waits out a long backoff")
+    func newFileDoesNotWaitOutABackoff() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        let scheduler = ManualScheduler()
+        let collected = CollectedURLs()
+        var options = FolderWatcher.Options(recursive: true, settledInterval: .seconds(1), clock: clock, scheduler: scheduler)
+        options.observesFileSystem = false
+        let watcher = FolderWatcher(folderURL: folder, options: options) { collected.append($0) }
+        await watcher.start()
+
+        let copying = folder.appendingPathComponent("talk.mov")
+        try Fixture.writeSettled(copying, clock: clock)
+        try FileManager.default.setAttributes([.creationDate: Date(timeIntervalSince1970: -753_578_704)], ofItemAtPath: copying.path)
+        await watcher.checkForNewFiles()
+        try await scheduler.advance(ticks: 6)
+        #expect(await scheduler.intervals.last == .seconds(33))
+
+        try Fixture.writeSettled(folder.appendingPathComponent("voice-memo.m4a"), clock: clock)
+        await watcher.checkForNewFiles()
+        let deadline = ContinuousClock.now + .seconds(5)
+        while ContinuousClock.now < deadline {
+            let parked = await scheduler.parkedCount
+            let last = await scheduler.intervals.last
+            if parked == 1, last == .seconds(1) { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(await scheduler.intervals.last == .seconds(1))
+        try await scheduler.advance(ticks: 3)
+        await watcher.stop()
+        #expect(collected.snapshot().map(\.lastPathComponent) == ["voice-memo.m4a"])
+    }
+
     private final class Placeholder: Sendable {
         private let downloaded = OSAllocatedUnfairLock(initialState: false)
         let reads = CallCounter()
