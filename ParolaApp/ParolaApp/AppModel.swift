@@ -682,7 +682,11 @@ final class AppModel {
     }
 
     /// Watched-folder files waiting their turn, the one running included; each leaves when it lands or fails.
-    @ObservationIgnored var watchedArrivals: [WatchedArrival] = []
+    @ObservationIgnored var watchedArrivals: [WatchedArrival] = [] {
+        didSet { if watchedArrivals != oldValue { saveWatchedArrivals() } }
+    }
+    /// Test seam: when set, replaces telling the watchers that a file they handed over couldn't be used.
+    @ObservationIgnored var offerWatchedFileAgain: (@MainActor (URL) -> Void)?
     @ObservationIgnored var watchedLaneTask: Task<Void, Never>?
     @ObservationIgnored var backgroundArrivalID: WatchedArrival.ID?
     @ObservationIgnored var visibleArrivalID: WatchedArrival.ID?
@@ -1513,6 +1517,7 @@ final class AppModel {
         cancelPass &+= 1
         unsettledInPass = 0
         cancelAllInFlightBatchJobs()
+        sendWaitingArrivalsOutOfSight()
         deferredArrivals = []
         deferredLinks = []
         cancelAndTrack(&downloadTask)
@@ -1738,6 +1743,7 @@ final class AppModel {
         Task { [library] in await library.warmSearchIndex() }
         refreshLibrary()
         restoreBatchQueue()
+        restoreWatchedArrivals()
         loadPendingRecovery()
         sweepInflightRecordings()
         if features.isEnabled(.dictation) {
@@ -2217,7 +2223,8 @@ final class AppModel {
         fileTranscribeStage = nil
 
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
-        let recoveryToken = fetchedLink.map {
+        // The lane keeps a watched file across a quit, so its run leaves no checkpoint to offer twice.
+        let recoveryToken: Int? = arrival != nil ? nil : fetchedLink.map {
             beginFileTranscribeRecovery(sourceURL: $0.link, title: $0.media.metadata.title, source: .web)
         } ?? beginFileTranscribeRecovery(sourceURL: fileURL)
 
@@ -2248,7 +2255,7 @@ final class AppModel {
                 filePartialText = ""
                 fileTranscribeFraction = nil
                 fileTranscribeStage = nil
-                endRecovery(recoveryToken)
+                if let recoveryToken { endRecovery(recoveryToken) }
                 phase = .ready
                 let ownedDownload = fetchedLink.flatMap { $0.media.workingDirectory == nil ? nil : $0 }
                 let linkMetadataTitle = fetchedLink?.media.metadata.title
@@ -2267,7 +2274,7 @@ final class AppModel {
                 if let arrival { visibleArrivalLanded(arrival) }
                 retireFileRun(runToken)
             } catch {
-                endRecovery(recoveryToken)
+                if let recoveryToken { endRecovery(recoveryToken) }
                 // Retry and recovery fetch the link again, so the download has no further use.
                 fetchedLink?.media.discard()
                 // A run a newer one replaced leaves the newer one's pane alone.

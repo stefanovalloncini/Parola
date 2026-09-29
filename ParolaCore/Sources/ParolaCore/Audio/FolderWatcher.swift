@@ -664,6 +664,16 @@ public actor FolderWatcher {
         modified <= emittedAt.addingTimeInterval(Self.seconds(options.reemitWindow))
     }
 
+    /// A file this watcher handed over that the app couldn't use: a change within `reemitWindow` from now offers it again.
+    public func offerAgainOnChange(_ url: URL) {
+        guard let key = files.first(where: { $0.value.path == url.path })?.key,
+              case .emitted = files[key]?.status else { return }
+        let now = options.clock.now()
+        setStatus(.emitted(at: now), for: key, now: now)
+        publishBaselineChange()
+        scheduleSettleTick()
+    }
+
     /// Until the first scan is applied this is the baseline the watcher was started with, or nil:
     /// an empty folder and a folder not listed yet must not look alike.
     public func baseline() -> Baseline? {

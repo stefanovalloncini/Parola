@@ -167,7 +167,7 @@ extension AppModel {
         pumpWatchedLane()
     }
 
-    /// A file that couldn't be transcribed leaves the line; the error pane or the toast says why.
+    /// A file that couldn't be transcribed leaves the line and a change brings it back; the error pane or the toast says why.
     func failArrival(_ arrival: WatchedArrival, error: any Error) {
         if backgroundArrivalID == arrival.id {
             watchedLaneTask = nil
@@ -176,7 +176,52 @@ extension AppModel {
         }
         if visibleArrivalID == arrival.id { visibleArrivalID = nil }
         watchedArrivals.removeAll { $0.id == arrival.id }
+        if let offerWatchedFileAgain {
+            offerWatchedFileAgain(arrival.url)
+        } else if activeSideEffects.contains(.watchedFolders) {
+            watchedFolders.offerAgainOnChange(arrival.url)
+        }
         pumpWatchedLane()
+    }
+
+    /// Cancel gives the window back: the files still waiting finish out of sight instead of taking it again.
+    func sendWaitingArrivalsOutOfSight() {
+        var waiting = watchedArrivals
+        for index in waiting.indices { waiting[index].inBackground = true }
+        watchedArrivals = waiting
+    }
+
+    // MARK: - Across a quit
+
+    var watchedArrivalsFileURL: URL {
+        library.libraryURL.appendingPathComponent("watched-arrivals.json")
+    }
+
+    func saveWatchedArrivals() {
+        let url = watchedArrivalsFileURL
+        do {
+            if watchedArrivals.isEmpty {
+                if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            } else {
+                try JSONEncoder().encode(watchedArrivals).write(to: url, options: .atomic)
+            }
+        } catch {
+            ParolaLog.error(.library, "watched-folder queue could not be saved", [.error: .error(error)])
+        }
+    }
+
+    /// The files may have changed while Parola was closed, so each add takes its own digest.
+    func restoreWatchedArrivals() {
+        guard features.isEnabled(.watchedFolders), watchedArrivals.isEmpty,
+              let data = try? Data(contentsOf: watchedArrivalsFileURL),
+              let saved = try? JSONDecoder().decode([WatchedArrival].self, from: data),
+              !saved.isEmpty else { return }
+        watchedArrivals = saved.map { arrival in
+            var restored = arrival
+            restored.sourceDigest = nil
+            return restored
+        }
+        Task { [weak self] in self?.pumpWatchedLane() }
     }
 
     func openArrivalNotice() {

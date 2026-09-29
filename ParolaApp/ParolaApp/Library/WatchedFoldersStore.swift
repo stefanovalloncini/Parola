@@ -209,6 +209,13 @@ final class WatchedFoldersStore {
         watchers[id]
     }
 
+    /// A file a watcher handed over that the app couldn't use: a change to it offers it again.
+    func offerAgainOnChange(_ url: URL) {
+        for watcher in watchers.values {
+            Task { await watcher.offerAgainOnChange(url) }
+        }
+    }
+
     /// Stops every watcher and releases the folders; the saved baselines stay for the next start.
     func stopWatching() async {
         starts.removeAll()
