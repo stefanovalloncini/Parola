@@ -946,7 +946,7 @@ extension TranscriberMockSuites {
             let document = try await model.library.load(recovered.id).document
             #expect(document.transcript.modelName.isEmpty)
             #expect(try AVAudioFile(forReading: try #require(document.audioURL)).length > 0, "a crashed take's header is rewritten so it plays")
-            #expect(!FileManager.default.fileExists(atPath: orphan.path), "the orphan moved into its entry")
+            #expect(!FileManager.default.fileExists(atPath: orphan.path), "once its entry holds a copy, the orphan goes")
             #expect(!FileManager.default.fileExists(atPath: savedCopy.path))
             #expect(FileManager.default.fileExists(atPath: fresh.path), "a file written minutes ago is left alone")
         }
@@ -1382,7 +1382,7 @@ extension TranscriberMockSuites {
             #expect(await model.library.list().isEmpty)
         }
 
-        // MARK: - Quitting during a take        // MARK: - Quitting during a take
+        // MARK: - Quitting during a take
 
         @Test("quitting with no take in progress goes at once and asks nothing")
         func quitWithoutATakeAsksNothing() {

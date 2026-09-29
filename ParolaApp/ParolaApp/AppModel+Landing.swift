@@ -186,12 +186,6 @@ extension AppModel {
         await landingSteps?.value
     }
 
-    /// The category the take in flight was started under; reading it hands the next take the default.
-    func takeRecordingCategory() -> EntryCategory {
-        defer { pendingRecordingCategory = .transcription }
-        return pendingRecordingCategory
-    }
-
     private func saveLanding(_ landing: RunLanding, navigation: Int) -> Task<LibraryEntry, any Error> {
         if let entryID = landing.rerunEntryID { return replaceEntry(entryID, with: landing) }
         let beforeSave = beforeLandingSave

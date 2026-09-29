@@ -205,19 +205,16 @@ struct LandingPolicyTests {
         #expect(await rig.tally.summaries == 0)
     }
 
-    @Test("a take lands in the category it was started under, and the next take starts from the default")
-    func takeCategoryIsHandedBack() async throws {
+    @Test("a take lands in the category it carries")
+    func takeLandsInItsCategory() async throws {
         let rig = try makeRig("category")
         defer { try? FileManager.default.removeItem(at: rig.folder) }
-        rig.model.pendingRecordingCategory = .meeting
 
         let entry = try await rig.model.land(RunLanding(
-            kind: .recording, transcript: Self.transcript(), source: .systemAudio,
-            category: rig.model.takeRecordingCategory()
+            kind: .recording, transcript: Self.transcript(), source: .systemAudio, category: .meeting
         )).value
 
         #expect(entry.category == .meeting)
-        #expect(rig.model.pendingRecordingCategory == .transcription)
     }
 }
 
