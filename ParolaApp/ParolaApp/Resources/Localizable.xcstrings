@@ -6085,6 +6085,17 @@
         }
       }
     },
+    "Getting ready to record from %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparazione della registrazione da %@"
+          }
+        }
+      }
+    },
     "Go": {
       "extractionState": "manual",
       "localizations": {

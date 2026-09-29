@@ -42,7 +42,12 @@ struct RecordingPane: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Recording from \(source.label.lowercased())")
+        .accessibilityLabel(accessibilityTitle)
+    }
+
+    private var accessibilityTitle: LocalizedStringKey {
+        let from = source.label.lowercased()
+        return model.takeArming == nil ? "Recording from \(from)" : "Getting ready to record from \(from)"
     }
 
     @ViewBuilder
