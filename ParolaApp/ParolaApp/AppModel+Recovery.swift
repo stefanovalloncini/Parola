@@ -12,6 +12,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         case recording
     }
 
+    /// Names the checkpoint's file; one written before the field gets a fresh id when it is read.
+    var id: UUID
     var kind: Kind
     var startedAt: Date
     var modelName: String
@@ -32,8 +34,10 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         segments: [TranscriptSegment] = [],
         audioURL: URL? = nil,
         title: String? = nil,
-        source: EntrySource? = nil
+        source: EntrySource? = nil,
+        id: UUID = UUID()
     ) {
+        self.id = id
         self.kind = kind
         self.startedAt = startedAt
         self.modelName = modelName
@@ -43,6 +47,20 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         self.audioURL = audioURL
         self.title = title
         self.source = source
+    }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        kind = try c.decode(Kind.self, forKey: .kind)
+        startedAt = try c.decode(Date.self, forKey: .startedAt)
+        modelName = try c.decode(String.self, forKey: .modelName)
+        sourceURL = try c.decodeIfPresent(URL.self, forKey: .sourceURL)
+        language = try c.decodeIfPresent(String.self, forKey: .language)
+        segments = try c.decode([TranscriptSegment].self, forKey: .segments)
+        audioURL = try c.decodeIfPresent(URL.self, forKey: .audioURL)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        source = try c.decodeIfPresent(EntrySource.self, forKey: .source)
     }
 
     /// A file by its name; a link by the video's title, or the link itself before the title was known.
@@ -55,14 +73,36 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
 
 extension AppModel {
 
-    var recoveryFileURL: URL {
+    /// One file per take or run, so ending one never removes another's.
+    var recoveryDirectoryURL: URL {
+        library.libraryURL.appendingPathComponent("recovery", isDirectory: true)
+    }
+
+    /// Where the one checkpoint lived before each run had its own; a launch moves it into the directory.
+    var legacyRecoveryFileURL: URL {
         library.libraryURL.appendingPathComponent("recovery.json")
+    }
+
+    func recoveryFileURL(for id: UUID) -> URL {
+        recoveryDirectoryURL.appendingPathComponent("\(id.uuidString).json")
+    }
+
+    /// The checkpoint file of the run in flight, while there is one.
+    var activeRecoveryFileURL: URL? {
+        activeRecoveryGeneration.flatMap { recoveryFileIDs[$0] }.map(recoveryFileURL(for:))
+    }
+
+    /// Every checkpoint on disk, the legacy file included.
+    var recoveryCheckpointFiles: [URL] {
+        let listed = (try? FileManager.default.contentsOfDirectory(at: recoveryDirectoryURL, includingPropertiesForKeys: nil)) ?? []
+        let checkpoints = listed.filter { $0.pathExtension == "json" }
+        guard FileManager.default.fileExists(atPath: legacyRecoveryFileURL.path) else { return checkpoints }
+        return checkpoints + [legacyRecoveryFileURL]
     }
 
     @discardableResult
     func beginFileTranscribeRecovery(sourceURL: URL, title: String? = nil, source: EntrySource = .file) -> Int {
-        recoveryGeneration += 1
-        activeRecoveryGeneration = recoveryGeneration
+        let generation = beginRecoveryGeneration()
         recordingRecoveryStartedAt = nil
         writeRecoveryFile(RecoveryCheckpoint(
             kind: .fileTranscription,
@@ -72,14 +112,27 @@ extension AppModel {
             title: title,
             source: source
         ))
-        return recoveryGeneration
+        return generation
     }
 
     @discardableResult
     func beginRecordingRecovery() -> Int {
+        let generation = beginRecoveryGeneration()
+        recordingRecoveryStartedAt = Date()
+        return generation
+    }
+
+    private func beginRecoveryGeneration() -> Int {
         recoveryGeneration += 1
         activeRecoveryGeneration = recoveryGeneration
-        recordingRecoveryStartedAt = Date()
+        recoveryFileIDs[recoveryGeneration] = UUID()
+        return recoveryGeneration
+    }
+
+    /// A checkpoint read at launch joins the live ones without becoming active, so the save that keeps its take can end it.
+    func adoptRecovery(_ checkpoint: RecoveryCheckpoint) -> Int {
+        recoveryGeneration += 1
+        recoveryFileIDs[recoveryGeneration] = checkpoint.id
         return recoveryGeneration
     }
 
@@ -97,27 +150,32 @@ extension AppModel {
         ))
     }
 
-    /// Generation-guarded delete so a superseded task's exit can't remove its successor's file.
+    /// Deletes that run's checkpoint unless a take's run or save still needs it; other runs' checkpoints stay.
     func endRecovery(_ generation: Int) {
-        guard generation == activeRecoveryGeneration else { return }
-        endActiveRecovery()
-    }
-
-    /// Leaves a checkpoint a take's save still needs; that save ends it once the entry exists.
-    func endActiveRecovery() {
-        guard let active = activeRecoveryGeneration, !recoveryHeldBySave.contains(active) else { return }
-        activeRecoveryGeneration = nil
-        recordingRecoveryStartedAt = nil
-        let url = recoveryFileURL
+        guard !recoveryHeldByTake.contains(generation) else { return }
+        if generation == activeRecoveryGeneration {
+            activeRecoveryGeneration = nil
+            recordingRecoveryStartedAt = nil
+        }
+        guard let id = recoveryFileIDs.removeValue(forKey: generation) else { return }
+        let url = recoveryFileURL(for: id)
         // Synchronous on the same queue the writes use: a checkpoint already queued must land
         // before this delete, or it resurrects the prompt after the recording stopped.
         recoveryFileQueue.sync { try? FileManager.default.removeItem(at: url) }
     }
 
+    func endActiveRecovery() {
+        guard let active = activeRecoveryGeneration else { return }
+        endRecovery(active)
+    }
+
     private func writeRecoveryFile(_ checkpoint: RecoveryCheckpoint) {
-        let url = recoveryFileURL
-        let generation = activeRecoveryGeneration
-        pendingRecoveryWrite = Task { [weak self] in
+        guard let generation = activeRecoveryGeneration, let id = recoveryFileIDs[generation] else { return }
+        var checkpoint = checkpoint
+        checkpoint.id = id
+        let url = recoveryFileURL(for: id)
+        let directory = recoveryDirectoryURL
+        pendingRecoveryWrite = Task { [weak self, checkpoint] in
             let data: Data
             do {
                 data = try await AppModel.offMainIO { try JSONEncoder().encode(checkpoint) }
@@ -125,13 +183,14 @@ extension AppModel {
                 ParolaLog.error(.appRecovery, "recovery checkpoint could not be encoded", [.error: .error(error)])
                 return
             }
-            // Re-check after the encode: the recording may have ended meanwhile, and a late
+            // Re-check after the encode: the run may have ended meanwhile, and a late
             // write would resurrect a stale recovery prompt on the next launch.
-            guard let self, self.activeRecoveryGeneration == generation else { return }
-            // Queued in the same main-actor step as the check above, so an endActiveRecovery
+            guard let self, self.recoveryFileIDs[generation] == id else { return }
+            // Queued in the same main-actor step as the check above, so an endRecovery
             // that lands after it still drains this write before deleting the file.
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 recoveryFileQueue.async {
+                    try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                     try? data.write(to: url, options: .atomic)
                     continuation.resume()
                 }
@@ -163,18 +222,52 @@ extension AppModel {
 
     // MARK: - Launch offer
 
+    /// Offers the newest checkpoint; older ones stay on disk for a later launch.
     func loadPendingRecovery() {
-        guard let data = try? Data(contentsOf: recoveryFileURL) else { return }
-        guard let checkpoint = try? JSONDecoder().decode(RecoveryCheckpoint.self, from: data),
-              Self.isRestorable(checkpoint) else {
-            try? FileManager.default.removeItem(at: recoveryFileURL)
-            return
+        var found: [RecoveryCheckpoint] = []
+        for file in recoveryCheckpointFiles {
+            guard let data = try? Data(contentsOf: file),
+                  let checkpoint = try? JSONDecoder().decode(RecoveryCheckpoint.self, from: data),
+                  Self.isRestorable(checkpoint) else {
+                try? FileManager.default.removeItem(at: file)
+                continue
+            }
+            settleCheckpointFile(checkpoint, at: file)
+            found.append(checkpoint)
         }
+        recoveryReferencedFiles = Set(found.flatMap { [$0.sourceURL, $0.audioURL] }
+            .compactMap { $0?.isFileURL == true ? $0?.resolvingSymlinksInPath().path : nil })
+        guard let newest = found.max(by: { $0.startedAt < $1.startedAt }) else { return }
         ParolaLog.notice(
-            .appRecovery, "recovery checkpoint offered for \(checkpoint.kind)",
-            [.count: .int(checkpoint.segments.count)]
+            .appRecovery, "recovery checkpoint offered for \(newest.kind)",
+            [.count: .int(newest.segments.count)]
         )
-        pendingRecovery = checkpoint
+        pendingRecovery = newest
+    }
+
+    /// A checkpoint whose file isn't named for it, the legacy recovery.json among them, moves under its own name.
+    private func settleCheckpointFile(_ checkpoint: RecoveryCheckpoint, at file: URL) {
+        let target = recoveryFileURL(for: checkpoint.id)
+        guard file.standardizedFileURL.path != target.standardizedFileURL.path else { return }
+        do {
+            try FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
+            try JSONEncoder().encode(checkpoint).write(to: target, options: .atomic)
+            try FileManager.default.removeItem(at: file)
+        } catch {
+            ParolaLog.error(.appRecovery, "a recovery checkpoint could not be moved", [.error: .error(error)])
+        }
+    }
+
+    /// The offer is answered: what it points at is no longer held back from the sweep or from release.
+    private func answerRecoveryOffer(_ checkpoint: RecoveryCheckpoint) {
+        pendingRecovery = nil
+        recoveryReferencedFiles.subtract([checkpoint.sourceURL, checkpoint.audioURL].compactMap { $0?.resolvingSymlinksInPath().path })
+    }
+
+    /// The offer is settled: its own file goes, whatever else is on disk.
+    func removeRecoveryFile(of checkpoint: RecoveryCheckpoint) {
+        let url = recoveryFileURL(for: checkpoint.id)
+        recoveryFileQueue.sync { try? FileManager.default.removeItem(at: url) }
     }
 
     private nonisolated static func isRestorable(_ checkpoint: RecoveryCheckpoint) -> Bool {
@@ -192,26 +285,36 @@ extension AppModel {
 
     func acceptPendingRecovery() {
         guard let checkpoint = pendingRecovery else { return }
-        pendingRecovery = nil
-        try? FileManager.default.removeItem(at: recoveryFileURL)
+        answerRecoveryOffer(checkpoint)
         switch checkpoint.kind {
         case .fileTranscription:
-            guard let url = checkpoint.sourceURL else { return }
+            guard let url = checkpoint.sourceURL else {
+                removeRecoveryFile(of: checkpoint)
+                return
+            }
             guard url.isFileURL else {
+                removeRecoveryFile(of: checkpoint)
                 transcribeYouTube(urlString: url.absoluteString)
                 return
             }
-            guard FileManager.default.fileExists(atPath: url.path) else { return }
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                removeRecoveryFile(of: checkpoint)
+                return
+            }
             if let title = checkpoint.title {
                 // A recorded take mid-transcription when the app died: the take path keeps
                 // its title and saves the audio if this run fails too.
+                let adopted = adoptRecovery(checkpoint)
                 fileTranscribeTask?.cancel()
                 fileTranscribeTask = Task { [weak self] in
                     guard let self else { return }
-                    await transcribeRecordedTake(url: url, title: title, source: checkpoint.source ?? .microphone)
+                    await transcribeRecordedTake(
+                        url: url, title: title, source: checkpoint.source ?? .microphone, replacing: adopted
+                    )
                     if !Task.isCancelled { self.fileTranscribeTask = nil }
                 }
             } else {
+                removeRecoveryFile(of: checkpoint)
                 transcribe(fileURL: url)
             }
         case .recording:
@@ -222,8 +325,8 @@ extension AppModel {
     /// Declining discards the take: its working file goes too, so the sweep doesn't bring it back.
     func declinePendingRecovery() {
         guard let checkpoint = pendingRecovery else { return }
-        pendingRecovery = nil
-        try? FileManager.default.removeItem(at: recoveryFileURL)
+        answerRecoveryOffer(checkpoint)
+        removeRecoveryFile(of: checkpoint)
         for file in [checkpoint.audioURL, checkpoint.sourceURL].compactMap({ $0 }) where isInflightFile(file) {
             try? FileManager.default.removeItem(at: file)
         }
@@ -244,7 +347,10 @@ extension AppModel {
     }
 
     private func finishRecordingRestore(_ checkpoint: RecoveryCheckpoint, audioURL: URL?, pageAtStart: Route) {
-        guard !checkpoint.segments.isEmpty || audioURL != nil else { return }
+        guard !checkpoint.segments.isEmpty || audioURL != nil else {
+            removeRecoveryFile(of: checkpoint)
+            return
+        }
         let restored = Transcript(
             segments: checkpoint.segments,
             language: checkpoint.language ?? "en",
@@ -266,14 +372,15 @@ extension AppModel {
         phase = .ready
         // A page opened while the take was probed is the later word, as in loadEntry.
         if route == pageAtStart { route = .transcript }
-        land(RunLanding(
-            kind: .recording,
-            transcript: restored,
-            audioSource: audioURL,
+        saveTake(
+            restored,
+            audio: audioURL,
+            title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt),
             source: checkpoint.source ?? .microphone,
-            category: takeRecordingCategory(),
-            title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt)
-        ))
+            category: .transcription,
+            activate: true,
+            recovery: adoptRecovery(checkpoint)
+        )
     }
 
     nonisolated static func readableRecordingURL(_ url: URL) -> URL? {
@@ -300,9 +407,10 @@ extension AppModel {
 
     /// Whether this session still reads a working file: playing it, retrying it, recording it, transcribing it, or offering it back.
     func inflightFileInUse(_ file: URL) -> Bool {
+        let path = file.resolvingSymlinksInPath().path
+        if recoveryReferencedFiles.contains(path) { return true }
         var readers = [sourceFileURL, failedTakeAudioURL, liveRecordingAudioURL, pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
         if takeRun != nil { readers.append(recordedTake?.file) }
-        let path = file.resolvingSymlinksInPath().path
         return readers.contains { $0?.resolvingSymlinksInPath().path == path }
     }
 
@@ -315,7 +423,7 @@ extension AppModel {
     /// Copies of takes already in the library go; a take that never reached it comes back as a "(recovered)" entry.
     func sweepInflightRecordings() {
         let dir = inflightRecordingsURL
-        let keep = Set([pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
+        let keep = recoveryReferencedFiles.union([pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
             .compactMap { $0?.resolvingSymlinksInPath().path })
         inflightSweep = Task { [weak self, library] in
             let found = (try? await AppModel.offMainIO(qos: .utility) { AppModel.inflightFiles(in: dir) }) ?? []

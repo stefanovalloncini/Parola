@@ -71,7 +71,7 @@ extension TranscriberMockSuites {
 
         private func decodeRecoveryFile(_ model: AppModel) async throws -> RecoveryCheckpoint {
             await flushRecoveryWrites(model)
-            let data = try Data(contentsOf: model.recoveryFileURL)
+            let data = try Data(contentsOf: try #require(model.activeRecoveryFileURL))
             return try JSONDecoder().decode(RecoveryCheckpoint.self, from: data)
         }
 
@@ -82,7 +82,7 @@ extension TranscriberMockSuites {
         }
 
         private func recoveryFileExists(_ model: AppModel) -> Bool {
-            FileManager.default.fileExists(atPath: model.recoveryFileURL.path)
+            !model.recoveryCheckpointFiles.isEmpty
         }
 
         private func waitUntil(timeoutMs: Int = 5000, _ condition: @MainActor () -> Bool) async -> Bool {
@@ -354,7 +354,6 @@ extension TranscriberMockSuites {
             model.acceptPendingRecovery()
 
             #expect(model.pendingRecovery == nil)
-            #expect(!recoveryFileExists(model))
             #expect(model.transcript?.segments == segments)
             #expect(model.transcript?.language == "it")
             #expect(model.phase == .ready)
@@ -369,6 +368,7 @@ extension TranscriberMockSuites {
             #expect(entries.count == 1)
             #expect(entries.first?.title.hasPrefix("Recording ") == true)
             #expect(entries.first?.title.hasSuffix("(recovered)") == true)
+            #expect(await waitUntil { !self.recoveryFileExists(model) }, "the checkpoint goes once the restored take is in the library")
         }
 
         /// The probe is the same await window loadEntry has, and a page opened inside it is the user's last word.
@@ -417,6 +417,65 @@ extension TranscriberMockSuites {
                 #expect(model.transcript?.text == "ripresa")
                 #expect(!recoveryFileExists(model))
             }
+        }
+
+        @Test("a legacy recovery.json moves into the recovery folder under its checkpoint's own name, once")
+        func legacyCheckpointMovesIntoTheFolder() throws {
+            let lib = makeTempLibraryURL("recovery-legacy")
+            try writeCheckpoint(
+                RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", segments: Self.makeSegments()),
+                libraryURL: lib
+            )
+
+            let model = makeModel(libraryURL: lib)
+
+            let offered = try #require(model.pendingRecovery)
+            #expect(!FileManager.default.fileExists(atPath: model.legacyRecoveryFileURL.path))
+            #expect(model.recoveryCheckpointFiles.map(\.lastPathComponent) == ["\(offered.id.uuidString).json"])
+            let relaunched = makeModel(libraryURL: lib)
+            #expect(relaunched.pendingRecovery?.id == offered.id, "the moved file keeps the id it was given")
+        }
+
+        @Test("ending one run's checkpoint leaves every other run's file on disk")
+        func eachRunEndsOnlyItsOwnCheckpoint() async throws {
+            let model = makeModel()
+            let older = model.beginFileTranscribeRecovery(sourceURL: URL(fileURLWithPath: "/tmp/recovery-older.wav"))
+            await flushRecoveryWrites(model)
+            let olderFile = try #require(model.activeRecoveryFileURL)
+            model.recoveryHeldByTake.insert(older)
+            _ = model.beginFileTranscribeRecovery(sourceURL: URL(fileURLWithPath: "/tmp/recovery-newer.wav"))
+            await flushRecoveryWrites(model)
+            let newerFile = try #require(model.activeRecoveryFileURL)
+
+            model.endActiveRecovery()
+            #expect(!FileManager.default.fileExists(atPath: newerFile.path))
+            #expect(FileManager.default.fileExists(atPath: olderFile.path), "an older take's held checkpoint outlives a newer run's end")
+
+            model.recoveryHeldByTake.remove(older)
+            model.endRecovery(older)
+            #expect(!FileManager.default.fileExists(atPath: olderFile.path))
+            #expect(model.recoveryCheckpointFiles.isEmpty)
+        }
+
+        @Test("with several checkpoints on disk, the newest is offered and the rest wait for a later launch")
+        func newestCheckpointIsOffered() throws {
+            let lib = makeTempLibraryURL("recovery-several")
+            let older = RecoveryCheckpoint(
+                kind: .recording, startedAt: Date().addingTimeInterval(-600), modelName: "m", segments: Self.makeSegments()
+            )
+            let newer = RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", segments: Self.makeSegments())
+            let folder = lib.appendingPathComponent("recovery", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for checkpoint in [older, newer] {
+                try JSONEncoder().encode(checkpoint).write(to: folder.appendingPathComponent("\(checkpoint.id.uuidString).json"))
+            }
+
+            let model = makeModel(libraryURL: lib)
+            #expect(model.pendingRecovery?.id == newer.id)
+
+            model.declinePendingRecovery()
+            #expect(model.recoveryCheckpointFiles.map(\.lastPathComponent) == ["\(older.id.uuidString).json"])
+            #expect(makeModel(libraryURL: lib).pendingRecovery?.id == older.id)
         }
 
         @Test("recovered recording titles carry the timestamp and suffix")

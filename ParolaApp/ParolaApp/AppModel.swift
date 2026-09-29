@@ -419,8 +419,12 @@ final class AppModel {
     var pendingRecovery: RecoveryCheckpoint?
     @ObservationIgnored var recoveryGeneration: Int = 0
     @ObservationIgnored var activeRecoveryGeneration: Int?
-    /// Checkpoints a take's save still needs: cleanup leaves them on disk until the entry exists.
-    @ObservationIgnored var recoveryHeldBySave: Set<Int> = []
+    /// Each live generation's checkpoint file, named for its id; a generation missing here has ended.
+    @ObservationIgnored var recoveryFileIDs: [Int: UUID] = [:]
+    /// Checkpoints a take's run or save still needs: cleanup leaves them on disk until the entry exists.
+    @ObservationIgnored var recoveryHeldByTake: Set<Int> = []
+    /// Working files the checkpoints on disk point at, which the sweep leaves for the offer to settle.
+    @ObservationIgnored var recoveryReferencedFiles: Set<String> = []
     @ObservationIgnored var inflightSweep: Task<Void, Never>?
     @ObservationIgnored var recordingRecoveryStartedAt: Date?
     @ObservationIgnored var liveRecordingAudioURL: URL?
@@ -3424,7 +3428,7 @@ final class AppModel {
     private func keepFailedLiveTake(_ reason: String, take: TakeContext?, session: (any StreamingTranscriber)?) async {
         let recovery = activeRecoveryGeneration
         // Held first, so the teardown below leaves the checkpoint for the save to end.
-        if let recovery { recoveryHeldBySave.insert(recovery) }
+        if let recovery { recoveryHeldByTake.insert(recovery) }
         let confirmed = liveSegments
         teardownStreaming()
         let audioURL = await session?.recordingAudioURL()
@@ -3449,7 +3453,7 @@ final class AppModel {
             )
             message += " " + String(localized: "The recording up to this point was saved to your library.")
         } else if let recovery {
-            recoveryHeldBySave.remove(recovery)
+            recoveryHeldByTake.remove(recovery)
             endRecovery(recovery)
         }
         liveSegments = []
@@ -3553,14 +3557,16 @@ final class AppModel {
             do {
                 let url = try await source.prepare()
                 clearTakeReadouts()
-                await transcribeRecordedTake(url: url, title: title, source: takeSource, category: category)
+                await transcribeRecordedTake(
+                    url: url, title: title, source: takeSource, category: category, replacing: recovery
+                )
             } catch let cut as CaptureInterrupted {
                 clearTakeReadouts()
                 liveRecordingAudioURL = nil
                 keepCutShortTake(cut, title: title, source: takeSource, category: category, recovery: recovery)
             } catch {
                 clearTakeReadouts()
-                endActiveRecovery()
+                if let recovery { endRecovery(recovery) }
                 liveRecordingAudioURL = nil
                 let message = Self.transcriptionFailureMessage(for: error)
                 phase = .failed(message: message)
@@ -3634,9 +3640,9 @@ final class AppModel {
         return String(localized: "Nothing was recorded.", bundle: bundle)
     }
 
-    /// Transcribes a finished take from its in-flight file; the audio is irreplaceable, so a failure or a stop still saves it.
+    /// Transcribes a finished take from its working file, retiring the checkpoint it replaces; a failure or a stop still saves it.
     func transcribeRecordedTake(
-        url: URL, title: String, source: EntrySource, category: EntryCategory = .transcription
+        url: URL, title: String, source: EntrySource, category: EntryCategory = .transcription, replacing previous: Int? = nil
     ) async {
         liveRecordingAudioURL = nil
         takeRunCounter &+= 1
@@ -3644,10 +3650,16 @@ final class AppModel {
         takeRun = run
         defer { if takeRun == run { takeRun = nil } }
         let recovery = beginFileTranscribeRecovery(sourceURL: url, title: title, source: source)
+        // Held by the run itself, so a Cancel's cleanup leaves it for the save that follows.
+        recoveryHeldByTake.insert(recovery)
         recordedTake = RecordedTake(file: url, title: title)
         sourceFileURL = url
         installPlayer(for: url)
         phase = .transcribing(file: url)
+        if let previous {
+            await pendingRecoveryWrite?.value
+            endRecovery(previous)
+        }
         do {
             let result = try await session.transcribe(
                 source: FileAudioSource(url: url),
@@ -3736,7 +3748,7 @@ final class AppModel {
 
     /// A take's library save: the checkpoint and working file stay until the entry exists, and a quit waits for it.
     @discardableResult
-    private func saveTake(
+    func saveTake(
         _ transcript: Transcript,
         audio: URL?,
         title: String,
@@ -3754,14 +3766,14 @@ final class AppModel {
             category: category,
             title: title
         ))
-        if let recovery { recoveryHeldBySave.insert(recovery) }
+        if let recovery { recoveryHeldByTake.insert(recovery) }
         trackTakeWork { [weak self, library] in
             let entry = try? await saving.value
             var entryAudio: URL?
             if let entry, audio != nil { entryAudio = try? await library.load(entry.id).document.audioURL }
             guard let self else { return }
             if let recovery {
-                self.recoveryHeldBySave.remove(recovery)
+                self.recoveryHeldByTake.remove(recovery)
                 if entry != nil { self.endRecovery(recovery) }
             }
             guard let entry else { return }

@@ -194,7 +194,7 @@ extension TranscriberMockSuites {
             model.writeRecordingCheckpoint()
 
             await model.pendingRecoveryWrite?.value
-            let data = try Data(contentsOf: model.recoveryFileURL)
+            let data = try Data(contentsOf: try #require(model.activeRecoveryFileURL))
             let checkpoint = try JSONDecoder().decode(RecoveryCheckpoint.self, from: data)
             #expect(checkpoint.kind == .recording)
             #expect(checkpoint.audioURL == audio)
@@ -222,11 +222,15 @@ extension TranscriberMockSuites {
 
             model.acceptPendingRecovery()
 
-            let restored = await waitUntil { model.sourceFileURL == wav && model.transcript != nil }
+            let restored = await waitUntil { model.transcript?.segments.first?.text == "salvato" && model.sourceFileURL != nil }
             #expect(restored)
-            #expect(model.transcript?.segments.first?.text == "salvato")
             let saved = await entries(model, count: 1)
             #expect(saved.first?.manifest.originalAudioName.isEmpty == false)
+            // Playback follows the take into its entry once the library holds the audio.
+            let followed = await waitUntil {
+                model.sourceFileURL?.deletingLastPathComponent().lastPathComponent == saved.first?.bundleURL.lastPathComponent
+            }
+            #expect(followed)
         }
 
         @Test("accepting a take's transcription recovery keeps its title")

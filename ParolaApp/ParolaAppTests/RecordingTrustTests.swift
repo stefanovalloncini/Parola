@@ -201,19 +201,19 @@ extension TranscriberMockSuites {
                 let model = makeModel()
                 await transcribingTake(model, wav: wav)
                 await model.pendingRecoveryWrite?.value
-                #expect(FileManager.default.fileExists(atPath: model.recoveryFileURL.path))
+                #expect(model.recoveryCheckpointFiles.count == 1, "the capture's checkpoint handed over to the transcription's")
 
                 model.stopTranscribingTake()
 
                 var savedWithoutCheckpointFirst = false
                 await waitUntil {
-                    let checkpointGone = !FileManager.default.fileExists(atPath: model.recoveryFileURL.path)
+                    let checkpointGone = model.recoveryCheckpointFiles.isEmpty
                     let saved = await !model.library.list().isEmpty
                     if checkpointGone, !saved { savedWithoutCheckpointFirst = true }
                     return saved
                 }
                 #expect(!savedWithoutCheckpointFirst, "the checkpoint went before the take was in the library")
-                await waitUntil { !FileManager.default.fileExists(atPath: model.recoveryFileURL.path) }
+                await waitUntil { model.recoveryCheckpointFiles.isEmpty }
             }
         }
 
@@ -224,14 +224,15 @@ extension TranscriberMockSuites {
             model.liveRecordingAudioURL = URL(fileURLWithPath: "/tmp/parola-held-checkpoint.wav")
             model.writeRecordingCheckpoint()
             await model.pendingRecoveryWrite?.value
-            model.recoveryHeldBySave.insert(generation)
+            let file = try #require(model.activeRecoveryFileURL)
+            model.recoveryHeldByTake.insert(generation)
 
             model.endActiveRecovery()
-            #expect(FileManager.default.fileExists(atPath: model.recoveryFileURL.path))
+            #expect(FileManager.default.fileExists(atPath: file.path))
 
-            model.recoveryHeldBySave.remove(generation)
+            model.recoveryHeldByTake.remove(generation)
             model.endRecovery(generation)
-            #expect(!FileManager.default.fileExists(atPath: model.recoveryFileURL.path))
+            #expect(!FileManager.default.fileExists(atPath: file.path))
         }
 
         // MARK: - Recording while a take transcribes
@@ -363,6 +364,29 @@ extension TranscriberMockSuites {
                 await settle()
                 #expect(model.phase == .idle)
                 #expect(model.takeArming == nil)
+            }
+        }
+
+        @Test("Cancel while a take arms leaves an older take's held checkpoint on disk", .timeLimit(.minutes(1)))
+        func armingCancelSparesAnOlderCheckpoint() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel()
+                let older = model.beginFileTranscribeRecovery(
+                    sourceURL: URL(fileURLWithPath: "/tmp/parola-older-take.wav"), title: "Recording 1", source: .microphone
+                )
+                await model.pendingRecoveryWrite?.value
+                let olderFile = try #require(model.activeRecoveryFileURL)
+                model.recoveryHeldByTake.insert(older)
+
+                await startStreamingTake(model, gate: MockTranscriberGate(), download: 0.5)
+                await waitUntil { model.takeArming != nil }
+                model.cancelRecordingBeforeCapture()
+                await settle()
+
+                #expect(FileManager.default.fileExists(atPath: olderFile.path), "the older take's save still needs its checkpoint")
+                model.recoveryHeldByTake.remove(older)
+                model.endRecovery(older)
             }
         }
 
@@ -633,7 +657,7 @@ extension TranscriberMockSuites {
                 #expect(listed.count == 1, "the take is saved before the app is told it may quit")
                 #expect(listed.first?.title.hasSuffix("(not transcribed)") == true)
                 #expect(listed.first?.manifest.originalAudioName.isEmpty == false)
-                #expect(!FileManager.default.fileExists(atPath: model.recoveryFileURL.path))
+                #expect(model.recoveryCheckpointFiles.isEmpty)
                 #expect(!model.takeInProgress)
             }
         }

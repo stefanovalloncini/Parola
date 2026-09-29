@@ -505,8 +505,8 @@ extension TranscriberMockSuites {
             let first = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture, gate: gate))
 
             first.transcribeYouTube(urlString: Self.link)
-            await waitUntil { FileManager.default.fileExists(atPath: first.recoveryFileURL.path) }
-            let saved = try Data(contentsOf: first.recoveryFileURL)
+            await waitUntil { first.activeRecoveryFileURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false }
+            let saved = try Data(contentsOf: try #require(first.activeRecoveryFileURL))
             let checkpoint = try JSONDecoder().decode(RecoveryCheckpoint.self, from: saved)
             #expect(checkpoint.sourceURL == URL(string: Self.link))
             #expect(checkpoint.source == .web)
@@ -515,7 +515,7 @@ extension TranscriberMockSuites {
 
             let relaunchFetcher = ScriptedLinkFetcher(fixture: fixture, gate: gate)
             let relaunched = makeModel(fetcher: relaunchFetcher)
-            try saved.write(to: relaunched.recoveryFileURL)
+            try saved.write(to: relaunched.legacyRecoveryFileURL)
             relaunched.loadPendingRecovery()
             #expect(relaunched.pendingRecovery?.sourceURL == URL(string: Self.link))
 
