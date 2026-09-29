@@ -123,8 +123,9 @@ extension AppModel {
         }
     }
 
+    /// A take still playing from its working file goes by its own title, never the file's name.
     var currentTranscriptTitle: String {
-        Self.transcriptDisplayTitle(
+        recordedTakeTitle(playing: sourceFileURL) ?? Self.transcriptDisplayTitle(
             sourceFileURL: sourceFileURL,
             entry: selectedEntryID.flatMap { libraryEntry(id: $0) },
             showsAITitle: showAITitles,

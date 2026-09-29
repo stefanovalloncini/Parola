@@ -687,6 +687,25 @@ extension TranscriberMockSuites {
             #expect(AppModel.recoveredRecordingTitle(startedAt: endedAt, bundle: italian) == "Registrazione \(stamp) (recuperata)")
         }
 
+        @Test("Export and Share name a take still playing from its working file by its title")
+        func exportNamesAnUnsavedTakeByItsTitle() async throws {
+            let wav = try makeTakeWAV("export-title")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "unsaved")],
+                    gate: MockTranscriberGate()
+                ))
+                let model = makeModel()
+                await transcribingTake(model, wav: wav)
+                let title = try #require(model.recordedTake?.title)
+
+                #expect(model.currentTranscriptTitle == title)
+                #expect(!model.currentTranscriptTitle.contains("parola-trust"))
+                model.stopTranscribingTake()
+            }
+        }
+
         @Test("a take's title loses its not-transcribed note once it has words, in either language")
         func transcribedTitleDropsTheNote() throws {
             #expect(AppModel.transcribedTitle(from: "Recording 1 (not transcribed)") == "Recording 1")
