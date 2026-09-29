@@ -57,31 +57,69 @@ enum TranscriptWindows {
         if wholeCount <= limit {
             return [Window(transcript: transcript, text: whole)]
         }
-        // Calibrated against the one real count so windows come out near full; each is still checked below.
+        // Calibrated against the one real count; the 5 % slack absorbs windows denser than the average.
         let scale = Double(wholeCount) / Double(budget.estimate(whole))
+        func cost(_ segment: TranscriptSegment) -> Double {
+            line(segment).map { Double(budget.estimate($0)) * scale } ?? 0
+        }
         let frame = Double(budget.estimate(render(transcript.windowed([])))) * scale
-        let lineLimit = max(1, Double(limit) - frame)
+        let lineLimit = max(1, (Double(limit) - frame) * 0.95)
 
         var runs: [[TranscriptSegment]] = []
         var current: [TranscriptSegment] = []
         var used = 0.0
         for segment in transcript.segments {
-            let cost = line(segment).map { Double(budget.estimate($0)) * scale } ?? 0
-            if !current.isEmpty && used + cost > lineLimit {
+            let segmentCost = cost(segment)
+            if !current.isEmpty && used + segmentCost > lineLimit {
                 runs.append(current)
                 current = []
                 used = 0
             }
             current.append(segment)
-            used += cost
+            used += segmentCost
         }
         if !current.isEmpty { runs.append(current) }
 
         var windows: [Window] = []
-        for run in runs {
-            windows += await fitted(run, of: transcript, limit: limit, budget: budget, render: render)
+        var carried: [TranscriptSegment] = []
+        var next = 0
+        while next < runs.count || !carried.isEmpty {
+            let run = carried + (next < runs.count ? runs[next] : [])
+            next += 1
+            let (kept, rest) = await trimmed(run, of: transcript, limit: limit, budget: budget, cost: cost, render: render)
+            windows += kept
+            carried = rest
         }
         return windows.isEmpty ? [Window(transcript: transcript, text: whole)] : windows
+    }
+
+    /// Fits a run by handing its last segments on to the next run, a few tries at most, then by halving.
+    private static func trimmed(
+        _ run: [TranscriptSegment],
+        of transcript: Transcript,
+        limit: Int,
+        budget: TokenBudget,
+        cost: (TranscriptSegment) -> Double,
+        render: (Transcript) -> String
+    ) async -> (windows: [Window], carried: [TranscriptSegment]) {
+        var kept = run
+        var carried: [TranscriptSegment] = []
+        for _ in 0..<3 {
+            let window = transcript.windowed(kept)
+            let text = render(window)
+            if kept.count == 1 || text.utf8.count <= limit { return ([Window(transcript: window, text: text)], carried) }
+            let over = await budget.count(text) - limit
+            if over <= 0 { return ([Window(transcript: window, text: text)], carried) }
+            var dropped = 0.0
+            var moved = 0
+            while kept.count > 1, dropped < Double(over) || moved == 0 {
+                let last = kept.removeLast()
+                dropped += cost(last)
+                moved += 1
+                carried.insert(last, at: 0)
+            }
+        }
+        return (await fitted(kept, of: transcript, limit: limit, budget: budget, render: render), carried)
     }
 
     /// Tokens left for a window's text once the instructions and the answer are set aside.
@@ -95,7 +133,7 @@ enum TranscriptWindows {
         return max(1, limit)
     }
 
-    /// Halves a run until each half fits; a single segment over the limit goes alone.
+    /// The last resort: halves a run until each half fits; a single segment over the limit goes alone.
     private static func fitted(
         _ run: [TranscriptSegment],
         of transcript: Transcript,

@@ -68,6 +68,30 @@ struct TranscriptWindowsTests {
         }
     }
 
+    @Test("windows denser than their estimate hand their last lines on, costing at most one extra call")
+    func overflowAddsAtMostOneCall() async {
+        let transcript = hourLong()
+        let planned = await TranscriptWindows.split(
+            transcript,
+            budget: smallOnDevice,
+            instructions: "Summarise.",
+            line: TranscriptPromptContext.timestampedLine(for:),
+            render: TranscriptPromptContext.timestampedLines(for:)
+        )
+        let underrated = await TranscriptWindows.split(
+            transcript,
+            budget: smallOnDevice,
+            instructions: "Summarise.",
+            line: { TranscriptPromptContext.timestampedLine(for: $0).map { String($0.prefix($0.count * 17 / 20)) } },
+            render: TranscriptPromptContext.timestampedLines(for:)
+        )
+        #expect(underrated.count <= planned.count + 1)
+        #expect(underrated.flatMap(\.transcript.segments) == transcript.segments)
+        for window in underrated {
+            #expect(smallOnDevice.estimate("Summarise.") + smallOnDevice.estimate(window.text) <= smallOnDevice.tokens)
+        }
+    }
+
     @Test("a long summary never sends a call over the budget")
     func summaryCallsFit() async throws {
         let model = MockLanguageModel()
