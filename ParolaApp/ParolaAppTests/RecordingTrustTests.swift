@@ -273,6 +273,38 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Retry of a take whose save failed runs from its working file and retires the checkpoint that save left")
+        func retryRetiresTheFailedSavesCheckpoint() async throws {
+            let wav = try makeTakeWAV("retry-failed-save")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine boom")
+                ))
+                let model = makeModel()
+                model.beforeLandingSave = { throw URLError(.cannotWriteToFile) }
+                model.liveSource = StubTake(url: wav)
+                model.phase = .recording(source: .microphone)
+                model.stopRecordingAndTranscribe()
+                await waitUntil {
+                    if case .failed = model.phase { return !model.hasPendingTakeWork }
+                    return false
+                }
+                #expect(model.recoveryCheckpointFiles.count == 1, "the failed save left its checkpoint")
+
+                model.beforeLandingSave = nil
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "second time lucky")]
+                ))
+                await model.unloadTranscriptionSession()
+                model.retryFailedTake()
+
+                let saved = await entries(model, count: 1)
+                #expect(saved.count == 1)
+                #expect(await waitUntil { model.recoveryCheckpointFiles.isEmpty })
+            }
+        }
+
         @Test("a cancellation never reaches the screen as its type name")
         func cancellationReadsPlainly() {
             let message = AppModel.transcriptionFailureMessage(for: CancellationError())

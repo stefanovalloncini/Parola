@@ -453,6 +453,8 @@ final class AppModel {
     var failedTakeAudioURL: URL?
     /// The save that put the failed take in the library, so Retry fills in that entry instead of adding a twin.
     @ObservationIgnored var failedTakeSave: Task<LibraryEntry, any Error>?
+    /// The failed take's checkpoint, which a Retry from its working file retires once its own is on disk.
+    @ObservationIgnored var failedTakeRecovery: Int?
     /// The file a failed file transcription was reading; the error card retries and reveals it.
     var failedFileURL: URL?
     /// The translate setting the failed run used, so Retry repeats it rather than the current toggle.
@@ -3503,7 +3505,7 @@ final class AppModel {
         phase = .failed(message: message)
         // After the phase: its didSet forgets whatever the last failure left behind.
         if savedPartial, let audioURL {
-            armTakeRetry(url: audioURL, title: takeTitle, source: takeSource, category: takeCategory, save: saving)
+            armTakeRetry(url: audioURL, title: takeTitle, source: takeSource, category: takeCategory, save: saving, recovery: recovery)
         }
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
@@ -3684,7 +3686,7 @@ final class AppModel {
         let message = String(localized: "Parola couldn't keep writing the recording to disk.")
             + " " + String(localized: "The recording up to this point was saved to your library.")
         phase = .failed(message: message)
-        armTakeRetry(url: cut.url, title: title, source: source, category: category, save: saving)
+        armTakeRetry(url: cut.url, title: title, source: source, category: category, save: saving, recovery: recovery)
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
@@ -3809,17 +3811,19 @@ final class AppModel {
             return
         }
         phase = .failed(message: message)
-        armTakeRetry(url: url, title: title, source: source, category: category, save: saving)
+        armTakeRetry(url: url, title: title, source: source, category: category, save: saving, recovery: recovery)
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
     /// After the phase is set: its didSet forgets whatever the last failure left behind.
     private func armTakeRetry(
-        url: URL, title: String, source: EntrySource, category: EntryCategory, save: Task<LibraryEntry, any Error>?
+        url: URL, title: String, source: EntrySource, category: EntryCategory,
+        save: Task<LibraryEntry, any Error>?, recovery: Int?
     ) {
         failureKind = .transcription
         failedTakeAudioURL = url
         failedTakeSave = save
+        failedTakeRecovery = recovery
         failedTakeTitle = title
         failedTakeCategory = category
         failedTakeSource = source
@@ -4064,6 +4068,7 @@ final class AppModel {
         if failedLinkDownload != nil { failedLinkDownload = nil }
         if failedTakeAudioURL != nil { failedTakeAudioURL = nil }
         failedTakeSave = nil
+        failedTakeRecovery = nil
         failedTakeTitle = nil
         failedTakeCategory = nil
         failedTakeSource = nil
@@ -4114,6 +4119,7 @@ final class AppModel {
         let source = failedTakeSource ?? .microphone
         let category = failedTakeCategory ?? .transcription
         let saving = failedTakeSave
+        let recovery = failedTakeRecovery
         Task { [weak self] in
             if let entry = try? await saving?.value, let self, (try? await self.openEntry(entry.id)) != nil {
                 self.retranscribeCurrentEntry(model: self.selectedModel, language: self.selectedLanguage)
@@ -4121,7 +4127,9 @@ final class AppModel {
                 return
             }
             self?.startTakeTask { [weak self] in
-                await self?.transcribeRecordedTake(url: url, title: title, source: source, category: category)
+                await self?.transcribeRecordedTake(
+                    url: url, title: title, source: source, category: category, replacing: recovery
+                )
             }
         }
     }
