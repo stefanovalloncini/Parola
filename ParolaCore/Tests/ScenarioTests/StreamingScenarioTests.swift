@@ -5,6 +5,17 @@ import ScenarioKit
 extension ScenarioSuite {
     @Suite("Streaming scenarios")
     struct Streaming {
+    /// A take reads "recording" from the moment it's asked for, but captures only once its model is ready.
+    private func waitForCapture(_ client: ScenarioBridgeClient, timeout: Duration) async throws -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            let state = try await client.send("getState")
+            if state["recordingStartedAt"]?.doubleValue != nil { return true }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        return false
+    }
+
     @Test("mic streaming renders scripted partials then finishes")
     func micStreaming() async throws {
         let client = try ScenarioBridgeClient()
@@ -20,6 +31,8 @@ extension ScenarioSuite {
             _ = try await client.send("startRecording", ["source": "microphone"])
             let recording = try await client.send("waitForPhase", ["phase": "recording", "timeoutMs": 5000])
             #expect(recording["matched"]?.boolValue == true)
+            // Loading the model can take a while on a cold start; the take counts only from its first audio.
+            #expect(try await waitForCapture(client, timeout: .seconds(60)))
 
             try await Task.sleep(for: .seconds(5))
             _ = try await client.send("stopRecording")
@@ -44,6 +57,7 @@ extension ScenarioSuite {
             _ = try await client.send("startRecording", ["source": "microphone"])
             let recording = try await client.send("waitForPhase", ["phase": "recording", "timeoutMs": 5000])
             #expect(recording["matched"]?.boolValue == true)
+            #expect(try await waitForCapture(client, timeout: .seconds(5)))
 
             _ = try await client.send("stopRecording")
             let ready = try await client.send("waitForPhase", ["phase": "ready", "timeoutMs": 10000])

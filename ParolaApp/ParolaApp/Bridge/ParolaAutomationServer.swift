@@ -472,6 +472,7 @@ final class ParolaAutomationServer {
         return .object([
             "phase": .string(Self.phaseName(model.phase)),
             "phaseDetail": Self.phaseDetail(model.phase, progress: TranscribeProgress(model: model)),
+            "recordingStartedAt": model.recordingStartedAt.map { .double($0.timeIntervalSince1970) } ?? .null,
             "route": .string(model.route.rawValue),
             "settingsPane": .string(model.settingsPane),
             "libraryFilter": .string(model.libraryFilter?.rawValue ?? ""),
