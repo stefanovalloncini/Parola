@@ -1396,6 +1396,29 @@ struct LibraryStoreTests {
         #expect(try await store.load(entry.id).document.transcript.chapters == summarized)
     }
 
+    @Test("chapters and action items set on their own land in the entry and leave the rest alone")
+    func setChaptersAndActionItems() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        try await store.setSummary(Summary(text: "Recap"), for: entry.id)
+        let chapters = [Chapter(title: "Opening", start: 0)]
+        let items = [ActionItem(assignee: "Ada", task: "Send the deck", dueDate: "Friday")]
+
+        try await store.setChapters(chapters, for: entry.id)
+        try await store.setActionItems(items, for: entry.id)
+
+        var stored = try await store.load(entry.id).document.transcript
+        #expect(stored.chapters == chapters)
+        #expect(stored.summary?.chapters == chapters)
+        #expect(stored.summary?.text == "Recap")
+        #expect(stored.actionItems == items)
+
+        try await store.setActionItems(nil, for: entry.id)
+        stored = try await store.load(entry.id).document.transcript
+        #expect(stored.actionItems == nil)
+        #expect(stored.chapters == chapters)
+    }
+
     @Test("a summary a save already wrote without indexing still reaches the index")
     func setSummaryIndexesWhatASaveWrote() async throws {
         let (store, _) = try makeTempLibrary()

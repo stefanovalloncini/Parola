@@ -87,6 +87,9 @@ public struct Transcript: Codable, Hashable, Sendable {
     /// The transcript rendered in another language, or nil when it has never been translated.
     public var translation: TranscriptTranslation?
 
+    /// Action items found on their own, apart from the summary's; nil when none were ever looked for.
+    public var actionItems: [ActionItem]?
+
     public init(
         schemaVersion: Int = Transcript.currentSchemaVersion,
         segments: [TranscriptSegment],
@@ -99,7 +102,8 @@ public struct Transcript: Codable, Hashable, Sendable {
         chapters: [Chapter]? = nil,
         chatHistory: [ChatMessage]? = nil,
         languageDetection: LanguageDetection? = nil,
-        translation: TranscriptTranslation? = nil
+        translation: TranscriptTranslation? = nil,
+        actionItems: [ActionItem]? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.segments = segments
@@ -113,6 +117,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.chatHistory = chatHistory
         self.languageDetection = languageDetection
         self.translation = translation
+        self.actionItems = actionItems
     }
 
     public init(from decoder: any Decoder) throws {
@@ -129,6 +134,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         chatHistory = try c.decodeIfPresent([ChatMessage].self, forKey: .chatHistory)
         languageDetection = try c.decodeIfPresent(LanguageDetection.self, forKey: .languageDetection)
         translation = try c.decodeIfPresent(TranscriptTranslation.self, forKey: .translation)
+        actionItems = try c.decodeIfPresent([ActionItem].self, forKey: .actionItems)
     }
 
     public var text: String {

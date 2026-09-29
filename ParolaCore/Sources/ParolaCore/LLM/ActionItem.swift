@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ActionItem: Equatable, Sendable, Identifiable {
+public struct ActionItem: Codable, Hashable, Sendable, Identifiable {
     public let id: UUID
     public let assignee: String?
     public let task: String

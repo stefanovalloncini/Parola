@@ -245,19 +245,87 @@ struct AICallSiteTests {
         }
     }
 
-    @Test("a chat digest never replaces a summary the entry got in the meantime")
-    func chatDigestLeavesAnExistingSummary() async throws {
+    @Test("a chat digest waits on the summary already running instead of starting another")
+    func chatDigestJoinsTheRunningSummary() async throws {
         let model = makeModel()
         let entry = try await model.library.add(transcript: try #require(model.transcript), audioSource: nil, category: .transcription)
         model.selectedEntryID = entry.id
-        let asked = Summary(text: "asked for")
-        model.transcript?.install(summary: asked)
-        try await model.library.setSummary(asked, for: entry.id)
+        let digests = DigestCounter()
+        let (release, releaser) = AsyncStream<Void>.makeStream()
+        model.summariseOperation = { _, _ in
+            await digests.bump()
+            for await _ in release { break }
+            return Summary(text: "one run")
+        }
 
-        await model.keepChatDigest(Summary(text: "digest"), for: entry.id)
+        model.summariseTranscript()
+        let digest = model.chatDigest(for: entry.id, transcript: try #require(model.transcript))
+        async let fromChat = digest()
+        releaser.finish()
 
-        #expect(model.transcript?.summary?.text == "asked for")
-        #expect(try await model.library.load(entry.id).document.transcript.summary?.text == "asked for")
+        #expect(try await fromChat.text == "one run")
+        #expect(await digests.count == 1)
+    }
+
+    @Test("chapters and action items asked for on one entry land in it while another is open")
+    func runsLandOnTheirEntry() async throws {
+        try await withInstalledMocks {
+            await MockLanguageModelStore.shared.install(
+                provider: .foundation,
+                response: MockLanguageModelResponse(text: "00:00 Opening", delayMs: 300)
+            )
+            await MockLanguageModelStore.shared.install(
+                provider: .openAI,
+                response: MockLanguageModelResponse(text: "- [Ada] send the deck", delayMs: 300)
+            )
+            let model = makeModel()
+            let a = try await model.library.add(transcript: try #require(model.transcript), audioSource: nil, category: .transcription)
+            let b = try await model.library.add(transcript: try #require(model.transcript), audioSource: nil, category: .transcription)
+            model.selectedEntryID = a.id
+            pick(openAI(), for: .prompts, on: model)
+
+            model.extractSmartChapters()
+            model.extractActionItems()
+            #expect(model.isExtractingChapters && model.isExtractingActionItems)
+
+            model.loadEntry(b.id)
+            #expect(await waitUntil { model.selectedEntryID == b.id })
+            #expect(!model.isExtractingChapters && !model.isExtractingActionItems)
+            #expect(await waitUntil(timeoutMs: 3000) {
+                !model.aiJobs.isRunning(.chapters, for: a.id) && !model.aiJobs.isRunning(.actionItems, for: a.id)
+            })
+            #expect(model.smartChapters.isEmpty)
+            #expect(model.actionItems.isEmpty)
+            let storedA = try await model.library.load(a.id).document.transcript
+            #expect(storedA.chapters?.map(\.title) == ["Opening"])
+            #expect(storedA.actionItems?.map(\.task) == ["send the deck"])
+
+            model.loadEntry(a.id)
+            #expect(await waitUntil { model.selectedEntryID == a.id && !model.smartChapters.isEmpty })
+            #expect(model.actionItems.map(\.assignee) == ["Ada"])
+        }
+    }
+
+    @Test("Clear stops an action item run and forgets the saved ones")
+    func clearActionItemsCancels() async throws {
+        try await withInstalledMocks {
+            await MockLanguageModelStore.shared.install(
+                provider: .foundation,
+                response: MockLanguageModelResponse(text: "- send the deck", delayMs: 200)
+            )
+            let model = makeModel()
+            let entry = try await model.library.add(transcript: try #require(model.transcript), audioSource: nil, category: .transcription)
+            model.selectedEntryID = entry.id
+
+            model.extractActionItems()
+            #expect(model.isExtractingActionItems)
+            model.clearActionItems()
+            #expect(!model.isExtractingActionItems)
+
+            try await Task.sleep(for: .milliseconds(400))
+            #expect(model.actionItems.isEmpty)
+            #expect(try await model.library.load(entry.id).document.transcript.actionItems == nil)
+        }
     }
 
     @Test("with nothing picked every task stays on the on-device model")

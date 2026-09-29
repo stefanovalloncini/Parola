@@ -186,26 +186,65 @@ struct ChatIntegrationTests {
         #expect(model.isSummarising == false)
     }
 
-    @Test("summariseTranscript drops the summary when the user switches entries")
-    func summariseDropsOnEntrySwitch() async throws {
-        let model = makeModel(entryID: "entry-A", transcript: makeTranscript())
+    @Test("a summary started on A lands in A while B is open, and B's pane is not affected")
+    func summaryLandsOnTheEntryThatAsked() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let a = try await seedStore.add(transcript: makeTranscript(), audioSource: nil, category: .transcription)
+        let b = try await seedStore.add(transcript: makeTranscript(), audioSource: nil, category: .transcription)
+        model.loadEntry(a.id)
+        try await waitUntil { model.selectedEntryID == a.id && model.transcript != nil }
         let gate = SummariseGate()
         model.summariseOperation = { _, _ in
             await gate.wait()
-            return Summary(text: "summary for A", chapters: [])
+            return Summary(text: "summary for A", chapters: [Chapter(title: "A opens", start: 0)])
         }
 
         model.summariseTranscript()
         #expect(model.isSummarising)
 
-        model.transcript = makeTranscript()
-        model.selectedEntryID = "entry-B"
+        model.loadEntry(b.id)
+        try await waitUntil { model.selectedEntryID == b.id && model.transcript != nil }
+        #expect(model.isSummarising == false)
+        #expect(model.aiJobs.isRunning(.summary, for: a.id))
 
         gate.open()
-        try await waitUntil { !model.isSummarising }
+        try await waitUntil { !model.aiJobs.isRunning(.summary, for: a.id) }
 
         #expect(model.transcript?.summary == nil)
+        #expect(model.smartChapters.isEmpty)
+        #expect(try await model.library.load(b.id).document.transcript.summary == nil)
+        let storedA = try await model.library.load(a.id).document.transcript
+        #expect(storedA.summary?.text == "summary for A")
+        #expect(storedA.chapters?.map(\.title) == ["A opens"])
+
+        model.loadEntry(a.id)
+        try await waitUntil { model.selectedEntryID == a.id && model.transcript?.summary != nil }
+        #expect(model.smartChapters.map(\.title) == ["A opens"])
+    }
+
+    @Test("Clear stops the summary run in flight and nothing lands afterwards")
+    func clearCancelsTheRun() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let a = try await seedStore.add(transcript: makeTranscript(), audioSource: nil, category: .transcription)
+        model.loadEntry(a.id)
+        try await waitUntil { model.selectedEntryID == a.id && model.transcript != nil }
+        let gate = SummariseGate()
+        model.summariseOperation = { _, _ in
+            await gate.wait()
+            return Summary(text: "too late")
+        }
+
+        model.summariseTranscript()
+        #expect(model.isSummarising)
+        model.clearSummary()
         #expect(model.isSummarising == false)
+
+        gate.open()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(model.transcript?.summary == nil)
+        #expect(try await model.library.load(a.id).document.transcript.summary == nil)
     }
 
     @Test("a summary asked for right after a recording follows the transcript into its new entry")

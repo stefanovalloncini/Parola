@@ -609,12 +609,10 @@ final class AppModel {
 
     @ObservationIgnored let promptLibrary: PromptLibrary
     var promptOutput: PromptOutput?
-    var isRunningPrompt: Bool = false
+    let aiJobs = AIJobRegistry()
     var actionItems: [ActionItem] = []
-    var isExtractingActionItems: Bool = false
     var actionItemsError: String?
     var smartChapters: [Chapter] = []
-    var isExtractingChapters: Bool = false
     var chaptersError: String?
     var entrySpeakerFilters: [String: String] = [:]
     var favoritesOnly: Bool = false
@@ -1863,6 +1861,7 @@ final class AppModel {
                 // taking the selection would repoint their next edits at this new entry.
                 if activate, loadEntryGeneration == navigationGeneration, selectedEntryID == nil {
                     selectedEntryID = entry.id
+                    aiJobs.adoptUnsaved(as: entry.id)
                 }
                 Self.landingSignposter.endInterval("entry", landing)
             } catch {
@@ -1876,11 +1875,8 @@ final class AppModel {
             guard activate, let entry = persisted else { return }
             if playsCompletionSound { playCompletionSound() }
             let card = enqueueCardMetadata(for: entry.id, transcript: result)
-            if autostartSummary,
-               features.isEnabled(.ai),
-               loadEntryGeneration == navigationGeneration, selectedEntryID == entry.id,
-               result.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= CardMetadataService.minimumCharacters {
-                summariseTranscript()
+            if loadEntryGeneration == navigationGeneration, selectedEntryID == entry.id {
+                applyAutostartSummary(to: entry.id, transcript: result)
             }
             // Delivery sends the AI title, so only a send waits for the card.
             guard hasAutoSendDestination else { return }
@@ -3590,9 +3586,7 @@ final class AppModel {
 
     // MARK: - Summary
 
-    var isSummarising: Bool = false
     var summaryError: String?
-    @ObservationIgnored var summaryGeneration: Int = 0
     /// Test seam: when set, replaces the on-device SummaryService so summarise timing is deterministic.
     @ObservationIgnored var summariseOperation: (@Sendable (Transcript, SummaryOptions) async throws -> Summary)?
 

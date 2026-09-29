@@ -25,67 +25,110 @@ extension AppModel {
         }
     }
 
+    var isRunningPrompt: Bool { aiJobs.isRunning(.prompt, for: selectedEntryID) }
+    var isExtractingActionItems: Bool { aiJobs.isRunning(.actionItems, for: selectedEntryID) }
+    var isExtractingChapters: Bool { aiJobs.isRunning(.chapters, for: selectedEntryID) }
+
     func runPrompt(_ prompt: Prompt) {
-        guard features.isEnabled(.ai) else { return }
-        guard let transcript = self.transcript else { return }
-        guard !isRunningPrompt else { return }
-        isRunningPrompt = true
-        promptOutput = nil
-        let generation = derivedArtifactsGeneration
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let model = try await makeLanguageModel(for: .prompts, instructions: prompt.instructions)
-                let result = try await PromptRunner.run(
-                    prompt, on: transcript, model: model, budget: tokenBudget(for: .prompts), features: features
-                )
-                if generation == derivedArtifactsGeneration {
-                    promptOutput = PromptOutput(promptName: prompt.name, text: result)
-                }
-            } catch {
-                if generation == derivedArtifactsGeneration {
-                    promptOutput = PromptOutput(
-                        promptName: prompt.name,
-                        text: "",
-                        failure: Self.promptFailureMessage(.prompt, error: error)
-                    )
-                }
-                refreshAIAvailability()
-            }
-            isRunningPrompt = false
+        guard features.isEnabled(.ai), let transcript else { return }
+        let budget = tokenBudget(for: .prompts)
+        let features = features
+        startPromptJob(named: prompt.name, failure: .prompt) { [weak self] in
+            guard let self else { throw CancellationError() }
+            let model = try await self.makeLanguageModel(for: .prompts, instructions: prompt.instructions)
+            return try await PromptRunner.run(prompt, on: transcript, model: model, budget: budget, features: features)
         }
     }
 
-    func extractActionItems() {
-        guard features.isEnabled(.ai) else { return }
-        guard let transcript = self.transcript else { return }
-        guard !isExtractingActionItems else { return }
-        guard let prompt = Prompt.builtIns.first(where: { $0.name == "Action items" }) else { return }
-        isExtractingActionItems = true
-        actionItemsError = nil
-        let generation = derivedArtifactsGeneration
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let model = try await makeLanguageModel(for: .prompts, instructions: prompt.instructions)
-                let result = try await PromptRunner.run(
-                    prompt, on: transcript, model: model, budget: tokenBudget(for: .prompts), features: features
-                )
-                if generation == derivedArtifactsGeneration {
-                    actionItems = ActionItemParser.parse(result)
+    func generateYouTubeChapters() {
+        guard features.isEnabled(.ai), let transcript else { return }
+        let budget = tokenBudget(for: .summary)
+        startPromptJob(named: "YouTube Chapters", failure: .chapterGeneration) { [weak self] in
+            guard let self else { throw CancellationError() }
+            let model = try await self.makeLanguageModel(for: .summary, instructions: nil)
+            return try await YouTubeChapters.generate(for: transcript, model: model, budget: budget)
+        }
+    }
+
+    /// A prompt's answer is shown, not saved, so it only appears while its transcript is still on screen.
+    private func startPromptJob(
+        named name: String,
+        failure: PromptFailure,
+        work: @escaping @Sendable () async throws -> String
+    ) {
+        let entryID = selectedEntryID
+        let artifacts = derivedArtifactsGeneration
+        let started = aiJobs.start(
+            .prompt,
+            for: entryID,
+            work: work,
+            land: { [weak self] text, entryID in
+                guard let self, isOnScreen(entryID, askedAt: artifacts) else { return }
+                promptOutput = PromptOutput(promptName: name, text: text)
+            },
+            fail: { [weak self] error, entryID in
+                guard let self else { return }
+                if isOnScreen(entryID, askedAt: artifacts) {
+                    promptOutput = PromptOutput(promptName: name, text: "", failure: Self.promptFailureMessage(failure, error: error))
                 }
-            } catch {
-                if generation == derivedArtifactsGeneration {
+                refreshAIAvailability()
+            }
+        )
+        if started != nil { promptOutput = nil }
+    }
+
+    func extractActionItems() {
+        guard features.isEnabled(.ai), let transcript else { return }
+        guard let prompt = Prompt.builtIns.first(where: { $0.name == "Action items" }) else { return }
+        let entryID = selectedEntryID
+        let artifacts = derivedArtifactsGeneration
+        let budget = tokenBudget(for: .prompts)
+        let features = features
+        let started = aiJobs.start(
+            .actionItems,
+            for: entryID,
+            work: { [weak self] in
+                guard let self else { throw CancellationError() }
+                let model = try await self.makeLanguageModel(for: .prompts, instructions: prompt.instructions)
+                let result = try await PromptRunner.run(prompt, on: transcript, model: model, budget: budget, features: features)
+                return ActionItemParser.parse(result)
+            },
+            land: { [weak self] items, entryID in
+                await self?.landActionItems(items, for: entryID, askedAt: artifacts)
+            },
+            fail: { [weak self] error, entryID in
+                guard let self else { return }
+                if isOnScreen(entryID, askedAt: artifacts) {
                     actionItemsError = Self.promptFailureMessage(.actionItems, error: error)
                 }
                 refreshAIAvailability()
             }
-            isExtractingActionItems = false
+        )
+        if started != nil { actionItemsError = nil }
+    }
+
+    private func landActionItems(_ items: [ActionItem], for entryID: LibraryEntry.ID?, askedAt artifacts: Int) async {
+        if isOnScreen(entryID, askedAt: artifacts) {
+            actionItems = items
+            transcript?.actionItems = items
+        }
+        guard let entryID else { return }
+        do {
+            try await library.setActionItems(items, for: entryID)
+        } catch {
+            ParolaLog.error(.library, "action items could not be saved to the library", [.error: .error(error)])
         }
     }
 
     func clearActionItems() {
+        aiJobs.cancel(.actionItems, for: selectedEntryID)
         actionItems = []
+        guard transcript?.actionItems != nil else { return }
+        transcript?.actionItems = nil
+        guard let entryID = selectedEntryID else { return }
+        Task { [library] in
+            try? await library.setActionItems(nil, for: entryID)
+        }
     }
 
     /// Drops LLM output and undo history tied to the previous transcript. Call wherever a different transcript installs.
@@ -96,6 +139,7 @@ extension AppModel {
         pendingRevealSegmentID = nil
         if editingSegmentNote != nil { editingSegmentNote = nil }
         derivedArtifactsGeneration &+= 1
+        aiJobs.cancelUnsaved()
         if promptOutput != nil { promptOutput = nil }
         if !actionItems.isEmpty { actionItems = [] }
         if !smartChapters.isEmpty { smartChapters = [] }
@@ -108,6 +152,7 @@ extension AppModel {
         clearDerivedArtifacts()
         transcript = stored
         adoptSavedChapters()
+        if let saved = stored.actionItems, !saved.isEmpty { actionItems = saved }
     }
 
     /// A subtitles fetch brings no bundle and no media, so this swap is the whole handover: no entry, and the same seam a stored document takes.
@@ -131,7 +176,7 @@ extension AppModel {
         transcript = updated
         guard let entryID = selectedEntryID else { return }
         Task { [library] in
-            try? await library.updateTranscript(updated, for: entryID, reindex: false)
+            try? await library.setChapters(chapters, for: entryID)
         }
     }
 
@@ -146,32 +191,48 @@ extension AppModel {
     }
 
     func extractSmartChapters() {
-        guard features.isEnabled(.ai) else { return }
-        guard let transcript = self.transcript else { return }
-        guard !isExtractingChapters else { return }
-        isExtractingChapters = true
-        chaptersError = nil
-        let generation = derivedArtifactsGeneration
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let model = try await makeLanguageModel(for: .summary, instructions: nil)
-                let chapters = try await SmartChapters.generate(for: transcript, model: model, budget: tokenBudget(for: .summary))
-                if generation == derivedArtifactsGeneration {
-                    smartChapters = chapters
-                    persistChapters(chapters)
-                }
-            } catch {
-                if generation == derivedArtifactsGeneration {
+        guard features.isEnabled(.ai), let transcript else { return }
+        let entryID = selectedEntryID
+        let artifacts = derivedArtifactsGeneration
+        let budget = tokenBudget(for: .summary)
+        let started = aiJobs.start(
+            .chapters,
+            for: entryID,
+            work: { [weak self] in
+                guard let self else { throw CancellationError() }
+                let model = try await self.makeLanguageModel(for: .summary, instructions: nil)
+                return try await SmartChapters.generate(for: transcript, model: model, budget: budget)
+            },
+            land: { [weak self] chapters, entryID in
+                await self?.landChapters(chapters, for: entryID, askedAt: artifacts)
+            },
+            fail: { [weak self] error, entryID in
+                guard let self else { return }
+                if isOnScreen(entryID, askedAt: artifacts) {
                     chaptersError = Self.promptFailureMessage(.chapterExtraction, error: error)
                 }
                 refreshAIAvailability()
             }
-            isExtractingChapters = false
+        )
+        if started != nil { chaptersError = nil }
+    }
+
+    private func landChapters(_ chapters: [Chapter], for entryID: LibraryEntry.ID?, askedAt artifacts: Int) async {
+        if isOnScreen(entryID, askedAt: artifacts) {
+            smartChapters = chapters
+            persistChapters(chapters)
+            return
+        }
+        guard let entryID else { return }
+        do {
+            try await library.setChapters(chapters, for: entryID)
+        } catch {
+            ParolaLog.error(.library, "chapters could not be saved to the library", [.error: .error(error)])
         }
     }
 
     func clearSmartChapters() {
+        aiJobs.cancel(.chapters, for: selectedEntryID)
         smartChapters = []
         persistChapters([])
     }
@@ -253,34 +314,5 @@ extension AppModel {
         let landing = Self.landingSignposter.beginInterval("card")
         landLibraryEntry(entry)
         Self.landingSignposter.endInterval("card", landing)
-    }
-
-    func generateYouTubeChapters() {
-        guard features.isEnabled(.ai) else { return }
-        guard let transcript = self.transcript else { return }
-        guard !isRunningPrompt else { return }
-        isRunningPrompt = true
-        promptOutput = nil
-        let generation = derivedArtifactsGeneration
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let model = try await makeLanguageModel(for: .summary, instructions: nil)
-                let result = try await YouTubeChapters.generate(for: transcript, model: model, budget: tokenBudget(for: .summary))
-                if generation == derivedArtifactsGeneration {
-                    promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
-                }
-            } catch {
-                if generation == derivedArtifactsGeneration {
-                    promptOutput = PromptOutput(
-                        promptName: "YouTube Chapters",
-                        text: "",
-                        failure: Self.promptFailureMessage(.chapterGeneration, error: error)
-                    )
-                }
-                refreshAIAvailability()
-            }
-            isRunningPrompt = false
-        }
     }
 }

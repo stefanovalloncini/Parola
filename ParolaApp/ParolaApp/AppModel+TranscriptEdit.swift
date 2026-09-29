@@ -198,12 +198,13 @@ extension AppModel {
 }
 
 extension Transcript {
-    /// What undo and redo put back: this snapshot's segments, with the summary, chapters, chat and translation made since.
+    /// What undo and redo put back: this snapshot's segments, with the AI results, chat and translation made since.
     func restoring(generatedIn live: Transcript, translationAfterEdit: TranscriptTranslation?) -> Transcript {
         var restored = self
         restored.summary = live.summary
         restored.chapters = live.chapters
         restored.chatHistory = live.chatHistory
+        restored.actionItems = live.actionItems
         if live.translation != translationAfterEdit {
             restored.translation = live.translation?.carried(from: live.segments, onto: segments)
         }

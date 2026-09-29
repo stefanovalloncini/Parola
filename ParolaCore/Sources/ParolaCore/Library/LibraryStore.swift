@@ -889,6 +889,19 @@ public actor LibraryStore {
         try await mutateTranscript(for: id, reindex: false) { $0.translation = translation }
     }
 
+    /// Replaces the entry's chapters, and the copy its summary keeps, or clears them when `chapters` is nil.
+    public func setChapters(_ chapters: [Chapter]?, for id: LibraryEntry.ID) async throws {
+        try await mutateTranscript(for: id, reindex: false) { transcript in
+            transcript.chapters = chapters
+            if let chapters { transcript.summary?.chapters = chapters }
+        }
+    }
+
+    /// Replaces the action items found on their own, or clears them when `items` is nil.
+    public func setActionItems(_ items: [ActionItem]?, for id: LibraryEntry.ID) async throws {
+        try await mutateTranscript(for: id, reindex: false) { $0.actionItems = items }
+    }
+
     /// Replaces the entry's summary, or clears it when `summary` is nil, and re-indexes: summary text is searchable.
     /// `chapters`, when given, replaces the entry's chapter list in the same write, so the two never disagree on disk.
     public func setSummary(_ summary: Summary?, chapters: [Chapter]? = nil, for id: LibraryEntry.ID) async throws {
