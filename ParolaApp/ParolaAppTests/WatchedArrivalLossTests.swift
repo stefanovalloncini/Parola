@@ -229,6 +229,43 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a save a quit cut short that finished anyway isn't transcribed again, even under Transcribe it again",
+              arguments: [true, false])
+        func interruptedSaveIsNotRunTwice(interrupted: Bool) async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let folder = try makeFolder("interrupted-\(interrupted)")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let library = makeTempLibraryURL("loss-interrupted")
+                let defaults = temporaryDefaults()
+                defaults.set(DuplicateImportPolicy.transcribeAgain.rawValue, forKey: "duplicateImportPolicy")
+                let file = try makeWAV("Saved", in: folder)
+                do {
+                    let before = makeModel(library: library, defaults: defaults)
+                    _ = try await before.library.add(
+                        transcript: Transcript(
+                            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "kept")],
+                            language: "en", modelName: "stub"
+                        ),
+                        audioSource: file
+                    )
+                    var saved = WatchedArrival(url: file)
+                    saved.isLanding = interrupted
+                    before.watchedArrivals = [saved]
+                }
+
+                let after = makeModel(library: library, defaults: defaults)
+                #expect(after.watchedArrivals.first?.landingInterrupted == interrupted)
+                #expect(await waitUntil(timeoutMs: 20_000) { after.watchedLaneIsIdle })
+
+                let count = await after.library.list().count
+                #expect(count == (interrupted ? 1 : 2))
+                #expect(after.batchDuplicatesSkipped == 0)
+            }
+        }
+
         @Test("a file whose entry couldn't be saved is handed back to its watcher", arguments: [false, true])
         func failedSaveIsHandedBack(outOfSight: Bool) async throws {
             try await withMocksCleared(.transcriber) {

@@ -11,6 +11,8 @@ struct WatchedArrival: Codable, Equatable, Identifiable, Sendable {
     var inBackground = false
     /// Transcribed and on its way into the library; it leaves the line once the entry is saved.
     var isLanding = false
+    /// Parola quit while its entry was being saved, so the library may already hold it.
+    var landingInterrupted = false
     /// The watched folder it came from; nil when that isn't known, and the file's own folder stands in.
     var folderID: UUID?
     var folderPath: String?
@@ -110,7 +112,7 @@ extension AppModel {
         guard watchedLaneTask == nil, visibleArrivalID == nil, watchedLanePausedAt == nil, !foregroundIsHeld,
               let next = nextWatchedArrival else { return }
         let deadline = fileReadDeadline
-        let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
+        let checksLibrary = duplicateImportPolicy.batchSkipsDuplicates || next.landingInterrupted
         let folderIsUnavailable = next.folderID.map { watchedFoldersIfWatching?.isUnavailable($0) ?? false } ?? false
         let probe = watchedFileReach
         // Off main and bounded: a watched folder can sit on a server that takes its time to answer, or never does.
@@ -122,7 +124,7 @@ extension AppModel {
             }
             // Nobody opened this file, so a copy the library holds follows the batch rule: skipped and counted, never a sheet.
             var lookup: DuplicateNotice.Lookup?
-            if reach == .present, next.sourceDigest == nil, skipsDuplicates {
+            if reach == .present, next.sourceDigest == nil, checksLibrary {
                 lookup = await DuplicateNotice.lookup(for: next.url, in: library, deadline: deadline)
             }
             guard let self, !Task.isCancelled else { return }
@@ -142,8 +144,11 @@ extension AppModel {
                 return
             }
             if lookup?.entry != nil {
-                batchDuplicatesSkipped += 1
-                ParolaLog.info(.library, "skipped a watched-folder file the library already holds")
+                // A save cut short by a quit that finished anyway is this file's own entry, not a duplicate to count.
+                if !next.landingInterrupted {
+                    batchDuplicatesSkipped += 1
+                    ParolaLog.info(.library, "skipped a watched-folder file the library already holds")
+                }
                 watchedArrivals.removeAll { $0.id == next.id }
                 pumpWatchedLane()
                 return
@@ -412,6 +417,7 @@ extension AppModel {
         watchedArrivals = saved.map { arrival in
             var restored = arrival
             restored.sourceDigest = nil
+            restored.landingInterrupted = arrival.landingInterrupted || arrival.isLanding
             restored.isLanding = false
             return restored
         }
