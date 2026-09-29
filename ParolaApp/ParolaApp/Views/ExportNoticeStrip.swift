@@ -33,6 +33,14 @@ struct ExportNoticeStrip: View {
                 }
             }
             Spacer(minLength: DS.Spacing.small)
+            if notice.offersFolderChoice {
+                Button("Choose Folder…") {
+                    model.dismissExportNotice()
+                    model.chooseAutoExportFolder()
+                }
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                .axLeaf("ExportNotice.Button.ChooseFolder")
+            }
             if let folder = notice.folder {
                 Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))

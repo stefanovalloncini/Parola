@@ -208,8 +208,14 @@ final class AppModel {
     var burnTextColorRaw: String = BurnTextColor.white.rawValue { didSet { defaults.set(burnTextColorRaw, forKey: "burnTextColor") } }
     var burnOutline: Bool = true { didSet { defaults.set(burnOutline, forKey: "burnOutline") } }
     var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue { didSet { defaults.set(htmlExportThemeRaw, forKey: "htmlExportTheme") } }
-    /// Empty means the default: Documents/Parola Exports.
-    var autoExportFolderPath: String = "" { didSet { defaults.set(autoExportFolderPath, forKey: "autoExportFolder") } }
+    var autoExportFolder: AutoExportFolder? {
+        didSet {
+            if let autoExportFolder { writeJSON(autoExportFolder, forKey: "autoExportFolder") } else {
+                defaults.removeObject(forKey: "autoExportFolder")
+            }
+        }
+    }
+    @ObservationIgnored var autoExportNoticeShown = false
     var dictationHudOpacity: Double = 1.0 { didSet { defaults.set(dictationHudOpacity, forKey: "dictationHudOpacity") } }
     var lastFindQuery: String = "" { didSet { defaults.set(lastFindQuery, forKey: "lastFindQuery") } }
     var userPrivacyMode: Bool = false { didSet { defaults.set(userPrivacyMode, forKey: "parola.userPrivacyMode") } }
@@ -843,7 +849,7 @@ final class AppModel {
         self.burnTextColorRaw = defaults.string(forKey: "burnTextColor") ?? BurnTextColor.white.rawValue
         self.burnOutline = readBool("burnOutline", default: true)
         self.htmlExportThemeRaw = defaults.string(forKey: "htmlExportTheme") ?? HtmlExportTheme.light.rawValue
-        self.autoExportFolderPath = defaults.string(forKey: "autoExportFolder") ?? ""
+        self.autoExportFolder = readJSON(AutoExportFolder.self, forKey: "autoExportFolder")
         self.dictationHudOpacity = readDouble("dictationHudOpacity", default: 1.0)
         self.lastFindQuery = defaults.string(forKey: "lastFindQuery") ?? ""
         self.userPrivacyMode = defaults.bool(forKey: "parola.userPrivacyMode")

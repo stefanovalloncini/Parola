@@ -2141,6 +2141,28 @@
         }
       }
     },
+    "Auto-export can't reach its folder. Choose it again in Settings › Auto-Export.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'esportazione automatica non raggiunge la sua cartella. Sceglila di nuovo in Impostazioni › Esportazione automatica."
+          }
+        }
+      }
+    },
+    "Auto-export couldn't write to its folder: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'esportazione automatica non è riuscita a scrivere nella sua cartella: %@"
+          }
+        }
+      }
+    },
     "Auto-export folder": {
       "extractionState": "manual",
       "localizations": {
@@ -2148,6 +2170,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cartella di esportazione automatica"
+          }
+        }
+      }
+    },
+    "Auto-export skipped this transcript: recordings and links save to an auto-export folder, and none is chosen yet. Choose one in Settings › Auto-Export.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'esportazione automatica ha saltato questa trascrizione: registrazioni e link si salvano in una cartella di esportazione automatica, e non ne hai ancora scelta una. Sceglila in Impostazioni › Esportazione automatica."
           }
         }
       }
@@ -2163,13 +2196,13 @@
         }
       }
     },
-    "Auto-export writes additional files next to the source when transcription completes. Recordings and links have no folder of their own, so theirs go to the auto-export folder, named after the entry. Leave a rule's extension field empty to match every file.": {
+    "Auto-export writes additional files next to the source when transcription completes. Recordings and links have no folder of their own, so theirs go to the auto-export folder you choose, named after the entry. Leave a rule's extension field empty to match every file.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "L'esportazione automatica scrive file aggiuntivi accanto al file sorgente al termine della trascrizione. Registrazioni e link non hanno una cartella propria, quindi i loro file vanno nella cartella di esportazione automatica, con il nome della voce. Lascia vuoto il campo delle estensioni di una regola per applicarla a ogni file."
+            "value": "L'esportazione automatica scrive file aggiuntivi accanto al file sorgente al termine della trascrizione. Registrazioni e link non hanno una cartella propria, quindi i loro file vanno nella cartella di esportazione automatica che scegli tu, con il nome della voce. Lascia vuoto il campo delle estensioni di una regola per applicarla a ogni file."
           }
         }
       }
@@ -2985,6 +3018,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Controllo…"
+          }
+        }
+      }
+    },
+    "Choose": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli"
+          }
+        }
+      }
+    },
+    "Choose Folder…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli cartella…"
           }
         }
       }
@@ -8576,6 +8631,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Non è un file di impostazioni valido."
+          }
+        }
+      }
+    },
+    "Not chosen: recordings and links skip auto-export.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non scelta: registrazioni e link saltano l'esportazione automatica."
           }
         }
       }

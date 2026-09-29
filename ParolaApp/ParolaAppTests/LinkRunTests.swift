@@ -123,6 +123,13 @@ extension TranscriberMockSuites {
         private static let link = "https://youtu.be/dQw4w9WgXcQ"
         private static let page = ScriptedLinkFetcher.talk.webpageURL
 
+        private func makeExportFolder() throws -> URL {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("parola-link-exports-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            return url
+        }
+
         private func makeModel(fetcher: ScriptedLinkFetcher) -> AppModel {
             AppModel(bootstrap: AppBootstrap(
                 mode: .test,
@@ -427,6 +434,9 @@ extension TranscriberMockSuites {
             let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture, captions: captions))
             let srt = try #require(model.exportPresets.first { $0.spec.format == .srt })
             model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [srt.id])]
+            let chosen = try makeExportFolder()
+            defer { try? FileManager.default.removeItem(at: chosen) }
+            #expect(model.setAutoExportFolder(chosen))
 
             #expect(model.fetchYouTubeSubs(urlString: Self.link) == .started)
 
@@ -436,7 +446,7 @@ extension TranscriberMockSuites {
             #expect(loaded.entry.manifest.source == .web)
             #expect(loaded.document.transcript.sourceURL == Self.page)
             #expect(model.transcript?.text.contains("own captions") == true)
-            let exported = model.autoExportFolderURL.appendingPathComponent("A talk.srt")
+            let exported = chosen.appendingPathComponent("A talk.srt")
             await waitUntil { FileManager.default.fileExists(atPath: exported.path) }
             #expect(try String(contentsOf: exported, encoding: .utf8).contains("own captions"))
             #expect(model.nonFatalWarning == nil)
@@ -525,9 +535,12 @@ extension TranscriberMockSuites {
                 let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture))
                 let srt = try #require(model.exportPresets.first { $0.spec.format == .srt })
                 model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [srt.id])]
+                let chosen = try makeExportFolder()
+                defer { try? FileManager.default.removeItem(at: chosen) }
+                #expect(model.setAutoExportFolder(chosen))
 
                 model.transcribeYouTube(urlString: Self.link)
-                let exported = model.autoExportFolderURL.appendingPathComponent("A talk.srt")
+                let exported = chosen.appendingPathComponent("A talk.srt")
                 await waitUntil { OutputMarker.isMarked(exported) }
 
                 #expect(try String(contentsOf: exported, encoding: .utf8).contains("own words"))
