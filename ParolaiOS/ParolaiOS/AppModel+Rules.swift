@@ -49,31 +49,41 @@ extension AppModel {
         guard !presets.isEmpty else { return }
         // The add cached what it saved, so this load decodes nothing.
         Task.detached(priority: .utility) { [library] in
+            let loaded: LoadedEntry
+            let exportsDir = library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
             do {
-                let loaded = try await library.load(entry.id)
-                let exportsDir = library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
+                loaded = try await library.load(entry.id)
                 try FileManager.default.createDirectory(at: exportsDir, withIntermediateDirectories: true)
-                let base = Self.unusedExportBase(
-                    for: entry.title, extensions: presets.map(\.spec.format.fileExtension), in: exportsDir
-                )
-                for preset in presets {
+            } catch {
+                ParolaLog.error(.export, "auto-export could not start", [.error: .error(error)])
+                return
+            }
+            let base = Self.unusedExportBase(
+                for: entry.title, extensions: presets.map(\.spec.format.fileExtension), in: exportsDir
+            )
+            // Best-effort, one format at a time: the transcript is already saved, and one failure keeps the rest.
+            for preset in presets {
+                do {
                     let target = exportsDir.appendingPathComponent("\(base).\(preset.spec.format.fileExtension)")
                     let data = try Exporters.exporter(for: preset.spec).render(loaded.document.transcript)
                     try data.write(to: target, options: .atomic)
+                } catch {
+                    ParolaLog.error(.export, "auto-export failed as \(preset.spec.format)", [.error: .error(error)])
                 }
-            } catch {
-                // Best-effort; primary transcription already saved.
             }
         }
     }
 
     /// Imports that share a file name share a title, so the second one's exports become "Title 2", "Title 3"…
     nonisolated static func unusedExportBase(
-        for title: String,
+        for rawTitle: String,
         extensions: [String],
         in directory: URL,
         exists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
     ) -> String {
+        // A renamed entry's title can hold a slash, which would name a folder, or start with a dot, which hides the file.
+        let cleaned = String(rawTitle.replacingOccurrences(of: "/", with: "-").drop { $0 == "." })
+        let title = cleaned.isEmpty ? "Transcript" : cleaned
         func free(_ base: String) -> Bool {
             !extensions.contains { exists(directory.appendingPathComponent("\(base).\($0)")) }
         }

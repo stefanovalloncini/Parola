@@ -191,6 +191,30 @@ struct AppModelRulesTests {
         #expect(base == "Talk 3")
     }
 
+    @Test("a title with a slash exports into Exports, not a folder of its own")
+    func slashInTitleStaysInExports() async throws {
+        let model = try makeModel(defaults: freshDefaults())
+        model.autoExportRules = [
+            AutoExportRule(sourceExtensions: ["m4a"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id]),
+        ]
+        let audio = try makeAudioFile(ext: "m4a")
+        let entry = try await model.library.add(transcript: transcript("slash title"), audioSource: audio, title: "Q3/Q4 review")
+
+        model.runAutoExports(for: entry)
+
+        let target = model.library.libraryURL.appendingPathComponent("Exports/Q3-Q4 review.txt")
+        try await pollUntil { FileManager.default.fileExists(atPath: target.path) }
+        #expect(try String(contentsOf: target, encoding: .utf8).contains("slash title"))
+    }
+
+    @Test("an export name never names a folder or a hidden file")
+    func exportBaseCleansTheTitle() {
+        let dir = URL(fileURLWithPath: "/exports", isDirectory: true)
+        #expect(AppModel.unusedExportBase(for: "a/b/c", extensions: ["txt"], in: dir) { _ in false } == "a-b-c")
+        #expect(AppModel.unusedExportBase(for: "..hidden", extensions: ["txt"], in: dir) { _ in false } == "hidden")
+        #expect(AppModel.unusedExportBase(for: "...", extensions: ["txt"], in: dir) { _ in false } == "Transcript")
+    }
+
     @Test("runAutoExports writes nothing when no rule matches the source extension")
     func runAutoExportsSkipsUnmatched() async throws {
         let model = try makeModel(defaults: freshDefaults())
