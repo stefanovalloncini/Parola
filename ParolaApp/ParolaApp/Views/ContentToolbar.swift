@@ -234,51 +234,40 @@ struct ContentToolbar: ToolbarContent {
 private struct RecordingToolbarButton: View {
     @Environment(AppModel.self) private var model
 
-    private var isArming: Bool { model.recordingStartedAt == nil }
-
     var body: some View {
-        Button {
-            if isArming {
-                model.cancelRecordingBeforeCapture()
-            } else {
-                model.stopRecordingAndTranscribe()
-            }
-        } label: {
-            label
-                .font(DS.Font.bodyStrong)
-        }
-        .buttonStyle(.glassProminent)
-        .tint(DS.Color.recordingFill)
-        .help(help)
-        .accessibilityLabel(accessibilityTitle)
-        .accessibilityIdentifier("toolbar.stopRecording")
-        .axLeaf("Toolbar.Button.StopRecording")
-    }
-
-    private var help: LocalizedStringKey {
-        isArming ? "Cancel the recording before it starts." : "Stop recording and transcribe."
-    }
-
-    private var accessibilityTitle: LocalizedStringKey {
-        isArming ? "Cancel" : "Stop Recording"
-    }
-
-    @ViewBuilder
-    private var label: some View {
         if let startedAt = model.recordingStartedAt {
-            HStack(spacing: DS.Spacing.snug) {
-                Circle()
-                    .fill(.foreground)
-                    .frame(width: 8, height: 8)
-                    .accessibilityHidden(true)
-                TimelineView(.periodic(from: startedAt, by: 1)) { context in
-                    Text(verbatim: AppFormat.elapsed(context.date.timeIntervalSince(startedAt)))
-                        .monospacedDigit()
+            TimelineView(.periodic(from: startedAt, by: 1)) { context in
+                let elapsed = context.date.timeIntervalSince(startedAt)
+                Button {
+                    model.stopRecordingAndTranscribe()
+                } label: {
+                    HStack(spacing: DS.Spacing.snug) {
+                        Circle()
+                            .fill(.foreground)
+                            .frame(width: 8, height: 8)
+                            .accessibilityHidden(true)
+                        Text(verbatim: AppFormat.elapsed(elapsed))
+                            .monospacedDigit()
+                        Text("Stop")
+                    }
+                    .font(DS.Font.bodyStrong)
                 }
-                Text("Stop")
+                .buttonStyle(.glassProminent)
+                .tint(DS.Color.recordingFill)
+                .help("Stop recording and transcribe.")
+                .accessibilityLabel("Stop Recording")
+                .accessibilityValue(AppFormat.duration(seconds: elapsed))
+                .accessibilityAddTraits(.updatesFrequently)
+                .accessibilityIdentifier("toolbar.stopRecording")
+                .axLeaf("Toolbar.Button.StopRecording")
             }
         } else {
-            Text("Cancel")
+            Button("Cancel") { model.cancelRecordingBeforeCapture() }
+                .font(DS.Font.bodyStrong)
+                .buttonStyle(.glass)
+                .help("Cancel the recording before it starts.")
+                .accessibilityIdentifier("toolbar.stopRecording")
+                .axLeaf("Toolbar.Button.StopRecording")
         }
     }
 }
