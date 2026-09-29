@@ -184,7 +184,9 @@ final class AppModel {
     private(set) var takeArming: TakeArming?
     /// The take transcribing or just transcribed. Matched by file, so a stale one names nothing.
     private(set) var recordedTake: RecordedTake?
-    @ObservationIgnored private var takeTranscriptionRunning = false
+    @ObservationIgnored private var takeRunCounter = 0
+    /// The take transcription in flight, so Stop Transcribing acts on that run alone.
+    @ObservationIgnored private var takeRun: Int?
     /// The library save of the last live take, which a quit waits for.
     @ObservationIgnored private var takeSave: Task<LibraryEntry, any Error>?
     var livePartialText: String = ""
@@ -3473,8 +3475,10 @@ final class AppModel {
         url: URL, title: String, source: EntrySource, category: EntryCategory = .transcription
     ) async {
         liveRecordingAudioURL = nil
-        takeTranscriptionRunning = true
-        defer { takeTranscriptionRunning = false }
+        takeRunCounter &+= 1
+        let run = takeRunCounter
+        takeRun = run
+        defer { if takeRun == run { takeRun = nil } }
         let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, title: title, source: source)
         recordedTake = RecordedTake(file: url, title: title)
         sourceFileURL = url
@@ -3553,7 +3557,7 @@ final class AppModel {
 
     /// Stops a take's transcription. The take is saved to the library untranscribed, so the recording survives.
     func stopTranscribingTake() {
-        guard takeTranscriptionRunning else { return }
+        guard takeRun != nil else { return }
         cancelAndTrack(&fileTranscribeTask)
         phase = .idle
     }
