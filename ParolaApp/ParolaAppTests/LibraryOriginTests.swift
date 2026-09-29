@@ -136,6 +136,18 @@ struct LibraryOriginTests {
         #expect(sidebar(model) == .category(.meeting), "the sidebar keeps the row the entry came from")
     }
 
+    @Test("opening an entry clears a stale failure before the load lands")
+    func openingAnEntryClearsAFailure() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "quarterly review")
+        model.phase = .failed(message: "Couldn't transcribe Voice note 17.m4a")
+
+        model.loadEntry(entry.id)
+
+        #expect(model.phase == .idle, "the stale failure must not survive the click that starts the open")
+        #expect(await waitUntil { model.selectedEntryID == entry.id && model.transcript != nil })
+    }
+
     @Test("opening from search records the query and keeps the results")
     func opensFromSearch() async throws {
         let model = makeModel()

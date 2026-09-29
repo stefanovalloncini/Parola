@@ -601,6 +601,8 @@ extension AppModel {
         inPlace: Bool = false
     ) throws(IntentActionError) -> Task<Transcript, any Error> {
         if !inPlace, let refusal = entryOpenRefusal { throw refusal }
+        // The batch's in-place open leaves the phase exactly as it is; only a full navigation clears a stale failure.
+        if !inPlace { leaveFailedPhase() }
         introduction.defer()
         loadEntryGeneration &+= 1
         let generation = loadEntryGeneration
@@ -673,6 +675,16 @@ extension AppModel {
         libraryFilter = category
         libraryBrowsingAll = false
         showList()
+    }
+
+    /// Not `dismissError()`: that also cancels an in-flight yt-dlp update, which navigating away must not do.
+    func leaveFailedPhase() {
+        guard case .failed(let message) = phase else { return }
+        // The error card only ever renders on .transcript; anywhere else this failure was never shown.
+        if route != .transcript {
+            exportNotice = ExportNotice(message: message, failures: [], folder: nil)
+        }
+        phase = transcript == nil ? .idle : .ready
     }
 
     /// Results outrank every list, so anything that leaves one has to retire the query that would mask it.
@@ -775,9 +787,12 @@ extension AppModel {
     static let searchDebounce = Duration.milliseconds(70)
 
     func search(_ query: String) {
+        let isNewQuery = query != searchQuery
+        // A same-value write-back (e.g. a binding re-publishing) must not clear a failure that just landed.
+        if isNewQuery { leaveFailedPhase() }
         searchTask?.cancel()
         // Only results can go stale on a new query; a list the transcript came from is still where it was.
-        if query != searchQuery, case .search = libraryOrigin { forgetLibraryOrigin() }
+        if isNewQuery, case .search = libraryOrigin { forgetLibraryOrigin() }
         searchQuery = query
         let q = query.trimmingCharacters(in: .whitespaces)
         if q.isEmpty {

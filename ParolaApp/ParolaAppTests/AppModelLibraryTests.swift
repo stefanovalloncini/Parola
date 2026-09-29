@@ -706,6 +706,41 @@ struct AppModelLibraryTests {
         #expect(LibraryEntryDisplay.listTitle(for: renamed, showsAITitle: true) == "My real title")
     }
 
+    @Test("a search after a transcription failure clears it and shows results")
+    func searchAfterFailureClearsIt() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        _ = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "banana bread recipe")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        await model.refreshLibraryAndWait()
+        model.phase = .failed(message: "Couldn't transcribe Voice note 17.m4a")
+
+        model.search("banana")
+
+        #expect(model.phase == .idle)
+        #expect(model.route == .transcript)
+        #expect(await waitUntil { model.hasSearchResults })
+    }
+
+    @Test("re-publishing the same query does not clear a failure that just landed")
+    func sameQuerySearchDoesNotClearAFailure() {
+        let model = makeModel()
+        model.search("banana")
+        let failure = AppModel.Phase.failed(message: "Couldn't transcribe Voice note 17.m4a")
+        model.phase = failure
+
+        model.search("banana")
+
+        #expect(model.phase == failure)
+    }
+
     @Test("LibrarySortOrder exposes a label for every case")
     func sortOrderLabels() {
         for order in LibrarySortOrder.allCases {
