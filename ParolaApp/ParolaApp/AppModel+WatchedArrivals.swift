@@ -28,6 +28,13 @@ struct WatchedArrival: Codable, Equatable, Identifiable, Sendable {
         case unreachable
     }
 
+    /// What the pre-run check makes of a probe: nil when it didn't answer in time.
+    static func verdict(probed: Reach?, folderIsUnavailable: Bool, folderVouches: Bool) -> Reach {
+        guard !folderIsUnavailable, let probed else { return .unreachable }
+        // An empty mount point looks like a folder that lost the file until the watch says it is the folder.
+        return probed == .gone && !folderVouches ? .unreachable : probed
+    }
+
     /// A file is only gone when the folder it came from is there without it.
     static func reach(_ file: URL, in folder: URL) -> Reach {
         let manager = FileManager.default
@@ -114,14 +121,19 @@ extension AppModel {
         let deadline = fileReadDeadline
         let checksLibrary = duplicateImportPolicy.batchSkipsDuplicates || next.landingInterrupted
         let folderIsUnavailable = next.folderID.map { watchedFoldersIfWatching?.isUnavailable($0) ?? false } ?? false
+        let folderVouches = watchedFolderVouches(for: next)
+        let returnsAtCheck = watchedFolderReturns
         let probe = watchedFileReach
         // Off main and bounded: a watched folder can sit on a server that takes its time to answer, or never does.
         watchedLaneTask = Task { [weak self, library] in
-            var reach = WatchedArrival.Reach.unreachable
+            var probed: WatchedArrival.Reach?
             if !folderIsUnavailable,
                case .done(let found) = await BoundedFileRead.run(deadline: deadline, { probe(next.url, next.folderURL) }) {
-                reach = found
+                probed = found
             }
+            let reach = WatchedArrival.verdict(
+                probed: probed, folderIsUnavailable: folderIsUnavailable, folderVouches: folderVouches
+            )
             // Nobody opened this file, so a copy the library holds follows the batch rule: skipped and counted, never a sheet.
             var lookup: DuplicateNotice.Lookup?
             if reach == .present, next.sourceDigest == nil, checksLibrary {
@@ -133,8 +145,11 @@ extension AppModel {
             case .present:
                 break
             case .unreachable:
-                ParolaLog.info(.library, "a watched-folder file waits for its folder to come back")
-                unreachableArrivalIDs.insert(next.id)
+                // A folder that came back while this check ran would never be retried for it.
+                if watchedFolderReturns == returnsAtCheck {
+                    ParolaLog.info(.library, "a watched-folder file waits for its folder to come back")
+                    unreachableArrivalIDs.insert(next.id)
+                }
                 pumpWatchedLane()
                 return
             case .gone:
@@ -184,8 +199,16 @@ extension AppModel {
         }
     }
 
+    /// Whether a missing file is really gone: its folder is watched and answering, or there is no watch to wait for.
+    func watchedFolderVouches(for arrival: WatchedArrival) -> Bool {
+        guard let id = arrival.folderID, let store = watchedFoldersIfWatching,
+              store.folders.contains(where: { $0.id == id }) else { return true }
+        return store.watcher(for: id) != nil && !store.isUnavailable(id)
+    }
+
     /// A folder is back: the files that waited on it try again, in their places.
     func retryUnreachableArrivals() {
+        watchedFolderReturns &+= 1
         guard !unreachableArrivalIDs.isEmpty else { return }
         unreachableArrivalIDs = []
         pumpWatchedLane()

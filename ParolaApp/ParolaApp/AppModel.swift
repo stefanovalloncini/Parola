@@ -699,6 +699,7 @@ final class AppModel {
     @ObservationIgnored var foregroundClaims = 0
     /// Files whose folder didn't answer: they keep their place and wait for the folder to come back.
     @ObservationIgnored var unreachableArrivalIDs: Set<WatchedArrival.ID> = []
+    @ObservationIgnored var watchedFolderReturns = 0
     /// Test seam: where a watched file stands, given the folder it came from.
     @ObservationIgnored var watchedFileReach: @Sendable (URL, URL) -> WatchedArrival.Reach = WatchedArrival.reach
     @ObservationIgnored var visibleArrivalID: WatchedArrival.ID?
