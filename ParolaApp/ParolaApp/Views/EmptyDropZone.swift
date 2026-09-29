@@ -262,7 +262,7 @@ private struct ViewAllButton: View {
                     .font(DS.Font.caption)
             }
             .font(DS.Font.bodyStrong)
-            .foregroundStyle(DS.Color.accentText)
+            .foregroundStyle(DS.Color.accentInk)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

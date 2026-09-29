@@ -84,7 +84,7 @@ struct BurnJobStrip: View {
 
     private var tint: Color {
         switch job.state {
-        case .running: return DS.Color.accentText
+        case .running: return DS.Color.accentInk
         case .finished: return DS.Palette.success
         case .failed: return DS.Color.danger
         }

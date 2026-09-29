@@ -305,6 +305,7 @@ private struct PromptEditor: View {
                 Button("Cancel", role: .cancel, action: onCancel)
                     .axLeaf("PromptEditor.Button.Cancel")
                 Button("Save") { onCommit(draft) }
+                    .sheetPrimaryAction()
                     .keyboardShortcut(.defaultAction)
                     .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .axLeaf("PromptEditor.Button.Save")

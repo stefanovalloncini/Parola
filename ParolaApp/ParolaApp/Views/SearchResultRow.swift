@@ -43,7 +43,7 @@ struct SearchResultRow: View {
         if let count = match?.matchCount, count > 0 {
             Text(verbatim: LibraryListContent.matchesLabel(count))
                 .font(DS.Font.caption)
-                .foregroundStyle(isSelected ? DS.Color.onAccent : DS.Color.accentText)
+                .foregroundStyle(isSelected ? DS.Color.onAccent : DS.Color.accentInk)
                 .lineLimit(1)
                 .fixedSize()
                 .chipChrome(

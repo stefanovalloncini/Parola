@@ -122,8 +122,8 @@ struct RowChromeTests {
         let toggle = appearance(selected: true, hovered: false, FindToggleButton.selectionStyle)
         #expect(FindToggleButton.ink(isOn: true) == popover.foreground)
         #expect(FindToggleButton.ink(isOn: false) != popover.foreground)
-        // The toggle is a 22 pt glyph, not a row of text: it takes the accent at full strength.
-        #expect(toggle.fill == DS.Color.accent)
+        // The toggle's glyph is `onAccent` too, so it needs the same AA-solved fill under it.
+        #expect(toggle.fill == DS.Color.accentFill)
     }
 
     @Test("a row in a List animates its hover, never the selection the List paints")

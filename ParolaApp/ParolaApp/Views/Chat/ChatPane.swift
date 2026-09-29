@@ -85,7 +85,7 @@ struct ChatPane: View {
                 Divider().opacity(0.4)
                 Button("Manage prompts") { model.openSettings(route: .prompts) }
                     .buttonStyle(.plain)
-                    .foregroundStyle(DS.Color.accent)
+                    .foregroundStyle(DS.Color.accentInk)
                     .accessibilityIdentifier("chat.manage_prompts")
                     .axLeaf("Chat.Button.ManagePrompts")
             }
@@ -245,10 +245,10 @@ struct ChatPane: View {
             Button(action: send) {
                 Image(systemName: "paperplane.fill")
                     .font(DS.Font.bodyStrong)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.onAccent)
                     .frame(width: 32, height: 32)
                     .background(
-                        Circle().fill(isSendDisabled ? DS.Color.accent.opacity(0.4) : DS.Color.accent)
+                        Circle().fill(isSendDisabled ? DS.Color.accentFill.opacity(0.4) : DS.Color.accentFill)
                     )
             }
             .buttonStyle(.plain)

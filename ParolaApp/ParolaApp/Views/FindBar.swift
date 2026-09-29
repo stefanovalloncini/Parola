@@ -187,7 +187,7 @@ struct FindToggleButton: View {
     @State private var hovered = false
 
     /// Computed, not stored: a stored colour would freeze the palette the app launched with.
-    static var selectionStyle: RowSelectionStyle { .prominent(fill: DS.Color.accent) }
+    static var selectionStyle: RowSelectionStyle { .prominent(fill: DS.Color.accentFill) }
 
     /// Set here, not through the chrome's foreground: an inner `foregroundStyle` wins over it.
     static func ink(isOn: Bool) -> Color {

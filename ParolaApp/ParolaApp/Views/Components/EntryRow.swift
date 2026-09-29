@@ -173,9 +173,9 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         return EntryRowMetrics.height(compact: compact, hasDetail: detailText != nil)
     }
 
-    /// The palette's secondary is a fixed grey; on the accent fill of a selected row only the system's flips with it.
+    /// The system flips `.secondary` white regardless of what `onAccent` solved to, so the row sets its own ink — the same one the badge and chips already use.
     private var secondaryStyle: Color {
-        isSelected ? .secondary : DS.Color.secondaryText
+        onAccent ? DS.Color.onAccentSecondary : DS.Color.secondaryText
     }
 
     private var onAccent: Bool {
@@ -216,11 +216,11 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                 if display.pinned {
                     Image(systemName: "pin.fill")
                         .font(DS.Font.caption)
-                        .foregroundStyle(DS.Color.accent)
+                        .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.accent)
                 }
                 Text(display.title)
                     .font(DS.Font.bodyStrong)
-                    .foregroundStyle(DS.Color.primaryText)
+                    .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.primaryText)
                     .lineLimit(1)
                 if display.noteCount > 0 { noteChip }
             }
@@ -270,7 +270,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                 .font(DS.Font.caption)
                 .monospacedDigit()
         }
-        .foregroundStyle(DS.Color.accentText)
+        .foregroundStyle(DS.Color.accentInk)
         .padding(.horizontal, DS.Spacing.tight)
         .padding(.vertical, 1)
         .background(Capsule().fill(DS.Color.accentWash))

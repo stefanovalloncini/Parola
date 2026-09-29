@@ -338,6 +338,7 @@ struct InfoMenuRow<Content: View>: View {
                 .menuStyle(.button)
                 .controlSize(.small)
                 .fixedSize()
+                .tint(DS.Color.accentInk)
                 .disabled(!isEnabled)
                 .help(help ?? "")
                 .axLeaf(leaf)

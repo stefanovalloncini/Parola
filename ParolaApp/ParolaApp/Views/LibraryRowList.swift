@@ -59,7 +59,7 @@ struct LibraryRowList: View {
             }
         }
         .listStyle(.inset)
-        .tint(DS.Color.accent)
+        .tint(DS.Color.accentFill)
         .focused(focus, equals: focusKey)
         .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: groups.flatMap { $0.rows.map(\.id) })
         // Empty on purpose: each row keeps its own context menu, and the list takes only double-click and Return.

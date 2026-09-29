@@ -291,7 +291,7 @@ private struct MeetingVignette: View {
                     .lineLimit(1)
                     .padding(.horizontal, DS.Spacing.small)
                     .padding(.vertical, DS.Spacing.tight)
-                    .background(Capsule(style: .continuous).fill(DS.Color.accent))
+                    .background(Capsule(style: .continuous).fill(DS.Color.accentFill))
                     .scaleEffect(frame.pillScale)
                 Circle()
                     .fill(DS.Color.danger)

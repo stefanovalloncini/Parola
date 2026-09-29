@@ -20,7 +20,7 @@ struct Chip: View {
     var size: Size = .compact
     var weight: Font.Weight = .medium
     var style: Style = .elevated
-    var selectedFill: Color = DS.Color.accent
+    var selectedFill: Color = DS.Color.accentFill
     var bordered: Bool = true
     var identifier: String? = nil
     var help: String? = nil
@@ -82,7 +82,7 @@ extension View {
         style: Chip.Style = .elevated,
         hovering: Bool = false,
         pressed: Bool = false,
-        selectedFill: Color = DS.Color.accent,
+        selectedFill: Color = DS.Color.accentFill,
         bordered: Bool = true,
         border overrideBorder: Color? = nil,
         horizontalPadding: CGFloat? = nil

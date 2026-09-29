@@ -29,7 +29,7 @@ struct BatchSidebar: View {
                 }
             }
             .listStyle(.sidebar)
-            .tint(DS.Color.accent)
+            .tint(DS.Color.accentFill)
             .onChange(of: model.selectedBatchJobID) { _, newValue in
                 if let id = newValue { model.selectBatchJob(id) }
             }

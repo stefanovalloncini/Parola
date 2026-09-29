@@ -35,20 +35,10 @@ struct SummaryEmpty: View {
             }
 
             if !isWorking {
-                Button(action: onGenerate) {
-                    Text("Generate")
-                        .font(DS.Font.heading)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, DS.Spacing.large)
-                        .padding(.vertical, DS.Spacing.small)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(DS.Color.accent)
-                        )
-                }
-                .buttonStyle(.plain)
-                .padding(.top, DS.Spacing.small)
-                .axLeaf("Summary.Button.Generate")
+                Button("Generate", action: onGenerate)
+                    .buttonStyle(DSPillButtonStyle(kind: .primary))
+                    .padding(.top, DS.Spacing.small)
+                    .axLeaf("Summary.Button.Generate")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

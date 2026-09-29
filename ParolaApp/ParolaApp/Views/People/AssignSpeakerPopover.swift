@@ -70,7 +70,7 @@ struct AssignSpeakerPopover: View {
                     .font(DS.Font.caption)
                     .foregroundStyle(
                         person.id == assigned?.id
-                            ? DS.Color.accentText
+                            ? DS.Color.accentInk
                             : DS.speakerColor(for: person.name, colorIndex: person.colorIndex)
                     )
                     .frame(width: 12)

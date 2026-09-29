@@ -49,7 +49,7 @@ struct AboutInfoView: View {
                                 .padding(.horizontal, DS.Spacing.snug)
                                 .padding(.vertical, 1)
                                 .background(Capsule().fill(DS.Color.accentWash))
-                                .foregroundStyle(DS.Color.accentText)
+                                .foregroundStyle(DS.Color.accentInk)
                         }
                     }
                 }

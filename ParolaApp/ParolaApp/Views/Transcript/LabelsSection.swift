@@ -50,7 +50,7 @@ struct LabelsSection: View {
             .accessibilityLabel("Remove label \(label)")
             .axLeaf("Labels.Button.RemoveChip")
         }
-        .foregroundStyle(DS.Color.accentText)
+        .foregroundStyle(DS.Color.accentInk)
         .padding(.leading, DS.Spacing.small)
         // The measured fill: a 12% accent over the inspector's material is a pair nothing measures.
         .background(

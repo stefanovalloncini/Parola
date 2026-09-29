@@ -245,7 +245,7 @@ private struct DropZonePanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                .fill(isHot ? DS.Color.accent : DS.Color.surfaceElevated)
+                .fill(isHot ? DS.Color.accentFill : DS.Color.surfaceElevated)
         )
         .overlay(
             RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)

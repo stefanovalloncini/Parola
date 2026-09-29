@@ -34,7 +34,7 @@ enum BatchJobStatus {
     static func tint(for status: BatchJob.Status) -> Color {
         switch status {
         case .pending: return DS.Color.secondaryText
-        case .transcribing: return DS.Color.accentText
+        case .transcribing: return DS.Color.accentInk
         case .done: return DS.Color.successText
         case .failed: return DS.Color.dangerText
         case .cancelled: return DS.Color.secondaryText

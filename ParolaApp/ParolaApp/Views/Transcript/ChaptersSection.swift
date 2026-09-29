@@ -76,7 +76,7 @@ private struct ChapterRow: View {
             HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
                 Text(Timecode.format(chapter.start))
                     .font(DS.Font.mono)
-                    .foregroundStyle(DS.Color.accentText)
+                    .foregroundStyle(DS.Color.accentInk)
                 Text(chapter.title)
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.primaryText)

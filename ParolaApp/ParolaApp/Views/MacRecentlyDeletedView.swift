@@ -115,7 +115,7 @@ struct MacRecentlyDeletedView: View {
             }
         }
         .listStyle(.inset)
-        .tint(DS.Color.accent)
+        .tint(DS.Color.accentFill)
         .animation(reduceMotion ? nil : DS.Motion.listRows, value: model.deletedEntries.map(\.id))
     }
 

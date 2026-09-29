@@ -63,7 +63,7 @@ struct DSPillButtonStyle: ButtonStyle {
         private func background(pressed: Bool) -> Color {
             switch kind {
             case .primary:
-                return isEnabled ? DS.Color.accent.opacity(pressed ? 0.85 : 1.0) : DSPillButtonStyle.disabledFill
+                return isEnabled ? DS.Color.accentFill.opacity(pressed ? 0.85 : 1.0) : DSPillButtonStyle.disabledFill
             case .secondary:
                 return isEnabled && hovering ? DS.Palette.pillFillHover : DS.Color.surfaceElevated
             }

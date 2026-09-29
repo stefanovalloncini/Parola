@@ -152,7 +152,7 @@ struct PillToggleButton: View {
     }
 
     private var fillColor: Color {
-        if isOn { return hovering ? DS.Color.accent.opacity(0.95) : DS.Color.selectionProminent }
+        if isOn { return DS.Color.selectionProminent }
         return Color.primary.opacity(hovering ? 0.10 : 0.06)
     }
 

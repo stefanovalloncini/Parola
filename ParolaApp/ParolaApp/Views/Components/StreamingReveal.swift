@@ -20,6 +20,6 @@ enum StreamingReveal {
 
     static func caret(visible: Bool) -> Text {
         Text(verbatim: "\u{258F}")
-            .foregroundStyle(DS.Color.accentText.opacity(visible ? 1 : 0))
+            .foregroundStyle(DS.Color.accentInk.opacity(visible ? 1 : 0))
     }
 }

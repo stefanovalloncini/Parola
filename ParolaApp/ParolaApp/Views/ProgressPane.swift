@@ -27,7 +27,7 @@ struct ProgressPane: View {
                         .contentTransition(.numericText())
                     if let etaLabel {
                         Text(verbatim: "·")
-                            .foregroundStyle(DS.Color.accentText.opacity(0.6))
+                            .foregroundStyle(DS.Color.accentInk.opacity(0.6))
                         Text("\(etaLabel) left")
                     }
                 }

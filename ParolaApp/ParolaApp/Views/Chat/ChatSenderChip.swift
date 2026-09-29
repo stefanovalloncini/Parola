@@ -45,7 +45,7 @@ private struct SenderChipButtonStyle: ButtonStyle {
             .foregroundStyle(isFiltered ? DS.Color.onAccent : Color.primary.opacity(0.85))
             .background(
                 RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
-                    .fill(isFiltered ? DS.Color.accent : DS.Color.surfaceElevated.opacity(0.85))
+                    .fill(isFiltered ? DS.Color.accentFill : DS.Color.surfaceElevated.opacity(0.85))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)

@@ -60,7 +60,7 @@ struct MiniPlayerWindow: View {
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.onAccent)
                     .frame(width: 32, height: 32)
-                    .background(Circle().fill(DS.Color.accent))
+                    .background(Circle().fill(DS.Color.accentFill))
             }
             .buttonStyle(.plain)
             .disabled(model.player == nil)

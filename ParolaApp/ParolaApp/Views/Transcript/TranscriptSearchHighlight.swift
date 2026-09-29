@@ -5,10 +5,12 @@ import ParolaCore
 @MainActor
 enum TranscriptSearchHighlight {
     static func background(isCurrent: Bool) -> Color {
-        isCurrent ? DS.Color.accent : Color.yellow
+        isCurrent ? DS.Color.accentFill : Color.yellow
     }
 
-    static let foreground = Color.black
+    static func foreground(isCurrent: Bool) -> Color {
+        isCurrent ? DS.Color.onAccent : .black
+    }
 
     /// A segment's text with its matches painted, trimmed as an unmatched segment renders it so nothing shifts while typing.
     static func attributed(
@@ -84,6 +86,6 @@ enum TranscriptSearchHighlight {
             low < high
         else { return }
         text[low..<high].backgroundColor = background(isCurrent: isCurrent)
-        text[low..<high].foregroundColor = foreground
+        text[low..<high].foregroundColor = foreground(isCurrent: isCurrent)
     }
 }

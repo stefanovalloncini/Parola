@@ -46,7 +46,7 @@ struct MediaBar: View {
                     .font(DS.Font.bodyStrong)
                     .foregroundStyle(DS.Color.onAccent)
                     .frame(width: 36, height: 36)
-                    .background(Circle().fill(DS.Color.accent))
+                    .background(Circle().fill(DS.Color.accentFill))
             }
             .buttonStyle(.plain)
             .help(model.isPlaying ? "Pause" : "Play")
@@ -140,7 +140,7 @@ private struct SpeedPillStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(DS.Font.mono.weight(.semibold))
-            .foregroundStyle(DS.Color.accentText)
+            .foregroundStyle(DS.Color.accentInk)
             .padding(.horizontal, DS.Spacing.small)
             .padding(.vertical, DS.Spacing.tight)
             .background(Capsule().fill(DS.Color.accentWash))

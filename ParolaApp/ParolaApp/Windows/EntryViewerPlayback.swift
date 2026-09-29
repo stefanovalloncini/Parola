@@ -39,7 +39,7 @@ struct EntryViewerPlaybackBar: View {
                         .font(DS.Font.bodyStrong)
                         .foregroundStyle(DS.Color.onAccent)
                         .frame(width: 36, height: 36)
-                        .background(Circle().fill(DS.Color.accent))
+                        .background(Circle().fill(DS.Color.accentFill))
                 }
                 .buttonStyle(.plain)
                 .help(session.isPlaying ? "Pause" : "Play")

@@ -87,7 +87,7 @@ struct LiveCaptionsView: View {
     }
 
     private func chipFill(translating: Bool) -> Color {
-        translating ? DS.Color.accent : Color.white.opacity(0.12)
+        translating ? DS.Color.accentFill : Color.white.opacity(0.12)
     }
 
     @ViewBuilder

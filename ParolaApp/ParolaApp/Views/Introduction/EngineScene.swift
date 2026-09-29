@@ -54,7 +54,7 @@ struct EngineScene: View {
         } label: {
             Text("More models in Settings")
                 .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.accentText)
+                .foregroundStyle(DS.Color.accentInk)
         }
         .buttonStyle(.plain)
         .axLeaf("Introduction.Button.MoreModels")

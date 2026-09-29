@@ -105,6 +105,7 @@ struct TranslationSection: View {
         .menuStyle(.button)
         .controlSize(.small)
         .fixedSize()
+        .tint(DS.Color.accentInk)
         .disabled(!model.canTranslateTranscript || menuTargets.isEmpty)
         .axLeaf("Translation.Menu.TranslateTo")
     }
