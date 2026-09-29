@@ -802,11 +802,20 @@ public actor FolderWatcher {
     /// Off the actor, since the read waits for the download; a failed read hands the file over as it is.
     private func materialize(_ key: FileKey, path: String) {
         let cloud = options.cloud
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        Self.placeholderReads.addOperation { [weak self] in
             let result = Result { try cloud.materialize(path) }
             Task { await self?.materialized(key, path: path, result: result) }
         }
     }
+
+    /// Two at a time, apart from the scans: each read can wait minutes on a download.
+    private static let placeholderReads: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "app.parola.folder-watch.placeholder-reads"
+        queue.maxConcurrentOperationCount = 2
+        queue.qualityOfService = .utility
+        return queue
+    }()
 
     private func materialized(_ key: FileKey, path: String, result: Result<Void, any Error>) {
         guard files[key]?.path == path, files[key]?.status == .pending else { return }

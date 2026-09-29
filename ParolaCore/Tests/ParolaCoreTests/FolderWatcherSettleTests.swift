@@ -319,6 +319,39 @@ struct FolderWatcherSettleTests {
         #expect(placeholder.reads.count == 1)
     }
 
+    @Test("stuck placeholders are read two at a time")
+    func placeholderReadsAreLimited() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        let reads = ReadGate()
+        let scheduler = ManualScheduler()
+        var options = FolderWatcher.Options(recursive: true, settledInterval: .milliseconds(50), clock: clock, scheduler: scheduler)
+        options.observesFileSystem = false
+        options.placeholderChecks = 1
+        options.cloud = FolderWatcher.CloudProbe(
+            isUbiquitous: { _ in true },
+            isDownloaded: { _ in false },
+            requestDownload: { _ in },
+            materialize: { _ in reads.read() }
+        )
+        let watcher = FolderWatcher(folderURL: folder, options: options) { _ in }
+        await watcher.start()
+        for index in 1...5 {
+            try Fixture.writeSettled(folder.appendingPathComponent("online-only-\(index).m4a"), clock: clock)
+        }
+        await watcher.checkForNewFiles()
+        try await scheduler.advanceAndWait()
+
+        #expect(await waitFor { reads.active == 2 })
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(reads.most == 2)
+        reads.open()
+        #expect(await waitFor { reads.finished == 5 })
+        #expect(reads.most == 2)
+        await watcher.stop()
+    }
+
     @Test("a placeholder whose read fails is handed over as it is rather than held forever")
     func unreadablePlaceholderArrivesAnyway() async throws {
         let folder = try Fixture.makeTempDir()
@@ -339,6 +372,37 @@ struct FolderWatcherSettleTests {
         #expect(await watcher.pendingPaths.isEmpty)
         await watcher.stop()
         #expect(collected.snapshot().map(\.lastPathComponent) == ["offline.m4a"])
+    }
+}
+
+final class ReadGate: Sendable {
+    private struct State {
+        var active = 0
+        var most = 0
+        var finished = 0
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let gate = DispatchSemaphore(value: 0)
+
+    var active: Int { state.withLock { $0.active } }
+    var most: Int { state.withLock { $0.most } }
+    var finished: Int { state.withLock { $0.finished } }
+
+    func read() {
+        state.withLock {
+            $0.active += 1
+            $0.most = max($0.most, $0.active)
+        }
+        gate.wait()
+        state.withLock {
+            $0.active -= 1
+            $0.finished += 1
+        }
+    }
+
+    func open() {
+        for _ in 0..<5 { gate.signal() }
     }
 }
 
