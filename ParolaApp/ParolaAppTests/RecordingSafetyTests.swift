@@ -70,7 +70,7 @@ extension TranscriberMockSuites {
             return listed
         }
 
-        @Test("a failed take is saved to the library and Retry re-transcribes it")
+        @Test("a failed take is saved to the library, and Retry transcribes that entry instead of adding another")
         func failedTakeSavesAudioAndRetryWorks() async throws {
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
@@ -102,13 +102,13 @@ extension TranscriberMockSuites {
 
                 model.retryFailedTake()
 
-                let ready = await waitUntil { model.phase == .ready }
+                let ready = await waitUntil { model.phase == .ready && model.transcript?.text == "recovered text" }
                 #expect(ready)
-                #expect(model.transcript?.text == "recovered text")
                 #expect(model.failedTakeAudioURL == nil)
-                let after = await entries(model, count: 2)
-                #expect(after.count == 2)
-                #expect(after.contains { !$0.title.hasSuffix("(transcription failed)") })
+                #expect(model.selectedEntryID == saved.first?.id, "Retry opens the take's entry")
+                let after = await model.library.list()
+                #expect(after.count == 1, "the entry is filled in, not joined by a twin")
+                #expect(after.first?.title.hasSuffix("(transcription failed)") == false)
             }
         }
 

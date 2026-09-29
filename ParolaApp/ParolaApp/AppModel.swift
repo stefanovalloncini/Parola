@@ -446,6 +446,8 @@ final class AppModel {
     private(set) var failureKind: FailureKind = .other
     /// A recorded take whose transcription failed; the file backs the error pane's Retry.
     var failedTakeAudioURL: URL?
+    /// The save that put the failed take in the library, so Retry fills in that entry instead of adding a twin.
+    @ObservationIgnored var failedTakeSave: Task<LibraryEntry, any Error>?
     /// The file a failed file transcription was reading; the error card retries and reveals it.
     var failedFileURL: URL?
     /// The translate setting the failed run used, so Retry repeats it rather than the current toggle.
@@ -3453,13 +3455,14 @@ final class AppModel {
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let takeTitle = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
         let savedPartial = !confirmed.isEmpty || audioURL != nil
+        var saving: Task<LibraryEntry, any Error>?
         if savedPartial {
             // With no words through, no model ran on it as far as the entry can tell: it opens as not transcribed.
             let finished = await StreamingTranscriptionSession.finishedTake(
                 segments: confirmed, options: currentOptions, modelName: confirmed.isEmpty ? "" : selectedModel, audioURL: audioURL
             )
             let partial = await postProcessDetached(finished)
-            saveTake(
+            saving = saveTake(
                 partial,
                 audio: audioURL,
                 title: Self.takeTitle(takeTitle, suffix: .interrupted),
@@ -3480,7 +3483,7 @@ final class AppModel {
         phase = .failed(message: message)
         // After the phase: its didSet forgets whatever the last failure left behind.
         if savedPartial, let audioURL {
-            armTakeRetry(url: audioURL, title: takeTitle, source: takeSource, category: takeCategory)
+            armTakeRetry(url: audioURL, title: takeTitle, source: takeSource, category: takeCategory, save: saving)
         }
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
@@ -3649,7 +3652,7 @@ final class AppModel {
         _ cut: CaptureInterrupted, title: String, source: EntrySource, category: EntryCategory, recovery: Int?
     ) async {
         _ = try? await AppModel.offMainIO { WAVHeaderRepair.makeReadable(cut.url) }
-        saveTake(
+        let saving = saveTake(
             Self.untranscribedTranscript(of: cut.url, language: currentOptions.language),
             audio: cut.url,
             title: Self.takeTitle(title, suffix: .interrupted),
@@ -3661,7 +3664,7 @@ final class AppModel {
         let message = String(localized: "Parola couldn't keep writing the recording to disk.")
             + " " + String(localized: "The recording up to this point was saved to your library.")
         phase = .failed(message: message)
-        armTakeRetry(url: cut.url, title: title, source: source, category: category)
+        armTakeRetry(url: cut.url, title: title, source: source, category: category, save: saving)
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
@@ -3756,7 +3759,7 @@ final class AppModel {
         recovery: Int?, forNewTake: Bool
     ) {
         let stopped = error is CancellationError || Task.isCancelled
-        saveTake(
+        let saving = saveTake(
             Self.untranscribedTranscript(of: url, language: currentOptions.language),
             audio: url,
             title: Self.takeTitle(title, suffix: stopped ? .notTranscribed : .transcriptionFailed),
@@ -3786,14 +3789,17 @@ final class AppModel {
             return
         }
         phase = .failed(message: message)
-        armTakeRetry(url: url, title: title, source: source, category: category)
+        armTakeRetry(url: url, title: title, source: source, category: category, save: saving)
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
     /// After the phase is set: its didSet forgets whatever the last failure left behind.
-    private func armTakeRetry(url: URL, title: String, source: EntrySource, category: EntryCategory) {
+    private func armTakeRetry(
+        url: URL, title: String, source: EntrySource, category: EntryCategory, save: Task<LibraryEntry, any Error>?
+    ) {
         failureKind = .transcription
         failedTakeAudioURL = url
+        failedTakeSave = save
         failedTakeTitle = title
         failedTakeCategory = category
         failedTakeSource = source
@@ -4033,6 +4039,7 @@ final class AppModel {
         if failedLink != nil { failedLink = nil }
         if failedLinkDownload != nil { failedLinkDownload = nil }
         if failedTakeAudioURL != nil { failedTakeAudioURL = nil }
+        failedTakeSave = nil
         failedTakeTitle = nil
         failedTakeCategory = nil
         failedTakeSource = nil
@@ -4076,14 +4083,22 @@ final class AppModel {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
-    /// Re-runs transcription of the take a failure left behind.
+    /// Re-runs a failed take's transcription in the entry its failure saved, so no twin appears; from its working file when that save never landed.
     func retryFailedTake() {
         guard let url = failedTakeAudioURL else { return }
         let title = failedTakeTitle ?? Self.liveRecordingTitle(category: .transcription, endedAt: Date())
         let source = failedTakeSource ?? .microphone
         let category = failedTakeCategory ?? .transcription
-        startTakeTask { [weak self] in
-            await self?.transcribeRecordedTake(url: url, title: title, source: source, category: category)
+        let saving = failedTakeSave
+        Task { [weak self] in
+            if let entry = try? await saving?.value, let self, (try? await self.openEntry(entry.id)) != nil {
+                self.retranscribeCurrentEntry(model: self.selectedModel, language: self.selectedLanguage)
+                self.releaseTakeFile(url)
+                return
+            }
+            self?.startTakeTask { [weak self] in
+                await self?.transcribeRecordedTake(url: url, title: title, source: source, category: category)
+            }
         }
     }
 
