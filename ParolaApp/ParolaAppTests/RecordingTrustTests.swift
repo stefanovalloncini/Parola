@@ -281,5 +281,23 @@ extension TranscriberMockSuites {
                 ) == title)
             }
         }
+
+        // MARK: - Legibility
+
+        @Test("white on the Stop fill clears 4.5:1 in both appearances")
+        func stopFillIsLegible() {
+            let fill = DS.Color.recordingFillTheme.appearanceVariants
+            let white = RGBA(1, 1, 1)
+            #expect(white.contrast(against: fill.light) >= RGBA.textContrastMinimum)
+            #expect(white.contrast(against: fill.dark) >= RGBA.textContrastMinimum)
+        }
+
+        @Test("warning banners set near-black text on solid amber, at 7:1 or more")
+        func warningBannerIsLegible() {
+            let amber = ThemePalette.sharedNeutrals.warning.appearanceVariants
+            let ink = DS.Color.warningBannerInkRGBA
+            #expect(ink.contrast(against: amber.light) >= 7)
+            #expect(ink.contrast(against: amber.dark) >= 7)
+        }
     }
 }

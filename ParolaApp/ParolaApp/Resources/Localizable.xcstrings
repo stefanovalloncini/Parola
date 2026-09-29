@@ -7403,6 +7403,17 @@
         }
       }
     },
+    "Low disk space — recording stops automatically below 200 MB.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Poco spazio su disco: la registrazione si ferma da sola sotto i 200 MB."
+          }
+        }
+      }
+    },
     "MCP & Automation": {
       "extractionState": "manual",
       "localizations": {

@@ -69,16 +69,15 @@ struct RecordingPane: View {
     private func warningBanner(icon: String, message: LocalizedStringKey) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .foregroundStyle(.white)
             Text(message)
                 .font(DS.Font.bodyStrong)
-                .foregroundStyle(.white)
             Spacer()
         }
+        .foregroundStyle(DS.Color.warningBannerInk)
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
         .background(
-            Capsule().fill(DS.Palette.warning.opacity(0.85))
+            Capsule().fill(DS.Palette.warning)
         )
         .padding(.horizontal, DS.Spacing.large)
         .padding(.bottom, DS.Spacing.medium)
@@ -141,7 +140,7 @@ struct RecordingCard: View {
                 .padding(.top, DS.Spacing.hair)
                 Text(source.meterLabel)
                     .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText.opacity(0.7))
+                    .foregroundStyle(DS.Color.secondaryText)
             }
 
             if startedAt == nil {
@@ -156,7 +155,7 @@ struct RecordingCard: View {
                         .foregroundStyle(.white)
                         .frame(width: 120, height: 36)
                         .background(
-                            Capsule().fill(DS.Color.danger.opacity(0.9))
+                            Capsule().fill(DS.Color.recordingFill)
                         )
                 }
                 .buttonStyle(.plain)
@@ -211,6 +210,19 @@ struct RecordingCard: View {
         guard case .preparingModel(let name, _) = arming else { return Text("Starting…") }
         return Text("Preparing \(ModelPickerView.shortLabel(for: AppModel.modelLabel(name)))…")
     }
+}
+
+extension DS.Color {
+    /// A take's Stop fill: white on it clears 4.5:1 in both appearances, where `danger` reaches 3.6.
+    static let recordingFillTheme = ThemeColor.dynamic(
+        light: RGBA(0.769, 0.137, 0.165),
+        dark: RGBA(0.839, 0.208, 0.184)
+    )
+    static let recordingFill = recordingFillTheme.color
+
+    /// Near-black on the amber warning fill, 9:1; white on it read under 2:1.
+    static let warningBannerInkRGBA = RGBA(0.08, 0.08, 0.08)
+    static let warningBannerInk = ThemeColor.uniform(warningBannerInkRGBA).color
 }
 
 struct LiveTranscriptView: View {
