@@ -258,6 +258,50 @@ extension TranscriberMockSuites {
             }
         }
 
+        private actor Calls {
+            var count = 0
+            func next() -> Int {
+                count += 1
+                return count
+            }
+        }
+
+        @Test("a run in the window replaced while it post-processes lands once, out of sight, not twice")
+        func replacedDuringPostProcessingLandsOnce() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let folder = try makeFolder("postprocess")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let model = makeModel(library: makeTempLibraryURL("loss-postprocess"), defaults: temporaryDefaults())
+                let calls = Calls()
+                let (held, release) = AsyncStream<Void>.makeStream()
+                defer { release.finish() }
+                model.postProcessOperation = { transcript in
+                    if await calls.next() == 1 {
+                        for await _ in held { break }
+                    }
+                    return transcript
+                }
+                let arrived = try makeWAV("Arrived", in: folder)
+                let opened = try makeWAV("Opened", in: folder, seconds: 0.6)
+                await arrive(model, [arrived])
+                #expect(await waitUntil(timeoutMs: 10_000) { await calls.count == 1 })
+
+                model.transcribe(fileURL: opened)
+                #expect(await waitUntil(timeoutMs: 10_000) { model.sourceFileURL == opened })
+                release.yield()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle && model.fileTranscribeTask == nil })
+                await model.awaitLandingSteps()
+                await settle()
+                let titles = await model.library.list().map(LibraryEntryDisplay.title(for:)).sorted()
+                #expect(titles == ["Arrived", "Opened"])
+                #expect(model.sourceFileURL?.lastPathComponent == "Opened.wav")
+            }
+        }
+
         @Test("a settings reset leaves the files waiting in the line")
         func settingsResetKeepsTheLine() async throws {
             let folder = try makeFolder("reset")

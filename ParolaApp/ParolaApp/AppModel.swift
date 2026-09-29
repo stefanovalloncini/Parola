@@ -2255,6 +2255,8 @@ final class AppModel {
                 )
                 try Task.checkCancellation()
                 var processed = await postProcessDetached(result)
+                // Post-processing is a suspension a cancel can land in; a replaced run must not land after it.
+                try Task.checkCancellation()
                 if let fetchedLink { processed.sourceURL = fetchedLink.media.metadata.webpageURL ?? fetchedLink.link }
                 let landing = Self.landingSignposter.beginInterval("install")
                 defer { Self.landingSignposter.endInterval("install", landing) }

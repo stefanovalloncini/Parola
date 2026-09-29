@@ -181,9 +181,10 @@ extension AppModel {
         }
     }
 
-    /// The run in the window reached its landing.
+    /// The run in the window reached its landing. One the window already let go is the lane's to run.
     func visibleArrivalLanded(_ arrival: WatchedArrival, saving: Task<LibraryEntry, any Error>) {
-        if visibleArrivalID == arrival.id { visibleArrivalID = nil }
+        guard visibleArrivalID == arrival.id else { return }
+        visibleArrivalID = nil
         holdUntilSaved(arrival, saving, ringsWhenDry: false)
     }
 
