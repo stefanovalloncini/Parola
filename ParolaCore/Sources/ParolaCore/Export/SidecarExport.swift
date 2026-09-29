@@ -38,18 +38,41 @@ public struct SidecarSource: Sendable, Hashable {
     }
 }
 
-/// One file to write: what to render and where.
+/// One file to write: what to render and where. A job's name is `<baseName><nameTail>.<ext>`; when that
+/// is taken, the runner numbers the base, `<baseName> (2)<nameTail>.<ext>`, the same for every job of one source.
 public struct ExportJob: Sendable, Hashable {
     public var spec: ExportSpec
-    public var target: URL
+    public var directory: URL
+    public var baseName: String
+    public var nameTail: String
     public var owner: String
     public var createsDirectory: Bool
 
+    public var target: URL { target(number: 1) }
+
     public init(spec: ExportSpec, target: URL, owner: String, createsDirectory: Bool = false) {
+        self.init(
+            spec: spec,
+            directory: target.deletingLastPathComponent(),
+            baseName: target.deletingPathExtension().lastPathComponent,
+            nameTail: "",
+            owner: owner,
+            createsDirectory: createsDirectory
+        )
+    }
+
+    init(spec: ExportSpec, directory: URL, baseName: String, nameTail: String, owner: String, createsDirectory: Bool) {
         self.spec = spec
-        self.target = target
+        self.directory = directory
+        self.baseName = baseName
+        self.nameTail = nameTail
         self.owner = owner
         self.createsDirectory = createsDirectory
+    }
+
+    func target(number: Int) -> URL {
+        let base = number == 1 ? baseName : "\(baseName) (\(number))"
+        return directory.appendingPathComponent(base + nameTail).appendingPathExtension(spec.format.fileExtension)
     }
 }
 
@@ -79,23 +102,18 @@ public enum SidecarExportPlanner {
         var seenTargets = Set<URL>()
         var jobs: [ExportJob] = []
         for preset in presets + ruled where seenPresets.insert(preset.id).inserted {
-            let ext = preset.spec.format.fileExtension
-            let names = [
-                source.baseName,
-                "\(source.baseName).\(slug(preset))",
-                "\(source.baseName).\(slug(preset))-\(preset.id.uuidString.prefix(8))",
-            ]
-            guard let target = names
-                .map({ source.directory.appendingPathComponent($0).appendingPathExtension(ext) })
-                .first(where: { !seenTargets.contains($0) })
+            let tails = ["", ".\(slug(preset))", ".\(slug(preset))-\(preset.id.uuidString.prefix(8))"]
+            guard let job = tails
+                .map({
+                    ExportJob(
+                        spec: preset.spec, directory: source.directory, baseName: source.baseName, nameTail: $0,
+                        owner: source.owner, createsDirectory: source.createsDirectory
+                    )
+                })
+                .first(where: { !seenTargets.contains($0.target) })
             else { continue }
-            seenTargets.insert(target)
-            jobs.append(
-                ExportJob(
-                    spec: preset.spec, target: target, owner: source.owner,
-                    createsDirectory: source.createsDirectory
-                )
-            )
+            seenTargets.insert(job.target)
+            jobs.append(job)
         }
         return jobs
     }
@@ -128,20 +146,27 @@ public enum SidecarExportPlanner {
 public enum ExportRunner {
     @concurrent
     public static func run(_ jobs: [ExportJob], transcript: Transcript) async -> [ExportJobResult] {
-        jobs.map { job in
+        var numbers: [SourceKey: Int] = [:]
+        return jobs.map { job in
             do {
                 let data = try Exporters.exporter(for: job.spec).render(transcript)
                 if job.createsDirectory {
-                    try FileManager.default.createDirectory(
-                        at: job.target.deletingLastPathComponent(), withIntermediateDirectories: true
-                    )
+                    try FileManager.default.createDirectory(at: job.directory, withIntermediateDirectories: true)
                 }
-                let target = claim(job.target, owner: job.owner)
-                if target != job.target {
-                    ParolaLog.notice(
-                        .export, "sidecar target holds a file Parola didn't write; wrote a numbered copy as \(job.spec.format)"
-                    )
+                let key = SourceKey(job)
+                let number: Int
+                if let claimed = numbers[key] {
+                    number = claimed
+                } else {
+                    number = claim(jobs.filter { SourceKey($0) == key })
+                    numbers[key] = number
+                    if number > 1 {
+                        ParolaLog.notice(
+                            .export, "sidecar target holds a file Parola didn't write; wrote a numbered copy as \(job.spec.format)"
+                        )
+                    }
                 }
+                let target = job.target(number: number)
                 try data.write(to: target, options: .atomic)
                 OutputMarker.mark(target, owner: job.owner)
                 return ExportJobResult(job: job, written: target, error: nil)
@@ -152,17 +177,27 @@ public enum ExportRunner {
         }
     }
 
-    /// The target itself when it is free or already this owner's; else the first `name (n).ext` that is.
-    static func claim(_ target: URL, owner: String) -> URL {
-        let stem = target.deletingPathExtension().lastPathComponent
-        let ext = target.pathExtension
-        let folder = target.deletingLastPathComponent()
-        var candidate = target
-        for number in 2...1000 {
-            guard FileManager.default.fileExists(atPath: candidate.path),
-                  OutputMarker.owner(of: candidate) != owner else { return candidate }
-            candidate = folder.appendingPathComponent("\(stem) (\(number))").appendingPathExtension(ext)
+    /// The jobs of one source share their base name, so all of them take the same number.
+    struct SourceKey: Hashable {
+        let directory: URL
+        let baseName: String
+        let owner: String
+
+        init(_ job: ExportJob) {
+            directory = job.directory
+            baseName = job.baseName
+            owner = job.owner
         }
-        return folder.appendingPathComponent("\(stem) \(UUID().uuidString.prefix(8))").appendingPathExtension(ext)
+    }
+
+    /// The smallest number at which every one of the source's files is free or already this owner's.
+    static func claim(_ group: [ExportJob]) -> Int {
+        func usable(_ url: URL, owner: String) -> Bool {
+            !FileManager.default.fileExists(atPath: url.path) || OutputMarker.owner(of: url) == owner
+        }
+        for number in 1...1000 where group.allSatisfy({ usable($0.target(number: number), owner: $0.owner) }) {
+            return number
+        }
+        return 1001
     }
 }

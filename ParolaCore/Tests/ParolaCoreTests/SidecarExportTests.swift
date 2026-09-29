@@ -197,10 +197,28 @@ struct SidecarExportTests {
         let first = await ExportRunner.run(jobs, transcript: transcript())
         let second = await ExportRunner.run(jobs, transcript: transcript())
 
-        #expect(first.map(\.written?.lastPathComponent) == ["talk.srt", "talk (2).txt"])
+        #expect(first.map(\.written?.lastPathComponent) == ["talk (2).srt", "talk (2).txt"])
         #expect(second.map(\.written) == first.map(\.written))
         let files = try FileManager.default.contentsOfDirectory(atPath: dir.path).sorted()
-        #expect(files == ["talk (2).txt", "talk.srt", "talk.txt"])
+        #expect(files == ["talk (2).srt", "talk (2).txt", "talk.txt"])
+    }
+
+    @Test("a name is taken when any of the source's formats already uses it, so its files share one number")
+    func oneNumberPerSource() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Data("theirs".utf8).write(to: dir.appendingPathComponent("Talk.txt"))
+        try Data("theirs".utf8).write(to: dir.appendingPathComponent("Talk (2).srt"))
+        var short = ExportSpec.standard(for: .srt)
+        short.options.captionLength = .short
+        let reels = ExportPreset(name: "Reels", spec: short)
+        let source = SidecarSource(fileExtension: "m4a", folder: dir, baseName: "Talk", owner: "entry-1")
+
+        let results = await ExportRunner.run(
+            SidecarExportPlanner.plan(presets: [srt, txt, reels], source: source), transcript: transcript()
+        )
+
+        #expect(results.map(\.written?.lastPathComponent) == ["Talk (3).srt", "Talk (3).txt", "Talk (3).Reels.srt"])
     }
 
     @Test("two sources with one stem in one folder keep their own sidecars")

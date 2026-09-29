@@ -181,6 +181,32 @@ struct AppModelRulesTests {
         #expect(!FileManager.default.fileExists(atPath: exportsDir.appendingPathComponent("Call 10.srt").path))
     }
 
+    @Test("an export name is taken when any of the import's formats already uses it")
+    func oneImportsFormatsShareOneName() async throws {
+        let model = try makeModel(defaults: freshDefaults())
+        model.autoExportRules = [
+            AutoExportRule(
+                sourceExtensions: ["m4a"],
+                presetIDs: [ExportPreset.builtIn(for: .srt)!.id, ExportPreset.builtIn(for: .txt)!.id]
+            ),
+        ]
+        let exportsDir = model.library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
+        try FileManager.default.createDirectory(at: exportsDir, withIntermediateDirectories: true)
+        try Data("someone else's".utf8).write(to: exportsDir.appendingPathComponent("Talk.txt"))
+        let audio = try makeAudioFile(ext: "m4a")
+        let entry = try await model.library.add(transcript: transcript("one name"), audioSource: audio, title: "Talk")
+
+        model.runAutoExports(for: entry)
+
+        try await pollUntil {
+            ["srt", "txt"].allSatisfy {
+                OutputMarker.owner(of: exportsDir.appendingPathComponent("Talk (2).\($0)")) == entry.id
+            }
+        }
+        #expect(!FileManager.default.fileExists(atPath: exportsDir.appendingPathComponent("Talk.srt").path))
+        #expect(try String(contentsOf: exportsDir.appendingPathComponent("Talk.txt"), encoding: .utf8) == "someone else's")
+    }
+
     @Test("running an entry's rules again replaces its own exports instead of numbering them")
     func rerunReplacesItsOwnExports() async throws {
         let model = try makeModel(defaults: freshDefaults())
