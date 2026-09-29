@@ -247,6 +247,32 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a take whose save failed keeps its checkpoint for the next launch, out of reach of the next take's cleanup")
+        func failedSaveKeepsItsCheckpoint() async throws {
+            let wav = try makeTakeWAV("failed-save")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "never landed")],
+                    gate: MockTranscriberGate()
+                ))
+                let model = makeModel()
+                await transcribingTake(model, wav: wav)
+                await model.pendingRecoveryWrite?.value
+                let checkpoint = try #require(model.activeRecoveryFileURL)
+                model.beforeLandingSave = { throw URLError(.cannotWriteToFile) }
+
+                model.stopTranscribingTake()
+                await waitUntil { !model.hasPendingTakeWork }
+
+                #expect(await model.library.list().isEmpty)
+                #expect(FileManager.default.fileExists(atPath: checkpoint.path))
+                #expect(model.activeRecoveryGeneration == nil)
+                model.endActiveRecovery()
+                #expect(FileManager.default.fileExists(atPath: checkpoint.path), "a cancelled take's cleanup can't reach it")
+            }
+        }
+
         @Test("a cancellation never reaches the screen as its type name")
         func cancellationReadsPlainly() {
             let message = AppModel.transcriptionFailureMessage(for: CancellationError())

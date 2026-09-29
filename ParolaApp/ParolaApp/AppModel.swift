@@ -3863,7 +3863,11 @@ final class AppModel {
             // At once: the entry holds the take now, and a quit may not wait for the rest.
             if let recovery {
                 self?.recoveryHeldByTake.remove(recovery)
-                if entry != nil { self?.endRecovery(recovery) }
+                if entry != nil {
+                    self?.endRecovery(recovery)
+                } else {
+                    self?.keepForNextLaunch(recovery)
+                }
             }
             var entryAudio: URL?
             if let entry, audio != nil { entryAudio = try? await library.load(entry.id).document.audioURL }

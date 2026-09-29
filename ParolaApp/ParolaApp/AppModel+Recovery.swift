@@ -200,6 +200,13 @@ extension AppModel {
         endRecovery(active)
     }
 
+    /// A take whose save failed: its checkpoint stays for the next launch, out of reach of the cleanup the next take runs.
+    func keepForNextLaunch(_ generation: Int) {
+        guard generation == activeRecoveryGeneration else { return }
+        activeRecoveryGeneration = nil
+        recordingRecoveryStartedAt = nil
+    }
+
     private func writeRecoveryFile(generation: Int, _ checkpoint: RecoveryCheckpoint) {
         guard let id = recoveryFileIDs[generation] else { return }
         var checkpoint = checkpoint
