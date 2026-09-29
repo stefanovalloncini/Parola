@@ -39,9 +39,15 @@ struct TranscribingPane: View {
         return heuristic
     }
 
-    /// A link's captions arrive with no file of their own, so the site stands in for the name.
+    private var recordedTake: AppModel.RecordedTake? {
+        guard let take = model.recordedTake, take.file == file else { return nil }
+        return take
+    }
+
+    /// A take is named by its title, and a link's captions arrive with no file of their own, so the site stands in.
     private var shownName: String {
         if let name { return name }
+        if let recordedTake { return recordedTake.title }
         guard !file.isFileURL else { return file.lastPathComponent }
         return LinkDownloadFailure.site(for: file) ?? file.absoluteString
     }

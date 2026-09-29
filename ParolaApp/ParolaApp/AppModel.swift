@@ -50,6 +50,12 @@ final class AppModel {
         }
     }
 
+    /// A take's title with the file it was recorded to, so no pane names the working file.
+    struct RecordedTake: Equatable {
+        let file: URL
+        let title: String
+    }
+
     enum Route: String, Hashable, CaseIterable {
         case transcript
         case batch
@@ -150,6 +156,8 @@ final class AppModel {
     var liveSegments: [TranscriptSegment] = []
     /// The route the running take took; the recording pane reads it.
     private(set) var liveTakeIsStreaming = false
+    /// The take transcribing or just transcribed. Matched by file, so a stale one names nothing.
+    private(set) var recordedTake: RecordedTake?
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
@@ -3251,24 +3259,26 @@ final class AppModel {
             }
             let landing = Self.landingSignposter.beginInterval("install")
             defer { Self.landingSignposter.endInterval("install", landing) }
+            let title = Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date())
             clearDerivedArtifacts()
             self.selectedEntryID = nil
             self.transcript = processed
             self.phase = .ready
             if let audioURL = processed.sourceURL {
+                recordedTake = RecordedTake(file: audioURL, title: title)
                 sourceFileURL = audioURL
                 installPlayer(for: audioURL)
                 adoptLoadedMediaDuration()
             }
-            let category = takeRecordingCategory()
-            land(RunLanding(
+            let saving = land(RunLanding(
                 kind: .recording,
                 transcript: processed,
                 audioSource: processed.sourceURL,
                 source: pendingRecordingSource,
-                category: category,
-                title: Self.liveRecordingTitle(category: category, endedAt: Date())
+                category: takeRecordingCategory(),
+                title: title
             ))
+            if let audioURL = processed.sourceURL { followTakeIntoLibrary(audioURL, entry: saving) }
             resolveRecordingOutcome(.success(processed.text))
         }
     }
@@ -3330,6 +3340,7 @@ final class AppModel {
     func transcribeRecordedTake(url: URL, title: String, source: EntrySource) async {
         liveRecordingAudioURL = nil
         let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, title: title, source: source)
+        recordedTake = RecordedTake(file: url, title: title)
         sourceFileURL = url
         installPlayer(for: url)
         phase = .transcribing(file: url)
@@ -3348,10 +3359,11 @@ final class AppModel {
             adoptLoadedMediaDuration()
             endRecovery(recoveryToken)
             phase = .ready
-            land(RunLanding(
+            let saving = land(RunLanding(
                 kind: .recording, transcript: processed, audioSource: url, source: source,
                 category: takeRecordingCategory(), title: title
             ))
+            followTakeIntoLibrary(url, entry: saving)
             resolveRecordingOutcome(.success(processed.text))
         } catch {
             endRecovery(recoveryToken)
@@ -3385,6 +3397,22 @@ final class AppModel {
             }
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
         }
+    }
+
+    /// Playback follows a saved take into its entry, so the header reads the entry's title from then on.
+    private func followTakeIntoLibrary(_ takeURL: URL, entry saving: Task<LibraryEntry, any Error>) {
+        Task { [weak self, library] in
+            guard let entry = try? await saving.value,
+                  let audio = try? await library.load(entry.id).document.audioURL else { return }
+            guard let self, self.sourceFileURL == takeURL, self.selectedEntryID == entry.id else { return }
+            self.movePlayback(to: audio)
+        }
+    }
+
+    /// The take's title while its own working file is what's loaded; nil once playback moves into its entry.
+    func recordedTakeTitle(playing file: URL?) -> String? {
+        guard let file, let recordedTake, recordedTake.file == file else { return nil }
+        return recordedTake.title
     }
 
     /// A phase change means the last failure's file is no longer what the error card is about.

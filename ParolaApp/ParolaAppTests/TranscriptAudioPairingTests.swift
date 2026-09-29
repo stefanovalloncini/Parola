@@ -154,9 +154,17 @@ extension TranscriberMockSuites {
                 await gate.open()
                 let finished = await waitUntil { model.phase == .ready && model.selectedEntryID != other.id }
                 #expect(finished, "the take never landed")
-                #expect(model.sourceFileURL == fixture, "the take landed on the entry's audio instead of its own")
+                #expect(model.sourceFileURL != other.audio, "the take landed on the entry's audio instead of its own")
                 #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
-                #expect(playerURL(model) == fixture, "the take's transcript would play the entry's audio")
+                // Once the library holds the take, it plays from its own entry's copy of the recording.
+                let playsItsOwnEntry = await waitUntil {
+                    guard let id = model.selectedEntryID, id != other.id, let entry = model.libraryEntry(id: id) else {
+                        return false
+                    }
+                    return model.sourceFileURL?.deletingLastPathComponent().lastPathComponent == entry.bundleURL.lastPathComponent
+                }
+                #expect(playsItsOwnEntry, "the take's transcript should play the take's own audio")
+                #expect(playerURL(model) == model.sourceFileURL, "the take's transcript would play the entry's audio")
             }
         }
 

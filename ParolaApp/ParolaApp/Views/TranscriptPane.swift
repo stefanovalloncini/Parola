@@ -112,7 +112,7 @@ struct TranscriptPane: View {
     }
 
     private var headerTitle: String {
-        AppModel.transcriptDisplayTitle(
+        model.recordedTakeTitle(playing: model.sourceFileURL) ?? AppModel.transcriptDisplayTitle(
             sourceFileURL: model.sourceFileURL,
             entry: model.selectedEntryID.flatMap { model.libraryEntry(id: $0) },
             showsAITitle: model.showAITitles,
