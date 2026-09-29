@@ -292,17 +292,13 @@ struct SurfaceContrastTests {
         #expect(light >= 3, "light playhead word: \(light)")
     }
 
-    /// `selectionProminent` is `accentFill` outright now, so the badge set straight on it clears full text AA;
-    /// the softened secondary tier keeps a lower floor since it's deliberately a notch quieter.
+    /// `selectionProminent` is `accentFill` outright, so the ink set on it clears full text AA — `onAccentSecondary` is that same ink at full strength, not a dimmed tier, so it clears the identical floor.
     @Test("the ink tiers on a chosen row clear AA now that the fill is opaque", arguments: ThemePreset.allCases)
     func inkTiersOnTheProminentFill(preset: ThemePreset) throws {
         let fill = try #require(Self.pair(preset.palette.accentFill))
         let ink = try #require(Self.pair(preset.palette.onAccent))
         for (scheme, drawn, badge) in [("light", fill.light, ink.light), ("dark", fill.dark, ink.dark)] {
-            #expect(badge.contrast(against: drawn) >= Self.minimum, "\(preset.rawValue) \(scheme) badge")
-
-            let second = drawn.blended(toward: badge, amount: DS.Color.onAccentSecondaryTint)
-            #expect(second.contrast(against: drawn) >= 3.5, "\(preset.rawValue) \(scheme): \(second.contrast(against: drawn))")
+            #expect(badge.contrast(against: drawn) >= Self.minimum, "\(preset.rawValue) \(scheme)")
         }
     }
 
