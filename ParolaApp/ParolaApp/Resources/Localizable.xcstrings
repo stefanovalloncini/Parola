@@ -11618,6 +11618,17 @@
         }
       }
     },
+    "Saved the previous recording without transcribing it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La registrazione precedente è stata salvata senza trascriverla."
+          }
+        }
+      }
+    },
     "Sea": {
       "extractionState": "manual",
       "localizations": {

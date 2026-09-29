@@ -196,8 +196,10 @@ final class AppModel {
     /// The take that owns the capture, the clock and the checkpoint; work an older take left running checks it first.
     @ObservationIgnored private(set) var activeTake: TakeContext?
     @ObservationIgnored private var takeRunCounter = 0
-    /// The take transcription in flight, so Stop Transcribing acts on that run alone.
+    /// The take transcription in flight, so Stop Transcribing and a new take act on that run alone.
     @ObservationIgnored private var takeRun: Int?
+    /// The take transcription a new take stopped, so its save can say why.
+    @ObservationIgnored private var takeRunStoppedForNewTake: Int?
     /// The library save of the last live take, which a quit waits for.
     @ObservationIgnored private var takeSave: Task<LibraryEntry, any Error>?
     var livePartialText: String = ""
@@ -389,6 +391,8 @@ final class AppModel {
         case .recording(.microphone):
             stopRecordingAndTranscribe()
         case .idle, .ready, .failed:
+            startRecording(source: .microphone)
+        case .transcribing where takeRun != nil:
             startRecording(source: .microphone)
         default:
             return
@@ -3068,6 +3072,8 @@ final class AppModel {
                 resolveRecordingOutcome(.failure(IntentActionError.cancelled))
                 return
             }
+            // A take recording now outranks one still transcribing: that one is saved as it is.
+            takeRunStoppedForNewTake = takeRun
             // A recording replaces any transcription in flight, like a user file-open does;
             // otherwise the old run would finish later and stomp the new take's transcript.
             cancelTranscriptionRuns()
@@ -3592,6 +3598,12 @@ final class AppModel {
                 options: currentOptions
             )
             let processed = await postProcessDetached(result)
+            // A run stopped after its words were ready keeps them, out of the way of whatever stopped it.
+            guard !Task.isCancelled else {
+                saveTake(processed, audio: url, title: title, source: source, category: category, activate: false, recovery: recovery)
+                resolveRecordingOutcome(.success(processed.text))
+                return
+            }
             let landing = Self.landingSignposter.beginInterval("install")
             defer { Self.landingSignposter.endInterval("install", landing) }
             clearDerivedArtifacts()
@@ -3604,14 +3616,16 @@ final class AppModel {
             resolveRecordingOutcome(.success(processed.text))
         } catch {
             keepUntranscribedTake(
-                url: url, title: title, source: source, category: category, error: error, recovery: recovery
+                url: url, title: title, source: source, category: category, error: error,
+                recovery: recovery, forNewTake: takeRunStoppedForNewTake == run
             )
         }
     }
 
     /// A take whose transcription failed or was stopped goes to the library as audio; only a failure reports.
     private func keepUntranscribedTake(
-        url: URL, title: String, source: EntrySource, category: EntryCategory, error: any Error, recovery: Int?
+        url: URL, title: String, source: EntrySource, category: EntryCategory, error: any Error,
+        recovery: Int?, forNewTake: Bool
     ) {
         let stopped = error is CancellationError || Task.isCancelled
         saveTake(
@@ -3627,20 +3641,32 @@ final class AppModel {
             category: category,
             activate: false,
             recovery: recovery
-        )
+        ) { [weak self] _ in
+            guard forNewTake else { return }
+            self?.exportNotice = ExportNotice(
+                message: String(localized: "Saved the previous recording without transcribing it."),
+                failures: [],
+                folder: nil
+            )
+        }
         if stopped {
             // Whatever stopped the run keeps the screen; only the take's own pane gives way to Home.
             let ownsPhase = phase == .transcribing(file: url) || phase == .idle
             if phase == .transcribing(file: url) { phase = .idle }
             if ownsPhase { armTakeRetry(url: url, title: title, source: source, category: category) }
             resolveRecordingOutcome(.failure(IntentActionError.cancelled))
-        } else {
-            let message = Self.transcriptionFailureMessage(for: error)
-                + " " + String(localized: "The audio was saved to your library.")
-            phase = .failed(message: message)
-            armTakeRetry(url: url, title: title, source: source, category: category)
-            resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+            return
         }
+        let message = Self.transcriptionFailureMessage(for: error)
+            + " " + String(localized: "The audio was saved to your library.")
+        // A take recording since then keeps the pane; the failed one waits in the library.
+        if case .recording = phase {
+            resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+            return
+        }
+        phase = .failed(message: message)
+        armTakeRetry(url: url, title: title, source: source, category: category)
+        resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
     /// After the phase is set: its didSet forgets whatever the last failure left behind.
@@ -3668,7 +3694,8 @@ final class AppModel {
         source: EntrySource,
         category: EntryCategory,
         activate: Bool,
-        recovery: Int?
+        recovery: Int?,
+        onSaved: (@MainActor (LibraryEntry) -> Void)? = nil
     ) -> Task<LibraryEntry, any Error> {
         let saving = land(RunLanding(
             kind: activate ? .recording : .salvagedTake,
@@ -3688,10 +3715,11 @@ final class AppModel {
                 self.recoveryHeldBySave.remove(recovery)
                 if entry != nil { self.endRecovery(recovery) }
             }
-            guard let entry, let audio, let entryAudio else { return }
-            if self.sourceFileURL == audio, self.selectedEntryID == entry.id {
+            guard let entry else { return }
+            if let audio, let entryAudio, self.sourceFileURL == audio, self.selectedEntryID == entry.id {
                 self.movePlayback(to: entryAudio)
             }
+            onSaved?(entry)
         }
         return saving
     }

@@ -185,6 +185,41 @@ extension TranscriberMockSuites {
             #expect(!FileManager.default.fileExists(atPath: model.recoveryFileURL.path))
         }
 
+        // MARK: - Recording while a take transcribes
+
+        @Test("recording while a take transcribes starts at once and keeps that take, untranscribed, with a notice")
+        func recordNowKeepsTheTranscribingTake() async throws {
+            let fixture = try makeTakeWAV("takes")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.transcriber, .audioSource]) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the first take")],
+                    gate: MockTranscriberGate()
+                ))
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let model = makeModel()
+                model.useStreaming = false
+                model.pendingRecordingCategory = .meeting
+                model.startRecording(source: .microphone)
+                await waitUntil { model.liveSource != nil }
+                model.stopRecordingAndTranscribe()
+                await waitUntil { if case .transcribing = model.phase { return true }; return false }
+
+                model.startRecording(source: .microphone)
+                await waitUntil { model.phase == .recording(source: .microphone) && model.liveSource != nil }
+                #expect(model.activeTake?.category == .transcription, "the new take carries its own category")
+
+                let first = try #require(await entries(model, count: 1).first)
+                #expect(first.title.hasSuffix("(not transcribed)"))
+                #expect(first.category == .meeting, "the stopped take keeps its own category")
+                await waitUntil { model.exportNotice != nil }
+                #expect(model.exportNotice?.message == "Saved the previous recording without transcribing it.")
+                #expect(model.phase == .recording(source: .microphone), "the save never takes the new take's pane")
+
+                model.cancelCurrentWork()
+            }
+        }
+
         // MARK: - A take's category and targets
 
         @Test("a take keeps the category and app targets it started with, whatever is asked for later")
