@@ -132,6 +132,15 @@ public struct ObsidianVaultFolderDestination: DeliveryDestination, Codable, Send
 
     // MARK: - Delivery
 
+    public func checkReachable() async throws {
+        let vault = try resolvedVaultURL()
+        let scoped = vault.startAccessingSecurityScopedResource()
+        defer { if scoped { vault.stopAccessingSecurityScopedResource() } }
+        guard FileManager.default.fileExists(atPath: vault.path) else {
+            throw DeliveryError.vaultUnavailable(name, vault.path)
+        }
+    }
+
     public func deliver(_ payload: DeliveryPayload) async throws -> DeliveryReceipt {
         let vault = try resolvedVaultURL()
         let scoped = vault.startAccessingSecurityScopedResource()

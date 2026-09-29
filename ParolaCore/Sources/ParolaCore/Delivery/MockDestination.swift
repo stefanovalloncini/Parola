@@ -8,6 +8,8 @@ public actor MockDeliveryRecorder {
     private var payloads: [DeliveryPayload] = []
     private var issued: [DeliveryReceipt] = []
     private var failuresLeft: [UUID: Int] = [:]
+    private var unreachable: Set<UUID> = []
+    private var checks = 0
 
     public init() {}
 
@@ -15,10 +17,27 @@ public actor MockDeliveryRecorder {
         failuresLeft[destinationID] = max(0, count)
     }
 
+    /// An unreachable mock fails its reachability check and every delivery, like a vault on an ejected drive.
+    public func setReachable(_ reachable: Bool, for destinationID: UUID) {
+        if reachable { unreachable.remove(destinationID) } else { unreachable.insert(destinationID) }
+    }
+
     public func reset() {
         payloads.removeAll()
         issued.removeAll()
         failuresLeft.removeAll()
+        unreachable.removeAll()
+        checks = 0
+    }
+
+    /// How many reachability checks the mocks answered.
+    public func reachabilityChecks() -> Int { checks }
+
+    func checkReachable(_ destination: MockDestination) throws {
+        checks += 1
+        if unreachable.contains(destination.id) {
+            throw DeliveryError.vaultUnavailable(destination.name, "")
+        }
     }
 
     public func recorded() -> [DeliveryPayload] { payloads }
@@ -26,6 +45,9 @@ public actor MockDeliveryRecorder {
     public func receipts() -> [DeliveryReceipt] { issued }
 
     func deliver(_ payload: DeliveryPayload, from destination: MockDestination) throws -> DeliveryReceipt {
+        if unreachable.contains(destination.id) {
+            throw DeliveryError.vaultUnavailable(destination.name, "")
+        }
         if let left = failuresLeft[destination.id], left > 0 {
             failuresLeft[destination.id] = left - 1
             throw DeliveryError.writeFailed(destination.name, "the mock destination was told to fail")
@@ -71,6 +93,10 @@ public struct MockDestination: DeliveryDestination, Sendable {
         self.categories = categories
         self.titleFormat = titleFormat
         self.recorder = recorder
+    }
+
+    public func checkReachable() async throws {
+        try await recorder.checkReachable(self)
     }
 
     public func deliver(_ payload: DeliveryPayload) async throws -> DeliveryReceipt {

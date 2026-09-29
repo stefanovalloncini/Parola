@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import ParolaCore
 
@@ -65,6 +66,7 @@ extension AppModel {
         setDestinations(destinations + [destination])
     }
 
+    /// An edit is often the fix for a folder that went missing, so what waited for it goes out now.
     func updateDestination(_ destination: AnyDestination) {
         guard let index = destinations.firstIndex(where: { $0.id == destination.id }) else {
             addDestination(destination)
@@ -73,6 +75,9 @@ extension AppModel {
         var updated = destinations
         updated[index] = destination
         setDestinations(updated)
+        guard destinationsEnabled else { return }
+        let engine = deliveryEngine
+        Task { await engine.retryNow(destinationID: destination.id) }
     }
 
     func removeDestination(id: UUID) {
@@ -100,6 +105,21 @@ extension AppModel {
         library.libraryURL == LibraryStore.defaultLibraryURL
             ? DeliveryQueueStore.defaultDirectory
             : library.libraryURL.appendingPathComponent("Delivery", isDirectory: true)
+    }
+
+    /// A vault on a drive that was just plugged in can take what queued for it without waiting out its backoff.
+    func observeVolumeMounts(on center: NotificationCenter = NSWorkspace.shared.notificationCenter) {
+        volumeMountObservation = NotificationObservation(
+            center: center, name: NSWorkspace.didMountNotification
+        ) { [weak self] in
+            self?.retryDeliveriesAfterMount()
+        }
+    }
+
+    func retryDeliveriesAfterMount() {
+        guard destinationsEnabled else { return }
+        let engine = deliveryEngine
+        Task { await engine.retryNow() }
     }
 
     func makeDeliveryEngine() -> DeliveryEngine {
@@ -241,5 +261,22 @@ extension AppModel {
         case .queued(_, let nextAt): return .queued(nextAt)
         case .skipped(let reason): return .failed(reason.message)
         }
+    }
+}
+
+/// A notification observer that goes away with its owner.
+final class NotificationObservation {
+    private let center: NotificationCenter
+    private let token: any NSObjectProtocol
+
+    init(center: NotificationCenter, name: Notification.Name, handler: @escaping @MainActor () -> Void) {
+        self.center = center
+        token = center.addObserver(forName: name, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { handler() }
+        }
+    }
+
+    deinit {
+        center.removeObserver(token)
     }
 }

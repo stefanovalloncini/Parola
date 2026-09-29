@@ -642,6 +642,7 @@ final class AppModel {
     var deliveryNotice: DeliveryNotice?
     var exportNotice: ExportNotice?
     @ObservationIgnored lazy var deliveryEngine: DeliveryEngine = makeDeliveryEngine()
+    @ObservationIgnored var volumeMountObservation: NotificationObservation?
 
     // MARK: - Watched folders
 
@@ -1688,6 +1689,7 @@ final class AppModel {
         // timers, so a delivery queued by an earlier launch does not wait for an unrelated send.
         if features.isEnabled(.destinations) {
             _ = deliveryEngine
+            observeVolumeMounts()
         }
         loadExportPresets()
         loadBatchExportSelection()

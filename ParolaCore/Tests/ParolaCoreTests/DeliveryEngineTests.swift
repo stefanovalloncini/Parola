@@ -516,6 +516,174 @@ final class DeliveryEngineTests {
         #expect(store.loadQueue().isEmpty)
     }
 
+    // MARK: - Reachability
+
+    private func queued(_ entryID: LibraryEntry.ID, to destination: MockDestination, attempt: Int = 1, dueIn: TimeInterval) -> QueuedDelivery {
+        QueuedDelivery(
+            entryID: entryID, destinationID: destination.id, attempt: attempt,
+            nextAttemptAt: Date().addingTimeInterval(dueIn)
+        )
+    }
+
+    @Test("a retry to an unreachable destination doesn't read the transcript")
+    func unreachableSkipsThePayload() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let destination = await mock(recorder: recorder)
+        await recorder.setReachable(false, for: destination.id)
+        let payloads = PayloadSpy(failingCall: 0)
+        let engine = makeEngine(
+            destinations: [.mock(destination)], store: try makeStore(), clock: clock,
+            payload: { try await payloads.build($0) }
+        )
+
+        let outcome = await engine.send(entryID: "entry-1", to: destination.id)
+        guard case .queued(1, _) = outcome else {
+            Issue.record("expected the send to be queued, got \(outcome)")
+            return
+        }
+        #expect(await poll { clock.sleeperCount == 1 })
+        let timer = await engine.timerTask(for: "entry-1", destinationID: destination.id)
+        clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
+        await timer?.value
+
+        #expect(await payloads.calls == 0)
+        #expect(try #require(await engine.pending().first).attempt == 2)
+    }
+
+    @Test("one failed check reschedules every delivery to that destination that was due, and nothing else")
+    func oneFailedCheckDefersTheGroup() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let store = try makeStore()
+        let vault = await mock(name: "Vault", recorder: recorder)
+        let other = await mock(name: "Other", recorder: recorder)
+        await recorder.setReachable(false, for: vault.id)
+        store.save(queue: [
+            queued("entry-1", to: vault, dueIn: -600),
+            queued("entry-2", to: vault, dueIn: -300),
+            queued("entry-3", to: vault, dueIn: 3600),
+            queued("entry-4", to: other, dueIn: 3600),
+        ])
+        let payloads = PayloadSpy(failingCall: 0)
+        let engine = makeEngine(
+            destinations: [.mock(vault), .mock(other)], store: store, clock: clock,
+            payload: { try await payloads.build($0) }
+        )
+
+        #expect(await poll { await engine.pending().first { $0.entryID == "entry-1" }?.attempt == 2 })
+
+        let pending = await engine.pending()
+        #expect(pending.first { $0.entryID == "entry-2" }?.attempt == 2, "the other due delivery moved with it")
+        #expect(pending.first { $0.entryID == "entry-3" }?.attempt == 1, "a delivery not yet due keeps its turn")
+        #expect(pending.first { $0.entryID == "entry-4" }?.attempt == 1, "another destination is left alone")
+        #expect(await recorder.reachabilityChecks() == 1)
+        #expect(await payloads.calls == 0)
+    }
+
+    @Test("deliveries that fell due while Parola was quit go out one at a time")
+    func launchResumeIsSpacedOut() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let store = try makeStore()
+        let destination = await mock(recorder: recorder)
+        store.save(queue: (1...3).map { queued("entry-\($0)", to: destination, dueIn: -60) })
+
+        let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
+
+        #expect(await poll { await recorder.recorded().count == 1 })
+        #expect(await poll { clock.sleeperCount == 2 }, "the other two wait their turn")
+        #expect(await recorder.recorded().map(\.entryID) == ["entry-1"])
+
+        let second = await engine.timerTask(for: "entry-2", destinationID: destination.id)
+        clock.advance(by: DeliveryEngine.catchUpSpacing)
+        await second?.value
+        #expect(await recorder.recorded().map(\.entryID) == ["entry-1", "entry-2"])
+
+        #expect(await poll { clock.sleeperCount == 1 })
+        let third = await engine.timerTask(for: "entry-3", destinationID: destination.id)
+        clock.advance(by: DeliveryEngine.catchUpSpacing)
+        await third?.value
+        #expect(await engine.pending().isEmpty)
+    }
+
+    @Test("the launch resume leaves a delivery a send already armed on its own timer")
+    func resumeKeepsAnArmedTimer() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let destination = await mock(failuresBeforeSuccess: 1, recorder: recorder)
+        let engine = makeEngine(destinations: [.mock(destination)], store: try makeStore(), clock: clock)
+        _ = await engine.send(entryID: "entry-1", to: destination.id)
+        #expect(await poll { clock.sleeperCount == 1 })
+        let armed = await engine.timerTask(for: "entry-1", destinationID: destination.id)
+
+        await engine.resumeQueue()
+
+        #expect(await engine.timerTask(for: "entry-1", destinationID: destination.id) == armed)
+        clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
+        await armed?.value
+        #expect(await recorder.recorded().map(\.entryID) == ["entry-1"])
+    }
+
+    @Test("retrying a fixed destination sends what it queued now, not on the old schedule")
+    func retryNowSendsAFixedDestination() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let destination = await mock(recorder: recorder)
+        await recorder.setReachable(false, for: destination.id)
+        let engine = makeEngine(destinations: [.mock(destination)], store: try makeStore(), clock: clock)
+        _ = await engine.send(entryID: "entry-1", to: destination.id)
+        _ = await engine.send(entryID: "entry-2", to: destination.id)
+        #expect(await engine.pending().count == 2)
+
+        await recorder.setReachable(true, for: destination.id)
+        await engine.retryNow(destinationID: destination.id)
+
+        #expect(await poll { await recorder.recorded().count == 1 })
+        #expect(await poll { clock.sleeperCount == 1 }, "the second waits its turn")
+        let second = await engine.timerTask(for: "entry-2", destinationID: destination.id)
+        clock.advance(by: DeliveryEngine.catchUpSpacing)
+        await second?.value
+        #expect(await recorder.recorded().map(\.entryID) == ["entry-1", "entry-2"])
+        #expect(await engine.pending().isEmpty)
+    }
+
+    @Test("retrying a destination that is still unreachable changes nothing and counts no attempt")
+    func retryNowLeavesAnUnreachableDestination() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let destination = await mock(recorder: recorder)
+        await recorder.setReachable(false, for: destination.id)
+        let engine = makeEngine(destinations: [.mock(destination)], store: try makeStore(), clock: clock)
+        _ = await engine.send(entryID: "entry-1", to: destination.id)
+        let before = try #require(await engine.pending().first)
+
+        await engine.retryNow()
+
+        let after = try #require(await engine.pending().first)
+        #expect(after == before)
+        #expect(await recorder.recorded().isEmpty)
+    }
+
+    @Test("an Obsidian vault that isn't there fails its check; one that is passes")
+    func obsidianReachability() async throws {
+        let vault = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-reach-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)
+        tempDirectories.append(vault)
+        let bookmark = try vault.bookmarkData()
+        let destination = ObsidianVaultFolderDestination(
+            name: "Vault", vaultBookmark: bookmark, vaultPath: vault.path
+        )
+
+        try await destination.checkReachable()
+
+        try FileManager.default.removeItem(at: vault)
+        await #expect(throws: DeliveryError.self) { try await destination.checkReachable() }
+        let unset = ObsidianVaultFolderDestination(name: "Unset", vaultBookmark: Data(), vaultPath: "")
+        await #expect(throws: DeliveryError.self) { try await unset.checkReachable() }
+    }
+
     @Test("the backoff steps are one minute, five, thirty, then daily")
     func backoffSchedule() {
         #expect(DeliveryEngine.delay(forAttempt: 1) == .seconds(60))
@@ -636,7 +804,7 @@ actor OutcomeBox {
 /// Builds the payload the engine sends, and throws on one chosen call so a retry can be made to
 /// fail on reading the transcript rather than on the destination.
 actor PayloadSpy {
-    private var calls = 0
+    private(set) var calls = 0
     private let failingCall: Int
     private let error: any Error
 

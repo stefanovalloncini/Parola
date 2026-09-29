@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Parola
@@ -293,5 +294,59 @@ struct DeliveryHookTests {
             Issue.record("expected a queued notice, got \(String(describing: model.deliveryNotice?.state))")
         }
         #expect(await model.deliveryEngine.pending().count == 1)
+    }
+
+    @Test("fixing a destination in Settings sends what queued for it at once")
+    func updatingADestinationRetriesItsQueue() async throws {
+        let model = makeModel()
+        let recorder = MockDeliveryRecorder()
+        let mock = installMock(on: model, recorder: recorder, autoSend: false)
+        await recorder.setReachable(false, for: mock.id)
+        let seeded = try await model.library.add(
+            transcript: Self.transcript(), audioSource: nil, category: .transcription
+        )
+        _ = await model.sendEntry(seeded.id, to: mock.id)
+        #expect(await model.deliveryEngine.pending().count == 1)
+
+        await recorder.setReachable(true, for: mock.id)
+        var fixed = mock
+        fixed.name = "Mock vault, found"
+        model.updateDestination(.mock(fixed))
+
+        #expect(await waitUntil(timeoutMs: 10_000) { await model.deliveryEngine.pending().isEmpty })
+        #expect(await recorder.recorded().map(\.entryID) == [seeded.id])
+    }
+
+    @Test("a volume mounting sends what queued for a destination that is back")
+    func aMountRetriesTheQueue() async throws {
+        let model = AppModel(bootstrap: AppBootstrap(
+            mode: .test,
+            library: makeTempLibraryURL("deliveryhook-mount"),
+            defaultsOverride: temporaryDefaults(),
+            sideEffects: [],
+            filePicker: TestFilePicker(),
+            clock: ContinuousClock()
+        ))
+        let recorder = MockDeliveryRecorder()
+        let mock = installMock(on: model, recorder: recorder, autoSend: false)
+        await recorder.setReachable(false, for: mock.id)
+        let seeded = try await model.library.add(
+            transcript: Self.transcript(), audioSource: nil, category: .transcription
+        )
+        _ = await model.sendEntry(seeded.id, to: mock.id)
+        #expect(model.volumeMountObservation != nil, "the launch listens for mounts")
+        // A private center: a mount posted on the workspace's would reach the test host's own model too.
+        let center = NotificationCenter()
+        model.observeVolumeMounts(on: center)
+
+        center.post(name: NSWorkspace.didMountNotification, object: nil)
+        await settle()
+        #expect(await model.deliveryEngine.pending().count == 1, "still unreachable: nothing moves")
+
+        await recorder.setReachable(true, for: mock.id)
+        center.post(name: NSWorkspace.didMountNotification, object: nil)
+
+        #expect(await waitUntil(timeoutMs: 10_000) { await model.deliveryEngine.pending().isEmpty })
+        #expect(await recorder.recorded().map(\.entryID) == [seeded.id])
     }
 }

@@ -202,6 +202,8 @@ public actor DeliveryEngine {
     public static let maxAttempts = 10
     /// A minute, five, half an hour, then once a day.
     public static let retryDelays: [Duration] = [.seconds(60), .seconds(300), .seconds(1800), .seconds(86_400)]
+    /// The gap between retries that come due at once: at launch, or when a destination is fixed.
+    public static let catchUpSpacing: Duration = .seconds(2)
 
     public static func delay(forAttempt attempt: Int) -> Duration {
         let index = max(1, attempt) - 1
@@ -262,6 +264,18 @@ public actor DeliveryEngine {
         }
         guard destination.isEnabled else {
             return skip(.notEnabled, entryID: entryID, destinationID: destinationID, name: destination.name)
+        }
+        let key = QueueKey(entryID: entryID, destinationID: destinationID)
+        do {
+            try await destination.checkReachable()
+        } catch {
+            guard !inFlight.contains(key) else {
+                return skip(
+                    .alreadySending(destination.name),
+                    entryID: entryID, destinationID: destinationID, name: destination.name
+                )
+            }
+            return failed(key, destination: destination, attempt: queueAttempt(key) + 1, error: error)
         }
         do {
             let payload = try await payloadProvider(entryID)
@@ -335,6 +349,32 @@ public actor DeliveryEngine {
 
     public func recentLog() -> [DeliveryLogEntry] { log.entries }
 
+    /// Brings every queued delivery for this destination forward to now, spaced out, once the destination
+    /// answers its reachability check: the user just fixed its folder, or its drive came back. An
+    /// unreachable destination keeps its schedule, and no attempt is counted.
+    public func retryNow(destinationID: UUID) async {
+        guard queue.contains(where: { $0.destinationID == destinationID }),
+              let destination = await destinationsProvider().first(where: { $0.id == destinationID })?.destination,
+              destination.isEnabled,
+              (try? await destination.checkReachable()) != nil
+        else { return }
+        let keys = queue
+            .filter { $0.destinationID == destinationID }
+            .map { QueueKey(entryID: $0.entryID, destinationID: $0.destinationID) }
+        for (index, key) in keys.enumerated() {
+            schedule(key, after: Self.catchUpSpacing * index)
+        }
+    }
+
+    /// `retryNow(destinationID:)` for every destination with something queued, as when a volume mounts.
+    public func retryNow() async {
+        var seen = Set<UUID>()
+        let destinationIDs = queue.map(\.destinationID).filter { seen.insert($0).inserted }
+        for destinationID in destinationIDs {
+            await retryNow(destinationID: destinationID)
+        }
+    }
+
     /// The task waiting to retry one delivery. A test takes it before it advances the clock and
     /// awaits it afterwards, so the retry is a suspension point rather than a wait on real time.
     func timerTask(for entryID: LibraryEntry.ID, destinationID: UUID) -> Task<Void, Never>? {
@@ -395,10 +435,21 @@ public actor DeliveryEngine {
         return .queued(attempt: attempt, nextAt: nextAt)
     }
 
-    private func resumeQueue() {
+    /// Retries that fell due while Parola was quit go one at a time, not all at once. This runs a turn
+    /// after init, so a send may already have queued and armed a delivery; that timer stays.
+    func resumeQueue() {
+        let now = Date()
+        var overdue = 0
         for item in queue {
             let key = QueueKey(entryID: item.entryID, destinationID: item.destinationID)
-            schedule(key, after: .seconds(max(0, item.nextAttemptAt.timeIntervalSinceNow)))
+            guard timers[key] == nil, !inFlight.contains(key) else { continue }
+            let remaining = item.nextAttemptAt.timeIntervalSince(now)
+            if remaining > 0 {
+                schedule(key, after: .seconds(remaining))
+            } else {
+                schedule(key, after: Self.catchUpSpacing * overdue)
+                overdue += 1
+            }
         }
     }
 
@@ -411,19 +462,29 @@ public actor DeliveryEngine {
         }
     }
 
+    /// Every await here can let a manual send or a cancel settle this delivery, so each is followed by a
+    /// check that it is still queued.
     private func runQueued(_ key: QueueKey) async {
         timers[key] = nil
-        guard queue.contains(where: { $0.entryID == key.entryID && $0.destinationID == key.destinationID }) else {
-            return
-        }
+        guard isQueued(key) else { return }
         let stored = await destinationsProvider().first { $0.id == key.destinationID }
+        guard isQueued(key) else { return }
         guard let destination = stored?.destination, destination.isEnabled else {
             dequeue(key)
             appendMissing(key, name: stored?.name ?? "", event: .skipped, detail: "the destination is gone or switched off")
             return
         }
         do {
+            try await destination.checkReachable()
+        } catch {
+            guard isQueued(key) else { return }
+            deferDueDeliveries(to: destination, after: key, error: error)
+            return
+        }
+        guard isQueued(key) else { return }
+        do {
             let payload = try await payloadProvider(key.entryID)
+            guard isQueued(key) else { return }
             _ = await attempt(payload: payload, destination: destination)
         } catch let error as DeliveryPayloadError {
             let attempts = queueAttempt(key)
@@ -432,6 +493,24 @@ public actor DeliveryEngine {
         } catch {
             _ = failed(key, destination: destination, attempt: queueAttempt(key) + 1, error: error)
         }
+    }
+
+    /// One failed check stands for every delivery to that destination that was due by the time this one
+    /// was: each moves to its next step without a transcript read or a check of its own.
+    private func deferDueDeliveries(to destination: any DeliveryDestination, after key: QueueKey, error: any Error) {
+        let firedAt = queue.first { $0.entryID == key.entryID && $0.destinationID == key.destinationID }?.nextAttemptAt
+        let dueBy = max(Date(), firedAt ?? Date())
+        let due = queue
+            .filter { $0.destinationID == destination.id && $0.nextAttemptAt <= dueBy }
+            .map { QueueKey(entryID: $0.entryID, destinationID: $0.destinationID) }
+            .filter { !inFlight.contains($0) }
+        for dueKey in due {
+            _ = failed(dueKey, destination: destination, attempt: queueAttempt(dueKey) + 1, error: error)
+        }
+    }
+
+    private func isQueued(_ key: QueueKey) -> Bool {
+        queue.contains { $0.entryID == key.entryID && $0.destinationID == key.destinationID }
     }
 
     private func queueAttempt(_ key: QueueKey) -> Int {

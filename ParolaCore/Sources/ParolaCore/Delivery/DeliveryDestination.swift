@@ -83,11 +83,16 @@ public protocol DeliveryDestination: Sendable, Identifiable {
     var autoSend: Bool { get }
     var categories: Set<EntryCategory> { get }
     var titleFormat: TitleFormat { get }
+    /// Throws when the destination can't be written to right now, such as a vault on a drive that isn't
+    /// mounted. Cheap: the engine asks before it reads a transcript for a retry.
+    func checkReachable() async throws
     func deliver(_ payload: DeliveryPayload) async throws -> DeliveryReceipt
 }
 
 public extension DeliveryDestination {
     var kind: DestinationKind { Self.kind }
+
+    func checkReachable() async throws {}
 
     func accepts(_ category: EntryCategory) -> Bool {
         categories.contains(category)
