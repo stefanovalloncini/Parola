@@ -109,6 +109,42 @@ struct TranscriptChatBudgetTests {
         #expect(await session.history.count == 4)
     }
 
+    @Test("on-device chat goes through the factory, so a stand-in answers it")
+    func onDeviceChatIsMockable() async throws {
+        let (reply, instructions) = try await MockLanguageModelStore.shared.withLease {
+            await MockLanguageModelStore.shared.clear()
+            await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "from the stand-in"))
+            let session = try? await TranscriptChat.makeSession(transcript: transcript, features: .all)
+            let reply = try? await session?.ask("what was said?")
+            let instructions = await MockLanguageModelStore.shared.lastInstructions(for: .foundation)
+            await MockLanguageModelStore.shared.clear()
+            return (reply?.text, instructions)
+        }
+        #expect(reply == "from the stand-in")
+        #expect(instructions?.contains("Hello world.") == true)
+    }
+
+    @Test("an unavailable on-device model reaches the chat as its own sentence")
+    func onDeviceUnavailableIsOneError() async throws {
+        let thrown = try await MockLanguageModelStore.shared.withLease { () -> (any Error)? in
+            await MockLanguageModelStore.shared.clear()
+            await MockLanguageModelStore.shared.install(
+                provider: .foundation,
+                response: MockLanguageModelResponse(failure: MockLanguageModelFailure(code: .notAvailable, message: "Apple Intelligence is off."))
+            )
+            var thrown: (any Error)?
+            do {
+                let session = try await TranscriptChat.makeSession(transcript: transcript, features: .all)
+                _ = try await session.ask("anything?")
+            } catch {
+                thrown = error
+            }
+            await MockLanguageModelStore.shared.clear()
+            return thrown
+        }
+        #expect(thrown?.localizedDescription.contains("Apple Intelligence is off.") == true)
+    }
+
     @Test("every provider's overflow reads as one")
     func overflowDetection() {
         #expect(LanguageModelFactory.isContextOverflow(CloudLLMError.tokenBudgetExceeded(provider: .openAI, used: 2, limit: 1)))

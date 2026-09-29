@@ -58,7 +58,7 @@ public enum CardMetadataService {
         let excerpt = String(text.prefix(excerptCharacters))
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
-           await MockLanguageModelStore.shared.resolve(for: .foundation) == nil {
+           !(await LanguageModelFactory.onDeviceIsMocked()) {
             return try await generateStructured(excerpt: excerpt, prompts: prompts)
         }
         #endif
@@ -82,15 +82,7 @@ public enum CardMetadataService {
     #if canImport(FoundationModels)
     @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
     private static func generateStructured(excerpt: String, prompts: CardMetadataPrompts) async throws -> CardMetadata {
-        switch SystemLanguageModel.default.availability {
-        case .available:
-            break
-        case .unavailable(let reason):
-            throw LanguageModelFactory.Failure.notAvailable(LanguageModelFactory.unavailableMessage(for: reason))
-        @unknown default:
-            throw LanguageModelFactory.Failure.notAvailable("Apple Intelligence isn't available right now.")
-        }
-
+        try LanguageModelFactory.requireOnDevice()
         let session = LanguageModelSession(instructions: textInstructions(prompts))
         let response = try await session.respond(to: excerpt, generating: GenerableCardMetadata.self)
         return CardMetadata(

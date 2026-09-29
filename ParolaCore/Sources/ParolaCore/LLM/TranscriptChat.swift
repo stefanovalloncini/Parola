@@ -10,37 +10,23 @@ public enum TranscriptChatProvider: Sendable, Hashable {
 }
 
 public enum TranscriptChat {
-    /// `digest` builds the summary a long transcript is condensed around when it has none saved;
-    /// without one the session summarises it itself and keeps the result only for its own life.
+    /// Chat on the on-device model. `digest` builds the summary a long transcript is condensed around
+    /// when it has none saved; without one the session summarises it itself, for its own life only.
     public static func makeSession(
         transcript: Transcript,
         history: [ChatMessage] = [],
         budget: TokenBudget? = nil,
         digest: (@Sendable () async throws -> Summary)? = nil,
         features: FeatureSet = .resolve()
-    ) throws -> TranscriptChatSession {
+    ) async throws -> TranscriptChatSession {
         try features.require(.ai)
         let budget = budget ?? .onDevice
-        if usesCondensedContext(for: transcript, budget: budget) {
-            // Probe availability now so an over-budget session fails at creation like the plain path.
-            _ = try makeOnDeviceModel(instructions: "")
-            let model = CondensedChatModel(
-                transcript: transcript,
-                budget: budget,
-                makeDigest: digestProvider(for: transcript, budget: budget, digest: digest),
-                makeModel: { try makeOnDeviceModel(instructions: $0) }
-            )
-            return TranscriptChatSession(
-                transcript: transcript, history: history, model: model, budget: budget, instructionTokens: budget.tokens
-            )
-        }
-        let instructions = systemInstructions(for: transcript)
-        return TranscriptChatSession(
+        return try await session(
             transcript: transcript,
             history: history,
-            model: try makeOnDeviceModel(instructions: instructions),
             budget: budget,
-            instructionTokens: budget.estimate(instructions)
+            makeDigest: digestProvider(for: transcript, budget: budget, digest: digest),
+            makeModel: { try await LanguageModelFactory.makeOnDevice(instructions: $0) }
         )
     }
 
@@ -57,7 +43,7 @@ public enum TranscriptChat {
         try features.require(.ai)
         switch provider {
         case .onDevice:
-            return try makeSession(transcript: transcript, history: history, budget: budget, digest: digest, features: features)
+            return try await makeSession(transcript: transcript, history: history, budget: budget, digest: digest, features: features)
         case .cloud(let id):
             return try await makeSession(
                 transcript: transcript,
@@ -88,17 +74,28 @@ public enum TranscriptChat {
         makeModel: @escaping @Sendable (String) async throws -> any LanguageModel
     ) async throws -> TranscriptChatSession {
         try features.require(.ai)
+        return try await session(
+            transcript: transcript,
+            history: history,
+            budget: budget,
+            makeDigest: digestProvider(for: transcript, budget: budget, digest: digest, summariseModel: {
+                try await makeModel(SummaryService.textInstructions(for: SummaryOptions(actionItems: false)))
+            }),
+            makeModel: makeModel
+        )
+    }
+
+    private static func session(
+        transcript: Transcript,
+        history: [ChatMessage],
+        budget: TokenBudget,
+        makeDigest: @escaping @Sendable () async throws -> Summary,
+        makeModel: @escaping @Sendable (String) async throws -> any LanguageModel
+    ) async throws -> TranscriptChatSession {
         if usesCondensedContext(for: transcript, budget: budget) {
-            // Probe key/policy now so an over-budget session fails at creation like the plain path.
+            // Probe availability, key and policy now so an over-budget session fails at creation like the plain path.
             _ = try await makeModel("")
-            let model = CondensedChatModel(
-                transcript: transcript,
-                budget: budget,
-                makeDigest: digestProvider(for: transcript, budget: budget, digest: digest, summariseModel: {
-                    try await makeModel(SummaryService.textInstructions(for: SummaryOptions(actionItems: false)))
-                }),
-                makeModel: makeModel
-            )
+            let model = CondensedChatModel(transcript: transcript, budget: budget, makeDigest: makeDigest, makeModel: makeModel)
             return TranscriptChatSession(
                 transcript: transcript, history: history, model: model, budget: budget, instructionTokens: budget.tokens
             )
@@ -248,22 +245,6 @@ public enum TranscriptChat {
                 .filter { $0.count >= 3 }
                 .map(String.init)
         )
-    }
-
-    private static func makeOnDeviceModel(instructions: String) throws -> any LanguageModel {
-        #if canImport(FoundationModels)
-        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
-            switch SystemLanguageModel.default.availability {
-            case .available:
-                return FoundationLanguageModel(instructions: instructions)
-            case .unavailable(let reason):
-                throw TranscriptChatSession.FailureReason.notAvailable(LanguageModelFactory.unavailableMessage(for: reason))
-            @unknown default:
-                throw TranscriptChatSession.FailureReason.notAvailable("Apple Intelligence isn't available right now.")
-            }
-        }
-        #endif
-        throw TranscriptChatSession.FailureReason.notAvailable("Apple Intelligence needs macOS 26 or iOS 26 or newer.")
     }
 }
 

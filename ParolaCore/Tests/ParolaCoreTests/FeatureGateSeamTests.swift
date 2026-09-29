@@ -57,9 +57,9 @@ struct FeatureGateSeamTests {
         }
     }
 
-    @Test func transcriptChatRefusesWhenDisabled() {
-        #expect(throws: ParolaError.self) {
-            _ = try TranscriptChat.makeSession(transcript: stubTranscript, features: none)
+    @Test func transcriptChatRefusesWhenDisabled() async {
+        await #expect(throws: ParolaError.self) {
+            _ = try await TranscriptChat.makeSession(transcript: stubTranscript, features: none)
         }
     }
 

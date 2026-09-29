@@ -14,7 +14,12 @@ public enum LanguageModelFactory {
             }
         }
 
-        public var errorDescription: String? { description }
+        /// The reason alone: it is already a sentence written for the person reading it.
+        public var errorDescription: String? {
+            switch self {
+            case .notAvailable(let reason): return reason
+            }
+        }
     }
 
     public static let defaultInstructions = "You're a helpful assistant."
@@ -185,22 +190,37 @@ public enum LanguageModelFactory {
 
     /// Cheap enough to call whenever a view appears: it reads cached system state, it doesn't load the model.
     public static func onDeviceAvailability() async -> OnDeviceAvailability {
-        if await MockLanguageModelStore.shared.resolve(for: .foundation) != nil {
-            return .available
-        }
+        if await onDeviceIsMocked() { return .available }
+        return onDeviceUnavailableReason().map { .unavailable(reason: $0) } ?? .available
+    }
+
+    /// Why the on-device model can't serve a request right now, in words for a person; nil when it can.
+    static func onDeviceUnavailableReason() -> String? {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
             switch SystemLanguageModel.default.availability {
             case .available:
-                return .available
+                return nil
             case .unavailable(let reason):
-                return .unavailable(reason: unavailableMessage(for: reason))
+                return unavailableMessage(for: reason)
             @unknown default:
-                return .unavailable(reason: "Apple Intelligence isn't available right now.")
+                return "Apple Intelligence isn't available right now."
             }
         }
         #endif
-        return .unavailable(reason: "Apple Intelligence needs macOS 26 or iOS 26 or newer.")
+        return "Apple Intelligence needs macOS 26 or iOS 26 or newer."
+    }
+
+    /// The one check every on-device path makes before it talks to the model, and the one error it throws.
+    static func requireOnDevice() throws {
+        guard let reason = onDeviceUnavailableReason() else { return }
+        ParolaLog.notice(.ai, "on-device model unavailable: \(Self.unavailability())")
+        throw Failure.notAvailable(reason)
+    }
+
+    /// Whether a test stands in for the on-device model. The structured paths can't use a stand-in, so they answer as text.
+    static func onDeviceIsMocked() async -> Bool {
+        await MockLanguageModelStore.shared.resolve(for: .foundation) != nil
     }
 
     public static func makeOnDevice(
@@ -211,10 +231,7 @@ public enum LanguageModelFactory {
             await MockLanguageModelStore.shared.recordInstructions(instructions, for: .foundation)
             return await MockLanguageModelStore.shared.model(for: .foundation, response: mock, clock: clock)
         }
-        if let reason = await onDeviceAvailability().reason {
-            ParolaLog.notice(.ai, "on-device model unavailable: \(Self.unavailability())")
-            throw Failure.notAvailable(reason)
-        }
+        try requireOnDevice()
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
             return FoundationLanguageModel(instructions: instructions)

@@ -2,12 +2,10 @@ import Foundation
 
 public actor TranscriptChatSession {
     public enum FailureReason: LocalizedError, CustomStringConvertible, Sendable {
-        case notAvailable(String)
         case modelError(String)
 
         public var description: String {
             switch self {
-            case .notAvailable(let reason): return "Chat unavailable: \(reason)"
             case .modelError(let reason): return "Chat failed: \(reason)"
             }
         }

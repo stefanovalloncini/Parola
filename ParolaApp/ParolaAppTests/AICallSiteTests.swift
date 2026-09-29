@@ -181,6 +181,19 @@ struct AICallSiteTests {
         }
     }
 
+    @Test("with nothing picked, chat answers on the on-device model through the same stand-in as every other task")
+    func onDeviceChatIsMocked() async throws {
+        try await withInstalledMocks {
+            let model = makeModel()
+
+            let session = try await model.makeChatSession(transcript: try #require(model.transcript), history: [], entryID: nil)
+            let reply = try await session.ask("who answers?")
+
+            #expect(reply.text == "from apple")
+            #expect(await MockLanguageModelStore.shared.lastInstructions(for: .foundation)?.contains("we ship the patch on Friday") == true)
+        }
+    }
+
     @Test("an over-budget transcript is condensed through the picked model, not refused")
     func chatCondensesOverBudget() async throws {
         for service in [ollama(), custom()] {

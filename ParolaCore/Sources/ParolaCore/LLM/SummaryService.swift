@@ -6,12 +6,10 @@ import FoundationModels
 
 public actor SummaryService {
     public enum FailureReason: LocalizedError, CustomStringConvertible, Sendable {
-        case notAvailable(String)
         case modelError(String)
 
         public var description: String {
             switch self {
-            case .notAvailable(let reason): return "Summary unavailable: \(reason)"
             case .modelError(let reason): return "Summary failed: \(reason)"
             }
         }
@@ -50,11 +48,9 @@ public actor SummaryService {
     public func summarise(_ transcript: Transcript, options: SummaryOptions) async throws -> Summary {
         try features.require(.ai)
         #if canImport(FoundationModels)
-        // The structured path talks to FoundationModels directly, so it can't see an installed
-        // mock — route mocked runs through the text path, which resolves models via the factory.
         if makeModel == nil,
            #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
-           await MockLanguageModelStore.shared.resolve(for: .foundation) == nil {
+           !(await LanguageModelFactory.onDeviceIsMocked()) {
             return try await summariseStructured(transcript, options: options)
         }
         #endif
@@ -138,15 +134,7 @@ public actor SummaryService {
     #if canImport(FoundationModels)
     @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
     private func summariseStructured(_ transcript: Transcript, options: SummaryOptions) async throws -> Summary {
-        switch SystemLanguageModel.default.availability {
-        case .available:
-            break
-        case .unavailable(let reason):
-            throw FailureReason.notAvailable(LanguageModelFactory.unavailableMessage(for: reason))
-        @unknown default:
-            throw FailureReason.notAvailable("Apple Intelligence isn't available right now.")
-        }
-
+        try LanguageModelFactory.requireOnDevice()
         let instructions = SummaryService.structuredInstructions(for: options)
         return try await summarise(transcript, options: options, instructions: instructions) { prompt in
             let session = LanguageModelSession(instructions: instructions)
