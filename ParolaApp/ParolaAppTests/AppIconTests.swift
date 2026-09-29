@@ -45,8 +45,8 @@ struct AppIconTests {
         #expect(abs(actual.b - expected.b) < tolerance, comment)
     }
 
-    @Test("the accent fills the icon background and the bars sit on top")
-    func accentReachesThePixels() throws {
+    @Test("the artwork paints its background and bars in the colours it's given")
+    func artworkPaintsTheGivenColours() throws {
         let background = RGBA(0.20, 0.49, 0.96)
         let foreground = RGBA(0.99, 0.95, 0.90)
         let image = try #require(AppIconArtwork.cgImage(
