@@ -220,9 +220,13 @@ struct AppModelRulesTests {
 
         model.runAutoExports(for: entry)
         try await pollUntil { OutputMarker.owner(of: target) == entry.id }
+        try await model.library.updateTranscript(transcript("the second run's words"), for: entry.id)
         model.runAutoExports(for: entry)
-        try await Task.sleep(for: .milliseconds(200))
+        try await pollUntil {
+            (try? String(contentsOf: target, encoding: .utf8))?.contains("the second run's words") == true
+        }
 
+        #expect(try String(contentsOf: target, encoding: .utf8).contains("the second run's words"))
         #expect(try FileManager.default.contentsOfDirectory(atPath: exportsDir.path) == ["Talk.txt"])
     }
 
