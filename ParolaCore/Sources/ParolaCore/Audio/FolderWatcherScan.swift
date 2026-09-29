@@ -9,8 +9,7 @@ extension FolderWatcher {
         var created: Date?
     }
 
-    /// One directory's direct children: its media files and, when watching recursively, its
-    /// subdirectories with their identities, so a folder replaced under the same name is noticed.
+    /// Subdirectories carry their inode, so a folder replaced under the same name is noticed.
     struct Listing: Sendable {
         var path: String
         var inode: UInt64?
@@ -45,8 +44,7 @@ extension FolderWatcher {
         var failed: Set<String> = []
     }
 
-    /// Lists each requested directory without descending, and walks once the subdirectories
-    /// that are new to it.
+    /// Lists each directory one level deep and walks only the subdirectories new to it.
     static func scan(_ request: ScanRequest) -> ScanResult {
         var result = ScanResult()
         for path in request.directories {
@@ -87,8 +85,7 @@ extension FolderWatcher {
         }
     }
 
-    /// `readdir` and one `lstat` per media file or directory: most entries in a big tree are neither,
-    /// and this runs for every directory event.
+    /// `readdir`, and `lstat` only for media and directories: most entries in a big tree are neither.
     static func list(_ path: String, recursive: Bool) -> ListOutcome {
         let info = FileInfo(path)
         guard let directory = opendir(path) else {
@@ -114,7 +111,11 @@ extension FolderWatcher {
                 }
             } else if info.isRegularFile, isMedia {
                 listing.media.append(ScannedFile(
-                    key: FileKey(inode: info.inode), path: childPath, size: info.size, modified: info.modified, created: info.birth
+                    key: FileKey(inode: info.inode),
+                    path: childPath,
+                    size: info.size,
+                    modified: info.modified,
+                    created: info.birth
                 ))
             }
         }
@@ -133,8 +134,7 @@ extension FolderWatcher {
         return (try? URL(fileURLWithPath: path, isDirectory: true).resourceValues(forKeys: [.isPackageKey]))?.isPackage == true
     }
 
-    /// What `lstat` says about one path, dates converted the same way everywhere so sizes and dates
-    /// compare exactly between a listing and a later check.
+    /// One conversion of `lstat`'s dates everywhere, so a listing and a later check compare exactly.
     struct FileInfo: Sendable {
         var inode: UInt64
         var size: Int64

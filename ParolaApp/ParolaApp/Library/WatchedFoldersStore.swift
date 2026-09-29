@@ -22,8 +22,7 @@ struct WatchedFolder: Codable, Identifiable, Hashable {
 final class WatchedFoldersStore {
     private(set) var folders: [WatchedFolder] = []
     private(set) var lastError: String?
-    /// Folders nothing is watching right now: missing, in the Trash, on a volume that isn't mounted,
-    /// or no longer readable. They are tried again when a volume mounts and when the Mac wakes.
+    /// Missing, trashed, unmounted or unreadable; tried again when a volume mounts and when the Mac wakes.
     private(set) var unavailableFolderIDs: Set<UUID> = []
     @ObservationIgnored private var watchers: [UUID: FolderWatcher] = [:]
     @ObservationIgnored private var scopedURLs: [UUID: URL] = [:]
@@ -39,8 +38,7 @@ final class WatchedFoldersStore {
     @ObservationIgnored private let baselineMaxWait: Duration
     @ObservationIgnored private let onNewMediaFile: @MainActor (URL) -> Void
 
-    /// Every watcher gets `watcherOptions`, so they share its ledger and a file moved between two
-    /// watched folders keeps its identity.
+    /// Every watcher shares `watcherOptions`' ledger, so a file moved between watched folders keeps its identity.
     init(
         defaults: UserDefaults = DefaultsStore.current,
         baselineDirectory: URL,
@@ -164,9 +162,7 @@ final class WatchedFoldersStore {
         }
     }
 
-    /// Applies an external change to the "watchedFolders" defaults key (settings reset or import)
-    /// without a relaunch. Only folders whose entry changed restart; one at the same path keeps
-    /// what its watcher knew.
+    /// After a settings reset or import, restarts only the folders whose entry changed.
     func reloadFromDefaults() {
         let previous = Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0) })
         folders = []
@@ -226,8 +222,7 @@ final class WatchedFoldersStore {
         }
     }
 
-    /// The watcher being replaced stops, and its folder access ends, before the new one starts, so a
-    /// folder never has two; by default the new one picks up from what the old one knew.
+    /// The replaced watcher stops first, so a folder never has two; the new one starts from what it knew.
     private func startWatcher(
         for folder: WatchedFolder,
         replacing previous: FolderWatcher? = nil,
@@ -305,9 +300,7 @@ final class WatchedFoldersStore {
         }
     }
 
-    /// A renamed or moved folder, or one on a volume mounted somewhere new, resolves with a stale
-    /// bookmark. The app isn't sandboxed, so the resolved folder is usable: keep watching it and
-    /// save a fresh bookmark and path.
+    /// The app isn't sandboxed, so a moved folder's stale bookmark still leads somewhere usable: save where.
     private func follow(_ folder: WatchedFolder, to resolved: ResolvedBookmark) {
         guard resolved.isStale || resolved.movedTo != nil else { return }
         let refreshed = WatchedFolder(
@@ -448,8 +441,7 @@ final class WatchedFoldersStore {
     }
 }
 
-/// One JSON file per watched folder. Every read and write goes through one serial queue, so a later
-/// save never lands before an earlier one.
+/// One JSON file per folder, read and written on one serial queue so saves land in order.
 struct WatchedFolderBaselines: Sendable {
     let directory: URL
     private static let queue = DispatchQueue(label: "app.parola.watched-folder-baselines", qos: .utility)

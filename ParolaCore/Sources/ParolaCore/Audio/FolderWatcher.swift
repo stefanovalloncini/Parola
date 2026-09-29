@@ -407,8 +407,7 @@ public actor FolderWatcher {
         await drainTask?.value
     }
 
-    /// Directories that change while a drain is listing join its next pass. One drain at a time: a
-    /// listing taken before a newer one must not be applied on top of it.
+    /// One drain at a time, so an older listing never lands on a newer one; changes during a drain join its next pass.
     private func noteDirty(_ path: String) {
         dirty.insert(path)
         if drainTask == nil {
@@ -698,7 +697,9 @@ public actor FolderWatcher {
             created: info.created,
             isDataless: info.isDataless || (check.isUbiquitous == true && !options.cloud.isDownloaded(file.path))
         )
-        let verdict = Self.settle(observation, after: (file.size, file.modified), checks: &check.stableChecks, now: now, options: options)
+        let verdict = Self.settle(
+            observation, after: (file.size, file.modified), checks: &check.stableChecks, now: now, options: options
+        )
         if info.size != file.size || info.modified != file.modified {
             check.isUbiquitous = nil
         }
@@ -728,8 +729,7 @@ public actor FolderWatcher {
             backOff(&check)
             pending[key] = check
         case .arrive:
-            // A move from another watched folder can reach this watcher before that one notices
-            // the file left; the settle delay gives it time to hand the file over.
+            // The settle delay gives a watched folder a file moved out of it time to hand it over.
             if let departure = options.ledger.claim(
                 key, size: info.size, modified: info.modified, created: info.birth, now: now
             ) {
@@ -803,9 +803,7 @@ public actor FolderWatcher {
     /// Finder dates a file it is still copying 14 February 1946.
     static let finderBusyDays = Date(timeIntervalSince1970: -753_667_200)...Date(timeIntervalSince1970: -753_494_400)
 
-    /// A file arrives once `stableChecks` checks in a row saw the same non-zero size and date, and
-    /// the date is older than one interval. A cloud placeholder waits for its download, and a file
-    /// Finder is still copying waits for Finder.
+    /// `stableChecks` unchanged non-empty checks and a date older than one interval; placeholders and Finder copies wait.
     static func settle(
         _ observation: SettleObservation,
         after previous: (size: Int64, modified: Date),

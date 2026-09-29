@@ -107,7 +107,7 @@ enum DroppedFiles {
         return result
     }
 
-    /// On GCD, not `Task.detached`, for the enumerator crash FolderWatcher.scanFolderOffActor describes.
+    /// On GCD, not `Task.detached`, for the enumerator crash FolderWatcher.scanOffActor describes.
     static func classifyOffMain(_ urls: [URL]) async -> Classification {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
