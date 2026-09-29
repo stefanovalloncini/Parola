@@ -211,6 +211,9 @@ public actor LibrarySearchIndex {
     private var snapshotWriteFailing = false
     /// Started by the first call that needs the index, so a process that never searches never decodes the snapshot.
     private var loadTask: Task<LoadResult, Never>?
+    /// The snapshot manifest's date when this index last read it, and the ids that manifest listed.
+    private var snapshotStamp: Date?
+    private var snapshotListed: Set<String> = []
     private let indexDirectory: URL
     /// False for a reader: the index lives in memory and the snapshot on disk stays the owner's.
     private let persists: Bool
@@ -225,6 +228,7 @@ public actor LibrarySearchIndex {
     private(set) var snapshotGeneration = 0
     private(set) var entriesEncoded = 0
     private(set) var vocabularySorts = 0
+    private(set) var entriesDecoded = 0
 
     /// `indexDirectory` holds the snapshot: a `manifest.json` and one file per entry under `entries/`.
     public init(
@@ -541,6 +545,33 @@ public actor LibrarySearchIndex {
         scheduleSave()
     }
 
+    /// Decodes only the owner's entry files written since this index last read the snapshot; false means load it whole.
+    func refreshFromSnapshot() async -> Bool {
+        guard isLoaded else { return loadTask == nil }
+        let directory = indexDirectory
+        let stamp = Self.modificationDate(of: Self.manifestURL(in: directory))
+        let since = snapshotStamp
+        let known = Set(entries.keys)
+        let read = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: Self.snapshotChanges(in: directory, since: since, known: known))
+            }
+        }
+        guard let changes = read else { return false }
+        for id in snapshotListed.subtracting(changes.listed) {
+            removeFromIndex(id)
+            if excerptsByEntry.removeValue(forKey: id) != nil { excerptsGeneration &+= 1 }
+        }
+        for entry in changes.decoded {
+            removeFromIndex(entry.id)
+            install(entry.entry, for: entry.id)
+        }
+        entriesDecoded &+= changes.decoded.count
+        snapshotStamp = stamp
+        snapshotListed = changes.listed
+        return true
+    }
+
     private func ensureLoaded() async {
         guard !isLoaded else { return }
         let task: Task<LoadResult, Never>
@@ -548,6 +579,7 @@ public actor LibrarySearchIndex {
             task = loadTask
         } else {
             let directory = indexDirectory
+            snapshotStamp = Self.modificationDate(of: Self.manifestURL(in: directory))
             task = Task.detached(priority: .utility) {
                 await Self.loadSnapshotOffPool(at: directory)
             }
@@ -563,6 +595,8 @@ public actor LibrarySearchIndex {
         case .loaded(let state):
             entries = state.entries
             inverted = state.inverted
+            snapshotListed = Set(state.entries.keys)
+            entriesDecoded &+= state.entries.count
             sortedTokens = nil
             excerptsByEntry = state.entries.compactMapValues(\.excerpt)
             if !excerptsByEntry.isEmpty { excerptsGeneration &+= 1 }
@@ -621,17 +655,7 @@ public actor LibrarySearchIndex {
             guard entry.id == id, manifest.entries[id] == entry.fingerprint else {
                 return LoadResult(outcome: .staleDiscarded, legacySnapshotPresent: legacy)
             }
-            entries[entry.id] = IndexedEntry(
-                title: entry.title,
-                text: entry.text,
-                tokens: entry.tokens,
-                counts: entry.counts,
-                offsets: entry.offsets,
-                boundaryOffsets: entry.boundaryOffsets,
-                boundaryCentiseconds: entry.boundaryCentiseconds,
-                fingerprint: entry.fingerprint,
-                excerpt: excerpt(from: entry.text, maxLength: excerptLength)
-            )
+            entries[entry.id] = indexedEntry(from: entry)
             for token in entry.tokens {
                 inverted[token, default: []].insert(entry.id)
             }
@@ -640,6 +664,48 @@ public actor LibrarySearchIndex {
             outcome: .loaded(LoadedState(entries: entries, inverted: inverted)),
             legacySnapshotPresent: legacy
         )
+    }
+
+    private static func indexedEntry(from entry: SnapshotEntry) -> IndexedEntry {
+        IndexedEntry(
+            title: entry.title,
+            text: entry.text,
+            tokens: entry.tokens,
+            counts: entry.counts,
+            offsets: entry.offsets,
+            boundaryOffsets: entry.boundaryOffsets,
+            boundaryCentiseconds: entry.boundaryCentiseconds,
+            fingerprint: entry.fingerprint,
+            excerpt: excerpt(from: entry.text, maxLength: excerptLength)
+        )
+    }
+
+    private struct SnapshotChanges: Sendable {
+        let listed: Set<String>
+        let decoded: [PreparedEntry]
+    }
+
+    /// The owner's current manifest, with the entries it lists that are new to `known` or were written after `since`.
+    private static func snapshotChanges(in directory: URL, since: Date?, known: Set<String>) -> SnapshotChanges? {
+        guard let data = try? Data(contentsOf: manifestURL(in: directory)),
+              let manifest = try? JSONDecoder().decode(Manifest.self, from: data),
+              manifest.version == snapshotVersion else { return nil }
+        let entriesDirectory = entriesDirectory(in: directory)
+        let ids = manifest.entries.keys.filter { id in
+            guard let since, known.contains(id) else { return true }
+            return modificationDate(of: entryURL(id, in: entriesDirectory)).map { $0 > since } ?? true
+        }.sorted()
+        guard let decoded = decodeEntries(ids, in: entriesDirectory) else { return nil }
+        var prepared: [PreparedEntry] = []
+        for (id, entry) in zip(ids, decoded) {
+            guard entry.id == id, manifest.entries[id] == entry.fingerprint else { return nil }
+            prepared.append(PreparedEntry(id: id, entry: indexedEntry(from: entry)))
+        }
+        return SnapshotChanges(listed: Set(manifest.entries.keys), decoded: prepared)
+    }
+
+    private static func modificationDate(of url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
     }
 
     /// nil when a row the manifest lists is missing or will not decode: the snapshot is then stale as a whole.

@@ -967,6 +967,46 @@ final class LibrarySearchIndexTests {
         #expect(await later.search("sprint").count == 2, "the load sees what landed after the index was made")
     }
 
+    @Test("a reader refreshes from the owner's newer snapshot by decoding only what changed")
+    func readerRefreshDecodesOnlyChanges() async throws {
+        let (owner, url) = makeTempIndex()
+        await owner.index(id: "e1", title: "One", text: "alpha notes", fingerprint: "f1", createdAt: Date())
+        await owner.index(id: "e2", title: "Two", text: "beta notes", fingerprint: "f2", createdAt: Date())
+        await owner.index(id: "e3", title: "Three", text: "gamma notes", fingerprint: "f3", createdAt: Date())
+        await owner.flush()
+        let reader = LibrarySearchIndex(readingSnapshotIn: url)
+        #expect(await reader.search("notes").count == 3)
+        #expect(await reader.entriesDecoded == 3)
+        await reader.index(id: "mine", title: "Mine", text: "epsilon notes", fingerprint: "fm", createdAt: Date())
+
+        await owner.index(id: "e2", title: "Two qqxwtitle", text: "beta notes", fingerprint: "f2", createdAt: Date())
+        await owner.index(id: "e4", title: "Four", text: "delta notes", fingerprint: "f4", createdAt: Date())
+        await owner.remove("e3")
+        await owner.flush()
+
+        #expect(await reader.refreshFromSnapshot())
+        #expect(await reader.entriesDecoded == 5, "only the renamed and the new entry are decoded again")
+        #expect(await reader.search("qqxwtitle").map(\.entryID) == ["e2"])
+        #expect(await reader.search("gamma").isEmpty)
+        #expect(Set(await reader.search("notes").map(\.entryID)) == ["e1", "e2", "e4", "mine"])
+        let fresh = LibrarySearchIndex(readingSnapshotIn: url)
+        #expect(await keyed(reader.search("delta")) == keyed(fresh.search("delta")))
+    }
+
+    @Test("a snapshot a reader can't refresh from sends it back to a whole load")
+    func readerRefreshFallsBack() async throws {
+        let (owner, url) = makeTempIndex()
+        await owner.index(id: "e1", title: "One", text: "alpha", fingerprint: "f1", createdAt: Date())
+        await owner.flush()
+        let reader = LibrarySearchIndex(readingSnapshotIn: url)
+        #expect(await reader.refreshFromSnapshot(), "nothing loaded yet: the first search reads the snapshot anyway")
+        #expect(await reader.search("alpha").count == 1)
+
+        try Data("not json".utf8).write(to: manifestURL(in: url))
+
+        #expect(await !reader.refreshFromSnapshot())
+    }
+
     private func keyed(_ matches: [LibrarySearchIndex.Match]) -> [String: LibrarySearchIndex.Match] {
         Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0) })
     }

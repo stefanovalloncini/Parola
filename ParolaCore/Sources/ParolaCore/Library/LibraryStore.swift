@@ -453,7 +453,7 @@ public actor LibraryStore {
     /// read when another process has changed an entry or the search index since the last call. Two
     /// stats when nothing moved. True when it dropped anything.
     @discardableResult
-    public func reloadIfChangedElsewhere() -> Bool {
+    public func reloadIfChangedElsewhere() async -> Bool {
         var snapshotMoved = false
         if role == .reader {
             let snapshot = Self.modificationDate(of: Self.indexDirectory(in: libraryURL).appendingPathComponent("manifest.json"))
@@ -462,7 +462,8 @@ public actor LibraryStore {
         }
         guard folderChangedElsewhere() || snapshotMoved else { return false }
         dropCaches()
-        if snapshotMoved, indexReadyTask != nil {
+        let index = searchIndex
+        if snapshotMoved, indexReadyTask != nil, await !index.refreshFromSnapshot(), index === searchIndex {
             searchIndex = LibrarySearchIndex(readingSnapshotIn: Self.indexDirectory(in: libraryURL))
         }
         return true
