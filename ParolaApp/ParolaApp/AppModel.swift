@@ -73,6 +73,13 @@ final class AppModel {
         let captureTargets: Set<String>
     }
 
+    /// How long a take stays quiet before the pane warns: a mic soon, Mac audio only past a pause, unless it has heard nothing yet.
+    struct SilenceRule {
+        var microphone: TimeInterval = 8
+        var macAudioBeforeSound: TimeInterval = 10
+        var macAudioAfterSound: TimeInterval = 60
+    }
+
     /// A take's title with the file it was recorded to, so no pane names the working file.
     struct RecordedTake: Equatable {
         let file: URL
@@ -1199,6 +1206,7 @@ final class AppModel {
     static let takeLevelHistoryCapacity = 48
     var recordingIsSilent: Bool = false
     @ObservationIgnored var silenceDetector: SilenceDetector = SilenceDetector(threshold: 8)
+    @ObservationIgnored var silenceRule = SilenceRule()
     @ObservationIgnored var silenceWatchTask: Task<Void, Never>?
     @ObservationIgnored var recordingAutoStopTask: Task<Void, Never>?
 
@@ -3246,7 +3254,7 @@ final class AppModel {
         if recordingIsSilent != alert { recordingIsSilent = alert }
     }
 
-    /// Reads the meter rather than a voice detector, so every source warns the same way: mic or Mac audio, live or not.
+    /// Reads the meter rather than a voice detector, so every source warns off the same signal: mic or Mac audio, live or not.
     private func startSilenceWatch() {
         stopSilenceWatch()
         silenceDetector.reset()
@@ -3262,7 +3270,14 @@ final class AppModel {
     }
 
     private func noteRecordingLevel() {
-        let heard = recordingLevelMeter?.lastSound.map { $0.duration(to: .now) < .seconds(1) } ?? false
+        let lastSound = recordingLevelMeter?.lastSound
+        let heard = lastSound.map { $0.duration(to: .now) < .seconds(1) } ?? false
+        // Mac audio has pauses a mic take doesn't: it warns early only if it has heard nothing yet.
+        if case .recording(.systemAudio) = phase {
+            silenceDetector.threshold = lastSound == nil ? silenceRule.macAudioBeforeSound : silenceRule.macAudioAfterSound
+        } else {
+            silenceDetector.threshold = silenceRule.microphone
+        }
         silenceDetector.note(active: heard)
         updateSilenceFlag()
     }
