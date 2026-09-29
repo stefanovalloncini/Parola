@@ -388,6 +388,48 @@ struct WatchedFoldersStoreWatchingTests {
         #expect(!FileManager.default.fileExists(atPath: rig.baselineURL.path))
         await store.stopWatching()
     }
+
+    @Test("a change that lands while an overdue save is already under way is saved by one more pass")
+    func changeDuringADueSaveIsSavedAgain() async throws {
+        let rig = try makeRig("rewrite")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let store = WatchedFoldersStore(
+            defaults: rig.defaults,
+            baselineDirectory: rig.baselineDirectory,
+            watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50)),
+            baselineWriteDelay: .seconds(1),
+            baselineMaxWait: .zero
+        ) { _ in }
+        #expect(await waitUntil { store.baselineSaves >= 1 })
+        let before = store.baselineSaves
+
+        store.scheduleBaselineWrite(for: rig.folderID)
+        store.scheduleBaselineWrite(for: rig.folderID)
+        #expect(await waitUntil { store.baselineSaves == before + 2 })
+        await store.stopWatching()
+    }
+
+    @Test("the quit flush returns only after saves already queued have landed")
+    func quitFlushWaitsForQueuedSaves() async throws {
+        let rig = try makeRig("flush-barrier")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let store = makeStore(rig, arrivals: Arrivals())
+        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        await store.stopWatching()
+
+        let other = UUID()
+        let entries: [[String: Any]] = (0..<200_000).map {
+            ["path": "recording \($0).m4a", "inode": $0, "size": 1, "modified": 0]
+        }
+        let json = try JSONSerialization.data(withJSONObject: ["entries": entries])
+        let large = try JSONDecoder().decode(FolderWatcher.Baseline.self, from: json)
+        let baselines = WatchedFolderBaselines(directory: rig.baselineDirectory)
+        baselines.write(large, for: other)
+        await store.pendingBaselineFlush()()
+
+        let saved = try JSONDecoder().decode(FolderWatcher.Baseline.self, from: Data(contentsOf: baselines.fileURL(for: other)))
+        #expect(saved.entries.count == 200_000)
+    }
 }
 
 private struct DiskImage {

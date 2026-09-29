@@ -28,6 +28,8 @@ final class WatchedFoldersStore {
     @ObservationIgnored private var scopedURLs: [UUID: URL] = [:]
     @ObservationIgnored private var baselineWrites: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var baselineDeadlines: [UUID: ContinuousClock.Instant] = [:]
+    @ObservationIgnored private var baselineRewrites: Set<UUID> = []
+    @ObservationIgnored private(set) var baselineSaves = 0
     @ObservationIgnored private var starts: [UUID: UUID] = [:]
     @ObservationIgnored private var carries: [UUID: Task<FolderWatcher.Baseline?, Never>] = [:]
     @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
@@ -340,7 +342,10 @@ final class WatchedFoldersStore {
     func scheduleBaselineWrite(for id: UUID) {
         let now = ContinuousClock.now
         let deadline = baselineDeadlines[id] ?? now + baselineMaxWait
-        if baselineWrites[id] != nil, deadline <= now { return }
+        if baselineWrites[id] != nil, deadline <= now {
+            baselineRewrites.insert(id)
+            return
+        }
         baselineWrites[id]?.cancel()
         baselineDeadlines[id] = deadline
         let delay = max(.zero, min(baselineWriteDelay, deadline - now))
@@ -351,13 +356,20 @@ final class WatchedFoldersStore {
             guard !Task.isCancelled else { return }
             self.baselineWrites[id] = nil
             self.baselineDeadlines[id] = nil
-            if let baseline { self.baselines.write(baseline, for: id) }
+            if let baseline {
+                self.baselines.write(baseline, for: id)
+                self.baselineSaves += 1
+            }
+            if self.baselineRewrites.remove(id) != nil {
+                self.scheduleBaselineWrite(for: id)
+            }
         }
     }
 
     private func cancelBaselineWrite(_ id: UUID) {
         baselineWrites.removeValue(forKey: id)?.cancel()
         baselineDeadlines[id] = nil
+        baselineRewrites.remove(id)
     }
 
     /// For quit, when the main thread is blocked: saves each baseline still waiting to be written.
@@ -370,6 +382,7 @@ final class WatchedFoldersStore {
                     baselines.writeNow(baseline, for: id)
                 }
             }
+            baselines.finishWrites()
         }
     }
 
@@ -502,6 +515,10 @@ struct WatchedFolderBaselines: Sendable {
                 try? FileManager.default.removeItem(at: directory.appendingPathComponent(name))
             }
         }
+    }
+
+    func finishWrites() {
+        Self.queue.sync {}
     }
 
     /// Waits for every save queued before it; tests read the files after this.
