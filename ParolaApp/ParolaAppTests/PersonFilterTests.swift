@@ -144,6 +144,21 @@ struct PersonFilterTests {
         #expect(model.libraryBrowsingAll)
     }
 
+    @Test("re-picking a person still navigates when another route took over, like a batch")
+    func repickingAPersonNavigatesFromAnotherRoute() async {
+        let model = await makeModel()
+        model.browsePerson(ada)
+        // Simulates addToQueue / startBatch / a duplicate-import sheet setting route directly.
+        model.route = .batch
+        #expect(model.personFilter == ada)
+
+        model.browsePerson(ada)
+
+        #expect(model.route == .transcript)
+        #expect(model.personFilter == ada)
+        #expect(model.libraryBrowsingAll)
+    }
+
     @Test("choosing a category clears the person filter")
     func categorySelectionClearsThePerson() async {
         let model = await makeModel()
