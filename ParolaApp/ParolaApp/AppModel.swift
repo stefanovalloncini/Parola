@@ -134,7 +134,6 @@ final class AppModel {
         didSet { if oldValue != nil, duplicateCheckTask == nil { foregroundLetGo() } }
     }
     @ObservationIgnored var batchImportTask: Task<Void, Never>?
-    @ObservationIgnored var watchedImportTask: Task<Void, Never>?
     /// A run the user stopped does not ring when its queue unwinds. Cleared when a wave starts.
     @ObservationIgnored var batchRunCancelled = false
     var currentSegmentID: TranscriptSegment.ID?

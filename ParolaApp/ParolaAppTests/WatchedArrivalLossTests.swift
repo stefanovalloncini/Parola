@@ -63,9 +63,8 @@ extension TranscriberMockSuites {
             ))
         }
 
-        private func arrive(_ model: AppModel, _ urls: [URL]) async {
+        private func arrive(_ model: AppModel, _ urls: [URL]) {
             for url in urls { model.handleWatchedArrival(url) }
-            await model.awaitWatchedImport()
         }
 
         /// An entry of the user's own on screen, so arrivals run out of sight.
@@ -99,7 +98,7 @@ extension TranscriberMockSuites {
                 do {
                     let before = makeModel(library: library, defaults: defaults)
                     before.fileTranscribeTask = Task {}
-                    await arrive(before, files)
+                    arrive(before, files)
                     #expect(try savedQueue(before) == files)
                 }
 
@@ -115,6 +114,59 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("files are saved to the line as they are handed over, so a quit during the duplicate check keeps them")
+        func arrivalsAreSavedBeforeTheCheck() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let folder = try makeFolder("quit-checking")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let library = makeTempLibraryURL("loss-quit-checking")
+                let defaults = temporaryDefaults()
+                let files = [
+                    try makeWAV("One", in: folder), try makeWAV("Two", in: folder, seconds: 0.4),
+                    try makeWAV("Three", in: folder, seconds: 0.5),
+                ]
+                do {
+                    let before = makeModel(library: library, defaults: defaults)
+                    arrive(before, files)
+                    #expect(before.watchedLaneTask != nil, "the first file's check is under way")
+                    #expect(before.backgroundArrivalID == nil && before.visibleArrivalID == nil)
+                    #expect(try savedQueue(before) == files)
+                    before.preemptWatchedLane()
+                }
+
+                let after = makeModel(library: library, defaults: defaults)
+                #expect(after.watchedArrivals.map(\.url) == files)
+                #expect(await waitUntil(timeoutMs: 20_000) { after.watchedLaneIsIdle })
+                #expect(await waitUntil(timeoutMs: 10_000) { await after.library.list().count == 3 })
+            }
+        }
+
+        @Test("a file the library already holds is skipped by the check before its run, even after a quit")
+        func duplicateIsSkippedBeforeItsRun() async throws {
+            let folder = try makeFolder("duplicate")
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let model = makeModel(library: makeTempLibraryURL("loss-duplicate"), defaults: temporaryDefaults())
+            let file = try makeWAV("Known", in: folder)
+            _ = try await model.library.add(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "already here")],
+                    language: "en", modelName: "stub"
+                ),
+                audioSource: file
+            )
+            model.watchedArrivals = [WatchedArrival(url: file)]
+
+            model.pumpWatchedLane()
+
+            #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+            #expect(model.batchDuplicatesSkipped == 1)
+            #expect(model.fileTranscribeTask == nil)
+            #expect(await model.library.list().count == 1)
+        }
+
         @Test("a file running out of sight when Parola quits comes back at the next launch")
         func runningArrivalSurvivesAQuit() async throws {
             try await withMocksCleared(.transcriber) {
@@ -128,7 +180,7 @@ extension TranscriberMockSuites {
                 do {
                     let before = makeModel(library: library, defaults: defaults)
                     _ = try await openOwnEntry(before, in: folder)
-                    await arrive(before, [file])
+                    arrive(before, [file])
                     #expect(await waitUntil { before.backgroundArrivalID != nil })
                     #expect(try savedQueue(before) == [file])
                     before.preemptWatchedLane()
@@ -163,7 +215,7 @@ extension TranscriberMockSuites {
                         throw CancellationError()
                     }
                     _ = try await openOwnEntry(before, in: folder)
-                    await arrive(before, [file])
+                    arrive(before, [file])
                     #expect(await waitUntil(timeoutMs: 10_000) { before.watchedArrivals.first?.isLanding == true })
                     #expect(try savedQueue(before) == [file])
                 }
@@ -192,7 +244,7 @@ extension TranscriberMockSuites {
                 model.beforeLandingSave = { throw CocoaError(.fileWriteOutOfSpace) }
                 let file = try makeWAV("Unsaved", in: folder)
 
-                await arrive(model, [file])
+                arrive(model, [file])
 
                 #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
                 #expect(handedBack.urls == [file])
@@ -210,7 +262,7 @@ extension TranscriberMockSuites {
                 defer { try? FileManager.default.removeItem(at: folder) }
                 let model = makeModel(library: makeTempLibraryURL("loss-cancel"), defaults: temporaryDefaults())
                 let files = [try makeWAV("First", in: folder), try makeWAV("Second", in: folder, seconds: 0.4)]
-                await arrive(model, files)
+                arrive(model, files)
                 #expect(await waitUntil { model.visibleArrivalID != nil })
                 #expect(model.fileTranscribeTask != nil)
 
@@ -240,9 +292,9 @@ extension TranscriberMockSuites {
                 let arrived = try makeWAV("Arrived", in: folder)
                 let later = try makeWAV("Later", in: folder, seconds: 0.5)
                 let opened = try makeWAV("Opened", in: folder, seconds: 0.6)
-                await arrive(model, [arrived])
+                arrive(model, [arrived])
                 #expect(await waitUntil { model.visibleArrivalID != nil })
-                await arrive(model, [later])
+                arrive(model, [later])
 
                 model.transcribe(fileURL: opened)
                 #expect(await waitUntil(timeoutMs: 10_000) { model.sourceFileURL == opened })
@@ -286,7 +338,7 @@ extension TranscriberMockSuites {
                 }
                 let arrived = try makeWAV("Arrived", in: folder)
                 let opened = try makeWAV("Opened", in: folder, seconds: 0.6)
-                await arrive(model, [arrived])
+                arrive(model, [arrived])
                 #expect(await waitUntil(timeoutMs: 10_000) { await calls.count == 1 })
 
                 model.transcribe(fileURL: opened)
@@ -309,7 +361,7 @@ extension TranscriberMockSuites {
             let model = makeModel(library: makeTempLibraryURL("loss-reset"), defaults: temporaryDefaults())
             model.fileTranscribeTask = Task {}
             let file = try makeWAV("Waiting", in: folder)
-            await arrive(model, [file])
+            arrive(model, [file])
 
             model.reloadSettings()
 
@@ -333,7 +385,7 @@ extension TranscriberMockSuites {
                 if outOfSight { _ = try await openOwnEntry(model, in: folder) }
                 let file = try makeWAV("Broken", in: folder)
 
-                await arrive(model, [file])
+                arrive(model, [file])
 
                 #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
                 #expect(handedBack.urls == [file])

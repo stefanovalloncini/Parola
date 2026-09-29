@@ -285,19 +285,20 @@ extension TranscriberMockSuites {
             if busy { model.fileTranscribeTask = Task {} }
 
             model.handleWatchedArrival(wav)
-            await model.awaitWatchedImport()
+            if busy {
+                // The check waits its turn in the lane, and the file waits there, saved, until then.
+                #expect(model.watchedArrivals.map(\.url) == [wav])
+                model.fileTranscribeTask?.cancel()
+                model.fileTranscribeTask = nil
+            }
 
+            #expect(await waitUntil { model.batchDuplicateNotice == "1 already in your library" })
+            #expect(await waitUntil { model.watchedLaneIsIdle })
             #expect(model.duplicateImport == nil)
             #expect(model.selectedEntryID == selection)
             #expect(model.route == route)
             #expect(model.deferredArrivals.isEmpty)
-            #expect(model.batchDuplicateNotice == "1 already in your library")
-            if busy {
-                model.fileTranscribeTask?.cancel()
-                model.fileTranscribeTask = nil
-            } else {
-                #expect(model.fileTranscribeTask == nil)
-            }
+            #expect(model.fileTranscribeTask == nil)
         }
 
         @Test("with Transcribe it again a watched-folder copy of a known file is transcribed")
@@ -313,7 +314,6 @@ extension TranscriberMockSuites {
                 _ = try await seedLibrary(model, with: wav)
 
                 model.handleWatchedArrival(wav)
-                await model.awaitWatchedImport()
 
                 #expect(model.duplicateImport == nil)
                 #expect(await waitUntil { model.fileTranscribeTask != nil })
@@ -334,7 +334,6 @@ extension TranscriberMockSuites {
                 defer { try? FileManager.default.removeItem(at: wav) }
 
                 model.handleWatchedArrival(wav)
-                await model.awaitWatchedImport()
 
                 #expect(model.duplicateImport == nil)
                 #expect(await waitUntil { model.fileTranscribeTask != nil })

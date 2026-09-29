@@ -997,7 +997,6 @@ struct AppModelBatchTests {
         let url = URL(fileURLWithPath: "/tmp/watched.wav")
 
         model.handleWatchedArrival(url)
-        await model.awaitWatchedImport()
 
         #expect(model.watchedArrivals.map(\.url) == [url])
         #expect(model.watchedLaneTask == nil)

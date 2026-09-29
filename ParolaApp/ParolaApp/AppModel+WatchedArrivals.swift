@@ -37,36 +37,9 @@ struct ArrivalNotice: Equatable, Identifiable {
 
 extension AppModel {
 
-    /// Nobody opened this file, so a copy the library holds follows the batch rule whether Parola is idle
-    /// or busy: skipped and counted with the batch's duplicates, never a sheet or a jump to the stored entry.
+    /// Saved to the line before anything reads the file, so a quit during the duplicate check loses nothing.
     func handleWatchedArrival(_ url: URL) {
-        let previous = watchedImportTask
-        let deadline = fileReadDeadline
-        let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
-        watchedImportTask = Task { [weak self] in
-            await previous?.value
-            guard let self else { return }
-            var lookup: DuplicateNotice.Lookup?
-            if skipsDuplicates {
-                lookup = await DuplicateNotice.lookup(for: url, in: self.library, deadline: deadline)
-            }
-            if lookup?.entry != nil {
-                guard !Task.isCancelled else { return }
-                self.batchDuplicatesSkipped += 1
-                ParolaLog.info(.library, "skipped a watched-folder file the library already holds")
-                return
-            }
-            guard !Task.isCancelled else { return }
-            self.enqueueWatchedArrival(WatchedArrival(url: url, sourceDigest: lookup?.digest))
-        }
-    }
-
-    /// Waits for the duplicate check a watched arrival goes through before it joins the lane.
-    func awaitWatchedImport() async {
-        while let task = watchedImportTask {
-            await task.value
-            if watchedImportTask == task { watchedImportTask = nil }
-        }
+        enqueueWatchedArrival(WatchedArrival(url: url))
     }
 
     /// A file offered again before its turn keeps its place in the line; one offered while it runs waits once behind it.
@@ -86,11 +59,18 @@ extension AppModel {
     func pumpWatchedLane() {
         guard watchedLaneTask == nil, visibleArrivalID == nil, !foregroundIsHeld,
               let next = nextWatchedArrival else { return }
+        let deadline = fileReadDeadline
+        let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
         // Off main: a watched folder can sit on a server that takes its time to answer.
-        watchedLaneTask = Task { [weak self] in
+        watchedLaneTask = Task { [weak self, library] in
             let present = (try? await AppModel.offMainIO(qos: .utility) {
                 FileManager.default.fileExists(atPath: next.url.path)
             }) ?? false
+            // Nobody opened this file, so a copy the library holds follows the batch rule: skipped and counted, never a sheet.
+            var lookup: DuplicateNotice.Lookup?
+            if present, next.sourceDigest == nil, skipsDuplicates {
+                lookup = await DuplicateNotice.lookup(for: next.url, in: library, deadline: deadline)
+            }
             guard let self, !Task.isCancelled else { return }
             watchedLaneTask = nil
             guard present else {
@@ -98,6 +78,16 @@ extension AppModel {
                 watchedArrivals.removeAll { $0.id == next.id }
                 pumpWatchedLane()
                 return
+            }
+            if lookup?.entry != nil {
+                batchDuplicatesSkipped += 1
+                ParolaLog.info(.library, "skipped a watched-folder file the library already holds")
+                watchedArrivals.removeAll { $0.id == next.id }
+                pumpWatchedLane()
+                return
+            }
+            if let digest = lookup?.digest, let index = watchedArrivals.firstIndex(where: { $0.id == next.id }) {
+                watchedArrivals[index].sourceDigest = digest
             }
             startArrival(next)
         }

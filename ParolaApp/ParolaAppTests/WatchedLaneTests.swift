@@ -100,9 +100,8 @@ extension TranscriberMockSuites {
             return entry
         }
 
-        private func arrive(_ model: AppModel, _ urls: URL...) async {
+        private func arrive(_ model: AppModel, _ urls: URL...) {
             for url in urls { model.handleWatchedArrival(url) }
-            await model.awaitWatchedImport()
         }
 
         @Test("an arrival while a transcript is open and playing leaves the window alone and lands out of sight")
@@ -122,7 +121,7 @@ extension TranscriberMockSuites {
                 let route = model.route
                 let arrived = try makeWAV("Standup", in: rig.folder)
 
-                await arrive(model, arrived)
+                arrive(model, arrived)
 
                 #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
                 await model.awaitLandingSteps()
@@ -157,7 +156,7 @@ extension TranscriberMockSuites {
                 let model = rig.model
                 let arrived = try makeWAV("Idle", in: rig.folder)
 
-                await arrive(model, arrived)
+                arrive(model, arrived)
 
                 #expect(await waitUntil { model.fileTranscribeTask != nil })
                 #expect(model.sourceFileURL == arrived)
@@ -189,7 +188,7 @@ extension TranscriberMockSuites {
                 _ = model.entryWindows.session(for: viewed.id, model: model)
                 #expect(!model.arrivalMayTakeWindow)
 
-                await arrive(model, try makeWAV("Beside", in: rig.folder))
+                arrive(model, try makeWAV("Beside", in: rig.folder))
 
                 #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
                 #expect(model.transcript == nil)
@@ -213,7 +212,6 @@ extension TranscriberMockSuites {
                 }
 
                 for file in files { model.handleWatchedArrival(file) }
-                await model.awaitWatchedImport()
                 #expect(model.watchedArrivals.map(\.url) == files)
                 await gate.open()
 
@@ -244,12 +242,12 @@ extension TranscriberMockSuites {
                 _ = try await openOwnEntry(rig)
                 let file = try makeWAV("Growing", in: rig.folder)
                 let other = try makeWAV("Other", in: rig.folder, seconds: 0.5)
-                await arrive(model, file)
+                arrive(model, file)
                 #expect(await waitUntil { model.backgroundArrivalID != nil })
 
-                await arrive(model, file)
-                await arrive(model, other)
-                await arrive(model, file)
+                arrive(model, file)
+                arrive(model, other)
+                arrive(model, file)
 
                 #expect(model.watchedArrivals.map(\.url) == [file, file, other])
                 await gate.open()
@@ -269,7 +267,7 @@ extension TranscriberMockSuites {
                 let arrived = try makeWAV("Arrived", in: rig.folder)
                 let opened = try makeWAV("Opened", in: rig.folder, seconds: 0.5)
 
-                await arrive(model, arrived)
+                arrive(model, arrived)
                 #expect(await waitUntil { model.backgroundArrivalID != nil })
 
                 model.transcribe(fileURL: opened)
@@ -296,7 +294,7 @@ extension TranscriberMockSuites {
                 let model = rig.model
                 let gone = try makeWAV("Gone", in: rig.folder)
                 model.fileTranscribeTask = Task {}
-                await arrive(model, gone)
+                arrive(model, gone)
                 #expect(model.watchedArrivals.map(\.url) == [gone])
                 try FileManager.default.removeItem(at: gone)
 
@@ -321,7 +319,7 @@ extension TranscriberMockSuites {
                 _ = try await openOwnEntry(rig)
                 let arrived = try makeWAV("Broken", in: rig.folder)
 
-                await arrive(model, arrived)
+                arrive(model, arrived)
 
                 #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
                 #expect(model.arrivalNotice?.name == "Broken")
