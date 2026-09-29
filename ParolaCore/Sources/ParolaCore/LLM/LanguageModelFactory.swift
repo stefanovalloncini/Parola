@@ -75,7 +75,7 @@ public enum LanguageModelFactory {
     ) async throws -> any LanguageModel {
         if let mockProvider = MockLanguageModelStore.Provider(cloudProviderID: provider),
            let mock = await MockLanguageModelStore.shared.resolve(for: mockProvider) {
-            return MockLanguageModel.make(response: mock, clock: clock)
+            return await MockLanguageModelStore.shared.model(for: mockProvider, response: mock, clock: clock)
         }
         if managed.disableCloudLLM {
             throw CloudLLMError.disabledByPolicy
@@ -100,7 +100,7 @@ public enum LanguageModelFactory {
         clock: any Clock<Duration> = ContinuousClock()
     ) async throws -> any LanguageModel {
         if let mock = await MockLanguageModelStore.shared.resolve(for: .custom) {
-            return MockLanguageModel.make(response: mock, clock: clock)
+            return await MockLanguageModelStore.shared.model(for: .custom, response: mock, clock: clock)
         }
         if managed.disableCloudLLM {
             throw CloudLLMError.disabledByPolicy
@@ -122,7 +122,7 @@ public enum LanguageModelFactory {
         clock: any Clock<Duration> = ContinuousClock()
     ) async -> any LanguageModel {
         if let mock = await MockLanguageModelStore.shared.resolve(for: .ollama) {
-            return MockLanguageModel.make(response: mock, clock: clock)
+            return await MockLanguageModelStore.shared.model(for: .ollama, response: mock, clock: clock)
         }
         return OllamaLanguageModel(model: model, endpoint: endpoint, instructions: instructions, contextTokens: contextTokens)
     }
@@ -209,7 +209,7 @@ public enum LanguageModelFactory {
     ) async throws -> any LanguageModel {
         if let mock = await MockLanguageModelStore.shared.resolve(for: .foundation) {
             await MockLanguageModelStore.shared.recordInstructions(instructions, for: .foundation)
-            return MockLanguageModel.make(response: mock, clock: clock)
+            return await MockLanguageModelStore.shared.model(for: .foundation, response: mock, clock: clock)
         }
         if let reason = await onDeviceAvailability().reason {
             ParolaLog.notice(.ai, "on-device model unavailable: \(Self.unavailability())")

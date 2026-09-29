@@ -154,9 +154,7 @@ struct PromptLibraryTests {
             model: model
         )
         #expect(result == "MOCK_RESPONSE")
-        let prompt = await model.receivedPrompts.last ?? ""
-        #expect(prompt.contains("Cleanup the transcript") || prompt.contains("Clean up the transcript"))
-        #expect(prompt.contains("hello"))
+        #expect(await model.receivedPrompts.last == "Input:\nhello")
     }
 
     @Test("Prompt round-trips through JSON")

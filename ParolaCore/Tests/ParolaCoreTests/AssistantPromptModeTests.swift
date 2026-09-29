@@ -37,13 +37,12 @@ struct AssistantPromptModeTests {
         #expect(assistant?.triggerWords.contains("hey assistant") == true)
     }
 
-    @Test("cleanup mode wraps text in the prompt envelope")
-    func cleanupEnvelopeIncludesInstructions() {
+    @Test("cleanup mode marks the text as input and leaves the instructions to the model's own")
+    func cleanupEnvelopeCarriesOnlyTheInput() {
         let cleanup = Prompt(name: "Cleanup", instructions: "Clean the text below.")
         let message = PromptRunner.buildUserMessage(for: cleanup, text: "hello world")
-        #expect(message.contains("Clean the text below."))
-        #expect(message.contains("Input:"))
-        #expect(message.contains("hello world"))
+        #expect(message == "Input:\nhello world")
+        #expect(!message.contains("Clean the text below."))
     }
 
     @Test("assistant mode passes the user's text plain")
@@ -55,15 +54,13 @@ struct AssistantPromptModeTests {
         #expect(message.contains("Input:") == false)
     }
 
-    @Test("PromptRunner.run uses cleanup envelope when system instructions are on")
+    @Test("PromptRunner.run sends the instructions once, not again in the user turn")
     func runnerUsesEnvelopeInCleanupMode() async throws {
         let model = MockLanguageModel(scriptedResponses: ["ok"])
         let cleanup = Prompt(name: "Cleanup", instructions: "Clean the text below.")
         _ = try await PromptRunner.run(cleanup, on: "hello", model: model)
         let received = await model.receivedPrompts.last ?? ""
-        #expect(received.contains("Clean the text below."))
-        #expect(received.contains("Input:"))
-        #expect(received.contains("hello"))
+        #expect(received == "Input:\nhello")
     }
 
     @Test("PromptRunner.run passes plain text in assistant mode")

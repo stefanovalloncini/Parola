@@ -85,7 +85,8 @@ enum TranscriptWindows {
 
     /// Tokens left for a window's text once the instructions and the answer are set aside.
     static func inputLimit(budget: TokenBudget, instructions: String, answer: Answer) async -> Int {
-        let fixed = instructions.isEmpty ? 0 : await budget.count(instructions)
+        // Short instructions are prose, which the estimate never undercounts; only a long block is worth asking the model about.
+        let fixed = instructions.utf8.count <= 1024 ? budget.estimate(instructions) : await budget.count(instructions)
         var limit = budget.tokens - fixed
         if case .asLongAsInput = answer {
             limit = min(limit, (budget.contextTokens - fixed) / 2)

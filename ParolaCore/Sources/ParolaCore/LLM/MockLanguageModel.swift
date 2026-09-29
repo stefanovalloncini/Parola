@@ -52,22 +52,34 @@ public struct MockLanguageModelResponse: Sendable {
 public struct MockLanguageModel: LanguageModel {
     let response: MockLanguageModelResponse
     let sleeper: @Sendable (Int) async throws -> Void
+    /// Hears every request, so a test can read what a call site sent.
+    let onRequest: (@Sendable ([ChatTurn]) async -> Void)?
 
-    public init<C: Clock>(response: MockLanguageModelResponse, clock: C) where C.Duration == Duration {
+    public init<C: Clock>(
+        response: MockLanguageModelResponse,
+        clock: C,
+        onRequest: (@Sendable ([ChatTurn]) async -> Void)? = nil
+    ) where C.Duration == Duration {
         self.response = response
         self.sleeper = { ms in
             try await Task.sleep(for: .milliseconds(ms), clock: clock)
         }
+        self.onRequest = onRequest
     }
 
-    public static func make(response: MockLanguageModelResponse, clock: any Clock<Duration>) -> MockLanguageModel {
+    public static func make(
+        response: MockLanguageModelResponse,
+        clock: any Clock<Duration>,
+        onRequest: (@Sendable ([ChatTurn]) async -> Void)? = nil
+    ) -> MockLanguageModel {
         func _make<C: Clock>(_ clock: C) -> MockLanguageModel where C.Duration == Duration {
-            MockLanguageModel(response: response, clock: clock)
+            MockLanguageModel(response: response, clock: clock, onRequest: onRequest)
         }
         return _make(clock)
     }
 
     public func respond(history: [ChatTurn]) async throws -> String {
+        await onRequest?(history)
         if let failure = response.failure {
             if response.delayMs > 0 {
                 try? await sleeper(response.delayMs)
@@ -83,8 +95,10 @@ public struct MockLanguageModel: LanguageModel {
     public func stream(history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
         let response = response
         let sleeper = sleeper
+        let onRequest = onRequest
         return AsyncThrowingStream { continuation in
             let task = Task {
+                await onRequest?(history)
                 if let failure = response.failure {
                     if response.delayMs > 0 {
                         try? await sleeper(response.delayMs)

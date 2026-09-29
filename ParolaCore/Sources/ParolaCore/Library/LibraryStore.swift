@@ -889,6 +889,11 @@ public actor LibraryStore {
         try await mutateTranscript(for: id, reindex: false) { $0.translation = translation }
     }
 
+    /// Replaces the entry's chat. Chat is not searchable, so this write skips the index.
+    public func setChatHistory(_ history: [ChatMessage]?, for id: LibraryEntry.ID) async throws {
+        try await mutateTranscript(for: id, reindex: false) { $0.chatHistory = history }
+    }
+
     /// Replaces the entry's chapters, and the copy its summary keeps, or clears them when `chapters` is nil.
     public func setChapters(_ chapters: [Chapter]?, for id: LibraryEntry.ID) async throws {
         try await mutateTranscript(for: id, reindex: false) { transcript in

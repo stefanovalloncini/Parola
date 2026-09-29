@@ -192,7 +192,7 @@ struct ChatSheet: View {
                 var saved = transcript
                 saved.chatHistory = updated
                 do {
-                    try await model.library.updateTranscript(saved, for: entry.id)
+                    try await model.library.setChatHistory(updated, for: entry.id)
                     // The detail view holds a pre-chat snapshot; without this refresh, its
                     // next save (reopened chat, speaker rename) erases this history on disk.
                     onSave?(saved)

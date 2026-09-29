@@ -11,7 +11,7 @@ extension AppModel {
             guard let self else { return }
             do {
                 let model = try await LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
-                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
+                let result = try await PromptRunner.run(prompt, on: transcript, model: model, budget: .onDevice)
                 promptOutput = PromptOutput(promptName: prompt.name, text: result)
             } catch {
                 lastError = error.localizedDescription

@@ -16,6 +16,7 @@ public actor MockLanguageModelStore {
     private var byProvider: [Provider: MockLanguageModelResponse] = [:]
     private var globalMock: MockLanguageModelResponse?
     private var lastInstructions: [Provider: String] = [:]
+    private var lastPrompts: [Provider: String] = [:]
     private var leased = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
@@ -66,6 +67,7 @@ public actor MockLanguageModelStore {
         byProvider.removeAll()
         globalMock = nil
         lastInstructions.removeAll()
+        lastPrompts.removeAll()
     }
 
     public func resolve(for provider: Provider) -> MockLanguageModelResponse? {
@@ -79,6 +81,22 @@ public actor MockLanguageModelStore {
 
     public func lastInstructions(for provider: Provider) -> String? {
         lastInstructions[provider]
+    }
+
+    public func recordPrompt(_ prompt: String, for provider: Provider) {
+        lastPrompts[provider] = prompt
+    }
+
+    /// The last user turn a mocked model was sent.
+    public func lastPrompt(for provider: Provider) -> String? {
+        lastPrompts[provider]
+    }
+
+    /// A mock model for `provider` that reports each request's user turn back here.
+    func model(for provider: Provider, response: MockLanguageModelResponse, clock: any Clock<Duration>) -> MockLanguageModel {
+        MockLanguageModel.make(response: response, clock: clock) { [weak self] history in
+            await self?.recordPrompt(history.last?.text ?? "", for: provider)
+        }
     }
 
     public func list() -> [String] {

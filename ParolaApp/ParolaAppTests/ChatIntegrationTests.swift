@@ -46,6 +46,26 @@ struct ChatIntegrationTests {
         #expect(stored.last?.role == .assistant)
     }
 
+    @Test("recordChat saves the chat into the entry")
+    func recordChatPersists() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let entry = try await seedStore.add(transcript: makeTranscript(), audioSource: nil, category: .transcription)
+        model.transcript = makeTranscript()
+        model.selectedEntryID = entry.id
+        let history = [ChatMessage(role: .user, text: "what is this?"), ChatMessage(role: .assistant, text: "A test.")]
+
+        model.recordChat(history: history, for: entry.id)
+
+        var stored: [String]?
+        let deadline = ContinuousClock().now.advanced(by: .seconds(2))
+        while stored != ["what is this?", "A test."], ContinuousClock().now < deadline {
+            stored = try await model.library.load(entry.id).document.transcript.chatHistory?.map(\.text)
+            if stored == nil { try await Task.sleep(for: .milliseconds(10)) }
+        }
+        #expect(stored == ["what is this?", "A test."])
+    }
+
     @Test("recordChat replaces prior history on subsequent calls")
     func recordChatReplaces() {
         let entryID: LibraryEntry.ID = "entry-2"

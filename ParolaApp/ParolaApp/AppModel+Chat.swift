@@ -9,7 +9,7 @@ extension AppModel {
         transcript.chatHistory = history
         self.transcript = transcript
         Task { [library] in
-            try? await library.updateTranscript(transcript, for: entryID, reindex: false)
+            try? await library.setChatHistory(history, for: entryID)
         }
     }
 

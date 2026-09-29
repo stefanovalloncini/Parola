@@ -295,13 +295,17 @@ public actor MCPServer {
         let source = FileAudioSource(url: url)
         let transcript = try await session.transcribe(
             source: source,
-            options: TranscriptionOptions()
+            options: TranscriptionOptions(model: args["model"] as? String, language: args["language"] as? String)
         )
-        let model = try await LanguageModelFactory.makeOnDevice(
-            instructions: "Summarise the transcript in 3 short bullet points."
-        )
-        let summary = try await model.respond(to: transcript.text)
-        return MCPToolCallResult(text: summary)
+        let summary = try await SummaryService(features: features)
+            .summarise(transcript, options: SummaryOptions(actionItems: false))
+        return MCPToolCallResult(text: Self.summaryText(summary))
+    }
+
+    static func summaryText(_ summary: Summary) -> String {
+        guard !summary.chapters.isEmpty else { return summary.text }
+        let chapters = summary.chapters.map { "\(Timecode.format($0.start))  \($0.title)" }
+        return summary.text + "\n\nChapters:\n" + chapters.joined(separator: "\n")
     }
 
     private func openApp(args: [String: Any]) async throws -> MCPToolCallResult {

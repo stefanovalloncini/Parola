@@ -328,6 +328,20 @@ struct AICallSiteTests {
         }
     }
 
+    @Test("a prompt's instructions travel once, as the model's own, and the turn carries only the input")
+    func promptInstructionsOnce() async throws {
+        try await withInstalledMocks {
+            let model = makeModel()
+            let prompt = try #require(Prompt.builtIns.first)
+
+            model.runPrompt(prompt)
+
+            #expect(await waitUntil { model.promptOutput != nil })
+            #expect(await MockLanguageModelStore.shared.lastInstructions(for: .foundation) == prompt.instructions)
+            #expect(await MockLanguageModelStore.shared.lastPrompt(for: .foundation) == "Input:\nwe ship the patch on Friday")
+        }
+    }
+
     @Test("with nothing picked every task stays on the on-device model")
     func defaultsStayOnDevice() async throws {
         try await withInstalledMocks {

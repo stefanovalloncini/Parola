@@ -85,10 +85,14 @@ public enum EngineTool: String, CaseIterable, Sendable {
         case .summarize:
             return MCPTool(
                 name: rawValue,
-                description: "Transcribe and summarise an audio file using the on-device LLM.",
+                description: "Transcribe an audio file and summarise it with the on-device LLM: a short summary, then its chapters with their start times. Long recordings are summarised part by part.",
                 inputSchema: AnyEncodable([
                     "type": "object",
-                    "properties": ["path": ["type": "string"]],
+                    "properties": [
+                        "path": ["type": "string"],
+                        "model": ["type": "string", "description": "Model variant id (see parola_list_models). Defaults to the recommended model."],
+                        "language": ["type": "string", "description": "Two-letter language code (en, it, ...). Omit to auto-detect."],
+                    ],
                     "required": ["path"],
                 ] as [String: Any])
             )

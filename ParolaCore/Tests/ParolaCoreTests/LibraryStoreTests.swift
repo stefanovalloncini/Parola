@@ -1396,6 +1396,20 @@ struct LibraryStoreTests {
         #expect(try await store.load(entry.id).document.transcript.chapters == summarized)
     }
 
+    @Test("a chat history is saved without touching the index")
+    func setChatHistorySkipsTheIndex() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let history = [ChatMessage(role: .user, text: "renewal?"), ChatMessage(role: .assistant, text: "Renewal is late.")]
+
+        try await store.setChatHistory(history, for: entry.id)
+
+        #expect(try await store.load(entry.id).document.transcript.chatHistory?.map(\.text) == history.map(\.text))
+        #expect(await store.search("renewal").isEmpty)
+        try await store.setChatHistory(nil, for: entry.id)
+        #expect(try await store.load(entry.id).document.transcript.chatHistory == nil)
+    }
+
     @Test("chapters and action items set on their own land in the entry and leave the rest alone")
     func setChaptersAndActionItems() async throws {
         let (store, _) = try makeTempLibrary()

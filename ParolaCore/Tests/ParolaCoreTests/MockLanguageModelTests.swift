@@ -114,6 +114,18 @@ struct MockLanguageModelTests {
         #expect(ran)
     }
 
+    @Test("a store-made mock reports the user turn it was sent")
+    func storeRecordsThePrompt() async throws {
+        let store = MockLanguageModelStore()
+        let model = await store.model(for: .foundation, response: MockLanguageModelResponse(text: "ok"), clock: ImmediateClock())
+
+        _ = try await model.respond(history: [ChatTurn(role: .user, text: "first"), ChatTurn(role: .user, text: "Input:\nhello")])
+
+        #expect(await store.lastPrompt(for: .foundation) == "Input:\nhello")
+        #expect(await store.lastPrompt(for: .openAI) == nil)
+        await store.clear()
+        #expect(await store.lastPrompt(for: .foundation) == nil)
+    }
 }
 
 /// Records what each lessee did, in order.

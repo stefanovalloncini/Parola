@@ -41,16 +41,10 @@ public enum PromptRunner {
         return answers.filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
 
+    /// The user turn for `text`. The prompt's instructions travel once, as the model's own
+    /// instructions, so this carries only the input, marked as such unless the prompt answers it directly.
     public static func buildUserMessage(for prompt: Prompt, text: String) -> String {
-        if prompt.useSystemInstructions {
-            return """
-            \(prompt.instructions)
-
-            Input:
-            \(text)
-            """
-        }
-        return text
+        prompt.useSystemInstructions ? "Input:\n\(text)" : text
     }
 
     /// A segment's share of `promptText`, counted as if it opened a new speaker's turn.
