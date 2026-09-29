@@ -14336,6 +14336,17 @@
         }
       }
     },
+    "Transcribing %@ from a watched folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione di %@ da una cartella monitorata"
+          }
+        }
+      }
+    },
     "Transcribing %@…": {
       "extractionState": "manual",
       "localizations": {

@@ -34,9 +34,10 @@ struct WatchedArrival: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-/// What the toast says about the last watched-folder file that ran out of sight.
+/// What the toast says about a watched-folder file out of sight: running, landed or failed.
 struct ArrivalNotice: Equatable, Identifiable {
     enum State: Equatable {
+        case running
         case saved(LibraryEntry.ID)
         case failed(String)
     }
@@ -53,6 +54,11 @@ struct ArrivalNotice: Equatable, Identifiable {
     init(failed url: URL, reason: String) {
         name = url.deletingPathExtension().lastPathComponent
         state = .failed(reason)
+    }
+
+    init(running url: URL) {
+        name = url.deletingPathExtension().lastPathComponent
+        state = .running
     }
 }
 
@@ -179,6 +185,7 @@ extension AppModel {
     private func runArrivalInBackground(_ arrival: WatchedArrival) {
         let options = currentOptions
         backgroundArrivalID = arrival.id
+        runningArrivalNotice = ArrivalNotice(running: arrival.url)
         watchedLaneTask = Task { [weak self, session] in
             do {
                 let result = try await session.transcribe(source: FileAudioSource(url: arrival.url), options: options)
@@ -201,6 +208,38 @@ extension AppModel {
         task.cancel()
         watchedLaneTask = nil
         backgroundArrivalID = nil
+        runningArrivalNotice = nil
+    }
+
+    /// Stop on the running strip: the file leaves the line, and only a change to it brings it back.
+    func stopBackgroundArrival() {
+        guard let id = backgroundArrivalID, let arrival = watchedArrivals.first(where: { $0.id == id }) else { return }
+        preemptWatchedLane()
+        watchedArrivals.removeAll { $0.id == id }
+        handBack(arrival.url)
+        pumpWatchedLane()
+    }
+
+    /// Cancel on a watched file in the window stops it the same way, without a word: the user asked for it.
+    func cancelVisibleArrival() {
+        guard let id = visibleArrivalID, let arrival = watchedArrivals.first(where: { $0.id == id }) else { return }
+        visibleArrivalID = nil
+        watchedArrivals.removeAll { $0.id == id }
+        handBack(arrival.url)
+    }
+
+    /// Hides the running strip until the next file starts; the run goes on.
+    func hideRunningArrival() {
+        runningArrivalNotice = nil
+    }
+
+    /// The watcher offers a file it handed over again once it changes.
+    private func handBack(_ url: URL) {
+        if let offerWatchedFileAgain {
+            offerWatchedFileAgain(url)
+        } else if activeSideEffects.contains(.watchedFolders) {
+            watchedFolders.offerAgainOnChange(url)
+        }
     }
 
     /// The run in the window was replaced or stopped before it landed: the file finishes out of sight.
@@ -222,6 +261,7 @@ extension AppModel {
     private func landBackgroundArrival(_ arrival: WatchedArrival, _ transcript: Transcript) {
         watchedLaneTask = nil
         backgroundArrivalID = nil
+        runningArrivalNotice = nil
         let saving = land(RunLanding(
             kind: .backgroundArrival, transcript: transcript, audioSource: arrival.url,
             sourceDigest: arrival.sourceDigest
@@ -251,19 +291,16 @@ extension AppModel {
         if backgroundArrivalID == arrival.id {
             watchedLaneTask = nil
             backgroundArrivalID = nil
+            runningArrivalNotice = nil
             arrivalNotice = ArrivalNotice(failed: arrival.url, reason: Self.transcriptionFailureMessage(for: error))
         }
         if visibleArrivalID == arrival.id { visibleArrivalID = nil }
         watchedArrivals.removeAll { $0.id == arrival.id }
-        if let offerWatchedFileAgain {
-            offerWatchedFileAgain(arrival.url)
-        } else if activeSideEffects.contains(.watchedFolders) {
-            watchedFolders.offerAgainOnChange(arrival.url)
-        }
+        handBack(arrival.url)
         pumpWatchedLane()
     }
 
-    /// Cancel gives the window back: the files still waiting finish out of sight instead of taking it again.
+    /// Cancel gives the window back: the files still waiting finish out of sight instead of taking it.
     func sendWaitingArrivalsOutOfSight() {
         var waiting = watchedArrivals
         for index in waiting.indices { waiting[index].inBackground = true }

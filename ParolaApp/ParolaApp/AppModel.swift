@@ -700,6 +700,7 @@ final class AppModel {
     @ObservationIgnored var watchedFileReach: @Sendable (URL, URL) -> WatchedArrival.Reach = WatchedArrival.reach
     @ObservationIgnored var visibleArrivalID: WatchedArrival.ID?
     var arrivalNotice: ArrivalNotice?
+    var runningArrivalNotice: ArrivalNotice?
 
     /// A `--library` override keeps the watchers' baselines next to that library, like the delivery queue.
     var watchedFoldersDirectory: URL {
@@ -1532,6 +1533,7 @@ final class AppModel {
         cancelPass &+= 1
         unsettledInPass = 0
         cancelAllInFlightBatchJobs()
+        cancelVisibleArrival()
         sendWaitingArrivalsOutOfSight()
         deferredArrivals = []
         deferredLinks = []

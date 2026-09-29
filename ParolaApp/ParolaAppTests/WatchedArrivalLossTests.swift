@@ -253,14 +253,16 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("Cancel stops the run in the window and leaves every watched file to finish out of sight")
-        func cancelLeavesArrivalsAlone() async throws {
+        @Test("Cancel stops the file in the window for good, hands it back, and lets the rest finish out of sight")
+        func cancelStopsTheWindowRunOnly() async throws {
             try await withMocksCleared(.transcriber) {
                 let gate = MockTranscriberGate()
                 await install(gate)
                 let folder = try makeFolder("cancel")
                 defer { try? FileManager.default.removeItem(at: folder) }
                 let model = makeModel(library: makeTempLibraryURL("loss-cancel"), defaults: temporaryDefaults())
+                let handedBack = HandedBack()
+                model.offerWatchedFileAgain = { handedBack.urls.append($0) }
                 let files = [try makeWAV("First", in: folder), try makeWAV("Second", in: folder, seconds: 0.4)]
                 arrive(model, files)
                 #expect(await waitUntil { model.visibleArrivalID != nil })
@@ -269,15 +271,46 @@ extension TranscriberMockSuites {
                 model.cancelCurrentWork()
 
                 #expect(model.visibleArrivalID == nil)
-                #expect(model.watchedArrivals.map(\.url) == files)
-                let outOfSight = model.watchedArrivals.allSatisfy { $0.inBackground }
-                #expect(outOfSight)
+                #expect(handedBack.urls == [files[0]])
+                #expect(model.watchedArrivals.map(\.url) == [files[1]])
+                #expect(model.watchedArrivals.first?.inBackground == true)
                 await gate.open()
                 #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
-                #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 2 })
+                let titles = await model.library.list().map(LibraryEntryDisplay.title(for:))
+                #expect(titles == ["Second"])
                 #expect(model.transcript == nil)
                 #expect(model.phase == .idle)
-                #expect(model.arrivalNotice != nil)
+                #expect(model.arrivalNotice?.name == "Second")
+            }
+        }
+
+        @Test("Stop on the running strip stops the file out of sight, hands it back, and the next one runs")
+        func stopEndsTheBackgroundRun() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                let folder = try makeFolder("stop")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let model = makeModel(library: makeTempLibraryURL("loss-stop"), defaults: temporaryDefaults())
+                let handedBack = HandedBack()
+                model.offerWatchedFileAgain = { handedBack.urls.append($0) }
+                let own = try await openOwnEntry(model, in: folder)
+                let files = [try makeWAV("Long", in: folder), try makeWAV("Short", in: folder, seconds: 0.4)]
+                arrive(model, files)
+                #expect(await waitUntil(timeoutMs: 10_000) { model.backgroundArrivalID != nil })
+                #expect(model.runningArrivalNotice?.name == "Long")
+                #expect(model.runningArrivalNotice?.state == .running)
+
+                model.stopBackgroundArrival()
+
+                #expect(handedBack.urls == [files[0]])
+                #expect(model.watchedArrivals.map(\.url) == [files[1]])
+                await gate.open()
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                let titles = await model.library.list().filter { $0.id != own.id }.map(LibraryEntryDisplay.title(for:))
+                #expect(titles == ["Short"])
+                #expect(model.runningArrivalNotice == nil)
+                #expect(model.selectedEntryID == own.id)
             }
         }
 

@@ -8,9 +8,14 @@ struct ArrivalToast: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: DS.Spacing.regular) {
-            Image(systemName: symbol)
-                .font(DS.Font.bodyStrong)
-                .foregroundStyle(tint)
+            if notice.state == .running {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Image(systemName: symbol)
+                    .font(DS.Font.bodyStrong)
+                    .foregroundStyle(tint)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 title
                     .font(DS.Font.secondary)
@@ -25,15 +30,28 @@ struct ArrivalToast: View {
             }
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: DS.Spacing.small)
-            if case .saved = notice.state {
+            switch notice.state {
+            case .saved:
                 Button("Open") {
                     model.openArrivalNotice()
                 }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf("Arrival.Button.Open")
+            case .running:
+                Button("Stop") {
+                    model.stopBackgroundArrival()
+                }
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                .axLeaf("Arrival.Button.Stop")
+            case .failed:
+                EmptyView()
             }
             Button {
-                model.dismissArrivalNotice()
+                if notice.state == .running {
+                    model.hideRunningArrival()
+                } else {
+                    model.dismissArrivalNotice()
+                }
             } label: {
                 Image(systemName: "xmark")
                     .font(DS.Font.caption)
@@ -55,6 +73,7 @@ struct ArrivalToast: View {
         )
         .padding(DS.Spacing.regular)
         .task(id: notice) {
+            guard notice.state != .running else { return }
             try? await Task.sleep(for: DeliveryToast.dismissAfter)
             guard !Task.isCancelled, model.arrivalNotice == notice else { return }
             model.dismissArrivalNotice()
@@ -64,6 +83,8 @@ struct ArrivalToast: View {
 
     private var title: Text {
         switch notice.state {
+        case .running:
+            return Text("Transcribing \(notice.name) from a watched folder")
         case .saved:
             return Text("Transcribed \(notice.name) from a watched folder")
         case .failed:
@@ -73,6 +94,7 @@ struct ArrivalToast: View {
 
     private var symbol: String {
         switch notice.state {
+        case .running: return "waveform"
         case .saved: return "checkmark.circle.fill"
         case .failed: return "exclamationmark.triangle.fill"
         }
@@ -80,6 +102,7 @@ struct ArrivalToast: View {
 
     private var tint: Color {
         switch notice.state {
+        case .running: return DS.Color.accent
         case .saved: return DS.Palette.success
         case .failed: return DS.Color.danger
         }
