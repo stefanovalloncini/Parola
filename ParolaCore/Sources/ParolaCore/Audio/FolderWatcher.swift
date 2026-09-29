@@ -30,6 +30,8 @@ public actor FolderWatcher {
         var openDirectory: @Sendable (String) -> Int32 = { path in path.withCString { open($0, O_EVTONLY) } }
         var lister: Lister = { FolderWatcher.list($0, recursive: $1) }
         var cloud = CloudProbe.system
+        /// Download checks a placeholder gets before the watcher reads it to make it download.
+        var placeholderChecks = 10
 
         public init(
             recursive: Bool = true,
@@ -70,6 +72,8 @@ public actor FolderWatcher {
         var isUbiquitous: Bool?
         var ticksToSkip = 0
         var backoff = 1
+        var downloadChecks = 0
+        var materializing = false
     }
 
     /// The longest a file waiting on Finder or on a download goes between checks, in settle intervals.
@@ -79,6 +83,8 @@ public actor FolderWatcher {
         var isUbiquitous: @Sendable (String) -> Bool
         var isDownloaded: @Sendable (String) -> Bool
         var requestDownload: @Sendable (String) throws -> Void
+        /// Reading a byte makes a File Provider placeholder download, where a download request may not.
+        var materialize: @Sendable (String) throws -> Void
 
         static let system = CloudProbe(
             isUbiquitous: { path in
@@ -90,6 +96,11 @@ public actor FolderWatcher {
             },
             requestDownload: { path in
                 try FileManager.default.startDownloadingUbiquitousItem(at: URL(fileURLWithPath: path))
+            },
+            materialize: { path in
+                let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
+                defer { try? handle.close() }
+                _ = try handle.read(upToCount: 1)
             }
         )
     }
@@ -708,6 +719,11 @@ public actor FolderWatcher {
                     ParolaLog.error(.library, "a watched cloud file's download could not start", [.error: .error(error)])
                 }
             }
+            check.downloadChecks += 1
+            if check.downloadChecks >= options.placeholderChecks, !check.materializing {
+                check.materializing = true
+                materialize(key, path: file.path)
+            }
             backOff(&check)
             pending[key] = check
         case .arrive:
@@ -721,6 +737,30 @@ public actor FolderWatcher {
                 setStatus(.emitted(at: now), for: key, now: now)
                 onNewMediaFile(URL(fileURLWithPath: file.path))
             }
+        }
+    }
+
+    /// Off the actor, since the read waits for the download; a failed read hands the file over as it is.
+    private func materialize(_ key: FileKey, path: String) {
+        let cloud = options.cloud
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let result = Result { try cloud.materialize(path) }
+            Task { await self?.materialized(key, path: path, result: result) }
+        }
+    }
+
+    private func materialized(_ key: FileKey, path: String, result: Result<Void, any Error>) {
+        guard files[key]?.path == path, files[key]?.status == .pending else { return }
+        switch result {
+        case .success:
+            pending[key]?.ticksToSkip = 0
+            pending[key]?.backoff = 1
+        case .failure(let error):
+            ParolaLog.error(.library, "a watched cloud file never downloaded; handing it over as it is", [.error: .error(error)])
+            let now = options.clock.now()
+            setStatus(.emitted(at: now), for: key, now: now)
+            publishBaselineChange()
+            onNewMediaFile(URL(fileURLWithPath: path))
         }
     }
 

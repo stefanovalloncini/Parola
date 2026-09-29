@@ -220,6 +220,92 @@ struct FolderWatcherSettleTests {
         #expect(intervals == [1, 2, 3, 5, 9, 17, 33, 33, 33])
         #expect(lookups.count == 1)
     }
+
+    private final class Placeholder: Sendable {
+        private let downloaded = OSAllocatedUnfairLock(initialState: false)
+        let reads = CallCounter()
+        let requests = CallCounter()
+        var isDownloaded: Bool { downloaded.withLock { $0 } }
+        func finish() { downloaded.withLock { $0 = true } }
+    }
+
+    private func placeholderWatcher(
+        _ folder: URL, clock: FixedClock, scheduler: ManualScheduler, placeholder: Placeholder,
+        readFails: Bool, collected: CollectedURLs
+    ) -> FolderWatcher {
+        var options = FolderWatcher.Options(recursive: true, settledInterval: .milliseconds(50), clock: clock, scheduler: scheduler)
+        options.observesFileSystem = false
+        options.placeholderChecks = 2
+        options.cloud = FolderWatcher.CloudProbe(
+            isUbiquitous: { _ in true },
+            isDownloaded: { _ in placeholder.isDownloaded },
+            requestDownload: { _ in placeholder.requests.increment() },
+            materialize: { _ in
+                placeholder.reads.increment()
+                struct Offline: Error {}
+                if readFails { throw Offline() }
+                placeholder.finish()
+            }
+        )
+        return FolderWatcher(folderURL: folder, options: options) { collected.append($0) }
+    }
+
+    private func waitFor(_ condition: () async -> Bool) async -> Bool {
+        let deadline = ContinuousClock.now + .seconds(5)
+        while ContinuousClock.now < deadline {
+            if await condition() { return true }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        return await condition()
+    }
+
+    @Test("a cloud placeholder that doesn't download on request is read to make it download, then arrives")
+    func stuckPlaceholderIsRead() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        let placeholder = Placeholder()
+        let collected = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let watcher = placeholderWatcher(
+            folder, clock: clock, scheduler: scheduler, placeholder: placeholder, readFails: false, collected: collected
+        )
+        await watcher.start()
+        try Fixture.writeSettled(folder.appendingPathComponent("online-only.m4a"), clock: clock)
+        await watcher.checkForNewFiles()
+
+        try await scheduler.advance(ticks: 2)
+        #expect(placeholder.requests.count == 1)
+        #expect(await waitFor { placeholder.reads.count == 1 })
+        #expect(collected.snapshot().isEmpty)
+
+        try await scheduler.advance(ticks: 3)
+        await watcher.stop()
+        #expect(collected.snapshot().map(\.lastPathComponent) == ["online-only.m4a"])
+        #expect(placeholder.reads.count == 1)
+    }
+
+    @Test("a placeholder whose read fails is handed over as it is rather than held forever")
+    func unreadablePlaceholderArrivesAnyway() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        let placeholder = Placeholder()
+        let collected = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let watcher = placeholderWatcher(
+            folder, clock: clock, scheduler: scheduler, placeholder: placeholder, readFails: true, collected: collected
+        )
+        await watcher.start()
+        try Fixture.writeSettled(folder.appendingPathComponent("offline.m4a"), clock: clock)
+        await watcher.checkForNewFiles()
+
+        try await scheduler.advance(ticks: 2)
+        #expect(await waitFor { !collected.snapshot().isEmpty })
+        #expect(await watcher.pendingPaths.isEmpty)
+        await watcher.stop()
+        #expect(collected.snapshot().map(\.lastPathComponent) == ["offline.m4a"])
+    }
 }
 
 final class CallCounter: Sendable {
