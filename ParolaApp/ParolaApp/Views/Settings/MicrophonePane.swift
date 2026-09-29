@@ -174,7 +174,7 @@ private final class MicPreviewController {
     private var started = false
 
     init(deviceUID: String?) {
-        self.source = MicAudioSource(deviceUID: deviceUID)
+        self.source = MicAudioSource(deviceUID: deviceUID, filePrefix: RecordingScratch.previewPrefix)
     }
 
     func start() async throws -> LevelMeter {

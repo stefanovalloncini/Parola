@@ -96,9 +96,11 @@ actor MicDictationRecorder: DictationRecorder {
         fallbackSource = nil
         // prepare() is the only way to stop capture; the finalized take is thrown away
         // unread, so no model load or transcription happens on this path.
-        if let url = try? await source.prepare() {
-            try? FileManager.default.removeItem(at: url)
-        }
+        do {
+            Self.discardScratch(try await source.prepare())
+        } catch let cut as CaptureInterrupted {
+            Self.discardScratch(cut.url)
+        } catch {}
     }
 
     func levelMeter() -> LevelMeter? {
@@ -187,7 +189,9 @@ actor MicDictationRecorder: DictationRecorder {
 
     private func startFallback() async throws {
         guard fallbackSource == nil else { return }
-        let mic = await LiveAudioSourceFactory.makeMicrophone(deviceUID: deviceUID, clock: clock)
+        let mic = await LiveAudioSourceFactory.makeMicrophone(
+            deviceUID: deviceUID, clock: clock, filePrefix: RecordingScratch.dictationPrefix
+        )
         try await mic.start()
         fallbackSource = mic
     }
@@ -195,13 +199,26 @@ actor MicDictationRecorder: DictationRecorder {
     private func stopFallback() async throws -> String {
         guard let source = fallbackSource else { return "" }
         self.fallbackSource = nil
-        let url = try await source.prepare()
+        let url: URL
+        do {
+            url = try await source.prepare()
+        } catch let cut as CaptureInterrupted {
+            Self.discardScratch(cut.url)
+            throw cut
+        }
+        defer { Self.discardScratch(url) }
         let transcript = try await fallbackSession.transcribe(
             source: FileAudioSource(url: url),
             options: transcriptionOptions(),
             downloadProgress: downloadProgress
         )
         return transcript.text
+    }
+
+    /// Dictation audio is scratch: it goes once read or given up on. Only a file named for dictation, never a test fixture.
+    static func discardScratch(_ url: URL) {
+        guard url.lastPathComponent.hasPrefix(RecordingScratch.dictationPrefix + "-") else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     private func removePartialContinuation(_ id: UUID) {

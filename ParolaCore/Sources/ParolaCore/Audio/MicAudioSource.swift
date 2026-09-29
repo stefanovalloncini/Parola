@@ -14,6 +14,7 @@ public actor MicAudioSource: LiveAudioSource {
     private static let maxBufferedTapChunks = 3 * tapChunksPerMinuteAt48kHz
     private let engine = AVAudioEngine()
     private let preferredDeviceUID: String?
+    private let filePrefix: String
     private var session: Session?
     private var outputScratch: AVAudioPCMBuffer?
     public nonisolated let levelMeter = LevelMeter()
@@ -27,8 +28,10 @@ public actor MicAudioSource: LiveAudioSource {
         var consumerTask: Task<Void, Never>
     }
 
-    public init(deviceUID: String? = nil) {
+    /// `filePrefix` names the file after its purpose, which is how a sweep tells a take from dictation scratch.
+    public init(deviceUID: String? = nil, filePrefix: String = "parola-mic") {
         self.preferredDeviceUID = deviceUID
+        self.filePrefix = filePrefix
     }
 
     public func inFlightURL() -> URL? { session?.outputURL }
@@ -60,7 +63,7 @@ public actor MicAudioSource: LiveAudioSource {
             throw ParolaError.captureUnavailable("could not create audio converter \(tapFormat) → \(outFormat)")
         }
 
-        let url = RecordingScratch.fileURL(prefix: "parola-mic")
+        let url = RecordingScratch.fileURL(prefix: filePrefix)
         let file = try AVAudioFile(
             forWriting: url,
             settings: outFormat.settings,

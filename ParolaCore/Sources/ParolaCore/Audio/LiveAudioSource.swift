@@ -24,12 +24,13 @@ public extension LiveAudioSource {
 public enum LiveAudioSourceFactory {
     public static func makeMicrophone(
         deviceUID: String? = nil,
-        clock: any Clock<Duration> = ContinuousClock()
+        clock: any Clock<Duration> = ContinuousClock(),
+        filePrefix: String = "parola-mic"
     ) async -> any LiveAudioSource {
         if let fixtureURL = await MockAudioSourceRegistry.shared.resolve(for: .mic) {
             return FixtureAudioSource.make(fixtureURL: fixtureURL, clock: clock)
         }
-        return MicAudioSource(deviceUID: deviceUID)
+        return MicAudioSource(deviceUID: deviceUID, filePrefix: filePrefix)
     }
 
     #if os(macOS)

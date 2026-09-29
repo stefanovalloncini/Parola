@@ -491,7 +491,7 @@ extension AppModel {
         try? FileManager.default.removeItem(at: file)
     }
 
-    /// Copies of takes already in the library go; a take that never reached it comes back as a "(recovered)" entry.
+    /// Copies of takes already in the library go, and so does old scratch; a take that never reached the library comes back as a "(recovered)" entry.
     func sweepInflightRecordings() {
         let dir = inflightRecordingsURL
         let keep = recoveryReferencedFiles.union([pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
@@ -503,7 +503,7 @@ extension AppModel {
             for file in AppModel.staleInflightFiles(in: found, keeping: keep, now: Date()) {
                 if self?.inflightFileInUse(file) == true { continue }
                 let bytes = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-                guard bytes > AppModel.emptyTakeBytes else {
+                guard RecordingScratch.isTake(file), bytes > AppModel.emptyTakeBytes else {
                     if (try? FileManager.default.removeItem(at: file)) != nil { deleted += 1 }
                     continue
                 }
@@ -541,14 +541,14 @@ extension AppModel {
     /// A WAV header and next to nothing after it: nothing was recorded.
     nonisolated static let emptyTakeBytes = 8_192
 
+    /// The regular .wav files in the folder; anything else there is left alone.
     nonisolated static func inflightFiles(in dir: URL) -> [(url: URL, modified: Date)] {
-        let files = (try? FileManager.default.contentsOfDirectory(
-            at: dir,
-            includingPropertiesForKeys: [.contentModificationDateKey]
-        )) ?? []
-        return files.map { url in
-            (url: url,
-             modified: (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .isRegularFileKey]
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: Array(keys))) ?? []
+        return files.compactMap { url in
+            guard url.pathExtension.lowercased() == "wav",
+                  let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true else { return nil }
+            return (url: url, modified: values.contentModificationDate ?? .distantPast)
         }
     }
 
@@ -556,15 +556,18 @@ extension AppModel {
         file.lastPathComponent.hasPrefix("parola-system") ? .systemAudio : .microphone
     }
 
-    /// Files left alone for ten minutes and not kept for a recovery offer; a take still writing is never that quiet.
+    /// Files not kept for a recovery offer and quiet long enough: a take after ten minutes, which one still writing never is, and other scratch after two days.
     nonisolated static func staleInflightFiles(
         in files: [(url: URL, modified: Date)],
         keeping: Set<String>,
         now: Date
     ) -> [URL] {
-        let cutoff = now.addingTimeInterval(-10 * 60)
-        return files
-            .filter { !keeping.contains($0.url.resolvingSymlinksInPath().path) && $0.modified < cutoff }
+        files
+            .filter { file in
+                guard !keeping.contains(file.url.resolvingSymlinksInPath().path) else { return false }
+                let quiet: TimeInterval = RecordingScratch.isTake(file.url) ? 10 * 60 : 48 * 3600
+                return file.modified < now.addingTimeInterval(-quiet)
+            }
             .map(\.url)
     }
 }

@@ -38,7 +38,7 @@ private final class QuitReply {
     var asked = false
 }
 
-private func makeTakeWAV(_ label: String, seconds: Double = 0.3, in directory: URL? = nil) throws -> URL {
+private func makeTakeWAV(_ label: String, seconds: Double = 0.3, in directory: URL? = nil, prefix: String = "parola-trust") throws -> URL {
     let sampleRate = 16_000, channels = 1, bytesPerSample = 2
     let frames = Int(Double(sampleRate) * seconds)
     let dataBytes = frames * channels * bytesPerSample
@@ -53,7 +53,7 @@ private func makeTakeWAV(_ label: String, seconds: Double = 0.3, in directory: U
     ascii("data"); le32(UInt32(dataBytes))
     data.append(Data(count: dataBytes))
     let folder = directory ?? FileManager.default.temporaryDirectory
-    let url = folder.appendingPathComponent("parola-trust-\(label)-\(UUID().uuidString).wav")
+    let url = folder.appendingPathComponent("\(prefix)-\(label)-\(UUID().uuidString).wav")
     try data.write(to: url)
     return url
 }
@@ -576,9 +576,9 @@ extension TranscriberMockSuites {
             let library = makeTempLibraryURL("sweep-import")
             let inflight = library.appendingPathComponent("inflight", isDirectory: true)
             try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
-            let orphan = try makeTakeWAV("orphan", seconds: 1, in: inflight)
-            let savedCopy = try makeTakeWAV("saved", seconds: 1.1, in: inflight)
-            let fresh = try makeTakeWAV("fresh", seconds: 1.2, in: inflight)
+            let orphan = try makeTakeWAV("orphan", seconds: 1, in: inflight, prefix: "parola-mic")
+            let savedCopy = try makeTakeWAV("saved", seconds: 1.1, in: inflight, prefix: "parola-system")
+            let fresh = try makeTakeWAV("fresh", seconds: 1.2, in: inflight, prefix: "parola-recording")
             let seed = LibraryStore(libraryURL: library, extraIndexer: nil)
             _ = try await seed.add(
                 transcript: AppModel.untranscribedTranscript(of: savedCopy, language: nil),
@@ -601,6 +601,50 @@ extension TranscriberMockSuites {
             #expect(FileManager.default.fileExists(atPath: fresh.path), "a file written minutes ago is left alone")
         }
 
+        @Test("the sweep leaves dictation and preview scratch out of the library, deleting it only once it is two days old")
+        func sweepNeverImportsScratch() async throws {
+            let library = makeTempLibraryURL("sweep-scratch")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            func scratch(_ prefix: String, age: TimeInterval) throws -> URL {
+                let url = inflight.appendingPathComponent("\(prefix)-\(UUID().uuidString).wav")
+                try Data(count: 64 * 1024).write(to: url)
+                try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: url.path)
+                return url
+            }
+            let oldDictation = try scratch(RecordingScratch.dictationPrefix, age: 3 * 24 * 3600)
+            let recentDictation = try scratch(RecordingScratch.dictationPrefix, age: 3_600)
+            let oldPreview = try scratch(RecordingScratch.previewPrefix, age: 3 * 24 * 3600)
+            let folder = inflight.appendingPathComponent("not-a-take.wav", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-3 * 24 * 3600)], ofItemAtPath: folder.path)
+
+            let model = makeModel(libraryURL: library)
+            await model.inflightSweep?.value
+
+            #expect(await model.library.list().isEmpty, "scratch is never a take")
+            #expect(!FileManager.default.fileExists(atPath: oldDictation.path))
+            #expect(!FileManager.default.fileExists(atPath: oldPreview.path))
+            #expect(FileManager.default.fileExists(atPath: recentDictation.path), "scratch from today may still be in use")
+            #expect(FileManager.default.fileExists(atPath: folder.path), "only regular .wav files are swept")
+        }
+
+        @Test("dictation throws away only its own scratch, never a file with another name")
+        func dictationDiscardsOnlyItsScratch() throws {
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent("dictation-scratch-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let own = folder.appendingPathComponent("\(RecordingScratch.dictationPrefix)-\(UUID().uuidString).wav")
+            let fixture = folder.appendingPathComponent("fixture.wav")
+            try Data("RIFF".utf8).write(to: own)
+            try Data("RIFF".utf8).write(to: fixture)
+
+            MicDictationRecorder.discardScratch(own)
+            MicDictationRecorder.discardScratch(fixture)
+
+            #expect(!FileManager.default.fileExists(atPath: own.path))
+            #expect(FileManager.default.fileExists(atPath: fixture.path))
+        }
+
         private func writeLegacyCheckpoint(_ checkpoint: RecoveryCheckpoint, library: URL) throws {
             try JSONEncoder().encode(checkpoint).write(to: library.appendingPathComponent("recovery.json"))
         }
@@ -610,7 +654,7 @@ extension TranscriberMockSuites {
             let library = makeTempLibraryURL("not-now-take")
             let inflight = library.appendingPathComponent("inflight", isDirectory: true)
             try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
-            let take = try makeTakeWAV("not-now", in: inflight)
+            let take = try makeTakeWAV("not-now", in: inflight, prefix: "parola-mic")
             try writeLegacyCheckpoint(RecoveryCheckpoint(
                 kind: .fileTranscription, startedAt: Date(), modelName: "m",
                 sourceURL: take, title: "Recording 29 Sep 2026", source: .systemAudio
@@ -636,7 +680,7 @@ extension TranscriberMockSuites {
             let library = makeTempLibraryURL("discard-take")
             let inflight = library.appendingPathComponent("inflight", isDirectory: true)
             try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
-            let take = try makeTakeWAV("discarded", in: inflight)
+            let take = try makeTakeWAV("discarded", in: inflight, prefix: "parola-mic")
             try writeLegacyCheckpoint(
                 RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", audioURL: take), library: library
             )

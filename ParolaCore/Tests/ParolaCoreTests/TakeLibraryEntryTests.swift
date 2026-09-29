@@ -41,6 +41,18 @@ struct TakeLibraryEntryTests {
         #expect(!(await store.hasEntry(digest: "")))
     }
 
+    @Test("a working file is a take by its prefix; dictation and preview scratch are not")
+    func takePrefixesTellTakesFromScratch() {
+        let folder = FileManager.default.temporaryDirectory
+        for prefix in RecordingScratch.takePrefixes {
+            #expect(RecordingScratch.isTake(folder.appendingPathComponent("\(prefix)-A1B2.wav")), "\(prefix)")
+        }
+        #expect(!RecordingScratch.isTake(folder.appendingPathComponent("\(RecordingScratch.dictationPrefix)-A1B2.wav")))
+        #expect(!RecordingScratch.isTake(folder.appendingPathComponent("\(RecordingScratch.previewPrefix)-A1B2.wav")))
+        #expect(!RecordingScratch.isTake(folder.appendingPathComponent("parola-mic-A1B2.json")))
+        #expect(!RecordingScratch.isTake(folder.appendingPathComponent("parola-microphone.wav")), "a prefix counts only up to its dash")
+    }
+
     @Test("a stored title can be replaced, and a missing entry says so")
     func storedTitleIsReplaced() async throws {
         let store = try makeLibrary()

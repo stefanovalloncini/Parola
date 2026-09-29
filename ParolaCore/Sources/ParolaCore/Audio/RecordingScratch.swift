@@ -15,6 +15,17 @@ public enum RecordingScratch {
         override.withLock { $0 = url }
     }
 
+    /// The prefixes of recorded takes; anything else left in the folder is dictation or preview scratch.
+    public static let takePrefixes = ["parola-mic", "parola-system", "parola-recording"]
+    public static let dictationPrefix = "parola-dictation"
+    public static let previewPrefix = "parola-preview"
+
+    /// Whether a leftover file is a recorded take, which a sweep brings back, rather than scratch it may delete.
+    public static func isTake(_ file: URL) -> Bool {
+        let name = file.lastPathComponent
+        return file.pathExtension.lowercased() == "wav" && takePrefixes.contains { name.hasPrefix($0 + "-") }
+    }
+
     /// A unique URL for a new take, creating the directory if needed.
     public static func fileURL(prefix: String) -> URL {
         let dir = directory
