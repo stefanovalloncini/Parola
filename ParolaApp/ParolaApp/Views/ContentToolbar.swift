@@ -32,19 +32,16 @@ struct ContentToolbar: ToolbarContent {
             if showsSearch {
                 ToolbarSearchField(intakeWidth: intakeWidth, pageHasOwnSearch: pageHasOwnSearch)
             }
-            if isRecording {
-                Button {
-                    model.stopRecordingAndTranscribe()
-                } label: {
-                    Label("Stop", systemImage: "stop.fill")
-                }
-                .tint(DS.Color.danger)
-                .help("Stop recording and transcribe.")
-                .accessibilityIdentifier("toolbar.stopRecording")
-                .axLeaf("Toolbar.Button.StopRecording")
-            } else {
+            if !isRecording {
                 newMenu
             }
+        }
+        if isRecording {
+            // Its own item with no shared glass behind it, so the red capsule isn't set inside a second pill.
+            ToolbarItem(placement: .primaryAction) {
+                RecordingToolbarButton()
+            }
+            .sharedBackgroundVisibility(.hidden)
         }
     }
 
@@ -230,6 +227,59 @@ struct ContentToolbar: ToolbarContent {
     private var isRecording: Bool {
         if case .recording = model.phase { return true }
         return false
+    }
+}
+
+/// The take's control on every page: its time and Stop once audio arrives, Cancel while it is still starting.
+private struct RecordingToolbarButton: View {
+    @Environment(AppModel.self) private var model
+
+    private var isArming: Bool { model.recordingStartedAt == nil }
+
+    var body: some View {
+        Button {
+            if isArming {
+                model.cancelRecordingBeforeCapture()
+            } else {
+                model.stopRecordingAndTranscribe()
+            }
+        } label: {
+            label
+                .font(DS.Font.bodyStrong)
+        }
+        .buttonStyle(.glassProminent)
+        .tint(DS.Color.recordingFill)
+        .help(help)
+        .accessibilityLabel(accessibilityTitle)
+        .accessibilityIdentifier("toolbar.stopRecording")
+        .axLeaf("Toolbar.Button.StopRecording")
+    }
+
+    private var help: LocalizedStringKey {
+        isArming ? "Cancel the recording before it starts." : "Stop recording and transcribe."
+    }
+
+    private var accessibilityTitle: LocalizedStringKey {
+        isArming ? "Cancel" : "Stop Recording"
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        if let startedAt = model.recordingStartedAt {
+            HStack(spacing: DS.Spacing.snug) {
+                Circle()
+                    .fill(.foreground)
+                    .frame(width: 8, height: 8)
+                    .accessibilityHidden(true)
+                TimelineView(.periodic(from: startedAt, by: 1)) { context in
+                    Text(verbatim: AppFormat.elapsed(context.date.timeIntervalSince(startedAt)))
+                        .monospacedDigit()
+                }
+                Text("Stop")
+            }
+        } else {
+            Text("Cancel")
+        }
     }
 }
 

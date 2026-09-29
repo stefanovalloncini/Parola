@@ -2685,6 +2685,17 @@
         }
       }
     },
+    "Cancel the recording before it starts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla la registrazione prima che inizi."
+          }
+        }
+      }
+    },
     "Cancel transcription": {
       "extractionState": "manual",
       "localizations": {
@@ -12953,6 +12964,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ferma la lettura"
+          }
+        }
+      }
+    },
+    "Stop recording and transcribe.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferma la registrazione e trascrivi."
           }
         }
       }
