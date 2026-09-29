@@ -39,7 +39,7 @@ struct FolderWatcherIdentityTests {
 
         try Fixture.writeSettled(folder.appendingPathComponent("drop.wav"), clock: clock)
         await watcher.checkForNewFiles()
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         #expect(collected.snapshot().map(\.lastPathComponent) == ["drop.wav"])
 
         try FileManager.default.moveItem(
@@ -120,7 +120,7 @@ struct FolderWatcherIdentityTests {
         await target.checkForNewFiles()
         #expect(Fixture.names(await target.pendingPaths) == ["late.m4a"])
         await source.checkForNewFiles()
-        try await secondScheduler.advance(ticks: 2)
+        try await secondScheduler.advance(ticks: 3)
 
         #expect(await target.pendingPaths.isEmpty)
         #expect(Fixture.names(await target.trackedPaths) == ["early.m4a", "late.m4a"])
@@ -148,7 +148,7 @@ struct FolderWatcherIdentityTests {
 
         try FileManager.default.moveItem(at: outside.appendingPathComponent("memo.m4a"), to: folder.appendingPathComponent("memo.m4a"))
         await watcher.checkForNewFiles()
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         await watcher.stop()
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["memo.m4a"])
@@ -181,7 +181,7 @@ struct FolderWatcherIdentityTests {
         let resumed = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
         await resumed.start(baseline: saved)
         #expect(Fixture.names(await resumed.pendingPaths) == ["fresh.mp3"])
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         await resumed.stop()
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["fresh.mp3"])
@@ -212,7 +212,7 @@ struct FolderWatcherIdentityTests {
         let watcher = makeWatcher(folder, clock: clock, scheduler: scheduler, observesFileSystem: false, collected: collected)
         await watcher.start(baseline: seed)
         #expect(Fixture.names(await watcher.pendingPaths) == ["renamed.wav", "same-name.wav"])
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         await watcher.stop()
 
         #expect(Set(collected.snapshot().map(\.lastPathComponent)) == ["renamed.wav", "same-name.wav"])
@@ -244,7 +244,7 @@ struct FolderWatcherIdentityTests {
         await watcher.checkForNewFiles()
 
         #expect(Fixture.names(await watcher.pendingPaths) == ["replaced.m4a"])
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         let sizes = Dictionary(uniqueKeysWithValues: (await watcher.baseline()?.entries ?? []).map { ($0.path, $0.size) })
         await watcher.stop()
         #expect(collected.snapshot().map(\.lastPathComponent) == ["replaced.m4a"])

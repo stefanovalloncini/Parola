@@ -59,7 +59,7 @@ struct FolderWatcherAvailabilityTests {
         let resumed = FolderWatcher(folderURL: renamed, options: options) { collected.append($0) }
         try Fixture.writeSettled(renamed.appendingPathComponent("new.wav"), clock: clock)
         await resumed.start(baseline: saved)
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         await resumed.stop()
         await watcher.stop()
         #expect(collected.snapshot().map(\.lastPathComponent) == ["new.wav"])

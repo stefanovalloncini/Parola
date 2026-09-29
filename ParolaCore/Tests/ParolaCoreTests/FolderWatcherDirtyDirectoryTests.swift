@@ -73,7 +73,7 @@ struct FolderWatcherDirtyDirectoryTests {
         await watcher.markDirty([try realPath(folder)])
         #expect(await watcher.listedDirectoryCount == before + 3, "the root, then Batch and Day 2 walked once")
 
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         await watcher.stop()
         #expect(Set(collected.snapshot().map(\.lastPathComponent)) == ["one.m4a", "two.mp3"])
     }
@@ -120,7 +120,7 @@ struct FolderWatcherDirtyDirectoryTests {
         await watcher.markDirty([try realPath(folder)])
 
         #expect(Fixture.names(await watcher.trackedPaths) == ["replacement.m4a"])
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         await watcher.stop()
         #expect(collected.snapshot().map(\.lastPathComponent) == ["replacement.m4a"])
     }
@@ -196,7 +196,7 @@ struct FolderWatcherResourceTests {
         #expect(Fixture.names(await watcher.pendingPaths) == ["no-event.wav"])
 
         outOfDescriptors.set(false)
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         await watcher.markDirty([])
         #expect(await watcher.sourcelessDirectories.isEmpty)
         await watcher.stop()

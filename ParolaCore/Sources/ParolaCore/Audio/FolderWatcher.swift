@@ -12,7 +12,8 @@ public actor FolderWatcher {
         public var recursive: Bool
         /// The time between two checks of a file that is still arriving.
         public var settledInterval: Duration
-        /// How many checks in a row must find the same size and date before a file arrives.
+        /// How many checks in a row must find the same size and date before a file arrives; the listing
+        /// that found the file is not one of them.
         public var stableChecks: Int
         /// A file that changes this soon after it arrived (a copy that stalled, a recorder that was
         /// paused) arrives again once it settles.
@@ -63,7 +64,7 @@ public actor FolderWatcher {
     }
 
     private struct PendingCheck {
-        var stableChecks = 1
+        var stableChecks = 0
         var downloadRequested = false
     }
 
@@ -711,11 +712,11 @@ public actor FolderWatcher {
         options: Options
     ) -> SettleVerdict {
         guard !observation.isDataless else {
-            checks = 1
+            checks = 0
             return .download
         }
         guard observation.size > 0, !finderBusyDays.contains(observation.created) else {
-            checks = 1
+            checks = 0
             return .wait
         }
         checks = observation.size == previous.size && observation.modified == previous.modified ? checks + 1 : 1

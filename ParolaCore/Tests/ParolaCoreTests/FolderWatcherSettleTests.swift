@@ -37,7 +37,7 @@ struct FolderWatcherSettleTests {
         let recording = folder.appendingPathComponent("interview.wav")
         try Fixture.writeSettled(recording, clock: clock, bytes: 1000)
         await watcher.checkForNewFiles()
-        try await scheduler.advanceAndWait()
+        try await scheduler.advance(ticks: 2)
         #expect(collected.snapshot().isEmpty, "two quiet checks are not three")
 
         try append(1000, to: recording, modified: clock.start.addingTimeInterval(-9))
@@ -65,13 +65,13 @@ struct FolderWatcherSettleTests {
         let copy = folder.appendingPathComponent("lecture.m4a")
         try Fixture.writeSettled(copy, clock: clock, bytes: 1000)
         await watcher.checkForNewFiles()
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         #expect(collected.snapshot().count == 1)
 
         try append(3000, to: copy, modified: clock.start.addingTimeInterval(-5))
         try await scheduler.advanceAndWait()
         #expect(Fixture.names(await watcher.pendingPaths) == ["lecture.m4a"])
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         await watcher.stop()
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["lecture.m4a", "lecture.m4a"])
@@ -91,7 +91,7 @@ struct FolderWatcherSettleTests {
         let file = folder.appendingPathComponent("memo.m4a")
         try Fixture.writeSettled(file, clock: clock, bytes: 1000)
         await watcher.checkForNewFiles()
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
 
         try append(500, to: file, modified: clock.start.addingTimeInterval(3600))
         try await scheduler.advance(ticks: 3)
@@ -121,7 +121,7 @@ struct FolderWatcherSettleTests {
         #expect(collected.snapshot().isEmpty)
 
         try FileManager.default.setAttributes([.creationDate: clock.start.addingTimeInterval(-60)], ofItemAtPath: copying.path)
-        try await scheduler.advance(ticks: 2)
+        try await scheduler.advance(ticks: 3)
         await watcher.stop()
         #expect(collected.snapshot().map(\.lastPathComponent) == ["talk.mov"])
     }
@@ -141,7 +141,7 @@ struct FolderWatcherSettleTests {
         let arrival = folder.appendingPathComponent("arrival.wav")
         try Fixture.writeSettled(arrival, clock: clock)
         await before.checkForNewFiles()
-        try await first.advance(ticks: 2)
+        try await first.advance(ticks: 3)
         let saved = try #require(await before.baseline())
         await before.stop()
         #expect(saved.entries.first { $0.path == "arrival.wav" }?.emittedAt == clock.start)
@@ -153,7 +153,7 @@ struct FolderWatcherSettleTests {
         let after = makeWatcher(folder, clock: clock, scheduler: second, collected: collected)
         await after.start(baseline: saved)
         #expect(Fixture.names(await after.pendingPaths) == ["arrival.wav"])
-        try await second.advance(ticks: 2)
+        try await second.advance(ticks: 3)
         await after.stop()
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["arrival.wav", "arrival.wav"])
@@ -177,15 +177,15 @@ struct FolderWatcherSettleTests {
 
         var placeholder = steady
         placeholder.isDataless = true
-        #expect(verdict(placeholder, checks: 2) == (.download, 1))
+        #expect(verdict(placeholder, checks: 2) == (.download, 0))
 
         var empty = steady
         empty.size = 0
-        #expect(verdict(empty, checks: 2, previous: (0, old)) == (.wait, 1))
+        #expect(verdict(empty, checks: 2, previous: (0, old)) == (.wait, 0))
 
         var copying = steady
         copying.created = Date(timeIntervalSince1970: -753_578_704)
-        #expect(verdict(copying, checks: 2) == (.wait, 1))
+        #expect(verdict(copying, checks: 2) == (.wait, 0))
 
         var fresh = steady
         fresh.modified = now.addingTimeInterval(-0.5)
