@@ -496,6 +496,7 @@ final class ParolaAutomationServer {
             "liveCaptionsActive": .bool(model.liveCaptions?.isActive ?? false),
             "batchJobCount": .int(model.batchJobs.count),
             "burn": Self.burnState(model.burnJob),
+            "exportNotice": Self.exportNoticeState(model.exportNotice),
             "dropPayload": .string(model.dropDragPayload?.name ?? ""),
             "dropPayloadCount": .int(model.dropDragPayload?.count ?? 0),
             "dropHighlight": .string(model.dropHighlight?.rawValue ?? ""),
@@ -618,6 +619,16 @@ final class ParolaAutomationServer {
         case .failed(let message):
             return .object(["state": .string("failed"), "message": .string(message), "output": .string(job.output.path)])
         }
+    }
+
+    static func exportNoticeState(_ notice: ExportNotice?) -> AutomationValue {
+        guard let notice else { return .null }
+        return .object([
+            "message": .string(notice.message),
+            "succeeded": .bool(notice.succeeded),
+            "failures": .array(notice.failures.map { .object(["name": .string($0.name), "reason": .string($0.reason)]) }),
+            "folder": notice.folder.map { .string($0.path) } ?? .null,
+        ])
     }
 
     static func stageName(_ stage: TranscribeStage) -> String {

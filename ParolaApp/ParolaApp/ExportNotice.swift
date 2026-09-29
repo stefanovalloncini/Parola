@@ -1,6 +1,6 @@
 import Foundation
 
-/// A failed export or a bulk export's count, shown without taking the open transcript's place.
+/// A dismissible strip over whatever page is open: an export's count, a failed library mutation, or a failure from another page.
 struct ExportNotice: Equatable, Identifiable {
     struct Failure: Equatable {
         let name: String

@@ -741,6 +741,43 @@ struct AppModelLibraryTests {
         #expect(model.phase == failure)
     }
 
+    /// The 7 non-fatal library mutations: none may cost the user their place.
+    @Test("a failed label edit, move, pin, rename, delete, restore or purge shows a toast, not a phase change")
+    func libraryMutationFailuresDoNotGatePhase() async {
+        let mutations: [(String, (AppModel) -> Void)] = [
+            ("label edit", { $0.setLabels(["x"], for: "missing") }),
+            ("move", { $0.moveEntry("missing", to: .meeting) }),
+            ("pin", { $0.togglePinned(for: "missing") }),
+            ("rename", { $0.renameEntry("missing", to: "New name") }),
+            ("delete", { $0.deleteEntry("missing") }),
+            ("restore", { $0.restoreEntry("missing") }),
+            ("purge", { $0.purgeEntry("missing") }),
+        ]
+        for (name, act) in mutations {
+            let model = makeModel()
+            model.libraryBrowsingAll = true
+
+            act(model)
+
+            #expect(await waitUntil { model.exportNotice != nil }, "\(name)")
+            #expect(model.phase == .idle, "\(name)")
+            #expect(model.libraryBrowsingAll, "\(name)")
+        }
+    }
+
+    @Test("a failed pin on the All list leaves the list on screen")
+    func failedPinKeepsTheListOnScreen() async {
+        let model = makeModel()
+        model.libraryBrowsingAll = true
+        model.route = .transcript
+
+        model.togglePinned(for: "missing-entry")
+
+        #expect(await waitUntil { model.exportNotice != nil })
+        #expect(model.isBrowsingLibrary)
+        #expect(model.phase == .idle)
+    }
+
     @Test("LibrarySortOrder exposes a label for every case")
     func sortOrderLabels() {
         for order in LibrarySortOrder.allCases {

@@ -272,7 +272,7 @@ extension AppModel {
             do {
                 try await library.setLabels(labels, for: id)
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                noteLibraryFailure(String(localized: "Couldn't update labels"), error)
             }
             refreshLibrary()
         }
@@ -284,7 +284,7 @@ extension AppModel {
             do {
                 try await library.setCategory(category, for: id)
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                noteLibraryFailure(String(localized: "Couldn't move"), error)
             }
             refreshLibrary()
         }
@@ -297,7 +297,7 @@ extension AppModel {
             do {
                 try await library.setPinned(!current, for: id)
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                noteLibraryFailure(current ? String(localized: "Couldn't unpin") : String(localized: "Couldn't pin"), error)
             }
             refreshLibrary()
         }
@@ -309,7 +309,7 @@ extension AppModel {
             do {
                 try await library.renameEntry(id, to: newName)
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                noteLibraryFailure(String(localized: "Couldn't rename"), error)
             }
             refreshLibrary()
         }
@@ -462,7 +462,7 @@ extension AppModel {
                 if selectedEntryID == id { clearLoadedEntry() }
                 if destinationsEnabled { await deliveryEngine.cancel(entryID: id) }
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                noteLibraryFailure(String(localized: "Couldn't delete"), error)
             }
             refreshLibrary()
         }
@@ -474,7 +474,7 @@ extension AppModel {
             do {
                 try await library.restore(id)
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                noteLibraryFailure(String(localized: "Couldn't restore"), error)
             }
             refreshLibrary()
         }
@@ -489,10 +489,15 @@ extension AppModel {
                 if selectedEntryID == id { clearLoadedEntry() }
                 if destinationsEnabled { await deliveryEngine.cancel(entryID: id) }
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                noteLibraryFailure(String(localized: "Couldn't permanently delete"), error)
             }
             refreshLibrary()
         }
+    }
+
+    /// Shows the failure as a dismissible strip over whatever page the user is on.
+    private func noteLibraryFailure(_ action: String, _ error: Error) {
+        exportNotice = ExportNotice(message: "\(action): \(error.localizedDescription)", failures: [], folder: nil)
     }
 
     func clearLoadedEntry() {
