@@ -29,6 +29,7 @@ final class WatchedFoldersStore {
     @ObservationIgnored private var scopedURLs: [UUID: URL] = [:]
     @ObservationIgnored private var baselineWrites: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var starts: [UUID: UUID] = [:]
+    @ObservationIgnored private var carries: [UUID: Task<FolderWatcher.Baseline?, Never>] = [:]
     @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let baselines: WatchedFolderBaselines
@@ -188,6 +189,7 @@ final class WatchedFoldersStore {
 
     private func forget(_ id: UUID) {
         starts[id] = nil
+        carries[id] = nil
         unavailableFolderIDs.remove(id)
         baselineWrites.removeValue(forKey: id)?.cancel()
         let scopedURL = scopedURLs.removeValue(forKey: id)
@@ -208,6 +210,7 @@ final class WatchedFoldersStore {
     /// Stops every watcher and releases the folders; the saved baselines stay for the next start.
     func stopWatching() async {
         starts.removeAll()
+        carries.removeAll()
         let running = watchers
         let scopes = scopedURLs
         watchers.removeAll()
@@ -234,18 +237,34 @@ final class WatchedFoldersStore {
         starts[id] = start
         let bookmark = folder.bookmark
         let baselines = self.baselines
-        Task { [weak self] in
-            let carried = carriesBaseline ? await previous?.baseline() : nil
+        // A start that replaced nothing takes over what a start still in flight carried.
+        let earlier = carriesBaseline ? carries[id] : nil
+        let carry = Task<FolderWatcher.Baseline?, Never> {
             await previous?.stop()
+            if carriesBaseline, let baseline = await previous?.baseline() { return baseline }
+            return await earlier?.value
+        }
+        carries[id] = carry
+        Task { [weak self] in
+            let carried = await carry.value
             previousScope?.stopAccessingSecurityScopedResource()
             let resolved = await Self.resolveBookmark(bookmark, mounting: mounting)
-            var baseline = carried
-            if baseline == nil {
-                baseline = await baselines.read(id)
+            let saved = carried == nil ? await baselines.read(id) : nil
+            guard let self else {
+                if let carried { baselines.write(carried, for: id) }
+                return
             }
-            guard let self else { return }
-            defer { if self.starts[id] == start { self.starts[id] = nil } }
-            guard self.starts[id] == start, let current = self.folders.first(where: { $0.id == id }) else { return }
+            defer {
+                if self.starts[id] == start { self.starts[id] = nil }
+                if self.carries[id] == carry { self.carries[id] = nil }
+            }
+            guard self.starts[id] == start, let current = self.folders.first(where: { $0.id == id }) else {
+                if let carried, self.folders.contains(where: { $0.id == id }) {
+                    baselines.write(carried, for: id)
+                }
+                return
+            }
+            let baseline = carried ?? saved
             guard let resolved, resolved.isDirectory, !Self.isInTrash(resolved.url),
                   resolved.url.startAccessingSecurityScopedResource() else {
                 if let carried { baselines.write(carried, for: id) }

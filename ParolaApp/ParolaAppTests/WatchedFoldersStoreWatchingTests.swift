@@ -276,6 +276,39 @@ struct WatchedFoldersStoreWatchingTests {
         #expect(!store.isUnavailable(rig.folderID))
         await store.stopWatching()
     }
+
+    @Test("two quick re-adds keep what the watcher knew, so a file that already arrived doesn't arrive again")
+    func quickReplacementsKeepTheCarriedBaseline() async throws {
+        let rig = try makeRig("double-adopt")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+
+        let first = makeStore(rig, arrivals: Arrivals())
+        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        await first.stopWatching()
+
+        let arrivals = Arrivals()
+        let store = WatchedFoldersStore(
+            defaults: rig.defaults,
+            baselineDirectory: rig.baselineDirectory,
+            watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50)),
+            baselineWriteDelay: .seconds(60)
+        ) { url in
+            arrivals.urls.append(url)
+        }
+        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        try writeSettled(rig.folder.appendingPathComponent("arrived.wav"))
+        #expect(await waitUntil { arrivals.names == ["arrived.wav"] })
+
+        let before = store.watcher(for: rig.folderID)
+        store.adopt(rig.folder, for: rig.folderID)
+        store.adopt(rig.folder, for: rig.folderID)
+        #expect(await waitUntil { store.watcher(for: rig.folderID).map { $0 !== before } ?? false })
+        try writeSettled(rig.folder.appendingPathComponent("later.wav"))
+        #expect(await waitUntil { arrivals.names.contains("later.wav") })
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(arrivals.names == ["arrived.wav", "later.wav"])
+        await store.stopWatching()
+    }
 }
 
 private struct DiskImage {
