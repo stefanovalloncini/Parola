@@ -83,6 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         diagnostics?.stopPeriodicFlush()
         let pending = model?.cancelAndDrainPendingTranscriptSave()
         let library = model?.library
+        let flushBaselines = model?.watchedFolderBaselineFlush()
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached {
             if let library {
@@ -91,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 await library.flush()
             }
+            await flushBaselines?()
             await diagnostics?.flushForTermination()
             semaphore.signal()
         }

@@ -28,6 +28,7 @@ final class WatchedFoldersStore {
     @ObservationIgnored private var watchers: [UUID: FolderWatcher] = [:]
     @ObservationIgnored private var scopedURLs: [UUID: URL] = [:]
     @ObservationIgnored private var baselineWrites: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var baselineDeadlines: [UUID: ContinuousClock.Instant] = [:]
     @ObservationIgnored private var starts: [UUID: UUID] = [:]
     @ObservationIgnored private var carries: [UUID: Task<FolderWatcher.Baseline?, Never>] = [:]
     @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
@@ -35,6 +36,7 @@ final class WatchedFoldersStore {
     @ObservationIgnored private let baselines: WatchedFolderBaselines
     @ObservationIgnored private let watcherOptions: FolderWatcher.Options
     @ObservationIgnored private let baselineWriteDelay: Duration
+    @ObservationIgnored private let baselineMaxWait: Duration
     @ObservationIgnored private let onNewMediaFile: @MainActor (URL) -> Void
 
     /// Every watcher gets `watcherOptions`, so they share its ledger and a file moved between two
@@ -44,12 +46,14 @@ final class WatchedFoldersStore {
         baselineDirectory: URL,
         watcherOptions: FolderWatcher.Options = FolderWatcher.Options(),
         baselineWriteDelay: Duration = .seconds(2),
+        baselineMaxWait: Duration = .seconds(10),
         onNewMediaFile: @escaping @MainActor (URL) -> Void
     ) {
         self.defaults = defaults
         self.baselines = WatchedFolderBaselines(directory: baselineDirectory)
         self.watcherOptions = watcherOptions
         self.baselineWriteDelay = baselineWriteDelay
+        self.baselineMaxWait = baselineMaxWait
         self.onNewMediaFile = onNewMediaFile
         load()
         baselines.removeAll(except: Set(folders.map(\.id)))
@@ -130,7 +134,7 @@ final class WatchedFoldersStore {
                 folders[idx] = refreshed
             }
             unavailableFolderIDs.remove(folder.id)
-            baselineWrites.removeValue(forKey: folder.id)?.cancel()
+            cancelBaselineWrite(folder.id)
             // Another folder's baseline would flood it with arrivals; start it the way a new folder starts.
             if url.path != folder.displayPath {
                 baselines.remove(folder.id)
@@ -174,7 +178,7 @@ final class WatchedFoldersStore {
         baselines.removeAll(except: kept)
         for folder in folders where previous[folder.id] != folder {
             let samePath = previous[folder.id]?.displayPath == folder.displayPath
-            baselineWrites.removeValue(forKey: folder.id)?.cancel()
+            cancelBaselineWrite(folder.id)
             if !samePath {
                 baselines.remove(folder.id)
             }
@@ -191,7 +195,7 @@ final class WatchedFoldersStore {
         starts[id] = nil
         carries[id] = nil
         unavailableFolderIDs.remove(id)
-        baselineWrites.removeValue(forKey: id)?.cancel()
+        cancelBaselineWrite(id)
         let scopedURL = scopedURLs.removeValue(forKey: id)
         guard let watcher = watchers.removeValue(forKey: id) else {
             scopedURL?.stopAccessingSecurityScopedResource()
@@ -215,8 +219,7 @@ final class WatchedFoldersStore {
         let scopes = scopedURLs
         watchers.removeAll()
         scopedURLs.removeAll()
-        for task in baselineWrites.values { task.cancel() }
-        baselineWrites.removeAll()
+        for id in Array(baselineWrites.keys) { cancelBaselineWrite(id) }
         for (id, watcher) in running {
             await watcher.stop()
             scopes[id]?.stopAccessingSecurityScopedResource()
@@ -322,7 +325,7 @@ final class WatchedFoldersStore {
         guard state == .lost || state == .unmounted, let watcher = watchers[id], await watcher.state == state,
               watchers[id] === watcher, let folder = folders.first(where: { $0.id == id }) else { return }
         watchers[id] = nil
-        baselineWrites.removeValue(forKey: id)?.cancel()
+        cancelBaselineWrite(id)
         let scopedURL = scopedURLs.removeValue(forKey: id)
         if state == .lost {
             startWatcher(for: folder, replacing: watcher, releasing: scopedURL, mounting: false)
@@ -339,16 +342,40 @@ final class WatchedFoldersStore {
         url.pathComponents.contains { $0 == ".Trash" || $0 == ".Trashes" }
     }
 
-    private func scheduleBaselineWrite(for id: UUID) {
+    /// Waits for changes to pause, but never longer than the max wait, so a long sync still gets saved.
+    func scheduleBaselineWrite(for id: UUID) {
+        let now = ContinuousClock.now
+        let deadline = baselineDeadlines[id] ?? now + baselineMaxWait
+        if baselineWrites[id] != nil, deadline <= now { return }
         baselineWrites[id]?.cancel()
-        let delay = baselineWriteDelay
+        baselineDeadlines[id] = deadline
+        let delay = max(.zero, min(baselineWriteDelay, deadline - now))
         baselineWrites[id] = Task { [weak self] in
             try? await Task.sleep(for: delay)
-            guard !Task.isCancelled, let self, let watcher = self.watchers[id] else { return }
-            let baseline = await watcher.baseline()
-            guard !Task.isCancelled, let baseline else { return }
-            self.baselines.write(baseline, for: id)
+            guard !Task.isCancelled, let self else { return }
+            let baseline = await self.watchers[id]?.baseline()
+            guard !Task.isCancelled else { return }
             self.baselineWrites[id] = nil
+            self.baselineDeadlines[id] = nil
+            if let baseline { self.baselines.write(baseline, for: id) }
+        }
+    }
+
+    private func cancelBaselineWrite(_ id: UUID) {
+        baselineWrites.removeValue(forKey: id)?.cancel()
+        baselineDeadlines[id] = nil
+    }
+
+    /// For quit, when the main thread is blocked: saves each baseline still waiting to be written.
+    func pendingBaselineFlush() -> @Sendable () async -> Void {
+        let waiting = watchers.filter { baselineWrites[$0.key] != nil }
+        let baselines = self.baselines
+        return {
+            for (id, watcher) in waiting {
+                if let baseline = await watcher.baseline() {
+                    baselines.writeNow(baseline, for: id)
+                }
+            }
         }
     }
 
@@ -445,12 +472,24 @@ struct WatchedFolderBaselines: Sendable {
         let url = fileURL(for: id)
         let directory = directory
         Self.queue.async {
-            do {
-                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                try JSONEncoder().encode(baseline).write(to: url, options: .atomic)
-            } catch {
-                ParolaLog.error(.library, "watched folder baseline save failed", [.error: .error(error)])
-            }
+            Self.save(baseline, to: url, in: directory)
+        }
+    }
+
+    func writeNow(_ baseline: FolderWatcher.Baseline, for id: UUID) {
+        let url = fileURL(for: id)
+        let directory = directory
+        Self.queue.sync {
+            Self.save(baseline, to: url, in: directory)
+        }
+    }
+
+    private static func save(_ baseline: FolderWatcher.Baseline, to url: URL, in directory: URL) {
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try JSONEncoder().encode(baseline).write(to: url, options: .atomic)
+        } catch {
+            ParolaLog.error(.library, "watched folder baseline save failed", [.error: .error(error)])
         }
     }
 

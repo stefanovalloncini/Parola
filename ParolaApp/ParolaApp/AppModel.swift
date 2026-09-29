@@ -663,6 +663,12 @@ final class AppModel {
         self?.handleWatchedArrival(url)
     }
 
+    /// Nil when this launch doesn't watch folders, so quitting never builds the store just to flush it.
+    func watchedFolderBaselineFlush() -> (@Sendable () async -> Void)? {
+        guard activeSideEffects.contains(.watchedFolders) else { return nil }
+        return watchedFolders.pendingBaselineFlush()
+    }
+
     /// A `--library` override keeps the watchers' baselines next to that library, like the delivery queue.
     var watchedFoldersDirectory: URL {
         library.libraryURL == LibraryStore.defaultLibraryURL

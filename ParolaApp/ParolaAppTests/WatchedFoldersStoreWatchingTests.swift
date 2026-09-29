@@ -309,6 +309,55 @@ struct WatchedFoldersStoreWatchingTests {
         #expect(arrivals.names == ["arrived.wav", "later.wav"])
         await store.stopWatching()
     }
+
+    @Test("a steady stream of changes still saves the baseline once the max wait is up")
+    func baselineWriteHasAMaxWait() async throws {
+        let rig = try makeRig("max-wait")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let store = WatchedFoldersStore(
+            defaults: rig.defaults,
+            baselineDirectory: rig.baselineDirectory,
+            watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50)),
+            baselineWriteDelay: .seconds(1),
+            baselineMaxWait: .milliseconds(200)
+        ) { _ in }
+        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+
+        var savedDuringStream = false
+        for _ in 0..<20 {
+            store.scheduleBaselineWrite(for: rig.folderID)
+            try await Task.sleep(for: .milliseconds(50))
+            await WatchedFolderBaselines(directory: rig.baselineDirectory).settle()
+            if FileManager.default.fileExists(atPath: rig.baselineURL.path) { savedDuringStream = true }
+        }
+        #expect(savedDuringStream)
+        await store.stopWatching()
+    }
+
+    @Test("quitting saves a baseline that was still waiting for its debounce")
+    func quitFlushesPendingBaselines() async throws {
+        let rig = try makeRig("flush")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let arrivals = Arrivals()
+        let store = WatchedFoldersStore(
+            defaults: rig.defaults,
+            baselineDirectory: rig.baselineDirectory,
+            watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50)),
+            baselineWriteDelay: .seconds(60)
+        ) { url in
+            arrivals.urls.append(url)
+        }
+        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        try writeSettled(rig.folder.appendingPathComponent("arrived.wav"))
+        #expect(await waitUntil { arrivals.names == ["arrived.wav"] })
+        #expect(!FileManager.default.fileExists(atPath: rig.baselineURL.path))
+
+        await store.pendingBaselineFlush()()
+        let saved = try JSONDecoder().decode(FolderWatcher.Baseline.self, from: Data(contentsOf: rig.baselineURL))
+        #expect(saved.entries.map(\.path) == ["arrived.wav"])
+        #expect(saved.entries.first?.emittedAt != nil)
+        await store.stopWatching()
+    }
 }
 
 private struct DiskImage {
