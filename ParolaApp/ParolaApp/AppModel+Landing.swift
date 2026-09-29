@@ -187,8 +187,10 @@ extension AppModel {
 
     private func saveLanding(_ landing: RunLanding, navigation: Int) -> Task<LibraryEntry, any Error> {
         if let entryID = landing.rerunEntryID { return replaceEntry(entryID, with: landing) }
+        let beforeSave = beforeLandingSave
         let saving = Task { [weak self, library] in
             do {
+                try await beforeSave?()
                 let entry = try await library.add(
                     transcript: landing.transcript,
                     audioSource: landing.audioSource,

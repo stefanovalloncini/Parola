@@ -9,6 +9,8 @@ struct WatchedArrival: Codable, Equatable, Identifiable, Sendable {
     var sourceDigest: String?
     /// Set once the window let the run go: the file finishes out of sight.
     var inBackground = false
+    /// Transcribed and on its way into the library; it leaves the line once the entry is saved.
+    var isLanding = false
 }
 
 /// What the toast says about the last watched-folder file that ran out of sight.
@@ -70,7 +72,7 @@ extension AppModel {
     /// A file offered again before its turn keeps its place in the line; one offered while it runs waits once behind it.
     func enqueueWatchedArrival(_ arrival: WatchedArrival) {
         let waiting = watchedArrivals.firstIndex {
-            $0.url == arrival.url && $0.id != backgroundArrivalID && $0.id != visibleArrivalID
+            $0.url == arrival.url && !$0.isLanding && $0.id != backgroundArrivalID && $0.id != visibleArrivalID
         }
         if let index = waiting {
             watchedArrivals[index].sourceDigest = arrival.sourceDigest
@@ -83,7 +85,7 @@ extension AppModel {
     /// Starts the next watched file when the foreground is free: in the window when Parola is idle, out of sight otherwise.
     func pumpWatchedLane() {
         guard watchedLaneTask == nil, visibleArrivalID == nil, !foregroundIsHeld,
-              let next = watchedArrivals.first else { return }
+              let next = nextWatchedArrival else { return }
         // Off main: a watched folder can sit on a server that takes its time to answer.
         watchedLaneTask = Task { [weak self] in
             let present = (try? await AppModel.offMainIO(qos: .utility) {
@@ -103,7 +105,7 @@ extension AppModel {
 
     private func startArrival(_ vetted: WatchedArrival) {
         guard visibleArrivalID == nil, !foregroundIsHeld else { return }
-        guard let next = watchedArrivals.first, next.id == vetted.id else {
+        guard let next = nextWatchedArrival, next.id == vetted.id else {
             pumpWatchedLane()
             return
         }
@@ -115,6 +117,11 @@ extension AppModel {
         } else {
             runArrivalInBackground(next)
         }
+    }
+
+    /// The first file in the line that still has to run.
+    var nextWatchedArrival: WatchedArrival? {
+        watchedArrivals.first { !$0.isLanding }
     }
 
     /// Nothing open, playing or asking: an arrival may run where the user can see it, as a file they opened would.
@@ -175,21 +182,36 @@ extension AppModel {
     }
 
     /// The run in the window reached its landing.
-    func visibleArrivalLanded(_ arrival: WatchedArrival) {
+    func visibleArrivalLanded(_ arrival: WatchedArrival, saving: Task<LibraryEntry, any Error>) {
         if visibleArrivalID == arrival.id { visibleArrivalID = nil }
-        watchedArrivals.removeAll { $0.id == arrival.id }
+        holdUntilSaved(arrival, saving, ringsWhenDry: false)
     }
 
     private func landBackgroundArrival(_ arrival: WatchedArrival, _ transcript: Transcript) {
         watchedLaneTask = nil
         backgroundArrivalID = nil
-        watchedArrivals.removeAll { $0.id == arrival.id }
-        land(RunLanding(
+        let saving = land(RunLanding(
             kind: .backgroundArrival, transcript: transcript, audioSource: arrival.url,
             sourceDigest: arrival.sourceDigest
         ))
-        if watchedArrivals.isEmpty { playCompletionSound() }
+        holdUntilSaved(arrival, saving, ringsWhenDry: true)
         pumpWatchedLane()
+    }
+
+    /// The file stays in the line until its entry is saved: a quit during the copy runs it again, a failed save hands it back.
+    private func holdUntilSaved(_ arrival: WatchedArrival, _ saving: Task<LibraryEntry, any Error>, ringsWhenDry: Bool) {
+        guard let index = watchedArrivals.firstIndex(where: { $0.id == arrival.id }) else { return }
+        watchedArrivals[index].isLanding = true
+        Task { [weak self] in
+            do {
+                _ = try await saving.value
+                guard let self else { return }
+                watchedArrivals.removeAll { $0.id == arrival.id }
+                if ringsWhenDry, watchedArrivals.isEmpty { playCompletionSound() }
+            } catch {
+                self?.failArrival(arrival, error: error)
+            }
+        }
     }
 
     /// A file that couldn't be transcribed leaves the line and a change brings it back; the error pane or the toast says why.
@@ -244,6 +266,7 @@ extension AppModel {
         watchedArrivals = saved.map { arrival in
             var restored = arrival
             restored.sourceDigest = nil
+            restored.isLanding = false
             return restored
         }
         Task { [weak self] in self?.pumpWatchedLane() }

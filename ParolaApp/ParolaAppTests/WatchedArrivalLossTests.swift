@@ -143,6 +143,64 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a file whose entry is still being saved when Parola quits runs again at the next launch")
+        func landingArrivalSurvivesAQuit() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let folder = try makeFolder("quit-landing")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let library = makeTempLibraryURL("loss-quit-landing")
+                let defaults = temporaryDefaults()
+                let file = try makeWAV("Copying", in: folder)
+                let (held, release) = AsyncStream<Void>.makeStream()
+                defer { release.finish() }
+                do {
+                    let before = makeModel(library: library, defaults: defaults)
+                    before.beforeLandingSave = {
+                        for await _ in held {}
+                        throw CancellationError()
+                    }
+                    _ = try await openOwnEntry(before, in: folder)
+                    await arrive(before, [file])
+                    #expect(await waitUntil(timeoutMs: 10_000) { before.watchedArrivals.first?.isLanding == true })
+                    #expect(try savedQueue(before) == [file])
+                }
+
+                let after = makeModel(library: library, defaults: defaults)
+                #expect(after.watchedArrivals.map(\.url) == [file])
+                #expect(after.watchedArrivals.first?.isLanding == false)
+                #expect(await waitUntil(timeoutMs: 20_000) { after.watchedLaneIsIdle })
+                let titles = await after.library.list().map(LibraryEntryDisplay.title(for:))
+                #expect(titles.contains("Copying"))
+            }
+        }
+
+        @Test("a file whose entry couldn't be saved is handed back to its watcher", arguments: [false, true])
+        func failedSaveIsHandedBack(outOfSight: Bool) async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let folder = try makeFolder("save-failed-\(outOfSight)")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let model = makeModel(library: makeTempLibraryURL("loss-save-failed"), defaults: temporaryDefaults())
+                let handedBack = HandedBack()
+                model.offerWatchedFileAgain = { handedBack.urls.append($0) }
+                if outOfSight { _ = try await openOwnEntry(model, in: folder) }
+                model.beforeLandingSave = { throw CocoaError(.fileWriteOutOfSpace) }
+                let file = try makeWAV("Unsaved", in: folder)
+
+                await arrive(model, [file])
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+                #expect(handedBack.urls == [file])
+                #expect(model.nonFatalWarning?.contains("couldn't save it to your library") == true)
+                #expect(!FileManager.default.fileExists(atPath: model.watchedArrivalsFileURL.path))
+            }
+        }
+
         @Test("Cancel stops the run in the window and leaves every watched file to finish out of sight")
         func cancelLeavesArrivalsAlone() async throws {
             try await withMocksCleared(.transcriber) {

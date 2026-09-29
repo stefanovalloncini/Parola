@@ -1411,6 +1411,8 @@ final class AppModel {
     }
     @ObservationIgnored var fileRunLanding: FileRunLanding?
     @ObservationIgnored var landingSteps: Task<Void, Never>?
+    /// Test seam: runs before a landing's library add, and a throw fails the save.
+    @ObservationIgnored var beforeLandingSave: (@Sendable () async throws -> Void)?
     @ObservationIgnored let fileReadDeadline: Duration
     @ObservationIgnored private var cancelPass = 0
     @ObservationIgnored private var unsettledInPass = 0
@@ -2280,7 +2282,7 @@ final class AppModel {
                 ))
                 fileRunLanding = FileRunLanding(runToken: runToken, text: processed.text, entry: entry)
                 if let ownedDownload { followLinkAudioIntoLibrary(ownedDownload, entry: entry) }
-                if let arrival { visibleArrivalLanded(arrival) }
+                if let arrival { visibleArrivalLanded(arrival, saving: entry) }
                 retireFileRun(runToken)
             } catch {
                 if let recoveryToken { endRecovery(recoveryToken) }
