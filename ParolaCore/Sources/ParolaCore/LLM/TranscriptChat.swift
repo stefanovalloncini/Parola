@@ -18,20 +18,27 @@ public enum TranscriptChat {
     ) throws -> TranscriptChatSession {
         try features.require(.ai)
         let budget = budget ?? .onDevice
-        let model: any LanguageModel
         if usesCondensedContext(for: transcript, budget: budget) {
             // Probe availability now so an over-budget session fails at creation like the plain path.
             _ = try makeOnDeviceModel(instructions: "")
-            model = CondensedChatModel(
+            let model = CondensedChatModel(
                 transcript: transcript,
                 budget: budget,
                 makeDigest: digestProvider(for: transcript, budget: budget),
                 makeModel: { try makeOnDeviceModel(instructions: $0) }
             )
-        } else {
-            model = try makeOnDeviceModel(instructions: systemInstructions(for: transcript))
+            return TranscriptChatSession(
+                transcript: transcript, history: history, model: model, budget: budget, instructionTokens: budget.tokens
+            )
         }
-        return TranscriptChatSession(transcript: transcript, history: history, model: model)
+        let instructions = systemInstructions(for: transcript)
+        return TranscriptChatSession(
+            transcript: transcript,
+            history: history,
+            model: try makeOnDeviceModel(instructions: instructions),
+            budget: budget,
+            instructionTokens: budget.estimate(instructions)
+        )
     }
 
     public static func makeSession(
@@ -75,11 +82,10 @@ public enum TranscriptChat {
         makeModel: @escaping @Sendable (String) async throws -> any LanguageModel
     ) async throws -> TranscriptChatSession {
         try features.require(.ai)
-        let model: any LanguageModel
         if usesCondensedContext(for: transcript, budget: budget) {
             // Probe key/policy now so an over-budget session fails at creation like the plain path.
             _ = try await makeModel("")
-            model = CondensedChatModel(
+            let model = CondensedChatModel(
                 transcript: transcript,
                 budget: budget,
                 makeDigest: digestProvider(for: transcript, budget: budget, summariseModel: {
@@ -87,10 +93,18 @@ public enum TranscriptChat {
                 }),
                 makeModel: makeModel
             )
-        } else {
-            model = try await makeModel(systemInstructions(for: transcript))
+            return TranscriptChatSession(
+                transcript: transcript, history: history, model: model, budget: budget, instructionTokens: budget.tokens
+            )
         }
-        return TranscriptChatSession(transcript: transcript, history: history, model: model)
+        let instructions = systemInstructions(for: transcript)
+        return TranscriptChatSession(
+            transcript: transcript,
+            history: history,
+            model: try await makeModel(instructions),
+            budget: budget,
+            instructionTokens: budget.estimate(instructions)
+        )
     }
 
     /// The system prompt a chat session runs with: the instructions plus the whole transcript,

@@ -1,0 +1,160 @@
+import Foundation
+import Testing
+@testable import ParolaCore
+
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
+
+@Suite("Transcript chat history budget")
+struct TranscriptChatBudgetTests {
+    private let transcript = Transcript(
+        segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello world.")],
+        language: "en",
+        modelName: "tiny"
+    )
+
+    /// 400-token window, 100 held for the answer: 50 of that for the reply, 250 for turns beside 100 of instructions.
+    private let budget = TokenBudget(contextTokens: 400, answerTokens: 100, counting: .bytes(perToken: 4))
+
+    private func savedHistory(_ pairs: Int) -> [ChatMessage] {
+        (0..<pairs).flatMap { i in
+            [
+                ChatMessage(role: .user, text: "question \(i) " + String(repeating: "x", count: 80)),
+                ChatMessage(role: .assistant, text: "answer \(i) " + String(repeating: "y", count: 80)),
+            ]
+        }
+    }
+
+    @Test("only the newest turns that fit are replayed, starting on a question")
+    func replaysTheNewestTurnsThatFit() async throws {
+        let model = MockLanguageModel(scriptedResponses: ["ok"])
+        let session = TranscriptChatSession(
+            transcript: transcript, history: savedHistory(10), model: model, budget: budget, instructionTokens: 100
+        )
+
+        _ = try await session.ask("What next?")
+
+        let sent = try #require(await model.lastReceivedHistory)
+        #expect(sent.count > 1)
+        #expect(sent.count < 21)
+        #expect(sent.first?.role == .user)
+        #expect(sent.last?.text == "What next?")
+        #expect(sent.dropLast().last?.text.hasPrefix("answer 9 ") == true)
+        let used = sent.reduce(0) { $0 + budget.estimate($1.text) + 4 }
+        #expect(used <= 250)
+        #expect(await session.history.count == 22)
+    }
+
+    @Test("without a budget every turn is replayed")
+    func unboundedReplaysAll() async throws {
+        let model = MockLanguageModel(scriptedResponses: ["ok"])
+        let session = TranscriptChatSession(transcript: transcript, history: savedHistory(10), model: model)
+        _ = try await session.ask("What next?")
+        #expect(await model.lastReceivedHistory?.count == 21)
+        #expect(session.messageCharacterLimit == nil)
+    }
+
+    @Test("an attachment gets half the room the turns have")
+    func messageLimitFollowsTheRoom() {
+        let session = TranscriptChatSession(
+            transcript: transcript, model: MockLanguageModel(), budget: budget, instructionTokens: 100
+        )
+        #expect(session.messageCharacterLimit == 125 * 4)
+    }
+
+    @Test("a context overflow is retried once with the question alone")
+    func overflowRetriesWithTheQuestionAlone() async throws {
+        let model = OverflowOnceModel()
+        let session = TranscriptChatSession(
+            transcript: transcript, history: savedHistory(2), model: model, budget: budget, instructionTokens: 100
+        )
+
+        let answer = try await session.ask("And then?")
+
+        #expect(answer.text == "recovered")
+        let histories = await model.histories
+        #expect(histories.count == 2)
+        #expect(histories[0].count == 5)
+        #expect(histories[1].map(\.text) == ["And then?"])
+        #expect(await session.history.count == 6)
+    }
+
+    @Test("a streamed context overflow is retried once before any text arrives")
+    func streamedOverflowRetries() async throws {
+        let model = OverflowOnceModel()
+        let session = TranscriptChatSession(
+            transcript: transcript, history: savedHistory(2), model: model, budget: budget, instructionTokens: 100
+        )
+
+        var completed: ChatMessage?
+        for try await event in session.stream("And then?") {
+            if case .completed(let message) = event { completed = message }
+        }
+
+        #expect(completed?.text == "recovered")
+        #expect(await model.histories.last?.map(\.text) == ["And then?"])
+    }
+
+    @Test("a second overflow surfaces and records nothing")
+    func secondOverflowFails() async throws {
+        let model = MockLanguageModel(error: CloudLLMError.tokenBudgetExceeded(provider: .openAI, used: 10, limit: 1))
+        let session = TranscriptChatSession(
+            transcript: transcript, history: savedHistory(2), model: model, budget: budget, instructionTokens: 100
+        )
+        await #expect(throws: TranscriptChatSession.FailureReason.self) {
+            _ = try await session.ask("And then?")
+        }
+        #expect(await model.receivedHistories.count == 2)
+        #expect(await session.history.count == 4)
+    }
+
+    @Test("every provider's overflow reads as one")
+    func overflowDetection() {
+        #expect(LanguageModelFactory.isContextOverflow(CloudLLMError.tokenBudgetExceeded(provider: .openAI, used: 2, limit: 1)))
+        #expect(!LanguageModelFactory.isContextOverflow(CloudLLMError.missingAPIKey(.openAI)))
+        #expect(!LanguageModelFactory.isContextOverflow(CancellationError()))
+        #if canImport(FoundationModels)
+        if #available(macOS 27.0, iOS 27.0, visionOS 27.0, *) {
+            let exceeded = LanguageModelError.contextSizeExceeded(
+                .init(contextSize: 4096, tokenCount: 5000, debugDescription: "too long")
+            )
+            #expect(LanguageModelFactory.isContextOverflow(exceeded))
+        }
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
+            let exceeded = LanguageModelSession.GenerationError.exceededContextWindowSize(.init(debugDescription: "too long"))
+            #expect(LanguageModelFactory.isContextOverflow(exceeded))
+        }
+        #endif
+    }
+}
+
+/// Refuses the first request as too long, then answers.
+private actor OverflowOnceModel: ParolaCore.LanguageModel {
+    private(set) var histories: [[ChatTurn]] = []
+
+    private func next(_ history: [ChatTurn]) throws -> String {
+        histories.append(history)
+        if histories.count == 1 {
+            throw CloudLLMError.tokenBudgetExceeded(provider: .openAI, used: 10_000, limit: 100)
+        }
+        return "recovered"
+    }
+
+    func respond(history: [ChatTurn]) async throws -> String {
+        try next(history)
+    }
+
+    nonisolated func stream(history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    continuation.yield(try await self.next(history))
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+}

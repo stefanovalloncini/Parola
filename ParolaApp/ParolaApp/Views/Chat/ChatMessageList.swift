@@ -6,6 +6,7 @@ struct ChatMessageList: View {
     let searchQuery: String
     let senderFilter: ChatSenderFilter
     let isSending: Bool
+    var failure: String?
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -29,6 +30,9 @@ struct ChatMessageList: View {
                     if isSending {
                         ChatThinkingIndicator(isActive: isSending)
                             .id("thinking")
+                    } else if let failure {
+                        ChatTurnFailure(message: failure)
+                            .id("failure")
                     }
                 }
                 .padding(.horizontal, DS.Spacing.medium)
@@ -39,6 +43,10 @@ struct ChatMessageList: View {
             }
             .onChange(of: isSending) { _, sending in
                 if sending { scrollToEnd(proxy: proxy) }
+            }
+            .onChange(of: failure) { _, failure in
+                guard failure != nil else { return }
+                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("failure", anchor: .bottom) }
             }
         }
     }

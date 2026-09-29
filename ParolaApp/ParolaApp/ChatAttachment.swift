@@ -21,6 +21,12 @@ enum ChatAttachment {
         return trimmedInput + "\n\n" + block
     }
 
+    /// What an attachment may add to `input` when the chat session caps the whole message.
+    static func maxCharacters(messageLimit: Int?, input: String) -> Int {
+        guard let messageLimit else { return defaultMaxCharacters }
+        return min(defaultMaxCharacters, max(0, messageLimit - input.count))
+    }
+
     static func isReadableTextFile(_ url: URL) -> Bool {
         textExtensions.contains(url.pathExtension.lowercased())
     }

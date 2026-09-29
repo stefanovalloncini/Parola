@@ -27,6 +27,7 @@ struct ChatPane: View {
     @AppStorage("chat.searchExpanded", store: DefaultsStore.current) private var isSearchingPersisted: Bool = false
     @State private var session: TranscriptChatSession?
     @State private var sessionError: String?
+    @State private var turnError: String?
     @State private var input: String = ""
     @State private var isSending: Bool = false
     @State private var displayedHistory: [ChatMessage] = []
@@ -209,7 +210,8 @@ struct ChatPane: View {
                 history: displayedHistory,
                 searchQuery: searchQuery,
                 senderFilter: senderFilter,
-                isSending: isSending
+                isSending: isSending,
+                failure: turnError
             )
             composer
         }
@@ -303,6 +305,7 @@ struct ChatPane: View {
         sendTask = nil
         isSending = false
         sessionError = nil
+        turnError = nil
         session = nil
         displayedHistory = []
         guard let transcript = model.transcript else { return }
@@ -349,6 +352,7 @@ struct ChatPane: View {
         sendTask?.cancel()
         sendTask = nil
         isSending = false
+        turnError = nil
         let entryID = model.selectedEntryID
         Task {
             await session.clearHistory()
@@ -370,7 +374,12 @@ struct ChatPane: View {
                     return try String(contentsOf: url, encoding: .utf8)
                 }
                 guard let raw else { continue }
-                input = ChatAttachment.attach(input: input, filename: url.lastPathComponent, content: raw)
+                input = ChatAttachment.attach(
+                    input: input,
+                    filename: url.lastPathComponent,
+                    content: raw,
+                    maxCharacters: ChatAttachment.maxCharacters(messageLimit: session?.messageCharacterLimit, input: input)
+                )
             }
             composerFocused = true
         }
@@ -388,6 +397,7 @@ struct ChatPane: View {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let session, !isSending else { return }
         isSending = true
+        turnError = nil
         let entryID = model.selectedEntryID
         sendTask?.cancel()
         displayedHistory.append(ChatMessage(role: .user, text: text))
@@ -419,7 +429,8 @@ struct ChatPane: View {
                 }
             } catch {
                 guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
-                sessionError = error.localizedDescription
+                displayedHistory.removeAll { $0.id == liveID }
+                turnError = error.localizedDescription
             }
         }
     }

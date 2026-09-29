@@ -29,6 +29,26 @@ struct ChatUnavailable: View {
     }
 }
 
+/// A turn that got no answer, shown under the conversation instead of in place of it.
+struct ChatTurnFailure: View {
+    let message: String
+
+    var body: some View {
+        Label {
+            Text(verbatim: message)
+        } icon: {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(DS.Color.warningText)
+        }
+        .font(DS.Font.secondary)
+        .foregroundStyle(DS.Color.secondaryText)
+        .padding(.vertical, DS.Spacing.small)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .axLeaf("Chat.Label.TurnFailure")
+    }
+}
+
 struct ChatEmpty: View {
     var body: some View {
         ContentUnavailableView {

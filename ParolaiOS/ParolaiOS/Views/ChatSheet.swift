@@ -28,6 +28,7 @@ struct ChatSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var session: TranscriptChatSession?
     @State private var sessionError: String?
+    @State private var turnError: String?
     @State private var input: String = ""
     @State private var isSending: Bool = false
     @State private var displayedHistory: [ChatMessage] = []
@@ -111,6 +112,15 @@ struct ChatSheet: View {
                             Text("Thinking…").foregroundStyle(.secondary)
                         }
                         .padding(.horizontal, 12)
+                    } else if let turnError {
+                        Label {
+                            Text(verbatim: turnError)
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
                     }
                 }
                 .padding()
@@ -173,6 +183,7 @@ struct ChatSheet: View {
         guard !text.isEmpty, let session, !isSending else { return }
         input = ""
         isSending = true
+        turnError = nil
         Task {
             do {
                 _ = try await session.ask(text)
@@ -190,7 +201,7 @@ struct ChatSheet: View {
                 }
                 isSending = false
             } catch {
-                sessionError = error.localizedDescription
+                turnError = error.localizedDescription
                 isSending = false
             }
         }

@@ -223,6 +223,22 @@ public enum LanguageModelFactory {
         throw Failure.notAvailable("Apple Intelligence needs macOS 26 or iOS 26 or newer.")
     }
 
+    /// Whether `error` says the input was too long for the model's window, in any provider's words.
+    public static func isContextOverflow(_ error: any Error) -> Bool {
+        if case CloudLLMError.tokenBudgetExceeded = error { return true }
+        #if canImport(FoundationModels)
+        if #available(macOS 27.0, iOS 27.0, visionOS 27.0, *),
+           let failure = error as? LanguageModelError, case .contextSizeExceeded = failure {
+            return true
+        }
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+           let failure = error as? LanguageModelSession.GenerationError, case .exceededContextWindowSize = failure {
+            return true
+        }
+        #endif
+        return false
+    }
+
     #if canImport(FoundationModels)
     /// Human, actionable copy for each reason Apple Intelligence can be unavailable.
     @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)

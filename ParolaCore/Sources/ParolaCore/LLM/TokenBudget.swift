@@ -77,6 +77,10 @@ public struct TokenBudget: Sendable, Hashable {
         max(1, (utf8Count + bytesPerToken - 1) / bytesPerToken)
     }
 
+    func characters(forTokens tokens: Int) -> Int {
+        max(0, tokens) * bytesPerToken
+    }
+
     /// The model's own count where it can give one, the estimate otherwise.
     func count(_ text: String) async -> Int {
         if case .onDevice = counting, let exact = await Self.onDeviceTokenCount(text) {

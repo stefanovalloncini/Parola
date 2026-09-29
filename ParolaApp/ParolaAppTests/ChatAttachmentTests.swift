@@ -80,4 +80,12 @@ struct ChatAttachmentTests {
     func rejectsNonTextFiles(name: String) {
         #expect(ChatAttachment.isReadableTextFile(URL(fileURLWithPath: "/tmp/\(name)")) == false)
     }
+
+    @Test("an attachment gets what the session's message limit leaves after the draft")
+    func attachmentFollowsTheSessionLimit() {
+        #expect(ChatAttachment.maxCharacters(messageLimit: nil, input: "hi") == ChatAttachment.defaultMaxCharacters)
+        #expect(ChatAttachment.maxCharacters(messageLimit: 1_500, input: String(repeating: "a", count: 500)) == 1_000)
+        #expect(ChatAttachment.maxCharacters(messageLimit: 100_000, input: "") == ChatAttachment.defaultMaxCharacters)
+        #expect(ChatAttachment.maxCharacters(messageLimit: 10, input: "a longer draft than that") == 0)
+    }
 }
