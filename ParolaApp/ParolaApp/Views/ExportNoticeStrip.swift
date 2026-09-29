@@ -1,8 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// A failed export, or a bulk export's count, along the bottom of the window. A clean bulk export goes
-/// away on its own; anything that failed waits to be dismissed.
+/// A clean bulk export's count goes away on its own; anything that failed waits to be dismissed.
 struct ExportNoticeStrip: View {
     @Environment(AppModel.self) private var model
     let notice: ExportNotice

@@ -515,8 +515,7 @@ extension AppModel {
         }
     }
 
-    /// Writes each entry as its own file and keeps going past a failure: the notice counts what landed
-    /// and names what didn't.
+    /// Keeps going past a failure: the notice counts what landed and names what didn't.
     func exportEntries(_ entries: [LibraryEntry], format: ExportFormat, to folder: URL) async -> ExportNotice {
         let exporter = makeExporter(for: format)
         var usedNames = Set<String>()
@@ -554,7 +553,7 @@ extension AppModel {
         return .bulk(exported: entries.count - failures.count, of: entries.count, failures: failures, folder: folder)
     }
 
-    /// False, with a beep and nothing changed, while a recording or an export owns the phase.
+    /// False, with a beep and nothing changed, while a recording owns the phase.
     @discardableResult
     func loadEntry(_ id: LibraryEntry.ID) -> Bool {
         do {
@@ -578,8 +577,7 @@ extension AppModel {
         try await startOpeningEntry(id).value
     }
 
-    /// Why an entry can't take the main pane now: opening sets `.ready`, and a capture under it couldn't be stopped.
-    /// A burn keeps its own copy of the transcript, so opening another one leaves it running.
+    /// Opening sets `.ready`, which a capture couldn't survive; a burn keeps its own copy of the transcript.
     var entryOpenRefusal: IntentActionError? {
         if case .recording = phase { return .recordingInProgress }
         return nil

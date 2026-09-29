@@ -39,8 +39,7 @@ extension AppModel {
         }
     }
 
-    /// Exports go to the library's Exports folder under the entry's title. Two entries that share a title
-    /// keep their own files: the second one's are numbered, and a re-run replaces only its own.
+    /// Into Exports under the entry's title; a namesake's files are numbered, a re-run replaces its own.
     func runAutoExports(for entry: LibraryEntry) {
         let source = SidecarSource(
             fileExtension: (entry.manifest.originalAudioName as NSString).pathExtension,

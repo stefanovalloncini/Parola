@@ -12,9 +12,7 @@ struct BurnCue: Sendable, Equatable {
 extension SubtitleBurner {
     static let maxLinesPerCue = 2
 
-    /// The cues an SRT export with these options writes, fitted to the frame: wrapped to its width, and a
-    /// cue longer than two lines split into consecutive cues, timed by its words when it has them and by
-    /// its characters when it doesn't.
+    /// An SRT export's cues, wrapped to the frame, with anything over two lines split into consecutive cues.
     static func cues(
         from transcript: Transcript, options: ExportOptions, metrics: CaptionMetrics, renderSize: CGSize
     ) throws -> [BurnCue] {
@@ -62,8 +60,7 @@ extension SubtitleBurner {
         }
     }
 
-    /// Word timings place the breaks only when the cue says exactly the spoken words; a speaker label,
-    /// a translation or a word Core Text broke in two leaves the time shared out by characters.
+    /// Word timings place the breaks only when the cue says exactly the spoken words, else characters do.
     static func split(
         _ lines: [String], start: Double, end: Double, words: [WordTiming]?, spokenText: String
     ) -> [BurnCue] {

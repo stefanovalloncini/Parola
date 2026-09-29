@@ -1,7 +1,6 @@
 import Foundation
 
-/// How an export the user asked for went, when there is something to say: it failed, or a bulk export
-/// finished and counts what it wrote. The open transcript stays on screen either way.
+/// A failed export or a bulk export's count, shown without taking the open transcript's place.
 struct ExportNotice: Equatable, Identifiable {
     struct Failure: Equatable {
         let name: String

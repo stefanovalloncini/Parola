@@ -138,8 +138,7 @@ public enum SubtitleBurner {
         OutputMarker.mark(output)
     }
 
-    /// The frame rate the source plays at: its shortest frame, else its nominal rate, else 30 fps. A
-    /// shortest frame under 1/240 s is a timing glitch, not a rate.
+    /// The shortest frame (under 1/240 s is a glitch), else the nominal rate, else 30 fps.
     static func frameDuration(minFrameDuration: CMTime, nominalFrameRate: Float) -> CMTime {
         if minFrameDuration.isNumeric, minFrameDuration.seconds >= 1.0 / 240 {
             return minFrameDuration
@@ -257,8 +256,7 @@ public enum SubtitleBurner {
     }
 }
 
-/// A burn's captions, looked up per frame. Only a cue that reaches the screen is rasterised, and only the
-/// last two stay, so memory holds flat however long the transcript runs.
+/// Rasterises a cue only when it reaches the screen and keeps the last two, so memory stays flat.
 final class BurnCaptionTrack: Sendable {
     private struct Rendered {
         let index: Int

@@ -22,8 +22,7 @@ public struct SrtExporter: TranscriptExporter {
         return utf8(out)
     }
 
-    /// What a segment's cue says: its wrapped text, the speaker in front when asked for, and a "both"
-    /// export's translation under it. Nil for a segment with no text. The burn draws the same words.
+    /// A segment's cue text, speaker and translation included, or nil when empty; the burn draws the same.
     func cueText(for segment: TranscriptSegment, in transcript: Transcript) -> String? {
         let body = CaptionWrapper.wrap(segment.text, length: options.captionLength)
         guard !body.isEmpty else { return nil }

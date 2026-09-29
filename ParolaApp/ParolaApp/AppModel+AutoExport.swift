@@ -45,8 +45,7 @@ extension AppModel {
         case unavailable
     }
 
-    /// Off the main thread: resolving can wait on the folder's volume. A stale bookmark that still finds
-    /// the folder comes back re-minted.
+    /// Off main, since resolving can wait on the folder's volume; a stale bookmark comes back re-minted.
     @concurrent
     nonisolated static func resolve(_ folder: AutoExportFolder) async -> AutoExportFolderResolution {
         var isStale = false
@@ -67,8 +66,7 @@ extension AppModel {
         return .resolved(url, refreshed: refreshed)
     }
 
-    /// The auto-export rules for one finished run. A file's exports go beside it; a take's or a link's go to
-    /// the folder the user chose, under the entry's title, and wait for that choice until it is made.
+    /// A file's exports go beside it; a take's or a link's go to the chosen folder, under the entry's title.
     @discardableResult
     func runAutoExports(
         transcript: Transcript, audioSource: URL?, source: EntrySource, entry: LibraryEntry?, title: String? = nil
@@ -121,8 +119,7 @@ extension AppModel {
         case none
     }
 
-    /// A file the system or Parola clears later, such as a Shortcuts input in the temporary folder, goes
-    /// the folder route like a take. Fetched captions have no audio and follow their link.
+    /// A file in a folder that gets cleared, like a Shortcuts input, goes the folder route like a take.
     func sidecarRoute(audioSource: URL?, source: EntrySource) -> SidecarRoute {
         switch source {
         case .file:

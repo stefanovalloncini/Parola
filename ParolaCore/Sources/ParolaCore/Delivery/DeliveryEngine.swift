@@ -455,8 +455,7 @@ public actor DeliveryEngine {
         return .queued(attempt: attempt, nextAt: nextAt)
     }
 
-    /// Retries that fell due while Parola was quit go one at a time, not all at once. This runs a turn
-    /// after init, so a send may already have queued and armed a delivery; that timer stays.
+    /// Spaces out what fell due while Parola was quit, and keeps a timer a send armed before it ran.
     func resumeQueue() {
         let now = Date()
         var overdue = 0
@@ -482,8 +481,7 @@ public actor DeliveryEngine {
         }
     }
 
-    /// Every await here can let a manual send or a cancel settle this delivery, so each is followed by a
-    /// check that it is still queued.
+    /// A manual send or a cancel can settle the delivery during any await, so each is followed by a queue check.
     private func runQueued(_ key: QueueKey) async {
         timers[key] = nil
         guard isQueued(key) else { return }

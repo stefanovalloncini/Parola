@@ -13,7 +13,7 @@ extension AppModel {
         }
     }
 
-    /// A capture or an export owns the phase, and opening would set it to `.ready` under them.
+    /// A recording owns the phase, and opening would set it to `.ready` under it.
     func summarizeLatestEntry(options: SummaryOptions? = nil) {
         introduction.defer()
         guard features.isEnabled(.ai), !phaseDefersArrivals else { return }
