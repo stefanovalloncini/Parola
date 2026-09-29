@@ -58,3 +58,38 @@ public final class FolderWatcherLedger: Sendable {
         }
     }
 }
+
+/// Caps the descriptors all watchers hold for subfolder sources, keeping a reserve; folders past it are polled.
+final class FolderSourceBudget: Sendable {
+    static let shared = FolderSourceBudget(limit: FolderSourceBudget.processLimit())
+
+    let limit: Int
+    private let used = OSAllocatedUnfairLock(initialState: 0)
+
+    init(limit: Int) {
+        self.limit = limit
+    }
+
+    var inUse: Int {
+        used.withLock { $0 }
+    }
+
+    func acquire() -> Bool {
+        used.withLock { count in
+            guard count < limit else { return false }
+            count += 1
+            return true
+        }
+    }
+
+    func release() {
+        used.withLock { $0 = max(0, $0 - 1) }
+    }
+
+    static func processLimit() -> Int {
+        var limit = rlimit()
+        guard getrlimit(RLIMIT_NOFILE, &limit) == 0 else { return 0 }
+        let soft = Int(clamping: limit.rlim_cur)
+        return soft - min(512, soft / 2)
+    }
+}

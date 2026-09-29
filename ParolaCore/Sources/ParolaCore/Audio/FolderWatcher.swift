@@ -30,6 +30,7 @@ public actor FolderWatcher {
         var openDirectory: @Sendable (String) -> Int32 = { path in path.withCString { open($0, O_EVTONLY) } }
         var lister: Lister = { FolderWatcher.list($0, recursive: $1) }
         var fileSystemName: @Sendable (Int32) -> String? = FolderWatcher.fileSystemName
+        var sourceBudget = FolderSourceBudget.shared
         var cloud = CloudProbe.system
         /// Download checks a placeholder gets before the watcher reads it to make it download.
         var placeholderChecks = 10
@@ -183,6 +184,12 @@ public actor FolderWatcher {
     /// Directories without a source (out of descriptors) or whose last listing failed: relisted on every pass.
     private var unsourced: Set<String> = []
     private var unlisted: Set<String> = []
+    private var polls: [String: Poll] = [:]
+
+    private struct Poll {
+        var dueTick: Int
+        var backoff = 1
+    }
     private var drainTask: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
     private var eventContinuation: AsyncStream<Event>.Continuation?
@@ -319,6 +326,7 @@ public actor FolderWatcher {
         fd: Int32,
         path: String,
         isRoot: Bool = false,
+        budget: FolderSourceBudget? = nil,
         continuation: AsyncStream<Event>.Continuation,
         queue: DispatchQueue
     ) -> DispatchSourceFileSystemObject {
@@ -333,6 +341,7 @@ public actor FolderWatcher {
         }
         src.setCancelHandler { [fd] in
             close(fd)
+            budget?.release()
         }
         src.resume()
         return src
@@ -347,13 +356,21 @@ public actor FolderWatcher {
     private func openSource(for path: String) {
         guard options.recursive, options.observesFileSystem, subdirSources[path] == nil,
               let continuation = eventContinuation else { return }
+        let budget = options.sourceBudget
+        guard budget.acquire() else {
+            unsourced.insert(path)
+            return
+        }
         let fd = options.openDirectory(path)
         guard fd >= 0 else {
+            budget.release()
             unsourced.insert(path)
             return
         }
         unsourced.remove(path)
-        subdirSources[path] = Self.makeSource(fd: fd, path: path, continuation: continuation, queue: eventQueue)
+        subdirSources[path] = Self.makeSource(
+            fd: fd, path: path, budget: budget, continuation: continuation, queue: eventQueue
+        )
         noteDirtyIfChangedSinceListing(path)
     }
 
@@ -396,6 +413,7 @@ public actor FolderWatcher {
         dirty.removeAll()
         unsourced.removeAll()
         unlisted.removeAll()
+        polls.removeAll()
         settledTask?.cancel()
         settledTask = nil
         armedTick = nil
@@ -426,7 +444,7 @@ public actor FolderWatcher {
 
     private func drainDirty() async {
         while !dirty.isEmpty, fileDescriptor >= 0 {
-            let batch = dirty.union(unsourced).union(unlisted)
+            let batch = dirty
             dirty = []
             await rescan(batch)
         }
@@ -498,6 +516,7 @@ public actor FolderWatcher {
     private func dropSubtree(_ path: String, departing candidates: inout Set<FileKey>) {
         unsourced.remove(path)
         unlisted.remove(path)
+        polls[path] = nil
         guard let record = directories.removeValue(forKey: path) else { return }
         candidates.formUnion(record.media)
         subdirSources.removeValue(forKey: path)?.cancel()
@@ -666,9 +685,10 @@ public actor FolderWatcher {
 
     /// Arms the tick for whatever comes due first, and re-arms when something new comes due sooner.
     private func scheduleSettleTick() {
-        let everyTick = !watchedAfterEmit.isEmpty || !unsourced.isEmpty || !unlisted.isEmpty
-        let firstDue = everyTick ? currentTick + 1 : pending.values.map(\.dueTick).min()
-        guard let firstDue else { return }
+        var dues = pending.values.map(\.dueTick)
+        dues += unsourced.union(unlisted).map { polls[$0]?.dueTick ?? currentTick + 1 }
+        if !watchedAfterEmit.isEmpty { dues.append(currentTick + 1) }
+        guard let firstDue = dues.min() else { return }
         let due = max(firstDue, currentTick + 1)
         if settledTask != nil, let armedTick, armedTick <= due { return }
         settledTask?.cancel()
@@ -696,11 +716,23 @@ public actor FolderWatcher {
         for key in watchedAfterEmit {
             recheckEmitted(key, now: now)
         }
-        for path in unsourced.union(unlisted) {
-            noteDirty(path)
-        }
+        pollUnwatchedDirectories()
         publishBaselineChange()
         scheduleSettleTick()
+    }
+
+    /// Directories without a source or a good listing are listed on a backoff, from every tick up to every 32.
+    private func pollUnwatchedDirectories() {
+        let unwatched = unsourced.union(unlisted)
+        polls = polls.filter { unwatched.contains($0.key) }
+        for path in unwatched {
+            var poll = polls[path] ?? Poll(dueTick: currentTick)
+            guard poll.dueTick <= currentTick else { continue }
+            noteDirty(path)
+            poll.dueTick = currentTick + poll.backoff + 1
+            poll.backoff = min(poll.backoff * 2, Self.longestBackoff)
+            polls[path] = poll
+        }
     }
 
     private func checkPending(_ key: FileKey, now: Date) {

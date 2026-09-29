@@ -203,6 +203,44 @@ struct FolderWatcherResourceTests {
         #expect(collected.snapshot().map(\.lastPathComponent) == ["no-event.wav"])
     }
 
+    @Test("folders past the source budget are polled on a backoff, and their sources are given back on stop")
+    func foldersPastTheBudgetArePolled() async throws {
+        let clock = FixedClock(start: Date())
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        for name in ["A", "B", "C"] {
+            try FileManager.default.createDirectory(at: folder.appendingPathComponent(name), withIntermediateDirectories: true)
+        }
+        let budget = FolderSourceBudget(limit: 1)
+        let scheduler = ManualScheduler()
+        let collected = CollectedURLs()
+        var options = FolderWatcher.Options(recursive: true, settledInterval: .seconds(1), clock: clock, scheduler: scheduler)
+        options.sourceBudget = budget
+        let watcher = FolderWatcher(folderURL: folder, options: options) { collected.append($0) }
+        await watcher.start()
+        #expect(budget.inUse == 1)
+        let polled = await watcher.sourcelessDirectories
+        #expect(polled.count == 2)
+
+        try await scheduler.advance(ticks: 4)
+        #expect(await scheduler.intervals.map { $0.components.seconds } == [1, 2, 3, 5, 9])
+
+        let quiet = try #require(polled.first)
+        try Fixture.writeSettled(URL(fileURLWithPath: quiet).appendingPathComponent("unheard.wav"), clock: clock)
+        try await scheduler.advanceAndWait()
+        await watcher.markDirty([])
+        #expect(Fixture.names(await watcher.pendingPaths) == ["unheard.wav"])
+        try await scheduler.advance(ticks: 3)
+        #expect(collected.snapshot().map(\.lastPathComponent) == ["unheard.wav"])
+
+        await watcher.stop()
+        let deadline = ContinuousClock.now + .seconds(5)
+        while budget.inUse > 0, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(budget.inUse == 0)
+    }
+
     @Test("a listing of the watched folder that runs out of descriptors keeps the watch and is tried again")
     func failedRootListingIsRetried() async throws {
         let clock = FixedClock(start: Date())
