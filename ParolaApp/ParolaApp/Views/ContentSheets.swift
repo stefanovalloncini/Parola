@@ -65,10 +65,12 @@ struct ContentSheetsModifier: ViewModifier {
                 }
             }
             .alert("Discard this recording?", isPresented: $confirmingRecoveryDiscard) {
+                // Return keeps the take: only a deliberate click deletes it.
+                Button("Cancel", role: .cancel) {}
+                    .keyboardShortcut(.defaultAction)
+                    .axLeaf("Recovery.Button.KeepOffer")
                 Button("Discard", role: .destructive) { model.discardPendingRecovery() }
                     .axLeaf("Recovery.Button.ConfirmDiscard")
-                Button("Cancel", role: .cancel) {}
-                    .axLeaf("Recovery.Button.KeepOffer")
             } message: {
                 Text("It won't be saved to your library, and this can't be undone.")
             }
