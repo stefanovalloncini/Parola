@@ -5879,6 +5879,17 @@
         }
       }
     },
+    "Finish the recording first. Parola offers the recovered one again when it ends.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termina prima la registrazione. Parola ti riproporrà quella recuperata quando finisce."
+          }
+        }
+      }
+    },
     "Floating pill near the bottom of the screen.": {
       "extractionState": "manual",
       "localizations": {

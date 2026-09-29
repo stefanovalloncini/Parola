@@ -89,12 +89,17 @@ struct ContentSheetsModifier: ViewModifier {
         }
     }
 
-    // Every answer is a button of its own; a prompt closed without one stays on offer and deletes nothing.
+    // Every answer is a button of its own; a prompt closed without one stays on offer and deletes nothing. It waits out a take.
     private var recoveryBinding: Binding<Bool> {
         Binding(
-            get: { model.pendingRecovery != nil && !confirmingRecoveryDiscard },
+            get: { model.pendingRecovery != nil && !confirmingRecoveryDiscard && !isRecording },
             set: { _ in }
         )
+    }
+
+    private var isRecording: Bool {
+        if case .recording = model.phase { return true }
+        return model.recordingCountdown != nil
     }
 }
 

@@ -131,7 +131,7 @@ extension AppModel {
     ) -> Int {
         let generation = beginRecoveryGeneration()
         recordingRecoveryStartedAt = nil
-        writeRecoveryFile(RecoveryCheckpoint(
+        writeRecoveryFile(generation: generation, RecoveryCheckpoint(
             kind: .fileTranscription,
             startedAt: Date(),
             modelName: selectedModel,
@@ -165,9 +165,11 @@ extension AppModel {
     }
 
     func writeRecordingCheckpoint() {
-        guard activeRecoveryGeneration != nil, let startedAt = recordingRecoveryStartedAt else { return }
+        let generation = activeTake.map(\.recovery) ?? activeRecoveryGeneration
+        let startedAt = activeTake.map(\.recoveryStartedAt) ?? recordingRecoveryStartedAt
+        guard let generation, let startedAt else { return }
         guard !liveSegments.isEmpty || liveRecordingAudioURL != nil else { return }
-        writeRecoveryFile(RecoveryCheckpoint(
+        writeRecoveryFile(generation: generation, RecoveryCheckpoint(
             kind: .recording,
             startedAt: startedAt,
             modelName: selectedModel,
@@ -198,8 +200,8 @@ extension AppModel {
         endRecovery(active)
     }
 
-    private func writeRecoveryFile(_ checkpoint: RecoveryCheckpoint) {
-        guard let generation = activeRecoveryGeneration, let id = recoveryFileIDs[generation] else { return }
+    private func writeRecoveryFile(generation: Int, _ checkpoint: RecoveryCheckpoint) {
+        guard let id = recoveryFileIDs[generation] else { return }
         var checkpoint = checkpoint
         checkpoint.id = id
         checkpoint.owner = recoveryOwner?.id
@@ -345,6 +347,15 @@ extension AppModel {
 
     func acceptPendingRecovery() {
         guard let checkpoint = pendingRecovery else { return }
+        // Restoring takes over the screen a take in progress is using; the offer waits until the take ends.
+        guard !recordingActive else {
+            exportNotice = ExportNotice(
+                message: String(localized: "Finish the recording first. Parola offers the recovered one again when it ends."),
+                failures: [],
+                folder: nil
+            )
+            return
+        }
         answerRecoveryOffer(checkpoint)
         switch checkpoint.kind {
         case .fileTranscription:

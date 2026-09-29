@@ -1039,6 +1039,66 @@ extension TranscriberMockSuites {
             transcribing.endActiveRecovery()
         }
 
+        @Test("Restore waits while a take records: the offer stays and says why, and works once the take ends")
+        func restoreWaitsForTheTakeInProgress() async throws {
+            let library = makeTempLibraryURL("restore-during-take")
+            try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+            let segments = [TranscriptSegment(id: 0, start: 0, end: 1, text: "from before the crash")]
+            try writeLegacyCheckpoint(
+                RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", segments: segments), library: library
+            )
+            let fixture = try makeTakeWAV("take-in-progress")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let model = makeModel(libraryURL: library)
+                model.useStreaming = false
+                #expect(model.pendingRecovery != nil)
+                model.startRecording(source: .microphone)
+                await waitUntil { model.liveSource != nil }
+
+                model.acceptPendingRecovery()
+
+                #expect(model.pendingRecovery != nil, "the offer waits")
+                #expect(model.phase == .recording(source: .microphone))
+                #expect(model.exportNotice?.message == "Finish the recording first. Parola offers the recovered one again when it ends.")
+
+                model.cancelCurrentWork()
+                await waitUntil { !model.recordingActive }
+                model.acceptPendingRecovery()
+                #expect(model.pendingRecovery == nil)
+                #expect(await waitUntil { model.transcript?.segments == segments })
+            }
+        }
+
+        @Test("a take ends its own checkpoint, never a run that started meanwhile", .timeLimit(.minutes(1)))
+        func takeEndsOnlyItsOwnCheckpoint() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel()
+                await startStreamingTake(
+                    model, segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "its own words")], delayMs: 300
+                )
+                await waitUntil { model.recordingStartedAt != nil }
+                let recovery = try #require(model.activeTake?.recovery)
+                model.liveRecordingAudioURL = URL(fileURLWithPath: "/tmp/parola-streamed-take.wav")
+                model.writeRecordingCheckpoint()
+                await model.pendingRecoveryWrite?.value
+                let takeCheckpoint = model.recoveryFileURL(for: try #require(model.recoveryFileIDs[recovery]))
+                #expect(FileManager.default.fileExists(atPath: takeCheckpoint.path))
+                let other = model.beginFileTranscribeRecovery(sourceURL: URL(fileURLWithPath: "/tmp/parola-other-run.wav"))
+                await model.pendingRecoveryWrite?.value
+                let otherCheckpoint = try #require(model.activeRecoveryFileURL)
+
+                model.stopRecordingAndTranscribe()
+
+                _ = await entries(model, count: 1)
+                #expect(await waitUntil { !FileManager.default.fileExists(atPath: takeCheckpoint.path) })
+                #expect(FileManager.default.fileExists(atPath: otherCheckpoint.path), "the other run's checkpoint is its own to end")
+                model.endRecovery(other)
+            }
+        }
+
         @Test("only a confirmed Discard deletes a recovered take's audio")
         func discardDeletesTheTake() async throws {
             let library = makeTempLibraryURL("discard-take")

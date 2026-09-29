@@ -71,6 +71,9 @@ final class AppModel {
         let source: RecordSource
         let category: EntryCategory
         let captureTargets: Set<String>
+        /// The take's own checkpoint once it has one, so its end never touches whichever run is active by then.
+        var recovery: Int?
+        var recoveryStartedAt: Date?
     }
 
     /// How long a take stays quiet before the pane warns: a mic soon, Mac audio only past a pause, unless it has heard nothing yet.
@@ -1610,6 +1613,7 @@ final class AppModel {
     }
 
     private func teardownActiveCapture(exitsMedia: Bool = true) {
+        let takeRecovery = activeTake?.recovery
         if recordingStartInFlight, liveSource == nil {
             stopRequestedDuringStart = true
         } else {
@@ -1620,6 +1624,7 @@ final class AppModel {
         stopSilenceWatch()
         clearTakeReadouts()
         stopRecordingWatch()
+        if let takeRecovery { endRecovery(takeRecovery) }
         endActiveRecovery()
         liveRecordingAudioURL = nil
         cancelAndTrack(&streamingConsumer)
@@ -3206,7 +3211,8 @@ final class AppModel {
             // pointer to the in-flight file instead of losing the take outright.
             liveRecordingAudioURL = inFlight
             if liveRecordingAudioURL != nil {
-                beginRecordingRecovery()
+                activeTake?.recovery = beginRecordingRecovery()
+                activeTake?.recoveryStartedAt = recordingRecoveryStartedAt
                 writeRecordingCheckpoint()
             }
             return true
@@ -3271,9 +3277,15 @@ final class AppModel {
         clearTakeReadouts()
         stopSilenceWatch()
         stopRecordingWatch()
-        endActiveRecovery()
+        if let recovery = recoveryGeneration(of: take ?? activeTake) { endRecovery(recovery) }
         liveRecordingAudioURL = nil
         activeTake = nil
+    }
+
+    /// A take's own checkpoint; with no take, as in a test driving the events directly, whichever run is active.
+    func recoveryGeneration(of take: TakeContext?) -> Int? {
+        guard let take else { return activeRecoveryGeneration }
+        return take.recovery
     }
 
     private func updateSilenceFlag() {
@@ -3317,6 +3329,7 @@ final class AppModel {
     }
 
     private func startStreamingMic(_ take: TakeContext) {
+        var take = take
         streamingConsumer?.cancel()
         let modelName = selectedModel
         let s = StreamingTranscriberFactory.make(clock: clock, deviceUID: preferredInputDeviceUID, persistAudio: true)
@@ -3328,7 +3341,9 @@ final class AppModel {
         liveVoiceActive = false
         beginTakeArming(.preparingModel(name: modelName, download: nil))
         phase = .recording(source: .microphone)
-        beginRecordingRecovery()
+        take.recovery = beginRecordingRecovery()
+        take.recoveryStartedAt = recordingRecoveryStartedAt
+        activeTake = take
         startRecordingWatch(checkpoints: true)
 
         let opts = currentOptions
@@ -3449,7 +3464,7 @@ final class AppModel {
 
     /// A live take that failed keeps what it heard: its confirmed words and its audio, as an interrupted entry.
     private func keepFailedLiveTake(_ reason: String, take: TakeContext?, session: (any StreamingTranscriber)?) async {
-        let recovery = activeRecoveryGeneration
+        let recovery = recoveryGeneration(of: take)
         // Held first, so the teardown below leaves the checkpoint for the save to end.
         if let recovery { recoveryHeldByTake.insert(recovery) }
         let confirmed = liveSegments
@@ -3495,7 +3510,7 @@ final class AppModel {
 
     /// A live take's final transcript lands on screen and in the library; one with nothing in it says so.
     private func landLiveTake(_ transcript: Transcript, take: TakeContext?, session: (any StreamingTranscriber)?) async {
-        let recovery = activeRecoveryGeneration
+        let recovery = recoveryGeneration(of: take)
         // Held until the save ends it, so a cancel's cleanup during the awaits below leaves it on disk.
         if let recovery { recoveryHeldByTake.insert(recovery) }
         let arming = takeArming
@@ -3599,7 +3614,7 @@ final class AppModel {
         stopSilenceWatch()
         let category = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
-        let recovery = activeRecoveryGeneration
+        let recovery = recoveryGeneration(of: take)
         startTakeTask { [weak self] in
             guard let self else { return }
             await mediaSession.exitRecording()
@@ -3990,7 +4005,7 @@ final class AppModel {
         stopSilenceWatch()
         let category = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
-        let recovery = activeRecoveryGeneration
+        let recovery = recoveryGeneration(of: take)
         let title = Self.liveRecordingTitle(category: category, endedAt: Date())
         await mediaSession.exitRecording()
         var cutShort = false
