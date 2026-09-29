@@ -276,8 +276,9 @@ extension AppModel {
         return url
     }
 
-    nonisolated static func recoveredRecordingTitle(startedAt: Date) -> String {
-        "Recording \(AppFormat.dateAndTime(startedAt)) (recovered)"
+    nonisolated static func recoveredRecordingTitle(startedAt: Date, bundle: Bundle = .main) -> String {
+        let title = liveRecordingTitle(category: .transcription, endedAt: startedAt, bundle: bundle)
+        return "\(title) \(String(localized: "(recovered)", bundle: bundle))"
     }
 
     // MARK: - Inflight sweep

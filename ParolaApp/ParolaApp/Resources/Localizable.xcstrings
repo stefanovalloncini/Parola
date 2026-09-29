@@ -631,6 +631,50 @@
         }
       }
     },
+    "(interrupted)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(interrotta)"
+          }
+        }
+      }
+    },
+    "(not transcribed)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(non trascritta)"
+          }
+        }
+      }
+    },
+    "(recovered)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(recuperata)"
+          }
+        }
+      }
+    },
+    "(transcription failed)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(trascrizione non riuscita)"
+          }
+        }
+      }
+    },
     "+1 frame": {
       "extractionState": "manual",
       "localizations": {
@@ -7633,6 +7677,17 @@
         }
       }
     },
+    "Meeting %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riunione %@"
+          }
+        }
+      }
+    },
     "Meetings": {
       "extractionState": "manual",
       "localizations": {
@@ -10695,6 +10750,17 @@
         }
       }
     },
+    "Recording %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione %@"
+          }
+        }
+      }
+    },
     "Recording from %@": {
       "extractionState": "manual",
       "localizations": {
@@ -13502,6 +13568,17 @@
         }
       }
     },
+    "The audio was saved to your library.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'audio è stato salvato nella libreria."
+          }
+        }
+      }
+    },
     "The base URL of an OpenAI-compatible server, without /chat/completions.": {
       "extractionState": "manual",
       "localizations": {
@@ -13663,6 +13740,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La registrazione resta nella libreria."
+          }
+        }
+      }
+    },
+    "The recording up to this point was saved to your library.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La registrazione fino a questo punto è stata salvata nella libreria."
           }
         }
       }

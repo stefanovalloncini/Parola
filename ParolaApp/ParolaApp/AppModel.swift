@@ -2891,13 +2891,6 @@ final class AppModel {
         return transcriptionFailureMessage(for: error, bundle: bundle)
     }
 
-    /// Live takes capture to a temp file whose UUID name would otherwise leak into the
-    /// library title when auto-titling is unavailable.
-    nonisolated static func liveRecordingTitle(category: EntryCategory, endedAt: Date) -> String {
-        let stamp = AppFormat.dateAndTime(endedAt)
-        return category == .meeting ? "Meeting \(stamp)" : "Recording \(stamp)"
-    }
-
     nonisolated static func microphoneAccessOffMessage(bundle: Bundle = .main) -> String {
         String(
             localized: "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone, then start recording again.",
@@ -3327,7 +3320,7 @@ final class AppModel {
                     audioSource: audioURL,
                     source: takeSource,
                     category: takeCategory,
-                    title: takeTitle + " (interrupted)"
+                    title: Self.takeTitle(takeTitle, suffix: .interrupted)
                 ))
                 message += " " + String(localized: "The recording up to this point was saved to your library.")
             }
@@ -3532,7 +3525,7 @@ final class AppModel {
             audioSource: url,
             source: source,
             category: category,
-            title: title + (stopped ? " (not transcribed)" : " (transcription failed)")
+            title: Self.takeTitle(title, suffix: stopped ? .notTranscribed : .transcriptionFailed)
         ))
         if stopped {
             // Whatever stopped the run keeps the screen; only the take's own pane gives way to Home.
@@ -3579,6 +3572,36 @@ final class AppModel {
     func recordedTakeTitle(playing file: URL?) -> String? {
         guard let file, let recordedTake, recordedTake.file == file else { return nil }
         return recordedTake.title
+    }
+
+    // MARK: - Take titles
+
+    /// What a take's title says about the audio it holds.
+    enum TakeTitleSuffix {
+        case notTranscribed
+        case transcriptionFailed
+        case interrupted
+    }
+
+    /// Live takes capture to a temp file whose UUID name would otherwise leak into the
+    /// library title when auto-titling is unavailable.
+    nonisolated static func liveRecordingTitle(category: EntryCategory, endedAt: Date, bundle: Bundle = .main) -> String {
+        let stamp = AppFormat.dateAndTime(endedAt)
+        return category == .meeting
+            ? String(localized: "Meeting \(stamp)", bundle: bundle)
+            : String(localized: "Recording \(stamp)", bundle: bundle)
+    }
+
+    nonisolated static func takeTitle(_ title: String, suffix: TakeTitleSuffix, bundle: Bundle = .main) -> String {
+        "\(title) \(suffixText(suffix, bundle: bundle))"
+    }
+
+    private nonisolated static func suffixText(_ suffix: TakeTitleSuffix, bundle: Bundle) -> String {
+        switch suffix {
+        case .notTranscribed: return String(localized: "(not transcribed)", bundle: bundle)
+        case .transcriptionFailed: return String(localized: "(transcription failed)", bundle: bundle)
+        case .interrupted: return String(localized: "(interrupted)", bundle: bundle)
+        }
     }
 
     // MARK: - Quitting during a take
@@ -3635,7 +3658,7 @@ final class AppModel {
             audioSource: url,
             source: takeSource,
             category: category,
-            title: title + " (not transcribed)"
+            title: Self.takeTitle(title, suffix: .notTranscribed)
         ))
         if (try? await saving.value) != nil { endActiveRecovery() }
     }

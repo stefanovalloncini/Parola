@@ -291,6 +291,19 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a take's title and its notes read in Italian")
+        func takeTitlesReadInItalian() throws {
+            let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+            let italian = try #require(Bundle(path: path))
+            let endedAt = Date(timeIntervalSince1970: 1_700_000_000)
+            let stamp = AppFormat.dateAndTime(endedAt)
+
+            let meeting = AppModel.liveRecordingTitle(category: .meeting, endedAt: endedAt, bundle: italian)
+            #expect(meeting == "Riunione \(stamp)")
+            #expect(AppModel.takeTitle(meeting, suffix: .notTranscribed, bundle: italian) == "Riunione \(stamp) (non trascritta)")
+            #expect(AppModel.recoveredRecordingTitle(startedAt: endedAt, bundle: italian) == "Registrazione \(stamp) (recuperata)")
+        }
+
         // MARK: - Quitting during a take
 
         @Test("quitting with no take in progress goes at once and asks nothing")
