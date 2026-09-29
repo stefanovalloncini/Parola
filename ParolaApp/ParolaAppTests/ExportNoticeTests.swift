@@ -52,6 +52,59 @@ struct ExportNoticeTests {
         #expect(model.transcript?.text == "still here")
     }
 
+    @Test("a project save that can't be written says so and leaves the transcript on screen")
+    func failedDocumentSaveKeepsTheTranscript() async {
+        let picker = TestFilePicker()
+        let model = makeModel(picker)
+        model.transcript = transcript("the open one")
+        model.sourceFileURL = URL(fileURLWithPath: "/tmp/parola-notice-source.wav")
+        model.phase = .ready
+        await picker.queueSaveResponse(unwritable("notes.parola"))
+
+        model.saveProjectDocument()
+        await waitUntil { model.exportNotice != nil }
+
+        #expect(model.exportNotice?.succeeded == false)
+        #expect(model.phase == .ready)
+        #expect(model.transcript?.text == "the open one")
+    }
+
+    @Test("a project save that works marks the document as Parola's")
+    func savedDocumentIsMarked() async throws {
+        let picker = TestFilePicker()
+        let model = makeModel(picker)
+        model.transcript = transcript("saved")
+        let folder = try scratch()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let audio = folder.appendingPathComponent("source.wav")
+        try Data("RIFFstub".utf8).write(to: audio)
+        model.sourceFileURL = audio
+        let destination = folder.appendingPathComponent("saved.parola")
+        await picker.queueSaveResponse(destination)
+
+        model.saveProjectDocument()
+        await waitUntil { OutputMarker.isMarked(destination) || model.exportNotice != nil }
+
+        #expect(OutputMarker.isMarked(destination))
+        #expect(model.exportNotice == nil)
+    }
+
+    @Test("a term pack that can't be written says so and leaves the transcript on screen")
+    func failedTermPackExportKeepsTheTranscript() async {
+        let picker = TestFilePicker()
+        let model = makeModel(picker)
+        model.transcript = transcript("still open")
+        model.phase = .ready
+        await picker.queueSaveResponse(unwritable("terms.json"))
+
+        model.presentTermPackExporter()
+        await waitUntil { model.exportNotice != nil }
+
+        #expect(model.exportNotice?.message.hasPrefix("Export failed:") == true)
+        #expect(model.phase == .ready)
+        #expect(model.transcript?.text == "still open")
+    }
+
     @Test("a notes export that can't be written says so")
     func failedNotesExport() async throws {
         let picker = TestFilePicker()

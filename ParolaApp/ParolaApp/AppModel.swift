@@ -3560,13 +3560,14 @@ final class AppModel {
             guard let dest = await self.filePicker.chooseSaveDestination(suggestedName: suggested, allowedTypes: []) else { return }
             do {
                 try await AppModel.offMainIO {
-                    _ = try ParolaDocument.write(
+                    let written = try ParolaDocument.write(
                         transcript: transcript, audioURL: sourceFileURL, to: dest, entrySource: entrySource
                     )
+                    OutputMarker.mark(written)
                 }
             } catch {
                 ParolaLog.error(.export, "document save failed", [.error: .error(error)])
-                self.phase = .failed(message: "Save failed: \(error.localizedDescription)")
+                self.exportNotice = .failed(error)
             }
         }
     }

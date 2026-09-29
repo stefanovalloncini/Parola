@@ -54,8 +54,10 @@ extension AppModel {
                 )
                 let data = try TermPackIO.encode(pack)
                 try data.write(to: url, options: .atomic)
+                OutputMarker.mark(url)
             } catch {
-                self.phase = .failed(message: "Couldn't export term pack: \(error.localizedDescription)")
+                ParolaLog.error(.export, "term pack export failed", [.error: .error(error)])
+                self.exportNotice = .failed(error)
             }
         }
     }
