@@ -217,4 +217,47 @@ struct FolderWatcherIdentityTests {
 
         #expect(Set(collected.snapshot().map(\.lastPathComponent)) == ["renamed.wav", "same-name.wav"])
     }
+
+    @Test("a file that was already there, changed in place or saved again with its birth time, doesn't arrive; one replaced by a new file does")
+    func sameFileSavedAgainVersusReplaced() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        let firstBirth = Date(timeIntervalSince1970: (clock.start.timeIntervalSince1970 - 3600).rounded())
+        for name in ["edited.m4a", "saved-again.m4a", "replaced.m4a"] {
+            let url = folder.appendingPathComponent(name)
+            try Fixture.writeSettled(url, clock: clock)
+            try FileManager.default.setAttributes([.creationDate: firstBirth], ofItemAtPath: url.path)
+        }
+
+        let collected = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let watcher = makeWatcher(folder, clock: clock, scheduler: scheduler, observesFileSystem: false, collected: collected)
+        await watcher.start()
+
+        let edited = try FileHandle(forWritingTo: folder.appendingPathComponent("edited.m4a"))
+        try edited.seekToEnd()
+        try edited.write(contentsOf: Data(count: 500))
+        try edited.close()
+        try replace(folder.appendingPathComponent("saved-again.m4a"), bytes: 3000, birth: firstBirth, clock: clock)
+        try replace(folder.appendingPathComponent("replaced.m4a"), bytes: 3000, birth: firstBirth.addingTimeInterval(1800), clock: clock)
+        await watcher.checkForNewFiles()
+
+        #expect(Fixture.names(await watcher.pendingPaths) == ["replaced.m4a"])
+        try await scheduler.advance(ticks: 2)
+        let sizes = Dictionary(uniqueKeysWithValues: (await watcher.baseline()?.entries ?? []).map { ($0.path, $0.size) })
+        await watcher.stop()
+        #expect(collected.snapshot().map(\.lastPathComponent) == ["replaced.m4a"])
+        #expect(sizes == ["edited.m4a": 1524, "saved-again.m4a": 3000, "replaced.m4a": 3000])
+    }
+
+    private func replace(_ url: URL, bytes: Int, birth: Date, clock: FixedClock) throws {
+        let staging = url.deletingLastPathComponent().appendingPathComponent(".staging-\(UUID().uuidString)")
+        try Data(count: bytes).write(to: staging)
+        try FileManager.default.setAttributes(
+            [.modificationDate: clock.start.addingTimeInterval(-5), .creationDate: birth],
+            ofItemAtPath: staging.path
+        )
+        #expect(rename(staging.path, url.path) == 0)
+    }
 }

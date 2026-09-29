@@ -442,34 +442,43 @@ public actor FolderWatcher {
         if let known = files[item.key], !Self.isSameFile(known, as: item) {
             forget(item.key)
         }
-        if var known = files[item.key] {
-            let changed = known.size != item.size || known.modified != item.modified
-            let moved = known.path != item.path
-            known.path = item.path
-            let reborn = item.created != nil && item.created != known.created
-            if known.status != .pending, changed || moved || reborn {
-                known.size = item.size
-                known.modified = item.modified
-                baselineChanged = true
-            }
-            known.created = item.created ?? known.created
-            files[item.key] = known
-            if case .emitted(let at) = known.status, changed, arrivesAgain(modified: item.modified, emittedAt: at) {
-                setStatus(.pending, for: item.key, now: now)
-            }
+        if files[item.key] != nil {
+            refresh(item.key, with: item, now: now)
         } else if let departure = options.ledger.claim(
             item.key, size: item.size, modified: item.modified, created: item.created, now: now
         ) {
             track(item, status: departure.status, now: now)
         } else if let oldKey = vanished[item.path], let old = files[oldKey],
-                  old.size == item.size, old.modified == item.modified {
-            // Same name, size and date under a new inode: an atomic save of the same bytes, or a
-            // network volume that renumbered its files on remount.
+                  Self.isSameFile(old, as: item) || (old.size == item.size && old.modified == item.modified) {
+            // The same file saved again under a new inode: judged like a change written in place.
             vanished.removeValue(forKey: item.path)
             forget(oldKey)
-            track(item, status: old.status, now: now)
+            files[item.key] = TrackedFile(
+                path: old.path, size: old.size, modified: old.modified, created: old.created, status: .pending
+            )
+            setStatus(old.status, for: item.key, now: now)
+            refresh(item.key, with: item, now: now)
         } else {
             track(item, status: .pending, now: now)
+        }
+    }
+
+    /// A changed file that was already there is updated; one that arrived moments ago arrives again.
+    private func refresh(_ key: FileKey, with item: ScannedFile, now: Date) {
+        guard var known = files[key] else { return }
+        let changed = known.size != item.size || known.modified != item.modified
+        let moved = known.path != item.path
+        let reborn = item.created != nil && item.created != known.created
+        known.path = item.path
+        if known.status != .pending, changed || moved || reborn {
+            known.size = item.size
+            known.modified = item.modified
+            baselineChanged = true
+        }
+        known.created = item.created ?? known.created
+        files[key] = known
+        if case .emitted(let at) = known.status, changed, arrivesAgain(modified: item.modified, emittedAt: at) {
+            setStatus(.pending, for: key, now: now)
         }
     }
 
