@@ -7425,6 +7425,17 @@
         }
       }
     },
+    "Mac audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio del Mac"
+          }
+        }
+      }
+    },
     "Make the dictation HUD translucent.": {
       "extractionState": "manual",
       "localizations": {
@@ -8630,6 +8641,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ancora nessuno snippet"
+          }
+        }
+      }
+    },
+    "No sound from your Mac — check that audio is playing.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun suono dal Mac: controlla che l'audio sia in riproduzione."
           }
         }
       }

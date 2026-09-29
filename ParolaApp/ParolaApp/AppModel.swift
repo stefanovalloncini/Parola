@@ -48,6 +48,13 @@ final class AppModel {
             case .systemAudio: return .systemAudio
             }
         }
+        /// What the meter under a take is listening to.
+        var meterLabel: String {
+            switch self {
+            case .microphone: return String(localized: "Microphone")
+            case .systemAudio: return String(localized: "Mac audio")
+            }
+        }
     }
 
     /// A take between Record and its first captured audio, when the pane shows a wait instead of a clock.
@@ -3133,6 +3140,7 @@ final class AppModel {
         guard takeArming != nil else { return }
         takeArming = nil
         recordingStartedAt = Date()
+        startSilenceWatch()
         scheduleRecordingAutoStop()
     }
 
@@ -3148,6 +3156,7 @@ final class AppModel {
         if recordingIsSilent != alert { recordingIsSilent = alert }
     }
 
+    /// Reads the meter rather than a voice detector, so every source warns the same way: mic or Mac audio, live or not.
     private func startSilenceWatch() {
         stopSilenceWatch()
         silenceDetector.reset()
@@ -3157,9 +3166,15 @@ final class AppModel {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(750), clock: clock)
                 if Task.isCancelled { return }
-                self?.updateSilenceFlag()
+                self?.noteRecordingLevel()
             }
         }
+    }
+
+    private func noteRecordingLevel() {
+        let heard = recordingLevelMeter?.lastSound.map { $0.duration(to: .now) < .seconds(1) } ?? false
+        silenceDetector.note(active: heard)
+        updateSilenceFlag()
     }
 
     private func stopSilenceWatch() {
@@ -3181,7 +3196,6 @@ final class AppModel {
         liveVoiceActive = false
         beginTakeArming(.preparingModel(name: modelName, download: nil))
         phase = .recording(source: .microphone)
-        startSilenceWatch()
         beginRecordingRecovery()
         startRecordingWatch(checkpoints: true)
 
@@ -3280,8 +3294,6 @@ final class AppModel {
         case .voiceActivity(let active):
             markTakeCapturing()
             if liveVoiceActive != active { liveVoiceActive = active }
-            silenceDetector.note(active: active)
-            updateSilenceFlag()
         case .warning:
             break
         case .failed(let msg):
@@ -3394,6 +3406,7 @@ final class AppModel {
         // Hand off synchronously so a racing auto-stop or second click can't start a duplicate run.
         liveSource = nil
         stopRecordingWatch()
+        stopSilenceWatch()
         let category = pendingRecordingCategory
         let takeSource = pendingRecordingSource
         fileTranscribeTask?.cancel()

@@ -9,7 +9,6 @@ struct RecordingPane: View {
     private var stopTitle: String {
         isStreaming ? String(localized: "Finish") : String(localized: "Stop")
     }
-    private var showsWaveform: Bool { source == .microphone }
 
     @ViewBuilder
     private var card: some View {
@@ -21,7 +20,6 @@ struct RecordingPane: View {
             stopTitle: stopTitle,
             levelMeter: model.recordingLevelMeter,
             levelTrace: model.recordingLevelTrace,
-            showsWaveform: showsWaveform,
             onStop: { model.stopRecordingAndTranscribe() },
             onCancel: { model.cancelRecordingBeforeCapture() }
         )
@@ -34,13 +32,12 @@ struct RecordingPane: View {
                     .padding(.horizontal, DS.Spacing.large)
                     .padding(.top, DS.Spacing.large)
                     .padding(.bottom, DS.Spacing.medium)
-                if model.recordingIsSilent { silenceBanner }
-                if model.recordingDiskSpaceLow { diskSpaceBanner }
+                banners
                 Divider()
                 LiveTranscriptView()
             } else {
                 card.frame(maxWidth: .infinity, maxHeight: .infinity)
-                if model.recordingDiskSpaceLow { diskSpaceBanner }
+                banners
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -48,8 +45,21 @@ struct RecordingPane: View {
         .accessibilityLabel("Recording from \(source.label.lowercased())")
     }
 
+    @ViewBuilder
+    private var banners: some View {
+        if model.recordingIsSilent { silenceBanner }
+        if model.recordingDiskSpaceLow { diskSpaceBanner }
+    }
+
     private var silenceBanner: some View {
-        warningBanner(icon: "speaker.slash.fill", message: "No voice detected — check your microphone.")
+        warningBanner(icon: "speaker.slash.fill", message: silenceMessage)
+    }
+
+    private var silenceMessage: LocalizedStringKey {
+        switch source {
+        case .microphone: return "No voice detected — check your microphone."
+        case .systemAudio: return "No sound from your Mac — check that audio is playing."
+        }
     }
 
     private var diskSpaceBanner: some View {
@@ -85,7 +95,6 @@ struct RecordingCard: View {
     let stopTitle: String
     var levelMeter: LevelMeter? = nil
     var levelTrace: LevelTrace? = nil
-    var showsWaveform: Bool = false
     let onStop: () -> Void
     let onCancel: () -> Void
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 64
@@ -118,21 +127,19 @@ struct RecordingCard: View {
                 } else {
                     armingReadout
                 }
-                if showsWaveform {
-                    WaveformHistory(
-                        meter: levelMeter,
-                        trace: levelTrace,
-                        capacity: AppModel.takeLevelHistoryCapacity,
-                        barWidth: 2,
-                        spacing: 2,
-                        maxHeight: 28,
-                        idleHeight: 3,
-                        fill: DS.Color.accent
-                    )
-                    .frame(width: 220, height: 30)
-                    .padding(.top, DS.Spacing.hair)
-                }
-                Text(source.label)
+                WaveformHistory(
+                    meter: levelMeter,
+                    trace: levelTrace,
+                    capacity: AppModel.takeLevelHistoryCapacity,
+                    barWidth: 2,
+                    spacing: 2,
+                    maxHeight: 28,
+                    idleHeight: 3,
+                    fill: DS.Color.accent
+                )
+                .frame(width: 220, height: 30)
+                .padding(.top, DS.Spacing.hair)
+                Text(source.meterLabel)
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText.opacity(0.7))
             }

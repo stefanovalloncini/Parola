@@ -232,6 +232,28 @@ extension TranscriberMockSuites {
             #expect(AppDelegate.secondsToNextTick(startedAt: nil, now: start) == 1)
         }
 
+        // MARK: - Mac audio
+
+        @Test("a system-audio take shows its meter and warns off the meter when it hears nothing")
+        func systemAudioTakeIsNotBlind() async throws {
+            let silent = try makeTakeWAV("mac-audio")
+            defer { try? FileManager.default.removeItem(at: silent) }
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: silent)
+                let model = makeModel()
+                model.silenceDetector = SilenceDetector(threshold: 0.5)
+                model.startRecording(source: .systemAudio)
+                await waitUntil { model.recordingLevelMeter != nil && model.recordingStartedAt != nil }
+                #expect(AppModel.RecordSource.systemAudio.meterLabel == "Mac audio")
+
+                // Two 750 ms ticks of the watch, and a slow host can stall the main actor for seconds.
+                await waitUntil(timeoutMs: 15_000) { model.recordingIsSilent }
+
+                model.cancelCurrentWork()
+                #expect(!model.recordingIsSilent)
+            }
+        }
+
         // MARK: - Titles
 
         @Test("a finished take is named by its title, then by its entry, never by its working file")
