@@ -46,7 +46,7 @@ struct FolderWatcherSettleTests {
 
         try await scheduler.advanceAndWait()
         #expect(collected.snapshot().map(\.lastPathComponent) == ["interview.wav"])
-        #expect(await watcher.baseline().entries.map(\.size) == [2000])
+        #expect(await watcher.baseline()?.entries.map(\.size) == [2000])
         try await scheduler.advance(ticks: 3)
         await watcher.stop()
         #expect(collected.snapshot().count == 1)
@@ -97,7 +97,7 @@ struct FolderWatcherSettleTests {
         try await scheduler.advance(ticks: 3)
         await watcher.checkForNewFiles()
         #expect(await watcher.pendingPaths.isEmpty)
-        #expect(await watcher.baseline().entries.map(\.size) == [1500])
+        #expect(await watcher.baseline()?.entries.map(\.size) == [1500])
         await watcher.stop()
         #expect(collected.snapshot().count == 1)
     }
@@ -142,7 +142,7 @@ struct FolderWatcherSettleTests {
         try Fixture.writeSettled(arrival, clock: clock)
         await before.checkForNewFiles()
         try await first.advance(ticks: 2)
-        let saved = await before.baseline()
+        let saved = try #require(await before.baseline())
         await before.stop()
         #expect(saved.entries.first { $0.path == "arrival.wav" }?.emittedAt == clock.start)
         #expect(saved.entries.first { $0.path == "old.m4a" }?.emittedAt == nil)

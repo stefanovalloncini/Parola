@@ -51,7 +51,7 @@ struct FolderWatcherAvailabilityTests {
         try FileManager.default.moveItem(at: folder, to: renamed)
         #expect(await waitUntil { await watcher.state == .lost })
         #expect(states.all == [.lost])
-        let saved = await watcher.baseline()
+        let saved = try #require(await watcher.baseline())
         #expect(saved.entries.map(\.path) == ["kept.m4a"])
 
         let scheduler = ManualScheduler()

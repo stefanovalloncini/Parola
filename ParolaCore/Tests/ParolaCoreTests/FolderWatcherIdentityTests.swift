@@ -173,7 +173,7 @@ struct FolderWatcherIdentityTests {
         await watcher.checkForNewFiles()
         #expect(await watcher.state == .lost)
         #expect(Fixture.names(await watcher.trackedPaths) == ["one.m4a", "two.wav"])
-        let saved = await watcher.baseline()
+        let saved = try #require(await watcher.baseline())
 
         try FileManager.default.moveItem(at: away, to: folder)
         try Fixture.writeSettled(folder.appendingPathComponent("fresh.mp3"), clock: clock)

@@ -187,4 +187,55 @@ struct WatchedFoldersStoreWatchingTests {
         #expect(!store.isUnavailable(rig.folderID))
         await store.stopWatching()
     }
+
+    @Test("re-adding a folder while its watcher is on its first scan brings back nothing already there")
+    func replacingAWatcherMidFirstScanFloodsNothing() async throws {
+        let rig = try makeRig("midscan")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        try writeSettled(rig.folder.appendingPathComponent("old.m4a"))
+
+        let arrivals = Arrivals()
+        let first = makeStore(rig, arrivals: arrivals)
+        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        await first.stopWatching()
+
+        let parked = DispatchQueue(label: "parola.test.parked-scan")
+        parked.suspend()
+        let store = WatchedFoldersStore(
+            defaults: rig.defaults,
+            baselineDirectory: rig.baselineDirectory,
+            watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50), scanQueue: parked),
+            baselineWriteDelay: .milliseconds(10)
+        ) { url in
+            arrivals.urls.append(url)
+        }
+        let watching = await waitUntil { store.watcher(for: rig.folderID) != nil }
+        let parkedWatcher = store.watcher(for: rig.folderID)
+        store.adopt(rig.folder, for: rig.folderID)
+        let replaced = await waitUntil { store.watcher(for: rig.folderID).map { $0 !== parkedWatcher } ?? false }
+        parked.resume()
+        #expect(watching)
+        #expect(replaced)
+
+        try writeSettled(rig.folder.appendingPathComponent("new.wav"))
+        #expect(await waitUntil { arrivals.names.contains("new.wav") })
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(arrivals.names == ["new.wav"])
+        await store.stopWatching()
+    }
+
+    @Test("a settings reload that leaves the watched folders alone restarts no watcher")
+    func unrelatedReloadKeepsWatchers() async throws {
+        let rig = try makeRig("unrelated-reload")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+
+        let store = makeStore(rig, arrivals: Arrivals())
+        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        let before = store.watcher(for: rig.folderID)
+        rig.defaults.set(true, forKey: "someOtherSetting")
+        store.reloadFromDefaults()
+
+        #expect(store.watcher(for: rig.folderID) === before)
+        await store.stopWatching()
+    }
 }

@@ -22,6 +22,8 @@ public actor FolderWatcher {
         /// Share one ledger between the watchers of one app so a file moved between two watched
         /// folders is not imported again.
         public var ledger: FolderWatcherLedger
+        /// Where directory listings run.
+        public var scanQueue: DispatchQueue
         /// Off in tests that drive every rescan themselves and need a fixed order between folders.
         var observesFileSystem = true
 
@@ -32,7 +34,8 @@ public actor FolderWatcher {
             reemitWindow: Duration = .seconds(600),
             clock: any FolderWatcherClock = SystemFolderWatcherClock(),
             scheduler: any FolderWatcherScheduler = SystemFolderWatcherScheduler(),
-            ledger: FolderWatcherLedger = FolderWatcherLedger()
+            ledger: FolderWatcherLedger = FolderWatcherLedger(),
+            scanQueue: DispatchQueue = .global(qos: .utility)
         ) {
             self.recursive = recursive
             self.settledInterval = settledInterval
@@ -41,6 +44,7 @@ public actor FolderWatcher {
             self.clock = clock
             self.scheduler = scheduler
             self.ledger = ledger
+            self.scanQueue = scanQueue
         }
     }
 
@@ -132,6 +136,8 @@ public actor FolderWatcher {
     private var eventContinuation: AsyncStream<Event>.Continuation?
     private var settledTask: Task<Void, Never>?
     private var baselineChanged = false
+    private var seed: Baseline?
+    private var hasScanned = false
     private(set) var listedDirectoryCount = 0
     public private(set) var state: State = .idle
 
@@ -161,6 +167,8 @@ public actor FolderWatcher {
     /// `.watching`, or `.unavailable` when the folder can't be opened.
     public func start(baseline: Baseline? = nil) async {
         guard fileDescriptor < 0 else { return }
+        seed = baseline
+        hasScanned = false
         let fd = folderURL.path.withCString { open($0, O_EVTONLY) }
         guard fd >= 0 else {
             state = .unavailable
@@ -210,6 +218,8 @@ public actor FolderWatcher {
                 subdirectories: listing.subdirectories
             )
         }
+        hasScanned = true
+        seed = nil
         baselineChanged = true
         publishBaselineChange()
         scheduleSettleTick()
@@ -490,7 +500,10 @@ public actor FolderWatcher {
         modified <= emittedAt.addingTimeInterval(Self.seconds(options.reemitWindow))
     }
 
-    public func baseline() -> Baseline {
+    /// Until the first scan is applied this is the baseline the watcher was started with, or nil:
+    /// an empty folder and a folder not listed yet must not look alike.
+    public func baseline() -> Baseline? {
+        guard hasScanned else { return seed }
         let prefix = rootPath + "/"
         let entries: [Baseline.Entry] = files.compactMap { key, file in
             guard file.status != .pending, file.path.hasPrefix(prefix) else { return nil }
@@ -646,8 +659,9 @@ public actor FolderWatcher {
     /// GCD, not `Task.detached`: a detached job resuming actor work around the enumerator's
     /// NSURL bridging has crashed with EXC_ARM_DA_ALIGN before.
     private func scanOffActor(_ request: ScanRequest) async -> ScanResult {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
+        let queue = options.scanQueue
+        return await withCheckedContinuation { continuation in
+            queue.async {
                 continuation.resume(returning: Self.scan(request))
             }
         }

@@ -35,7 +35,7 @@ struct FolderWatcherBaselineTests {
         let collected = CollectedURLs()
         let before = makeWatcher(folder, clock: clock, scheduler: ManualScheduler(), collected: collected)
         await before.start()
-        let saved = await before.baseline()
+        let saved = try #require(await before.baseline())
         await before.stop()
         #expect(saved.entries.map(\.path) == ["old.m4a"])
 
@@ -68,7 +68,7 @@ struct FolderWatcherBaselineTests {
         let watcher = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
         await watcher.start()
         #expect(await watcher.pendingPaths.isEmpty)
-        #expect(await watcher.baseline().entries.map(\.path) == ["Archive/c.mov", "a.m4a", "b.wav"])
+        #expect(await watcher.baseline()?.entries.map(\.path) == ["Archive/c.mov", "a.m4a", "b.wav"])
 
         try Fixture.writeSettled(folder.appendingPathComponent("new.m4a"), clock: clock)
         await watcher.checkForNewFiles()
@@ -90,7 +90,7 @@ struct FolderWatcherBaselineTests {
         let collected = CollectedURLs()
         let before = makeWatcher(folder, clock: clock, scheduler: ManualScheduler(), collected: collected)
         await before.start()
-        let data = try JSONEncoder().encode(await before.baseline())
+        let data = try JSONEncoder().encode(try #require(await before.baseline()))
         await before.stop()
 
         let renamed = parent.appendingPathComponent("Recordings")
@@ -118,7 +118,7 @@ struct FolderWatcherBaselineTests {
         try Fixture.writeSettled(folder.appendingPathComponent("settling.m4a"), clock: clock)
         await before.checkForNewFiles()
         #expect(Fixture.names(await before.pendingPaths) == ["settling.m4a"])
-        let saved = await before.baseline()
+        let saved = try #require(await before.baseline())
         await before.stop()
         #expect(saved.entries.isEmpty)
 
@@ -163,5 +163,37 @@ struct FolderWatcherBaselineTests {
         #expect(changes.withLock { $0 } == 2, "a rescan that finds nothing new changes nothing")
         await watcher.stop()
         #expect(collected.snapshot().count == 1)
+    }
+
+    @Test("until its first scan lands, a watcher's baseline is the one it started with, or nil")
+    func baselineBeforeTheFirstScan() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        try Fixture.writeSettled(folder.appendingPathComponent("old.m4a"), clock: clock)
+        let parked = DispatchQueue(label: "parola.test.parked-scan")
+        parked.suspend()
+        let options = FolderWatcher.Options(clock: clock, scheduler: ManualScheduler(), scanQueue: parked)
+        let seed = FolderWatcher.Baseline(entries: [
+            .init(path: "old.m4a", inode: 1, size: 1024, modified: clock.start, emittedAt: nil),
+        ])
+
+        let unseeded = FolderWatcher(folderURL: folder, options: options) { _ in }
+        let seeded = FolderWatcher(folderURL: folder, options: options) { _ in }
+        let first = Task { await unseeded.start() }
+        let second = Task { await seeded.start(baseline: seed) }
+        let deadline = ContinuousClock.now + .seconds(5)
+        while await seeded.baseline() != seed, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(await unseeded.baseline() == nil)
+        #expect(await seeded.baseline() == seed)
+
+        parked.resume()
+        await first.value
+        await second.value
+        #expect(await unseeded.baseline()?.entries.map(\.path) == ["old.m4a"])
+        await unseeded.stop()
+        await seeded.stop()
     }
 }

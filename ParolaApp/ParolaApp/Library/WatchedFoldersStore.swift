@@ -30,7 +30,6 @@ final class WatchedFoldersStore {
     @ObservationIgnored private var baselineWrites: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var starts: [UUID: UUID] = [:]
     @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
-    @ObservationIgnored private var watchEpoch = 0
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let baselines: WatchedFolderBaselines
     @ObservationIgnored private let watcherOptions: FolderWatcher.Options
@@ -98,21 +97,10 @@ final class WatchedFoldersStore {
     }
 
     func removeFolder(_ id: UUID) {
-        let watcher = watchers.removeValue(forKey: id)
-        let scopedURL = scopedURLs.removeValue(forKey: id)
         folders.removeAll { $0.id == id }
-        unavailableFolderIDs.remove(id)
-        baselineWrites.removeValue(forKey: id)?.cancel()
+        forget(id)
         baselines.remove(id)
         save()
-        if let watcher {
-            Task { @MainActor in
-                await watcher.stop()
-                scopedURL?.stopAccessingSecurityScopedResource()
-            }
-        } else {
-            scopedURL?.stopAccessingSecurityScopedResource()
-        }
     }
 
     func reattach(_ id: UUID) {
@@ -124,6 +112,12 @@ final class WatchedFoldersStore {
         panel.directoryURL = URL(fileURLWithPath: folder.displayPath)
         panel.message = "Pick \(folder.displayName) again to refresh permissions."
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        adopt(url, for: id)
+    }
+
+    /// Watches `url` for the folder `id` with a fresh bookmark, as Re-Add does after its panel.
+    func adopt(_ url: URL, for id: UUID) {
+        guard let folder = folders.first(where: { $0.id == id }) else { return }
         do {
             let bookmark = try url.bookmarkData(
                 options: .withSecurityScope,
@@ -135,9 +129,9 @@ final class WatchedFoldersStore {
                 folders[idx] = refreshed
             }
             unavailableFolderIDs.remove(folder.id)
+            baselineWrites.removeValue(forKey: folder.id)?.cancel()
             // Another folder's baseline would flood it with arrivals; start it the way a new folder starts.
             if url.path != folder.displayPath {
-                baselineWrites.removeValue(forKey: folder.id)?.cancel()
                 baselines.remove(folder.id)
             }
             save()
@@ -165,36 +159,54 @@ final class WatchedFoldersStore {
     }
 
     /// Applies an external change to the "watchedFolders" defaults key (settings reset or import)
-    /// without a relaunch. A folder that is still listed keeps what its watcher knew, so a file
-    /// that was settling arrives and one already imported doesn't come back.
+    /// without a relaunch. Only folders whose entry changed restart; one at the same path keeps
+    /// what its watcher knew.
     func reloadFromDefaults() {
-        watchEpoch += 1
-        let previousWatchers = watchers
-        let previousScopes = scopedURLs
-        watchers.removeAll()
-        scopedURLs.removeAll()
-        unavailableFolderIDs.removeAll()
-        for task in baselineWrites.values { task.cancel() }
-        baselineWrites.removeAll()
+        let previous = Dictionary(uniqueKeysWithValues: folders.map { ($0.id, $0) })
         folders = []
         load()
         let kept = Set(folders.map(\.id))
-        for (id, watcher) in previousWatchers where !kept.contains(id) {
-            let scopedURL = previousScopes[id]
-            Task { @MainActor in
-                await watcher.stop()
-                scopedURL?.stopAccessingSecurityScopedResource()
-            }
+        for id in previous.keys where !kept.contains(id) {
+            forget(id)
         }
         baselines.removeAll(except: kept)
-        for folder in folders {
-            startWatcher(for: folder, replacing: previousWatchers[folder.id], releasing: previousScopes[folder.id])
+        for folder in folders where previous[folder.id] != folder {
+            let samePath = previous[folder.id]?.displayPath == folder.displayPath
+            baselineWrites.removeValue(forKey: folder.id)?.cancel()
+            if !samePath {
+                baselines.remove(folder.id)
+            }
+            startWatcher(
+                for: folder,
+                replacing: watchers.removeValue(forKey: folder.id),
+                releasing: scopedURLs.removeValue(forKey: folder.id),
+                carriesBaseline: samePath
+            )
         }
+    }
+
+    private func forget(_ id: UUID) {
+        starts[id] = nil
+        unavailableFolderIDs.remove(id)
+        baselineWrites.removeValue(forKey: id)?.cancel()
+        let scopedURL = scopedURLs.removeValue(forKey: id)
+        guard let watcher = watchers.removeValue(forKey: id) else {
+            scopedURL?.stopAccessingSecurityScopedResource()
+            return
+        }
+        Task { @MainActor in
+            await watcher.stop()
+            scopedURL?.stopAccessingSecurityScopedResource()
+        }
+    }
+
+    func watcher(for id: UUID) -> FolderWatcher? {
+        watchers[id]
     }
 
     /// Stops every watcher and releases the folders; the saved baselines stay for the next start.
     func stopWatching() async {
-        watchEpoch += 1
+        starts.removeAll()
         let running = watchers
         let scopes = scopedURLs
         watchers.removeAll()
@@ -215,7 +227,6 @@ final class WatchedFoldersStore {
         releasing previousScope: URL? = nil,
         carriesBaseline: Bool = true
     ) {
-        let epoch = watchEpoch
         let id = folder.id
         let start = UUID()
         starts[id] = start
@@ -232,7 +243,7 @@ final class WatchedFoldersStore {
             }
             guard let self else { return }
             defer { if self.starts[id] == start { self.starts[id] = nil } }
-            guard epoch == self.watchEpoch, let current = self.folders.first(where: { $0.id == id }) else { return }
+            guard self.starts[id] == start, let current = self.folders.first(where: { $0.id == id }) else { return }
             guard let resolved, resolved.isDirectory, !Self.isInTrash(resolved.url),
                   resolved.url.startAccessingSecurityScopedResource() else {
                 if let carried { baselines.write(carried, for: id) }
@@ -291,6 +302,7 @@ final class WatchedFoldersStore {
         guard let watcher = watchers[id], await watcher.state == .lost, watchers[id] === watcher,
               let folder = folders.first(where: { $0.id == id }) else { return }
         watchers[id] = nil
+        baselineWrites.removeValue(forKey: id)?.cancel()
         startWatcher(for: folder, replacing: watcher, releasing: scopedURLs.removeValue(forKey: id))
     }
 
@@ -309,7 +321,7 @@ final class WatchedFoldersStore {
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled, let self, let watcher = self.watchers[id] else { return }
             let baseline = await watcher.baseline()
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, let baseline else { return }
             self.baselines.write(baseline, for: id)
             self.baselineWrites[id] = nil
         }
