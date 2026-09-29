@@ -55,6 +55,19 @@ enum LibraryListContent {
         !hasTranscript && (filter != nil || browsingAll)
     }
 
+    /// What Clear Filters resets: every dimension the list can be narrowed by, including the person.
+    static func clearFilters(
+        labelFilter: inout String?,
+        languageFilter: inout String?,
+        dateRangeFilter: inout LibraryDateRangeFilter,
+        personFilter: inout UUID?
+    ) {
+        labelFilter = nil
+        languageFilter = nil
+        dateRangeFilter = .all
+        personFilter = nil
+    }
+
     struct ActiveFilters: Equatable {
         var label: String? = nil
         var language: String? = nil
@@ -506,10 +519,12 @@ private struct LibraryBrowseList: View, Equatable {
             title: LocalizedStringKey(LibraryListContent.filteredEmptyTitle)
         ) {
             Button {
-                labelFilter = nil
-                languageFilter = nil
-                dateRangeFilter = .all
-                model.personFilter = nil
+                LibraryListContent.clearFilters(
+                    labelFilter: &labelFilter,
+                    languageFilter: &languageFilter,
+                    dateRangeFilter: &dateRangeFilter,
+                    personFilter: &model.personFilter
+                )
             } label: {
                 Label("Clear Filters", systemImage: "xmark.circle")
             }

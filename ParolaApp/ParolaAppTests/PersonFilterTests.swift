@@ -234,6 +234,23 @@ struct PersonFilterTests {
         #expect(LibraryFilterBar.showsPersonFilter(peopleOptions: [Person(name: "Ada")], personFilter: nil))
     }
 
+    @Test("Clear Filters resets every dimension, including the person")
+    func clearFiltersResetsThePersonToo() {
+        var label: String? = "work"
+        var language: String? = "it"
+        var dateRange: LibraryDateRangeFilter = .week
+        var person: UUID? = ada
+
+        LibraryListContent.clearFilters(
+            labelFilter: &label, languageFilter: &language, dateRangeFilter: &dateRange, personFilter: &person
+        )
+
+        #expect(label == nil)
+        #expect(language == nil)
+        #expect(dateRange == .all)
+        #expect(person == nil)
+    }
+
     @Test("the filter offers only people with an entry in the category on screen")
     func knownPeopleAreScoped() async {
         let model = await makeModel()
