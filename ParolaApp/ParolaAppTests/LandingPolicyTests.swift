@@ -62,6 +62,7 @@ struct LandingPolicyTests {
         model.autoExportRules = [
             AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])
         ]
+        model.batchExportPresetIDs = [ExportPreset.builtIn(for: .srt)!.id]
         model.setDestinations([.mock(MockDestination(
             name: "Mock vault", autoSend: true, categories: Set(EntryCategory.allCases), recorder: recorder
         ))])
@@ -75,6 +76,25 @@ struct LandingPolicyTests {
 
     private func exports(in rig: Rig) throws -> Set<String> {
         Set(try FileManager.default.contentsOfDirectory(atPath: rig.folder.path)).subtracting(["clip.wav"])
+    }
+
+    private func landing(_ kind: RunLanding.Kind, in rig: Rig) -> RunLanding {
+        switch kind {
+        case .batchJob:
+            let job = BatchJob(url: rig.source, status: .transcribing)
+            rig.model.batchJobs = [job]
+            return .batchJob(job, transcript: Self.transcript())
+        default:
+            return RunLanding(kind: kind, transcript: Self.transcript(), audioSource: rig.source)
+        }
+    }
+
+    private static func expectedExports(_ export: LandingPolicy.Export) -> Set<String> {
+        switch export {
+        case .none: []
+        case .rules: ["clip.txt"]
+        case .batchPresets: ["clip.srt", "clip.txt"]
+        }
     }
 
     @Test("the table names every kind's steps")
@@ -104,6 +124,10 @@ struct LandingPolicyTests {
                 selection: .unlessNavigated, sound: false, card: true, summary: .whenSelected,
                 export: .rules, autoSend: true, recents: false
             ),
+            .batchJob: LandingPolicy(
+                selection: .batchCopy, sound: false, card: true, summary: .never,
+                export: .batchPresets, autoSend: false, recents: false
+            ),
         ]
         #expect(Set(expected.keys) == Set(RunLanding.Kind.allCases))
         for kind in RunLanding.Kind.allCases {
@@ -117,9 +141,7 @@ struct LandingPolicyTests {
         defer { try? FileManager.default.removeItem(at: rig.folder) }
         let policy = kind.policy
 
-        let entry = try await rig.model.land(RunLanding(
-            kind: kind, transcript: Self.transcript(), audioSource: rig.source
-        )).value
+        let entry = try await rig.model.land(landing(kind, in: rig)).value
         await rig.model.awaitLandingSteps()
         await rig.model.awaitCardMetadataQueue()
 
@@ -128,7 +150,7 @@ struct LandingPolicyTests {
         #expect(rig.sounds.plays == (policy.sound ? 1 : 0))
         #expect(await rig.tally.cards == (policy.card ? 1 : 0))
         #expect(await rig.recorder.recorded().map(\.entryID) == (policy.autoSend ? [entry.id] : []))
-        #expect(try exports(in: rig) == (policy.export == .rules ? ["clip.txt"] : []))
+        #expect(try exports(in: rig) == Self.expectedExports(policy.export))
         if policy.summary == .whenSelected, selected {
             #expect(await waitUntil { await rig.tally.summaries == 1 })
         } else {
@@ -167,5 +189,22 @@ struct LandingPolicyTests {
 
         #expect(entry.category == .meeting)
         #expect(rig.model.pendingRecordingCategory == .transcription)
+    }
+}
+
+extension LandingPolicyTests {
+    @Test("a batch job's landing links the job to its entry and waits for the batch's refresh")
+    func batchJobLinksItsEntry() async throws {
+        let rig = try makeRig("batch-link")
+        defer { try? FileManager.default.removeItem(at: rig.folder) }
+        let refreshes = rig.model.libraryRefreshes
+
+        let entry = try await rig.model.land(landing(.batchJob, in: rig)).value
+
+        #expect(rig.model.batchJobs.first?.entryID == entry.id)
+        #expect(rig.model.batchJobs.first?.transcript == nil)
+        #expect(rig.model.libraryEntries.isEmpty)
+        #expect(rig.model.libraryRefreshes == refreshes)
+        #expect(rig.model.batchLibraryAdds.count == 1)
     }
 }

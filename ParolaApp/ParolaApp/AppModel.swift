@@ -403,7 +403,7 @@ final class AppModel {
     @ObservationIgnored var unsavedBatchJobOnScreen: UnsavedBatchJob?
     @ObservationIgnored var unsavedBatchEdits: Set<BatchJob.ID> = []
     /// The library adds of the finished jobs the closing refresh still has to wait for.
-    @ObservationIgnored var batchLibraryAdds: [Task<LibraryEntry?, Never>] = []
+    @ObservationIgnored var batchLibraryAdds: [Task<LibraryEntry, any Error>] = []
     @ObservationIgnored var batchClosingRefresh: Task<Void, Never>?
     /// Where each finished job's sidecars landed, which is not always `<stem>.<ext>`.
     @ObservationIgnored var batchSidecars: [BatchJob.ID: [URL]] = [:]

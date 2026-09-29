@@ -12,6 +12,7 @@ struct RunLanding {
         case salvagedTake
         case subtitles
         case captions
+        case batchJob
     }
 
     let kind: Kind
@@ -23,8 +24,17 @@ struct RunLanding {
     var titleSource: TitleSource?
     var sourceDigest: String?
     var consumesAudio = false
+    /// The job a `.batchJob` landing finishes.
+    var batchJobID: BatchJob.ID?
 
     var policy: LandingPolicy { kind.policy }
+
+    static func batchJob(_ job: BatchJob, transcript: Transcript) -> RunLanding {
+        RunLanding(
+            kind: .batchJob, transcript: transcript, audioSource: job.url,
+            sourceDigest: job.sourceDigest, batchJobID: job.id
+        )
+    }
 }
 
 /// What a landing does once the run is saved. One row per kind of run, and nothing else decides.
@@ -33,6 +43,8 @@ struct LandingPolicy: Equatable, Sendable {
         case none
         /// The saved entry takes the selection, unless the user opened something else while it saved.
         case unlessNavigated
+        /// The batch job's copy, if it is still on screen, becomes the entry; the list waits for the batch's last add.
+        case batchCopy
     }
 
     enum Summary: Equatable, Sendable {
@@ -45,6 +57,8 @@ struct LandingPolicy: Equatable, Sendable {
         case none
         /// The auto-export rules: beside a file, or in the chosen folder for takes and links.
         case rules
+        /// The batch's presets beside the file, planned together with the rules.
+        case batchPresets
     }
 
     var selection: Selection
@@ -85,6 +99,12 @@ extension RunLanding.Kind {
                 selection: .none, sound: false, card: false, summary: .never,
                 export: .none, autoSend: false, recents: false
             )
+        case .batchJob:
+            // The run rings once when it ends, not once per file.
+            LandingPolicy(
+                selection: .batchCopy, sound: false, card: true, summary: .never,
+                export: .batchPresets, autoSend: false, recents: false
+            )
         }
     }
 }
@@ -99,6 +119,7 @@ extension AppModel {
     func land(_ landing: RunLanding) -> Task<LibraryEntry, any Error> {
         let policy = landing.policy
         let navigation = loadEntryGeneration
+        let sidecars = policy.export == .batchPresets ? writeBatchSidecars(landing) : nil
         let saving = saveLanding(landing, navigation: navigation)
         landingSteps = Task { [weak self] in
             let entry = try? await saving.value
@@ -113,6 +134,7 @@ extension AppModel {
             }
             if let entry { await finishLanding(entry, landing, navigation: navigation) }
             await exports?.value
+            await sidecars?.value
         }
         return saving
     }
@@ -129,7 +151,7 @@ extension AppModel {
     }
 
     private func saveLanding(_ landing: RunLanding, navigation: Int) -> Task<LibraryEntry, any Error> {
-        Task { [weak self, library] in
+        let saving = Task { [weak self, library] in
             do {
                 let entry = try await library.add(
                     transcript: landing.transcript,
@@ -144,28 +166,49 @@ extension AppModel {
                 self?.place(entry, landing, navigation: navigation)
                 return entry
             } catch {
-                self?.reportLandingFailure(error)
+                self?.reportLandingFailure(landing, error)
                 throw error
             }
+        }
+        if landing.policy.selection == .batchCopy { batchLibraryAdds.append(saving) }
+        return saving
+    }
+
+    /// Where each file's sidecars landed, which is not always `<stem>.<ext>`.
+    private func writeBatchSidecars(_ landing: RunLanding) -> Task<Void, Never>? {
+        guard let jobID = landing.batchJobID, let source = landing.audioSource,
+              let sidecars = writeSidecars(
+                  landing.transcript, presets: batchExportPresets, source: SidecarSource(besideFile: source)
+              )
+        else { return nil }
+        return Task { [weak self] in
+            let written = await sidecars.value.compactMap(\.written)
+            self?.batchSidecars[jobID] = written
         }
     }
 
     private func place(_ entry: LibraryEntry, _ landing: RunLanding, navigation: Int) {
         let interval = Self.landingSignposter.beginInterval("entry")
         defer { Self.landingSignposter.endInterval("entry", interval) }
-        landLibraryEntry(entry)
         switch landing.policy.selection {
         case .none:
-            break
+            landLibraryEntry(entry)
         case .unlessNavigated:
+            landLibraryEntry(entry)
             // library.add copies media for seconds; a user who navigated meanwhile keeps their selection.
             if loadEntryGeneration == navigation, selectedEntryID == nil { selectLanded(entry.id) }
+        case .batchCopy:
+            if let jobID = landing.batchJobID { landBatchJobEntry(entry.id, jobID: jobID) }
         }
     }
 
-    private func reportLandingFailure(_ error: any Error) {
+    private func reportLandingFailure(_ landing: RunLanding, _ error: any Error) {
         ParolaLog.error(.library, "transcript could not be saved to the library", [.error: .error(error)])
-        nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
+        if landing.policy.selection == .batchCopy, let source = landing.audioSource {
+            nonFatalWarning = "\(source.lastPathComponent) was transcribed, but Parola couldn't save it to your library. \(error.localizedDescription)"
+        } else {
+            nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
+        }
     }
 
     private func finishLanding(_ entry: LibraryEntry, _ landing: RunLanding, navigation: Int) async {

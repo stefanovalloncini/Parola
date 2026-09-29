@@ -63,15 +63,7 @@ extension AppModel {
                 showUnsavedBatchJob(id, processed)
             }
             if let job = batchJobs.first(where: { $0.id == id }) {
-                if let sidecars = writeSidecars(
-                    processed, presets: batchExportPresets, source: SidecarSource(besideFile: job.url)
-                ) {
-                    Task { [weak self] in
-                        let written = await sidecars.value.compactMap(\.written)
-                        self?.batchSidecars[id] = written
-                    }
-                }
-                persistBatchJobToLibrary(id, transcript: processed, sourceURL: job.url, sourceDigest: job.sourceDigest)
+                land(.batchJob(job, transcript: processed))
             }
         case .failed(let id, let reason):
             guard !isCancelled(id) else { return }
@@ -100,35 +92,6 @@ extension AppModel {
         }
     }
 
-    // Skips land(_:) on purpose: its runAutoExports call would fire a second time
-    // (handleBatchEvent already ran the rules), and it would steal selection + refresh per job.
-    private func persistBatchJobToLibrary(
-        _ jobID: BatchJob.ID, transcript: Transcript, sourceURL: URL, sourceDigest digest: String?
-    ) {
-        let adding = Task { [weak self] () -> LibraryEntry? in
-            guard let self else { return nil }
-            do {
-                let entry = try await library.add(
-                    transcript: transcript,
-                    audioSource: sourceURL,
-                    category: .transcription,
-                    sourceDigest: digest,
-                    source: .file
-                )
-                landBatchJobEntry(entry.id, jobID: jobID)
-                return entry
-            } catch {
-                nonFatalWarning = "\(sourceURL.lastPathComponent) was transcribed, but Parola couldn't save it to your library. \(error.localizedDescription)"
-                return nil
-            }
-        }
-        batchLibraryAdds.append(adding)
-        Task { [weak self] in
-            guard let entry = await adding.value else { return }
-            self?.enqueueCardMetadata(for: entry.id, transcript: transcript)
-        }
-    }
-
     /// Every way a run ends short of its .finished: the refresh that event would have made happens here.
     private func stopBatchRun() {
         batchTask?.cancel()
@@ -145,7 +108,7 @@ extension AppModel {
             return
         }
         batchClosingRefresh = Task { [weak self] in
-            for add in adds { _ = await add.value }
+            for add in adds { _ = try? await add.value }
             self?.refreshLibrary()
         }
     }
@@ -172,7 +135,7 @@ extension AppModel {
     }
 
     /// From here the entry holds the transcript: the job lets go of its copy, and a copy still on screen becomes the entry.
-    private func landBatchJobEntry(_ entryID: LibraryEntry.ID, jobID: BatchJob.ID) {
+    func landBatchJobEntry(_ entryID: LibraryEntry.ID, jobID: BatchJob.ID) {
         let edited = unsavedBatchEdits.remove(jobID) != nil
         let jobCopy = batchJobs.first(where: { $0.id == jobID })?.transcript
         mutateBatchJob(jobID) {
