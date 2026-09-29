@@ -203,6 +203,8 @@ final class AppModel {
     private(set) var savingTakesBeforeQuit = false
     /// A quit already winding the takes down; the app delegate answers any other quit with a no.
     @ObservationIgnored var quitPending = false
+    /// How long a quit waits, on the model's clock, for its takes to reach the library.
+    @ObservationIgnored var quitSaveLimit: Duration = .seconds(30)
     @ObservationIgnored private var takeCounter = 0
     /// The take that owns the capture, the clock and the checkpoint; work an older take left running checks it first.
     @ObservationIgnored private(set) var activeTake: TakeContext?
@@ -2991,6 +2993,12 @@ final class AppModel {
             forgetTakeRequest()
             return
         }
+        // A quit is winding the takes down; a new one would only be cut off.
+        guard !quitPending else {
+            forgetTakeRequest()
+            refusalBeep?()
+            return
+        }
         let diskCheck = startDiskSpaceCheck()
         let countIn = max(0, recordingCountInSeconds)
         // The countdown overlay renders only in the main window; with no window visible
@@ -3788,14 +3796,14 @@ final class AppModel {
         if let recovery { recoveryHeldByTake.insert(recovery) }
         trackTakeWork { [weak self, library] in
             let entry = try? await saving.value
+            // At once: the entry holds the take now, and a quit may not wait for the rest.
+            if let recovery {
+                self?.recoveryHeldByTake.remove(recovery)
+                if entry != nil { self?.endRecovery(recovery) }
+            }
             var entryAudio: URL?
             if let entry, audio != nil { entryAudio = try? await library.load(entry.id).document.audioURL }
-            guard let self else { return }
-            if let recovery {
-                self.recoveryHeldByTake.remove(recovery)
-                if entry != nil { self.endRecovery(recovery) }
-            }
-            guard let entry else { return }
+            guard let self, let entry else { return }
             onSaved?(entry)
             if let audio {
                 if let entryAudio, self.sourceFileURL == audio, self.selectedEntryID == entry.id {
@@ -3878,30 +3886,38 @@ final class AppModel {
         !takeWork.isEmpty
     }
 
-    /// Acts on the answer to the quit prompt, then waits for every take's save; true when the app may quit.
+    /// Acts on the answer to the quit prompt and waits for every take's save, all within the quit's limit; true when the app may quit.
     func resolveQuitDuringTake(_ choice: QuitDuringTake) async -> Bool {
-        switch choice {
-        case .keepRecording:
-            return false
-        case .discard:
-            await discardTakeForQuit()
-        case .stopAndSave:
-            await saveTakeForQuit()
+        guard choice != .keepRecording else { return false }
+        // Said at once: a live take's last decode can take a while before any save begins.
+        if choice == .stopAndSave { savingTakesBeforeQuit = true }
+        await withinQuitLimit { [weak self] in
+            if choice == .discard {
+                await self?.discardTakeForQuit()
+            } else {
+                await self?.saveTakeForQuit()
+            }
+            await self?.waitForTakeWork()
         }
-        await finishTakeWorkForQuit()
         return true
     }
 
-    /// Holds a quit, with the window saying so, until every take is in the library or 30 seconds pass; a take still transcribing stops and is saved as audio.
+    /// Holds a quit, with the window saying so, until every take is in the library or the limit passes; a take still transcribing stops and is saved as audio.
     func finishTakeWorkForQuit() async {
+        await withinQuitLimit { [weak self] in await self?.waitForTakeWork() }
+    }
+
+    private func waitForTakeWork() async {
         takeTask?.cancel()
         guard !takeWork.isEmpty else { return }
         savingTakesBeforeQuit = true
-        let deadline = ContinuousClock.now + .seconds(30)
         while let work = takeWork.values.first {
-            let left = deadline - ContinuousClock.now
-            guard left > .zero, await AsyncTimeout.run(left, operation: { await work.value }) != nil else { break }
+            await work.value
         }
+    }
+
+    private func withinQuitLimit(_ work: @escaping @MainActor @Sendable () async -> Void) async {
+        _ = await AsyncTimeout.run(quitSaveLimit, clock: clock) { await work() }
     }
 
     /// A quit can't wait for a model, so a file take is saved as audio; a live take keeps what it transcribed.

@@ -20,6 +20,17 @@ private struct CutShortTake: LiveAudioSource {
     func cancel() async {}
 }
 
+/// A clock whose sleeps end at once, so a limit measured on it passes immediately.
+private struct InstantClock: Clock {
+    typealias Instant = ContinuousClock.Instant
+    var now: Instant { ContinuousClock().now }
+    var minimumResolution: Duration { .zero }
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+        try Task.checkCancellation()
+        await Task.yield()
+    }
+}
+
 /// Whether a quit asked, and the reply it handed back once the take was wound down.
 @MainActor
 private final class QuitReply {
@@ -52,14 +63,17 @@ extension TranscriberMockSuites {
     @Suite("Recording trust", .serialized)
     struct RecordingTrustTests {
 
-        private func makeModel(libraryURL: URL = makeTempLibraryURL("recording-trust")) -> AppModel {
+        private func makeModel(
+            libraryURL: URL = makeTempLibraryURL("recording-trust"),
+            clock: any Clock<Duration> = ContinuousClock()
+        ) -> AppModel {
             let model = AppModel(bootstrap: AppBootstrap(
                 mode: .test,
                 library: libraryURL,
                 defaultsOverride: temporaryDefaults(),
                 sideEffects: [],
                 filePicker: TestFilePicker(),
-                clock: ContinuousClock()
+                clock: clock
             ))
             model.recordingCountInSeconds = 0
             model.freeDiskSpaceProvider = { 50_000_000_000 }
@@ -735,6 +749,7 @@ extension TranscriberMockSuites {
 
                 await waitUntil { quit.value != nil }
                 #expect(quit.value == true)
+                #expect(model.savingTakesBeforeQuit, "the window said it was saving")
                 let saved = try #require(await model.library.list().first)
                 #expect(!saved.title.contains("("), "a live take keeps its words, so its title carries no note")
                 let stored = try await model.library.load(saved.id).document.transcript
@@ -767,6 +782,41 @@ extension TranscriberMockSuites {
                 #expect(saved.count == 1, "the take is in the library before the app is told it may quit")
                 #expect(saved.first?.title.hasSuffix("(not transcribed)") == true)
             }
+        }
+
+        @Test("a quit stops waiting once its limit passes on the model's clock, with a save still on its way")
+        func quitWaitIsBounded() async throws {
+            let wav = try makeTakeWAV("quit-limit")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "never landed")],
+                    gate: MockTranscriberGate()
+                ))
+                let model = makeModel(clock: InstantClock())
+                await transcribingTake(model, wav: wav)
+
+                await model.finishTakeWorkForQuit()
+
+                #expect(model.hasPendingTakeWork, "the limit ended the wait, not the work")
+                #expect(model.savingTakesBeforeQuit)
+                await waitUntil { !model.hasPendingTakeWork }
+                #expect(await model.library.list().count == 1, "the take still lands once the save finishes")
+            }
+        }
+
+        @Test("Record does nothing while a quit is winding the takes down")
+        func recordRefusedWhileQuitting() async {
+            let model = makeModel()
+            model.quitPending = true
+            model.pendingRecordingCategory = .meeting
+
+            model.startRecording(source: .microphone)
+
+            await settle()
+            #expect(model.activeTake == nil)
+            #expect(!model.recordingActive)
+            #expect(model.pendingRecordingCategory == .transcription, "the refused request's category is spent")
         }
 
         @Test("Discard drops the take, then lets the app quit")
