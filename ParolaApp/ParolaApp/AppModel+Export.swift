@@ -238,8 +238,9 @@ extension AppModel {
         guard transcript != nil else { return }
         Task { [weak self] in
             guard let self else { return }
+            let name = TranscriptShareFile.safeName(for: self.currentTranscriptTitle)
             guard let url = await self.filePicker.chooseSaveDestination(
-                suggestedName: "transcript.\(spec.format.fileExtension)",
+                suggestedName: "\(name).\(spec.format.fileExtension)",
                 // Unconstrained: most export formats (docx, pdf, csv, srt, ...) don't conform to
                 // .plainText, and a constrained panel rewrites their extension to .txt.
                 allowedTypes: []
