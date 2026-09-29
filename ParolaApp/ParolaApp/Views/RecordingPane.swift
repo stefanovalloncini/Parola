@@ -4,7 +4,6 @@ import ParolaCore
 struct RecordingPane: View {
     let source: AppModel.RecordSource
     @Environment(AppModel.self) private var model
-    @State private var startedAt: Date = Date()
 
     private var isStreaming: Bool { model.liveTakeIsStreaming }
     private var stateLabel: String { String(localized: "Recording") }
@@ -18,10 +17,11 @@ struct RecordingPane: View {
         RecordingCard(
             stateLabel: stateLabel,
             source: source,
-            startedAt: startedAt,
+            startedAt: model.recordingStartedAt,
             isVoiceActive: model.liveVoiceActive,
             stopTitle: stopTitle,
             levelMeter: model.recordingLevelMeter,
+            levelTrace: model.recordingLevelTrace,
             showsWaveform: showsWaveform,
             onStop: { model.stopRecordingAndTranscribe() }
         )
@@ -44,7 +44,6 @@ struct RecordingPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { startedAt = Date() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Recording from \(source.label.lowercased())")
     }
@@ -80,15 +79,18 @@ struct RecordingPane: View {
 struct RecordingCard: View {
     let stateLabel: String
     let source: AppModel.RecordSource
-    let startedAt: Date
+    /// Nil until the take captures its first audio.
+    let startedAt: Date?
     let isVoiceActive: Bool
     let stopTitle: String
     var levelMeter: LevelMeter? = nil
+    var levelTrace: LevelTrace? = nil
     var showsWaveform: Bool = false
     let onStop: () -> Void
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 64
 
     private static let cardRadius: CGFloat = 16
+    private static let readoutHeight: CGFloat = 28
 
     var body: some View {
         VStack(spacing: DS.Spacing.large) {
@@ -102,12 +104,7 @@ struct RecordingCard: View {
             }
 
             VStack(spacing: DS.Spacing.small) {
-                TimelineView(.periodic(from: startedAt, by: 1)) { context in
-                    let elapsed = Int(context.date.timeIntervalSince(startedAt))
-                    Text(String(format: "%02d:%02d", elapsed / 60, elapsed % 60))
-                        .font(DS.Font.timer)
-                        .foregroundStyle(DS.Color.primaryText)
-                }
+                clock(from: startedAt)
                 HStack(spacing: 6) {
                     Circle()
                         .fill(isVoiceActive ? DS.Color.accent : DS.Color.secondaryText.opacity(0.5))
@@ -119,7 +116,8 @@ struct RecordingCard: View {
                 if showsWaveform {
                     WaveformHistory(
                         meter: levelMeter,
-                        capacity: 48,
+                        trace: levelTrace,
+                        capacity: AppModel.takeLevelHistoryCapacity,
                         barWidth: 2,
                         spacing: 2,
                         maxHeight: 28,
@@ -157,6 +155,23 @@ struct RecordingCard: View {
             RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
                 .stroke(DS.Color.separator.opacity(0.6), lineWidth: 1)
         )
+    }
+
+    @ViewBuilder
+    private func clock(from startedAt: Date?) -> some View {
+        if let startedAt {
+            TimelineView(.periodic(from: startedAt, by: 1)) { context in
+                Text(verbatim: AppFormat.elapsed(context.date.timeIntervalSince(startedAt)))
+                    .font(DS.Font.timer)
+                    .foregroundStyle(DS.Color.primaryText)
+            }
+            .frame(height: Self.readoutHeight)
+        } else {
+            Text(verbatim: AppFormat.elapsed(0))
+                .font(DS.Font.timer)
+                .foregroundStyle(DS.Color.primaryText)
+                .frame(height: Self.readoutHeight)
+        }
     }
 }
 

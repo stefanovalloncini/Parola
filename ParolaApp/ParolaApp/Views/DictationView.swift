@@ -284,12 +284,11 @@ struct DictationView: View {
         switch state {
         case .listening, .transcribing:
             TimelineView(.periodic(from: startedAt, by: 1)) { context in
-                let elapsed = Int(context.date.timeIntervalSince(startedAt))
-                Text(String(format: "%02d:%02d", elapsed / 60, elapsed % 60))
+                Text(verbatim: AppFormat.elapsed(context.date.timeIntervalSince(startedAt)))
                     .font(DS.Font.mono)
             }
         default:
-            Text("00:00")
+            Text(verbatim: "0:00")
                 .font(DS.Font.mono)
                 .opacity(0)
         }

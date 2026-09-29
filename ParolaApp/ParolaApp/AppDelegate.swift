@@ -14,7 +14,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsResetSubscription: (any NSObjectProtocol)?
     private let menuBar = MenuBarController()
     private var recordingTickTask: Task<Void, Never>?
-    private var recordingStartedAt: Date?
     private let playbackKeys = PlaybackKeyMonitor()
     private var appearanceObservation: NSKeyValueObservation?
 
@@ -148,18 +147,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Reads the take's own clock each second, turning over with the pane's.
     private func startRecordingTick() {
         if recordingTickTask != nil { return }
-        recordingStartedAt = Date()
-        NSApp.dockTile.badgeLabel = "0:00"
         recordingTickTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
-                guard !Task.isCancelled, let start = self?.recordingStartedAt else { return }
-                let elapsed = Int(Date().timeIntervalSince(start))
-                let m = elapsed / 60
-                let s = elapsed % 60
-                NSApp.dockTile.badgeLabel = String(format: "%d:%02d", m, s)
+                let startedAt = self?.model?.recordingStartedAt
+                NSApp.dockTile.badgeLabel = Self.recordingBadge(startedAt: startedAt, now: Date())
+                try? await Task.sleep(for: .seconds(Self.secondsToNextTick(startedAt: startedAt, now: Date())))
             }
         }
     }
@@ -167,7 +162,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func stopRecordingTick() {
         recordingTickTask?.cancel()
         recordingTickTask = nil
-        recordingStartedAt = nil
+    }
+
+    /// A take still starting has no time to show yet.
+    nonisolated static func recordingBadge(startedAt: Date?, now: Date) -> String {
+        guard let startedAt else { return "…" }
+        return AppFormat.elapsed(now.timeIntervalSince(startedAt))
+    }
+
+    nonisolated static func secondsToNextTick(startedAt: Date?, now: Date) -> Double {
+        guard let startedAt else { return 1 }
+        let elapsed = max(0, now.timeIntervalSince(startedAt))
+        let next = elapsed.rounded(.down) + 1 - elapsed
+        return max(0.05, next)
     }
 }
 

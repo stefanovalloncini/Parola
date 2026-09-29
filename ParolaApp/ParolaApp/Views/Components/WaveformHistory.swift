@@ -90,10 +90,15 @@ struct WaveformHistory: View {
     /// A ready window of levels. When it is there the view draws it as-is instead of reading a meter.
     private let envelope: [Float]?
 
-    @State private var trace: LevelTrace
+    /// A history its owner keeps, so the bars outlive this view; without one the view keeps its own.
+    private let heldTrace: LevelTrace?
+    @State private var ownTrace: LevelTrace
+
+    private var trace: LevelTrace { heldTrace ?? ownTrace }
 
     init(
         meter: LevelMeter?,
+        trace: LevelTrace? = nil,
         capacity: Int = 32,
         barWidth: CGFloat = 2,
         spacing: CGFloat = 1.5,
@@ -109,7 +114,8 @@ struct WaveformHistory: View {
         self.idleHeight = idleHeight
         self.fill = fill
         self.envelope = nil
-        _trace = State(initialValue: LevelTrace(capacity: capacity))
+        self.heldTrace = trace
+        _ownTrace = State(initialValue: LevelTrace(capacity: capacity))
     }
 
     init(
@@ -128,8 +134,9 @@ struct WaveformHistory: View {
         self.idleHeight = idleHeight
         self.fill = fill
         self.envelope = samples
+        self.heldTrace = nil
         // The envelope draws itself; the trace behind a meter is never sampled on this path.
-        _trace = State(initialValue: LevelTrace(capacity: 1))
+        _ownTrace = State(initialValue: LevelTrace(capacity: 1))
     }
 
     private var contentWidth: CGFloat {

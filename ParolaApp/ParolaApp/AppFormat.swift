@@ -50,6 +50,16 @@ enum AppFormat {
         fraction.formatted(.percent.precision(.fractionLength(fractionDigits)).locale(locale))
     }
 
+    /// A running clock: m:ss under an hour, h:mm:ss from the hour on, counting whole seconds.
+    static func elapsed(_ seconds: TimeInterval) -> String {
+        let total = seconds.isFinite ? Int(max(0, seconds)) : 0
+        let hours = total / 3600
+        let minutes = total % 3600 / 60
+        let rest = total % 60
+        if hours > 0 { return String(format: "%d:%02d:%02d", hours, minutes, rest) }
+        return String(format: "%d:%02d", minutes, rest)
+    }
+
     /// Every span on screen: the largest two units that carry meaning, rounded to whole seconds — a shorter span reads "<1 sec".
     static func duration(seconds: Double, locale: Locale = AppFormat.locale) -> String {
         let total = Int(max(0, seconds).rounded())

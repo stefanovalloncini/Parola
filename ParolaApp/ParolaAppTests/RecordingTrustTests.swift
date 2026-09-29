@@ -123,6 +123,42 @@ extension TranscriberMockSuites {
             #expect(message == "Transcription stopped.")
         }
 
+        // MARK: - The take's clock
+
+        @Test("the take's clock and levels live on the model, so a page change keeps them")
+        func clockSurvivesARouteChange() async throws {
+            let fixture = try makeTakeWAV("clock")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let model = makeModel()
+                model.useStreaming = false
+                model.startRecording(source: .microphone)
+                await waitUntil { model.recordingStartedAt != nil }
+                let startedAt = try #require(model.recordingStartedAt)
+                let trace = try #require(model.recordingLevelTrace)
+
+                model.route = .statistics
+                await settle(for: .milliseconds(50))
+                model.route = .transcript
+
+                #expect(model.recordingStartedAt == startedAt)
+                #expect(model.recordingLevelTrace === trace)
+                #expect(AppDelegate.recordingBadge(startedAt: startedAt, now: startedAt.addingTimeInterval(75)) == "1:15")
+
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("the Dock badge waits while a take arms and turns over with the take's own seconds")
+        func dockBadgeReadsTheTakeClock() {
+            let start = Date(timeIntervalSinceReferenceDate: 1_000)
+            #expect(AppDelegate.recordingBadge(startedAt: nil, now: start) == "…")
+            #expect(AppDelegate.recordingBadge(startedAt: start, now: start.addingTimeInterval(3_725)) == "1:02:05")
+            #expect(abs(AppDelegate.secondsToNextTick(startedAt: start, now: start.addingTimeInterval(2.3)) - 0.7) < 0.000_1)
+            #expect(AppDelegate.secondsToNextTick(startedAt: nil, now: start) == 1)
+        }
+
         // MARK: - Titles
 
         @Test("a finished take is named by its title, then by its entry, never by its working file")

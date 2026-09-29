@@ -66,6 +66,26 @@ struct AppFormatTests {
         #expect(AppFormat.duration(seconds: 0.4, locale: Locale(identifier: "it_IT")).hasPrefix("<"))
     }
 
+    @Test("a running clock reads m:ss under an hour and h:mm:ss from the hour on")
+    func elapsedClock() {
+        #expect(AppFormat.elapsed(0) == "0:00")
+        #expect(AppFormat.elapsed(5.9) == "0:05")
+        #expect(AppFormat.elapsed(59) == "0:59")
+        #expect(AppFormat.elapsed(60) == "1:00")
+        #expect(AppFormat.elapsed(754) == "12:34")
+        #expect(AppFormat.elapsed(3_599) == "59:59")
+        #expect(AppFormat.elapsed(3_600) == "1:00:00")
+        #expect(AppFormat.elapsed(7_507) == "2:05:07")
+        #expect(AppFormat.elapsed(36_000) == "10:00:00")
+    }
+
+    @Test("a clock never runs below zero or off a broken span")
+    func elapsedClockHoldsAtZero() {
+        #expect(AppFormat.elapsed(-3) == "0:00")
+        #expect(AppFormat.elapsed(.infinity) == "0:00")
+        #expect(AppFormat.elapsed(.nan) == "0:00")
+    }
+
     @Test("sizes carry a unit and a separator, not raw bytes")
     func sizesCarryAUnit() {
         let label = AppFormat.byteSize(76_700_000, locale: Locale(identifier: "en_US"))
