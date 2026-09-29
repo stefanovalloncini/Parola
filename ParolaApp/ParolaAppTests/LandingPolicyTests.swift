@@ -258,3 +258,23 @@ extension LandingPolicyTests {
         #expect(stored.entry.segmentNotes.isEmpty)
     }
 }
+
+extension LandingPolicyTests {
+    @Test("a landing that couldn't be saved says so in Italian too")
+    func saveFailureMessagesAreTranslated() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        let transcript = Self.transcript()
+        let background = RunLanding(
+            kind: .backgroundArrival, transcript: transcript, audioSource: URL(fileURLWithPath: "/tmp/Memo.m4a")
+        )
+        let open = RunLanding(kind: .file, transcript: transcript)
+
+        #expect(AppModel.landingFailureMessage(background, reason: "Disco pieno.", bundle: italian)
+            == "Memo.m4a è stato trascritto, ma Parola non è riuscita a salvarlo nella libreria. Disco pieno.")
+        #expect(AppModel.landingFailureMessage(open, reason: "Disco pieno.", bundle: italian)
+            == "La trascrizione è ancora aperta, ma Parola non è riuscita a salvarla nella libreria. Disco pieno.")
+        #expect(AppModel.landingFailureMessage(background, reason: "Disk full.")
+            == "Memo.m4a was transcribed, but Parola couldn't save it to your library. Disk full.")
+    }
+}

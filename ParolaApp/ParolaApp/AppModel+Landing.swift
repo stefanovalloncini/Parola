@@ -279,15 +279,25 @@ extension AppModel {
         let message: LogMessage = landing.kind == .rerun
             ? "re-transcription could not be saved" : "transcript could not be saved to the library"
         ParolaLog.error(.library, message, [.error: .error(error)])
-        let reason = error.localizedDescription
+        nonFatalWarning = Self.landingFailureMessage(landing, reason: error.localizedDescription)
+    }
+
+    nonisolated static func landingFailureMessage(
+        _ landing: RunLanding, reason: String, bundle: Bundle = .main
+    ) -> String {
         switch landing.kind {
         case .rerun:
-            nonFatalWarning = String(localized: "The transcript ran again, but Parola couldn't save the result. \(reason)")
+            return String(localized: "The transcript ran again, but Parola couldn't save the result. \(reason)", bundle: bundle)
         case .batchJob, .backgroundArrival:
             let name = landing.audioSource?.lastPathComponent ?? ""
-            nonFatalWarning = "\(name) was transcribed, but Parola couldn't save it to your library. \(reason)"
+            return String(
+                localized: "\(name) was transcribed, but Parola couldn't save it to your library. \(reason)", bundle: bundle
+            )
         default:
-            nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(reason)"
+            return String(
+                localized: "The transcript is still open, but Parola couldn't save it to your library. \(reason)",
+                bundle: bundle
+            )
         }
     }
 

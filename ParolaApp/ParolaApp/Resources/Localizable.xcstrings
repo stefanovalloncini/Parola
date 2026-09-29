@@ -188,6 +188,17 @@
         }
       }
     },
+    "%@ was transcribed, but Parola couldn't save it to your library. %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ è stato trascritto, ma Parola non è riuscita a salvarlo nella libreria. %2$@"
+          }
+        }
+      }
+    },
     "%@ with timestamps": {
       "extractionState": "manual",
       "localizations": {
@@ -13577,6 +13588,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il testo della trascrizione viene inviato al servizio che hai scelto e trattato secondo le condizioni di quel servizio."
+          }
+        }
+      }
+    },
+    "The transcript is still open, but Parola couldn't save it to your library. %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione è ancora aperta, ma Parola non è riuscita a salvarla nella libreria. %@"
           }
         }
       }
