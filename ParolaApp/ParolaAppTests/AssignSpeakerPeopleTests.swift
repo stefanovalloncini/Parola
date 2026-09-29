@@ -148,6 +148,22 @@ struct AssignSpeakerPeopleTests {
         #expect(DS.speakerColor(for: "SPEAKER_01", colorIndex: nil) == DS.speakerColor(for: "SPEAKER_01"))
     }
 
+    /// SpeakerFilterRow, SegmentCard and FormatInspector all wear `model.speakerColor(for:)`, so this checks that one function rather than retyping its expression.
+    @Test("an assigned speaker's colour is the palette entry their person owns")
+    func assignedSpeakerColorsAgreeAcrossSurfaces() async throws {
+        let model = PeopleTestSupport.makeModel("assignspeakerchips")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+
+        await model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "Ada")
+        await model.assignSpeaker(label: "SPEAKER_01", toNewPersonNamed: "Grace")
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+        let grace = try #require(model.person(forSpeaker: "Grace"))
+        #expect(ada.colorIndex != grace.colorIndex)
+
+        #expect(model.speakerColor(for: "Ada") == DS.speakerPalette[ada.colorIndex])
+        #expect(model.speakerColor(for: "Grace") == DS.speakerPalette[grace.colorIndex])
+    }
+
     @Test("the palette has a colour for every index the store hands out")
     func paletteCoversTheStore() {
         #expect(DS.speakerPalette.count == PeopleStore.colorCount)

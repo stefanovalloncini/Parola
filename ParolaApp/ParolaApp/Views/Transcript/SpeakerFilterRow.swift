@@ -5,6 +5,8 @@ struct SpeakerFilterRow: View {
     let speakers: [String]
     @Binding var selection: String?
 
+    @Environment(AppModel.self) private var model
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DS.Spacing.small) {
@@ -19,7 +21,7 @@ struct SpeakerFilterRow: View {
                 ForEach(speakers, id: \.self) { speaker in
                     Chip(
                         verbatimTitle: speaker,
-                        tint: DS.speakerColor(for: speaker),
+                        tint: model.speakerColor(for: speaker),
                         isSelected: selection == speaker,
                         size: .regular,
                         help: selection == speaker ? "Show all speakers" : "Show only \(speaker)"

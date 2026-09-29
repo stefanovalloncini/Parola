@@ -191,7 +191,7 @@ struct SegmentCard: View {
         } label: {
             Text(label)
                 .font(DS.Font.bodyStrong)
-                .foregroundStyle(DS.speakerColor(for: raw, colorIndex: person?.colorIndex))
+                .foregroundStyle(model.speakerColor(for: raw))
         }
         .buttonStyle(.plain)
         .help(person == nil

@@ -114,7 +114,7 @@ struct SpeakerPersonRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(verbatim: label)
                     .font(DS.Font.secondary)
-                    .foregroundStyle(DS.speakerColor(for: label, colorIndex: person?.colorIndex))
+                    .foregroundStyle(model.speakerColor(for: label))
                     .lineLimit(1)
                 Text(verbatim: SegmentCount.label(segmentCount))
                     .font(DS.Font.caption)

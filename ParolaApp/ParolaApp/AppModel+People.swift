@@ -85,6 +85,11 @@ extension AppModel {
         return person(id: id)
     }
 
+    /// The one lookup every speaker-colour surface shares — the filter chip, the card, the heading, the inspector.
+    func speakerColor(for label: String) -> Color {
+        DS.speakerColor(for: label, colorIndex: person(forSpeaker: label)?.colorIndex)
+    }
+
     /// The colour each speaker label wears: the person's when it has one, its own hash otherwise.
     var speakerColorIndices: [String: Int] {
         var indices: [String: Int] = [:]
