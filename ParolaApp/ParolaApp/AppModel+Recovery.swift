@@ -573,14 +573,17 @@ extension AppModel {
         let root = library.libraryURL
         let keep = recoveryReferencedFiles.union([pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
             .compactMap { $0?.resolvingSymlinksInPath().path })
+        let cutoff = takeImportCutoff()
         inflightSweep = Task { [weak self, library] in
             let found = (try? await AppModel.offMainIO(qos: .utility) { AppModel.inflightFiles(in: dir) }) ?? []
             var recovered = 0
             var deleted = 0
-            for file in AppModel.staleInflightFiles(in: found, keeping: keep, now: Date()) {
+            let modified = Dictionary(found.map { ($0.url, $0.modified) }, uniquingKeysWith: { first, _ in first })
+            for file in AppModel.staleInflightFiles(in: found, keeping: keep, now: Date(), takesSince: cutoff) {
                 if self?.inflightFileInUse(file) == true { continue }
                 let bytes = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-                guard RecordingScratch.isTake(file), bytes > AppModel.emptyTakeBytes else {
+                let isTake = AppModel.isImportableTake(file, modified: modified[file] ?? .distantPast, takesSince: cutoff)
+                guard isTake, bytes > AppModel.emptyTakeBytes else {
                     if (try? FileManager.default.removeItem(at: file)) != nil { deleted += 1 }
                     continue
                 }
@@ -680,6 +683,26 @@ extension AppModel {
         }
     }
 
+    /// When this build first swept the library; an earlier build's dictation left parola-mic files too, so older ones stay scratch.
+    func takeImportCutoff() -> Date {
+        let marker = recoveryDirectoryURL.appendingPathComponent("take-import-cutoff")
+        let format = ISO8601DateFormatter()
+        if let text = try? String(contentsOf: marker, encoding: .utf8),
+           let date = format.date(from: text.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            return date
+        }
+        let now = Date()
+        try? FileManager.default.createDirectory(at: recoveryDirectoryURL, withIntermediateDirectories: true)
+        try? format.string(from: now).write(to: marker, atomically: true, encoding: .utf8)
+        return now
+    }
+
+    /// A take the sweep may bring back: any take prefix, but a parola-mic file only if it was written after the cutoff.
+    nonisolated static func isImportableTake(_ file: URL, modified: Date, takesSince cutoff: Date) -> Bool {
+        guard RecordingScratch.isTake(file) else { return false }
+        return !file.lastPathComponent.hasPrefix("parola-mic-") || modified >= cutoff
+    }
+
     nonisolated static func inflightTakeSource(_ file: URL) -> EntrySource {
         file.lastPathComponent.hasPrefix("parola-system") ? .systemAudio : .microphone
     }
@@ -688,12 +711,13 @@ extension AppModel {
     nonisolated static func staleInflightFiles(
         in files: [(url: URL, modified: Date)],
         keeping: Set<String>,
-        now: Date
+        now: Date,
+        takesSince cutoff: Date = .distantPast
     ) -> [URL] {
         files
             .filter { file in
                 guard !keeping.contains(file.url.resolvingSymlinksInPath().path) else { return false }
-                let quiet: TimeInterval = RecordingScratch.isTake(file.url) ? 10 * 60 : 48 * 3600
+                let quiet: TimeInterval = isImportableTake(file.url, modified: file.modified, takesSince: cutoff) ? 10 * 60 : 48 * 3600
                 return file.modified < now.addingTimeInterval(-quiet)
             }
             .map(\.url)

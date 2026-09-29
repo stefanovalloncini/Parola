@@ -721,11 +721,50 @@ extension TranscriberMockSuites {
 
         // MARK: - Working files the library never got
 
+        /// As if this build first swept the library a day ago, so the takes a test makes count as its own.
+        private func sweptBefore(_ library: URL) throws {
+            let folder = library.appendingPathComponent("recovery", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try ISO8601DateFormatter().string(from: Date().addingTimeInterval(-86_400))
+                .write(to: folder.appendingPathComponent("take-import-cutoff"), atomically: true, encoding: .utf8)
+        }
+
+        @Test("parola-mic files from before this build first swept keep the old rule: never imported, deleted after two days")
+        func earlierMicLeftoversAreNeverImported() async throws {
+            let library = makeTempLibraryURL("mic-cutoff")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            func leftover(_ label: String, prefix: String, age: TimeInterval) throws -> URL {
+                let file = try makeTakeWAV(label, seconds: 1, in: inflight, prefix: prefix)
+                try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: file.path)
+                return file
+            }
+            let dictation = try leftover("earlier-dictation", prefix: "parola-mic", age: 3_600)
+            let oldDictation = try leftover("old-dictation", prefix: "parola-mic", age: 3 * 86_400)
+            let systemTake = try leftover("earlier-meeting", prefix: "parola-system", age: 3_600)
+
+            let model = makeModel(libraryURL: library)
+            await model.inflightSweep?.value
+
+            let listed = await model.library.list()
+            #expect(listed.count == 1, "only the meeting take, which no dictation could have written")
+            #expect(listed.first?.manifest.source == .systemAudio)
+            #expect(FileManager.default.fileExists(atPath: dictation.path), "younger than two days: left for now")
+            #expect(!FileManager.default.fileExists(atPath: oldDictation.path))
+            #expect(!FileManager.default.fileExists(atPath: systemTake.path), "the imported take's copy goes")
+
+            let cutoff = model.takeImportCutoff()
+            let micTake = inflight.appendingPathComponent("parola-mic-\(UUID().uuidString).wav")
+            #expect(AppModel.isImportableTake(micTake, modified: cutoff.addingTimeInterval(60), takesSince: cutoff), "this build's own mic takes are")
+            #expect(!AppModel.isImportableTake(micTake, modified: cutoff.addingTimeInterval(-60), takesSince: cutoff))
+        }
+
         @Test("the sweep brings back a take that never reached the library and drops copies of saved ones")
         func sweepImportsOrphanedTakes() async throws {
             let library = makeTempLibraryURL("sweep-import")
             let inflight = library.appendingPathComponent("inflight", isDirectory: true)
             try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            try sweptBefore(library)
             let orphan = try makeTakeWAV("orphan", seconds: 1, in: inflight, prefix: "parola-mic")
             let savedCopy = try makeTakeWAV("saved", seconds: 1.1, in: inflight, prefix: "parola-system")
             let fresh = try makeTakeWAV("fresh", seconds: 1.2, in: inflight, prefix: "parola-recording")
@@ -787,6 +826,7 @@ extension TranscriberMockSuites {
             let library = makeTempLibraryURL("sweep-in-use")
             let inflight = library.appendingPathComponent("inflight", isDirectory: true)
             try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            try sweptBefore(library)
             let model = makeModel(libraryURL: library)
             await model.inflightSweep?.value
             let take = try makeTakeWAV("in-use", seconds: 1, in: inflight, prefix: "parola-mic")
