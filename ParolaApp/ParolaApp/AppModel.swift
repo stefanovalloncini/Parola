@@ -4135,7 +4135,7 @@ final class AppModel {
         let recovery = failedTakeRecovery
         Task { [weak self] in
             if let entry = try? await saving?.value, let self, (try? await self.openEntry(entry.id)) != nil {
-                self.retranscribeCurrentEntry(model: self.selectedModel, language: self.selectedLanguage)
+                self.retranscribeCurrentEntry(model: self.selectedModel, language: self.selectedLanguage, landingAs: .retriedTake)
                 self.releaseTakeFile(url)
                 return
             }

@@ -34,8 +34,8 @@ extension AppModel {
         return String(localized: "This transcript came in without its audio, so there is nothing to transcribe again.")
     }
 
-    /// Runs the loaded entry's own audio again and replaces what the entry holds; the one entry point.
-    func retranscribeCurrentEntry(model modelName: String, language: String?) {
+    /// Runs the loaded entry's own audio again and replaces what the entry holds; the one entry point. A take's Retry lands as the take would have.
+    func retranscribeCurrentEntry(model modelName: String, language: String?, landingAs kind: RunLanding.Kind = .rerun) {
         guard let entryID = selectedEntryID, canRetranscribeSelectedEntry, retranscribeRequest == nil else { return }
         // Always transcribe: translating to English would ignore the language the menu just picked.
         let options = makeOptions(task: .transcribe, model: modelName, language: language)
@@ -48,7 +48,7 @@ extension AppModel {
         cancelLinkFetch()
         fileTranscribeTask = Task { [weak self] in
             await self?.runRetranscription(
-                entryID: entryID, modelName: modelName, options: options, runToken: runToken
+                entryID: entryID, modelName: modelName, options: options, runToken: runToken, kind: kind
             )
         }
     }
@@ -57,7 +57,8 @@ extension AppModel {
         entryID: LibraryEntry.ID,
         modelName: String,
         options: TranscriptionOptions,
-        runToken: Int
+        runToken: Int,
+        kind: RunLanding.Kind
     ) async {
         var landing: Task<LibraryEntry, any Error>?
         do {
@@ -85,7 +86,20 @@ extension AppModel {
             // Post-processing is a suspension a cancel can land in, and past this line the old
             // transcript is gone: check rather than overwrite a take the user stopped.
             try Task.checkCancellation()
-            landing = land(.rerun(of: entryID, transcript: processed, clearingNotes: loaded.entry.segmentNotes))
+            var rerun = RunLanding.rerun(of: entryID, transcript: processed, clearingNotes: loaded.entry.segmentNotes)
+            if kind == .retriedTake {
+                rerun = RunLanding(
+                    kind: .retriedTake,
+                    transcript: processed,
+                    audioSource: audioURL,
+                    source: loaded.entry.manifest.source,
+                    category: loaded.entry.category,
+                    title: Self.transcribedTitle(from: loaded.entry.title) ?? loaded.entry.title,
+                    rerunEntryID: entryID,
+                    clearingNotes: loaded.entry.segmentNotes
+                )
+            }
+            landing = land(rerun)
         } catch {
             // applyTranscriptionError parks a cancelled run at .idle and a failed one at .failed;
             // either way the phase stops reading "transcribing" once this task has let go.

@@ -15,6 +15,8 @@ struct RunLanding {
         case batchJob
         /// An entry's own audio run again: the result replaces what the entry held.
         case rerun
+        /// A take's Retry after its transcription failed: it replaces the entry its failure saved, and is delivered as the take would have been.
+        case retriedTake
         /// A watched-folder file that arrived while Parola was idle, run where the user can see it.
         case arrival
         /// A watched-folder file run out of sight while the user works on something else.
@@ -128,6 +130,11 @@ extension RunLanding.Kind {
             LandingPolicy(
                 selection: .keep, sound: true, card: true, summary: .never,
                 export: .none, autoSend: false, recents: false
+            )
+        case .retriedTake:
+            LandingPolicy(
+                selection: .keep, sound: true, card: true, summary: .whenSelected,
+                export: .rules, autoSend: true, recents: false
             )
         case .arrival:
             LandingPolicy(
@@ -282,7 +289,7 @@ extension AppModel {
     }
 
     private func reportLandingFailure(_ landing: RunLanding, _ error: any Error) {
-        let message: LogMessage = landing.kind == .rerun
+        let message: LogMessage = landing.rerunEntryID != nil
             ? "re-transcription could not be saved" : "transcript could not be saved to the library"
         ParolaLog.error(.library, message, [.error: .error(error)])
         nonFatalWarning = Self.landingFailureMessage(landing, reason: error.localizedDescription)
@@ -292,7 +299,7 @@ extension AppModel {
         _ landing: RunLanding, reason: String, bundle: Bundle = .main
     ) -> String {
         switch landing.kind {
-        case .rerun:
+        case .rerun, .retriedTake:
             return String(localized: "The transcript ran again, but Parola couldn't save the result. \(reason)", bundle: bundle)
         case .batchJob, .backgroundArrival:
             let name = landing.audioSource?.lastPathComponent ?? ""

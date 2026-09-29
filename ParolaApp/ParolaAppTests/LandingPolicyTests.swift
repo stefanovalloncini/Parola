@@ -91,6 +91,11 @@ struct LandingPolicyTests {
                 modelName: "stub"
             ), audioSource: nil)
             return .rerun(of: earlier.id, transcript: Self.transcript(), clearingNotes: [:])
+        case .retriedTake:
+            let saved = try await rig.model.library.add(
+                transcript: Transcript(segments: [], language: "en", modelName: ""), audioSource: nil
+            )
+            return RunLanding(kind: .retriedTake, transcript: Self.transcript(), audioSource: rig.source, rerunEntryID: saved.id)
         default:
             return RunLanding(kind: kind, transcript: Self.transcript(), audioSource: rig.source)
         }
@@ -138,6 +143,10 @@ struct LandingPolicyTests {
             .rerun: LandingPolicy(
                 selection: .keep, sound: true, card: true, summary: .never,
                 export: .none, autoSend: false, recents: false
+            ),
+            .retriedTake: LandingPolicy(
+                selection: .keep, sound: true, card: true, summary: .whenSelected,
+                export: .rules, autoSend: true, recents: false
             ),
             .arrival: LandingPolicy(
                 selection: .unlessNavigated, sound: true, card: true, summary: .whenSelected,

@@ -99,6 +99,12 @@ extension TranscriberMockSuites {
                     segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "recovered text")]
                 ))
                 await model.unloadTranscriptionSession()
+                let exports = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("parola-retry-exports-\(UUID().uuidString)", isDirectory: true)
+                try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
+                defer { try? FileManager.default.removeItem(at: exports) }
+                #expect(model.setAutoExportFolder(exports))
+                model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])]
 
                 model.retryFailedTake()
 
@@ -109,6 +115,9 @@ extension TranscriberMockSuites {
                 let after = await model.library.list()
                 #expect(after.count == 1, "the entry is filled in, not joined by a twin")
                 #expect(after.first?.title.hasSuffix("(transcription failed)") == false)
+                await model.awaitLandingSteps()
+                let exported = try FileManager.default.contentsOfDirectory(atPath: exports.path)
+                #expect(exported.contains { $0.hasSuffix(".txt") }, "auto-export runs, as it would have for the take")
             }
         }
 
