@@ -17,97 +17,116 @@ struct FixedClock: FolderWatcherClock {
     func now() -> Date { start }
 }
 
-actor ManualScheduler: FolderWatcherScheduler {
+/// Ticks run only when a test advances them. Cancelling a tick takes it off the list at once, under the
+/// lock, so an advance can never resume a tick the watcher already replaced.
+final class ManualScheduler: FolderWatcherScheduler, Sendable {
+    struct NoTickScheduled: Error {}
+
     private struct Parked {
         let id: UUID
         let continuation: CheckedContinuation<Bool, Never>
     }
 
-    struct NoTickScheduled: Error {}
-
-    private struct ArrivalWaiter {
+    private struct Waiter {
         let id: UUID
         let continuation: CheckedContinuation<Bool, Never>
     }
 
-    private var parked: [Parked] = []
-    private var cancelledBeforeParking: Set<UUID> = []
-    private var done: [CheckedContinuation<Void, Never>] = []
-    private var arrivalWaiters: [ArrivalWaiter] = []
-
-    var parkedCount: Int { parked.count }
-    private(set) var intervals: [Duration] = []
-
-    func runTick(after interval: Duration, _ body: @Sendable @escaping () async -> Void) async throws {
-        intervals.append(interval)
-        guard await park() else { throw CancellationError() }
-        await body()
-        signalDone()
+    private struct State {
+        var parked: [Parked] = []
+        var cancelledBeforeParking: Set<UUID> = []
+        var done: [CheckedContinuation<Void, Never>] = []
+        var waiters: [Waiter] = []
+        var intervals: [Duration] = []
     }
 
-    /// Runs `ticks` settle checks. A settled file arrives on the second check after the scan that found it.
+    private enum Parking {
+        case parked(wake: CheckedContinuation<Bool, Never>?)
+        case cancelled
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    var parkedCount: Int { state.withLock { $0.parked.count } }
+    /// The interval of every tick that was armed, in order; one cancelled before it parked is left out.
+    var intervals: [Duration] { state.withLock { $0.intervals } }
+
+    func runTick(after interval: Duration, _ body: @Sendable @escaping () async -> Void) async throws {
+        let id = UUID()
+        let go = await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                let parking = state.withLock { state -> Parking in
+                    if state.cancelledBeforeParking.remove(id) != nil { return .cancelled }
+                    state.intervals.append(interval)
+                    state.parked.append(Parked(id: id, continuation: continuation))
+                    return .parked(wake: state.waiters.isEmpty ? nil : state.waiters.removeFirst().continuation)
+                }
+                switch parking {
+                case .cancelled: continuation.resume(returning: false)
+                case .parked(let wake): wake?.resume(returning: true)
+                }
+            }
+        } onCancel: {
+            let parked = state.withLock { state -> CheckedContinuation<Bool, Never>? in
+                if let index = state.parked.firstIndex(where: { $0.id == id }) {
+                    return state.parked.remove(at: index).continuation
+                }
+                state.cancelledBeforeParking.insert(id)
+                return nil
+            }
+            parked?.resume(returning: false)
+        }
+        guard go else { throw CancellationError() }
+        await body()
+        let done = state.withLock { $0.done.isEmpty ? nil : $0.done.removeFirst() }
+        done?.resume()
+    }
+
+    /// Runs `ticks` settle checks. A settled file arrives on the third check after the scan that found it.
     func advance(ticks: Int) async throws {
         for _ in 0..<ticks {
             try await advanceAndWait()
         }
     }
 
-    /// Fails instead of hanging when the watcher never schedules a tick.
+    /// Runs the armed tick to the end. Fails instead of hanging when the watcher never arms one.
     func advanceAndWait() async throws {
-        if parked.isEmpty {
-            let id = UUID()
-            Task {
-                try? await Task.sleep(for: .seconds(5))
-                self.expireWaiter(id)
+        while true {
+            let next = state.withLock { $0.parked.isEmpty ? nil : $0.parked.removeFirst() }
+            if let next {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    state.withLock { $0.done.append(continuation) }
+                    next.continuation.resume(returning: true)
+                }
+                return
             }
-            let arrived = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
-                arrivalWaiters.append(ArrivalWaiter(id: id, continuation: cont))
-            }
-            guard arrived else { throw NoTickScheduled() }
-        }
-        let go = parked.removeFirst()
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            done.append(cont)
-            go.continuation.resume(returning: true)
+            try await waitForArmedTick()
         }
     }
 
-    /// A tick cancelled by `stop()` resumes with `false` instead of leaking its continuation.
-    private func park() async -> Bool {
+    /// Returns once a tick is armed, so `intervals` is read after the watcher scheduled its next check.
+    func waitForArmedTick() async throws {
         let id = UUID()
-        return await withTaskCancellationHandler {
-            await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
-                if cancelledBeforeParking.remove(id) != nil {
-                    cont.resume(returning: false)
-                    return
-                }
-                parked.append(Parked(id: id, continuation: cont))
-                if let waiter = arrivalWaiters.first {
-                    arrivalWaiters.removeFirst()
-                    waiter.continuation.resume(returning: true)
-                }
+        let armed = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let ready = state.withLock { state -> Bool in
+                if !state.parked.isEmpty { return true }
+                state.waiters.append(Waiter(id: id, continuation: continuation))
+                return false
             }
-        } onCancel: {
-            Task { await self.cancelParked(id) }
+            if ready {
+                continuation.resume(returning: true)
+                return
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(30))
+                let expired = self.state.withLock { state -> CheckedContinuation<Bool, Never>? in
+                    guard let index = state.waiters.firstIndex(where: { $0.id == id }) else { return nil }
+                    return state.waiters.remove(at: index).continuation
+                }
+                expired?.resume(returning: false)
+            }
         }
-    }
-
-    private func expireWaiter(_ id: UUID) {
-        guard let index = arrivalWaiters.firstIndex(where: { $0.id == id }) else { return }
-        arrivalWaiters.remove(at: index).continuation.resume(returning: false)
-    }
-
-    private func cancelParked(_ id: UUID) {
-        if let index = parked.firstIndex(where: { $0.id == id }) {
-            parked.remove(at: index).continuation.resume(returning: false)
-        } else {
-            cancelledBeforeParking.insert(id)
-        }
-    }
-
-    private func signalDone() {
-        guard !done.isEmpty else { return }
-        done.removeFirst().resume()
+        guard armed else { throw NoTickScheduled() }
     }
 }
 

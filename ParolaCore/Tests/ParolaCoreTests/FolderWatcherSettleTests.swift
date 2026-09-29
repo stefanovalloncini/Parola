@@ -214,9 +214,10 @@ struct FolderWatcherSettleTests {
         try FileManager.default.setAttributes([.creationDate: Date(timeIntervalSince1970: -753_578_704)], ofItemAtPath: copying.path)
         await watcher.checkForNewFiles()
         try await scheduler.advance(ticks: 8)
+        try await scheduler.waitForArmedTick()
         await watcher.stop()
 
-        let intervals = await scheduler.intervals.map { $0.components.seconds }
+        let intervals = scheduler.intervals.map { $0.components.seconds }
         #expect(intervals == [1, 2, 3, 5, 9, 17, 33, 33, 33])
         #expect(lookups.count == 1)
     }
@@ -238,18 +239,14 @@ struct FolderWatcherSettleTests {
         try FileManager.default.setAttributes([.creationDate: Date(timeIntervalSince1970: -753_578_704)], ofItemAtPath: copying.path)
         await watcher.checkForNewFiles()
         try await scheduler.advance(ticks: 6)
-        #expect(await scheduler.intervals.last == .seconds(33))
+        try await scheduler.waitForArmedTick()
+        #expect(scheduler.intervals.last == .seconds(33))
 
         try Fixture.writeSettled(folder.appendingPathComponent("voice-memo.m4a"), clock: clock)
         await watcher.checkForNewFiles()
-        let deadline = ContinuousClock.now + .seconds(5)
-        while ContinuousClock.now < deadline {
-            let parked = await scheduler.parkedCount
-            let last = await scheduler.intervals.last
-            if parked == 1, last == .seconds(1) { break }
-            try await Task.sleep(for: .milliseconds(5))
-        }
-        #expect(await scheduler.intervals.last == .seconds(1))
+        try await scheduler.waitForArmedTick()
+        #expect(scheduler.parkedCount == 1)
+        #expect(scheduler.intervals.last == .seconds(1))
         try await scheduler.advance(ticks: 3)
         await watcher.stop()
         #expect(collected.snapshot().map(\.lastPathComponent) == ["voice-memo.m4a"])
@@ -311,6 +308,9 @@ struct FolderWatcherSettleTests {
         try await scheduler.advance(ticks: 2)
         #expect(placeholder.requests.count == 1)
         #expect(await waitFor { placeholder.reads.count == 1 })
+        // The read's result re-arms the tick; advancing before that would run the replaced tick, which is ignored.
+        #expect(await waitFor { scheduler.intervals.last == .milliseconds(50) })
+        try await scheduler.waitForArmedTick()
         #expect(collected.snapshot().isEmpty)
 
         try await scheduler.advance(ticks: 3)

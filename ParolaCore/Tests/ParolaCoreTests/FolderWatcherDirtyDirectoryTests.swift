@@ -223,7 +223,8 @@ struct FolderWatcherResourceTests {
         #expect(polled.count == 2)
 
         try await scheduler.advance(ticks: 4)
-        #expect(await scheduler.intervals.map { $0.components.seconds } == [1, 2, 3, 5, 9])
+        try await scheduler.waitForArmedTick()
+        #expect(scheduler.intervals.map { $0.components.seconds } == [1, 2, 3, 5, 9])
 
         let quiet = try #require(polled.first)
         try Fixture.writeSettled(URL(fileURLWithPath: quiet).appendingPathComponent("unheard.wav"), clock: clock)
