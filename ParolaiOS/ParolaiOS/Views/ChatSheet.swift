@@ -165,7 +165,8 @@ struct ChatSheet: View {
             let s = try await TranscriptChat.makeSession(
                 transcript: transcript,
                 history: transcript.chatHistory ?? [],
-                provider: .onDevice
+                provider: .onDevice,
+                digest: keptDigest()
             )
             guard !Task.isCancelled else { return }
             let history = await s.history
@@ -176,6 +177,32 @@ struct ChatSheet: View {
             guard !Task.isCancelled else { return }
             sessionError = error.localizedDescription
         }
+    }
+
+    /// The summary a long chat is condensed around, written once and kept as the entry's summary.
+    private func keptDigest() -> @Sendable () async throws -> Summary {
+        let transcript = transcript
+        let library = model.library
+        let entryID = entry.id
+        let refresh = onSave
+        return { @MainActor in
+            let written = try await SummaryService(budget: .onDevice).summarise(transcript)
+            let saved = await Self.keep(digest: written, for: entryID, in: transcript, library: library)
+            refresh?(saved)
+            return saved.summary ?? written
+        }
+    }
+
+    /// Saves a chat's digest as the entry's summary, leaving the chapters the entry already had.
+    static func keep(digest written: Summary, for entryID: LibraryEntry.ID, in transcript: Transcript, library: LibraryStore) async -> Transcript {
+        let chapters = transcript.chapters?.isEmpty == false ? transcript.chapters : written.chapters
+        var kept = written
+        kept.chapters = chapters ?? []
+        try? await library.setSummary(kept, chapters: chapters, for: entryID)
+        var saved = transcript
+        saved.summary = kept
+        saved.chapters = chapters
+        return saved
     }
 
     private func send() {
