@@ -129,7 +129,7 @@ extension TranscriberMockSuites {
                     let before = makeModel(library: library, defaults: defaults)
                     _ = try await openOwnEntry(before, in: folder)
                     await arrive(before, [file])
-                    #expect(before.backgroundArrivalID != nil)
+                    #expect(await waitUntil { before.backgroundArrivalID != nil })
                     #expect(try savedQueue(before) == [file])
                     before.preemptWatchedLane()
                 }
@@ -153,7 +153,7 @@ extension TranscriberMockSuites {
                 let model = makeModel(library: makeTempLibraryURL("loss-cancel"), defaults: temporaryDefaults())
                 let files = [try makeWAV("First", in: folder), try makeWAV("Second", in: folder, seconds: 0.4)]
                 await arrive(model, files)
-                #expect(model.visibleArrivalID != nil)
+                #expect(await waitUntil { model.visibleArrivalID != nil })
                 #expect(model.fileTranscribeTask != nil)
 
                 model.cancelCurrentWork()
@@ -183,7 +183,7 @@ extension TranscriberMockSuites {
                 let later = try makeWAV("Later", in: folder, seconds: 0.5)
                 let opened = try makeWAV("Opened", in: folder, seconds: 0.6)
                 await arrive(model, [arrived])
-                #expect(model.visibleArrivalID != nil)
+                #expect(await waitUntil { model.visibleArrivalID != nil })
                 await arrive(model, [later])
 
                 model.transcribe(fileURL: opened)

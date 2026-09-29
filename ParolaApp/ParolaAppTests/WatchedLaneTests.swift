@@ -159,7 +159,7 @@ extension TranscriberMockSuites {
 
                 await arrive(model, arrived)
 
-                #expect(model.fileTranscribeTask != nil)
+                #expect(await waitUntil { model.fileTranscribeTask != nil })
                 #expect(model.sourceFileURL == arrived)
                 await gate.open()
                 #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle && model.selectedEntryID != nil })
@@ -246,7 +246,7 @@ extension TranscriberMockSuites {
                 let opened = try makeWAV("Opened", in: rig.folder, seconds: 0.5)
 
                 await arrive(model, arrived)
-                #expect(model.backgroundArrivalID != nil)
+                #expect(await waitUntil { model.backgroundArrivalID != nil })
 
                 model.transcribe(fileURL: opened)
                 #expect(await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask != nil })
@@ -258,6 +258,30 @@ extension TranscriberMockSuites {
                 #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 3 })
                 let titles = Set(await model.library.list().filter { $0.id != own.id }.map(LibraryEntryDisplay.title(for:)))
                 #expect(titles == ["Arrived", "Opened"])
+            }
+        }
+
+        @Test("a watched file deleted before its turn leaves the line without a run or a toast")
+        func missingArrivalIsDropped() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let rig = try makeRig("missing")
+                defer { try? FileManager.default.removeItem(at: rig.folder) }
+                let model = rig.model
+                let gone = try makeWAV("Gone", in: rig.folder)
+                model.fileTranscribeTask = Task {}
+                await arrive(model, gone)
+                #expect(model.watchedArrivals.map(\.url) == [gone])
+                try FileManager.default.removeItem(at: gone)
+
+                model.fileTranscribeTask = nil
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+                #expect(model.arrivalNotice == nil)
+                #expect(model.fileTranscribeTask == nil)
+                #expect(await model.library.list().isEmpty)
             }
         }
 

@@ -316,7 +316,7 @@ extension TranscriberMockSuites {
                 await model.awaitWatchedImport()
 
                 #expect(model.duplicateImport == nil)
-                #expect(model.fileTranscribeTask != nil)
+                #expect(await waitUntil { model.fileTranscribeTask != nil })
                 #expect(model.sourceFileURL == wav)
                 #expect(model.batchDuplicatesSkipped == 0)
                 model.cancelCurrentWork()
@@ -337,7 +337,7 @@ extension TranscriberMockSuites {
                 await model.awaitWatchedImport()
 
                 #expect(model.duplicateImport == nil)
-                #expect(model.fileTranscribeTask != nil)
+                #expect(await waitUntil { model.fileTranscribeTask != nil })
                 #expect(model.batchDuplicatesSkipped == 0)
                 model.cancelCurrentWork()
             }

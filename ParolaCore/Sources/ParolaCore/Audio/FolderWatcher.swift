@@ -811,10 +811,20 @@ public actor FolderWatcher {
             ) {
                 setStatus(departure.status, for: key, now: now)
             } else {
-                setStatus(.emitted(at: now), for: key, now: now)
-                onNewMediaFile(URL(fileURLWithPath: file.path))
+                handOver(key, path: file.path, now: now)
             }
         }
+    }
+
+    /// A file Parola wrote itself, such as a video with burned-in captions saved here, is not an arrival.
+    private func handOver(_ key: FileKey, path: String, now: Date) {
+        let url = URL(fileURLWithPath: path)
+        guard !OutputMarker.isMarked(url) else {
+            setStatus(.existing, for: key, now: now)
+            return
+        }
+        setStatus(.emitted(at: now), for: key, now: now)
+        onNewMediaFile(url)
     }
 
     /// Off the actor, since the read waits for the download; a failed read hands the file over as it is.
@@ -844,10 +854,8 @@ public actor FolderWatcher {
             scheduleSettleTick()
         case .failure(let error):
             ParolaLog.error(.library, "a watched cloud file never downloaded; handing it over as it is", [.error: .error(error)])
-            let now = options.clock.now()
-            setStatus(.emitted(at: now), for: key, now: now)
+            handOver(key, path: path, now: options.clock.now())
             publishBaselineChange()
-            onNewMediaFile(URL(fileURLWithPath: path))
         }
     }
 

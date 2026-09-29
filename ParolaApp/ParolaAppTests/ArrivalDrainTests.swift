@@ -60,6 +60,29 @@ struct ForegroundSlotTests {
         await model.awaitArrivalDrain()
         #expect(model.deferredArrivals.isEmpty)
     }
+
+    @Test("a parked file deleted before its turn is dropped when the drain comes")
+    func missingParkedFileIsDropped() async throws {
+        let model = makeModel()
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-slot-missing-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let gone = folder.appendingPathComponent("gone.wav")
+        try Data("RIFF".utf8).write(to: gone)
+        model.fileTranscribeTask = Task {}
+        model.transcribeNow(urls: [gone])
+        #expect(model.deferredArrivals == [gone])
+        try FileManager.default.removeItem(at: gone)
+
+        model.fileTranscribeTask = nil
+        await model.awaitArrivalDrain()
+
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.duplicateCheckTask == nil)
+        #expect(model.fileTranscribeTask == nil)
+        #expect(!model.recentFiles.contains(gone))
+    }
 }
 
 extension TranscriberMockSuites {

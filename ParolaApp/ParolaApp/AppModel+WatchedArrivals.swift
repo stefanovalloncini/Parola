@@ -82,6 +82,29 @@ extension AppModel {
     func pumpWatchedLane() {
         guard watchedLaneTask == nil, visibleArrivalID == nil, !foregroundIsHeld,
               let next = watchedArrivals.first else { return }
+        // Off main: a watched folder can sit on a server that takes its time to answer.
+        watchedLaneTask = Task { [weak self] in
+            let present = (try? await AppModel.offMainIO(qos: .utility) {
+                FileManager.default.fileExists(atPath: next.url.path)
+            }) ?? false
+            guard let self, !Task.isCancelled else { return }
+            watchedLaneTask = nil
+            guard present else {
+                ParolaLog.info(.library, "a watched-folder file was gone by its turn")
+                watchedArrivals.removeAll { $0.id == next.id }
+                pumpWatchedLane()
+                return
+            }
+            startArrival(next)
+        }
+    }
+
+    private func startArrival(_ vetted: WatchedArrival) {
+        guard visibleArrivalID == nil, !foregroundIsHeld else { return }
+        guard let next = watchedArrivals.first, next.id == vetted.id else {
+            pumpWatchedLane()
+            return
+        }
         if !next.inBackground, arrivalMayTakeWindow {
             beginFileTranscription(
                 fileURL: next.url, translateOverride: nil, sourceDigest: next.sourceDigest, arrival: next

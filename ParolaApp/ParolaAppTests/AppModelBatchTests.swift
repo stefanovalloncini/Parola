@@ -17,6 +17,15 @@ struct AppModelBatchTests {
         URL(fileURLWithPath: "/tmp/AppModelBatchTests/\(name).wav")
     }
 
+    /// A parked file has to still be on disk when the drain comes for it.
+    private static func makeFile(_ name: String) -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("AppModelBatchTests-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let url = folder.appendingPathComponent(name)
+        FileManager.default.createFile(atPath: url.path, contents: Data("RIFF".utf8))
+        return url
+    }
+
     private static func makeJob(_ name: String, status: BatchJob.Status = .pending) -> BatchJob {
         BatchJob(url: makeURL(name), status: status)
     }
@@ -1020,7 +1029,7 @@ struct AppModelBatchTests {
     func deferredBatchStartsAfterFileTranscription() async {
         let model = makeModel()
         model.fileTranscribeTask = Task {}
-        let url = URL(fileURLWithPath: "/tmp/queued.wav")
+        let url = Self.makeFile("queued.wav")
         model.startBatch(urls: [url])
         #expect(model.batchJobs.isEmpty)
 
@@ -1041,7 +1050,7 @@ struct AppModelBatchTests {
         let model = makeModel()
         model.batchJobs = [Self.makeJob("finished", status: .done)]
         model.fileTranscribeTask = Task {}
-        let url = Self.makeURL("late")
+        let url = Self.makeFile("late.wav")
 
         model.addBatchFiles([url])
 
@@ -1110,7 +1119,7 @@ struct AppModelBatchTests {
         model.startBatch(urls: [Self.makeURL("a")])
         let jobID = model.batchJobs[0].id
         await model.handleBatchEvent(.started(jobID: jobID))
-        let parked = Self.makeURL("parked")
+        let parked = Self.makeFile("parked.wav")
         model.deferredArrivals = [parked]
 
         await model.handleBatchEvent(.completed(jobID: jobID, transcript: Self.makeTranscript()))
@@ -1129,7 +1138,7 @@ struct AppModelBatchTests {
         model.startBatch(urls: [Self.makeURL("a"), Self.makeURL("b")])
         let failed = model.batchJobs[0].id
         let cancelled = model.batchJobs[1].id
-        let parked = Self.makeURL("parked")
+        let parked = Self.makeFile("parked.wav")
         model.deferredArrivals = [parked]
 
         await model.handleBatchEvent(.failed(jobID: failed, reason: "boom"))
@@ -1150,7 +1159,7 @@ struct AppModelBatchTests {
         let jobID = model.batchJobs[0].id
         await model.handleBatchEvent(.started(jobID: jobID))
         model.batchJobs.append(Self.makeJob("queued"))
-        let parked = Self.makeURL("parked")
+        let parked = Self.makeFile("parked.wav")
         model.deferredArrivals = [parked]
 
         await model.handleBatchEvent(.completed(jobID: jobID, transcript: Self.makeTranscript()))
@@ -1202,7 +1211,7 @@ struct AppModelBatchTests {
     func deferredArrivalsDrainOnFinish() async {
         let model = makeModel()
         model.phase = .recording(source: .microphone)
-        let url = URL(fileURLWithPath: "/tmp/arrival.wav")
+        let url = Self.makeFile("arrival.wav")
         model.transcribe(fileURL: url)
         let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
         await model.handleStreamingEvent(.finished(final))
@@ -1250,8 +1259,8 @@ struct AppModelBatchTests {
     func parolaArrivalsDrainSeparately() async {
         let model = makeModel()
         model.phase = .recording(source: .microphone)
-        let audio = URL(fileURLWithPath: "/tmp/audio.wav")
-        let parola = URL(fileURLWithPath: "/tmp/doc.parola")
+        let audio = Self.makeFile("audio.wav")
+        let parola = Self.makeFile("doc.parola")
         model.transcribe(fileURL: audio)
         model.transcribe(fileURL: parola)
         #expect(model.deferredArrivals == [audio, parola])

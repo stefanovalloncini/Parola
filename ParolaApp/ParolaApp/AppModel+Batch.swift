@@ -218,7 +218,8 @@ extension AppModel {
 
     func drainDeferredArrivals() {
         guard !deferredArrivals.isEmpty || !deferredLinks.isEmpty else { return }
-        let urls = deferredArrivals
+        // A file deleted while it waited, or a burn cancelled mid-write, leaves nothing to open.
+        let urls = deferredArrivals.filter { FileManager.default.fileExists(atPath: $0.path) }
         deferredArrivals = []
         let parolaURLs = urls.filter(DroppedFiles.isProject)
         let subtitleURLs = urls.filter(Self.isSubtitleImport)
