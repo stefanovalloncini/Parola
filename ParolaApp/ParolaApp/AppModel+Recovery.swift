@@ -455,8 +455,7 @@ extension AppModel {
     }
 
     nonisolated static func readableRecordingURL(_ url: URL) -> URL? {
-        guard let file = try? AVAudioFile(forReading: url), file.length > 0 else { return nil }
-        return url
+        WAVHeaderRepair.makeReadable(url) ? url : nil
     }
 
     nonisolated static func recoveredRecordingTitle(startedAt: Date, bundle: Bundle = .main) -> String {
@@ -529,6 +528,8 @@ extension AppModel {
                     if (try? FileManager.default.removeItem(at: file)) != nil { deleted += 1 }
                     continue
                 }
+                // A take cut off by a crash may still carry the sizes its writer opened with.
+                _ = try? await AppModel.offMainIO(qos: .utility) { WAVHeaderRepair.makeReadable(file) }
                 let digest = await SourceDigest.digest(of: file)
                 if let digest, await library.hasEntry(digest: digest) {
                     if (try? FileManager.default.removeItem(at: file)) != nil { deleted += 1 }

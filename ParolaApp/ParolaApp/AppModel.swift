@@ -3578,7 +3578,7 @@ final class AppModel {
             } catch let cut as CaptureInterrupted {
                 clearTakeReadouts()
                 liveRecordingAudioURL = nil
-                keepCutShortTake(cut, title: title, source: takeSource, category: category, recovery: recovery)
+                await keepCutShortTake(cut, title: title, source: takeSource, category: category, recovery: recovery)
             } catch {
                 clearTakeReadouts()
                 if let recovery { endRecovery(recovery) }
@@ -3620,7 +3620,8 @@ final class AppModel {
     /// A take whose file stopped taking writes keeps the audio that landed, saved as interrupted, with Retry.
     private func keepCutShortTake(
         _ cut: CaptureInterrupted, title: String, source: EntrySource, category: EntryCategory, recovery: Int?
-    ) {
+    ) async {
+        _ = try? await AppModel.offMainIO { WAVHeaderRepair.makeReadable(cut.url) }
         saveTake(
             Self.untranscribedTranscript(of: cut.url, language: currentOptions.language),
             audio: cut.url,
@@ -3969,6 +3970,7 @@ final class AppModel {
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
         // Without a file the checkpoint stays, so the next launch offers what it points at.
         guard let url = prepared else { return }
+        if cutShort { _ = try? await AppModel.offMainIO { WAVHeaderRepair.makeReadable(url) } }
         saveTake(
             Self.untranscribedTranscript(of: url, language: currentOptions.language),
             audio: url,

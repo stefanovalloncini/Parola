@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Foundation
 import Testing
 @testable import Parola
@@ -53,6 +54,14 @@ private actor AudioOnlySession: StreamingTranscriber {
 private final class QuitReply {
     var value: Bool?
     var asked = false
+}
+
+/// What a writer that never closed its file leaves behind: the RIFF and data sizes it opened with.
+private func zeroSizes(of wav: URL) throws {
+    var bytes = try Data(contentsOf: wav)
+    bytes.replaceSubrange(4..<8, with: Data(count: 4))
+    bytes.replaceSubrange(40..<44, with: Data(count: 4))
+    try bytes.write(to: wav)
 }
 
 private func makeTakeWAV(_ label: String, seconds: Double = 0.3, in directory: URL? = nil, prefix: String = "parola-trust") throws -> URL {
@@ -515,6 +524,7 @@ extension TranscriberMockSuites {
         func cutShortTakeKeepsItsAudio() async throws {
             let wav = try makeTakeWAV("cut-short")
             defer { try? FileManager.default.removeItem(at: wav) }
+            try zeroSizes(of: wav)
             let model = makeModel()
             model.liveSource = CutShortTake(url: wav)
             model.phase = .recording(source: .microphone)
@@ -525,6 +535,8 @@ extension TranscriberMockSuites {
             #expect(saved.title.hasSuffix("(interrupted)"))
             #expect(saved.manifest.originalAudioName.isEmpty == false)
             #expect(FileManager.default.fileExists(atPath: wav.path), "the take's file is never deleted")
+            let kept = try #require(try await model.library.load(saved.id).document.audioURL)
+            #expect(try AVAudioFile(forReading: kept).length > 0, "its header counts the audio that landed")
             await waitUntil {
                 if case .failed(let message) = model.phase { return message.contains("saved to your library") }
                 return false
@@ -626,6 +638,7 @@ extension TranscriberMockSuites {
                 transcript: AppModel.untranscribedTranscript(of: savedCopy, language: nil),
                 audioSource: savedCopy
             )
+            try zeroSizes(of: orphan)
             let old = Date().addingTimeInterval(-3_600)
             for file in [orphan, savedCopy] {
                 try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: file.path)
@@ -637,7 +650,9 @@ extension TranscriberMockSuites {
             let listed = await model.library.list()
             #expect(listed.count == 2, "the saved take isn't imported a second time")
             let recovered = try #require(listed.first { $0.title.hasSuffix("(recovered)") })
-            #expect(try await model.library.load(recovered.id).document.transcript.modelName.isEmpty)
+            let document = try await model.library.load(recovered.id).document
+            #expect(document.transcript.modelName.isEmpty)
+            #expect(try AVAudioFile(forReading: try #require(document.audioURL)).length > 0, "a crashed take's header is rewritten so it plays")
             #expect(!FileManager.default.fileExists(atPath: orphan.path), "the orphan moved into its entry")
             #expect(!FileManager.default.fileExists(atPath: savedCopy.path))
             #expect(FileManager.default.fileExists(atPath: fresh.path), "a file written minutes ago is left alone")
