@@ -1452,6 +1452,27 @@ extension TranscriberMockSuites {
             #expect(model.pendingRecordingCategory == .transcription, "the refused request's category is spent")
         }
 
+        @Test("a count-in running when a quit begins never becomes a take")
+        func countInEndsWithTheQuit() async throws {
+            let fixture = try makeTakeWAV("count-in")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let model = makeModel()
+                model.useStreaming = false
+                model.recordingCountInSeconds = 1
+                model.startRecording(source: .microphone)
+                #expect(model.recordingCountdown != nil)
+
+                model.quitPending = true
+
+                #expect(model.recordingCountdown == nil)
+                await settle(for: .milliseconds(1_500))
+                #expect(model.activeTake == nil)
+                #expect(!model.recordingActive)
+            }
+        }
+
         @Test("Discard drops the take, then lets the app quit")
         func discardDropsTheTake() async throws {
             let fixture = try makeTakeWAV("discard")

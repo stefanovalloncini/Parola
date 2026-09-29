@@ -205,7 +205,9 @@ final class AppModel {
     /// True while a quit waits for takes to reach the library; the window says so.
     private(set) var savingTakesBeforeQuit = false
     /// A quit already winding the takes down; the app delegate answers any other quit with a no.
-    @ObservationIgnored var quitPending = false
+    @ObservationIgnored var quitPending = false {
+        didSet { if quitPending { cancelRecordingCountdown() } }
+    }
     /// How long a quit waits, on the model's clock, for its takes to reach the library.
     @ObservationIgnored var quitSaveLimit: Duration = .seconds(30)
     @ObservationIgnored private var takeCounter = 0
@@ -3088,6 +3090,12 @@ final class AppModel {
     }
 
     private func beginRecordingNow(source: RecordSource, diskCheck: Task<Int64?, Never>) {
+        // A count-in that ends after a quit began would start a take the quit can only cut off.
+        guard !quitPending else {
+            forgetTakeRequest()
+            resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+            return
+        }
         takeCounter &+= 1
         let take = TakeContext(
             id: takeCounter,
