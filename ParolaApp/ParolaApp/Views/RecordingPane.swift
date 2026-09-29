@@ -217,19 +217,6 @@ struct RecordingCard: View {
     }
 }
 
-extension DS.Color {
-    /// A take's Stop fill: white on it clears 4.5:1 in both appearances, where `danger` reaches 3.6.
-    static let recordingFillTheme = ThemeColor.dynamic(
-        light: RGBA(0.769, 0.137, 0.165),
-        dark: RGBA(0.839, 0.208, 0.184)
-    )
-    static let recordingFill = recordingFillTheme.color
-
-    /// Near-black on the amber warning fill, 9:1; white on it read under 2:1.
-    static let warningBannerInkRGBA = RGBA(0.08, 0.08, 0.08)
-    static let warningBannerInk = ThemeColor.uniform(warningBannerInkRGBA).color
-}
-
 struct LiveTranscriptView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
