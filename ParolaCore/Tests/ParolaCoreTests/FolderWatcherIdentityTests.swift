@@ -12,6 +12,7 @@ struct FolderWatcherIdentityTests {
         scheduler: ManualScheduler,
         ledger: FolderWatcherLedger = FolderWatcherLedger(),
         observesFileSystem: Bool = true,
+        fileSystem: String? = nil,
         collected: CollectedURLs
     ) -> FolderWatcher {
         var options = FolderWatcher.Options(
@@ -22,6 +23,9 @@ struct FolderWatcherIdentityTests {
             ledger: ledger
         )
         options.observesFileSystem = observesFileSystem
+        if let fileSystem {
+            options.fileSystemName = { _ in fileSystem }
+        }
         return FolderWatcher(folderURL: folder, options: options) { collected.append($0) }
     }
 
@@ -187,15 +191,22 @@ struct FolderWatcherIdentityTests {
         #expect(collected.snapshot().map(\.lastPathComponent) == ["fresh.mp3"])
     }
 
-    @Test("a baseline record under a reused inode hides no new file: the birth time tells them apart")
-    func reusedInodeIsANewFile() async throws {
+    @Test(
+        "under a reused inode, the birth time tells a new file from an old one; APFS never reuses inodes",
+        arguments: [("msdos", ["renamed.wav", "same-name.wav", "older-birth.wav"]), ("apfs", [])]
+    )
+    func reusedInodeIsANewFile(fileSystem: String, arrivals: [String]) async throws {
         let folder = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: folder) }
         let clock = FixedClock(start: Date())
-        let names = ["renamed.wav", "same-name.wav", "same-file.wav", "old-baseline.wav", "backdated.wav"]
+        let names = ["renamed.wav", "same-name.wav", "same-file.wav", "old-baseline.wav", "backdated.wav", "shifted.wav", "older-birth.wav"]
         for name in names {
             try Fixture.writeSettled(folder.appendingPathComponent(name), clock: clock)
         }
+        try FileManager.default.setAttributes(
+            [.creationDate: clock.start.addingTimeInterval(-5000)],
+            ofItemAtPath: folder.appendingPathComponent("older-birth.wav").path
+        )
         let info = try names.map { try #require(FolderWatcher.FileInfo(folder.appendingPathComponent($0).path)) }
         let otherBirth = clock.start.addingTimeInterval(-86_400)
         let seed = FolderWatcher.Baseline(entries: [
@@ -205,17 +216,25 @@ struct FolderWatcherIdentityTests {
             .init(path: "old-baseline.wav", inode: info[3].inode, size: info[3].size, modified: info[3].modified),
             .init(path: "backdated.wav", inode: info[4].inode, size: info[4].size, modified: info[4].modified,
                   created: info[4].created.addingTimeInterval(3600)),
+            .init(path: "shifted.wav", inode: info[5].inode, size: info[5].size, modified: info[5].modified.addingTimeInterval(-3600),
+                  created: info[5].created.addingTimeInterval(-3600)),
+            .init(path: "older-birth.wav", inode: info[6].inode, size: info[6].size, modified: info[6].modified,
+                  created: info[6].created.addingTimeInterval(3600)),
         ])
 
         let collected = CollectedURLs()
         let scheduler = ManualScheduler()
-        let watcher = makeWatcher(folder, clock: clock, scheduler: scheduler, observesFileSystem: false, collected: collected)
+        let watcher = makeWatcher(
+            folder, clock: clock, scheduler: scheduler, observesFileSystem: false, fileSystem: fileSystem, collected: collected
+        )
         await watcher.start(baseline: seed)
-        #expect(Fixture.names(await watcher.pendingPaths) == ["renamed.wav", "same-name.wav"])
-        try await scheduler.advance(ticks: 3)
+        #expect(Fixture.names(await watcher.pendingPaths) == Set(arrivals))
+        if !arrivals.isEmpty {
+            try await scheduler.advance(ticks: 3)
+        }
         await watcher.stop()
 
-        #expect(Set(collected.snapshot().map(\.lastPathComponent)) == ["renamed.wav", "same-name.wav"])
+        #expect(Set(collected.snapshot().map(\.lastPathComponent)) == Set(arrivals))
     }
 
     @Test("a file that was already there, changed in place or saved again with its birth time, doesn't arrive; one replaced by a new file does")

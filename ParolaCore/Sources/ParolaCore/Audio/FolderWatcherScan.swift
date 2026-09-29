@@ -122,6 +122,14 @@ extension FolderWatcher {
         return .listed(listing)
     }
 
+    static func fileSystemName(_ fd: Int32) -> String? {
+        var info = statfs()
+        guard fstatfs(fd, &info) == 0 else { return nil }
+        return withUnsafeBytes(of: info.f_fstypename) { bytes in
+            String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
+        }
+    }
+
     static func isMediaFile(name: String) -> Bool {
         guard let dot = name.lastIndex(of: "."), dot != name.startIndex else { return false }
         let ext = name[name.index(after: dot)...].lowercased()

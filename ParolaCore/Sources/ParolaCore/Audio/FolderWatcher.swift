@@ -29,6 +29,7 @@ public actor FolderWatcher {
         var observesFileSystem = true
         var openDirectory: @Sendable (String) -> Int32 = { path in path.withCString { open($0, O_EVTONLY) } }
         var lister: Lister = { FolderWatcher.list($0, recursive: $1) }
+        var fileSystemName: @Sendable (Int32) -> String? = FolderWatcher.fileSystemName
         var cloud = CloudProbe.system
         /// Download checks a placeholder gets before the watcher reads it to make it download.
         var placeholderChecks = 10
@@ -105,7 +106,7 @@ public actor FolderWatcher {
         )
     }
 
-    private struct TrackedFile {
+    struct TrackedFile {
         var path: String
         var size: Int64
         var modified: Date
@@ -177,6 +178,8 @@ public actor FolderWatcher {
     private var watchedAfterEmit: Set<FileKey> = []
     private var dirty: Set<String> = []
     private var rootInode: UInt64?
+    /// APFS and HFS+ never hand a deleted file's inode to a new one; FAT, exFAT and SMB or NFS shares can.
+    private var inodesAreUnique = false
     /// Directories without a source (out of descriptors) or whose last listing failed: relisted on every pass.
     private var unsourced: Set<String> = []
     private var unlisted: Set<String> = []
@@ -229,6 +232,7 @@ public actor FolderWatcher {
         guard fileDescriptor == fd else { return }
         var rootStat = stat()
         rootInode = fstat(fd, &rootStat) == 0 ? UInt64(rootStat.st_ino) : nil
+        inodesAreUnique = ["apfs", "hfs"].contains(options.fileSystemName(fd) ?? "")
         let request = ScanRequest(
             directories: [rootPath], knownSubdirectories: [:], recursive: options.recursive, lister: options.lister
         )
@@ -505,16 +509,27 @@ public actor FolderWatcher {
         return index
     }
 
-    /// Inodes are reused on FAT, exFAT and ext4 shares; a backdated mtime drags the birth time back, never forward.
-    private static func isSameFile(_ record: TrackedFile, as item: ScannedFile) -> Bool {
-        if record.created != nil, item.created != nil {
-            return !FolderWatcherLedger.isLater(item.created, than: record.created)
+    private func isSameInode(_ record: TrackedFile, as item: ScannedFile) -> Bool {
+        inodesAreUnique || Self.isSameFile(record, as: item)
+    }
+
+    /// For volumes that reuse inodes. FAT keeps local time, so a time-zone change shifts both dates alike;
+    /// `utimes` to an earlier date drags the birth time back onto the modification date.
+    static func isSameFile(_ record: TrackedFile, as item: ScannedFile) -> Bool {
+        guard let recorded = record.created, let listed = item.created else {
+            return record.path == item.path || (record.size == item.size && record.modified == item.modified)
         }
-        return record.path == item.path || (record.size == item.size && record.modified == item.modified)
+        if listed == recorded { return true }
+        if listed > recorded {
+            let birthShift = listed.timeIntervalSince(recorded)
+            let dateShift = item.modified.timeIntervalSince(record.modified)
+            return record.path == item.path && record.size == item.size && abs(birthShift - dateShift) < 0.001
+        }
+        return listed == item.modified
     }
 
     private func resolve(_ item: ScannedFile, vanished: inout [String: FileKey], now: Date) {
-        if let known = files[item.key], !Self.isSameFile(known, as: item) {
+        if let known = files[item.key], !isSameInode(known, as: item) {
             forget(item.key)
         }
         if files[item.key] != nil {
@@ -524,7 +539,8 @@ public actor FolderWatcher {
         ) {
             track(item, status: departure.status, now: now)
         } else if let oldKey = vanished[item.path], let old = files[oldKey],
-                  Self.isSameFile(old, as: item) || (old.size == item.size && old.modified == item.modified) {
+                  !FolderWatcherLedger.isLater(item.created, than: old.created)
+                    || (old.size == item.size && old.modified == item.modified) {
             // The same file saved again under a new inode: judged like a change written in place.
             vanished.removeValue(forKey: item.path)
             forget(oldKey)
