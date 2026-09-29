@@ -3691,6 +3691,17 @@
         }
       }
     },
+    "Couldn't delete": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile eliminare"
+          }
+        }
+      }
+    },
     "Couldn't export diagnostics": {
       "extractionState": "manual",
       "localizations": {
@@ -3735,6 +3746,17 @@
         }
       }
     },
+    "Couldn't move": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile spostare"
+          }
+        }
+      }
+    },
     "Couldn't open microphone": {
       "extractionState": "manual",
       "localizations": {
@@ -3742,6 +3764,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile aprire il microfono"
+          }
+        }
+      }
+    },
+    "Couldn't permanently delete": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile eliminare definitivamente"
+          }
+        }
+      }
+    },
+    "Couldn't pin": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile fissare"
           }
         }
       }
@@ -3764,6 +3808,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile raggiungere il sito."
+          }
+        }
+      }
+    },
+    "Couldn't rename": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile rinominare"
+          }
+        }
+      }
+    },
+    "Couldn't restore": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile ripristinare"
           }
         }
       }
@@ -3796,6 +3862,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione di %@ non riuscita"
+          }
+        }
+      }
+    },
+    "Couldn't unpin": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile rimuovere il pin"
+          }
+        }
+      }
+    },
+    "Couldn't update labels": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile aggiornare le etichette"
           }
         }
       }
