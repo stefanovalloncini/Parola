@@ -12,6 +12,8 @@ public struct TokenBudget: Sendable, Hashable {
     public let answerTokens: Int
     /// The longest answer the model returns in one call, whatever room the window leaves.
     public let maxAnswerTokens: Int
+    /// What a chat reply is kept: a cloud model refuses a request that leaves less than its whole answer share.
+    let chatReplyTokens: Int
     let counting: Counting
 
     enum Counting: Sendable, Hashable {
@@ -27,10 +29,17 @@ public struct TokenBudget: Sendable, Hashable {
         self.init(contextTokens: tokens + answerTokens, answerTokens: answerTokens, counting: .bytes(perToken: 4))
     }
 
-    init(contextTokens: Int, answerTokens: Int, counting: Counting, maxAnswerTokens: Int? = nil) {
+    init(
+        contextTokens: Int,
+        answerTokens: Int,
+        counting: Counting,
+        maxAnswerTokens: Int? = nil,
+        chatReplyTokens: Int? = nil
+    ) {
         self.contextTokens = contextTokens
         self.answerTokens = answerTokens
         self.maxAnswerTokens = maxAnswerTokens ?? contextTokens
+        self.chatReplyTokens = chatReplyTokens ?? min(1024, answerTokens / 2)
         self.counting = counting
     }
 
@@ -63,11 +72,22 @@ public struct TokenBudget: Sendable, Hashable {
 
     static func cloud(_ provider: CloudLLMProviderID) -> TokenBudget {
         let context = CloudLLMProviderInfo.info(for: provider)?.contextWindowTokens ?? 8192
-        return TokenBudget(contextTokens: context, answerTokens: 4096, counting: .bytes(perToken: 4), maxAnswerTokens: cloudMaxAnswerTokens)
+        return TokenBudget(
+            contextTokens: context,
+            answerTokens: cloudMaxAnswerTokens,
+            counting: .bytes(perToken: 4),
+            maxAnswerTokens: cloudMaxAnswerTokens,
+            chatReplyTokens: cloudMaxAnswerTokens
+        )
     }
 
     /// Anthropic's calls ask for at most this many tokens, and OpenAI-compatible models stop near it or later.
     static let cloudMaxAnswerTokens = 4096
+
+    /// What a condensed chat leaves unfilled in its instructions, so the most recent turns still fit.
+    var condensedTurnTokens: Int {
+        min(2048, tokens / 8)
+    }
 
     // MARK: - Counting
 

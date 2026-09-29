@@ -42,8 +42,7 @@ public actor TranscriptChatSession {
         self.model = model
         self.budget = budget
         if let budget {
-            let answer = min(1024, budget.answerTokens / 2)
-            let room = max(1, budget.contextTokens - instructionTokens - answer)
+            let room = max(1, budget.contextTokens - instructionTokens - budget.chatReplyTokens)
             turnRoom = room
             messageCharacterLimit = budget.characters(forTokens: room / 2)
         } else {

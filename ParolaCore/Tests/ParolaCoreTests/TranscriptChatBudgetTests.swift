@@ -63,6 +63,60 @@ struct TranscriptChatBudgetTests {
         #expect(session.messageCharacterLimit == 125 * 4)
     }
 
+    @Test("a cloud chat keeps the whole answer share free, as the provider's own check demands")
+    func cloudChatLeavesTheAnswerShare() async throws {
+        let cloud = TokenBudget(for: .cloud(provider: .openAI, model: "gpt-4o-mini"))
+        let instructionTokens = cloud.tokens - 300
+        let model = MockLanguageModel(scriptedResponses: ["ok"])
+        let session = TranscriptChatSession(
+            transcript: transcript, history: savedHistory(10), model: model, budget: cloud, instructionTokens: instructionTokens
+        )
+
+        _ = try await session.ask("What next?")
+
+        let sent = try #require(await model.lastReceivedHistory)
+        #expect(sent.count > 1)
+        let used = instructionTokens + sent.reduce(0) { $0 + TokenBudget.estimateTokens($1.text) + 4 }
+        #expect(used <= cloud.contextTokens - 4096)
+    }
+
+    @Test("a condensed chat leaves room in its instructions for the latest turns")
+    func condensedChatKeepsRecentTurns() async throws {
+        let strict = TokenBudget(
+            contextTokens: 8000, answerTokens: 2000, counting: .bytes(perToken: 4),
+            maxAnswerTokens: 2000, chatReplyTokens: 2000
+        )
+        let long = Transcript(
+            segments: (0..<600).map {
+                TranscriptSegment(id: $0, start: Double($0) * 5, end: Double($0) * 5 + 4, text: "we talked about the plan for the launch and the budget")
+            },
+            language: "en",
+            modelName: "tiny"
+        )
+        let log = HandedInstructions()
+        let answering = MockLanguageModel(scriptedResponses: ["ok"])
+        let session = try await TranscriptChat.makeSession(
+            transcript: long,
+            history: savedHistory(4),
+            budget: strict,
+            digest: { Summary(text: "A launch meeting.") },
+            features: .all,
+            makeModel: { instructions in
+                await log.record(instructions)
+                return answering
+            }
+        )
+
+        _ = try await session.ask("What about the launch budget?")
+
+        let instructions = try #require(await log.last)
+        #expect(instructions.contains("RELEVANT EXCERPTS:"))
+        let sent = try #require(await answering.lastReceivedHistory)
+        #expect(sent.count > 1)
+        let used = strict.estimate(instructions) + sent.reduce(0) { $0 + strict.estimate($1.text) + 4 }
+        #expect(used <= strict.contextTokens - 2000)
+    }
+
     @Test("a context overflow is retried once with the question alone")
     func overflowRetriesWithTheQuestionAlone() async throws {
         let model = OverflowOnceModel()
@@ -193,4 +247,9 @@ private actor OverflowOnceModel: ParolaCore.LanguageModel {
             }
         }
     }
+}
+
+private actor HandedInstructions {
+    private(set) var last: String?
+    func record(_ instructions: String) { last = instructions }
 }

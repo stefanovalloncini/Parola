@@ -97,7 +97,8 @@ public enum TranscriptChat {
             _ = try await makeModel("")
             let model = CondensedChatModel(transcript: transcript, budget: budget, makeDigest: makeDigest, makeModel: makeModel)
             return TranscriptChatSession(
-                transcript: transcript, history: history, model: model, budget: budget, instructionTokens: budget.tokens
+                transcript: transcript, history: history, model: model, budget: budget,
+                instructionTokens: budget.tokens - budget.condensedTurnTokens
             )
         }
         let instructions = systemInstructions(for: transcript)
@@ -196,7 +197,7 @@ public enum TranscriptChat {
             }
         }
         out += "\nRELEVANT EXCERPTS:\n"
-        let remaining = budget.tokens - budget.estimate(out)
+        let remaining = budget.tokens - budget.condensedTurnTokens - budget.estimate(out)
         for segment in relevantSegments(in: index, question: question, maxTokens: remaining, budget: budget) {
             let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
             out += "\(Timecode.format(segment.start))  \(body)\n"
