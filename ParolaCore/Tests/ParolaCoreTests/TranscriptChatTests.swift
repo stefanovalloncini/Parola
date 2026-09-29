@@ -57,6 +57,33 @@ struct TranscriptChatTests {
         #expect(await handedInstructions.last?.contains("RELEVANT EXCERPTS:") == true)
     }
 
+    @Test("a condensed session takes its digest from the caller when the transcript has no summary")
+    func callerDigest() async throws {
+        let long = Transcript(
+            segments: (0..<400).map {
+                TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "parola parola parola parola parola")
+            },
+            language: "it",
+            modelName: "tiny"
+        )
+        let handedInstructions = InstructionLog()
+        let chat = try await TranscriptChat.makeSession(
+            transcript: long,
+            history: [],
+            budget: TokenBudget(tokens: 3500),
+            digest: { Summary(text: "Digest from the caller.") },
+            features: .all,
+            makeModel: { instructions in
+                await handedInstructions.record(instructions)
+                return MockLanguageModel(scriptedResponses: ["ok"])
+            }
+        )
+        _ = try await chat.ask("Di cosa si parla?")
+
+        #expect(await handedInstructions.count == 2)
+        #expect(await handedInstructions.last?.contains("Digest from the caller.") == true)
+    }
+
     @Test("first ask records user and assistant messages")
     func firstAsk() async throws {
         let model = MockLanguageModel(scriptedResponses: ["Hi there!"])

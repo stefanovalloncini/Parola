@@ -310,7 +310,7 @@ struct ChatPane: View {
         displayedHistory = []
         guard let transcript = model.transcript else { return }
         let loaded = await Self.loadSession(key: sessionKey, currentKey: { sessionKey }) {
-            try await model.makeChatSession(transcript: transcript, history: transcript.chatHistory ?? [])
+            try await model.makeChatSession(transcript: transcript, history: transcript.chatHistory ?? [], entryID: model.selectedEntryID)
         }
         switch loaded {
         case .ready(let built, let history)?:

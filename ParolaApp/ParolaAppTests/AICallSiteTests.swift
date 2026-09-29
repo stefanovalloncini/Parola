@@ -175,7 +175,7 @@ struct AICallSiteTests {
             let model = makeModel()
             pick(openAI(), for: .chat, on: model)
 
-            let session = try await model.makeChatSession(transcript: try #require(model.transcript), history: [])
+            let session = try await model.makeChatSession(transcript: try #require(model.transcript), history: [], entryID: nil)
             let reply = try await session.ask("who answers?")
             #expect(reply.text == "from openai")
         }
@@ -200,12 +200,64 @@ struct AICallSiteTests {
 
                 let session = try await model.makeChatSession(
                     transcript: try #require(model.transcript),
-                    history: []
+                    history: [],
+                    entryID: nil
                 )
                 let reply = try await session.ask("di cosa si parla?")
                 #expect(!reply.text.isEmpty)
             }
         }
+    }
+
+    @Test("a condensed chat's digest is written once, kept as the entry's summary and reused")
+    func chatDigestIsKept() async throws {
+        try await withInstalledMocks([.ollama: "the answer"]) {
+            let model = makeModel()
+            let long = Transcript(
+                segments: (0..<400).map {
+                    TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "parola parola parola parola parola")
+                },
+                language: "it",
+                modelName: "stub"
+            )
+            let entry = try await model.library.add(transcript: long, audioSource: nil, category: .transcription)
+            model.selectedEntryID = entry.id
+            model.transcript = long
+            pick(ollama(), for: .chat, on: model)
+            let digests = DigestCounter()
+            model.summariseOperation = { _, _ in
+                await digests.bump()
+                return Summary(text: "the digest", chapters: [Chapter(title: "Start", start: 0)])
+            }
+
+            let first = try await model.makeChatSession(transcript: long, history: [], entryID: entry.id)
+            _ = try await first.ask("di cosa si parla?")
+
+            #expect(await digests.count == 1)
+            #expect(model.transcript?.summary?.text == "the digest")
+            #expect(model.smartChapters.map(\.title) == ["Start"])
+            let stored = try await model.library.load(entry.id).document.transcript
+            #expect(stored.summary?.text == "the digest")
+
+            let second = try await model.makeChatSession(transcript: try #require(model.transcript), history: [], entryID: entry.id)
+            _ = try await second.ask("e poi?")
+            #expect(await digests.count == 1)
+        }
+    }
+
+    @Test("a chat digest never replaces a summary the entry got in the meantime")
+    func chatDigestLeavesAnExistingSummary() async throws {
+        let model = makeModel()
+        let entry = try await model.library.add(transcript: try #require(model.transcript), audioSource: nil, category: .transcription)
+        model.selectedEntryID = entry.id
+        let asked = Summary(text: "asked for")
+        model.transcript?.install(summary: asked)
+        try await model.library.setSummary(asked, for: entry.id)
+
+        await model.keepChatDigest(Summary(text: "digest"), for: entry.id)
+
+        #expect(model.transcript?.summary?.text == "asked for")
+        #expect(try await model.library.load(entry.id).document.transcript.summary?.text == "asked for")
     }
 
     @Test("with nothing picked every task stays on the on-device model")
@@ -238,4 +290,9 @@ struct AICallSiteTests {
             #expect(model.promptOutput?.text == "from apple")
         }
     }
+}
+
+private actor DigestCounter {
+    private(set) var count = 0
+    func bump() { count += 1 }
 }

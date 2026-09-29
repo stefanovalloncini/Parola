@@ -13,20 +13,10 @@ extension AppModel {
         let snapshot = transcript
         let entryID = selectedEntryID
         let artifacts = derivedArtifactsGeneration
-        let makeModel = summaryModelMaker()
-        let budget = tokenBudget(for: .summary)
-        let provider = languageModelLabel(for: .summary)
-        let summarise = summariseOperation ?? { [features] transcript, options in
-            guard let makeModel else {
-                return try await SummaryService(budget: budget, features: features).summarise(transcript, options: options)
-            }
-            return try await SummaryService(budget: budget, features: features, makeModel: makeModel)
-                .summarise(transcript, options: options)
-        }
+        let summarise = makeSummariser()
         Task { [weak self] in
             do {
-                var summary = try await summarise(snapshot, resolvedOptions)
-                summary.provider = provider
+                let summary = try await summarise(snapshot, resolvedOptions)
                 guard let self, generation == summaryGeneration else { return }
                 // A nil entry id means the transcript wasn't in the library yet: persistToLibrary
                 // selects it moments later, and that late selection owns this summary.
@@ -46,6 +36,60 @@ extension AppModel {
                 isSummarising = false
                 refreshAIAvailability()
             }
+        }
+    }
+
+    /// Writes a summary with the model the summary task is set to, labelled with that model.
+    func makeSummariser() -> @Sendable (Transcript, SummaryOptions) async throws -> Summary {
+        let makeModel = summaryModelMaker()
+        let budget = tokenBudget(for: .summary)
+        let provider = languageModelLabel(for: .summary)
+        let summarise = summariseOperation ?? { [features] transcript, options in
+            guard let makeModel else {
+                return try await SummaryService(budget: budget, features: features).summarise(transcript, options: options)
+            }
+            return try await SummaryService(budget: budget, features: features, makeModel: makeModel)
+                .summarise(transcript, options: options)
+        }
+        return { transcript, options in
+            var summary = try await summarise(transcript, options)
+            summary.provider = provider
+            return summary
+        }
+    }
+
+    /// What a chat condenses a long transcript around when the entry has no summary: written the way
+    /// Summarise writes one and kept as the entry's summary, so the next chat starts from it.
+    func chatDigest(for entryID: LibraryEntry.ID?, transcript: Transcript) -> @Sendable () async throws -> Summary {
+        let summarise = makeSummariser()
+        let options = summaryOptions
+        return { [weak self] in
+            if let saved = await self?.shownSummary(for: entryID) { return saved }
+            let summary = try await summarise(transcript, options)
+            await self?.keepChatDigest(summary, for: entryID)
+            return summary
+        }
+    }
+
+    private func shownSummary(for entryID: LibraryEntry.ID?) -> Summary? {
+        guard let entryID, entryID == selectedEntryID, let summary = transcript?.summary, !summary.text.isEmpty else { return nil }
+        return summary
+    }
+
+    /// A summary the user asked for in the meantime wins; the digest only fills an empty place.
+    func keepChatDigest(_ summary: Summary, for entryID: LibraryEntry.ID?) async {
+        guard let entryID else { return }
+        if entryID == selectedEntryID, transcript?.summary == nil {
+            transcript?.install(summary: summary)
+            adoptSavedChapters()
+        }
+        do {
+            try await library.mutateTranscript(for: entryID) { stored in
+                guard stored.summary == nil else { return }
+                stored.install(summary: summary)
+            }
+        } catch {
+            ParolaLog.error(.library, "chat digest could not be kept as the summary", [.error: .error(error)])
         }
     }
 

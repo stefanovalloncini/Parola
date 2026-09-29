@@ -10,10 +10,13 @@ public enum TranscriptChatProvider: Sendable, Hashable {
 }
 
 public enum TranscriptChat {
+    /// `digest` builds the summary a long transcript is condensed around when it has none saved;
+    /// without one the session summarises it itself and keeps the result only for its own life.
     public static func makeSession(
         transcript: Transcript,
         history: [ChatMessage] = [],
         budget: TokenBudget? = nil,
+        digest: (@Sendable () async throws -> Summary)? = nil,
         features: FeatureSet = .resolve()
     ) throws -> TranscriptChatSession {
         try features.require(.ai)
@@ -24,7 +27,7 @@ public enum TranscriptChat {
             let model = CondensedChatModel(
                 transcript: transcript,
                 budget: budget,
-                makeDigest: digestProvider(for: transcript, budget: budget),
+                makeDigest: digestProvider(for: transcript, budget: budget, digest: digest),
                 makeModel: { try makeOnDeviceModel(instructions: $0) }
             )
             return TranscriptChatSession(
@@ -48,17 +51,19 @@ public enum TranscriptChat {
         keyStore: APIKeyStore = KeychainAPIKeyStore.shared,
         managed: ManagedConfiguration = .shared,
         budget: TokenBudget? = nil,
+        digest: (@Sendable () async throws -> Summary)? = nil,
         features: FeatureSet = .resolve()
     ) async throws -> TranscriptChatSession {
         try features.require(.ai)
         switch provider {
         case .onDevice:
-            return try makeSession(transcript: transcript, history: history, budget: budget, features: features)
+            return try makeSession(transcript: transcript, history: history, budget: budget, digest: digest, features: features)
         case .cloud(let id):
             return try await makeSession(
                 transcript: transcript,
                 history: history,
                 budget: budget ?? .cloud(id),
+                digest: digest,
                 features: features,
                 makeModel: { instructions in
                     try await LanguageModelFactory.makeBYOKCloud(
@@ -78,6 +83,7 @@ public enum TranscriptChat {
         transcript: Transcript,
         history: [ChatMessage] = [],
         budget: TokenBudget,
+        digest: (@Sendable () async throws -> Summary)? = nil,
         features: FeatureSet = .resolve(),
         makeModel: @escaping @Sendable (String) async throws -> any LanguageModel
     ) async throws -> TranscriptChatSession {
@@ -88,7 +94,7 @@ public enum TranscriptChat {
             let model = CondensedChatModel(
                 transcript: transcript,
                 budget: budget,
-                makeDigest: digestProvider(for: transcript, budget: budget, summariseModel: {
+                makeDigest: digestProvider(for: transcript, budget: budget, digest: digest, summariseModel: {
                     try await makeModel(SummaryService.textInstructions(for: SummaryOptions(actionItems: false)))
                 }),
                 makeModel: makeModel
@@ -130,11 +136,13 @@ public enum TranscriptChat {
     static func digestProvider(
         for transcript: Transcript,
         budget: TokenBudget,
+        digest: (@Sendable () async throws -> Summary)? = nil,
         summariseModel: (@Sendable () async throws -> any LanguageModel)? = nil
     ) -> @Sendable () async throws -> Summary {
         if let summary = transcript.summary, !summary.text.isEmpty {
             return { summary }
         }
+        if let digest { return digest }
         return {
             let service = SummaryService(budget: budget)
             if let summariseModel {

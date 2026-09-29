@@ -292,17 +292,23 @@ extension AppModel {
 
     /// Chat's one entry point, sized off the main actor: the on-device path keeps its condensed-context
     /// handling, and every other choice answers through a model built for it.
-    func makeChatSession(transcript: Transcript, history: [ChatMessage]) async throws -> TranscriptChatSession {
+    func makeChatSession(
+        transcript: Transcript,
+        history: [ChatMessage],
+        entryID: LibraryEntry.ID?
+    ) async throws -> TranscriptChatSession {
         let choice = resolvedLanguageModelChoice(for: .chat)
+        let digest = chatDigest(for: entryID, transcript: transcript)
         guard choice != .onDevice else {
             return try await TranscriptChat.makeSession(
-                transcript: transcript, history: history, provider: .onDevice, features: features
+                transcript: transcript, history: history, provider: .onDevice, digest: digest, features: features
             )
         }
         return try await TranscriptChat.makeSession(
             transcript: transcript,
             history: history,
             budget: TokenBudget(for: choice),
+            digest: digest,
             features: features,
             makeModel: { [weak self] instructions in
                 guard let self else { throw CancellationError() }
