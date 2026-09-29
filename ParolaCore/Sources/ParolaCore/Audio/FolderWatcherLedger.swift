@@ -7,6 +7,7 @@ public final class FolderWatcherLedger: Sendable {
     struct Departure: Sendable, Equatable {
         var size: Int64
         var modified: Date
+        var created: Date?
         var status: FolderWatcher.FileStatus
         var departedAt: Date
     }
@@ -31,14 +32,20 @@ public final class FolderWatcherLedger: Sendable {
         }
     }
 
-    /// Takes back a departure only when the file still has the size and modification date it left with.
-    func claim(_ key: FolderWatcher.FileKey, size: Int64, modified: Date, now: Date) -> Departure? {
+    static func isLater(_ listed: Date?, than recorded: Date?) -> Bool {
+        guard let listed, let recorded else { return false }
+        return listed > recorded
+    }
+
+    /// Takes back a departure only when the file still has the size, dates and birth time it left with.
+    func claim(_ key: FolderWatcher.FileKey, size: Int64, modified: Date, created: Date?, now: Date) -> Departure? {
         let horizon = now.addingTimeInterval(-retention)
         return state.withLock { state in
             guard let departure = state.departures[key],
                   departure.departedAt >= horizon,
                   departure.size == size,
-                  departure.modified == modified
+                  departure.modified == modified,
+                  !Self.isLater(created, than: departure.created)
             else { return nil }
             state.departures.removeValue(forKey: key)
             return departure

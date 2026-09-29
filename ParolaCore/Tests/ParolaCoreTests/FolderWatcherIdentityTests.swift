@@ -186,4 +186,35 @@ struct FolderWatcherIdentityTests {
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["fresh.mp3"])
     }
+
+    @Test("a baseline record under a reused inode hides no new file: the birth time tells them apart")
+    func reusedInodeIsANewFile() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        let names = ["renamed.wav", "same-name.wav", "same-file.wav", "old-baseline.wav", "backdated.wav"]
+        for name in names {
+            try Fixture.writeSettled(folder.appendingPathComponent(name), clock: clock)
+        }
+        let info = try names.map { try #require(FolderWatcher.FileInfo(folder.appendingPathComponent($0).path)) }
+        let otherBirth = clock.start.addingTimeInterval(-86_400)
+        let seed = FolderWatcher.Baseline(entries: [
+            .init(path: "ZOOM0001.WAV", inode: info[0].inode, size: 99, modified: otherBirth, created: otherBirth),
+            .init(path: "same-name.wav", inode: info[1].inode, size: info[1].size, modified: info[1].modified, created: otherBirth),
+            .init(path: "same-file.wav", inode: info[2].inode, size: info[2].size, modified: info[2].modified, created: info[2].birth),
+            .init(path: "old-baseline.wav", inode: info[3].inode, size: info[3].size, modified: info[3].modified),
+            .init(path: "backdated.wav", inode: info[4].inode, size: info[4].size, modified: info[4].modified,
+                  created: info[4].created.addingTimeInterval(3600)),
+        ])
+
+        let collected = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let watcher = makeWatcher(folder, clock: clock, scheduler: scheduler, observesFileSystem: false, collected: collected)
+        await watcher.start(baseline: seed)
+        #expect(Fixture.names(await watcher.pendingPaths) == ["renamed.wav", "same-name.wav"])
+        try await scheduler.advance(ticks: 2)
+        await watcher.stop()
+
+        #expect(Set(collected.snapshot().map(\.lastPathComponent)) == ["renamed.wav", "same-name.wav"])
+    }
 }

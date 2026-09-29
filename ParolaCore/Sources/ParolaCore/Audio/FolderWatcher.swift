@@ -69,6 +69,7 @@ public actor FolderWatcher {
         var path: String
         var size: Int64
         var modified: Date
+        var created: Date?
         var status: FileStatus
     }
 
@@ -82,6 +83,8 @@ public actor FolderWatcher {
             public var size: Int64
             public var modified: Date
             public var emittedAt: Date?
+            /// The birth time, when the volume keeps one; tells a new file from an old one under a reused inode.
+            public var created: Date?
         }
 
         public var entries: [Entry]
@@ -197,7 +200,9 @@ public actor FolderWatcher {
             for entry in baseline.entries {
                 let key = FileKey(inode: entry.inode)
                 let path = rootPath + "/" + entry.path
-                files[key] = TrackedFile(path: path, size: entry.size, modified: entry.modified, status: .existing)
+                files[key] = TrackedFile(
+                    path: path, size: entry.size, modified: entry.modified, created: entry.created, status: .existing
+                )
                 setStatus(entry.emittedAt.map { .emitted(at: $0) } ?? .existing, for: key, now: now)
             }
             let listedKeys = Set(listed.map(\.key))
@@ -208,7 +213,9 @@ public actor FolderWatcher {
             depart(Set(vanished.values), now: now)
         } else {
             for item in listed {
-                files[item.key] = TrackedFile(path: item.path, size: item.size, modified: item.modified, status: .existing)
+                files[item.key] = TrackedFile(
+                    path: item.path, size: item.size, modified: item.modified, created: item.created, status: .existing
+                )
             }
         }
         for listing in scan.listings {
@@ -423,21 +430,36 @@ public actor FolderWatcher {
         return index
     }
 
+    /// Inodes are reused on FAT, exFAT and ext4 shares; a backdated mtime drags the birth time back, never forward.
+    private static func isSameFile(_ record: TrackedFile, as item: ScannedFile) -> Bool {
+        if record.created != nil, item.created != nil {
+            return !FolderWatcherLedger.isLater(item.created, than: record.created)
+        }
+        return record.path == item.path || (record.size == item.size && record.modified == item.modified)
+    }
+
     private func resolve(_ item: ScannedFile, vanished: inout [String: FileKey], now: Date) {
+        if let known = files[item.key], !Self.isSameFile(known, as: item) {
+            forget(item.key)
+        }
         if var known = files[item.key] {
             let changed = known.size != item.size || known.modified != item.modified
             let moved = known.path != item.path
             known.path = item.path
-            if known.status != .pending, changed || moved {
+            let reborn = item.created != nil && item.created != known.created
+            if known.status != .pending, changed || moved || reborn {
                 known.size = item.size
                 known.modified = item.modified
                 baselineChanged = true
             }
+            known.created = item.created ?? known.created
             files[item.key] = known
             if case .emitted(let at) = known.status, changed, arrivesAgain(modified: item.modified, emittedAt: at) {
                 setStatus(.pending, for: item.key, now: now)
             }
-        } else if let departure = options.ledger.claim(item.key, size: item.size, modified: item.modified, now: now) {
+        } else if let departure = options.ledger.claim(
+            item.key, size: item.size, modified: item.modified, created: item.created, now: now
+        ) {
             track(item, status: departure.status, now: now)
         } else if let oldKey = vanished[item.path], let old = files[oldKey],
                   old.size == item.size, old.modified == item.modified {
@@ -454,7 +476,9 @@ public actor FolderWatcher {
     private func depart(_ keys: Set<FileKey>, now: Date) {
         for key in keys {
             guard let gone = forget(key) else { continue }
-            options.ledger.depart(key, .init(size: gone.size, modified: gone.modified, status: gone.status, departedAt: now))
+            options.ledger.depart(key, .init(
+                size: gone.size, modified: gone.modified, created: gone.created, status: gone.status, departedAt: now
+            ))
         }
     }
 
@@ -468,7 +492,9 @@ public actor FolderWatcher {
     }
 
     private func track(_ item: ScannedFile, status: FileStatus, now: Date) {
-        files[item.key] = TrackedFile(path: item.path, size: item.size, modified: item.modified, status: .pending)
+        files[item.key] = TrackedFile(
+            path: item.path, size: item.size, modified: item.modified, created: item.created, status: .pending
+        )
         setStatus(status, for: item.key, now: now)
     }
 
@@ -514,7 +540,8 @@ public actor FolderWatcher {
                 inode: key.inode,
                 size: file.size,
                 modified: file.modified,
-                emittedAt: emittedAt
+                emittedAt: emittedAt,
+                created: file.created
             )
         }
         return Baseline(entries: entries.sorted { $0.path < $1.path })
@@ -580,7 +607,9 @@ public actor FolderWatcher {
         case .arrive:
             // A move from another watched folder can reach this watcher before that one notices
             // the file left; the settle delay gives it time to hand the file over.
-            if let departure = options.ledger.claim(key, size: info.size, modified: info.modified, now: now) {
+            if let departure = options.ledger.claim(
+                key, size: info.size, modified: info.modified, created: info.birth, now: now
+            ) {
                 setStatus(departure.status, for: key, now: now)
             } else {
                 setStatus(.emitted(at: now), for: key, now: now)
@@ -618,7 +647,7 @@ public actor FolderWatcher {
     }
 
     /// Finder dates a file it is still copying 14 February 1946.
-    private static let finderBusyDays = Date(timeIntervalSince1970: -753_667_200)...Date(timeIntervalSince1970: -753_494_400)
+    static let finderBusyDays = Date(timeIntervalSince1970: -753_667_200)...Date(timeIntervalSince1970: -753_494_400)
 
     /// A file arrives once `stableChecks` checks in a row saw the same non-zero size and date, and
     /// the date is older than one interval. A cloud placeholder waits for its download, and a file

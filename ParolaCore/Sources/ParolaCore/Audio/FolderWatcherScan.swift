@@ -6,6 +6,7 @@ extension FolderWatcher {
         var path: String
         var size: Int64
         var modified: Date
+        var created: Date?
     }
 
     /// One directory's direct children: its media files and, when watching recursively, its
@@ -87,7 +88,9 @@ extension FolderWatcher {
                     listing.subdirectories[childPath] = FileKey(inode: info.inode)
                 }
             } else if info.isRegularFile, isMedia {
-                listing.media.append(ScannedFile(key: FileKey(inode: info.inode), path: childPath, size: info.size, modified: info.modified))
+                listing.media.append(ScannedFile(
+                    key: FileKey(inode: info.inode), path: childPath, size: info.size, modified: info.modified, created: info.birth
+                ))
             }
         }
         return listing
@@ -124,6 +127,11 @@ extension FolderWatcher {
             created = Self.date(info.st_birthtimespec)
             flags = info.st_flags
             mode = info.st_mode
+        }
+
+        /// The birth time, or nil where the volume keeps none or Finder has parked it on its busy date.
+        var birth: Date? {
+            created == Date(timeIntervalSince1970: 0) || FolderWatcher.finderBusyDays.contains(created) ? nil : created
         }
 
         var isDirectory: Bool { mode & S_IFMT == S_IFDIR }
