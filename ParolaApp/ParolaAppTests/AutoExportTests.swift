@@ -190,9 +190,10 @@ struct AutoExportTests {
         #expect(model.setAutoExportFolder(chosen))
         model.autoExportRules = Self.txtEverywhere
 
-        let entry = try await model.persistToLibrary(
-            Self.sampleTranscript(), audioSource: audio, source: .microphone, title: "Standup 10:30"
-        ).value
+        let entry = try await model.land(RunLanding(
+            kind: .recording, transcript: Self.sampleTranscript(), audioSource: audio, source: .microphone,
+            title: "Standup 10:30"
+        )).value
 
         let exported = chosen.appendingPathComponent("Standup 10-30.txt")
         #expect(await waitForMarked(exported))

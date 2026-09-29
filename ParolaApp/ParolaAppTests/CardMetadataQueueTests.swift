@@ -176,7 +176,7 @@ struct CardMetadataQueueTests {
             return CardMetadata(title: "Held card", summary: "Released.")
         }
 
-        let saved = try await model.persistToLibrary(transcript("export me"), audioSource: source, source: .file).value
+        let saved = try await model.land(RunLanding(kind: .file, transcript: transcript("export me"), audioSource: source)).value
         let sidecar = scratch.appendingPathComponent("memo.txt")
         var exported = false
         for _ in 0..<300 {

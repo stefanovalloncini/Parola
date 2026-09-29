@@ -264,12 +264,14 @@ extension AppModel {
         phase = .ready
         // A page opened while the take was probed is the later word, as in loadEntry.
         if route == pageAtStart { route = .transcript }
-        persistToLibrary(
-            restored,
+        land(RunLanding(
+            kind: .recording,
+            transcript: restored,
             audioSource: audioURL,
             source: checkpoint.source ?? .microphone,
+            category: takeRecordingCategory(),
             title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt)
-        )
+        ))
     }
 
     nonisolated static func readableRecordingURL(_ url: URL) -> URL? {

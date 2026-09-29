@@ -124,7 +124,7 @@ extension AppModel {
         phase = .ready
         Self.landingSignposter.endInterval("install", landing)
         playCompletionSound()
-        // The card-metadata hook lives in persistToLibrary, which a re-run never passes through.
+        // The card-metadata hook lives in land(_:), which a re-run never passes through.
         enqueueCardMetadata(for: entryID, transcript: transcript)
     }
 }

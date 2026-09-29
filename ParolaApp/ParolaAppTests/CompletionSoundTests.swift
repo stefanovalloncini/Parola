@@ -33,7 +33,7 @@ struct CompletionSoundTests {
     func finishedTranscriptionPlaysOnce() async {
         let (model, sound) = makeRig("sound-one")
 
-        model.persistToLibrary(makeTranscript(), audioSource: nil, source: .file, activate: true)
+        model.land(RunLanding(kind: .file, transcript: makeTranscript()))
 
         #expect(await waitUntil { sound.plays == 1 })
         #expect(await waitUntil { model.libraryEntries.count == 1 })
@@ -44,7 +44,7 @@ struct CompletionSoundTests {
     func inactiveSaveIsSilent() async {
         let (model, sound) = makeRig("sound-inactive")
 
-        model.persistToLibrary(makeTranscript(), audioSource: nil, source: .file, activate: false)
+        model.land(RunLanding(kind: .salvagedTake, transcript: makeTranscript()))
 
         #expect(await waitUntil { model.libraryEntries.count == 1 })
         #expect(sound.plays == 0)
@@ -55,7 +55,7 @@ struct CompletionSoundTests {
         let (model, sound) = makeRig("sound-off")
         model.playSoundWhenFinished = false
 
-        model.persistToLibrary(makeTranscript(), audioSource: nil, source: .file, activate: true)
+        model.land(RunLanding(kind: .file, transcript: makeTranscript()))
 
         #expect(await waitUntil { model.libraryEntries.count == 1 })
         #expect(sound.plays == 0)

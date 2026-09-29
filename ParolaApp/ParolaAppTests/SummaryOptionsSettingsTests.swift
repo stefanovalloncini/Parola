@@ -54,7 +54,7 @@ struct SummaryOptionsSettingsTests {
         let longText = String(repeating: "word ", count: 20)
         #expect(longText.count >= 40)
         model.transcript = makeTranscript(text: longText)
-        model.persistToLibrary(makeTranscript(text: longText), audioSource: nil, source: .file, activate: true)
+        model.land(RunLanding(kind: .file, transcript: makeTranscript(text: longText)))
 
         await waitUntil(timeoutMs: 5000) { model.transcript?.summary != nil }
         #expect(callCount.value == 1)
@@ -73,7 +73,7 @@ struct SummaryOptionsSettingsTests {
 
         let longText = String(repeating: "word ", count: 20)
         model.transcript = makeTranscript(text: longText)
-        model.persistToLibrary(makeTranscript(text: longText), audioSource: nil, source: .file, activate: false)
+        model.land(RunLanding(kind: .salvagedTake, transcript: makeTranscript(text: longText)))
 
         try? await Task.sleep(for: .milliseconds(200))
         #expect(callCount.value == 0)
@@ -124,7 +124,7 @@ struct SummaryOptionsSettingsTests {
 
         let longText = String(repeating: "word ", count: 20)
         model.transcript = makeTranscript(text: longText)
-        model.persistToLibrary(makeTranscript(text: longText), audioSource: nil, source: .file, activate: true)
+        model.land(RunLanding(kind: .file, transcript: makeTranscript(text: longText)))
 
         await waitUntil(timeoutMs: 2000) { callCount.value == 1 }
         #expect(model.cardJobsPending == 1)
@@ -145,7 +145,7 @@ struct SummaryOptionsSettingsTests {
 
         let longText = String(repeating: "word ", count: 20)
         model.transcript = makeTranscript(text: longText)
-        let adding = model.persistToLibrary(makeTranscript(text: longText), audioSource: nil, source: .file, activate: true)
+        let adding = model.land(RunLanding(kind: .file, transcript: makeTranscript(text: longText)))
         model.loadEntryGeneration &+= 1
         _ = try? await adding.value
 

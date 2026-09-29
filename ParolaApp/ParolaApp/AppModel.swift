@@ -1408,6 +1408,7 @@ final class AppModel {
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored var fileTranscribeTask: Task<Void, Never>?
     @ObservationIgnored var fileRunLanding: FileRunLanding?
+    @ObservationIgnored var landingSteps: Task<Void, Never>?
     @ObservationIgnored let fileReadDeadline: Duration
     @ObservationIgnored private var cancelPass = 0
     @ObservationIgnored private var unsettledInPass = 0
@@ -1832,74 +1833,6 @@ final class AppModel {
     /// A non-fatal warning (e.g. a failed library save) shown without replacing the open transcript.
     var nonFatalWarning: String?
 
-    /// Each main-actor turn a finished run lands in: the install, the saved entry, the AI card.
-    static let landingSignposter = OSSignposter(subsystem: "app.parola.app", category: "landing")
-
-    /// `activate: false` saves without taking the selection, auto-titling, or running
-    /// auto-exports — for interrupted or failed takes that only need to survive.
-    @discardableResult
-    func persistToLibrary(
-        _ result: Transcript,
-        audioSource: URL?,
-        source: EntrySource,
-        title: String? = nil,
-        titleSource: TitleSource? = nil,
-        activate: Bool = true,
-        sourceDigest: String? = nil,
-        playsCompletionSound: Bool = true,
-        consumesAudio: Bool = false
-    ) -> Task<LibraryEntry, any Error> {
-        let category = pendingRecordingCategory
-        pendingRecordingCategory = .transcription
-        let navigationGeneration = loadEntryGeneration
-        let adding = Task { [library] in
-            try await library.add(
-                transcript: result,
-                audioSource: audioSource,
-                category: category,
-                title: title,
-                titleSource: titleSource,
-                sourceDigest: sourceDigest,
-                source: source,
-                consumesAudio: consumesAudio
-            )
-        }
-        Task { [weak self] in
-            guard let self else { return }
-            var persisted: LibraryEntry?
-            do {
-                let entry = try await adding.value
-                persisted = entry
-                let landing = Self.landingSignposter.beginInterval("entry")
-                landLibraryEntry(entry)
-                // library.add copies media for seconds; if the user navigated meanwhile,
-                // taking the selection would repoint their next edits at this new entry.
-                if activate, loadEntryGeneration == navigationGeneration, selectedEntryID == nil {
-                    selectLanded(entry.id)
-                }
-                Self.landingSignposter.endInterval("entry", landing)
-            } catch {
-                ParolaLog.error(.library, "transcript could not be saved to the library", [.error: .error(error)])
-                nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
-            }
-            // Exports read nothing the AI writes, so they don't wait for the card.
-            if activate {
-                runAutoExports(transcript: result, audioSource: audioSource, source: source, entry: persisted, title: title)
-            }
-            guard activate, let entry = persisted else { return }
-            if playsCompletionSound { playCompletionSound() }
-            let card = enqueueCardMetadata(for: entry.id, transcript: result)
-            if loadEntryGeneration == navigationGeneration, selectedEntryID == entry.id {
-                applyAutostartSummary(to: entry.id, transcript: result)
-            }
-            // Delivery sends the AI title, so only a send waits for the card.
-            guard hasAutoSendDestination else { return }
-            await card.value
-            await autoSendEntry(entry.id)
-        }
-        return adding
-    }
-
     /// One transcription, one batch run or one re-run has landed in the library.
     func playCompletionSound() {
         guard playSoundWhenFinished, let completionSoundPlayer else { return }
@@ -2194,7 +2127,7 @@ final class AppModel {
             deferredArrivals.append(fileURL)
             return
         }
-        noteRecentFile(fileURL)
+        if RunLanding.Kind.subtitles.policy.recents { noteRecentFile(fileURL) }
         let imported: Transcript
         do {
             imported = try Self.parseSubtitleFile(at: fileURL)
@@ -2215,13 +2148,7 @@ final class AppModel {
         tearDownPlayer()
         transcript = processed
         phase = .ready
-        persistToLibrary(
-            processed,
-            audioSource: nil,
-            source: .file,
-            title: fileURL.deletingPathExtension().lastPathComponent,
-            playsCompletionSound: false
-        )
+        land(RunLanding(kind: .subtitles, transcript: processed, title: fileURL.deletingPathExtension().lastPathComponent))
     }
 
     nonisolated static func parseSubtitleFile(at url: URL) throws -> Transcript {
@@ -2266,7 +2193,8 @@ final class AppModel {
         // Before the new token: cancelling retires the old run's token; a file opened mid-download keeps its duplicate check.
         cancelTranscriptionRuns(keepingDuplicateCheck: fetchedLink != nil)
         let runToken = nextFileRunToken()
-        if fetchedLink == nil { noteRecentFile(fileURL) }
+        let landingKind: RunLanding.Kind = fetchedLink == nil ? .file : .link
+        if landingKind.policy.recents { noteRecentFile(fileURL) }
         if let fetchedLink, let title = fetchedLink.media.metadata.title {
             linkRunTitle = LinkRunTitle(file: fileURL, title: title)
         }
@@ -2325,15 +2253,16 @@ final class AppModel {
                 phase = .ready
                 let ownedDownload = fetchedLink.flatMap { $0.media.workingDirectory == nil ? nil : $0 }
                 let linkMetadataTitle = fetchedLink?.media.metadata.title
-                let entry = persistToLibrary(
-                    processed,
+                let entry = land(RunLanding(
+                    kind: landingKind,
+                    transcript: processed,
                     audioSource: fileURL,
                     source: fetchedLink == nil ? .file : .web,
                     title: fetchedLink.map { _ in linkMetadataTitle ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()) },
                     titleSource: linkMetadataTitle == nil ? nil : .source,
                     sourceDigest: sourceDigest,
                     consumesAudio: ownedDownload != nil
-                )
+                ))
                 fileRunLanding = FileRunLanding(runToken: runToken, text: processed.text, entry: entry)
                 if let ownedDownload { followLinkAudioIntoLibrary(ownedDownload, entry: entry) }
                 retireFileRun(runToken)
@@ -2741,14 +2670,13 @@ final class AppModel {
                 defer { Self.landingSignposter.endInterval("install", landing) }
                 installFetchedSubtitles(processed)
                 phase = .ready
-                persistToLibrary(
-                    processed,
-                    audioSource: nil,
+                land(RunLanding(
+                    kind: .captions,
+                    transcript: processed,
                     source: .web,
                     title: result.videoTitle ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()),
-                    titleSource: result.videoTitle == nil ? nil : .source,
-                    playsCompletionSound: false
-                )
+                    titleSource: result.videoTitle == nil ? nil : .source
+                ))
             } catch {
                 if !Task.isCancelled { applyTranscriptionError(error, link: .subtitles(url.absoluteString)) }
             }
@@ -3214,7 +3142,7 @@ final class AppModel {
             teardownStreaming()
             let audioURL = await streaming?.recordingAudioURL()
             var message = msg
-            let takeCategory = pendingRecordingCategory
+            let takeCategory = takeRecordingCategory()
             let takeSource = pendingRecordingSource
             let takeTitle = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
             let savedPartial = !confirmed.isEmpty || audioURL != nil
@@ -3223,13 +3151,14 @@ final class AppModel {
                     segments: confirmed, options: currentOptions, modelName: selectedModel, audioURL: audioURL
                 )
                 let partial = await postProcessDetached(finished)
-                persistToLibrary(
-                    partial,
+                land(RunLanding(
+                    kind: .salvagedTake,
+                    transcript: partial,
                     audioSource: audioURL,
                     source: takeSource,
-                    title: takeTitle + " (interrupted)",
-                    activate: false
-                )
+                    category: takeCategory,
+                    title: takeTitle + " (interrupted)"
+                ))
                 message += " " + String(localized: "The recording up to this point was saved to your library.")
             }
             liveSegments = []
@@ -3269,12 +3198,15 @@ final class AppModel {
                 installPlayer(for: audioURL)
                 adoptLoadedMediaDuration()
             }
-            persistToLibrary(
-                processed,
+            let category = takeRecordingCategory()
+            land(RunLanding(
+                kind: .recording,
+                transcript: processed,
                 audioSource: processed.sourceURL,
                 source: pendingRecordingSource,
-                title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date())
-            )
+                category: category,
+                title: Self.liveRecordingTitle(category: category, endedAt: Date())
+            ))
             resolveRecordingOutcome(.success(processed.text))
             drainDeferredArrivals()
         }
@@ -3358,16 +3290,20 @@ final class AppModel {
             adoptLoadedMediaDuration()
             endRecovery(recoveryToken)
             phase = .ready
-            persistToLibrary(processed, audioSource: url, source: source, title: title)
+            land(RunLanding(
+                kind: .recording, transcript: processed, audioSource: url, source: source,
+                category: takeRecordingCategory(), title: title
+            ))
             resolveRecordingOutcome(.success(processed.text))
         } catch {
             endRecovery(recoveryToken)
             var message = Self.transcriptionFailureMessage(for: error)
             let recoverable = !(error is CancellationError) && !Task.isCancelled
             if recoverable {
-                let category = pendingRecordingCategory
-                persistToLibrary(
-                    Transcript(
+                let category = takeRecordingCategory()
+                land(RunLanding(
+                    kind: .salvagedTake,
+                    transcript: Transcript(
                         segments: [],
                         language: currentOptions.language ?? "auto",
                         modelName: selectedModel,
@@ -3375,9 +3311,9 @@ final class AppModel {
                     ),
                     audioSource: url,
                     source: source,
-                    title: title + " (transcription failed)",
-                    activate: false
-                )
+                    category: category,
+                    title: title + " (transcription failed)"
+                ))
                 message += " " + String(localized: "The audio was saved to your library.")
                 phase = .failed(message: message)
                 // After the phase: its didSet forgets whatever the last failure left behind.

@@ -50,7 +50,7 @@ struct DeliveryHookTests {
         let recorder = MockDeliveryRecorder()
         installMock(on: model, recorder: recorder)
 
-        model.persistToLibrary(Self.transcript(), audioSource: nil, source: .file, title: "Riunione")
+        model.land(RunLanding(kind: .file, transcript: Self.transcript(), title: "Riunione"))
 
         #expect(await waitUntil(timeoutMs: 10_000) { await !recorder.recorded().isEmpty }, "the entry should have been sent")
         let entries = await model.library.list()
@@ -64,7 +64,7 @@ struct DeliveryHookTests {
         let recorder = MockDeliveryRecorder()
         installMock(on: model, recorder: recorder)
 
-        model.persistToLibrary(Self.transcript(), audioSource: nil, source: .file, title: "Riunione")
+        model.land(RunLanding(kind: .file, transcript: Self.transcript(), title: "Riunione"))
 
         #expect(await waitUntil(timeoutMs: 10_000) { await !recorder.recorded().isEmpty })
         let entryID = try #require(await recorder.recorded().first?.entryID)
@@ -79,7 +79,7 @@ struct DeliveryHookTests {
         let recorder = MockDeliveryRecorder()
         installMock(on: model, recorder: recorder)
 
-        model.persistToLibrary(Self.transcript(), audioSource: nil, source: .file, activate: false)
+        model.land(RunLanding(kind: .salvagedTake, transcript: Self.transcript()))
 
         #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 }, "the entry should still be saved")
         #expect(await recorder.recorded().isEmpty)
@@ -111,7 +111,7 @@ struct DeliveryHookTests {
         let recorder = MockDeliveryRecorder()
         installMock(on: model, recorder: recorder)
 
-        model.persistToLibrary(Self.transcript(), audioSource: nil, source: .file)
+        model.land(RunLanding(kind: .file, transcript: Self.transcript()))
 
         #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 })
         #expect(await recorder.recorded().isEmpty)
@@ -124,7 +124,7 @@ struct DeliveryHookTests {
         let recorder = MockDeliveryRecorder()
         installMock(on: model, recorder: recorder, categories: [.dictation])
 
-        model.persistToLibrary(Self.transcript(), audioSource: nil, source: .file)
+        model.land(RunLanding(kind: .file, transcript: Self.transcript()))
 
         #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 })
         #expect(await recorder.recorded().isEmpty)

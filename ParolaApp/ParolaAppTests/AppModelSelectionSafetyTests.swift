@@ -35,22 +35,22 @@ struct AppModelSelectionSafetyTests {
         return await condition()
     }
 
-    @Test("persistToLibrary takes the selection when the user stayed put")
+    @Test("a landing takes the selection when the user stayed put")
     func persistSelectsNewEntryWithoutNavigation() async {
         let model = makeModel()
         let result = makeTranscript()
         model.transcript = result
-        model.persistToLibrary(result, audioSource: nil, source: .file)
+        model.land(RunLanding(kind: .file, transcript: result))
         let selected = await poll { model.selectedEntryID != nil }
         #expect(selected, "the freshly saved recording should become the selected entry")
     }
 
-    @Test("a navigation during persistToLibrary keeps the user's selection")
+    @Test("a navigation during a landing keeps the user's selection")
     func persistDoesNotStealSelectionAfterNavigation() async {
         let model = makeModel()
         let result = makeTranscript()
         model.transcript = result
-        model.persistToLibrary(result, audioSource: nil, source: .file)
+        model.land(RunLanding(kind: .file, transcript: result))
         // The user opens another entry while library.add is still copying.
         model.loadEntryGeneration &+= 1
 

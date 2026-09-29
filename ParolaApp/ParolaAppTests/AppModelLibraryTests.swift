@@ -1011,15 +1011,14 @@ struct AppModelLibraryTests {
             selection.fired = true
         }
 
-        let saved = try await model.persistToLibrary(
-            Transcript(
+        let saved = try await model.land(RunLanding(
+            kind: .file,
+            transcript: Transcript(
                 segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "newest")],
                 language: "en",
                 modelName: "stub"
-            ),
-            audioSource: nil,
-            source: .file
-        ).value
+            )
+        )).value
         for _ in 0..<200 where model.selectedEntryID == nil {
             try await Task.sleep(for: .milliseconds(10))
         }

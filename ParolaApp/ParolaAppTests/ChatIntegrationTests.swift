@@ -340,7 +340,7 @@ struct ChatIntegrationTests {
             return Summary(text: "fresh take summary", chapters: [])
         }
 
-        model.persistToLibrary(transcript, audioSource: nil, source: .file)
+        model.land(RunLanding(kind: .file, transcript: transcript))
         model.summariseTranscript()
         #expect(model.selectedEntryID == nil, "library.add is still running when the user hits Summarise")
         #expect(model.isSummarising)

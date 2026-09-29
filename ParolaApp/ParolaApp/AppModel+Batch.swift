@@ -100,7 +100,7 @@ extension AppModel {
         }
     }
 
-    // Skips persistToLibrary on purpose: its runAutoExports call would fire a second time
+    // Skips land(_:) on purpose: its runAutoExports call would fire a second time
     // (handleBatchEvent already ran the rules), and it would steal selection + refresh per job.
     private func persistBatchJobToLibrary(
         _ jobID: BatchJob.ID, transcript: Transcript, sourceURL: URL, sourceDigest digest: String?
