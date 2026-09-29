@@ -349,8 +349,7 @@ extension AppModel {
 
     // MARK: - The Person filter
 
-    /// A sidebar or bridge destination: shows everything the person has, category cleared to All.
-    /// Re-picking the person a chip has since narrowed to a category still clears back to All.
+    /// A sidebar or bridge destination: shows everything the person has, and re-navigates unless that's already on screen.
     func browsePerson(_ id: UUID?) {
         guard let id else {
             guard personFilter != nil else { return }
