@@ -704,15 +704,24 @@ extension AppModel {
         }
     }
 
-    /// The `.parola.tmp` folders a save left in the library when it was cut off, once ten minutes quiet.
+    /// The `.parola.tmp` folders a save left in the library when it was cut off, once ten minutes quiet, contents included.
     nonisolated static func staleStagingFolders(in root: URL, now: Date) -> [URL] {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .isDirectoryKey]
         let listed = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: keys)) ?? []
         return listed.filter { url in
             guard url.lastPathComponent.hasSuffix(".parola.tmp"),
                   let values = try? url.resourceValues(forKeys: Set(keys)), values.isDirectory == true else { return false }
-            return (values.contentModificationDate ?? .distantPast) < now.addingTimeInterval(-10 * 60)
+            return newestModification(in: url, besides: values.contentModificationDate) < now.addingTimeInterval(-10 * 60)
         }
+    }
+
+    /// A copy into the folder moves its file's date, not the folder's, so the newest of them says when the folder was last written.
+    private nonisolated static func newestModification(in folder: URL, besides folderDate: Date?) -> Date {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: folder, includingPropertiesForKeys: [.contentModificationDateKey]
+        )) ?? []
+        let dates = contents.compactMap { try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate }
+        return (dates + [folderDate ?? .distantPast]).max() ?? .distantPast
     }
 
     /// Whatever a cut-off save's folder holds becomes an entry, the whole document if it was complete; the folder goes only once the entry exists.

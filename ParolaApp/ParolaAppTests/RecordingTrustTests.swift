@@ -963,8 +963,16 @@ extension TranscriberMockSuites {
             let complete = library.appendingPathComponent("\(UUID().uuidString).parola.tmp", isDirectory: true)
             try FileManager.default.moveItem(at: written, to: complete)
             for folder in [audioOnly, complete] {
+                for file in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) {
+                    try FileManager.default.setAttributes([.modificationDate: hourAgo], ofItemAtPath: file.path)
+                }
                 try FileManager.default.setAttributes([.modificationDate: hourAgo], ofItemAtPath: folder.path)
             }
+            let stillCopying = library.appendingPathComponent("\(UUID().uuidString).parola.tmp", isDirectory: true)
+            try FileManager.default.createDirectory(at: stillCopying, withIntermediateDirectories: true)
+            let copying = try makeTakeWAV("still-copying", seconds: 1.4)
+            try FileManager.default.moveItem(at: copying, to: stillCopying.appendingPathComponent("audio.wav"))
+            try FileManager.default.setAttributes([.modificationDate: hourAgo], ofItemAtPath: stillCopying.path)
 
             let alreadySaved = library.appendingPathComponent("\(UUID().uuidString).parola.tmp", isDirectory: true)
             try FileManager.default.createDirectory(at: alreadySaved, withIntermediateDirectories: true)
@@ -991,6 +999,7 @@ extension TranscriberMockSuites {
             #expect(recovered.manifest.originalAudioName.isEmpty == false)
             #expect(!FileManager.default.fileExists(atPath: audioOnly.path))
             #expect(!FileManager.default.fileExists(atPath: complete.path))
+            #expect(FileManager.default.fileExists(atPath: stillCopying.path), "an old folder with a file written just now is still in use")
         }
 
         @Test("the heartbeat marks only the working files in use as fresh")
