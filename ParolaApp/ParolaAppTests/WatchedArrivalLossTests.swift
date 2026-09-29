@@ -354,6 +354,72 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a file whose folder is missing keeps its place, lets the rest go, and runs when the folder is back")
+        func unreachableFolderKeepsItsFiles() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let root = try makeFolder("unreachable")
+                defer { try? FileManager.default.removeItem(at: root) }
+                let share = root.appendingPathComponent("Share", isDirectory: true)
+                let local = root.appendingPathComponent("Local", isDirectory: true)
+                let away = root.appendingPathComponent("Unmounted", isDirectory: true)
+                for folder in [share, local] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+                let model = makeModel(library: makeTempLibraryURL("loss-unreachable"), defaults: temporaryDefaults())
+                _ = try await openOwnEntry(model, in: root)
+                let onShare = try makeWAV("On the share", in: share)
+                let onDisk = try makeWAV("On the disk", in: local, seconds: 0.5)
+                model.fileTranscribeTask = Task {}
+                arrive(model, [onShare, onDisk])
+                try FileManager.default.moveItem(at: share, to: away)
+
+                model.fileTranscribeTask = nil
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedArrivals.map(\.url) == [onShare] })
+                #expect(model.watchedLaneTask == nil)
+                #expect(model.unreachableArrivalIDs == Set(model.watchedArrivals.map(\.id)))
+                #expect(await model.library.list().map(LibraryEntryDisplay.title(for:)).contains("On the disk"))
+
+                try FileManager.default.moveItem(at: away, to: share)
+                model.retryUnreachableArrivals()
+
+                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                #expect(await model.library.list().map(LibraryEntryDisplay.title(for:)).contains("On the share"))
+            }
+        }
+
+        @Test("a folder that doesn't answer before the deadline keeps its file waiting")
+        func stalledFolderKeepsItsFile() async throws {
+            let folder = try makeFolder("stalled")
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let bootstrap = AppBootstrap(
+                mode: .test,
+                library: makeTempLibraryURL("loss-stalled"),
+                defaultsOverride: temporaryDefaults(),
+                sideEffects: [],
+                filePicker: TestFilePicker(),
+                clock: ContinuousClock(),
+                fileReadDeadline: .milliseconds(200)
+            )
+            let model = AppModel(bootstrap: bootstrap)
+            let stall = DispatchSemaphore(value: 0)
+            defer { stall.signal() }
+            model.watchedFileReach = { _, _ in
+                stall.wait()
+                return .gone
+            }
+            let file = try makeWAV("Stalled", in: folder)
+
+            arrive(model, [file])
+
+            #expect(await waitUntil(timeoutMs: 5_000) { !model.unreachableArrivalIDs.isEmpty })
+            #expect(model.watchedArrivals.map(\.url) == [file])
+            #expect(model.watchedLaneTask == nil)
+            #expect(model.fileTranscribeTask == nil)
+            model.watchedArrivals = []
+        }
+
         @Test("a settings reset leaves the files waiting in the line")
         func settingsResetKeepsTheLine() async throws {
             let folder = try makeFolder("reset")

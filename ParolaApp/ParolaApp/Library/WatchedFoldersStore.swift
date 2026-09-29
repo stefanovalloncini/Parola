@@ -39,6 +39,8 @@ final class WatchedFoldersStore {
     @ObservationIgnored private let baselineWriteDelay: Duration
     @ObservationIgnored private let baselineMaxWait: Duration
     @ObservationIgnored private let onNewMediaFile: @MainActor (URL) -> Void
+    /// Called each time a folder's watch starts, so files waiting on an unreachable folder can go.
+    @ObservationIgnored var onFolderWatching: (@MainActor () -> Void)?
 
     /// Every watcher shares `watcherOptions`' ledger, so a file moved between watched folders keeps its identity.
     init(
@@ -154,6 +156,25 @@ final class WatchedFoldersStore {
 
     func isUnavailable(_ id: UUID) -> Bool {
         unavailableFolderIDs.contains(id)
+    }
+
+    /// The watched folder a file it handed over lives in, and where that folder was when the watch started.
+    func folder(containing url: URL) -> (id: UUID, root: URL)? {
+        let path = Self.comparablePath(url)
+        for (id, root) in scopedURLs {
+            let prefix = Self.comparablePath(root)
+            if path.hasPrefix(prefix.hasSuffix("/") ? prefix : prefix + "/") { return (id, root) }
+        }
+        return nil
+    }
+
+    /// `/var` and `/tmp` are links into `/private`, and the watcher reports the real path.
+    private static func comparablePath(_ url: URL) -> String {
+        let path = url.standardizedFileURL.path
+        for linked in ["/private/var/", "/private/tmp/"] where path.hasPrefix(linked) {
+            return String(path.dropFirst("/private".count))
+        }
+        return path
     }
 
     /// In the order the folders were added, for the sidebar's warning.
@@ -311,6 +332,7 @@ final class WatchedFoldersStore {
                 self.unavailableFolderIDs.insert(id)
             } else {
                 self.unavailableFolderIDs.remove(id)
+                self.onFolderWatching?()
             }
         }
     }

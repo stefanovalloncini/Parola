@@ -667,12 +667,13 @@ final class AppModel {
 
     // MARK: - Watched folders
 
-    @ObservationIgnored lazy var watchedFolders: WatchedFoldersStore = WatchedFoldersStore(
-        defaults: defaults,
-        baselineDirectory: watchedFoldersDirectory
-    ) { [weak self] url in
-        self?.handleWatchedArrival(url)
-    }
+    @ObservationIgnored lazy var watchedFolders: WatchedFoldersStore = {
+        let store = WatchedFoldersStore(defaults: defaults, baselineDirectory: watchedFoldersDirectory) { [weak self] url in
+            self?.handleWatchedArrival(url)
+        }
+        store.onFolderWatching = { [weak self] in self?.retryUnreachableArrivals() }
+        return store
+    }()
 
     /// Nil when this launch doesn't watch folders, so a view never builds the store and starts its watchers.
     var watchedFoldersIfWatching: WatchedFoldersStore? {
@@ -693,6 +694,10 @@ final class AppModel {
     @ObservationIgnored var offerWatchedFileAgain: (@MainActor (URL) -> Void)?
     @ObservationIgnored var watchedLaneTask: Task<Void, Never>?
     @ObservationIgnored var backgroundArrivalID: WatchedArrival.ID?
+    /// Files whose folder didn't answer: they keep their place and wait for the folder to come back.
+    @ObservationIgnored var unreachableArrivalIDs: Set<WatchedArrival.ID> = []
+    /// Test seam: where a watched file stands, given the folder it came from.
+    @ObservationIgnored var watchedFileReach: @Sendable (URL, URL) -> WatchedArrival.Reach = WatchedArrival.reach
     @ObservationIgnored var visibleArrivalID: WatchedArrival.ID?
     var arrivalNotice: ArrivalNotice?
 

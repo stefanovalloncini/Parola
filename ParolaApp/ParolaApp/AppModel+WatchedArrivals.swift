@@ -11,6 +11,27 @@ struct WatchedArrival: Codable, Equatable, Identifiable, Sendable {
     var inBackground = false
     /// Transcribed and on its way into the library; it leaves the line once the entry is saved.
     var isLanding = false
+    /// The watched folder it came from; nil when that isn't known, and the file's own folder stands in.
+    var folderID: UUID?
+    var folderPath: String?
+
+    var folderURL: URL {
+        folderPath.map { URL(fileURLWithPath: $0, isDirectory: true) } ?? url.deletingLastPathComponent()
+    }
+
+    enum Reach: Sendable {
+        case present
+        case gone
+        /// The folder itself is missing: an unmounted volume or a share that hasn't come back yet.
+        case unreachable
+    }
+
+    /// A file is only gone when the folder it came from is there without it.
+    static func reach(_ file: URL, in folder: URL) -> Reach {
+        let manager = FileManager.default
+        guard manager.fileExists(atPath: folder.path) else { return .unreachable }
+        return manager.fileExists(atPath: file.path) ? .present : .gone
+    }
 }
 
 /// What the toast says about the last watched-folder file that ran out of sight.
@@ -39,7 +60,8 @@ extension AppModel {
 
     /// Saved to the line before anything reads the file, so a quit during the duplicate check loses nothing.
     func handleWatchedArrival(_ url: URL) {
-        enqueueWatchedArrival(WatchedArrival(url: url))
+        let folder = watchedFoldersIfWatching?.folder(containing: url)
+        enqueueWatchedArrival(WatchedArrival(url: url, folderID: folder?.id, folderPath: folder?.root.path))
     }
 
     /// A file offered again before its turn keeps its place in the line; one offered while it runs waits once behind it.
@@ -61,19 +83,31 @@ extension AppModel {
               let next = nextWatchedArrival else { return }
         let deadline = fileReadDeadline
         let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
-        // Off main: a watched folder can sit on a server that takes its time to answer.
+        let folderIsUnavailable = next.folderID.map { watchedFoldersIfWatching?.isUnavailable($0) ?? false } ?? false
+        let probe = watchedFileReach
+        // Off main and bounded: a watched folder can sit on a server that takes its time to answer, or never does.
         watchedLaneTask = Task { [weak self, library] in
-            let present = (try? await AppModel.offMainIO(qos: .utility) {
-                FileManager.default.fileExists(atPath: next.url.path)
-            }) ?? false
+            var reach = WatchedArrival.Reach.unreachable
+            if !folderIsUnavailable,
+               case .done(let found) = await BoundedFileRead.run(deadline: deadline, { probe(next.url, next.folderURL) }) {
+                reach = found
+            }
             // Nobody opened this file, so a copy the library holds follows the batch rule: skipped and counted, never a sheet.
             var lookup: DuplicateNotice.Lookup?
-            if present, next.sourceDigest == nil, skipsDuplicates {
+            if reach == .present, next.sourceDigest == nil, skipsDuplicates {
                 lookup = await DuplicateNotice.lookup(for: next.url, in: library, deadline: deadline)
             }
             guard let self, !Task.isCancelled else { return }
             watchedLaneTask = nil
-            guard present else {
+            switch reach {
+            case .present:
+                break
+            case .unreachable:
+                ParolaLog.info(.library, "a watched-folder file waits for its folder to come back")
+                unreachableArrivalIDs.insert(next.id)
+                pumpWatchedLane()
+                return
+            case .gone:
                 ParolaLog.info(.library, "a watched-folder file was gone by its turn")
                 watchedArrivals.removeAll { $0.id == next.id }
                 pumpWatchedLane()
@@ -109,9 +143,16 @@ extension AppModel {
         }
     }
 
-    /// The first file in the line that still has to run.
+    /// The first file in the line that still has to run and whose folder answered.
     var nextWatchedArrival: WatchedArrival? {
-        watchedArrivals.first { !$0.isLanding }
+        watchedArrivals.first { !$0.isLanding && !unreachableArrivalIDs.contains($0.id) }
+    }
+
+    /// A folder is back: the files that waited on it try again, in their places.
+    func retryUnreachableArrivals() {
+        guard !unreachableArrivalIDs.isEmpty else { return }
+        unreachableArrivalIDs = []
+        pumpWatchedLane()
     }
 
     /// Nothing open, playing or asking: an arrival may run where the user can see it, as a file they opened would.
