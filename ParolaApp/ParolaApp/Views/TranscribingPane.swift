@@ -116,9 +116,16 @@ struct TranscribingPane: View {
                     .contentTransition(.interpolate)
                 Spacer()
                 readout.accentPill()
-                Button("Cancel") { model.cancelCurrentWork() }
-                    .controlSize(.small)
-                    .axLeaf("Transcribing.Button.Cancel")
+                if recordedTake != nil {
+                    Button("Stop Transcribing") { model.stopTranscribingTake() }
+                        .controlSize(.small)
+                        .help("The recording stays in your library.")
+                        .axLeaf("Transcribing.Button.StopTranscribing")
+                } else {
+                    Button("Cancel") { model.cancelCurrentWork() }
+                        .controlSize(.small)
+                        .axLeaf("Transcribing.Button.Cancel")
+                }
             }
             DSProgressBar(value: isFinishing ? nil : progress)
         }

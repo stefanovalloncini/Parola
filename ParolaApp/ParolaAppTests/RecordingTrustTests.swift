@@ -51,6 +51,78 @@ extension TranscriberMockSuites {
             return model
         }
 
+        private func entries(_ model: AppModel, count: Int) async -> [LibraryEntry] {
+            var listed: [LibraryEntry] = []
+            await waitUntil { listed = await model.library.list(); return listed.count >= count }
+            return listed
+        }
+
+        /// A take's transcription held by the gate, so the test acts while it is running.
+        private func transcribingTake(_ model: AppModel, wav: URL) async {
+            model.liveSource = StubTake(url: wav)
+            model.phase = .recording(source: .microphone)
+            model.stopRecordingAndTranscribe()
+            await waitUntil { model.phase == .transcribing(file: wav) }
+        }
+
+        // MARK: - Stopping a take's transcription
+
+        @Test("stopping a take's transcription saves the take and reports nothing")
+        func stopTranscribingKeepsTheTake() async throws {
+            let wav = try makeTakeWAV("stop")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "never landed")],
+                    gate: MockTranscriberGate()
+                ))
+                let model = makeModel()
+                await transcribingTake(model, wav: wav)
+                let take = try #require(model.recordedTake)
+                #expect(take.file == wav)
+                #expect(take.title.hasPrefix("Recording "), "the pane names the take, not its file")
+
+                model.stopTranscribingTake()
+                #expect(model.phase == .idle)
+
+                let saved = await entries(model, count: 1)
+                #expect(saved.count == 1)
+                #expect(saved.first?.title == take.title + " (not transcribed)")
+                #expect(saved.first?.manifest.originalAudioName.isEmpty == false)
+                await settle()
+                #expect(model.phase == .idle, "a stop is not a failure")
+                #expect(model.failedTakeAudioURL == wav, "Retry stays armed for the take")
+            }
+        }
+
+        @Test("a cancel from anywhere else keeps the take too, with no error")
+        func cancelCurrentWorkKeepsTheTake() async throws {
+            let wav = try makeTakeWAV("cancel")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "never landed")],
+                    gate: MockTranscriberGate()
+                ))
+                let model = makeModel()
+                await transcribingTake(model, wav: wav)
+
+                model.cancelCurrentWork()
+
+                let saved = await entries(model, count: 1)
+                #expect(saved.first?.title.hasSuffix("(not transcribed)") == true)
+                await settle()
+                #expect(model.phase == .idle)
+            }
+        }
+
+        @Test("a cancellation never reaches the screen as its type name")
+        func cancellationReadsPlainly() {
+            let message = AppModel.transcriptionFailureMessage(for: CancellationError())
+            #expect(!message.contains("CancellationError"))
+            #expect(message == "Transcription stopped.")
+        }
+
         // MARK: - Titles
 
         @Test("a finished take is named by its title, then by its entry, never by its working file")

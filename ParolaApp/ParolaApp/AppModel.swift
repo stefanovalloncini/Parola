@@ -158,6 +158,7 @@ final class AppModel {
     private(set) var liveTakeIsStreaming = false
     /// The take transcribing or just transcribed. Matched by file, so a stale one names nothing.
     private(set) var recordedTake: RecordedTake?
+    @ObservationIgnored private var takeTranscriptionRunning = false
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
@@ -2805,6 +2806,9 @@ final class AppModel {
     }
 
     nonisolated static func transcriptionFailureMessage(for error: Error, bundle: Bundle = .main) -> String {
+        if error is CancellationError {
+            return String(localized: "Transcription stopped.", bundle: bundle)
+        }
         if case ParolaError.transcriptionFailed(let reason) = error {
             return String(localized: "Transcription failed: \(reason)", bundle: bundle)
         }
@@ -3311,6 +3315,8 @@ final class AppModel {
         // Hand off synchronously so a racing auto-stop or second click can't start a duplicate run.
         liveSource = nil
         stopRecordingWatch()
+        let category = pendingRecordingCategory
+        let takeSource = pendingRecordingSource
         fileTranscribeTask?.cancel()
         fileTranscribeTask = Task {
             await mediaSession.exitRecording()
@@ -3319,8 +3325,9 @@ final class AppModel {
                 clearRecordingLevelMeter()
                 await transcribeRecordedTake(
                     url: url,
-                    title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date()),
-                    source: pendingRecordingSource
+                    title: Self.liveRecordingTitle(category: category, endedAt: Date()),
+                    source: takeSource,
+                    category: category
                 )
             } catch {
                 clearRecordingLevelMeter()
@@ -3335,10 +3342,14 @@ final class AppModel {
     }
 
     /// Transcribes a finished take from its in-flight file. Unlike a user-opened file the
-    /// audio is irreplaceable, so a failure saves it to the library and arms the error
-    /// pane's Retry instead of leaving the file orphaned.
-    func transcribeRecordedTake(url: URL, title: String, source: EntrySource) async {
+    /// audio is irreplaceable, so a failure or a stop saves it to the library and arms
+    /// Retry instead of leaving the file orphaned.
+    func transcribeRecordedTake(
+        url: URL, title: String, source: EntrySource, category: EntryCategory = .transcription
+    ) async {
         liveRecordingAudioURL = nil
+        takeTranscriptionRunning = true
+        defer { takeTranscriptionRunning = false }
         let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, title: title, source: source)
         recordedTake = RecordedTake(file: url, title: title)
         sourceFileURL = url
@@ -3359,44 +3370,67 @@ final class AppModel {
             adoptLoadedMediaDuration()
             endRecovery(recoveryToken)
             phase = .ready
+            pendingRecordingCategory = .transcription
             let saving = land(RunLanding(
                 kind: .recording, transcript: processed, audioSource: url, source: source,
-                category: takeRecordingCategory(), title: title
+                category: category, title: title
             ))
             followTakeIntoLibrary(url, entry: saving)
             resolveRecordingOutcome(.success(processed.text))
         } catch {
             endRecovery(recoveryToken)
-            var message = Self.transcriptionFailureMessage(for: error)
-            let recoverable = !(error is CancellationError) && !Task.isCancelled
-            if recoverable {
-                let category = takeRecordingCategory()
-                land(RunLanding(
-                    kind: .salvagedTake,
-                    transcript: Transcript(
-                        segments: [],
-                        language: currentOptions.language ?? "auto",
-                        modelName: selectedModel,
-                        sourceURL: url
-                    ),
-                    audioSource: url,
-                    source: source,
-                    category: category,
-                    title: title + " (transcription failed)"
-                ))
-                message += " " + String(localized: "The audio was saved to your library.")
-                phase = .failed(message: message)
-                // After the phase: its didSet forgets whatever the last failure left behind.
-                failureKind = .transcription
-                failedTakeAudioURL = url
-                failedTakeTitle = title
-                failedTakeCategory = category
-                failedTakeSource = source
-            } else {
-                phase = .failed(message: message)
-            }
+            keepUntranscribedTake(url: url, title: title, source: source, category: category, error: error)
+        }
+    }
+
+    /// A take whose transcription failed or was stopped goes to the library as audio; only a failure reports.
+    private func keepUntranscribedTake(
+        url: URL, title: String, source: EntrySource, category: EntryCategory, error: any Error
+    ) {
+        let stopped = error is CancellationError || Task.isCancelled
+        pendingRecordingCategory = .transcription
+        land(RunLanding(
+            kind: .salvagedTake,
+            transcript: Transcript(
+                segments: [],
+                language: currentOptions.language ?? "auto",
+                modelName: selectedModel,
+                sourceURL: url
+            ),
+            audioSource: url,
+            source: source,
+            category: category,
+            title: title + (stopped ? " (not transcribed)" : " (transcription failed)")
+        ))
+        if stopped {
+            // Whatever stopped the run keeps the screen; only the take's own pane gives way to Home.
+            let ownsPhase = phase == .transcribing(file: url) || phase == .idle
+            if phase == .transcribing(file: url) { phase = .idle }
+            if ownsPhase { armTakeRetry(url: url, title: title, source: source, category: category) }
+            resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+        } else {
+            let message = Self.transcriptionFailureMessage(for: error)
+                + " " + String(localized: "The audio was saved to your library.")
+            phase = .failed(message: message)
+            armTakeRetry(url: url, title: title, source: source, category: category)
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
         }
+    }
+
+    /// After the phase is set: its didSet forgets whatever the last failure left behind.
+    private func armTakeRetry(url: URL, title: String, source: EntrySource, category: EntryCategory) {
+        failureKind = .transcription
+        failedTakeAudioURL = url
+        failedTakeTitle = title
+        failedTakeCategory = category
+        failedTakeSource = source
+    }
+
+    /// Stops a take's transcription. The take is saved to the library untranscribed, so the recording survives.
+    func stopTranscribingTake() {
+        guard takeTranscriptionRunning else { return }
+        cancelAndTrack(&fileTranscribeTask)
+        phase = .idle
     }
 
     /// Playback follows a saved take into its entry, so the header reads the entry's title from then on.
@@ -3471,10 +3505,10 @@ final class AppModel {
         guard let url = failedTakeAudioURL else { return }
         let title = failedTakeTitle ?? Self.liveRecordingTitle(category: .transcription, endedAt: Date())
         let source = failedTakeSource ?? .microphone
-        pendingRecordingCategory = failedTakeCategory ?? .transcription
+        let category = failedTakeCategory ?? .transcription
         fileTranscribeTask?.cancel()
         fileTranscribeTask = Task {
-            await transcribeRecordedTake(url: url, title: title, source: source)
+            await transcribeRecordedTake(url: url, title: title, source: source, category: category)
             if !Task.isCancelled { self.fileTranscribeTask = nil }
         }
     }

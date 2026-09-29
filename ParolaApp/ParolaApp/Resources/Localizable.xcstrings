@@ -12882,6 +12882,17 @@
         }
       }
     },
+    "Stop Transcribing": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrompi trascrizione"
+          }
+        }
+      }
+    },
     "Stop dictation": {
       "extractionState": "manual",
       "localizations": {
@@ -13522,6 +13533,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La libreria di prompt dietro la pulizia della dettatura e il menu Trascrizione."
+          }
+        }
+      }
+    },
+    "The recording stays in your library.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La registrazione resta nella libreria."
           }
         }
       }
@@ -14525,6 +14547,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impostazioni di trascrizione"
+          }
+        }
+      }
+    },
+    "Transcription stopped.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione interrotta."
           }
         }
       }
