@@ -587,23 +587,80 @@ extension TranscriberMockSuites {
             #expect(FileManager.default.fileExists(atPath: fresh.path), "a file written minutes ago is left alone")
         }
 
-        @Test("declining a recovery discards the take's working file, so the sweep can't bring it back")
-        func declineDiscardsTheTakeFile() throws {
-            let library = makeTempLibraryURL("decline-take")
+        private func writeLegacyCheckpoint(_ checkpoint: RecoveryCheckpoint, library: URL) throws {
+            try JSONEncoder().encode(checkpoint).write(to: library.appendingPathComponent("recovery.json"))
+        }
+
+        @Test("Not Now keeps a take that was transcribing when Parola quit, untranscribed, and the offer names it by its title")
+        func notNowKeepsATranscribingTake() async throws {
+            let library = makeTempLibraryURL("not-now-take")
             let inflight = library.appendingPathComponent("inflight", isDirectory: true)
             try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
-            let take = try makeTakeWAV("declined", in: inflight)
-            let checkpoint = RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", audioURL: take)
-            try JSONEncoder().encode(checkpoint).write(to: library.appendingPathComponent("recovery.json"))
+            let take = try makeTakeWAV("not-now", in: inflight)
+            try writeLegacyCheckpoint(RecoveryCheckpoint(
+                kind: .fileTranscription, startedAt: Date(), modelName: "m",
+                sourceURL: take, title: "Recording 29 Sep 2026", source: .systemAudio
+            ), library: library)
             let model = makeModel(libraryURL: library)
-            #expect(model.pendingRecovery != nil)
+            let offer = try #require(model.pendingRecovery)
+            #expect(offer.isTake)
+            #expect(offer.sourceName == "Recording 29 Sep 2026", "the prompt names the take, not its working file")
 
             model.declinePendingRecovery()
 
-            #expect(!FileManager.default.fileExists(atPath: take.path))
+            let saved = try #require(await entries(model, count: 1).first)
+            #expect(saved.title == "Recording 29 Sep 2026 (not transcribed)")
+            #expect(saved.manifest.originalAudioName.isEmpty == false)
+            #expect(saved.manifest.source == .systemAudio)
+            #expect(try await model.library.load(saved.id).document.transcript.modelName.isEmpty)
+            #expect(await waitUntil { model.recoveryCheckpointFiles.isEmpty }, "the checkpoint goes once the entry holds the take")
+            #expect(model.phase == .idle, "a take kept for later doesn't open")
         }
 
-        // MARK: - Quitting during a take
+        @Test("only a confirmed Discard deletes a recovered take's audio")
+        func discardDeletesTheTake() async throws {
+            let library = makeTempLibraryURL("discard-take")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let take = try makeTakeWAV("discarded", in: inflight)
+            try writeLegacyCheckpoint(
+                RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", audioURL: take), library: library
+            )
+            let model = makeModel(libraryURL: library)
+            #expect(model.pendingRecovery?.isTake == true)
+
+            model.discardPendingRecovery()
+
+            #expect(model.pendingRecovery == nil)
+            #expect(!FileManager.default.fileExists(atPath: take.path))
+            #expect(model.recoveryCheckpointFiles.isEmpty)
+            await settle()
+            #expect(await model.library.list().isEmpty)
+        }
+
+        @Test("Not Now on a file's offer leaves the file where it is and just drops the offer")
+        func notNowDropsAFileOffer() async throws {
+            let library = makeTempLibraryURL("not-now-file")
+            try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+            let file = try makeTakeWAV("users-own")
+            defer { try? FileManager.default.removeItem(at: file) }
+            try writeLegacyCheckpoint(
+                RecoveryCheckpoint(kind: .fileTranscription, startedAt: Date(), modelName: "m", sourceURL: file), library: library
+            )
+            let model = makeModel(libraryURL: library)
+            let offer = try #require(model.pendingRecovery)
+            #expect(!offer.isTake)
+            #expect(offer.sourceName == file.lastPathComponent)
+
+            model.declinePendingRecovery()
+
+            #expect(model.recoveryCheckpointFiles.isEmpty)
+            #expect(FileManager.default.fileExists(atPath: file.path))
+            await settle()
+            #expect(await model.library.list().isEmpty)
+        }
+
+        // MARK: - Quitting during a take        // MARK: - Quitting during a take
 
         @Test("quitting with no take in progress goes at once and asks nothing")
         func quitWithoutATakeAsksNothing() {

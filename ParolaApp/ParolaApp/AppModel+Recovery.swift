@@ -63,11 +63,16 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         source = try c.decodeIfPresent(EntrySource.self, forKey: .source)
     }
 
-    /// A file by its name; a link by the video's title, or the link itself before the title was known.
+    /// A take by its title, a file by its name; a link by the video's title, or the link itself before the title was known.
     var sourceName: String? {
         guard let sourceURL else { return nil }
         guard sourceURL.isFileURL else { return title ?? sourceURL.absoluteString }
-        return sourceURL.lastPathComponent
+        return title ?? sourceURL.lastPathComponent
+    }
+
+    /// A recorded take rather than a file or link the user opened: its audio exists nowhere else.
+    var isTake: Bool {
+        kind == .recording || (title != nil && sourceURL?.isFileURL == true)
     }
 }
 
@@ -222,7 +227,7 @@ extension AppModel {
 
     // MARK: - Launch offer
 
-    /// Offers the newest checkpoint; older ones stay on disk for a later launch.
+    /// Offers the newest checkpoint; older takes go to the library quietly, and older file offers lapse.
     func loadPendingRecovery() {
         var found: [RecoveryCheckpoint] = []
         for file in recoveryCheckpointFiles {
@@ -238,6 +243,9 @@ extension AppModel {
         recoveryReferencedFiles = Set(found.flatMap { [$0.sourceURL, $0.audioURL] }
             .compactMap { $0?.isFileURL == true ? $0?.resolvingSymlinksInPath().path : nil })
         guard let newest = found.max(by: { $0.startedAt < $1.startedAt }) else { return }
+        for older in found where older.id != newest.id {
+            keepRecoveredTake(older, releasingReferencesWhenSaved: true)
+        }
         ParolaLog.notice(
             .appRecovery, "recovery checkpoint offered for \(newest.kind)",
             [.count: .int(newest.segments.count)]
@@ -322,8 +330,15 @@ extension AppModel {
         }
     }
 
-    /// Declining discards the take: its working file goes too, so the sweep doesn't bring it back.
+    /// Not Now, Escape or a prompt closed unanswered: a take is kept in the library, a file or link is simply not offered again.
     func declinePendingRecovery() {
+        guard let checkpoint = pendingRecovery else { return }
+        answerRecoveryOffer(checkpoint)
+        keepRecoveredTake(checkpoint, releasingReferencesWhenSaved: false)
+    }
+
+    /// The prompt's Discard, once confirmed: the only answer that deletes a take.
+    func discardPendingRecovery() {
         guard let checkpoint = pendingRecovery else { return }
         answerRecoveryOffer(checkpoint)
         removeRecoveryFile(of: checkpoint)
@@ -332,32 +347,91 @@ extension AppModel {
         }
     }
 
+    /// Saves a take without opening it; its checkpoint goes once the entry exists, and a file or link's offer just lapses.
+    private func keepRecoveredTake(_ checkpoint: RecoveryCheckpoint, releasingReferencesWhenSaved: Bool) {
+        guard checkpoint.isTake else {
+            removeRecoveryFile(of: checkpoint)
+            return
+        }
+        let referenced = [checkpoint.sourceURL, checkpoint.audioURL].compactMap { $0?.resolvingSymlinksInPath().path }
+        var release: (@MainActor (LibraryEntry) -> Void)?
+        if releasingReferencesWhenSaved {
+            release = { [weak self] _ in self?.recoveryReferencedFiles.subtract(referenced) }
+        }
+        switch checkpoint.kind {
+        case .fileTranscription:
+            guard let url = checkpoint.sourceURL, let title = checkpoint.title,
+                  FileManager.default.fileExists(atPath: url.path) else {
+                removeRecoveryFile(of: checkpoint)
+                return
+            }
+            saveTake(
+                Self.untranscribedTranscript(of: url, language: checkpoint.language),
+                audio: url,
+                title: Self.takeTitle(title, suffix: .notTranscribed),
+                source: checkpoint.source ?? .microphone,
+                category: .transcription,
+                activate: false,
+                recovery: adoptRecovery(checkpoint),
+                onSaved: release
+            )
+        case .recording:
+            Task { [weak self] in
+                let audioURL = await Self.probedRecordingURL(checkpoint.audioURL)
+                guard let self else { return }
+                guard let restored = Self.restoredTranscript(checkpoint, audioURL: audioURL) else {
+                    self.removeRecoveryFile(of: checkpoint)
+                    return
+                }
+                self.saveTake(
+                    restored,
+                    audio: audioURL,
+                    title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt),
+                    source: checkpoint.source ?? .microphone,
+                    category: .transcription,
+                    activate: false,
+                    recovery: self.adoptRecovery(checkpoint),
+                    onSaved: release
+                )
+            }
+        }
+    }
+
     private func restoreRecoveredRecording(_ checkpoint: RecoveryCheckpoint) {
         let pageAtStart = route
-        guard let candidate = checkpoint.audioURL else {
+        guard checkpoint.audioURL != nil else {
             finishRecordingRestore(checkpoint, audioURL: nil, pageAtStart: pageAtStart)
             return
         }
-        // A crash can leave the in-flight WAV with a stale header; attach it only
-        // when it still opens, and probe off-main (AVAudioFile can block).
         Task { [weak self] in
-            let audioURL = (try? await AppModel.offMainIO({ Self.readableRecordingURL(candidate) })) ?? nil
+            let audioURL = await Self.probedRecordingURL(checkpoint.audioURL)
             self?.finishRecordingRestore(checkpoint, audioURL: audioURL, pageAtStart: pageAtStart)
         }
     }
 
-    private func finishRecordingRestore(_ checkpoint: RecoveryCheckpoint, audioURL: URL?, pageAtStart: Route) {
-        guard !checkpoint.segments.isEmpty || audioURL != nil else {
-            removeRecoveryFile(of: checkpoint)
-            return
-        }
-        let restored = Transcript(
+    /// A crash can leave the in-flight WAV with a stale header, so a take's audio is attached only when it still opens; probed off-main, since AVAudioFile can block.
+    private nonisolated static func probedRecordingURL(_ candidate: URL?) async -> URL? {
+        guard let candidate else { return nil }
+        return (try? await AppModel.offMainIO { Self.readableRecordingURL(candidate) }) ?? nil
+    }
+
+    /// What a recording checkpoint holds as a transcript; nil when it holds nothing at all.
+    nonisolated static func restoredTranscript(_ checkpoint: RecoveryCheckpoint, audioURL: URL?) -> Transcript? {
+        guard !checkpoint.segments.isEmpty || audioURL != nil else { return nil }
+        return Transcript(
             segments: checkpoint.segments,
             language: checkpoint.language ?? "en",
             modelName: checkpoint.modelName,
             sourceURL: audioURL,
             durationSeconds: checkpoint.segments.last?.end
         )
+    }
+
+    private func finishRecordingRestore(_ checkpoint: RecoveryCheckpoint, audioURL: URL?, pageAtStart: Route) {
+        guard let restored = Self.restoredTranscript(checkpoint, audioURL: audioURL) else {
+            removeRecoveryFile(of: checkpoint)
+            return
+        }
         clearDerivedArtifacts()
         selectedEntryID = nil
         if let audioURL {

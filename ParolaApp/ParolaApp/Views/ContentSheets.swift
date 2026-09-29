@@ -4,6 +4,7 @@ import ParolaCore
 struct ContentSheetsModifier: ViewModifier {
     @Environment(AppModel.self) private var model
     @State private var meetingAppSnapshot: String = ""
+    @State private var confirmingRecoveryDiscard = false
 
     func body(content: Content) -> some View {
         @Bindable var model = model
@@ -47,15 +48,29 @@ struct ContentSheetsModifier: ViewModifier {
             ) { checkpoint in
                 Button(checkpoint.kind == .recording ? "Restore" : "Transcribe") { model.acceptPendingRecovery() }
                     .axLeaf("Recovery.Button.Accept")
-                Button(checkpoint.kind == .recording ? "Discard" : "Not Now", role: .cancel) { model.declinePendingRecovery() }
+                Button("Not Now", role: .cancel) { model.declinePendingRecovery() }
                     .axLeaf("Recovery.Button.Decline")
+                if checkpoint.isTake {
+                    Button("Discard…", role: .destructive) { confirmingRecoveryDiscard = true }
+                        .axLeaf("Recovery.Button.Discard")
+                }
             } message: { checkpoint in
                 switch checkpoint.kind {
                 case .recording:
-                    Text("Parola quit while recording. Restore puts the transcript captured up to that point in your library.")
+                    Text("Parola quit while recording. Restore opens what was captured; Not Now saves it to your library for later.")
+                case .fileTranscription where checkpoint.isTake:
+                    Text("Parola quit while transcribing \(checkpoint.sourceName ?? "this recording"). Not Now saves the recording to your library without a transcript.")
                 case .fileTranscription:
                     Text("Parola quit while transcribing \(checkpoint.sourceName ?? "this file").")
                 }
+            }
+            .alert("Discard this recording?", isPresented: $confirmingRecoveryDiscard) {
+                Button("Discard", role: .destructive) { model.discardPendingRecovery() }
+                    .axLeaf("Recovery.Button.ConfirmDiscard")
+                Button("Cancel", role: .cancel) {}
+                    .axLeaf("Recovery.Button.KeepOffer")
+            } message: {
+                Text("It won't be saved to your library, and this can't be undone.")
             }
     }
 
@@ -74,11 +89,11 @@ struct ContentSheetsModifier: ViewModifier {
         }
     }
 
-    // Dismissing without choosing counts as a decline, so the file can't be re-offered forever.
+    // Every answer is a button of its own; a prompt closed without one stays on offer and deletes nothing.
     private var recoveryBinding: Binding<Bool> {
         Binding(
-            get: { model.pendingRecovery != nil },
-            set: { if !$0 { model.declinePendingRecovery() } }
+            get: { model.pendingRecovery != nil && !confirmingRecoveryDiscard },
+            set: { _ in }
         )
     }
 }

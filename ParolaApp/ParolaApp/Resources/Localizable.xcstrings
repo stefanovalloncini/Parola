@@ -4669,6 +4669,28 @@
         }
       }
     },
+    "Discard this recording?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scartare questa registrazione?"
+          }
+        }
+      }
+    },
+    "Discard…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarta…"
+          }
+        }
+      }
+    },
     "Discreet bar pinned under the MacBook notch.": {
       "extractionState": "manual",
       "localizations": {
@@ -6764,6 +6786,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ascolta e scrive."
+          }
+        }
+      }
+    },
+    "It won't be saved to your library, and this can't be undone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non verrà salvata nella libreria, e non si può annullare."
           }
         }
       }
@@ -9766,6 +9799,39 @@
         }
       }
     },
+    "Parola quit while recording. Restore opens what was captured; Not Now saves it to your library for later.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola si è chiusa durante una registrazione. Ripristina apre quanto registrato; Non ora la salva nella libreria per dopo."
+          }
+        }
+      }
+    },
+    "Parola quit while transcribing %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola si è chiusa mentre trascriveva %@."
+          }
+        }
+      }
+    },
+    "Parola quit while transcribing %@. Not Now saves the recording to your library without a transcript.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola si è chiusa mentre trascriveva %@. Non ora salva la registrazione nella libreria senza trascrizione."
+          }
+        }
+      }
+    },
     "Parola recognises a file by its contents, so a renamed copy counts as the same recording. In a batch, “Ask me” skips the file.": {
       "extractionState": "manual",
       "localizations": {
@@ -11323,6 +11389,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ripristina (%lld)"
+          }
+        }
+      }
+    },
+    "Restore recovered recording?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristinare la registrazione recuperata?"
           }
         }
       }
@@ -14483,6 +14560,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi"
+          }
+        }
+      }
+    },
+    "Transcribe %@ again?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivere di nuovo %@?"
           }
         }
       }

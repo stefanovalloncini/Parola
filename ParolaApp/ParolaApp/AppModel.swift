@@ -3777,13 +3777,13 @@ final class AppModel {
                 if entry != nil { self.endRecovery(recovery) }
             }
             guard let entry else { return }
+            onSaved?(entry)
             if let audio {
                 if let entryAudio, self.sourceFileURL == audio, self.selectedEntryID == entry.id {
                     self.movePlayback(to: entryAudio)
                 }
                 self.releaseTakeFile(audio)
             }
-            onSaved?(entry)
         }
         return saving
     }

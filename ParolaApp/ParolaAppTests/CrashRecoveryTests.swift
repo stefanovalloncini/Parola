@@ -325,8 +325,8 @@ extension TranscriberMockSuites {
             #expect(!recoveryFileExists(model))
         }
 
-        @Test("declining deletes the recovery file")
-        func declineDeletesRecoveryFile() throws {
+        @Test("Not Now keeps a recording checkpoint's take in the library without opening it, then clears the checkpoint")
+        func notNowKeepsTheRecordedTake() async throws {
             let lib = makeTempLibraryURL("recovery-decline")
             try writeCheckpoint(
                 RecoveryCheckpoint(kind: .recording, startedAt: Date(), modelName: "m", segments: Self.makeSegments()),
@@ -338,7 +338,11 @@ extension TranscriberMockSuites {
             model.declinePendingRecovery()
 
             #expect(model.pendingRecovery == nil)
-            #expect(!recoveryFileExists(model))
+            #expect(await waitUntil { !self.recoveryFileExists(model) })
+            let entries = await model.library.list()
+            #expect(entries.count == 1)
+            #expect(entries.first?.title.hasSuffix("(recovered)") == true)
+            #expect(model.transcript == nil, "a take kept for later doesn't open")
         }
 
         @Test("accepting a recording recovery installs and persists the transcript")
@@ -457,8 +461,8 @@ extension TranscriberMockSuites {
             #expect(model.recoveryCheckpointFiles.isEmpty)
         }
 
-        @Test("with several checkpoints on disk, the newest is offered and the rest wait for a later launch")
-        func newestCheckpointIsOffered() throws {
+        @Test("with several checkpoints on disk, the newest is offered and older takes go to the library quietly")
+        func newestCheckpointIsOffered() async throws {
             let lib = makeTempLibraryURL("recovery-several")
             let older = RecoveryCheckpoint(
                 kind: .recording, startedAt: Date().addingTimeInterval(-600), modelName: "m", segments: Self.makeSegments()
@@ -472,10 +476,12 @@ extension TranscriberMockSuites {
 
             let model = makeModel(libraryURL: lib)
             #expect(model.pendingRecovery?.id == newer.id)
+            #expect(await waitUntil { model.recoveryCheckpointFiles.map(\.lastPathComponent) == ["\(newer.id.uuidString).json"] })
+            #expect(await model.library.list().count == 1, "the older take is kept, not dropped")
 
             model.declinePendingRecovery()
-            #expect(model.recoveryCheckpointFiles.map(\.lastPathComponent) == ["\(older.id.uuidString).json"])
-            #expect(makeModel(libraryURL: lib).pendingRecovery?.id == older.id)
+            #expect(await waitUntil { !self.recoveryFileExists(model) })
+            #expect(await model.library.list().count == 2)
         }
 
         @Test("recovered recording titles carry the timestamp and suffix")
