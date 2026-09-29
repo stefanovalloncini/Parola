@@ -231,13 +231,23 @@ struct FolderWatcherResourceTests {
         await watcher.stop()
     }
 
-    @Test("only a missing directory counts as gone; running out of descriptors is worth another try")
+    @Test("only a missing directory counts as gone; any other listing error is worth another try")
     func listingErrorsAreSorted() throws {
         let folder = try Fixture.makeTempDir()
-        defer { try? FileManager.default.removeItem(at: folder) }
+        let locked = folder.appendingPathComponent("Locked")
+        try FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: locked.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path)
+            try? FileManager.default.removeItem(at: folder)
+        }
         if case .listed = FolderWatcher.list(folder.path, recursive: true) {} else { Issue.record("an existing folder lists") }
         if case .missing = FolderWatcher.list(folder.appendingPathComponent("gone").path, recursive: true) {} else {
             Issue.record("a missing folder is missing")
         }
+        let file = folder.appendingPathComponent("file.wav")
+        try Data(count: 1).write(to: file)
+        if case .missing = FolderWatcher.list(file.path, recursive: true) {} else { Issue.record("a file is no folder") }
+        if case .failed = FolderWatcher.list(locked.path, recursive: true) {} else { Issue.record("no permission is retried") }
     }
 }

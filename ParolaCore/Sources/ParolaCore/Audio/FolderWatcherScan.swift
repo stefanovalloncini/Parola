@@ -22,7 +22,7 @@ extension FolderWatcher {
     enum ListOutcome: Sendable {
         case listed(Listing)
         case missing
-        /// Out of descriptors or interrupted: the directory is still there, try again.
+        /// Anything but a missing directory (no descriptors, a timed-out share, no permission): try again.
         case failed
     }
 
@@ -89,7 +89,7 @@ extension FolderWatcher {
     static func list(_ path: String, recursive: Bool) -> ListOutcome {
         let info = FileInfo(path)
         guard let directory = opendir(path) else {
-            return [EMFILE, ENFILE, EINTR, EAGAIN, ENOMEM].contains(errno) ? .failed : .missing
+            return [ENOENT, ENOTDIR].contains(errno) ? .missing : .failed
         }
         defer { closedir(directory) }
         var listing = Listing(path: path, inode: info?.inode, modified: info?.modified)
