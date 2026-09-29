@@ -132,8 +132,9 @@ public struct ObsidianVaultFolderDestination: DeliveryDestination, Codable, Send
 
     // MARK: - Delivery
 
+    /// Never mounts a volume or asks for a password: a vault on a share that isn't connected is out of reach.
     public func checkReachable() async throws {
-        let vault = try resolvedVaultURL()
+        let vault = try resolvedVaultURL(options: Self.reachabilityResolution)
         let scoped = vault.startAccessingSecurityScopedResource()
         defer { if scoped { vault.stopAccessingSecurityScopedResource() } }
         guard FileManager.default.fileExists(atPath: vault.path) else {
@@ -174,12 +175,14 @@ public struct ObsidianVaultFolderDestination: DeliveryDestination, Codable, Send
     /// The vault folder the bookmark points at. A bookmark made without the security scope (a
     /// process that cannot mint one) still resolves, so this tries both. Through `NSURL`, whose
     /// stale flag is optional: a stale bookmark still resolves, and this type cannot re-mint one.
-    func resolvedVaultURL() throws -> URL {
+    static let reachabilityResolution: NSURL.BookmarkResolutionOptions = [.withoutMounting, .withoutUI]
+
+    func resolvedVaultURL(options: NSURL.BookmarkResolutionOptions = []) throws -> URL {
         guard !vaultBookmark.isEmpty else { throw DeliveryError.vaultUnavailable(name, vaultPath) }
         #if os(macOS)
         if let url = try? NSURL(
             resolvingBookmarkData: vaultBookmark,
-            options: .withSecurityScope,
+            options: options.union(.withSecurityScope),
             relativeTo: nil,
             bookmarkDataIsStale: nil
         ) as URL {
@@ -188,7 +191,7 @@ public struct ObsidianVaultFolderDestination: DeliveryDestination, Codable, Send
         #endif
         if let url = try? NSURL(
             resolvingBookmarkData: vaultBookmark,
-            options: [],
+            options: options,
             relativeTo: nil,
             bookmarkDataIsStale: nil
         ) as URL {

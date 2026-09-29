@@ -742,6 +742,13 @@ final class DeliveryEngineTests {
         await #expect(throws: DeliveryError.self) { try await unset.checkReachable() }
     }
 
+    @Test("the reachability check resolves the vault without mounting a volume or showing UI")
+    func reachabilityNeverMounts() throws {
+        let options = ObsidianVaultFolderDestination.reachabilityResolution
+        #expect(options.contains(.withoutMounting))
+        #expect(options.contains(.withoutUI))
+    }
+
     @Test("the backoff steps are one minute, five, thirty, then daily")
     func backoffSchedule() {
         #expect(DeliveryEngine.delay(forAttempt: 1) == .seconds(60))
