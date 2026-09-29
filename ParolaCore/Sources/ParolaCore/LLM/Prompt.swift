@@ -193,6 +193,21 @@ public extension Prompt {
         ),
     ]
 
+    /// Built-ins that answer with a short list whatever the input's length; every other prompt,
+    /// user prompts included, may answer at the length of what it was given.
+    var answerLength: AnswerLength {
+        Self.listAnswerIDs.contains(id) ? .brief : .asLongAsInput
+    }
+
+    // Bullet points, Action items, Highlight key points, Extract questions, Extract statistics.
+    private static let listAnswerIDs = Set([
+        "00000000-0000-0000-0000-000000000005",
+        "00000000-0000-0000-0000-000000000006",
+        "00000000-0000-0000-0000-00000000000D",
+        "00000000-0000-0000-0000-00000000000E",
+        "00000000-0000-0000-0000-000000000011",
+    ].compactMap(UUID.init(uuidString:)))
+
     static let rewritePresets: [Prompt] = {
         let lookup = Dictionary(uniqueKeysWithValues: builtIns.map { ($0.name, $0) })
         let order = ["Professional tone", "Casual", "Concise", "Bullet points"]

@@ -10,6 +10,8 @@ import FoundationModels
 public struct TokenBudget: Sendable, Hashable {
     public let contextTokens: Int
     public let answerTokens: Int
+    /// The longest answer the model returns in one call, whatever room the window leaves.
+    public let maxAnswerTokens: Int
     let counting: Counting
 
     enum Counting: Sendable, Hashable {
@@ -25,9 +27,10 @@ public struct TokenBudget: Sendable, Hashable {
         self.init(contextTokens: tokens + answerTokens, answerTokens: answerTokens, counting: .bytes(perToken: 4))
     }
 
-    init(contextTokens: Int, answerTokens: Int, counting: Counting) {
+    init(contextTokens: Int, answerTokens: Int, counting: Counting, maxAnswerTokens: Int? = nil) {
         self.contextTokens = contextTokens
         self.answerTokens = answerTokens
+        self.maxAnswerTokens = maxAnswerTokens ?? contextTokens
         self.counting = counting
     }
 
@@ -38,9 +41,12 @@ public struct TokenBudget: Sendable, Hashable {
         case .cloud(let provider, _):
             self = .cloud(provider)
         case .ollama:
-            self.init(contextTokens: OllamaLanguageModel.defaultContextTokens, answerTokens: 4096, counting: .bytes(perToken: 4))
+            self.init(
+                contextTokens: OllamaLanguageModel.defaultContextTokens, answerTokens: 4096,
+                counting: .bytes(perToken: 4), maxAnswerTokens: 4096
+            )
         case .custom:
-            self.init(contextTokens: 8192, answerTokens: 4096, counting: .bytes(perToken: 4))
+            self.init(contextTokens: 8192, answerTokens: 4096, counting: .bytes(perToken: 4), maxAnswerTokens: 4096)
         }
     }
 
@@ -57,8 +63,11 @@ public struct TokenBudget: Sendable, Hashable {
 
     static func cloud(_ provider: CloudLLMProviderID) -> TokenBudget {
         let context = CloudLLMProviderInfo.info(for: provider)?.contextWindowTokens ?? 8192
-        return TokenBudget(contextTokens: context, answerTokens: 4096, counting: .bytes(perToken: 4))
+        return TokenBudget(contextTokens: context, answerTokens: 4096, counting: .bytes(perToken: 4), maxAnswerTokens: cloudMaxAnswerTokens)
     }
+
+    /// Anthropic's calls ask for at most this many tokens, and OpenAI-compatible models stop near it or later.
+    static let cloudMaxAnswerTokens = 4096
 
     // MARK: - Counting
 

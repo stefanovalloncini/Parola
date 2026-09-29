@@ -119,6 +119,40 @@ struct TranscriptWindowsTests {
         #expect(prompts.last?.contains("part119 ") == true)
     }
 
+    @Test("a rewrite on a cloud model is cut to what one answer can hold; a list is not")
+    func cloudRewriteWindowsFollowTheAnswerCap() async throws {
+        let cloud = TokenBudget(for: .cloud(provider: .anthropic, model: "claude-haiku-4-5"))
+        #expect(cloud.maxAnswerTokens == 4096)
+        let rewrite = MockLanguageModel()
+        _ = try await PromptRunner.run(
+            Prompt(name: "Cleanup", instructions: "Clean up the transcript below."),
+            on: hourLong(), model: rewrite, budget: cloud, features: .all
+        )
+        let rewritePrompts = await rewrite.receivedPrompts
+        #expect(rewritePrompts.count > 1)
+        for sent in rewritePrompts {
+            #expect(cloud.estimate(sent) <= 4096)
+        }
+
+        let list = MockLanguageModel()
+        let actionItems = try #require(Prompt.builtIns.first { $0.name == "Action items" })
+        #expect(actionItems.answerLength == .brief)
+        _ = try await PromptRunner.run(actionItems, on: hourLong(), model: list, budget: cloud, features: .all)
+        #expect(await list.receivedPrompts.count == 1)
+    }
+
+    @Test("a brief answer lets each on-device window carry more of the transcript")
+    func briefAnswersTakeLargerWindows() async throws {
+        let prompt = Prompt(name: "Questions", instructions: "List every question asked in the text below.")
+        let asLong = MockLanguageModel()
+        _ = try await PromptRunner.run(prompt, on: hourLong(), model: asLong, budget: smallOnDevice, features: .all)
+        let brief = MockLanguageModel()
+        _ = try await PromptRunner.run(prompt, on: hourLong(), model: brief, budget: smallOnDevice, answer: .brief, features: .all)
+        #expect(await brief.receivedPrompts.count < asLong.receivedPrompts.count)
+        #expect(Prompt.builtIns.first { $0.name == "Cleanup" }?.answerLength == .asLongAsInput)
+        #expect(Prompt.builtIns.first { $0.name == "Extract questions" }?.answerLength == .brief)
+    }
+
     @Test("a short prompt run is one call with the transcript's prompt text")
     func shortPromptIsOneCall() async throws {
         let prompt = Prompt(name: "Cleanup", instructions: "Clean up the transcript below.")

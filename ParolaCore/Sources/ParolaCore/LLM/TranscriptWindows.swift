@@ -1,14 +1,15 @@
 import Foundation
 
 /// Cuts a transcript into consecutive runs of segments that each fit one call to the model.
-enum TranscriptWindows {
-    enum Answer: Sendable {
-        /// A few hundred tokens whatever the input: summaries, chapters, lists.
-        case brief
-        /// Up to as long as the input: a rewrite hands back what it was given.
-        case asLongAsInput
-    }
+/// How long a call's answer can run, which decides how much input each window may carry.
+public enum AnswerLength: Sendable, Hashable {
+    /// A few hundred tokens whatever the input: summaries, chapters, lists.
+    case brief
+    /// Up to as long as the input: a rewrite hands back what it was given.
+    case asLongAsInput
+}
 
+enum TranscriptWindows {
     struct Window: Sendable {
         let transcript: Transcript
         let text: String
@@ -43,7 +44,7 @@ enum TranscriptWindows {
         _ transcript: Transcript,
         budget: TokenBudget,
         instructions: String,
-        answer: Answer = .brief,
+        answer: AnswerLength = .brief,
         line: (TranscriptSegment) -> String?,
         render: (Transcript) -> String
     ) async -> [Window] {
@@ -84,12 +85,12 @@ enum TranscriptWindows {
     }
 
     /// Tokens left for a window's text once the instructions and the answer are set aside.
-    static func inputLimit(budget: TokenBudget, instructions: String, answer: Answer) async -> Int {
+    static func inputLimit(budget: TokenBudget, instructions: String, answer: AnswerLength) async -> Int {
         // Short instructions are prose, which the estimate never undercounts; only a long block is worth asking the model about.
         let fixed = instructions.utf8.count <= 1024 ? budget.estimate(instructions) : await budget.count(instructions)
         var limit = budget.tokens - fixed
         if case .asLongAsInput = answer {
-            limit = min(limit, (budget.contextTokens - fixed) / 2)
+            limit = min(limit, (budget.contextTokens - fixed) / 2, budget.maxAnswerTokens)
         }
         return max(1, limit)
     }

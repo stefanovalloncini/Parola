@@ -90,7 +90,9 @@ extension AppModel {
             work: { [weak self] in
                 guard let self else { throw CancellationError() }
                 let model = try await self.makeLanguageModel(for: .prompts, instructions: prompt.instructions)
-                let result = try await PromptRunner.run(prompt, on: transcript, model: model, budget: budget, features: features)
+                let result = try await PromptRunner.run(
+                    prompt, on: transcript, model: model, budget: budget, answer: .brief, features: features
+                )
                 return ActionItemParser.parse(result)
             },
             land: { [weak self] items, entryID in

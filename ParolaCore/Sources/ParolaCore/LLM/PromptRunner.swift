@@ -13,13 +13,14 @@ public enum PromptRunner {
     }
 
     /// Runs `prompt` over the transcript's `promptText`, speaker labels kept. A transcript too long for
-    /// `budget` is sent window by window, each small enough for an answer as long as itself, and the
-    /// answers are joined in order.
+    /// `budget` is sent window by window, each small enough for the answer `answer` expects (the prompt's
+    /// own by default), and the answers are joined in order.
     public static func run(
         _ prompt: Prompt,
         on transcript: Transcript,
         model: any LanguageModel,
         budget: TokenBudget,
+        answer: AnswerLength? = nil,
         features: FeatureSet = .resolve()
     ) async throws -> String {
         try features.require(.ai)
@@ -27,7 +28,7 @@ public enum PromptRunner {
             transcript,
             budget: budget,
             instructions: prompt.instructions,
-            answer: .asLongAsInput,
+            answer: answer ?? prompt.answerLength,
             line: promptLine(for:),
             render: { buildUserMessage(for: prompt, text: $0.promptText) }
         )
