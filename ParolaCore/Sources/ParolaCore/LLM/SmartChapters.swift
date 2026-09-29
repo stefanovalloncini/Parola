@@ -21,7 +21,7 @@ public enum SmartChapters {
         model: any LanguageModel,
         budget: TokenBudget
     ) async throws -> [Chapter] {
-        try await markers(for: transcript, model: model, budget: budget, ask: smartChaptersAsk).chapters
+        try await markers(for: transcript, model: model, budget: budget, wholeCount: "between 4 and 10", ask: smartChaptersAsk).chapters
     }
 
     struct Markers {
@@ -29,45 +29,59 @@ public enum SmartChapters {
         let chapters: [Chapter]
     }
 
+    /// What a chapter prompt asks for: where the first marker goes and how many markers to write.
+    struct Ask {
+        let firstMarker: String
+        let markers: String
+        let part: TranscriptWindows.Part?
+
+        static let widest = Ask(firstMarker: "99:59:59", markers: "between 99 and 99", part: .widest)
+    }
+
     static func markers(
         for transcript: Transcript,
         model: any LanguageModel,
         budget: TokenBudget,
-        ask: (_ firstMarker: String) -> String
+        wholeCount: String,
+        ask: (Ask) -> String
     ) async throws -> Markers {
-        let firstID = transcript.segments.first?.id
+        func prompt(_ window: Transcript, _ request: Ask) -> String {
+            ask(request) + "\n\nTranscript:\n" + TranscriptPromptContext.timestampedLines(for: window)
+        }
         let windows = await TranscriptWindows.split(
             transcript,
             budget: budget,
             instructions: LanguageModelFactory.defaultInstructions,
             line: TranscriptPromptContext.timestampedLine(for:),
-            render: { window in
-                let opensTranscript = window.segments.first?.id == firstID
-                let first = opensTranscript ? "00:00" : Timecode.format(window.segments.first?.start ?? 0)
-                return ask(first) + "\n\nTranscript:\n" + TranscriptPromptContext.timestampedLines(for: window)
-            }
+            render: { prompt($0, .widest) }
         )
         let cap = transcript.segments.map(\.end).max()
         guard windows.count > 1 else {
-            let response = try await model.respond(to: windows[0].text)
+            let response = try await model.respond(to: prompt(transcript, Ask(firstMarker: "00:00", markers: wholeCount, part: nil)))
             return Markers(responses: [response], chapters: parseResponse(response, maxSeconds: cap))
         }
         var responses: [String] = []
         var chapters: [Chapter] = []
-        for (index, window) in windows.enumerated() {
-            let response = try await model.respond(to: window.text)
-            responses.append(response)
+        for (index, (window, part)) in zip(windows, TranscriptWindows.parts(of: windows, in: transcript)).enumerated() {
             let from = index == 0 ? 0 : window.transcript.segments.first?.start ?? 0
+            let request = Ask(firstMarker: Timecode.format(from), markers: "\(part.chapters)", part: part)
+            let response = try await model.respond(to: prompt(window.transcript, request))
+            responses.append(response)
             let next = index + 1 < windows.count ? windows[index + 1].transcript.segments.first?.start : nil
             chapters += parseResponse(response, maxSeconds: cap).filter { chapter in
                 chapter.start >= from && next.map { chapter.start < $0 } ?? true
             }
         }
-        return Markers(responses: responses, chapters: SummaryService.mergeChapters(chapters))
+        let merged = SummaryService.mergeChapters(chapters)
+        return Markers(responses: responses, chapters: SummaryService.thinChapters(merged, end: cap ?? 0))
     }
 
-    private static func smartChaptersAsk(firstMarker: String) -> String {
-        "Read the transcript below and propose between 4 and 10 chapter markers that capture the major topic shifts. Output only the markers, one per line, in the form 'MM:SS Title' (or 'HH:MM:SS Title' for content over an hour). The first marker MUST start at \(firstMarker). Titles are 3 to 7 plain words — no bullets, no quotes, no commentary."
+    static func partNote(_ part: TranscriptWindows.Part?) -> String {
+        part.map { "This is part \($0.index) of \($0.count) of a longer transcript. " } ?? ""
+    }
+
+    private static func smartChaptersAsk(_ ask: Ask) -> String {
+        partNote(ask.part) + "Read the transcript below and propose \(ask.markers) chapter markers that capture the major topic shifts. Output only the markers, one per line, in the form 'MM:SS Title' (or 'HH:MM:SS Title' for content over an hour). The first marker MUST start at \(ask.firstMarker). Titles are 3 to 7 plain words — no bullets, no quotes, no commentary."
     }
 
     private static let timestampWrappers = CharacterSet(charactersIn: "*_[]()`")

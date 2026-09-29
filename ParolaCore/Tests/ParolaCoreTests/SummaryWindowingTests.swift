@@ -23,11 +23,19 @@ struct SummaryWindowingTests {
     }
 
     private func windowsOf(_ transcript: Transcript, promptTokens: Int) async -> [Transcript] {
+        await splitWindows(transcript, promptTokens: promptTokens).map(\.transcript)
+    }
+
+    private func splitWindows(_ transcript: Transcript, promptTokens: Int) async -> [TranscriptWindows.Window] {
         await SummaryService.windows(
             for: transcript,
             budget: budget(promptTokens: promptTokens),
             instructions: SummaryService.textInstructions(for: .default)
-        ).map(\.transcript)
+        )
+    }
+
+    private func fiveChapters(from start: Double, every step: Double) -> String {
+        (0..<5).map { "\(Timecode.format(start + Double($0) * step)) Topic \(Int(start + Double($0) * step))" }.joined(separator: "\n")
     }
 
     private func windowResponse(_ i: Int, start: Double) -> String {
@@ -63,7 +71,9 @@ struct SummaryWindowingTests {
     @Test("over budget summarises each window then reduces")
     func overBudgetMapReduce() async throws {
         let transcript = longTranscript()
-        let windows = await windowsOf(transcript, promptTokens: 200)
+        let split = await splitWindows(transcript, promptTokens: 200)
+        let windows = split.map(\.transcript)
+        let parts = TranscriptWindows.parts(of: split, in: transcript)
         #expect(windows.count == 4)
 
         var responses = windows.enumerated().map { i, window in
@@ -83,7 +93,8 @@ struct SummaryWindowingTests {
         let prompts = await model.receivedPrompts
         #expect(prompts.count == windows.count + 1)
         for (i, window) in windows.enumerated() {
-            #expect(prompts[i] == SummaryService.buildPrompt(for: window))
+            #expect(prompts[i] == SummaryService.buildPrompt(for: window, part: parts[i]))
+            #expect(prompts[i].hasPrefix("This is part \(i + 1) of 4 of a longer transcript."))
             #expect(prompts[i].contains("marker\(i) "))
             for other in 0..<windows.count where other != i {
                 #expect(!prompts[i].contains("marker\(other) "))
@@ -126,7 +137,7 @@ struct SummaryWindowingTests {
         )
         #expect(prompted.count == 4)
         #expect(prompted.flatMap(\.transcript.segments) == transcript.segments)
-        #expect(prompted.map(\.text) == prompted.map { SummaryService.buildPrompt(for: $0.transcript) })
+        #expect(prompted.map(\.text) == prompted.map { SummaryService.buildPrompt(for: $0.transcript, part: .widest) })
     }
 
     @Test("a failed window propagates and no reduce call happens")
@@ -189,6 +200,53 @@ struct SummaryWindowingTests {
         let summary = try await SummaryService(budget: budget(promptTokens: 200)).summarise(transcript, model: model)
 
         #expect(summary.actionItems == ["Send the deck", "Book the room", "Email the client", "Follow up next week"])
+    }
+
+    @Test("each window asks for its share of the chapters, and five a window still ends at ten")
+    func windowedChaptersStayBounded() async throws {
+        let transcript = longTranscript(segmentCount: 12)
+        let split = await splitWindows(transcript, promptTokens: 200)
+        let parts = TranscriptWindows.parts(of: split, in: transcript)
+        #expect(split.count == 12)
+        #expect(parts.map(\.chapters).reduce(0, +) >= 10)
+        #expect(parts.allSatisfy { $0.chapters >= 1 })
+
+        var responses = split.enumerated().map { i, window in
+            "SUMMARY:\nWindow \(i).\n\nCHAPTERS:\n" + fiveChapters(from: window.transcript.segments[0].start, every: 50)
+        }
+        responses.append("SUMMARY:\nAll of it.")
+        let model = MockLanguageModel(scriptedResponses: responses)
+
+        let summary = try await SummaryService(budget: budget(promptTokens: 200)).summarise(transcript, model: model)
+
+        let prompts = await model.receivedPrompts
+        #expect(prompts[0].hasPrefix("This is part 1 of 12 of a longer transcript. Mark \(parts[0].chapters) chapter"))
+        #expect(summary.chapters.count == 10)
+        #expect(summary.chapters.first?.start == 0)
+        #expect(summary.chapters.map(\.start) == summary.chapters.map(\.start).sorted())
+        let firstHalf = summary.chapters.filter { $0.start < 1800 }.count
+        #expect((4...6).contains(firstHalf))
+    }
+
+    @Test("thinning drops the chapter whose neighbours sit closest, never the first")
+    func thinningKeepsTheTimelineEven() {
+        let chapters = [0, 10, 20, 600, 1200, 1210].map { Chapter(title: "At \($0)", start: Double($0)) }
+        let thinned = SummaryService.thinChapters(chapters, to: 3, end: 1800)
+        #expect(thinned.map(\.start) == [0, 600, 1200])
+        #expect(SummaryService.thinChapters(chapters, to: 10, end: 1800) == chapters)
+    }
+
+    @Test("windowed smart chapters ask per part and stay bounded")
+    func windowedSmartChaptersStayBounded() async throws {
+        let transcript = longTranscript(segmentCount: 12)
+        let responses = (0..<12).map { fiveChapters(from: Double($0) * 300, every: 50) }
+        let model = MockLanguageModel(scriptedResponses: responses)
+        let chapters = try await SmartChapters.generate(for: transcript, model: model, budget: TokenBudget(tokens: 300))
+        let prompts = await model.receivedPrompts
+        #expect(prompts.count > 1)
+        #expect(prompts[1].hasPrefix("This is part 2 of \(prompts.count) of a longer transcript. Read the transcript below and propose"))
+        #expect(chapters.count == 10)
+        #expect(chapters.first?.start == 0)
     }
 
     @Test("merged chapters drop consecutive duplicate titles but keep repeats apart")

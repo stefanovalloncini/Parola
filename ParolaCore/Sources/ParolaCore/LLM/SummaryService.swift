@@ -85,17 +85,21 @@ public actor SummaryService {
     ) async throws -> Summary {
         let windows = await SummaryService.windows(for: transcript, budget: budget, instructions: instructions, options: options)
         guard windows.count > 1 else {
-            return try await respond(windows[0].text)
+            return try await respond(SummaryService.buildPrompt(for: transcript, options: options))
         }
-        var parts: [Summary] = []
-        for window in windows {
-            parts.append(try await respond(window.text))
+        let parts = TranscriptWindows.parts(of: windows, in: transcript)
+        var summaries: [Summary] = []
+        for (window, part) in zip(windows, parts) {
+            summaries.append(try await respond(SummaryService.buildPrompt(for: window.transcript, options: options, part: part)))
         }
-        let reduced = try await reduce(parts.map(\.text), instructions: instructions, respond: respond)
+        let reduced = try await reduce(summaries.map(\.text), instructions: instructions, respond: respond)
         return Summary(
             text: reduced.text,
-            chapters: SummaryService.mergeChapters(parts.flatMap(\.chapters)),
-            actionItems: SummaryService.mergeActionItems(parts.flatMap(\.actionItems) + reduced.actionItems)
+            chapters: SummaryService.thinChapters(
+                SummaryService.mergeChapters(summaries.flatMap(\.chapters)),
+                end: transcript.segments.map(\.end).max() ?? 0
+            ),
+            actionItems: SummaryService.mergeActionItems(summaries.flatMap(\.actionItems) + reduced.actionItems)
         )
     }
 
@@ -233,8 +237,9 @@ public actor SummaryService {
 
     static let promptHeader = "Transcript follows. Each line is prefixed with its timestamp.\n\n"
 
-    static func buildPrompt(for transcript: Transcript, options: SummaryOptions = .default) -> String {
-        promptHeader + transcript.segments.compactMap { line(for: $0, options: options) }.joined()
+    static func buildPrompt(for transcript: Transcript, options: SummaryOptions = .default, part: TranscriptWindows.Part? = nil) -> String {
+        let note = part.map { "This is part \($0.index) of \($0.count) of a longer transcript. Mark \($0.chapters) chapter\($0.chapters == 1 ? "" : "s") for this part only.\n" } ?? ""
+        return note + promptHeader + transcript.segments.compactMap { line(for: $0, options: options) }.joined()
     }
 
     static func windows(
@@ -248,7 +253,7 @@ public actor SummaryService {
             budget: budget,
             instructions: instructions,
             line: { line(for: $0, options: options) },
-            render: { buildPrompt(for: $0, options: options) }
+            render: { buildPrompt(for: $0, options: options, part: .widest) }
         )
     }
 
@@ -271,6 +276,25 @@ public actor SummaryService {
             out.append(chapter)
         }
         return out
+    }
+
+    /// Drops the chapter whose neighbours sit closest until `limit` are left, so the rest split the timeline evenly.
+    static func thinChapters(_ chapters: [Chapter], to limit: Int = TranscriptWindows.chapterLimit, end: Double) -> [Chapter] {
+        var kept = chapters.sorted { $0.start < $1.start }
+        while kept.count > max(1, limit) {
+            var drop = 1
+            var narrowest = Double.infinity
+            for index in 1..<kept.count {
+                let after = index + 1 < kept.count ? kept[index + 1].start : max(end, kept[index].start)
+                let span = after - kept[index - 1].start
+                if span < narrowest {
+                    narrowest = span
+                    drop = index
+                }
+            }
+            kept.remove(at: drop)
+        }
+        return kept
     }
 
     static func mergeActionItems(_ items: [String]) -> [String] {

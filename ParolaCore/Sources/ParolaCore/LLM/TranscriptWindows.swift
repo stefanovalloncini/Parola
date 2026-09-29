@@ -14,6 +14,30 @@ enum TranscriptWindows {
         let text: String
     }
 
+    /// Where a window sits among the others and how many of the chapters it should mark.
+    struct Part: Equatable, Sendable {
+        let index: Int
+        let count: Int
+        let chapters: Int
+
+        /// The longest a part's note can read, so a window is measured with room for it.
+        static let widest = Part(index: 99, count: 99, chapters: 99)
+    }
+
+    /// The most chapters a transcript gets, however many windows it was read in.
+    static let chapterLimit = 10
+
+    /// Each window's share of `chapterLimit`, by the stretch of the recording it covers.
+    static func parts(of windows: [Window], in transcript: Transcript) -> [Part] {
+        let end = transcript.segments.map(\.end).max() ?? 0
+        return windows.indices.map { index in
+            let start = index == 0 ? 0 : windows[index].transcript.segments.first?.start ?? 0
+            let stop = index + 1 < windows.count ? windows[index + 1].transcript.segments.first?.start ?? end : end
+            let share = end > 0 ? (Double(chapterLimit) * (stop - start) / end).rounded() : 1
+            return Part(index: index + 1, count: windows.count, chapters: max(1, Int(share)))
+        }
+    }
+
     /// `line` is one segment's share of the text, `render` a window's whole text; never returns an empty list.
     static func split(
         _ transcript: Transcript,
