@@ -182,7 +182,7 @@ extension AppModel {
         if let screen = unsavedBatchJobOnScreen, screen.jobID == jobID {
             unsavedBatchJobOnScreen = nil
             if screen.install == derivedArtifactsGeneration, selectedEntryID == nil {
-                selectedEntryID = entryID
+                selectLanded(entryID)
                 if edited { persistCurrentTranscriptIfLoaded() }
                 return
             }

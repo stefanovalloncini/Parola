@@ -138,6 +138,13 @@ extension AppModel {
     }
 
     /// One assignment for an entry that just landed: its row patched, or inserted where the sort puts it, with no rescan.
+    /// The unsaved transcript on screen has just been saved as `entryID`: it takes the selection, and
+    /// the AI runs asked for it before the save follow it into the entry.
+    func selectLanded(_ entryID: LibraryEntry.ID) {
+        selectedEntryID = entryID
+        aiJobs.adoptUnsaved(as: entryID)
+    }
+
     func landLibraryEntry(_ entry: LibraryEntry) {
         var entries = libraryEntries
         if let index = entries.firstIndex(where: { $0.id == entry.id }) {

@@ -1860,8 +1860,7 @@ final class AppModel {
                 // library.add copies media for seconds; if the user navigated meanwhile,
                 // taking the selection would repoint their next edits at this new entry.
                 if activate, loadEntryGeneration == navigationGeneration, selectedEntryID == nil {
-                    selectedEntryID = entry.id
-                    aiJobs.adoptUnsaved(as: entry.id)
+                    selectLanded(entry.id)
                 }
                 Self.landingSignposter.endInterval("entry", landing)
             } catch {

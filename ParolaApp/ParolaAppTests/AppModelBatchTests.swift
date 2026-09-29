@@ -441,6 +441,40 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.first?.segmentCount == 1)
     }
 
+    @Test("a summary asked for on an unsaved batch job follows it into its entry")
+    func summaryOnUnsavedBatchJobLandsInTheEntry() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportPresetIDs = []
+        model.autoExportRules = []
+        model.cardMetadataOperation = { _ in nil }
+        let source = scratch.appendingPathComponent("standup.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [job]
+        model.selectedBatchJobID = job.id
+        let (release, releaser) = AsyncStream<Void>.makeStream()
+        model.summariseOperation = { _, _ in
+            for await _ in release { break }
+            return Summary(text: "batch summary")
+        }
+
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+        #expect(model.selectedEntryID == nil)
+        model.summariseTranscript()
+        #expect(model.isSummarising)
+
+        let entryID = try #require(await Self.waitForEntryID(of: job.id, in: model))
+        #expect(model.selectedEntryID == entryID)
+        #expect(model.isSummarising)
+        releaser.finish()
+
+        #expect(await Self.waitUntil { !model.isSummarising && model.transcript?.summary != nil })
+        #expect(model.transcript?.summary?.text == "batch summary")
+        #expect(try await model.library.load(entryID).document.transcript.summary?.text == "batch summary")
+    }
+
     private static func waitForEntryID(
         of jobID: BatchJob.ID, in model: AppModel, timeout: TimeInterval = 3
     ) async -> LibraryEntry.ID? {
