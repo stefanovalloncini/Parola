@@ -36,7 +36,7 @@ actor AppleSpeechTranscriber: Transcriber {
         handlers: TranscribeHandlers
     ) async throws -> Transcript {
         guard let modelName = loadedModel else {
-            throw ParolaError.transcriptionFailed("Apple Speech engine not loaded")
+            throw ParolaError.engineLoadFailed("Apple Speech engine not loaded")
         }
         if options.task == .translate {
             throw ParolaError.unsupportedForEngine("Apple Speech does not support translation")

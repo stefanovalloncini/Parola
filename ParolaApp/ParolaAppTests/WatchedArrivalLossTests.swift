@@ -553,6 +553,46 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a speaker model that can't load stops the lane with both files waiting; a file that won't decode leaves alone")
+        func engineLoadFailurePausesDecodeFailureDrops() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .engineLoadFailed, message: "SpeakerKit init failed: offline")
+                ))
+                let folder = try makeFolder("engine-load")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let model = makeModel(library: makeTempLibraryURL("loss-engine-load"), defaults: temporaryDefaults())
+                let handedBack = HandedBack()
+                model.offerWatchedFileAgain = { handedBack.urls.append($0) }
+                _ = try await openOwnEntry(model, in: folder)
+                let files = [try makeWAV("First", in: folder), try makeWAV("Second", in: folder, seconds: 0.4)]
+
+                arrive(model, files)
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLanePausedAt != nil })
+                #expect(model.watchedArrivals.map(\.url) == files)
+                #expect(handedBack.urls.isEmpty)
+
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "not audio")
+                ))
+                await model.unloadTranscriptionSession()
+                model.resumeWatchedLane()
+
+                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+                #expect(handedBack.urls == files)
+            }
+        }
+
+        @Test("what stops the lane: engine, model and network failures, never a file's own")
+        func whatStopsTheLane() {
+            #expect(AppModel.stopsWatchedLane(ParolaError.engineLoadFailed("model load failed")))
+            #expect(AppModel.stopsWatchedLane(ParolaError.modelDownloadFailed("m", underlying: "offline")))
+            #expect(AppModel.stopsWatchedLane(URLError(.notConnectedToInternet)))
+            #expect(!AppModel.stopsWatchedLane(ParolaError.transcriptionFailed("WhisperKit returned no results")))
+            #expect(!AppModel.stopsWatchedLane(ParolaError.unreadableFile(name: "a.wav", reason: nil)))
+        }
+
         @Test("a settings reset leaves the files waiting in the line")
         func settingsResetKeepsTheLine() async throws {
             let folder = try makeFolder("reset")

@@ -44,7 +44,7 @@ actor WhisperKitTranscriber: Transcriber {
                 .engineWhisperKit, "model \(ModelToken(model)) failed to load",
                 [.error: .error(error)]
             )
-            throw ParolaError.transcriptionFailed("model load failed: \(error.localizedDescription)")
+            throw ParolaError.engineLoadFailed("model load failed: \(error.localizedDescription)")
         }
     }
 
@@ -86,7 +86,7 @@ actor WhisperKitTranscriber: Transcriber {
     ) async throws -> Transcript {
         guard let kit = whisperKit, let modelName = loadedModel else {
             ParolaLog.fault(.engineWhisperKit, "transcribe called with no model loaded")
-            throw ParolaError.transcriptionFailed("model not loaded")
+            throw ParolaError.engineLoadFailed("model not loaded")
         }
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
         defer { signposter.endInterval("transcribe", interval) }

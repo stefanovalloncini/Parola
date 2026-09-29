@@ -348,7 +348,7 @@ extension AppModel {
         if offlineMessage(for: error) != nil { return true }
         switch error as? ParolaError {
         case .modelNotFound, .unknownModel, .policyRestricted, .featureDisabled, .modelDownloadFailed,
-             .modelChecksumMismatch, .engineNotRegistered, .unsupportedForEngine, .invalidLanguage:
+             .modelChecksumMismatch, .engineLoadFailed, .engineNotRegistered, .unsupportedForEngine, .invalidLanguage:
             return true
         default:
             return false

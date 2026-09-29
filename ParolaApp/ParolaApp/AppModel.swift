@@ -2773,6 +2773,9 @@ final class AppModel {
         if case ParolaError.transcriptionFailed(let reason) = error {
             return String(localized: "Transcription failed: \(reason)", bundle: bundle)
         }
+        if case ParolaError.engineLoadFailed(let reason) = error {
+            return String(localized: "Transcription failed: \(reason)", bundle: bundle)
+        }
         if case ParolaError.linkDownloadFailed(let failure) = error {
             return linkFailureMessage(failure, bundle: bundle)
         }

@@ -21,11 +21,11 @@ actor DiarizationService {
             do {
                 speakerKit = try await SpeakerKit(PyannoteConfig())
             } catch {
-                throw ParolaError.transcriptionFailed("SpeakerKit init failed: \(error.localizedDescription)")
+                throw ParolaError.engineLoadFailed("SpeakerKit init failed: \(error.localizedDescription)")
             }
         }
         guard let kit = speakerKit else {
-            throw ParolaError.transcriptionFailed("SpeakerKit unavailable")
+            throw ParolaError.engineLoadFailed("SpeakerKit unavailable")
         }
 
         let audioArray: [Float]

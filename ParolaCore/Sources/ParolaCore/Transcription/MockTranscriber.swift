@@ -47,6 +47,7 @@ public struct TranscriptSegmentSeed: Sendable {
 public struct MockTranscriberFailure: Sendable {
     public enum Code: String, Sendable {
         case transcriptionFailed
+        case engineLoadFailed
         case modelChecksumMismatch
         case unsupportedForEngine
         case engineNotRegistered
@@ -64,6 +65,8 @@ public struct MockTranscriberFailure: Sendable {
         switch code {
         case .transcriptionFailed:
             return ParolaError.transcriptionFailed(message)
+        case .engineLoadFailed:
+            return ParolaError.engineLoadFailed(message)
         case .modelChecksumMismatch:
             return ParolaError.modelChecksumMismatch(file: message, expected: "", got: "")
         case .unsupportedForEngine:

@@ -64,7 +64,7 @@ actor ParakeetTranscriber: Transcriber {
                 .engineParakeet, "model \(ModelToken(model)) failed to load",
                 [.error: .error(error)]
             )
-            throw ParolaError.transcriptionFailed("Parakeet load failed: \(error.localizedDescription)")
+            throw ParolaError.engineLoadFailed("Parakeet load failed: \(error.localizedDescription)")
         }
     }
 
@@ -75,7 +75,7 @@ actor ParakeetTranscriber: Transcriber {
     ) async throws -> Transcript {
         guard let asr = manager, let modelName = loadedModel else {
             ParolaLog.fault(.engineParakeet, "transcribe called with no model loaded")
-            throw ParolaError.transcriptionFailed("Parakeet model not loaded")
+            throw ParolaError.engineLoadFailed("Parakeet model not loaded")
         }
         if let lang = options.language, !Self.accepts(language: lang, forModel: modelName) {
             ParolaLog.notice(.engineParakeet, "rejected language \(LanguageToken(lang))")
