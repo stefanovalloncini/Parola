@@ -140,75 +140,66 @@ struct SettingsResetServiceTests {
 
     private let scope = SettingsPaneScope.customization
 
-    private func clearScopeKeys() {
-        let defaults = UserDefaults.standard
-        for key in scope.defaultsKeys {
-            defaults.removeObject(forKey: key)
-        }
+    // The test host's standard domain is the real app's, which the host's own model and any other Parola process write.
+    private func withIsolatedDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
+        let previous = DefaultsStore.current
+        let suite = temporaryDefaults("test-settings-reset-")
+        DefaultsStore.current = suite
+        defer { DefaultsStore.current = previous }
+        try body(suite)
     }
 
     @Test("reset removes every defaults key for the scope")
     func resetRemovesScopeKeys() {
-        let defaults = UserDefaults.standard
-        clearScopeKeys()
-        defer { clearScopeKeys() }
+        withIsolatedDefaults { defaults in
+            for key in scope.defaultsKeys {
+                defaults.set("sentinel", forKey: key)
+            }
+            for key in scope.defaultsKeys {
+                #expect(defaults.object(forKey: key) != nil)
+            }
 
-        for key in scope.defaultsKeys {
-            defaults.set("sentinel", forKey: key)
-        }
-        for key in scope.defaultsKeys {
-            #expect(defaults.object(forKey: key) != nil)
-        }
+            SettingsResetService.reset(scope: scope)
 
-        SettingsResetService.reset(scope: scope)
-
-        for key in scope.defaultsKeys {
-            #expect(defaults.object(forKey: key) == nil)
+            for key in scope.defaultsKeys {
+                #expect(defaults.object(forKey: key) == nil)
+            }
         }
     }
 
     @Test("reset leaves another pane's keys untouched")
     func resetIsScoped() {
-        let defaults = UserDefaults.standard
-        let otherKey = "test-reset-isolation-\(UUID().uuidString)"
-        clearScopeKeys()
-        defer {
-            clearScopeKeys()
-            defaults.removeObject(forKey: otherKey)
+        withIsolatedDefaults { defaults in
+            let otherKey = "test-reset-isolation"
+            defaults.set("keep", forKey: otherKey)
+            for key in scope.defaultsKeys {
+                defaults.set("clear", forKey: key)
+            }
+
+            SettingsResetService.reset(scope: scope)
+
+            #expect(defaults.string(forKey: otherKey) == "keep")
         }
-
-        defaults.set("keep", forKey: otherKey)
-        for key in scope.defaultsKeys {
-            defaults.set("clear", forKey: key)
-        }
-
-        SettingsResetService.reset(scope: scope)
-
-        #expect(defaults.string(forKey: otherKey) == "keep")
     }
 
     @Test("reset-all clears every scoped key")
     func resetAllClearsEveryScopedKey() {
-        let defaults = UserDefaults.standard
-        let keys = SettingsPaneScope.allCases.flatMap(\.defaultsKeys)
-        defer { for key in keys { defaults.removeObject(forKey: key) } }
+        withIsolatedDefaults { defaults in
+            let keys = SettingsPaneScope.allCases.flatMap(\.defaultsKeys)
+            for key in keys {
+                defaults.set("sentinel", forKey: key)
+            }
 
-        for key in keys {
-            defaults.set("sentinel", forKey: key)
-        }
+            SettingsResetService.resetAll()
 
-        SettingsResetService.resetAll()
-
-        for key in keys {
-            #expect(defaults.object(forKey: key) == nil, "\(key) survived reset-all")
+            for key in keys {
+                #expect(defaults.object(forKey: key) == nil, "\(key) survived reset-all")
+            }
         }
     }
 
     @Test("reset posts a notification carrying the scope")
     func resetPostsNotification() async {
-        clearScopeKeys()
-        defer { clearScopeKeys() }
-
         await confirmation("scope notification fires") { confirmed in
             let token = NotificationCenter.default.addObserver(
                 forName: .parolaSettingsReset,
@@ -221,7 +212,7 @@ struct SettingsResetServiceTests {
             }
             defer { NotificationCenter.default.removeObserver(token) }
 
-            SettingsResetService.reset(scope: scope)
+            withIsolatedDefaults { _ in SettingsResetService.reset(scope: scope) }
         }
     }
 }
