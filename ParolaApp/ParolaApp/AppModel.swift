@@ -215,6 +215,8 @@ final class AppModel {
     @ObservationIgnored private(set) var takeLevels: TakeLevelHistory?
     private(set) var takeLevelTick = 0
     @ObservationIgnored private var takeSampler: Task<Void, Never>?
+    /// The take whose meter, trace and sampler are up, so a late clear from an older take leaves them alone.
+    @ObservationIgnored private var takeReadoutsOwner: Int?
     /// The route the running take took; the recording pane reads it.
     var liveTakeIsStreaming: Bool { recording?.isStreaming ?? false }
     /// When the take in progress began capturing; the pane, the toolbar and the Dock all count from it.
@@ -3394,6 +3396,7 @@ final class AppModel {
     }
 
     private func showTakeLevels(_ meter: LevelMeter, take: TakeContext) {
+        takeReadoutsOwner = take.id
         recordingLevelTrace = LevelTrace(capacity: Self.takeLevelHistoryCapacity)
         recordingLevelMeter = meter
         startTakeSampler(meter: meter, take: take)
@@ -3421,9 +3424,16 @@ final class AppModel {
     }
 
     private func clearTakeReadouts() {
+        takeReadoutsOwner = nil
         stopTakeSampler()
         if recordingLevelMeter != nil { recordingLevelMeter = nil }
         recordingLevelTrace = nil
+    }
+
+    /// A take's own readouts only: a clear that lands after the next take showed its levels leaves them alone.
+    private func clearTakeReadouts(of takeID: Int?) {
+        guard takeReadoutsOwner == takeID else { return }
+        clearTakeReadouts()
     }
 
     /// The one reader of the take's meter peak, which every read resets; the first buffer it finds starts the take's clock.
@@ -3844,18 +3854,18 @@ final class AppModel {
             let title = Self.liveRecordingTitle(category: category, endedAt: Date())
             do {
                 let url = try await source.prepare()
-                clearTakeReadouts()
+                clearTakeReadouts(of: take?.id)
                 await transcribeRecordedTake(
                     url: url, title: title, source: takeSource, category: category, replacing: recovery, take: take?.id
                 )
             } catch let cut as CaptureInterrupted {
-                clearTakeReadouts()
+                clearTakeReadouts(of: take?.id)
                 liveRecordingAudioURL = nil
                 await keepCutShortTake(
                     cut, title: title, source: takeSource, category: category, recovery: recovery, take: take?.id
                 )
             } catch {
-                clearTakeReadouts()
+                clearTakeReadouts(of: take?.id)
                 if let recovery { endRecovery(recovery) }
                 liveRecordingAudioURL = nil
                 let message = Self.transcriptionFailureMessage(for: error)
@@ -4278,7 +4288,7 @@ final class AppModel {
         } catch {
             prepared = nil
         }
-        clearTakeReadouts()
+        clearTakeReadouts(of: take?.id)
         updateSession(of: take?.id) { $0.land(entryID: nil) }
         phase = .idle
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
