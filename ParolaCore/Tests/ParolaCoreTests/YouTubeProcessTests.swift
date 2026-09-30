@@ -11,7 +11,7 @@ private func fakeYtDlp(_ body: String) throws -> URL {
     return url
 }
 
-/// A freshly written script can take a second or two to start under a loaded test run, so no limit here is shorter than three.
+/// Limits for runs on a `TestClock`, which moves only when a test advances it.
 private func tight(
     startup: Duration = .seconds(10), quiet: Duration = .seconds(5), processing: Duration = .seconds(5)
 ) -> YtDlpRunner.ProgressLimits {
@@ -25,6 +25,66 @@ private func tight(
 
 private func isAlive(_ pid: Int32) -> Bool {
     kill(pid, 0) == 0
+}
+
+/// The pid a fake wrote to `file`, or nil, with an issue, when it never wrote one.
+private func childPID(in file: URL, sourceLocation: SourceLocation = #_sourceLocation) async -> Int32? {
+    var pid: Int32?
+    await pollUntil("the child to write its pid", sourceLocation: sourceLocation) {
+        pid = (try? String(contentsOf: file, encoding: .utf8)).flatMap {
+            Int32($0.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return pid != nil
+    }
+    return pid
+}
+
+private func expectEnded(_ pid: Int32?, sourceLocation: SourceLocation = #_sourceLocation) async {
+    guard let pid else { return }
+    await pollUntil("pid \(pid) to be gone", sourceLocation: sourceLocation) { !isAlive(pid) }
+}
+
+/// Points where a fake yt-dlp waits for the test, so the test clock moves only between the lines it chooses.
+private struct Steps {
+    let folder: URL
+
+    init() throws {
+        folder = FileManager.default.temporaryDirectory.appendingPathComponent("parola-steps-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    }
+
+    /// Shell that holds the script until `open(step)`; `step` may be a shell expression such as `$i`.
+    func hold(_ step: String) -> String {
+        "until [ -e '\(folder.path)/go'\"\(step)\" ]; do sleep 0.05; done"
+    }
+
+    func open(_ step: Int) {
+        FileManager.default.createFile(atPath: folder.appendingPathComponent("go\(step)").path, contents: nil)
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: folder)
+    }
+}
+
+/// A download on a test clock nobody advances, so no limit can end it; nil, with an issue, if it never finishes.
+private func fetched(
+    _ source: YouTubeAudioSource,
+    sourceLocation: SourceLocation = #_sourceLocation,
+    progress: @escaping @Sendable (LinkFetchEvent) -> Void = { _ in }
+) async throws -> FetchedMedia? {
+    try await GuardedTask { try await source.fetch(progress: progress) }
+        .value("the download to finish", sourceLocation: sourceLocation)
+}
+
+private func expectCancelled<T>(_ run: GuardedTask<T>, sourceLocation: SourceLocation = #_sourceLocation) async {
+    do {
+        _ = try await run.value("the cancelled run to return", sourceLocation: sourceLocation)
+        Issue.record("expected the run to be cancelled", sourceLocation: sourceLocation)
+    } catch is CancellationError {
+    } catch {
+        Issue.record("expected a cancellation, got \(error)", sourceLocation: sourceLocation)
+    }
 }
 
 private func linkFailure(_ body: () async throws -> Void) async -> LinkDownloadFailure? {
@@ -42,129 +102,190 @@ private func linkFailure(_ body: () async throws -> Void) async -> LinkDownloadF
 struct YouTubeProcessTests {
     @Test("a run that exits on its own comes back with its status and its lines")
     func waitsForNaturalExit() async throws {
-        let output = try await YtDlpRunner.run(
-            ytDlpPath: "/bin/sh", arguments: ["-c", "echo one; echo two >&2; exit 3"], run: .download, watch: .wallClock(seconds: 30)
-        )
-        #expect(output.status == 3)
-        #expect(output.stdout == ["one"])
-        #expect(output.stderr == "two")
+        let clock = TestClock()
+        let run = GuardedTask {
+            try await YtDlpRunner.run(
+                ytDlpPath: "/bin/sh", arguments: ["-c", "echo one; echo two >&2; exit 3"], run: .download,
+                watch: .wallClock(seconds: 30), clock: clock
+            )
+        }
+        let output = try await run.value("the run to exit on its own")
+        #expect(output?.status == 3)
+        #expect(output?.stdout == ["one"])
+        #expect(output?.stderr == "two")
     }
 
     @Test("a run past its wall clock is ended and fails as a timeout")
     func wallClockOverrun() async throws {
         let pidFile = FileManager.default.temporaryDirectory.appendingPathComponent("parola-pid-\(UUID().uuidString)")
-        do {
-            _ = try await YtDlpRunner.run(
+        defer { try? FileManager.default.removeItem(at: pidFile) }
+        let clock = TestClock()
+        let run = GuardedTask {
+            try await YtDlpRunner.run(
                 ytDlpPath: "/bin/sh", arguments: ["-c", "echo $$ > '\(pidFile.path)'; exec sleep 30"],
-                run: .download, watch: .wallClock(seconds: 3)
+                run: .download, watch: .wallClock(seconds: 3), clock: clock
             )
-            Issue.record("expected the run to time out")
-        } catch ParolaError.linkDownloadFailed(let failure) {
-            #expect(failure.reason == .timedOut(seconds: 3))
         }
-        let pid = try #require(Int32(String(contentsOf: pidFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
-        #expect(!isAlive(pid))
+        let pid = await childPID(in: pidFile)
+        await clock.waitForSleeper()
+        clock.advance(by: .seconds(3))
+
+        let failure = await linkFailure { _ = try await run.value("the run to end at its wall clock") }
+        #expect(failure?.reason == .timedOut(seconds: 3))
+        await expectEnded(pid)
     }
 
     @Test("output well past a pipe's buffer is read as it comes, without blocking the producer")
     func largeOutput() async throws {
-        let output = try await YtDlpRunner.run(
-            ytDlpPath: "/bin/sh", arguments: ["-c", "yes hello | head -n 20000"], run: .download, watch: .wallClock(seconds: 30)
-        )
-        #expect(output.stdout.count == 20000)
-        #expect(output.status == 0)
+        let clock = TestClock()
+        let run = GuardedTask {
+            try await YtDlpRunner.run(
+                ytDlpPath: "/bin/sh", arguments: ["-c", "yes hello | head -n 20000"], run: .download,
+                watch: .wallClock(seconds: 30), clock: clock
+            )
+        }
+        let output = try await run.value("the run to print everything and exit")
+        #expect(output?.stdout.count == 20000)
+        #expect(output?.status == 0)
     }
 
     @Test("a download that keeps printing progress runs past the quiet limit")
     func progressKeepsTheRunAlive() async throws {
+        let steps = try Steps()
+        defer { steps.remove() }
         let fake = try fakeYtDlp("""
-            for i in 1 2 3 4 5 6 7 8; do echo "[PAROLA_P] $((i * 100)) 800"; sleep 0.5; done
+            for i in 1 2 3 4; do echo "[PAROLA_P] $((i * 100)) 400"; \(steps.hold("$i")); done
             echo "[PAROLA_FILE] /tmp/audio.m4a"
             """)
         defer { try? FileManager.default.removeItem(at: fake) }
+        let clock = TestClock()
+        let seen = Awaitable<[YtDlpLine]>([])
+        let run = GuardedTask {
+            try await YtDlpRunner.run(
+                ytDlpPath: fake.path, arguments: [], run: .download, watch: .progress(tight(quiet: .seconds(3))), clock: clock
+            ) { line in seen.update { $0.append(line) } }
+        }
 
-        let output = try await YtDlpRunner.run(
-            ytDlpPath: fake.path, arguments: [], run: .download, watch: .progress(tight(quiet: .seconds(3)))
-        )
+        for step in 1...4 {
+            await seen.wait(until: { $0.count >= step }, "progress line \(step)")
+            clock.advance(by: .seconds(2))
+            steps.open(step)
+        }
+        let output = try await run.value("the download to finish")
 
-        #expect(output.status == 0)
-        #expect(output.filePath == "/tmp/audio.m4a")
-        #expect(output.stdout.isEmpty)
+        #expect(output?.status == 0)
+        #expect(output?.filePath == "/tmp/audio.m4a")
+        #expect(output?.stdout.isEmpty == true)
     }
 
     @Test("a download that goes quiet is ended as stalled, however long it ran before")
     func quietDownloadStalls() async throws {
         let pidFile = FileManager.default.temporaryDirectory.appendingPathComponent("parola-pid-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: pidFile) }
+        let steps = try Steps()
+        defer { steps.remove() }
         let fake = try fakeYtDlp("""
             echo $$ > '\(pidFile.path)'
-            for i in 1 2 3 4 5; do echo "[PAROLA_P] $i 10"; sleep 0.5; done
+            for i in 1 2 3 4 5; do echo "[PAROLA_P] $i 10"; \(steps.hold("$i")); done
             exec sleep 30
             """)
         defer { try? FileManager.default.removeItem(at: fake) }
-
-        do {
-            _ = try await YtDlpRunner.run(
-                ytDlpPath: fake.path, arguments: [], run: .download, watch: .progress(tight(quiet: .seconds(3)))
-            )
-            Issue.record("expected the stall to end the run")
-        } catch ParolaError.linkDownloadFailed(let failure) {
-            #expect(failure.reason == .stalled(seconds: 3))
+        let clock = TestClock()
+        let seen = Awaitable<[YtDlpLine]>([])
+        let run = GuardedTask {
+            try await YtDlpRunner.run(
+                ytDlpPath: fake.path, arguments: [], run: .download, watch: .progress(tight(quiet: .seconds(3))), clock: clock
+            ) { line in seen.update { $0.append(line) } }
         }
-        let pid = try #require(Int32(String(contentsOf: pidFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
-        #expect(!isAlive(pid))
+        let pid = await childPID(in: pidFile)
+
+        for step in 1...5 {
+            await seen.wait(until: { $0.count >= step }, "progress line \(step)")
+            clock.advance(by: .seconds(2))
+            steps.open(step)
+        }
+        clock.advance(by: .seconds(3))
+
+        let failure = await linkFailure { _ = try await run.value("the quiet download to be ended") }
+        #expect(failure?.reason == .stalled(seconds: 3))
+        await expectEnded(pid)
     }
 
     @Test("a silent extraction longer than the quiet limit is still within the startup allowance")
     func silentStartupSurvives() async throws {
+        let steps = try Steps()
+        defer { steps.remove() }
         let fake = try fakeYtDlp("""
-            sleep 5
+            \(steps.hold("1"))
             echo '[PAROLA_META] {"title": "Slow page", "duration": 12}'
             echo "[PAROLA_P] 10 10"
             echo "[PAROLA_FILE] /tmp/audio.m4a"
             """)
         defer { try? FileManager.default.removeItem(at: fake) }
+        let clock = TestClock()
+        let run = GuardedTask {
+            try await YtDlpRunner.run(
+                ytDlpPath: fake.path, arguments: [], run: .download,
+                watch: .progress(tight(startup: .seconds(15), quiet: .seconds(3))), clock: clock
+            )
+        }
 
-        let output = try await YtDlpRunner.run(
-            ytDlpPath: fake.path, arguments: [], run: .download,
-            watch: .progress(tight(startup: .seconds(15), quiet: .seconds(3)))
-        )
+        await clock.waitForSleeper()
+        clock.advance(by: .seconds(5))
+        steps.open(1)
+        let output = try await run.value("the download to finish after its silent start")
 
-        #expect(output.status == 0)
-        #expect(output.metadata?.title == "Slow page")
+        #expect(output?.status == 0)
+        #expect(output?.metadata?.title == "Slow page")
     }
 
     @Test("a run that never gets past extraction is ended once the startup allowance runs out")
     func silentStartupStalls() async throws {
         let fake = try fakeYtDlp("exec sleep 30")
         defer { try? FileManager.default.removeItem(at: fake) }
-
-        let failure = await linkFailure {
-            _ = try await YtDlpRunner.run(
+        let clock = TestClock()
+        let run = GuardedTask {
+            try await YtDlpRunner.run(
                 ytDlpPath: fake.path, arguments: [], run: .download,
-                watch: .progress(tight(startup: .seconds(3), quiet: .seconds(1)))
+                watch: .progress(tight(startup: .seconds(3), quiet: .seconds(1))), clock: clock
             )
         }
+
+        await clock.waitForSleeper()
+        clock.advance(by: .seconds(3))
+
+        let failure = await linkFailure { _ = try await run.value("the silent run to be ended") }
         #expect(failure?.reason == .stalled(seconds: 3))
     }
 
     @Test("post-processing runs on its own budget, not the quiet limit")
     func processingHasItsOwnBudget() async throws {
+        let steps = try Steps()
+        defer { steps.remove() }
         let fake = try fakeYtDlp("""
             echo '[PAROLA_META] {"title": "Clip", "duration": 12}'
             echo "[PAROLA_P] 10 10"
             echo "[PAROLA_PP] started ExtractAudio" >&2
-            sleep 4
+            \(steps.hold("1"))
             echo "[PAROLA_FILE] /tmp/audio.m4a"
             """)
         defer { try? FileManager.default.removeItem(at: fake) }
+        let clock = TestClock()
+        let seen = Awaitable<[YtDlpLine]>([])
+        let run = GuardedTask {
+            try await YtDlpRunner.run(
+                ytDlpPath: fake.path, arguments: [], run: .download,
+                watch: .progress(tight(quiet: .seconds(3), processing: .seconds(15))), clock: clock
+            ) { line in seen.update { $0.append(line) } }
+        }
 
-        let output = try await YtDlpRunner.run(
-            ytDlpPath: fake.path, arguments: [], run: .download,
-            watch: .progress(tight(quiet: .seconds(3), processing: .seconds(15)))
-        )
+        await seen.wait(until: { $0.count >= 3 && $0.contains(.processing) }, "the metadata, progress and processing lines")
+        clock.advance(by: .seconds(4))
+        steps.open(1)
+        let output = try await run.value("the download to finish after post-processing")
 
-        #expect(output.status == 0)
-        #expect(output.metadata?.title == "Clip")
+        #expect(output?.status == 0)
+        #expect(output?.metadata?.title == "Clip")
     }
 
     @Test("post-processing that overruns its budget fails as a timeout")
@@ -175,31 +296,38 @@ struct YouTubeProcessTests {
             exec sleep 30
             """)
         defer { try? FileManager.default.removeItem(at: fake) }
-
-        let failure = await linkFailure {
-            _ = try await YtDlpRunner.run(
+        let clock = TestClock()
+        let seen = Awaitable<[YtDlpLine]>([])
+        let run = GuardedTask {
+            try await YtDlpRunner.run(
                 ytDlpPath: fake.path, arguments: [], run: .download,
-                watch: .progress(tight(quiet: .seconds(30), processing: .seconds(3)))
-            )
+                watch: .progress(tight(quiet: .seconds(30), processing: .seconds(3))), clock: clock
+            ) { line in seen.update { $0.append(line) } }
         }
+
+        await seen.wait(until: { $0.count >= 2 && $0.contains(.processing) }, "the progress and processing lines")
+        clock.advance(by: .seconds(3))
+
+        let failure = await linkFailure { _ = try await run.value("the overrunning post-processing to be ended") }
         #expect(failure?.reason == .timedOut(seconds: 3))
     }
 
     @Test("cancelling a run ends the process")
     func cancelEndsTheProcess() async throws {
         let pidFile = FileManager.default.temporaryDirectory.appendingPathComponent("parola-pid-\(UUID().uuidString)")
-        let run = Task {
+        defer { try? FileManager.default.removeItem(at: pidFile) }
+        let clock = TestClock()
+        let run = GuardedTask {
             try await YtDlpRunner.run(
                 ytDlpPath: "/bin/sh", arguments: ["-c", "echo $$ > '\(pidFile.path)'; exec sleep 30"],
-                run: .download, watch: .progress(tight(quiet: .seconds(30)))
+                run: .download, watch: .progress(tight(quiet: .seconds(30))), clock: clock
             )
         }
-        while !FileManager.default.fileExists(atPath: pidFile.path) { try await Task.sleep(for: .milliseconds(20)) }
+        let pid = await childPID(in: pidFile)
         run.cancel()
 
-        await #expect(throws: CancellationError.self) { _ = try await run.value }
-        let pid = try #require(Int32(String(contentsOf: pidFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
-        #expect(!isAlive(pid))
+        await expectCancelled(run)
+        await expectEnded(pid)
     }
 
     @Test("a run and its children that ignore SIGTERM are killed as a group")
@@ -216,19 +344,21 @@ struct YouTubeProcessTests {
             while true; do sleep 1; done
             """)
         defer { try? FileManager.default.removeItem(at: fake) }
-
-        let failure = await linkFailure {
-            _ = try await YtDlpRunner.run(
+        let clock = TestClock()
+        let seen = Awaitable<[YtDlpLine]>([])
+        let run = GuardedTask {
+            try await YtDlpRunner.run(
                 ytDlpPath: fake.path, arguments: [], run: .download,
-                watch: .progress(tight(startup: .seconds(20), quiet: .seconds(1)))
-            )
+                watch: .progress(tight(quiet: .seconds(1))), clock: clock
+            ) { line in seen.update { $0.append(line) } }
         }
+        let pid = await childPID(in: childPid)
+        await seen.wait(until: { !$0.isEmpty }, "the progress line")
+        clock.advance(by: .seconds(1))
 
+        let failure = await linkFailure { _ = try await run.value("the stalled group to be ended") }
         #expect(failure?.reason == .stalled(seconds: 1))
-        let pid = try #require(Int32(String(contentsOf: childPid, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
-        let deadline = ContinuousClock.now + .seconds(3)
-        while isAlive(pid), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(50)) }
-        #expect(!isAlive(pid))
+        await expectEnded(pid)
     }
 
     @Test("a binary that can't launch fails as a tool that didn't start")
@@ -245,6 +375,10 @@ struct YouTubeProcessTests {
 @Suite("yt-dlp link download")
 struct YouTubeAudioDownloadTests {
     private static let link = URL(string: "https://youtu.be/dQw4w9WgXcQ")!
+
+    private static func source(_ fake: URL) throws -> YouTubeAudioSource {
+        try YouTubeAudioSource(url: link, features: .all, ytDlpPath: fake.path, limits: tight(), clock: TestClock())
+    }
 
     @Test("the audio download remuxes the m4a stream and prints what Parola reads")
     func arguments() {
@@ -327,9 +461,10 @@ struct YouTubeAudioDownloadTests {
             """)
         defer { try? FileManager.default.removeItem(at: fake) }
         let events = EventLog()
-        let source = try YouTubeAudioSource(url: Self.link, features: .all, ytDlpPath: fake.path, limits: tight())
+        let source = try Self.source(fake)
 
-        let media = try await source.fetch { events.append($0) }
+        let download = try await fetched(source) { events.append($0) }
+        let media = try #require(download)
         defer { try? FileManager.default.removeItem(at: media.fileURL.deletingLastPathComponent()) }
 
         #expect(media.fileURL.lastPathComponent == "audio.m4a")
@@ -360,9 +495,10 @@ struct YouTubeAudioDownloadTests {
     func finishedDownloadOwnsItsFolder() async throws {
         let fake = try fakeYtDlp(Self.writesAudio + "\necho \"[PAROLA_FILE] $file\"")
         defer { try? FileManager.default.removeItem(at: fake) }
-        let source = try YouTubeAudioSource(url: Self.link, features: .all, ytDlpPath: fake.path, limits: tight())
+        let source = try Self.source(fake)
 
-        let media = try await source.fetch()
+        let download = try await fetched(source)
+        let media = try #require(download)
 
         #expect(media.workingDirectory == source.workingDir)
         #expect(media.fileURL.deletingLastPathComponent().path == source.workingDir.path)
@@ -375,9 +511,9 @@ struct YouTubeAudioDownloadTests {
     func failedDownloadCleansUp() async throws {
         let fake = try fakeYtDlp(Self.writesAudio + "\necho 'ERROR: [youtube] x: Video unavailable' >&2\nexit 1")
         defer { try? FileManager.default.removeItem(at: fake) }
-        let source = try YouTubeAudioSource(url: Self.link, features: .all, ytDlpPath: fake.path, limits: tight())
+        let source = try Self.source(fake)
 
-        let failure = await linkFailure { _ = try await source.fetch() }
+        let failure = await linkFailure { _ = try await fetched(source) }
 
         #expect(failure?.reason == .unavailable(.removed))
         #expect(!FileManager.default.fileExists(atPath: source.workingDir.path))
@@ -388,15 +524,15 @@ struct YouTubeAudioDownloadTests {
         let pidFile = FileManager.default.temporaryDirectory.appendingPathComponent("parola-pid-\(UUID().uuidString)")
         let fake = try fakeYtDlp(Self.writesAudio + "\necho $$ > '\(pidFile.path)'\nexec sleep 30")
         defer { try? FileManager.default.removeItem(at: fake) }
-        let source = try YouTubeAudioSource(url: Self.link, features: .all, ytDlpPath: fake.path, limits: tight(quiet: .seconds(30)))
+        defer { try? FileManager.default.removeItem(at: pidFile) }
+        let source = try Self.source(fake)
 
-        let download = Task { try await source.fetch() }
-        while !FileManager.default.fileExists(atPath: pidFile.path) { try await Task.sleep(for: .milliseconds(20)) }
+        let download = GuardedTask { try await source.fetch() }
+        let pid = await childPID(in: pidFile)
         download.cancel()
 
-        await #expect(throws: CancellationError.self) { _ = try await download.value }
-        let pid = try #require(Int32(String(contentsOf: pidFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
-        #expect(!isAlive(pid))
+        await expectCancelled(download)
+        await expectEnded(pid)
         #expect(!FileManager.default.fileExists(atPath: source.workingDir.path))
     }
 
@@ -443,8 +579,9 @@ struct YouTubeAudioDownloadTests {
 
         for _ in 0..<5 {
             let events = EventLog()
-            let source = try YouTubeAudioSource(url: Self.link, features: .all, ytDlpPath: fake.path, limits: tight())
-            let media = try await source.fetch { events.append($0) }
+            let source = try Self.source(fake)
+            let download = try await fetched(source) { events.append($0) }
+            let media = try #require(download)
             media.discard()
 
             let delivered = events.all
@@ -457,9 +594,9 @@ struct YouTubeAudioDownloadTests {
     func noFileIsNoAudio() async throws {
         let fake = try fakeYtDlp("echo '[PAROLA_P] 1 1'")
         defer { try? FileManager.default.removeItem(at: fake) }
-        let source = try YouTubeAudioSource(url: Self.link, features: .all, ytDlpPath: fake.path, limits: tight())
+        let source = try Self.source(fake)
 
-        let failure = await linkFailure { _ = try await source.fetch() }
+        let failure = await linkFailure { _ = try await fetched(source) }
         #expect(failure == LinkDownloadFailure(reason: .noAudio, site: "YouTube"))
     }
 }
