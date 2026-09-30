@@ -4452,6 +4452,17 @@
         }
       }
     },
+    "Delete the earlier download of %@?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare il download precedente di %@?"
+          }
+        }
+      }
+    },
     "Delete the selected items for good": {
       "extractionState": "manual",
       "localizations": {

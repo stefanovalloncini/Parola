@@ -88,6 +88,9 @@ struct ModelsSettingsPane: View {
 
     private var confirmationTitle: String {
         guard let item = pendingDeletion else { return "Delete model?" }
+        if item.kind == .earlierDownload {
+            return String(localized: "Delete the earlier download of \(item.displayName)?")
+        }
         return "Delete \(item.displayName)?"
     }
 
