@@ -136,16 +136,16 @@ struct SegmentNoteEditTests {
         model.splitSegment(id: 0, atFraction: 0.5)
         let firstHalfID = try #require(model.transcript?.segments.first?.id)
         #expect(firstHalfID != 0)
-        let segmentNotesByIDWait = await waitUntil { model.segmentNotesByID == [firstHalfID: "why this matters"] }
-        #expect(segmentNotesByIDWait)
+        let noteUnderFirstHalf = await waitUntil { model.segmentNotesByID == [firstHalfID: "why this matters"] }
+        #expect(noteUnderFirstHalf)
 
         undo.undo()
-        let segmentNotesByIDWait2 = await waitUntil { model.segmentNotesByID == [0: "why this matters"] }
-        #expect(segmentNotesByIDWait2)
+        let noteUnderZero = await waitUntil { model.segmentNotesByID == [0: "why this matters"] }
+        #expect(noteUnderZero)
 
         undo.redo()
-        let segmentNotesByIDWait3 = await waitUntil { model.segmentNotesByID == [firstHalfID: "why this matters"] }
-        #expect(segmentNotesByIDWait3)
+        let noteBackUnderFirstHalf = await waitUntil { model.segmentNotesByID == [firstHalfID: "why this matters"] }
+        #expect(noteBackUnderFirstHalf)
     }
 
     @Test("merging joins both notes, and deleting drops the one it removed")
@@ -155,8 +155,8 @@ struct SegmentNoteEditTests {
         await note(model, "second", on: 1)
 
         model.mergeSegmentWithNext(id: 0)
-        let segmentNotesByIDWait = await waitUntil { model.segmentNotesByID == [0: "first\n\nsecond"] }
-        #expect(segmentNotesByIDWait)
+        let mergedNoteUnderZero = await waitUntil { model.segmentNotesByID == [0: "first\n\nsecond"] }
+        #expect(mergedNoteUnderZero)
 
         model.deleteSegment(id: 0)
         let segmentNotesCleared = await waitUntil { model.segmentNotesByID.isEmpty }

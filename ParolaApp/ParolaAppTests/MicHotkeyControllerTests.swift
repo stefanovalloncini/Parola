@@ -56,20 +56,20 @@ struct MicHotkeyControllerTests {
         controller.applyConfiguration(enabled: true, keyCode: 96, modifiers: [])
         let monitorIsFake1 = await spin { (controller.monitor as? GatedMonitor) === fake1 }
         #expect(monitorIsFake1)
-        let fake1Wait = await spin { await fake1.started == 1 }
-        #expect(fake1Wait)
+        let fake1Started = await spin { await fake1.started == 1 }
+        #expect(fake1Started)
 
         controller.applyConfiguration(enabled: true, keyCode: 99, modifiers: [])
-        let fake1Wait2 = await spin { await fake1.stopped == 1 }
-        #expect(fake1Wait2)
+        let fake1StoppedOnce = await spin { await fake1.stopped == 1 }
+        #expect(fake1StoppedOnce)
 
         controller.applyConfiguration(enabled: true, keyCode: 100, modifiers: [])
-        let fake1Wait3 = await spin { await fake1.stopped == 2 }
-        #expect(fake1Wait3)
+        let fake1StoppedTwice = await spin { await fake1.stopped == 2 }
+        #expect(fake1StoppedTwice)
 
         await fake1.openReversed()
-        let fake3Wait = await spin { await fake3.started == 1 }
-        #expect(fake3Wait)
+        let fake3Started = await spin { await fake3.started == 1 }
+        #expect(fake3Started)
 
         let settled = await spin { (controller.monitor as? GatedMonitor) === fake3 }
         #expect(settled, "the cancelled apply resumed after its stop and must not touch the monitor")

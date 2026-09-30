@@ -162,10 +162,10 @@ struct FavoriteSegmentsTests {
 
         // The filter drops inside setSegmentFavorite, which is the single write path both the star
         // and the bridge go through, so it lands on the write's own hop rather than synchronously.
-        let favoritesOnlyWait = await waitUntil { !model.favoritesOnly }
-        #expect(favoritesOnlyWait)
-        let isSegmentFavoriteWait = await waitUntil { !model.isSegmentFavorite(1) }
-        #expect(isSegmentFavoriteWait)
+        let favoritesOnlyOff = await waitUntil { !model.favoritesOnly }
+        #expect(favoritesOnlyOff)
+        let segmentOneUnfavorited = await waitUntil { !model.isSegmentFavorite(1) }
+        #expect(segmentOneUnfavorited)
     }
 
     @Test("splitting a favorited segment keeps the favorite on the first half")

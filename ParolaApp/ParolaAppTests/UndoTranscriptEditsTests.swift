@@ -302,8 +302,8 @@ struct UndoTranscriptEditsTests {
         model.persistChapters(chapters)
         model.summariseOperation = { _, _ in Summary(text: "recap") }
         model.summariseTranscript()
-        let isSummarisingWait = await waitUntil { !model.isSummarising && model.transcript?.summary?.text == "recap" }
-        #expect(isSummarisingWait)
+        let summaryLanded = await waitUntil { !model.isSummarising && model.transcript?.summary?.text == "recap" }
+        #expect(summaryLanded)
 
         undo.undo()
         #expect(model.transcript?.segments[0].text == "original")

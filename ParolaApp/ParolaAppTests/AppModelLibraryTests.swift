@@ -326,10 +326,10 @@ struct AppModelLibraryTests {
         let chapters = [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 30)]
         model.smartChapters = chapters
         model.persistChapters(chapters)
-        let libraryWait = await waitUntil {
+        let persistedChaptersMatch = await waitUntil {
             (try? await model.library.load(seeded.id).document.transcript.chapters) == chapters
         }
-        #expect(libraryWait)
+        #expect(persistedChaptersMatch)
 
         model.clearLoadedEntry()
         #expect(model.smartChapters.isEmpty)
@@ -360,21 +360,21 @@ struct AppModelLibraryTests {
         let generated = [Chapter(title: "Generated", start: 0)]
         model.smartChapters = generated
         model.persistChapters(generated)
-        let libraryWait = await waitUntil {
+        let persistedChaptersMatch = await waitUntil {
             (try? await model.library.load(seeded.id).document.transcript.chapters) == generated
         }
-        #expect(libraryWait)
+        #expect(persistedChaptersMatch)
 
         let summarized = [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 30)]
         model.summariseOperation = { _, _ in Summary(text: "recap", chapters: summarized) }
         model.summariseTranscript()
-        let isSummarisingWait = await waitUntil { !model.isSummarising && model.transcript?.summary != nil }
-        #expect(isSummarisingWait)
+        let summaryLanded = await waitUntil { !model.isSummarising && model.transcript?.summary != nil }
+        #expect(summaryLanded)
         #expect(model.smartChapters == summarized)
-        let libraryWait2 = await waitUntil {
+        let persistedSummaryChaptersMatch = await waitUntil {
             (try? await model.library.load(seeded.id).document.transcript.chapters) == summarized
         }
-        #expect(libraryWait2)
+        #expect(persistedSummaryChaptersMatch)
 
         model.clearLoadedEntry()
         model.loadEntry(seeded.id)

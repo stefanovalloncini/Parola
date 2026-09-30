@@ -367,8 +367,8 @@ struct AICallSiteTests {
             #expect(model.isExtractingChapters && model.isExtractingActionItems)
 
             model.loadEntry(b.id)
-            let selectedEntryIDWait = await waitUntil { model.selectedEntryID == b.id }
-            #expect(selectedEntryIDWait)
+            let selectedEntryIsB = await waitUntil { model.selectedEntryID == b.id }
+            #expect(selectedEntryIsB)
             #expect(!model.isExtractingChapters && !model.isExtractingActionItems)
             let isRunningWait = await waitUntil(timeoutMs: 3000) {
                 !model.aiJobs.isRunning(.chapters, for: a.id) && !model.aiJobs.isRunning(.actionItems, for: a.id)
@@ -381,8 +381,8 @@ struct AICallSiteTests {
             #expect(storedA.actionItems?.map(\.task) == ["send the deck"])
 
             model.loadEntry(a.id)
-            let selectedEntryIDWait2 = await waitUntil { model.selectedEntryID == a.id && !model.smartChapters.isEmpty }
-            #expect(selectedEntryIDWait2)
+            let selectedEntryIsAWithChapters = await waitUntil { model.selectedEntryID == a.id && !model.smartChapters.isEmpty }
+            #expect(selectedEntryIsAWithChapters)
             #expect(model.actionItems.map(\.assignee) == ["Ada"])
         }
     }

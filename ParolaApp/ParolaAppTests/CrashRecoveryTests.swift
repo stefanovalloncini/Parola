@@ -338,8 +338,8 @@ extension TranscriberMockSuites {
             model.declinePendingRecovery()
 
             #expect(model.pendingRecovery == nil)
-            let recoveryFileExistsWait = await waitUntil { !self.recoveryFileExists(model) }
-            #expect(recoveryFileExistsWait)
+            let recoveryFileGone = await waitUntil { !self.recoveryFileExists(model) }
+            #expect(recoveryFileGone)
             let entries = await model.library.list()
             #expect(entries.count == 1)
             #expect(entries.first?.title.hasSuffix("(recovered)") == true)
@@ -373,8 +373,8 @@ extension TranscriberMockSuites {
             #expect(entries.count == 1)
             #expect(entries.first?.title.hasPrefix("Recording ") == true)
             #expect(entries.first?.title.hasSuffix("(recovered)") == true)
-            let recoveryFileExistsWait = await waitUntil { !self.recoveryFileExists(model) }
-            #expect(recoveryFileExistsWait, "the checkpoint goes once the restored take is in the library")
+            let recoveryFileGone = await waitUntil { !self.recoveryFileExists(model) }
+            #expect(recoveryFileGone, "the checkpoint goes once the restored take is in the library")
         }
 
         /// The probe is the same await window loadEntry has, and a page opened inside it is the user's last word.
@@ -480,8 +480,8 @@ extension TranscriberMockSuites {
 
             model.declinePendingRecovery()
 
-            let fileExistsWait = await waitUntil { !FileManager.default.fileExists(atPath: model.legacyRecoveryFileURL.path) }
-            #expect(fileExistsWait)
+            let legacyRecoveryFileGone = await waitUntil { !FileManager.default.fileExists(atPath: model.legacyRecoveryFileURL.path) }
+            #expect(legacyRecoveryFileGone)
             #expect(await model.library.list().count == 1)
         }
 
@@ -505,8 +505,8 @@ extension TranscriberMockSuites {
             #expect(await model.library.list().count == 1, "the older take is kept, not dropped")
 
             model.declinePendingRecovery()
-            let recoveryFileExistsWait = await waitUntil { !self.recoveryFileExists(model) }
-            #expect(recoveryFileExistsWait)
+            let recoveryFileGone = await waitUntil { !self.recoveryFileExists(model) }
+            #expect(recoveryFileGone)
             #expect(await model.library.list().count == 2)
         }
 
