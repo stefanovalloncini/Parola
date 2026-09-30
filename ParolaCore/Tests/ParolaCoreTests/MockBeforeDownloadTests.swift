@@ -196,6 +196,24 @@ struct MockBeforeDownloadTests {
         #expect(missingLoads.isEmpty)
     }
 
+    @Test("a mock cleared after it ran hands the next run back to the real engine")
+    func clearedMockHandsBackTheEngine() async throws {
+        let setup = try await makeSetup()
+        defer { try? FileManager.default.removeItem(at: setup.folder) }
+        try setup.store.seedInstalledModel(Self.installedModel)
+        await setup.mocks.install(engineID: .whisperKit, response: Self.served)
+        let first = try await setup.transcribe(Self.installedModel)
+        #expect(first.modelName == "served-by-mock")
+
+        await setup.mocks.clear()
+        let second = try await setup.transcribe(Self.installedModel)
+        await setup.session.unloadModel()
+
+        let downloaded = await setup.downloads.variants
+        #expect(second.modelName == "real-engine")
+        #expect(downloaded.isEmpty)
+    }
+
     @Test("prewarm never downloads a model that isn't on disk, mocked or not", arguments: [false, true])
     func prewarmNeverDownloads(mocked: Bool) async throws {
         let setup = try await makeSetup()
