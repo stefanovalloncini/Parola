@@ -29,7 +29,7 @@ struct BatchView: View {
                 }
             }
         }
-        .toolbarSearch(text: $searchText, prompt: "Search Batch")
+        .toolbarSearch(text: $searchText, for: .batch)
         .axBranch("Batch")
     }
 

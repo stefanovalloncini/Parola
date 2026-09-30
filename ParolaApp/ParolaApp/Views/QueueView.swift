@@ -26,7 +26,7 @@ struct QueueView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
-        .toolbarSearch(text: $searchText, prompt: "Search Queue")
+        .toolbarSearch(text: $searchText, for: .queue)
         .axBranch("Queue")
     }
 

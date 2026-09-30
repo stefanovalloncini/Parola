@@ -128,9 +128,10 @@ struct EditCommands: View {
             .keyboardShortcut("e", modifiers: [.command, .option])
             .disabled(!model.findIsOpen || !model.hasMatches || model.keyWindowIsViewer)
         Divider()
-        Button("Search Library") { model.focusLibrarySearch() }
+        let searchTitle = model.route.searchTitle()
+        Button(searchTitle ?? String(localized: "Search Library")) { model.focusLibrarySearch() }
             .keyboardShortcut("f", modifiers: [.command, .option])
-            .disabled(model.introduction.isPresented || !ContentRoutes.hasSearchField(model.route))
+            .disabled(model.introduction.isPresented || searchTitle == nil)
             .axLeaf("Menu.Edit.SearchLibrary")
         Divider()
         Button("Auto-Detect Language") { model.selectedLanguage = nil }

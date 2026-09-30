@@ -60,11 +60,6 @@ struct ContentRoutes: View {
         }
     }
 
-    /// Statistics has nothing to search; every other page puts its own field in the toolbar.
-    static func hasSearchField(_ route: AppModel.Route) -> Bool {
-        route != .statistics
-    }
-
     /// Outside the identity the list, the panes and the batch take turns under: results replacing a transcript mid-query must not rebuild the field.
     private var transcriptPage: some View {
         ZStack {
@@ -72,7 +67,7 @@ struct ContentRoutes: View {
                 .id(routeID)
                 .transition(.opacity)
         }
-        .toolbarSearch(text: librarySearch, prompt: "Search Library")
+        .toolbarSearch(text: librarySearch, for: .transcript)
     }
 
     private var librarySearch: Binding<String> {
