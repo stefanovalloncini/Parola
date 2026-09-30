@@ -163,16 +163,23 @@ struct TranscriptionCoordinatorTests {
             at: try #require(Bundle(for: CoordinatorBundleAnchor.self).url(forResource: "sample", withExtension: "wav")),
             to: picked
         )
-        var landed: LibraryEntry?
-        coord.onComplete = { landed = $0 }
+        let (landings, landing) = AsyncStream.makeStream(of: LibraryEntry.self)
+        coord.onComplete = { landing.yield($0) }
+        let giveUp = Task {
+            try? await Task.sleep(for: .seconds(30))
+            landing.finish()
+        }
 
         coord.startFileTranscription(at: picked)
-        for _ in 0..<250 where landed == nil {
-            try await Task.sleep(for: .milliseconds(20))
+        var landed: LibraryEntry?
+        for await entry in landings {
+            landed = entry
+            break
         }
+        giveUp.cancel()
         await MockTranscriberRegistry.shared.clear()
 
-        let entry = try #require(landed)
+        let entry = try #require(landed, "the picked file never landed")
         #expect(entry.title == name)
         #expect(entry.manifest.source == .file)
         #expect(entry.manifest.originalAudioName == "\(name).wav", "the copy carried the file's own name")
