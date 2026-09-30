@@ -421,9 +421,7 @@ struct LibraryStoreTests {
         #expect(hit.highlights.isEmpty == false)
     }
 
-    /// Fix round 1, R1.4 finding #5: the query path must never read a bundle off disk. The entry is
-    /// the size of Stefano's 1h42m real file (961 segments, ~64,000 characters), and its transcript
-    /// is made unreadable before the search, keeping the size and date the index checks.
+    /// The transcript is made unreadable, keeping the size and date the index checks, so a hit can only come from the index.
     @Test("search answers a multi-hour entry from the index without reading its bundle")
     func searchQueryPathSkipsTheBundle() async throws {
         let (store, _) = try makeTempLibrary()
