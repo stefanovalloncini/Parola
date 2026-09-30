@@ -121,11 +121,16 @@ enum LibraryDateGroups {
         rows.isEmpty ? [] : [Group(id: id, title: nil, rows: rows)]
     }
 
-    /// A list read without date headers still keeps its pins apart, as Notes does.
+    /// A list read without date headers still keeps its pins apart, as Notes does: Pinned, then Transcripts.
     static func pinnedThenRest(_ rows: [LibraryRowDisplay], locale: Locale) -> [Group] {
         let pinned = rows.filter(\.pinned)
         guard !pinned.isEmpty else { return ungrouped(rows) }
-        return [pinnedGroup(pinned, locale: locale)] + ungrouped(rows.filter { !$0.pinned })
+        let rest = rows.filter { !$0.pinned }
+        guard !rest.isEmpty else { return [pinnedGroup(pinned, locale: locale)] }
+        return [
+            pinnedGroup(pinned, locale: locale),
+            Group(id: "all", title: String(localized: "Transcripts", locale: locale), rows: rest),
+        ]
     }
 
     private static func pinnedGroup(_ rows: [LibraryRowDisplay], locale: Locale) -> Group {

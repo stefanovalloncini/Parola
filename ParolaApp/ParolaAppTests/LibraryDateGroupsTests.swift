@@ -213,24 +213,31 @@ struct LibraryDateGroupsTests {
         #expect(list.when(for: rows[0].entry).hasPrefix("Today"))
     }
 
-    @Test("with grouping off, pinned rows still lead under Pinned; only the date headers go")
+    @Test("with grouping off, pinned rows lead under Pinned and the rest under Transcripts, as in Notes")
     func groupingOffKeepsPinned() {
         let list = headers(now: "2026-09-30T10:00", groupsByDate: false)
         let rows = [row("p", "2026-09-29T18:00", pinned: true), row("a", "2026-09-30T09:05"), row("b", "2026-08-02T09:00")]
         let grouped = list.groups(for: rows)
 
         #expect(grouped.map(\.id) == ["pinned", "all"])
-        #expect(grouped.map(\.title) == ["Pinned", nil])
+        #expect(grouped.map(\.title) == ["Pinned", "Transcripts"])
         #expect(grouped.map { $0.rows.map(\.id) } == [["p"], ["a", "b"]])
     }
 
-    @Test("an order that isn't by date keeps Pinned at the top under its own header")
+    @Test("an order that isn't by date keeps Pinned at the top, the rest under Transcripts")
     func undatedOrderKeepsPinned() {
         let rows = [row("z", "2026-09-29T18:00", pinned: true), row("a", "2026-09-30T09:05")]
         let grouped = groups(rows, now: "2026-09-30T10:00", sortOrder: .titleAZ)
 
-        #expect(grouped.map(\.title) == ["Pinned", nil])
+        #expect(grouped.map(\.title) == ["Pinned", "Transcripts"])
         #expect(grouped.map { $0.rows.map(\.id) } == [["z"], ["a"]])
+    }
+
+    @Test("the header over the unpinned rows reads in Italian")
+    func restHeaderInItalian() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        #expect(String(localized: "Transcripts", bundle: italian) == "Trascrizioni")
     }
 
     @Test("a list of nothing but pins has only the Pinned group")
