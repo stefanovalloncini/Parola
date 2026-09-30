@@ -5,6 +5,12 @@ import ParolaCore
 import ParolaTestSupport
 
 @MainActor
+private final class Finished {
+    var value = false
+}
+
+/// No test here hands `ModelStore.shared` to a delete path: in the test host it is the real model store.
+@MainActor
 @Suite("Model storage", .serialized)
 struct ModelStorageTests {
     private static let turbo = "openai_whisper-large-v3_turbo"
@@ -34,15 +40,43 @@ struct ModelStorageTests {
         return TempStore(root: root, store: store, live: live, leftover: leftover, orphan: orphan)
     }
 
-    private func makeModel() async -> AppModel {
+    /// Awaits an unstructured task with a deadline: on timeout `waitUntil` records the Issue and the wait is cancelled.
+    private func finishes(
+        timeoutMs: Int = 5_000,
+        sourceLocation: SourceLocation = #_sourceLocation,
+        _ work: @escaping @MainActor @Sendable () async -> Void
+    ) async -> Bool {
+        let finished = Finished()
+        let task = Task { @MainActor in
+            await work()
+            finished.value = true
+        }
+        let done = await waitUntil(timeoutMs: timeoutMs, sourceLocation: sourceLocation) { finished.value }
+        if !done { task.cancel() }
+        return done
+    }
+
+    /// Lets the launch scan and its copy refresh land first, so neither overwrites what a test sets.
+    private func makeModel() async throws -> AppModel {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("model-storage"))
-        await model.awaitModelListRefresh()
-        await model.awaitSupersededCopiesRefresh()
+        let scanned = await finishes { await model.awaitModelListRefresh() }
+        try #require(scanned)
+        let measured = await finishes { await model.awaitSupersededCopiesRefresh() }
+        try #require(measured)
         return model
     }
 
     private func size(_ url: URL, in store: ModelStore) throws -> Int64 {
         try Int64(#require(store.sizeOnDisk(at: url)))
+    }
+
+    private func missingCopy(under root: URL) -> SupersededCopy {
+        SupersededCopy(
+            variantID: Self.turbo,
+            displayName: "Whisper Large v3 Turbo",
+            url: root.appendingPathComponent("models/argmaxinc/whisperkit-coreml/openai_whisper-large-v3_turbo"),
+            bytes: 1
+        )
     }
 
     @Test("an earlier download counts toward the bytes on disk and is reported on its own")
@@ -51,9 +85,8 @@ struct ModelStorageTests {
         defer { try? FileManager.default.removeItem(at: temp.root) }
 
         let scan = temp.store.scan()
-        let models = scan.listedCatalog + scan.installed.filter { entry in
-            !scan.listedCatalog.contains { $0.name == entry.name }
-        }
+        let listedNames = Set(scan.listedCatalog.map(\.name))
+        let models = scan.listedCatalog + scan.installed.filter { !listedNames.contains($0.name) }
         var sizes: [String: Int64] = [:]
         for info in models where info.isInstalled {
             if let url = info.installedURL { sizes[info.name] = try size(url, in: temp.store) }
@@ -81,14 +114,36 @@ struct ModelStorageTests {
             + "\(AppFormat.byteSize(Int64(5_800_000_000))) in earlier downloads")
     }
 
+    @Test("the usage line and the earlier-download strings read in Italian, with a singular for one model")
+    func italianStrings() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let bundle = try #require(Bundle(path: path))
+        let size = "3 GB"
+        let name = "Whisper Large v3 Turbo"
+        let reason = "disco pieno"
+
+        #expect(String(localized: "\(1) installed · \(size)", bundle: bundle) == "1 installato · 3 GB")
+        #expect(String(localized: "\(8) installed · \(size)", bundle: bundle) == "8 installati · 3 GB")
+        #expect(String(localized: "\(size) in earlier downloads", bundle: bundle) == "3 GB in download precedenti")
+        #expect(String(localized: "Delete the earlier download of \(name)?", bundle: bundle)
+            == "Eliminare il download precedente di Whisper Large v3 Turbo?")
+        #expect(String(localized: "Could not delete \(name): \(reason)", bundle: bundle)
+            == "Impossibile eliminare Whisper Large v3 Turbo: disco pieno")
+        #expect(String(
+            localized: "This will remove \(size) from disk, including an earlier download. You can re-download the model later.",
+            bundle: bundle
+        ) == "Verrà rimosso 3 GB dal disco, compreso un download precedente. Potrai riscaricare il modello più tardi.")
+    }
+
     @Test("a refresh lists the earlier downloads with their measured size")
     func refreshListsEarlierDownloads() async throws {
         let temp = try makeStore()
         defer { try? FileManager.default.removeItem(at: temp.root) }
-        let model = await makeModel()
+        let model = try await makeModel()
 
         model.refreshSupersededCopies(in: temp.store)
-        await model.awaitSupersededCopiesRefresh()
+        let refreshed = await finishes { await model.awaitSupersededCopiesRefresh() }
+        try #require(refreshed)
 
         let leftoverBytes = try size(temp.leftover, in: temp.store)
         #expect(model.supersededCopies.map(\.url.standardizedFileURL) == [temp.leftover.standardizedFileURL])
@@ -99,58 +154,95 @@ struct ModelStorageTests {
     func reclaimRemovesOnlyTheLeftover() async throws {
         let temp = try makeStore()
         defer { try? FileManager.default.removeItem(at: temp.root) }
-        let model = await makeModel()
+        let model = try await makeModel()
         model.supersededCopies = AppModel.supersededCopies(in: temp.store)
         let copy = try #require(model.supersededCopies.first)
 
-        let task = try #require(model.reclaimSupersededCopy(Self.turbo, in: temp.store))
+        let started = model.reclaimSupersededCopy(Self.turbo, in: temp.store) != nil
+        try #require(started)
         #expect(model.isReclaiming(copy))
-        #expect(model.reclaimSupersededCopy(Self.turbo, in: temp.store) == nil)
-        await task.value
+        #expect(model.isDeletingModel(Self.turbo))
+        let startedTwice = model.reclaimSupersededCopy(Self.turbo, in: temp.store) != nil
+        #expect(!startedTwice)
+        let finished = await waitUntil { !model.isReclaiming(copy) }
+        try #require(finished)
 
+        let rowRemains = model.supersededCopies.contains { $0.url == copy.url }
         #expect(!FileManager.default.fileExists(atPath: temp.leftover.path))
         #expect(FileManager.default.fileExists(atPath: temp.live.path))
         #expect(temp.store.isInstalled(Self.turbo))
-        #expect(!model.isReclaiming(copy))
+        #expect(!model.isDeletingModel(Self.turbo))
         #expect(model.modelActionError == nil)
-        #expect(!model.supersededCopies.contains { $0.url == copy.url })
+        #expect(!rowRemains)
     }
 
-    @Test("a reclaim that fails says so and frees the row")
-    func failedReclaimReportsTheError() async throws {
+    @Test("a copy that is already gone counts as cleared")
+    func reclaimOfAMissingCopySucceeds() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("ModelStorageTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        let model = await makeModel()
-        let copy = SupersededCopy(
-            variantID: Self.turbo,
-            displayName: "Whisper Large v3 Turbo",
-            url: root.appendingPathComponent("models/argmaxinc/whisperkit-coreml/openai_whisper-large-v3_turbo"),
-            bytes: 1
-        )
+        let model = try await makeModel()
+        let copy = missingCopy(under: root)
         model.supersededCopies = [copy]
 
-        let task = try #require(model.reclaimSupersededCopy(Self.turbo, in: ModelStore(modelsDirectory: root)))
-        await task.value
+        let started = model.reclaimSupersededCopy(Self.turbo, in: ModelStore(modelsDirectory: root)) != nil
+        try #require(started)
+        let finished = await waitUntil { !model.isReclaiming(copy) }
+        try #require(finished)
 
-        #expect(!model.isReclaiming(copy))
-        #expect(model.modelActionError?.contains("Whisper Large v3 Turbo") == true)
+        let rowRemains = model.supersededCopies.contains { $0.url == copy.url }
+        #expect(model.modelActionError == nil)
+        #expect(!rowRemains)
+    }
+
+    @Test("a reclaim the disk refuses says why and leaves the copy in place")
+    func failedReclaimReportsTheError() async throws {
+        let temp = try makeStore()
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: temp.leftover.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: temp.leftover.path)
+            try? FileManager.default.removeItem(at: temp.root)
+        }
+        let model = try await makeModel()
+        model.supersededCopies = AppModel.supersededCopies(in: temp.store)
+        let copy = try #require(model.supersededCopies.first)
+
+        let started = model.reclaimSupersededCopy(Self.turbo, in: temp.store) != nil
+        try #require(started)
+        let finished = await waitUntil { !model.isReclaiming(copy) }
+        try #require(finished)
+
+        let message = model.modelActionError ?? ""
+        #expect(message.contains("Whisper Large v3 Turbo"))
+        #expect(FileManager.default.fileExists(atPath: temp.leftover.appendingPathComponent("weights.bin").path))
     }
 
     @Test("an earlier download reads as deleting while its model is being deleted")
-    func deletingTheModelCoversItsEarlierDownload() async {
-        let model = await makeModel()
-        let copy = SupersededCopy(
-            variantID: Self.turbo,
-            displayName: "Whisper Large v3 Turbo",
-            url: URL(fileURLWithPath: "/tmp/leftover"),
-            bytes: 1
-        )
-        model.supersededCopies = [copy]
+    func deletingTheModelCoversItsEarlierDownload() async throws {
+        let temp = try makeStore()
+        defer { try? FileManager.default.removeItem(at: temp.root) }
+        let model = try await makeModel()
+        model.supersededCopies = AppModel.supersededCopies(in: temp.store)
+        let copy = try #require(model.supersededCopies.first)
         model.modelsBeingDeleted = [Self.turbo]
 
-        #expect(model.isReclaiming(copy))
-        #expect(model.reclaimSupersededCopy(Self.turbo) == nil)
+        try #require(model.isReclaiming(copy))
+        let started = model.reclaimSupersededCopy(Self.turbo, in: temp.store) != nil
+        #expect(!started)
+        #expect(FileManager.default.fileExists(atPath: temp.leftover.path))
+    }
+
+    @Test("a model reads as busy while one of its earlier copies is being cleared")
+    func clearingACopyMarksItsModelBusy() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ModelStorageTests-\(UUID().uuidString)", isDirectory: true)
+        let model = try await makeModel()
+        let copy = missingCopy(under: root)
+        model.supersededCopies = [copy]
+        model.modelsBeingDeleted = [copy.id]
+
+        #expect(model.isDeletingModel(Self.turbo))
+        #expect(!model.isDeletingModel("openai_whisper-tiny"))
     }
 }

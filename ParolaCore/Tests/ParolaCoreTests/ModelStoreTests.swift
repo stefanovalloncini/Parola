@@ -173,7 +173,8 @@ struct ModelStoreTests {
             try Data("x".utf8).write(to: folder.appendingPathComponent("Encoder.mlmodelc"))
         }
 
-        #expect(try !store.installedModels().contains { $0.name == "parakeet-tdt-0.6b-v2-coreml" })
+        let listedAsOrphan = try store.installedModels().contains { $0.name == "parakeet-tdt-0.6b-v2-coreml" }
+        #expect(!listedAsOrphan)
         let leftovers = store.supersededInstalls()
         #expect(leftovers.map(\.variantID) == ["nvidia_parakeet-tdt-0.6b-v2"])
         #expect(leftovers.first?.displayName == "Parakeet TDT 0.6B v2")
