@@ -117,11 +117,15 @@ struct SessionLoggingTests {
     func policyRejectsLanguage() async throws {
         try await withSink { sink in
             let (session, audioURL) = try await makeSession(managed: ["requireEnglishOnly": true])
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await session.transcribe(
                     source: FileAudioSource(url: audioURL),
                     options: TranscriptionOptions(model: "openai_whisper-tiny", language: "it")
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(
                 modelRecords(sink, message: "rejected by policy: language").first
@@ -136,11 +140,15 @@ struct SessionLoggingTests {
             let (session, audioURL) = try await makeSession(
                 managed: ["allowedEngines": ["parakeet"]]
             )
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await session.transcribe(
                     source: FileAudioSource(url: audioURL),
                     options: TranscriptionOptions(model: "openai_whisper-tiny")
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(
                 modelRecords(sink, message: "rejected by policy: engine whisperkit").first
@@ -153,11 +161,15 @@ struct SessionLoggingTests {
     func unregisteredEngine() async throws {
         try await withSink { sink in
             let (session, audioURL) = try await makeSession(engineID: .parakeet)
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await session.transcribe(
                     source: FileAudioSource(url: audioURL),
                     options: TranscriptionOptions(model: "openai_whisper-tiny")
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(
                 modelRecords(sink, message: "engine whisperkit is not registered").first
@@ -184,8 +196,12 @@ struct SessionLoggingTests {
                 TranscriptionOptions(model: "openai_whisper-tiny", diarize: true),
             ]
             for options in rejected {
-                await #expect(throws: ParolaError.self) {
+                do {
                     _ = try await session.transcribe(source: source, options: options)
+                    Issue.record("expected ParolaError to be thrown")
+                } catch is ParolaError {
+                } catch {
+                    Issue.record("expected ParolaError but got \(error)")
                 }
             }
 

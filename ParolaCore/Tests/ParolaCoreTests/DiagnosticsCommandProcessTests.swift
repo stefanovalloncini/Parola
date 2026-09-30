@@ -42,7 +42,8 @@ struct DiagnosticsCommandProcessTests {
             #expect(run.stdout.hasPrefix(Self.header))
 
             let written = (try? FileManager.default.contentsOfDirectory(atPath: home.path)) ?? []
-            #expect(!written.contains { $0.hasSuffix(".txt") })
+            let hasTxtFile = written.contains { $0.hasSuffix(".txt") }
+            #expect(!hasTxtFile)
         }
     }
 

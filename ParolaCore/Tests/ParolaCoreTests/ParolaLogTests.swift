@@ -115,7 +115,8 @@ struct ParolaLogTests {
             }
             ParolaLog.debug(.models, "loading \(token())", [.model: .safe(token())])
             #expect(builds == 2)
-            #expect(sink.records.filter { $0.category == .models }.count == 1)
+            let modelsRecords = sink.records.filter { $0.category == .models }
+            #expect(modelsRecords.count == 1)
         }
     }
 
@@ -125,9 +126,12 @@ struct ParolaLogTests {
             ParolaLog.info(.appLifecycle, "launched")
             ParolaLog.info(.library, "swept")
             ParolaLog.info(.cli, "ran")
-            #expect(sink.records.first { $0.category == .appLifecycle }?.subsystem == .app)
-            #expect(sink.records.first { $0.category == .library }?.subsystem == .core)
-            #expect(sink.records.first { $0.category == .cli }?.subsystem == .cli)
+            let appLifecycleRecord = sink.records.first { $0.category == .appLifecycle }
+            #expect(appLifecycleRecord?.subsystem == .app)
+            let libraryRecord = sink.records.first { $0.category == .library }
+            #expect(libraryRecord?.subsystem == .core)
+            let cliRecord = sink.records.first { $0.category == .cli }
+            #expect(cliRecord?.subsystem == .cli)
         }
     }
 

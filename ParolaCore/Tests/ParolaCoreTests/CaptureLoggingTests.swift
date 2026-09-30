@@ -45,7 +45,8 @@ struct CaptureLoggingTests {
             writer.noteDrop()
             for _ in 0..<32 { writer.write(Self.buffer()) }
 
-            #expect(sink.records.filter { $0.category == .audioRecording }.isEmpty)
+            let audioRecordingRecords = sink.records.filter { $0.category == .audioRecording }
+            #expect(audioRecordingRecords.isEmpty)
         }
     }
 

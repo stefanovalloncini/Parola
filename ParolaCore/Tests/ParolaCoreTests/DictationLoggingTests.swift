@@ -77,11 +77,10 @@ struct DictationLoggingTests {
             await coordinator.startMonitoring()
             await coordinator.handle(.press)
 
-            let record = try #require(
-                dictationRecords(sink).first {
-                    $0.message.rendered == "dictation recorder failed to start in toggle"
-                }
-            )
+            let startFailureRecord = dictationRecords(sink).first {
+                $0.message.rendered == "dictation recorder failed to start in toggle"
+            }
+            let record = try #require(startFailureRecord)
             #expect(record.level == .error)
             #expect(record.fields[.error] != nil)
             #expect(record.formattedLine.contains("microphone is busy") == false)
@@ -96,11 +95,10 @@ struct DictationLoggingTests {
             await coordinator.handle(.press)
             await coordinator.handle(.release)
 
-            let record = try #require(
-                dictationRecords(sink).first {
-                    $0.message.rendered == "dictation finish failed in pushToTalk"
-                }
-            )
+            let finishFailureRecord = dictationRecords(sink).first {
+                $0.message.rendered == "dictation finish failed in pushToTalk"
+            }
+            let record = try #require(finishFailureRecord)
             #expect(record.level == .error)
             #expect(record.fields[.elapsed] != nil)
             #expect(record.fields[.error] != nil)
@@ -123,8 +121,10 @@ struct DictationLoggingTests {
                 "dictation state → transcribing",
                 "dictation state → idle",
             ])
-            #expect(transitions.allSatisfy { $0.level == .debug })
-            #expect(transitions.allSatisfy { $0.fields.isEmpty })
+            let allDebug = transitions.allSatisfy { $0.level == .debug }
+            #expect(allDebug)
+            let allHaveNoFields = transitions.allSatisfy { $0.fields.isEmpty }
+            #expect(allHaveNoFields)
         }
     }
 
@@ -139,9 +139,10 @@ struct DictationLoggingTests {
             let transitions = dictationRecords(sink)
                 .filter { $0.message.rendered.hasPrefix("dictation state") }
             #expect(transitions.map(\.message.rendered).last == "dictation state → failed")
-            #expect(dictationRecords(sink).allSatisfy {
+            let noneMentionTheEngine = dictationRecords(sink).allSatisfy {
                 $0.formattedLine.contains("the engine gave up") == false
-            })
+            }
+            #expect(noneMentionTheEngine)
         }
     }
 }

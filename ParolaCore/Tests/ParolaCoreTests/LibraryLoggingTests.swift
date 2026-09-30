@@ -117,8 +117,10 @@ struct LibraryLoggingTests {
             try setPermissions(0o500, on: entry.bundleURL)
             defer { try? setPermissions(0o700, on: entry.bundleURL) }
 
-            await #expect(throws: (any Error).self) {
+            do {
                 try await store.updateTranscript(self.makeTranscript("edited"), for: entry.id)
+                Issue.record("expected a throw but none occurred")
+            } catch {
             }
 
             let found = records(sink, .library, message: "transcript write left disk ahead of memory")
@@ -146,8 +148,10 @@ struct LibraryLoggingTests {
             manifest["version"] = 99
             try JSONSerialization.data(withJSONObject: manifest).write(to: manifestURL)
 
-            await #expect(throws: (any Error).self) {
+            do {
                 try await store.setPinned(true, for: entry.id)
+                Issue.record("expected a throw but none occurred")
+            } catch {
             }
 
             let record = try #require(
@@ -174,8 +178,10 @@ struct LibraryLoggingTests {
             try setPermissions(0o500, on: libraryURL)
             defer { try? setPermissions(0o700, on: libraryURL) }
 
-            await #expect(throws: (any Error).self) {
+            do {
                 _ = try await store.adopt(parolaBundle: entry.bundleURL)
+                Issue.record("expected a throw but none occurred")
+            } catch {
             }
 
             let record = try #require(

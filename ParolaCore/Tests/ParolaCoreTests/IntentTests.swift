@@ -164,8 +164,10 @@ struct IntentTests {
                 try? await Task.sleep(for: .milliseconds(10))
                 spins += 1
             }
-            #expect(signalled.withLock { $0 }, "the Darwin signal is the one delivery channel")
-            #expect(notificationPosts.withLock { $0 } == 0, "a NotificationCenter post would double-fire the in-process subscriber")
+            let wasSignalled = signalled.withLock { $0 }
+            #expect(wasSignalled, "the Darwin signal is the one delivery channel")
+            let notificationCount = notificationPosts.withLock { $0 }
+            #expect(notificationCount == 0, "a NotificationCenter post would double-fire the in-process subscriber")
         }
     }
 

@@ -61,8 +61,12 @@ struct ModelDownloadLoggingTests {
     func unknownModel() async throws {
         try await withSink { sink in
             let store = try makeStore()
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await store.download(variant: "whisper-tiny", registry: EngineRegistry())
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(modelRecords(sink, message: "unknown model unrecognized").first)
             #expect(record.level == .error)
@@ -73,8 +77,12 @@ struct ModelDownloadLoggingTests {
     func policyBlocksDownloads() async throws {
         try await withSink { sink in
             let store = try makeStore(managed: ["disableModelDownloads": true])
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await store.download(variant: Self.tiny, registry: EngineRegistry())
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(
                 modelRecords(sink, message: "download blocked by policy").first
@@ -87,8 +95,12 @@ struct ModelDownloadLoggingTests {
     func policyBlocksEngine() async throws {
         try await withSink { sink in
             let store = try makeStore(managed: ["allowedEngines": ["whisperkit"]])
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await store.download(variant: Self.parakeet, registry: EngineRegistry())
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(
                 modelRecords(sink, message: "download blocked by policy for parakeet").first
@@ -125,7 +137,8 @@ struct ModelDownloadLoggingTests {
                 modelRecords(sink, message: "download finished for \(Self.tiny)").first
             )
             #expect(finish.level == .info)
-            #expect((finish.fields[.bytes].flatMap { Int64($0.text) } ?? 0) > 0)
+            let finishBytes = finish.fields[.bytes].flatMap { Int64($0.text) } ?? 0
+            #expect(finishBytes > 0)
             #expect(finish.fields[.elapsed] != nil)
         }
     }
@@ -166,8 +179,10 @@ struct ModelDownloadLoggingTests {
                 downloader: { _, _, _ in throw CocoaError(.fileWriteNoPermission) }
             )
 
-            await #expect(throws: (any Error).self) {
+            do {
                 _ = try await store.download(variant: Self.tiny, registry: registry)
+                Issue.record("expected a throw but none occurred")
+            } catch {
             }
 
             let record = try #require(modelRecords(sink, message: "download failed").first)
@@ -191,8 +206,12 @@ struct ModelDownloadLoggingTests {
                 downloader: { _, _, _ in throw CancellationError() }
             )
 
-            await #expect(throws: CancellationError.self) {
+            do {
                 _ = try await store.download(variant: Self.tiny, registry: registry)
+                Issue.record("expected CancellationError to be thrown")
+            } catch is CancellationError {
+            } catch {
+                Issue.record("expected CancellationError but got \(error)")
             }
 
             #expect(modelRecords(sink, message: "download failed").isEmpty)
@@ -209,8 +228,12 @@ struct ModelDownloadLoggingTests {
                 capabilities: .whisperKitDefaults,
                 factory: { _ in StubTranscriber() }
             )
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await store.download(variant: Self.parakeet, registry: registry)
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(
                 modelRecords(sink, message: "no downloader registered for parakeet").first
@@ -226,7 +249,13 @@ struct ModelDownloadLoggingTests {
             try store.seedInstalledModel(Self.tiny)
             let parent = store.installedURL(for: Self.tiny).deletingLastPathComponent()
             try withReadOnly(parent) {
-                #expect(throws: ParolaError.self) { try store.delete(variant: Self.tiny) }
+                do {
+                    try store.delete(variant: Self.tiny)
+                    Issue.record("expected ParolaError to be thrown")
+                } catch is ParolaError {
+                } catch {
+                    Issue.record("expected ParolaError but got \(error)")
+                }
             }
             let record = try #require(
                 modelRecords(sink, message: "delete failed for \(Self.tiny)").first
@@ -247,8 +276,12 @@ struct ModelDownloadLoggingTests {
             try Data("weights".utf8).write(to: orphan.appendingPathComponent("model.bin"))
 
             try withReadOnly(root) {
-                #expect(throws: ParolaError.self) {
+                do {
                     try store.deleteAny(idOrPath: "whisper-tiny-leftovers")
+                    Issue.record("expected ParolaError to be thrown")
+                } catch is ParolaError {
+                } catch {
+                    Issue.record("expected ParolaError but got \(error)")
                 }
             }
             let record = try #require(
@@ -267,7 +300,7 @@ struct ModelDownloadLoggingTests {
             )
             let destination = try temporaryDirectory()
             defer { try? FileManager.default.removeItem(at: destination) }
-            await #expect(throws: ParolaError.self) {
+            do {
                 try await HuggingFaceDownloader.snapshot(
                     repo: "argmaxinc/whisperkit-coreml",
                     subpath: Self.tiny,
@@ -275,6 +308,10 @@ struct ModelDownloadLoggingTests {
                     urlSession: session,
                     progress: nil
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(modelRecords(sink, message: "repo listing was empty").first)
             #expect(record.level == .error)
@@ -287,7 +324,7 @@ struct ModelDownloadLoggingTests {
             let session = Self.session(tree: Self.tree(size: 7), fileStatus: 503)
             let destination = try temporaryDirectory()
             defer { try? FileManager.default.removeItem(at: destination) }
-            await #expect(throws: ParolaError.self) {
+            do {
                 try await HuggingFaceDownloader.snapshot(
                     repo: "argmaxinc/whisperkit-coreml",
                     subpath: Self.tiny,
@@ -295,6 +332,10 @@ struct ModelDownloadLoggingTests {
                     urlSession: session,
                     progress: nil
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(
                 modelRecords(sink, message: "file download returned HTTP 503").first
@@ -310,7 +351,7 @@ struct ModelDownloadLoggingTests {
             let session = Self.session(tree: Self.tree(size: 7, sha256: String(repeating: "0", count: 64)))
             let destination = try temporaryDirectory()
             defer { try? FileManager.default.removeItem(at: destination) }
-            await #expect(throws: ParolaError.self) {
+            do {
                 try await HuggingFaceDownloader.snapshot(
                     repo: "argmaxinc/whisperkit-coreml",
                     subpath: Self.tiny,
@@ -318,6 +359,10 @@ struct ModelDownloadLoggingTests {
                     urlSession: session,
                     progress: nil
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(
                 modelRecords(sink, message: "checksum mismatch, file discarded").first
@@ -333,7 +378,7 @@ struct ModelDownloadLoggingTests {
             let session = Self.session(tree: Self.tree(size: 999))
             let destination = try temporaryDirectory()
             defer { try? FileManager.default.removeItem(at: destination) }
-            await #expect(throws: ParolaError.self) {
+            do {
                 try await HuggingFaceDownloader.snapshot(
                     repo: "argmaxinc/whisperkit-coreml",
                     subpath: Self.tiny,
@@ -341,6 +386,10 @@ struct ModelDownloadLoggingTests {
                     urlSession: session,
                     progress: nil
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(modelRecords(sink, message: "short file rejected").first)
             #expect(record.level == .error)
@@ -359,12 +408,16 @@ struct ModelDownloadLoggingTests {
                 capabilities: .whisperKitDefaults,
                 factory: { _ in StubTranscriber() }
             )
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await store.download(
                     variant: Self.tiny,
                     registry: registry,
                     urlSession: Self.session(tree: "[]")
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(modelRecords(sink, message: "download failed").first)
             #expect(record.level == .error)

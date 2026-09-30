@@ -20,14 +20,19 @@ struct EngineLoggingTests {
     func whisperKitTranscribeWithoutModel() async throws {
         try await withSink { sink in
             let engine = WhisperKitTranscriber(modelStore: try temporaryStore())
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await engine.transcribe(
                     url: URL(fileURLWithPath: "/dev/null"),
                     options: TranscriptionOptions(),
                     handlers: TranscribeHandlers()
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
-            let record = try #require(sink.records.first { $0.category == .engineWhisperKit })
+            let whisperKitRecord = sink.records.first { $0.category == .engineWhisperKit }
+            let record = try #require(whisperKitRecord)
             #expect(record.level == .fault)
             #expect(record.message.rendered == "transcribe called with no model loaded")
             #expect(record.fields.isEmpty)
@@ -38,10 +43,15 @@ struct EngineLoggingTests {
     func whisperKitLoadFailure() async throws {
         try await withSink { sink in
             let engine = WhisperKitTranscriber(modelStore: try temporaryStore())
-            await #expect(throws: ParolaError.self) {
+            do {
                 try await engine.load(model: "openai_whisper-tiny")
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
-            let record = try #require(sink.records.first { $0.category == .engineWhisperKit })
+            let whisperKitRecord = sink.records.first { $0.category == .engineWhisperKit }
+            let record = try #require(whisperKitRecord)
             #expect(record.level == .error)
             #expect(record.message.rendered == "model openai_whisper-tiny failed to load")
             #expect(record.fields[.error] != nil)
@@ -61,7 +71,8 @@ struct EngineLoggingTests {
                 echo, engine: .whisperKit, options: TranscriptionOptions(initialPrompt: "Parola"), audioURL: nil
             )
             #expect(finished.segments.isEmpty)
-            let record = try #require(sink.records.first { $0.category == .engineWhisperKit })
+            let whisperKitRecord = sink.records.first { $0.category == .engineWhisperKit }
+            let record = try #require(whisperKitRecord)
             #expect(record.level == .info)
             #expect(record.message.rendered == "dropped a transcript that was only the prompt read back")
             #expect(record.fields[.model] != nil)
@@ -72,14 +83,19 @@ struct EngineLoggingTests {
     func parakeetTranscribeWithoutModel() async throws {
         try await withSink { sink in
             let engine = ParakeetTranscriber(modelStore: try temporaryStore())
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await engine.transcribe(
                     url: URL(fileURLWithPath: "/dev/null"),
                     options: TranscriptionOptions(),
                     handlers: TranscribeHandlers()
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
-            let record = try #require(sink.records.first { $0.category == .engineParakeet })
+            let parakeetRecord = sink.records.first { $0.category == .engineParakeet }
+            let record = try #require(parakeetRecord)
             #expect(record.level == .fault)
             #expect(record.message.rendered == "transcribe called with no model loaded")
         }

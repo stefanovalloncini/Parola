@@ -66,10 +66,14 @@ struct StreamingLoggingTests {
             let (store, directory) = temporaryStore()
             defer { try? FileManager.default.removeItem(at: directory) }
             let session = StreamingTranscriptionSession(modelStore: store)
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await session.start(
                     options: TranscriptionOptions(model: "nvidia_parakeet-tdt-0.6b-v2")
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
             let record = try #require(streamingRecords(sink, message: "engine parakeet cannot stream").first)
             #expect(record.level == .notice)
@@ -86,8 +90,10 @@ struct StreamingLoggingTests {
             try store.seedInstalledModel("openai_whisper-tiny")
             let session = StreamingTranscriptionSession(modelStore: store)
             // The seeded directory holds no weights, so the model load fails offline right after.
-            await #expect(throws: (any Error).self) {
+            do {
                 _ = try await session.start(options: TranscriptionOptions(model: "openai_whisper-tiny"))
+                Issue.record("expected a throw but none occurred")
+            } catch {
             }
             let record = try #require(
                 streamingRecords(sink, message: "streaming session starting on whisperkit").first
@@ -208,8 +214,12 @@ struct StreamingLoggingTests {
             let cache = StreamingModelCache { _, _ in throw StreamingLogFailure() }
             let (store, directory) = temporaryStore()
             defer { try? FileManager.default.removeItem(at: directory) }
-            await #expect(throws: StreamingLogFailure.self) {
+            do {
                 _ = try await cache.borrow("openai_whisper-tiny", store: store)
+                Issue.record("expected StreamingLogFailure to be thrown")
+            } catch is StreamingLogFailure {
+            } catch {
+                Issue.record("expected StreamingLogFailure but got \(error)")
             }
             let record = try #require(await awaitRecord(sink, message: "model load failed"))
             #expect(record.level == .error)
@@ -224,8 +234,12 @@ struct StreamingLoggingTests {
             let cache = StreamingModelCache { _, _ in throw CancellationError() }
             let (store, directory) = temporaryStore()
             defer { try? FileManager.default.removeItem(at: directory) }
-            await #expect(throws: CancellationError.self) {
+            do {
                 _ = try await cache.borrow("openai_whisper-tiny", store: store)
+                Issue.record("expected CancellationError to be thrown")
+            } catch is CancellationError {
+            } catch {
+                Issue.record("expected CancellationError but got \(error)")
             }
             try await Task.sleep(for: .milliseconds(50))
             #expect(streamingRecords(sink, message: "model load failed").isEmpty)

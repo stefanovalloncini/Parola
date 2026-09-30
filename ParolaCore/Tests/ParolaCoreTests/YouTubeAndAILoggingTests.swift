@@ -44,8 +44,12 @@ struct YouTubeAndAILoggingTests {
     func unsupportedURL() async throws {
         try await withSink { sink in
             let url = URL(string: "https://videos.example.com/watch?v=secret")!
-            #expect(throws: ParolaError.self) {
+            do {
                 _ = try YouTubeAudioSource(url: url, features: .all)
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
 
             let record = try #require(
@@ -60,10 +64,14 @@ struct YouTubeAndAILoggingTests {
     @Test("a yt-dlp run that overruns its timeout is logged with the timeout, not the URL")
     func timeoutLogged() async throws {
         try await withSink { sink in
-            await #expect(throws: ParolaError.self) {
+            do {
                 _ = try await YtDlpRunner.run(
                     ytDlpPath: "/bin/sleep", arguments: ["5"], run: .download, watch: .wallClock(seconds: 0)
                 )
+                Issue.record("expected ParolaError to be thrown")
+            } catch is ParolaError {
+            } catch {
+                Issue.record("expected ParolaError but got \(error)")
             }
 
             let record = try #require(
@@ -98,8 +106,10 @@ struct YouTubeAndAILoggingTests {
                 provider: .openAI, apiKey: "sk-test", session: MockTransport.makeSession(handler: handler)
             )
 
-            await #expect(throws: (any Error).self) {
+            do {
                 _ = try await model.respond(history: [ChatTurn(role: .user, text: "hi")])
+                Issue.record("expected a throw but none occurred")
+            } catch {
             }
 
             let record = try #require(
@@ -118,8 +128,10 @@ struct YouTubeAndAILoggingTests {
                 provider: .anthropic, apiKey: "sk-test", session: MockTransport.makeSession(handler: handler)
             )
 
-            await #expect(throws: (any Error).self) {
+            do {
                 for try await _ in model.stream(history: [ChatTurn(role: .user, text: "hi")]) {}
+                Issue.record("expected a throw but none occurred")
+            } catch {
             }
 
             let record = try #require(records(sink, .ai, message: "anthropic stream failed").first)
@@ -139,8 +151,12 @@ struct YouTubeAndAILoggingTests {
                 modelName: "stub"
             )
 
-            await #expect(throws: SummaryService.FailureReason.self) {
+            do {
                 _ = try await service.summarise(transcript, model: ThrowingLanguageModel())
+                Issue.record("expected SummaryService.FailureReason to be thrown")
+            } catch is SummaryService.FailureReason {
+            } catch {
+                Issue.record("expected SummaryService.FailureReason but got \(error)")
             }
 
             let record = try #require(records(sink, .ai, message: "summary model failed").first)
