@@ -253,6 +253,28 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a model download waits while a take transcribes, as it waits for a file's run")
+        func downloadsWaitForTheTakesRun() async throws {
+            let audio = try makeTakeWAV("take-download", seconds: 2)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "held")], gate: gate)
+                let model = makeModel("take-download")
+                recordAndStop(model, audio: audio, seconds: 2)
+                let transcribing = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                #expect(transcribing)
+                #expect(model.phase == .idle)
+
+                #expect(model.downloadBlockedReason == "Wait for the current job to finish before downloading a model.")
+
+                await gate.open()
+                let landed = await waitUntil { model.takeTranscription == nil && self.isDone(model) }
+                #expect(landed)
+                #expect(model.downloadBlockedReason == nil)
+            }
+        }
+
         @Test("the Dock badge marks a take transcribing as it marks a file's run, and lets go once it lands")
         func dockBadgeMarksATakeTranscribing() async throws {
             #expect(DockBadge.badge(for: .idle, takeTranscribing: true, burnProgress: 0.4) == "•")

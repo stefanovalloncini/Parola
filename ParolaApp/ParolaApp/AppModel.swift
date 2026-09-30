@@ -2273,10 +2273,12 @@ final class AppModel {
         if recordingActive { return "Stop the recording before downloading a model." }
         switch phase {
         case .transcribing, .loadingModel, .fetchingLink:
-            return "Wait for the current job to finish before downloading a model."
+            break
         default:
-            return nil
+            // A take's run holds the run slot off the phase, so a download finishing under it could not hand the phase back.
+            guard takeTranscription != nil else { return nil }
         }
+        return "Wait for the current job to finish before downloading a model."
     }
 
     /// A pick that never starts downloading, or stops without installing, must not stick as the
