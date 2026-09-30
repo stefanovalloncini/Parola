@@ -4962,6 +4962,17 @@
         }
       }
     },
+    "Drop audio and video anywhere": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascina audio e video ovunque"
+          }
+        }
+      }
+    },
     "Drop audio or video": {
       "extractionState": "manual",
       "localizations": {
@@ -8651,17 +8662,6 @@
         }
       }
     },
-    "No Entries Yet": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ancora nessun elemento"
-          }
-        }
-      }
-    },
     "No Items Match These Filters": {
       "extractionState": "manual",
       "localizations": {
@@ -10201,6 +10201,17 @@
         }
       }
     },
+    "Paste a link": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incolla un link"
+          }
+        }
+      }
+    },
     "Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any supported site. Parola downloads the audio locally.": {
       "extractionState": "manual",
       "localizations": {
@@ -11241,6 +11252,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Opzioni di registrazione"
+          }
+        }
+      }
+    },
+    "Recording source": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sorgente di registrazione"
           }
         }
       }
@@ -16752,6 +16774,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "on"
+          }
+        }
+      }
+    },
+    "or drop audio and video anywhere": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "oppure trascina audio e video ovunque"
           }
         }
       }

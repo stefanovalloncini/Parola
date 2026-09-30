@@ -221,8 +221,8 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     }
 }
 
-/// Persisted settings that no Settings pane hosts — they are set from the transcript view, the library's
-/// Sort menu, the burn-in sheet and the captions windows. They stay out of `SettingsPaneScope.defaultsKeys` so a
+/// Persisted settings that no Settings pane hosts — they are set from the transcript view, the Library page,
+/// the burn-in sheet and the captions windows. They stay out of `SettingsPaneScope.defaultsKeys` so a
 /// pane's own Reset button only clears what that pane shows, but a backup or a full reset covers them.
 enum UnscopedSettingsKeys {
     static let all: [String] = [
@@ -233,7 +233,7 @@ enum UnscopedSettingsKeys {
         "liveCaptions.fontSize", "liveCaptions.opacity", "presenter.fontSize",
         "introductionComplete",
         "summaryOptions", "autostartSummary",
-        "libraryGroupsByDate",
+        "libraryGroupsByDate", "lastRecordSource",
     ]
 }
 

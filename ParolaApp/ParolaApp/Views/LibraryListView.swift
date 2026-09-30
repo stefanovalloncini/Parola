@@ -11,28 +11,46 @@ enum LibraryEmptyAction {
     case dictationSettings
 }
 
+/// What an emptied list shows: the page's own empty state when it holds nothing, Clear Filters when the filters hid it all.
+enum LibraryEmptyState {
+    enum Kind {
+        case none
+        case emptyLibrary
+        case noMatches
+    }
+
+    /// `entryCount` is what the page holds before any filter; without a filter on, Clear Filters would have nothing to clear.
+    static func kind(entryCount: Int, visibleCount: Int, filtersActive: Bool) -> Kind {
+        if entryCount == 0 { return .emptyLibrary }
+        return visibleCount == 0 && filtersActive ? .noMatches : .none
+    }
+
+    /// The page's category, or the whole library: a person narrows a page like any other filter.
+    static func entryCount(in entries: [LibraryEntry], category: EntryCategory?) -> Int {
+        guard let category else { return entries.count }
+        return entries.count(where: { $0.category == category })
+    }
+}
+
 enum LibraryListContent {
-    /// Leads with the action that produces the kind of entry the filter shows, then the fallbacks.
-    static func emptyActions(for category: EntryCategory?, features: FeatureSet) -> [LibraryEmptyAction] {
+    /// Leads with the action that produces the kind of entry the category holds, then the fallbacks.
+    static func emptyActions(for category: EntryCategory, features: FeatureSet) -> [LibraryEmptyAction] {
         var actions: [LibraryEmptyAction] = []
         if category == .meeting, features.isEnabled(.meetings) { actions.append(.recordSystemAudio) }
         if category == .dictation, features.isEnabled(.dictation) { actions.append(.startDictation) }
         actions.append(.openFile)
-        if category != .meeting, category != .dictation, features.isEnabled(.micRecording) {
-            actions.append(.recordMicrophone)
-        }
+        if category == .transcription, features.isEnabled(.micRecording) { actions.append(.recordMicrophone) }
         if category == .meeting, features.isEnabled(.meetings) { actions.append(.meetingSettings) }
         if category == .dictation, features.isEnabled(.dictation) { actions.append(.dictationSettings) }
         return actions
     }
 
     /// The source keys, not `LocalizedStringKey`, so the casing rule can be asserted over them.
-    static func emptyTitle(for category: EntryCategory?) -> String {
+    static func emptyTitle(for category: EntryCategory) -> String {
         switch category {
         case .transcription: return "No Transcriptions Yet"
         case .meeting: return "No Meetings Yet"
         case .dictation: return "No Dictations Yet"
-        case nil: return "No Entries Yet"
         }
     }
 
@@ -117,28 +135,6 @@ enum LibraryListContent {
             kept.dateRange = .all
         }
         return kept
-    }
-
-    /// True when the rows are empty only because of the filters — the category itself has entries to show.
-    static func filtersHideEverything(
-        _ active: ActiveFilters,
-        category: EntryCategory?,
-        entries: [LibraryEntry]
-    ) -> Bool {
-        guard !active.isEmpty else { return false }
-        let anyMatch = anyRow(
-            in: entries,
-            category: category,
-            labelFilter: active.label,
-            languageFilter: active.language,
-            dateRange: active.dateRange,
-            personFilter: active.person
-        )
-        guard !anyMatch else { return false }
-        return anyRow(
-            in: entries, category: category, labelFilter: nil, languageFilter: nil,
-            dateRange: .all, personFilter: nil
-        )
     }
 
     /// The same test `rows` applies, without building the array a caller only measures for emptiness.
@@ -336,6 +332,8 @@ private struct LibraryBrowseList: View, Equatable {
     @State private var entries: [LibraryRowDisplay] = []
     @State private var rowGroups: [LibraryDateGroups.Group] = []
     @State private var pageTotals = LibraryListContent.PageTotals()
+    /// Set with `entries`, so the empty state never judges fresh library contents against rows not yet rebuilt.
+    @State private var unfilteredCount = 0
     @State private var displayCache = LibraryRowDisplayCache()
     @State private var animatesRows = false
 
@@ -343,6 +341,10 @@ private struct LibraryBrowseList: View, Equatable {
         LibraryListContent.ActiveFilters(
             label: labelFilter, language: languageFilter, dateRange: dateRangeFilter, person: model.personFilter
         )
+    }
+
+    private var emptyKind: LibraryEmptyState.Kind {
+        LibraryEmptyState.kind(entryCount: unfilteredCount, visibleCount: entries.count, filtersActive: !activeFilters.isEmpty)
     }
 
     /// Narrows the category on screen; unlike a sidebar or bridge pick it never navigates.
@@ -383,15 +385,17 @@ private struct LibraryBrowseList: View, Equatable {
         pageTotals = LibraryListContent.pageTotals(
             of: model.libraryEntries, category: category, person: filters.person, sizes: model.libraryBundleSizes
         )
+        unfilteredCount = LibraryEmptyState.entryCount(in: model.libraryEntries, category: category)
         return displays
     }
 
     var body: some View {
+        let kind = emptyKind
+        let showsHero = kind == .emptyLibrary && category == nil
         VStack(spacing: 0) {
-            pageTop
-            if entries.isEmpty {
-                emptyState
-            } else {
+            pageTop(showsIntake: !showsHero)
+            switch kind {
+            case .none:
                 LibraryRowList(
                     groups: rowGroups,
                     selection: $selection,
@@ -405,16 +409,17 @@ private struct LibraryBrowseList: View, Equatable {
                     focusKey: .browse
                 )
                 .scrollEdgeEffectStyle(.soft, for: .top)
+            case .noMatches:
+                noMatchesState
+            case .emptyLibrary:
+                if let category {
+                    emptyState(of: category)
+                } else {
+                    heroState
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Paste is offered by type alone; the contents are read once the paste happens, and anything but a link is dropped.
-        .onPasteCommand(of: [.url, .plainText]) { _ in
-            model.features.isEnabled(.youtube) && PastedLink.mayHoldLink(on: .general) ? () : nil
-        } perform: { _ in
-            guard let link = PastedLink.url(on: .general) else { return }
-            model.openLinkSheet(prefill: link)
-        }
         .onAppear { recomputeEntries() }
         // Later than onAppear's first fill, so the rows the route opens with don't animate in.
         .task { animatesRows = true }
@@ -460,7 +465,8 @@ private struct LibraryBrowseList: View, Equatable {
         ))
     }
 
-    private var pageTop: some View {
+    /// The hero on an empty library says what the intake strip would, so the strip stands aside for it.
+    private func pageTop(showsIntake: Bool) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             LibraryPageHeader(
                 title: LibraryPageHeader.title(category: category, personName: selectedPerson?.name),
@@ -480,7 +486,9 @@ private struct LibraryBrowseList: View, Equatable {
                 selection: selection,
                 pendingBulkDelete: $pendingBulkDelete
             )
-            IntakeStrip()
+            if showsIntake {
+                IntakeStrip()
+            }
             LibraryFailureBanner()
         }
         .padding(.horizontal, DS.Spacing.large)
@@ -488,34 +496,38 @@ private struct LibraryBrowseList: View, Equatable {
         .padding(.bottom, DS.Spacing.small)
     }
 
-    @ViewBuilder
-    private var emptyState: some View {
-        if filterHidesEverything {
-            filteredEmptyState
-        } else {
-            EmptyStateView(systemImage: emptyIcon, title: emptyTitle) {
-                let actions = LibraryListContent.emptyActions(for: category, features: model.features)
-                ForEach(Array(actions.enumerated()), id: \.offset) { index, action in
-                    Button {
-                        perform(action)
-                    } label: {
-                        Label(action.title, systemImage: action.systemImage)
-                    }
-                    .buttonStyle(DSPillButtonStyle(kind: index == 0 ? .primary : .secondary))
-                    .accessibilityIdentifier(action.identifier)
-                    .axLeaf(action.axIdentifier)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    private var heroState: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: DS.Spacing.large)
+            EmptyLibraryHero()
+            Spacer(minLength: DS.Spacing.large)
         }
+        .padding(.horizontal, DS.Spacing.large)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// The category has rows; the filters are what emptied it. Offering "Record" here would be a lie.
-    private var filterHidesEverything: Bool {
-        LibraryListContent.filtersHideEverything(activeFilters, category: category, entries: model.libraryEntries)
+    private func emptyState(of category: EntryCategory) -> some View {
+        EmptyStateView(
+            systemImage: DS.categorySymbol(for: category),
+            title: LocalizedStringKey(LibraryListContent.emptyTitle(for: category))
+        ) {
+            let actions = LibraryListContent.emptyActions(for: category, features: model.features)
+            ForEach(Array(actions.enumerated()), id: \.offset) { index, action in
+                Button {
+                    perform(action)
+                } label: {
+                    Label(action.title, systemImage: action.systemImage)
+                }
+                .buttonStyle(DSPillButtonStyle(kind: index == 0 ? .primary : .secondary))
+                .axLeaf(action.axLeaf)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .axBranch("Empty")
     }
 
-    private var filteredEmptyState: some View {
+    /// The page has rows; the filters are what emptied it. Offering "Record" here would be a lie.
+    private var noMatchesState: some View {
         EmptyStateView(
             systemImage: "line.3.horizontal.decrease.circle",
             title: LocalizedStringKey(LibraryListContent.filteredEmptyTitle)
@@ -531,9 +543,10 @@ private struct LibraryBrowseList: View, Equatable {
                 Label("Clear Filters", systemImage: "xmark.circle")
             }
             .buttonStyle(DSPillButtonStyle(kind: .primary))
-            .axLeaf("Empty.Button.ClearFilters")
+            .axLeaf("ClearFilters")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .axBranch("Empty")
     }
 
     private func perform(_ action: LibraryEmptyAction) {
@@ -549,15 +562,6 @@ private struct LibraryBrowseList: View, Equatable {
 
     private var selectedPerson: Person? {
         model.personFilter.flatMap(model.person(id:))
-    }
-
-    private var emptyTitle: LocalizedStringKey {
-        LocalizedStringKey(LibraryListContent.emptyTitle(for: category))
-    }
-
-    private var emptyIcon: String {
-        guard let category else { return "tray" }
-        return DS.categorySymbol(for: category)
     }
 }
 
@@ -589,30 +593,19 @@ extension LibraryEmptyAction {
         case .openFile: return "doc.badge.plus"
         case .recordMicrophone: return "mic.fill"
         case .recordSystemAudio: return "waveform.circle.fill"
-        case .startDictation: return "text.cursor"
+        case .startDictation: return DS.categorySymbol(for: .dictation)
         case .meetingSettings, .dictationSettings: return "gearshape"
         }
     }
 
-    var identifier: String {
+    var axLeaf: String {
         switch self {
-        case .openFile: return "empty.openFile"
-        case .recordMicrophone: return "empty.record"
-        case .recordSystemAudio: return "empty.recordSystemAudio"
-        case .startDictation: return "empty.startDictation"
-        case .meetingSettings: return "empty.meetingSettings"
-        case .dictationSettings: return "empty.dictationSettings"
-        }
-    }
-
-    var axIdentifier: String {
-        switch self {
-        case .openFile: return "Empty.Button.OpenFile"
-        case .recordMicrophone: return "Empty.Button.Record"
-        case .recordSystemAudio: return "Empty.Button.RecordSystemAudio"
-        case .startDictation: return "Empty.Button.StartDictation"
-        case .meetingSettings: return "Empty.Button.MeetingSettings"
-        case .dictationSettings: return "Empty.Button.DictationSettings"
+        case .openFile: return "OpenFiles"
+        case .recordMicrophone: return "Record"
+        case .recordSystemAudio: return "RecordSystemAudio"
+        case .startDictation: return "StartDictation"
+        case .meetingSettings: return "MeetingSettings"
+        case .dictationSettings: return "DictationSettings"
         }
     }
 }

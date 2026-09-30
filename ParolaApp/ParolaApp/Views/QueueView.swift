@@ -112,9 +112,10 @@ struct QueueView: View {
                 Text("Add Files…")
             }
             .buttonStyle(DSPillButtonStyle(kind: .primary))
-            .axLeaf("Empty.Button.AddFiles")
+            .axLeaf("AddFiles")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .axBranch("Empty")
     }
 
     private var hasFinishedJobs: Bool {

@@ -276,45 +276,17 @@ struct LibraryListContentTests {
         #expect(kept.language == nil)
     }
 
-    @Test("an empty filtered list is told apart from an empty category")
-    func filteredEmptyIsNotAnEmptyCategory() {
-        let entries = mixedLibrary()
-
-        #expect(LibraryListContent.filtersHideEverything(
-            LibraryListContent.ActiveFilters(label: "recap", language: "IT"),
-            category: .meeting,
-            entries: entries
-        ))
-        #expect(!LibraryListContent.filtersHideEverything(
-            LibraryListContent.ActiveFilters(label: "recap"),
-            category: .meeting,
-            entries: entries
-        ))
-        #expect(!LibraryListContent.filtersHideEverything(
-            LibraryListContent.ActiveFilters(),
-            category: .meeting,
-            entries: entries
-        ))
-        // Nothing in Dictations at all: that is the "no dictations yet" state, not a filter problem.
-        #expect(!LibraryListContent.filtersHideEverything(
-            LibraryListContent.ActiveFilters(label: "recap"),
-            category: .dictation,
-            entries: entries
-        ))
-    }
-
-    @Test("each filter's empty state leads with an action that produces that kind of entry")
-    func emptyActionsMatchTheFilter() {
+    @Test("each category's empty state leads with an action that produces that kind of entry")
+    func emptyActionsMatchTheCategory() {
         #expect(LibraryListContent.emptyActions(for: .dictation, features: .all).first == .startDictation)
         #expect(LibraryListContent.emptyActions(for: .meeting, features: .all).first == .recordSystemAudio)
         #expect(LibraryListContent.emptyActions(for: .transcription, features: .all).first == .openFile)
-        #expect(LibraryListContent.emptyActions(for: nil, features: .all).first == .openFile)
     }
 
     @Test("empty-state actions drop the ones their feature is gated off")
     func emptyActionsRespectFeatures() {
         let noCapture = FeatureSet(enabled: [.batch])
-        #expect(LibraryListContent.emptyActions(for: nil, features: noCapture) == [.openFile])
+        #expect(LibraryListContent.emptyActions(for: .transcription, features: noCapture) == [.openFile])
         #expect(LibraryListContent.emptyActions(for: .transcription, features: .all) == [.openFile, .recordMicrophone])
         #expect(LibraryListContent.emptyActions(for: .meeting, features: noCapture) == [.openFile])
         #expect(LibraryListContent.emptyActions(for: .dictation, features: noCapture) == [.openFile])
@@ -325,7 +297,12 @@ struct LibraryListContentTests {
         #expect(LibraryListContent.emptyActions(for: .meeting, features: .all).last == .meetingSettings)
         #expect(LibraryListContent.emptyActions(for: .dictation, features: .all).last == .dictationSettings)
         #expect(!LibraryListContent.emptyActions(for: .transcription, features: .all).contains(.meetingSettings))
-        #expect(!LibraryListContent.emptyActions(for: nil, features: .all).contains(.dictationSettings))
+        #expect(!LibraryListContent.emptyActions(for: .transcription, features: .all).contains(.dictationSettings))
+    }
+
+    @Test("Start Dictation wears the dictation glyph the sidebar and rows use")
+    func startDictationGlyph() {
+        #expect(LibraryEmptyAction.startDictation.systemImage == DS.categorySymbol(for: .dictation))
     }
 
     @Test("a gated-off feature takes its settings shortcut with it")

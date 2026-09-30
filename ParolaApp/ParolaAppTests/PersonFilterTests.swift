@@ -93,13 +93,21 @@ struct PersonFilterTests {
     @Test("a filter that hides every row reads as the filters' doing")
     func filtersHideEverything() async {
         let model = await makeModel()
-        let onlyGrace = LibraryListContent.ActiveFilters(person: grace)
-        #expect(!LibraryListContent.filtersHideEverything(onlyGrace, category: .meeting, entries: model.libraryEntries))
-        #expect(LibraryListContent.filtersHideEverything(
-            LibraryListContent.ActiveFilters(label: "nope", person: grace),
-            category: nil,
-            entries: model.libraryEntries
-        ))
+        func emptyKind(_ filters: LibraryListContent.ActiveFilters, category: EntryCategory?) -> LibraryEmptyState.Kind {
+            let visible = LibraryListContent.rows(
+                from: model.libraryEntries, category: category, labelFilter: filters.label, languageFilter: filters.language,
+                dateRange: filters.dateRange, personFilter: filters.person
+            )
+            return LibraryEmptyState.kind(
+                entryCount: LibraryEmptyState.entryCount(in: model.libraryEntries, category: category),
+                visibleCount: visible.count,
+                filtersActive: !filters.isEmpty
+            )
+        }
+        let noMeetings = emptyKind(LibraryListContent.ActiveFilters(person: grace), category: .meeting)
+        let nothingMatches = emptyKind(LibraryListContent.ActiveFilters(label: "nope", person: grace), category: nil)
+        #expect(noMeetings == .emptyLibrary, "no meetings at all is the page's own empty state")
+        #expect(nothingMatches == .noMatches)
     }
 
     @Test("browsing to a person brings the library list forward, and clearing it leaves the list alone")

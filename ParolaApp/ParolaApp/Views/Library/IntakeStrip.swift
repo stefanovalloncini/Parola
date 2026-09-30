@@ -116,8 +116,16 @@ enum IntakeSummary {
     }
 }
 
-/// "Whisper Turbo · Auto ›": opens the popover that sets up the next run.
-private struct IntakeSettingsButton: View {
+/// "Whisper Turbo · Auto ›": opens the popover that sets up the next run. Accent in the strip, quiet under the hero.
+struct IntakeSettingsButton: View {
+    enum Style {
+        case accent
+        case quiet
+    }
+
+    var style: Style = .accent
+    var leaf = "Intake.Button.Settings"
+
     @Environment(AppModel.self) private var model
     @State private var isPresented = false
 
@@ -132,8 +140,8 @@ private struct IntakeSettingsButton: View {
                     .font(.system(size: 9, weight: .semibold))
                     .accessibilityHidden(true)
             }
-            .font(DS.Font.secondary.weight(.medium))
-            .foregroundStyle(DS.Color.accentInk)
+            .font(style == .accent ? DS.Font.secondary.weight(.medium) : DS.Font.secondary)
+            .foregroundStyle(style == .accent ? DS.Color.accentInk : DS.Color.secondaryText)
             .lineLimit(1)
             .contentShape(Rectangle())
         }
@@ -145,7 +153,7 @@ private struct IntakeSettingsButton: View {
         .help("Transcription settings")
         .accessibilityLabel(Text("Transcription settings"))
         .accessibilityValue(Text(verbatim: parts.joined(separator: ", ")))
-        .axLeaf("Intake.Button.Settings")
+        .axLeaf(leaf)
     }
 }
 

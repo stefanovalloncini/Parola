@@ -1075,6 +1075,7 @@ final class AppModel {
         self.showMostUsedPeople = readBool("showMostUsedPeople", default: true)
         self.openEntriesInNewWindow = defaults.bool(forKey: "openEntriesInNewWindow")
         self.libraryGroupsByDate = readBool("libraryGroupsByDate", default: true)
+        self.lastRecordSource = defaults.string(forKey: "lastRecordSource").flatMap(RecordSource.init(rawValue:)) ?? .microphone
         introduction.reloadFromDefaults()
     }
 
@@ -1562,6 +1563,8 @@ final class AppModel {
         }
     }
     var libraryGroupsByDate: Bool = true { didSet { defaults.set(libraryGroupsByDate, forKey: "libraryGroupsByDate") } }
+    /// The empty library's Microphone | System Audio choice.
+    var lastRecordSource: RecordSource = .microphone { didSet { defaults.set(lastRecordSource.rawValue, forKey: "lastRecordSource") } }
     // Observed on purpose: the settings pane reads these, and refreshBundleSizes fills them asynchronously, so the assignment must re-render.
     var libraryBundleSizes: [String: Int64] = [:] {
         didSet { libraryBundleSizesVersion &+= 1 }

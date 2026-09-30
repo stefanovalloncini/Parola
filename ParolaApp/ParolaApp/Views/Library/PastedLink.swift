@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import ParolaCore
 
-/// What ⌘V on the Library page hands the link sheet: one address Parola can fetch, or nothing.
+/// What ⌘V in the main window hands the link sheet: one address Parola can fetch, or nothing.
 enum PastedLink {
     static func url(from text: String) -> URL? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
