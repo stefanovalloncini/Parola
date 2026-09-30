@@ -32,33 +32,33 @@ struct ShortcutCatalog {
 
     private static let allSections: [Section] = [
         Section(title: "Capture", entries: [
-            Entry(label: "New Recording",          keys: "⌘ N", requires: .micRecording),
+            Entry(label: "New Recording",              keys: "⌘ N", requires: .micRecording),
             Entry(label: "New System Audio Recording", keys: "⌘ ⌥ N", requires: .meetings),
-            Entry(label: "Toggle Live Captions",   keys: "⌘ ⇧ L", requires: .liveCaptions),
-            Entry(label: "Enter Presenter Mode",   keys: "⌘ ⇧ P", requires: .liveCaptions),
-            Entry(label: "Show Scratchpad",        keys: "⌘ ⇧ K", requires: .dictation),
+            Entry(label: "Toggle Live Captions",       keys: "⌘ ⇧ L", requires: .liveCaptions),
+            Entry(label: "Enter Presenter Mode",       keys: "⌘ ⇧ P", requires: .liveCaptions),
+            Entry(label: "Show Scratchpad",            keys: "⌘ ⇧ K", requires: .dictation),
         ]),
         Section(title: "Transcript", entries: [
-            Entry(label: "Find",                   keys: "⌘ F"),
-            Entry(label: "Export as TXT",          keys: "⌘ E"),
-            Entry(label: "Print Transcript",       keys: "⌘ P"),
-            Entry(label: "Focus Chat Composer",    keys: "⌘ L", requires: .ai),
-            Entry(label: "Toggle Inspector",       keys: "⌘ ⇧ I"),
+            Entry(label: "Find",                       keys: "⌘ F"),
+            Entry(label: "Export as TXT",              keys: "⌘ E"),
+            Entry(label: "Print Transcript",           keys: "⌘ P"),
+            Entry(label: "Focus Chat Composer",        keys: "⌘ L", requires: .ai),
+            Entry(label: "Toggle Inspector",           keys: "⌘ ⇧ I"),
         ]),
         Section(title: "Playback", entries: [
-            Entry(label: "Play / Pause",           keys: "Space"),
-            Entry(label: "Skip Back 5 Seconds",    keys: "⌘ ←"),
-            Entry(label: "Skip Forward 5 Seconds", keys: "⌘ →"),
+            Entry(label: "Play / Pause",               keys: "Space"),
+            Entry(label: "Skip Back 5 Seconds",        keys: "⌘ ←"),
+            Entry(label: "Skip Forward 5 Seconds",     keys: "⌘ →"),
         ]),
         Section(title: "Navigation", entries: [
-            Entry(label: "Back to the List",       keys: "⌘ ["),
-            Entry(label: "Open Settings",          keys: "⌘ ,"),
-            Entry(label: "Open…",                  keys: "⌘ O"),
-            Entry(label: "Search Library",         keys: "⌘ ⌥ F"),
-            Entry(label: "Auto-Detect Language",   keys: "⌘ ⇧ D"),
+            Entry(label: "Back to the List",           keys: "⌘ ["),
+            Entry(label: "Open Settings",              keys: "⌘ ,"),
+            Entry(label: "Open…",                      keys: "⌘ O"),
+            Entry(label: "Search Library",             keys: "⌘ ⌥ F"),
+            Entry(label: "Auto-Detect Language",       keys: "⌘ ⇧ D"),
         ]),
         Section(title: "Help", entries: [
-            Entry(label: "Keyboard Shortcuts",     keys: "⌘ /"),
+            Entry(label: "Keyboard Shortcuts",         keys: "⌘ /"),
         ]),
     ]
 }

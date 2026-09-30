@@ -4647,6 +4647,17 @@
         }
       }
     },
+    "Dictation uses the model set in Transcription Defaults or on the Library page.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La dettatura usa il modello impostato in Predefiniti trascrizione o nella pagina Libreria."
+          }
+        }
+      }
+    },
     "Dictations": {
       "extractionState": "manual",
       "localizations": {
@@ -13990,17 +14001,6 @@
         }
       }
     },
-    "The main-window toolbar overrides these per transcript.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La toolbar della finestra principale fa override di queste impostazioni per trascrizione."
-          }
-        }
-      }
-    },
     "The menu bar item carries quick actions and recent transcripts. Without the Dock icon Parola stays out of ⌘-Tab.": {
       "extractionState": "manual",
       "localizations": {
@@ -15719,17 +15719,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Usato per la voce attiva nella sidebar, i bottoni principali e altri elementi in evidenza."
-          }
-        }
-      }
-    },
-    "Used when you start a transcription without picking one in the toolbar.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Usato quando avvii una trascrizione senza scegliere un modello dalla toolbar."
           }
         }
       }

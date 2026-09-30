@@ -63,7 +63,7 @@ struct DictationPane: View {
                     .axLeaf("Dictation.Picker.Mode")
                 }
                 SettingRow("Model",
-                           description: "Dictation uses the model picked in the main toolbar.") {
+                           description: "Dictation uses the model set in Transcription Defaults or on the Library page.") {
                     Text(AppModel.modelLabel(model.selectedModel))
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
