@@ -193,8 +193,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                 .lineLimit(1)
             if display.pinned {
                 Image(systemName: "pin.fill")
-                    .font(DS.Font.caption)
-                    .imageScale(.small)
+                    .font(.system(size: 9))
                     .foregroundStyle(secondaryStyle)
                     .accessibilityLabel("Pinned")
             }
@@ -202,7 +201,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             labelChips
             if let language = display.language {
                 chip {
-                    HStack(spacing: DS.Spacing.hair) {
+                    HStack(spacing: 3) {
                         Image(systemName: "globe")
                             .accessibilityHidden(true)
                         Text(verbatim: language)
@@ -269,7 +268,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         let shown = Array(display.labels.prefix(2))
         let hidden = display.labels.count - shown.count
         if !shown.isEmpty {
-            HStack(spacing: DS.Spacing.tight) {
+            HStack(spacing: DS.Spacing.snug) {
                 ForEach(shown, id: \.self) { label in
                     chip { Text(verbatim: label) }
                 }
