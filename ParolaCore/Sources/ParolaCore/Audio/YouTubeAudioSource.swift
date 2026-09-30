@@ -46,12 +46,19 @@ public actor YouTubeAudioSource {
     nonisolated let workingDir: URL
     private let ytDlpPath: String?
     private let limits: YtDlpRunner.ProgressLimits
+    private let clock: any Clock<Duration>
 
     public init(url: URL, features: FeatureSet = .resolve()) throws {
         try self.init(url: url, features: features, ytDlpPath: YtDlpLocator.locate(), limits: .init())
     }
 
-    init(url: URL, features: FeatureSet, ytDlpPath: String?, limits: YtDlpRunner.ProgressLimits) throws {
+    init(
+        url: URL,
+        features: FeatureSet,
+        ytDlpPath: String?,
+        limits: YtDlpRunner.ProgressLimits,
+        clock: any Clock<Duration> = ContinuousClock()
+    ) throws {
         try features.require(.youtube)
         guard url.isYtDlpSupported else {
             ParolaLog.notice(.youtube, "URL is not on a host yt-dlp can fetch from")
@@ -60,6 +67,7 @@ public actor YouTubeAudioSource {
         self.url = url
         self.ytDlpPath = ytDlpPath
         self.limits = limits
+        self.clock = clock
         self.workingDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(LinkDownloadFolders.prefix)\(UUID().uuidString)")
     }
@@ -87,7 +95,8 @@ public actor YouTubeAudioSource {
             arguments: Self.arguments(url: url, outputTemplate: workingDir.appendingPathComponent("audio.%(ext)s").path),
             run: .download,
             watch: .progress(limits),
-            site: site
+            site: site,
+            clock: clock
         ) { line in
             guard let event = line.event else { return }
             processing.withLock { seen in
@@ -100,7 +109,8 @@ public actor YouTubeAudioSource {
 
         guard output.status == 0 else {
             let failure = await YouTubeProcess.failure(
-                exitStatus: output.status, stderr: output.stderr, stdout: output.stdoutText, ytDlpPath: ytDlp, site: site
+                exitStatus: output.status, stderr: output.stderr, stdout: output.stdoutText, ytDlpPath: ytDlp, site: site,
+                clock: clock
             )
             let error = ParolaError.linkDownloadFailed(failure)
             ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(output.status))", [.error: .error(error)])

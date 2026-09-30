@@ -58,14 +58,17 @@ enum YouTubeProcess {
         run: YtDlpRun,
         watch: YtDlpRunner.Watch,
         site: String?,
+        clock: any Clock<Duration> = ContinuousClock(),
         onLine: @escaping @Sendable (YtDlpLine) -> Void = { _ in }
     ) async throws -> YtDlpRunner.Output {
         do {
-            return try await YtDlpRunner.run(ytDlpPath: ytDlpPath, arguments: arguments, run: run, watch: watch, onLine: onLine)
+            return try await YtDlpRunner.run(
+                ytDlpPath: ytDlpPath, arguments: arguments, run: run, watch: watch, clock: clock, onLine: onLine
+            )
         } catch ParolaError.linkDownloadFailed(var failure) {
             failure.site = site
             guard failure.reason != .toolFailedToStart else { throw ParolaError.linkDownloadFailed(failure) }
-            let version = await YtDlpVersion.installed(at: ytDlpPath)
+            let version = await YtDlpVersion.installed(at: ytDlpPath, clock: clock)
             throw ParolaError.linkDownloadFailed(failure.noting(installedVersion: version, now: Date()))
         }
     }
@@ -76,9 +79,10 @@ enum YouTubeProcess {
         stderr: String,
         stdout: String,
         ytDlpPath: String,
-        site: String?
+        site: String?,
+        clock: any Clock<Duration> = ContinuousClock()
     ) async -> LinkDownloadFailure {
-        let version = await YtDlpVersion.installed(at: ytDlpPath)
+        let version = await YtDlpVersion.installed(at: ytDlpPath, clock: clock)
         return LinkDownloadFailure(
             exitStatus: exitStatus,
             stderr: stderr,
@@ -93,8 +97,13 @@ enum YouTubeProcess {
 extension YtDlpVersion {
     /// Runs `yt-dlp --version`. Nil when it can't run, fails, or prints something that isn't a version.
     public static func installed(at path: String, timeoutSeconds: Int = 10) async -> YtDlpVersion? {
+        await installed(at: path, timeoutSeconds: timeoutSeconds, clock: ContinuousClock())
+    }
+
+    static func installed(at path: String, timeoutSeconds: Int = 10, clock: any Clock<Duration>) async -> YtDlpVersion? {
         guard let output = try? await YtDlpRunner.run(
-            ytDlpPath: path, arguments: ["--version"], run: .versionCheck, watch: .wallClock(seconds: timeoutSeconds)
+            ytDlpPath: path, arguments: ["--version"], run: .versionCheck, watch: .wallClock(seconds: timeoutSeconds),
+            clock: clock
         ), output.status == 0 else { return nil }
         return YtDlpVersion(output.stdoutText)
     }

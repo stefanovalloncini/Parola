@@ -52,6 +52,7 @@ enum YtDlpRunner {
         arguments: [String],
         run: YtDlpRun,
         watch: Watch,
+        clock: any Clock<Duration> = ContinuousClock(),
         onLine: @escaping @Sendable (YtDlpLine) -> Void = { _ in }
     ) async throws -> Output {
         let process = Process()
@@ -64,7 +65,7 @@ enum YtDlpRunner {
         process.standardError = stderrPipe
         let stdoutLines = PipeLines(stdoutPipe)
         let stderrLines = PipeLines(stderrPipe)
-        let watchdog = Watchdog(watch)
+        let watchdog = Watchdog(watch, clock: clock)
 
         let exit: ExitSignal
         do {
@@ -115,7 +116,7 @@ enum YtDlpRunner {
             return first
         }
         // A grandchild that inherited a pipe would hold it open past the exit, so the readers get two seconds to finish.
-        let drained = await AsyncTimeout.run(.seconds(2)) { () async -> Bool in
+        let drained = await AsyncTimeout.run(.seconds(2), clock: clock) { () async -> Bool in
             _ = await stdoutReader.value
             _ = await stderrReader.value
             return true
@@ -158,35 +159,37 @@ enum YtDlpRunner {
         }
     }
 
-    /// Keeps the run's deadline: fixed for a wall clock, pushed out by each metadata or progress line for a download.
+    /// Keeps the run's deadline, as an offset from its start: fixed for a wall clock, pushed out by each metadata or progress line for a download.
     final class Watchdog: Sendable {
         private struct State {
-            var deadline: ContinuousClock.Instant
+            var deadline: Duration
             var expiry: Ending
             var mediaSeconds: Double?
         }
 
         private let watch: Watch
-        private let ceiling: ContinuousClock.Instant
+        private let elapsed: Elapsed
+        private let ceiling: Duration
         private let state: OSAllocatedUnfairLock<State>
 
-        init(_ watch: Watch, now: ContinuousClock.Instant = .now) {
+        init(_ watch: Watch, clock: any Clock<Duration> = ContinuousClock()) {
             self.watch = watch
+            elapsed = Elapsed(clock)
             switch watch {
             case .wallClock(let seconds):
-                ceiling = now + .seconds(seconds)
+                ceiling = .seconds(seconds)
                 state = OSAllocatedUnfairLock(initialState: State(deadline: ceiling, expiry: .wallClock(seconds: seconds)))
             case .progress(let limits):
-                ceiling = now + limits.ceiling
+                ceiling = limits.ceiling
                 state = OSAllocatedUnfairLock(initialState: State(
-                    deadline: now + limits.startup, expiry: .stalled(seconds: Self.wholeSeconds(limits.startup))
+                    deadline: limits.startup, expiry: .stalled(seconds: Self.wholeSeconds(limits.startup))
                 ))
             }
         }
 
         func observe(_ line: YtDlpLine) {
             guard case .progress(let limits) = watch else { return }
-            let now = ContinuousClock.now
+            let now = elapsed.now()
             state.withLock { state in
                 switch line {
                 case .metadata(let metadata):
@@ -208,18 +211,18 @@ enum YtDlpRunner {
         func expiry() async -> Ending {
             while !Task.isCancelled {
                 let (deadline, ending) = state.withLock { ($0.deadline, $0.expiry) }
-                let now = ContinuousClock.now
+                let now = elapsed.now()
                 if now >= ceiling, case .progress(let limits) = watch {
                     return .wallClock(seconds: Self.wholeSeconds(limits.ceiling))
                 }
                 if now >= deadline { return ending }
                 // A line can also bring the deadline closer, so no single sleep outlasts a second.
-                try? await Task.sleep(until: min(deadline, ceiling, now + .seconds(1)), clock: .continuous)
+                try? await elapsed.sleep(min(deadline, ceiling, now + .seconds(1)))
             }
             return .cancelled
         }
 
-        private static func pushQuietDeadline(_ state: inout State, now: ContinuousClock.Instant, limits: ProgressLimits) {
+        private static func pushQuietDeadline(_ state: inout State, now: Duration, limits: ProgressLimits) {
             guard case .stalled = state.expiry else { return }
             state.deadline = now + limits.quiet
             state.expiry = .stalled(seconds: wholeSeconds(limits.quiet))
@@ -227,6 +230,18 @@ enum YtDlpRunner {
 
         private static func wholeSeconds(_ duration: Duration) -> Int {
             Int(duration.components.seconds)
+        }
+    }
+
+    /// Time since a start on one clock, kept as a plain `Duration` so the watchdog needn't know which clock it is.
+    private struct Elapsed: Sendable {
+        let now: @Sendable () -> Duration
+        let sleep: @Sendable (_ until: Duration) async throws -> Void
+
+        init<C: Clock<Duration>>(_ clock: C) {
+            let start = clock.now
+            now = { start.duration(to: clock.now) }
+            sleep = { try await clock.sleep(until: start.advanced(by: $0), tolerance: nil) }
         }
     }
 }
