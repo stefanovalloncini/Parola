@@ -35,8 +35,8 @@ struct CompletionSoundTests {
 
         model.land(RunLanding(kind: .file, transcript: makeTranscript()))
 
-        #expect(await waitUntil { sound.plays == 1 })
-        #expect(await waitUntil { model.libraryEntries.count == 1 })
+        await awaitGuarded("the landing's steps") { await model.awaitLandingSteps() }
+        #expect(model.libraryEntries.count == 1)
         #expect(sound.plays == 1)
     }
 
@@ -46,7 +46,8 @@ struct CompletionSoundTests {
 
         model.land(RunLanding(kind: .salvagedTake, transcript: makeTranscript()))
 
-        #expect(await waitUntil { model.libraryEntries.count == 1 })
+        await awaitGuarded("the landing's steps") { await model.awaitLandingSteps() }
+        #expect(model.libraryEntries.count == 1)
         #expect(sound.plays == 0)
     }
 
@@ -57,7 +58,8 @@ struct CompletionSoundTests {
 
         model.land(RunLanding(kind: .file, transcript: makeTranscript()))
 
-        #expect(await waitUntil { model.libraryEntries.count == 1 })
+        await awaitGuarded("the landing's steps") { await model.awaitLandingSteps() }
+        #expect(model.libraryEntries.count == 1)
         #expect(sound.plays == 0)
     }
 
@@ -152,7 +154,8 @@ struct CompletionSoundTests {
 
         model.importSubtitle(fileURL: srt)
 
-        #expect(await waitUntil { model.libraryEntries.count == 1 })
+        await awaitGuarded("the import's landing") { await model.awaitLandingSteps() }
+        #expect(model.libraryEntries.count == 1)
         #expect(sound.plays == 0)
     }
 
