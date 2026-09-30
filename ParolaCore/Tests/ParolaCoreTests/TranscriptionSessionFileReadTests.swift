@@ -193,6 +193,7 @@ struct TranscriptionSessionFileReadTests {
             return try await run.value("the run to finish while its file no longer reads")
         }
         #expect(transcript?.segments.count == 1)
-        #expect(sink.records.contains { $0.message.rendered == "skipped the energy pass: the file stopped reading" })
+        let skipped = sink.records.contains { $0.message.rendered == "skipped the energy pass: the file stopped reading" }
+        #expect(skipped)
     }
 }
