@@ -422,7 +422,6 @@ private struct LibraryBrowseList: View, Equatable {
                     pageTop(showsIntake: !showsHero)
                         .padding(.horizontal, DS.Spacing.large)
                         .padding(.top, DS.Spacing.medium)
-                        .padding(.bottom, DS.Spacing.tight)
                     emptyContent
                 }
             }
