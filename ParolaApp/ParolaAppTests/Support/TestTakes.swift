@@ -86,3 +86,10 @@ func landedEntry(_ model: AppModel, timeoutMs: Int = 5_000) async -> LibraryEntr
     }
     return landed
 }
+
+/// The model's export notice, once one has posted.
+@MainActor
+func waitForNotice(_ model: AppModel, timeoutMs: Int = 5_000) async -> ExportNotice? {
+    await waitUntil(timeoutMs: timeoutMs) { model.exportNotice != nil }
+    return model.exportNotice
+}

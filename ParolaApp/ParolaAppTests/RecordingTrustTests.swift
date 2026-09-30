@@ -172,7 +172,7 @@ extension TranscriberMockSuites {
 
         // MARK: - Stopping a take's transcription
 
-        @Test("stopping a take's transcription saves the take untranscribed and reports nothing")
+        @Test("stopping a take's transcription saves the take untranscribed, with a gentle notice, not a failure")
         func stopTranscribingKeepsTheTake() async throws {
             let wav = try makeTakeWAV("stop")
             defer { try? FileManager.default.removeItem(at: wav) }
@@ -195,7 +195,11 @@ extension TranscriberMockSuites {
                 #expect(saved.manifest.originalAudioName.isEmpty == false)
                 let stored = try await model.library.load(saved.id).document.transcript
                 #expect(stored.modelName.isEmpty, "no model ran on it, so it opens as not transcribed")
-                await settle()
+                let notice = try #require(await waitForNotice(model))
+                #expect(notice.tone == .info)
+                #expect(notice.message == "Saved without a transcript.")
+                #expect(notice.actions.map(\.title) == ["Transcribe"])
+                #expect(notice.actions.map(\.handler) == [.transcribeEntry(saved.id)])
                 #expect(model.phase == .idle, "a stop is not a failure")
             }
         }
@@ -389,8 +393,11 @@ extension TranscriberMockSuites {
                 let first = try #require(await entries(model, count: 1).first)
                 #expect(first.title.hasSuffix("(not transcribed)"))
                 #expect(first.category == .meeting, "the stopped take keeps its own category")
-                await waitUntil { model.exportNotice != nil }
-                #expect(model.exportNotice?.message == "Saved the previous recording without transcribing it.")
+                let notice = try #require(await waitForNotice(model))
+                #expect(notice.message == "Saved the previous recording without transcribing it.")
+                #expect(notice.tone == .info)
+                #expect(notice.actions.map(\.title) == ["Open", "Transcribe"])
+                #expect(notice.actions.map(\.handler) == [.openEntry(first.id), .transcribeEntry(first.id)])
                 #expect(model.phase == .recording(source: .microphone), "the save never takes the new take's pane")
 
                 model.cancelCurrentWork()
@@ -417,8 +424,10 @@ extension TranscriberMockSuites {
 
                 let kept = try #require(await entries(model, count: 1).first)
                 #expect(kept.title.hasSuffix("(not transcribed)"))
-                await waitUntil { model.exportNotice != nil }
-                #expect(model.exportNotice?.message == "Saved the previous recording without transcribing it.")
+                let notice = try #require(await waitForNotice(model))
+                #expect(notice.message == "Saved the previous recording without transcribing it.")
+                #expect(notice.tone == .info)
+                #expect(notice.actions.map(\.title) == ["Open", "Transcribe"])
                 model.cancelCurrentWork()
             }
         }
@@ -742,6 +751,7 @@ extension TranscriberMockSuites {
             #expect(saved.title.hasSuffix("(interrupted)"))
             let audio = try #require(try await model.library.load(saved.id).document.audioURL)
             #expect(try AVAudioFile(forReading: audio).length > 0)
+            #expect(model.exportNotice?.tone == .info, "the audio landed, so this is news, not a failure")
         }
 
         // MARK: - Titles
@@ -1263,6 +1273,7 @@ extension TranscriberMockSuites {
                 #expect(model.pendingRecovery != nil, "the offer waits")
                 #expect(model.phase == .recording(source: .microphone))
                 #expect(model.exportNotice?.message == "Finish the recording first. Parola offers the recovered one again when it ends.")
+                #expect(model.exportNotice?.tone == .info)
 
                 model.cancelCurrentWork()
                 await waitUntil { !model.recordingActive }

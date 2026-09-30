@@ -274,6 +274,8 @@ final class AppModel {
     @ObservationIgnored private(set) var takeRun: Int?
     /// The take transcription that new work (a take, a file, a link) stopped, so its save can say why.
     @ObservationIgnored var takeRunStoppedByNewWork: Int?
+    /// The take transcription Stop Transcribing ended, so its save can note it too.
+    @ObservationIgnored var takeRunStoppedByStopTranscribing: Int?
     @ObservationIgnored private var takeWorkCounter = 0
     /// A take's prepare and transcription, which a quit stops so the take is saved rather than lost with the process.
     @ObservationIgnored private var takeTask: Task<Void, Never>?
@@ -3949,7 +3951,8 @@ final class AppModel {
             exportNotice = ExportNotice(
                 message: String(localized: "The recording stopped saving to disk partway, so its audio ends early."),
                 failures: [],
-                folder: nil
+                folder: nil,
+                tone: .info
             )
         }
         resolveRecordingOutcome(.success(processed.text))
@@ -4207,7 +4210,8 @@ final class AppModel {
         } catch {
             keepUntranscribedTake(
                 url: url, title: title, source: source, category: category, error: error,
-                recovery: recovery, forNewWork: takeRunStoppedByNewWork == run, take: take, annotations: annotations
+                recovery: recovery, forNewWork: takeRunStoppedByNewWork == run,
+                stoppedByUser: takeRunStoppedByStopTranscribing == run, take: take, annotations: annotations
             )
         }
     }
@@ -4215,7 +4219,7 @@ final class AppModel {
     /// A take whose transcription failed or was stopped goes to the library as audio; only a failure reports.
     private func keepUntranscribedTake(
         url: URL, title: String, source: EntrySource, category: EntryCategory, error: any Error,
-        recovery: Int?, forNewWork: Bool, take: Int?, annotations: TakeAnnotations
+        recovery: Int?, forNewWork: Bool, stoppedByUser: Bool, take: Int?, annotations: TakeAnnotations
     ) {
         let stopped = error is CancellationError || Task.isCancelled
         let saving = saveTake(
@@ -4228,13 +4232,24 @@ final class AppModel {
             recovery: recovery,
             take: take,
             annotations: annotations
-        ) { [weak self] _ in
-            guard forNewWork else { return }
-            self?.exportNotice = ExportNotice(
-                message: String(localized: "Saved the previous recording without transcribing it."),
-                failures: [],
-                folder: nil
-            )
+        ) { [weak self] entry in
+            guard let self else { return }
+            if forNewWork {
+                self.exportNotice = ExportNotice(
+                    message: String(localized: "Saved the previous recording without transcribing it."),
+                    failures: [], folder: nil, tone: .info,
+                    actions: [
+                        ExportNotice.Action(title: String(localized: "Open"), handler: .openEntry(entry.id)),
+                        ExportNotice.Action(title: String(localized: "Transcribe"), handler: .transcribeEntry(entry.id))
+                    ]
+                )
+            } else if stoppedByUser {
+                self.exportNotice = ExportNotice(
+                    message: String(localized: "Saved without a transcript."),
+                    failures: [], folder: nil, tone: .info,
+                    actions: [ExportNotice.Action(title: String(localized: "Transcribe"), handler: .transcribeEntry(entry.id))]
+                )
+            }
         }
         if stopped {
             // Whatever stopped the run keeps the screen; only the take's own pane gives way to the library.
@@ -4275,7 +4290,8 @@ final class AppModel {
 
     /// Stops a take's transcription. The take is saved to the library untranscribed, so the recording survives.
     func stopTranscribingTake() {
-        guard takeRun != nil else { return }
+        guard let run = takeRun else { return }
+        takeRunStoppedByStopTranscribing = run
         cancelAndTrack(&fileTranscribeTask)
         phase = .idle
     }

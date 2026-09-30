@@ -398,7 +398,8 @@ extension AppModel {
             exportNotice = ExportNotice(
                 message: String(localized: "Finish the recording first. Parola offers the recovered one again when it ends."),
                 failures: [],
-                folder: nil
+                folder: nil,
+                tone: .info
             )
             return
         }

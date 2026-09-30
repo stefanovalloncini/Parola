@@ -48,6 +48,7 @@ struct ExportNoticeTests {
         let notice = model.exportNotice
         #expect(notice?.message.hasPrefix("Export failed:") == true)
         #expect(notice?.succeeded == false)
+        #expect(notice?.tone == .failure)
         #expect(model.phase == .ready)
         #expect(model.transcript?.text == "still here")
     }
@@ -65,6 +66,7 @@ struct ExportNoticeTests {
         await waitUntil { model.exportNotice != nil }
 
         #expect(model.exportNotice?.succeeded == false)
+        #expect(model.exportNotice?.tone == .failure)
         #expect(model.phase == .ready)
         #expect(model.transcript?.text == "the open one")
     }
@@ -120,6 +122,7 @@ struct ExportNoticeTests {
         await waitUntil { model.exportNotice != nil }
 
         #expect(model.exportNotice?.succeeded == false)
+        #expect(model.exportNotice?.tone == .failure)
         #expect(model.phase == .ready)
     }
 
@@ -142,6 +145,7 @@ struct ExportNoticeTests {
         #expect(notice.failures.map(\.name) == ["Bravo"])
         #expect(notice.folder == folder)
         #expect(!notice.succeeded)
+        #expect(notice.tone == .failure)
         for written in ["Alpha.txt", "Charlie.txt"] {
             #expect(OutputMarker.isMarked(folder.appendingPathComponent(written)))
         }
@@ -158,6 +162,34 @@ struct ExportNoticeTests {
 
         #expect(notice.message == "Exported 1 of 1")
         #expect(notice.succeeded)
+        #expect(notice.tone == .success)
         #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Solo.md").path))
+    }
+
+    // MARK: - Tone
+
+    @Test("succeeded means a success-tone notice, not just a full folder")
+    func succeededMeansSuccessTone() {
+        #expect(ExportNotice(message: "m", failures: [], folder: nil, tone: .success).succeeded)
+        #expect(!ExportNotice(message: "m", failures: [], folder: nil, tone: .info).succeeded)
+        #expect(!ExportNotice(message: "m", failures: [], folder: nil, tone: .failure).succeeded)
+    }
+
+    @Test("a plain info or success notice auto-dismisses; one with actions waits to be dismissed or acted on")
+    func actionsHoldTheNoticeOpen() {
+        let plainInfo = ExportNotice(message: "m", failures: [], folder: nil, tone: .info)
+        #expect(plainInfo.autoDismisses)
+
+        let infoWithAction = ExportNotice(
+            message: "m", failures: [], folder: nil, tone: .info,
+            actions: [ExportNotice.Action(title: "Transcribe", handler: .transcribeEntry("entry-1"))]
+        )
+        #expect(!infoWithAction.autoDismisses)
+    }
+
+    @Test("a failure never auto-dismisses, even without actions")
+    func failuresNeverAutoDismiss() {
+        let notice = ExportNotice(message: "m", failures: [], folder: nil, tone: .failure)
+        #expect(!notice.autoDismisses)
     }
 }

@@ -11,9 +11,9 @@ struct ExportNoticeStrip: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
-            Image(systemName: notice.succeeded ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+            Image(systemName: iconName)
                 .font(DS.Font.bodyStrong)
-                .foregroundStyle(notice.succeeded ? DS.Palette.success : DS.Color.danger)
+                .foregroundStyle(iconColor)
             VStack(alignment: .leading, spacing: DS.Spacing.hair) {
                 Text(verbatim: notice.message)
                     .font(DS.Font.secondary)
@@ -45,6 +45,11 @@ struct ExportNoticeStrip: View {
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("ExportNotice.Button.Reveal")
             }
+            ForEach(notice.actions) { action in
+                Button(action.title) { perform(action) }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .axLeaf("ExportNotice.Button.\(axName(for: action.handler))")
+            }
             Button {
                 model.dismissExportNotice()
             } label: {
@@ -61,11 +66,47 @@ struct ExportNoticeStrip: View {
         .background(DS.Color.surfaceElevated)
         .overlay(alignment: .top) { Divider() }
         .task(id: notice.id) {
-            guard notice.succeeded else { return }
+            guard notice.autoDismisses else { return }
             try? await Task.sleep(for: Self.dismissAfter)
             guard !Task.isCancelled, model.exportNotice?.id == notice.id else { return }
             model.dismissExportNotice()
         }
         .axBranch("ExportNotice")
+    }
+
+    private var iconName: String {
+        switch notice.tone {
+        case .success: "checkmark.circle.fill"
+        case .info: "info.circle"
+        case .failure: "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var iconColor: Color {
+        switch notice.tone {
+        case .success: DS.Palette.success
+        case .info: DS.Color.secondaryText
+        case .failure: DS.Color.danger
+        }
+    }
+
+    private func perform(_ action: ExportNotice.Action) {
+        model.dismissExportNotice()
+        switch action.handler {
+        case .openEntry(let id):
+            model.openEntryFromLibrary(id, inNewWindow: false)
+        case .transcribeEntry(let id):
+            Task {
+                guard (try? await model.openEntry(id)) != nil else { return }
+                model.transcribeLoadedEntry()
+            }
+        }
+    }
+
+    private func axName(for handler: ExportNotice.Action.Handler) -> String {
+        switch handler {
+        case .openEntry: "Open"
+        case .transcribeEntry: "Transcribe"
+        }
     }
 }

@@ -12075,6 +12075,17 @@
         }
       }
     },
+    "Saved without a transcript.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvata senza trascrizione."
+          }
+        }
+      }
+    },
     "Saving your recording before Parola quits…": {
       "extractionState": "manual",
       "localizations": {

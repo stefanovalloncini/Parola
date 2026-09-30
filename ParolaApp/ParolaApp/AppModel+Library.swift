@@ -510,7 +510,7 @@ extension AppModel {
 
     /// Shows the failure as a dismissible strip over whatever page the user is on.
     private func noteLibraryFailure(_ action: String, _ error: Error) {
-        exportNotice = ExportNotice(message: "\(action): \(error.localizedDescription)", failures: [], folder: nil)
+        exportNotice = ExportNotice(message: "\(action): \(error.localizedDescription)", failures: [], folder: nil, tone: .failure)
     }
 
     func clearLoadedEntry() {
@@ -699,7 +699,7 @@ extension AppModel {
         guard case .failed(let message) = phase else { return }
         // The error card only ever renders on .transcript; anywhere else this failure was never shown.
         if route != .transcript {
-            exportNotice = ExportNotice(message: message, failures: [], folder: nil)
+            exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure)
         }
         phase = transcript == nil ? .idle : .ready
     }
