@@ -479,7 +479,8 @@ struct AppModelBatchTests {
         #expect(model.isSummarising)
         releaser.finish()
 
-        #expect(await Self.waitUntil { !model.isSummarising && model.transcript?.summary != nil })
+        let summarised = await Self.waitUntil { !model.isSummarising && model.transcript?.summary != nil }
+        #expect(summarised)
         #expect(model.transcript?.summary?.text == "batch summary")
         #expect(try await model.library.load(entryID).document.transcript.summary?.text == "batch summary")
     }
@@ -519,7 +520,8 @@ struct AppModelBatchTests {
         model.route = .batch
 
         model.selectBatchJob(job.id)
-        #expect(await Self.waitUntil { model.selectedEntryID == entryID && model.transcript != nil })
+        let landed = await Self.waitUntil { model.selectedEntryID == entryID && model.transcript != nil }
+        #expect(landed)
         model.editSegment(id: 0, newText: "corrected")
         await model.flushPendingTranscriptSave()
 

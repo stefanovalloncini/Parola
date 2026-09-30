@@ -91,7 +91,8 @@ extension TranscriberMockSuites {
             #expect(refused)
             if case .failed(let message) = model.phase { #expect(message.contains("200 MB")) }
             #expect(model.liveSource == nil)
-            #expect(await waitUntil { !model.recordingActive })
+            let stoppedRecording = await waitUntil { !model.recordingActive }
+            #expect(stoppedRecording)
         }
 
         @Test("a take refused for space ends its count-in as soon as the answer lands")
@@ -148,7 +149,8 @@ extension TranscriberMockSuites {
 
                 model.startRecording(source: .microphone)
 
-                #expect(await waitUntil { self.isRecording(model) })
+                let startedRecording = await waitUntil { self.isRecording(model) }
+                #expect(startedRecording)
                 #expect(!model.recordingDiskSpaceLow)
                 model.cancelCurrentWork()
             }

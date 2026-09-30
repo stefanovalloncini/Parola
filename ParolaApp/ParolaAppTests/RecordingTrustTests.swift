@@ -304,7 +304,8 @@ extension TranscriberMockSuites {
 
                 let saved = await entries(model, count: 1)
                 #expect(saved.count == 1)
-                #expect(await waitUntil { model.recoveryCheckpointFiles.isEmpty })
+                let checkpointsCleared = await waitUntil { model.recoveryCheckpointFiles.isEmpty }
+                #expect(checkpointsCleared)
             }
         }
 
@@ -1205,7 +1206,8 @@ extension TranscriberMockSuites {
             #expect(saved.manifest.originalAudioName.isEmpty == false)
             #expect(saved.manifest.source == .systemAudio)
             #expect(try await model.library.load(saved.id).document.transcript.modelName.isEmpty)
-            #expect(await waitUntil { model.recoveryCheckpointFiles.isEmpty }, "the checkpoint goes once the entry holds the take")
+            let checkpointsCleared = await waitUntil { model.recoveryCheckpointFiles.isEmpty }
+            #expect(checkpointsCleared, "the checkpoint goes once the entry holds the take")
             #expect(model.phase == .idle, "a take kept for later doesn't open")
         }
 
@@ -1266,7 +1268,8 @@ extension TranscriberMockSuites {
                 await waitUntil { !model.recordingActive }
                 model.acceptPendingRecovery()
                 #expect(model.pendingRecovery == nil)
-                #expect(await waitUntil { model.transcript?.segments == segments })
+                let segmentsLanded = await waitUntil { model.transcript?.segments == segments }
+                #expect(segmentsLanded)
             }
         }
 
@@ -1292,7 +1295,8 @@ extension TranscriberMockSuites {
                 model.stopRecordingAndTranscribe()
 
                 _ = await entries(model, count: 1)
-                #expect(await waitUntil { !FileManager.default.fileExists(atPath: takeCheckpoint.path) })
+                let checkpointGone = await waitUntil { !FileManager.default.fileExists(atPath: takeCheckpoint.path) }
+                #expect(checkpointGone)
                 #expect(FileManager.default.fileExists(atPath: otherCheckpoint.path), "the other run's checkpoint is its own to end")
                 model.endRecovery(other)
             }
@@ -1324,7 +1328,8 @@ extension TranscriberMockSuites {
 
             model.declinePendingRecovery()
 
-            #expect(await waitUntil { model.recoveryCheckpointFiles.isEmpty })
+            let checkpointsCleared = await waitUntil { model.recoveryCheckpointFiles.isEmpty }
+            #expect(checkpointsCleared)
             await settle()
             let listed = await model.library.list()
             #expect(listed.map(\.id) == [existing.id], "Not Now adds no twin of a take already in the library")
@@ -1351,9 +1356,11 @@ extension TranscriberMockSuites {
 
                 model.acceptPendingRecovery()
 
-                #expect(await waitUntil { model.selectedEntryID == existing.id && model.transcript?.text == "at last" })
+                let landed = await waitUntil { model.selectedEntryID == existing.id && model.transcript?.text == "at last" }
+                #expect(landed)
                 #expect(await model.library.list().map(\.id) == [existing.id])
-                #expect(await waitUntil { model.recoveryCheckpointFiles.isEmpty })
+                let checkpointsCleared = await waitUntil { model.recoveryCheckpointFiles.isEmpty }
+                #expect(checkpointsCleared)
             }
         }
 

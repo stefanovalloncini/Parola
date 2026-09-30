@@ -167,7 +167,8 @@ struct IntentActionsTests {
 
         model.summarizeLatestEntry()
 
-        #expect(await waitUntil { model.selectedEntryID == newest.id && model.transcript?.summary?.text == "recap" })
+        let summarized = await waitUntil { model.selectedEntryID == newest.id && model.transcript?.summary?.text == "recap" }
+        #expect(summarized)
         #expect(model.transcript?.text == "the newest take")
         #expect(model.sourceFileURL == newestAudio)
         #expect((model.player?.currentItem?.asset as? AVURLAsset)?.url == newestAudio)

@@ -335,7 +335,8 @@ struct DownloadCompletionPhaseTests {
 
         #expect(model.downloadModel(installed))
 
-        #expect(await waitUntil { model.phase == .idle })
+        let idled = await waitUntil { model.phase == .idle }
+        #expect(idled)
     }
 
     // The phases below are taken over mid-download, which no instant download can stage, so these
@@ -373,7 +374,8 @@ struct DownloadCompletionPhaseTests {
         model.phase = .downloadingModel(name: installed, progress: 0)
         tick(0.75)
 
-        #expect(await waitUntil { model.phase == .downloadingModel(name: installed, progress: 0.75) })
+        let progressLanded = await waitUntil { model.phase == .downloadingModel(name: installed, progress: 0.75) }
+        #expect(progressLanded)
     }
 
     @Test("a progress tick while the download owns the phase moves the bar")
@@ -384,7 +386,8 @@ struct DownloadCompletionPhaseTests {
 
         tick(0.5)
 
-        #expect(await waitUntil { model.phase == .downloadingModel(name: installed, progress: 0.5) })
+        let progressLanded = await waitUntil { model.phase == .downloadingModel(name: installed, progress: 0.5) }
+        #expect(progressLanded)
     }
 
     @Test("a digest in flight paints no phase, so the finished download still hands it back")

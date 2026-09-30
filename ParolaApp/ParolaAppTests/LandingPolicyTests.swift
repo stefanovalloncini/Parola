@@ -181,7 +181,8 @@ struct LandingPolicyTests {
         #expect(try exports(in: rig) == Self.expectedExports(policy.export))
         #expect((rig.model.arrivalNotice?.state == .saved(entry.id)) == policy.announces)
         if policy.summary == .always || (policy.summary == .whenSelected && selected) {
-            #expect(await waitUntil { await rig.tally.summaries == 1 })
+            let summarized = await waitUntil { await rig.tally.summaries == 1 }
+            #expect(summarized)
         } else {
             await settle()
             #expect(await rig.tally.summaries == 0)

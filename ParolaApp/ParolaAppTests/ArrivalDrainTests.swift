@@ -195,7 +195,8 @@ extension TranscriberMockSuites {
 
                 await gate.open()
 
-                #expect(await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "drained" })
+                let drained = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "drained" }
+                #expect(drained)
                 #expect(await secondStarted(model, second))
                 model.cancelCurrentWork()
             }
@@ -276,7 +277,8 @@ extension TranscriberMockSuites {
                 )
                 try await model.openEntry(entry.id)
                 model.refreshLibrary()
-                #expect(await waitUntil(timeoutMs: 10_000) { model.libraryEntry(id: entry.id) != nil })
+                let entryLoaded = await waitUntil(timeoutMs: 10_000) { model.libraryEntry(id: entry.id) != nil }
+                #expect(entryLoaded)
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: nil)
                 model.transcribeNow(urls: [second])
@@ -284,7 +286,8 @@ extension TranscriberMockSuites {
 
                 await gate.open()
 
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
+                let requestCleared = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(requestCleared)
                 #expect(await secondStarted(model, second))
                 model.cancelCurrentWork()
             }
