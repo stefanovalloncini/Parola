@@ -240,7 +240,7 @@ enum LibraryListContent {
                 cutoff: cutoff, personFilter: personFilter
             )
         }
-        // The entries arrive in the order the sidebar's sort menu picked; only pinning is layered on top.
+        // The entries arrive in the order the Sort menu picked; only pinning is layered on top.
         return filtered.filter(\.pinned) + filtered.filter { !$0.pinned }
     }
 

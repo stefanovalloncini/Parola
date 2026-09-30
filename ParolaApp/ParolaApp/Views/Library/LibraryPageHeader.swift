@@ -11,9 +11,14 @@ struct LibraryPageHeader: View {
         return personName ?? String(localized: "Library")
     }
 
-    /// Read off the window rather than measured from the menus, which change width as filters come and go.
+    /// 0 is a window not measured yet, which keeps the menus out rather than flash them folded.
     static func foldsFilters(windowWidth: CGFloat) -> Bool {
-        windowWidth < foldWidth
+        windowWidth > 0 && windowWidth < foldWidth
+    }
+
+    /// Wider windows fold too when the row laid out unfolded, subtitle whole, is wider than the header.
+    static func foldsFilters(windowWidth: CGFloat, unfoldedRowWidth: CGFloat, rowWidth: CGFloat) -> Bool {
+        foldsFilters(windowWidth: windowWidth) || (rowWidth > 0 && unfoldedRowWidth > rowWidth)
     }
 
     static func subtitle(count: Int, totalSeconds: Double, bundle: Bundle = .main) -> String {
@@ -32,6 +37,8 @@ struct LibraryPageHeader: View {
 
     @Environment(AppModel.self) private var model
     @Environment(\.mainWindowWidth) private var windowWidth
+    @State private var rowWidth: CGFloat = 0
+    @State private var unfoldedRowWidth: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.hair) {
@@ -42,31 +49,43 @@ struct LibraryPageHeader: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .accessibilityAddTraits(.isHeader)
-            HStack(spacing: DS.Spacing.regular) {
-                Text(verbatim: subtitle)
-                    .font(DS.Font.secondary)
-                    .monospacedDigit()
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .lineLimit(1)
-                    .modifier(OptionalHelp(help: subtitleHelp))
-                Spacer(minLength: DS.Spacing.regular)
-                controls
-            }
+            row(folded: Self.foldsFilters(windowWidth: windowWidth, unfoldedRowWidth: unfoldedRowWidth, rowWidth: rowWidth))
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
+                // An unfolded copy nobody sees or reaches, measured so the header knows before it would overflow.
+                .background(alignment: .leading) {
+                    row(folded: false)
+                        .fixedSize()
+                        .hidden()
+                        .accessibilityHidden(true)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { unfoldedRowWidth = $0 }
+                }
+        }
+    }
+
+    private func row(folded: Bool) -> some View {
+        HStack(spacing: DS.Spacing.small) {
+            Text(verbatim: subtitle)
+                .font(DS.Font.secondary)
+                .monospacedDigit()
+                .foregroundStyle(DS.Color.secondaryText)
+                .lineLimit(1)
+                .modifier(OptionalHelp(help: subtitleHelp))
+            Spacer(minLength: DS.Spacing.regular)
+            controls(folded: folded)
         }
     }
 
     @ViewBuilder
-    private var controls: some View {
-        let folds = Self.foldsFilters(windowWidth: windowWidth)
+    private func controls(folded: Bool) -> some View {
         let showsFilters = showsListControls || filters.isFiltering
         LibraryBulkActions(selection: selection, pendingBulkDelete: $pendingBulkDelete)
-        if showsFilters, !folds {
+        if showsFilters, !folded {
             filters
         }
         if showsListControls {
             sortMenu
         }
-        moreMenu(foldedFilters: showsFilters && folds)
+        moreMenu(foldedFilters: showsFilters && folded)
     }
 
     private var sortMenu: some View {
@@ -91,7 +110,7 @@ struct LibraryPageHeader: View {
         .axLeaf("Menu.Sort")
     }
 
-    /// Drawn in SwiftUI, not handed to AppKit like the text menus: AppKit would drop the glyph's spoken name.
+    /// Drawn in SwiftUI rather than as an AppKit pop-up, which ignores the ink the glyph takes while filters wait inside.
     private func moreMenu(foldedFilters: Bool) -> some View {
         let filtersInside = foldedFilters && filters.isFiltering
         return Menu {
@@ -118,6 +137,7 @@ struct LibraryPageHeader: View {
         .fixedSize()
         .help("More")
         .accessibilityLabel("More")
+        .accessibilityValue(filtersInside ? Text("Filters on") : Text(verbatim: ""))
         .axLeaf("Menu.More")
     }
 }

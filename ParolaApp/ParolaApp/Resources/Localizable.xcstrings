@@ -5774,6 +5774,17 @@
         }
       }
     },
+    "Filters on": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtri attivi"
+          }
+        }
+      }
+    },
     "Final Cut Pro XML": {
       "extractionState": "manual",
       "localizations": {

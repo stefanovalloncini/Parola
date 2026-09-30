@@ -20,6 +20,22 @@ struct LibraryPageHeaderTests {
     func folding() {
         #expect(LibraryPageHeader.foldsFilters(windowWidth: 920))
         #expect(!LibraryPageHeader.foldsFilters(windowWidth: 1180))
+        #expect(!LibraryPageHeader.foldsFilters(windowWidth: 0), "a window not measured yet keeps them unfolded")
+    }
+
+    @Test("wider than 1000 points they still fold when the row laid out unfolded is wider than the header")
+    func foldsWhenTheyWouldNotFit() {
+        #expect(LibraryPageHeader.foldsFilters(windowWidth: 1180, unfoldedRowWidth: 900, rowWidth: 892))
+        #expect(!LibraryPageHeader.foldsFilters(windowWidth: 1180, unfoldedRowWidth: 880, rowWidth: 892))
+        #expect(LibraryPageHeader.foldsFilters(windowWidth: 920, unfoldedRowWidth: 400, rowWidth: 632))
+        #expect(!LibraryPageHeader.foldsFilters(windowWidth: 0, unfoldedRowWidth: 0, rowWidth: 0), "nothing measured yet")
+    }
+
+    @Test("Export and Delete wait for a selection of more than one row")
+    func bulkActionsNeedSeveralRows() {
+        #expect(!LibraryBulkActions.isShown(forSelectionCount: 0))
+        #expect(!LibraryBulkActions.isShown(forSelectionCount: 1), "a click selects a row; the row's own menu covers one")
+        #expect(LibraryBulkActions.isShown(forSelectionCount: 2))
     }
 
     @Test("the subtitle counts the page's transcripts and how long they run")
@@ -31,39 +47,20 @@ struct LibraryPageHeaderTests {
 
     @Test("the subtitle reads naturally in Italian")
     func italianSubtitle() throws {
-        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
-        let italian = try #require(Bundle(path: path))
+        let italian = try italianBundle()
         #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0, bundle: italian) == "Ancora nessuna trascrizione")
         #expect(LibraryPageHeader.subtitle(count: 2, totalSeconds: 90, bundle: italian) == "2 trascrizioni · 1 min")
     }
 
-    @Test("an active filter names what it keeps; an idle one names the menu")
-    func filterTitles() {
-        #expect(LibraryFilterBar.labelsTitle(nil) == "Labels")
-        #expect(LibraryFilterBar.labelsTitle("Work") == "Labels: Work")
-        #expect(LibraryFilterBar.peopleTitle(nil) == "People")
-        #expect(LibraryFilterBar.peopleTitle("Giulia Rossi") == "People: Giulia Rossi")
-        #expect(LibraryFilterBar.languageTitle(nil) == "Language")
-        #expect(LibraryFilterBar.languageTitle("Italian") == "Language: Italian")
-    }
-
-    @Test("the filter menus read in Italian")
-    func italianFilterTitles() throws {
-        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
-        let italian = try #require(Bundle(path: path))
-        #expect(LibraryFilterBar.labelsTitle("Lavoro", bundle: italian) == "Etichette: Lavoro")
-        #expect(LibraryFilterBar.peopleTitle("Giulia", bundle: italian) == "Persone: Giulia")
-        #expect(LibraryFilterBar.languageTitle("Inglese", bundle: italian) == "Lingua: Inglese")
-        #expect(LibraryFilterBar.labelsTitle(nil, bundle: italian) == "Etichette")
-    }
-
-    @Test("a long label is cut short so one filter can't push the others off the header")
+    @Test("a long value is cut short so one filter can't crowd the others out")
     func longFilterValues() {
         let long = String(repeating: "Quarterly planning ", count: 4)
-        let title = LibraryFilterBar.labelsTitle(long)
-        #expect(title.hasPrefix("Labels: Quarterly planning"))
-        #expect(title.hasSuffix("…"))
-        #expect(title.count < long.count)
+        #expect(LibraryFilterBar.capped(long).hasPrefix("Quarterly planning"))
+        #expect(LibraryFilterBar.capped(long).hasSuffix("…"))
+        #expect(LibraryFilterBar.capped(long).count == LibraryFilterBar.valueCharacterCap)
+        #expect(LibraryFilterBar.isCut(long))
+        #expect(LibraryFilterBar.capped("Work") == "Work")
+        #expect(!LibraryFilterBar.isCut("Work"))
     }
 
     private let giulia = UUID()
@@ -109,19 +106,35 @@ struct LibraryPageHeaderTests {
         #expect(person == .init(count: 2, seconds: 1830, bytes: 20_000), "with no category, the person is the page")
     }
 
-    /// Every filter on, with long values: the widest the header's controls get.
-    private func hostedHeader(windowWidth: CGFloat, selection: Set<LibraryEntry.ID>) -> NSHostingView<AnyView> {
+    // MARK: - Layout
+
+    private func italianBundle() throws -> Bundle {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        return try #require(Bundle(path: path))
+    }
+
+    private static let english = Locale(identifier: "en_US")
+    private static let italian = Locale(identifier: "it_IT")
+
+    /// The header as the page hosts it at one window width: every filter on, with a label of an everyday length.
+    private func hostedHeader(
+        windowWidth: CGFloat,
+        selection: Set<LibraryEntry.ID> = [],
+        filtering: Bool = true,
+        locale: Locale = english,
+        subtitle: String = LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60)
+    ) -> NSHostingView<AnyView> {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("pageheader"))
         let giulia = Person(name: "Giulia Rossi")
         let header = LibraryPageHeader(
             title: "Library",
-            subtitle: LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60),
+            subtitle: subtitle,
             subtitleHelp: nil,
             filters: LibraryFilterBar(
-                labelFilter: .constant("Quarterly planning"),
-                languageFilter: .constant("it"),
-                dateRangeFilter: .constant(.month),
-                personFilter: .constant(giulia.id),
+                labelFilter: .constant(filtering ? "Quarterly planning" : nil),
+                languageFilter: .constant(filtering ? "it" : nil),
+                dateRangeFilter: .constant(filtering ? .month : .all),
+                personFilter: .constant(filtering ? giulia.id : nil),
                 labelOptions: ["Quarterly planning", "Research"],
                 languageOptions: ["en", "it"],
                 peopleOptions: [giulia]
@@ -132,9 +145,16 @@ struct LibraryPageHeaderTests {
         )
         let pageWidth = windowWidth - MainWindowLayout.sidebarIdealWidth - 2 * DS.Spacing.large
         let host = NSHostingView(rootView: AnyView(
-            header.environment(model).environment(\.mainWindowWidth, windowWidth).frame(width: pageWidth)
+            header
+                .environment(model)
+                .environment(\.mainWindowWidth, windowWidth)
+                .environment(\.locale, locale)
+                .frame(width: pageWidth)
         ))
         host.frame = NSRect(x: 0, y: 0, width: pageWidth, height: 120)
+        // The fold reads widths measured on the first pass, so the header is laid out a second time.
+        host.layoutSubtreeIfNeeded()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
         host.layoutSubtreeIfNeeded()
         return host
     }
@@ -145,36 +165,64 @@ struct LibraryPageHeaderTests {
         }
     }
 
-    /// The text menus are AppKit pop-ups; More, drawn in SwiftUI, follows the last of them.
+    /// The text menus are AppKit pop-ups; More, drawn in SwiftUI, sits a gap after the last of them.
     private func spillsPastTheRight(_ host: NSView) -> [String] {
-        let moreRoom = DS.Spacing.regular + GlyphButtonStyle.defaultSide
+        let moreRoom = DS.Spacing.small + GlyphButtonStyle.defaultSide
         return popUps(in: host).compactMap { button in
             let frame = button.convert(button.bounds, to: host)
             return frame.maxX + moreRoom > host.bounds.width + 0.5 ? "\(button.title) ends at \(frame.maxX)" : nil
         }
     }
 
-    @Test("at 920 points the filters wait in More; at 1180 each has its own menu")
-    func foldedMenus() {
-        let narrow = hostedHeader(windowWidth: MainWindowLayout.minimumWidth, selection: [])
-        let wide = hostedHeader(windowWidth: 1180, selection: [])
-        let italian = LanguageDisplay.name(for: "it") ?? "IT"
+    @Test("an idle menu reads its name; an active one names what it keeps")
+    func menuTitles() {
+        let idle = hostedHeader(windowWidth: 1440, filtering: false)
+        let active = hostedHeader(windowWidth: 1440)
+        let italianName = LanguageDisplay.name(for: "it") ?? "IT"
 
-        #expect(popUps(in: narrow).map(\.title) == ["Sort"])
-        #expect(popUps(in: wide).map(\.title) == [
-            "Labels: Quarterly planning", "People: Giulia Rossi", "Language: \(italian)", "Last 30 days", "Sort",
+        #expect(popUps(in: idle).map(\.title) == ["Labels", "People", "Language", "Any time", "Sort"])
+        #expect(popUps(in: active).map(\.title) == [
+            "Labels: Quarterly planning", "People: Giulia Rossi", "Language: \(italianName)", "Last 30 days", "Sort",
         ])
     }
 
-    @Test("with every filter on, the header's controls stay inside the page", arguments: [920.0, 1180.0])
+    @Test("the menus read in Italian")
+    func italianMenuTitles() {
+        let active = hostedHeader(windowWidth: 1440, locale: Self.italian)
+        let italianName = LanguageDisplay.name(for: "it") ?? "IT"
+
+        #expect(popUps(in: active).map(\.title) == [
+            "Etichette: Quarterly planning", "Persone: Giulia Rossi", "Lingua: \(italianName)", "Ultimi 30 giorni", "Ordina",
+        ])
+    }
+
+    @Test("at 920 points the filters wait in More; at 1440 each has its own menu")
+    func foldedMenus() {
+        #expect(popUps(in: hostedHeader(windowWidth: MainWindowLayout.minimumWidth)).map(\.title) == ["Sort"])
+        #expect(popUps(in: hostedHeader(windowWidth: 1440)).count == 5)
+    }
+
+    @Test("with every filter on, the header's controls stay inside the page", arguments: [920.0, 1000, 1040, 1180, 1440])
     func controlsStayInside(windowWidth: Double) {
-        let host = hostedHeader(windowWidth: CGFloat(windowWidth), selection: [])
+        let host = hostedHeader(windowWidth: CGFloat(windowWidth))
         #expect(spillsPastTheRight(host).isEmpty, "\(spillsPastTheRight(host))")
     }
 
-    @Test("a selection's Export and Delete still fit beside the folded menus")
-    func selectionFitsWhenFolded() {
-        let host = hostedHeader(windowWidth: MainWindowLayout.minimumWidth, selection: ["a", "b", "c"])
+    @Test("with every filter on and several rows selected, Export and Delete still fit", arguments: [920.0, 1000, 1180, 1440])
+    func selectionFits(windowWidth: Double) {
+        let host = hostedHeader(windowWidth: CGFloat(windowWidth), selection: ["a", "b", "c"])
         #expect(spillsPastTheRight(host).isEmpty, "\(spillsPastTheRight(host))")
+    }
+
+    @Test("the Italian menus stay inside the page too", arguments: [1000.0, 1040, 1180])
+    func italianStaysInside(windowWidth: Double) throws {
+        let subtitle = LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60, bundle: try italianBundle())
+        let host = hostedHeader(windowWidth: CGFloat(windowWidth), locale: Self.italian, subtitle: subtitle)
+        #expect(spillsPastTheRight(host).isEmpty, "\(spillsPastTheRight(host))")
+    }
+
+    @Test("with every filter on and rows selected, 1180 points is too narrow to keep the menus out")
+    func selectionFoldsAtTheDefaultSize() {
+        #expect(popUps(in: hostedHeader(windowWidth: 1180, selection: ["a", "b", "c"])).map(\.title) == ["Sort"])
     }
 }

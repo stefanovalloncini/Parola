@@ -71,7 +71,7 @@ struct LibraryListContentTests {
         #expect(rows(sorted).map(\.id) == ["a", "b", "c"])
     }
 
-    @Test("the sidebar sort order drives the rendered list")
+    @Test("the Sort menu's order drives the rendered list")
     func sortOrderDrivesList() async {
         let model = await makeModel()
         model.libraryEntries = [

@@ -41,26 +41,15 @@ struct LibraryFilterBar: View {
         !peopleOptions.isEmpty || personFilter != nil
     }
 
-    static func labelsTitle(_ label: String?, bundle: Bundle = .main) -> String {
-        guard let label else { return String(localized: "Labels", bundle: bundle) }
-        return String(localized: "Labels: \(capped(label))", bundle: bundle)
-    }
+    /// One long label or name shouldn't be enough to send the other menus into More.
+    static let valueCharacterCap = 24
 
-    static func peopleTitle(_ name: String?, bundle: Bundle = .main) -> String {
-        guard let name else { return String(localized: "People", bundle: bundle) }
-        return String(localized: "People: \(capped(name))", bundle: bundle)
-    }
-
-    static func languageTitle(_ name: String?, bundle: Bundle = .main) -> String {
-        guard let name else { return String(localized: "Language", bundle: bundle) }
-        return String(localized: "Language: \(capped(name))", bundle: bundle)
-    }
-
-    /// The header folds by window width, not by what fits, so one long label mustn't be able to fill it.
-    private static let valueCharacterCap = 24
-
-    private static func capped(_ value: String) -> String {
+    static func capped(_ value: String) -> String {
         value.count <= valueCharacterCap ? value : String(value.prefix(valueCharacterCap - 1)) + "…"
+    }
+
+    static func isCut(_ value: String) -> Bool {
+        value.count > valueCharacterCap
     }
 
     var isFiltering: Bool {
@@ -92,9 +81,10 @@ struct LibraryFilterBar: View {
                     .axLeaf("MenuItem.Label.\(label)")
             }
         } label: {
-            LibraryHeaderMenuLabel(title: Self.labelsTitle(labelFilter), isActive: labelFilter != nil)
+            LibraryHeaderMenuLabel(rest: Text("Labels"), active: labelFilter.map { Text("Labels: \(Self.capped($0))") })
         }
         .libraryHeaderMenu()
+        .modifier(FullValue(text: labelFilter.flatMap { Self.isCut($0) ? Text("Labels: \($0)") : nil }))
         .axLeaf("Menu.Labels")
     }
 
@@ -110,9 +100,10 @@ struct LibraryFilterBar: View {
                 }
             }
         } label: {
-            LibraryHeaderMenuLabel(title: Self.peopleTitle(selectedPerson?.name), isActive: personFilter != nil)
+            LibraryHeaderMenuLabel(rest: Text("People"), active: selectedName.map { Text("People: \(Self.capped($0))") })
         }
         .libraryHeaderMenu()
+        .modifier(FullValue(text: selectedName.flatMap { Self.isCut($0) ? Text("People: \($0)") : nil }))
         .axLeaf("Menu.People")
     }
 
@@ -126,12 +117,11 @@ struct LibraryFilterBar: View {
                     .axLeaf("MenuItem.Language.\(code)")
             }
         } label: {
-            LibraryHeaderMenuLabel(
-                title: Self.languageTitle(languageFilter.map(languageName)),
-                isActive: languageFilter != nil
-            )
+            let name = languageFilter.map(languageName)
+            LibraryHeaderMenuLabel(rest: Text("Language"), active: name.map { Text("Language: \(Self.capped($0))") })
         }
         .libraryHeaderMenu()
+        .modifier(FullValue(text: languageFilter.map(languageName).flatMap { Self.isCut($0) ? Text("Language: \($0)") : nil }))
         .axLeaf("Menu.Language")
     }
 
@@ -157,9 +147,9 @@ struct LibraryFilterBar: View {
     }
 
     /// Falls back to the full directory: a filtered person can be absent from this category's own options.
-    private var selectedPerson: Person? {
+    private var selectedName: String? {
         guard let personFilter else { return nil }
-        return peopleOptions.first { $0.id == personFilter } ?? model.person(id: personFilter)
+        return (peopleOptions.first { $0.id == personFilter } ?? model.person(id: personFilter))?.name
     }
 
     private func languageName(_ code: String) -> String {
@@ -169,12 +159,28 @@ struct LibraryFilterBar: View {
 
 /// What a header menu reads: the menu's name at rest, what it keeps once it filters, in the accent's ink.
 private struct LibraryHeaderMenuLabel: View {
-    let title: String
-    let isActive: Bool
+    let rest: Text
+    let active: Text?
 
     var body: some View {
-        Text(verbatim: title)
-            .foregroundStyle(isActive ? DS.Color.accentInk : DS.Color.primaryText)
+        if let active {
+            active.foregroundStyle(DS.Color.accentInk)
+        } else {
+            rest.foregroundStyle(DS.Color.primaryText)
+        }
+    }
+}
+
+/// A value cut short in the menu keeps all of itself in the tooltip and in what VoiceOver reads.
+private struct FullValue: ViewModifier {
+    let text: Text?
+
+    func body(content: Content) -> some View {
+        if let text {
+            content.help(text).accessibilityLabel(text)
+        } else {
+            content
+        }
     }
 }
 

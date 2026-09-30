@@ -175,8 +175,13 @@ struct LibraryBulkActions: View {
     let selection: Set<LibraryEntry.ID>
     @Binding var pendingBulkDelete: Bool
 
+    /// One click selects a row, and that row's own menu covers it; the pills are for acting on several at once.
+    static func isShown(forSelectionCount count: Int) -> Bool {
+        count > 1
+    }
+
     var body: some View {
-        if !selection.isEmpty {
+        if Self.isShown(forSelectionCount: selection.count) {
             Menu {
                 ForEach(ExportFormat.allCases) { format in
                     Button("\(format.displayName) (.\(format.fileExtension))") {
