@@ -145,7 +145,12 @@ struct Transcribe: AsyncParsableCommand {
         if case .youtube(let url) = input, preferExistingSubs {
             stderr("Fetching captions from \(url.absoluteString)…")
             emitter.progress(.downloading, detail: url.absoluteString)
-            let captions = try await YtDlpLinkFetcher(features: ParolaCLI.features).fetchCaptions(url: url, language: language)
+            let captions: FetchedCaptions
+            do {
+                captions = try await YtDlpLinkFetcher(features: ParolaCLI.features).fetchCaptions(url: url, language: language)
+            } catch {
+                throw addingYtDlpUpdateHint(to: error)
+            }
             let transcript = TranscriptPostProcessor.orthographyOnly.apply(captions.transcript)
             try emitTranscript(transcript, sourceURL: url, entrySource: input.entrySource, emitter: emitter)
             return
@@ -188,6 +193,8 @@ struct Transcribe: AsyncParsableCommand {
             } catch is Interrupted {
                 bar?.finish()
                 throw ExitCode(130)
+            } catch {
+                throw addingYtDlpUpdateHint(to: error)
             }
             bar?.finish()
             fetched = media

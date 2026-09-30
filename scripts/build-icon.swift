@@ -55,7 +55,8 @@ struct BuildIcon {
         guard let image = AppIconArtwork.cgImage(
             pixels: pixels,
             background: AppIconArtwork.brandBackground,
-            foreground: AppIconArtwork.brandForeground
+            foreground: AppIconArtwork.brandForeground,
+            nib: AppIconArtwork.brandNib
         ) else {
             throw NSError(domain: "build-icon", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not render \(pixels)px"])
         }

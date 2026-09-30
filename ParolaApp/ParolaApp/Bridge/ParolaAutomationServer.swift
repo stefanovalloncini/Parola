@@ -85,6 +85,8 @@ final class ParolaAutomationServer {
 
     func commandNames() -> [String] { commands.keys.sorted() }
 
+    func command(named name: String) -> AutomationCommand? { commands[name] }
+
     var isTestMode: Bool { model?.mode == .test }
 
     func capabilities() -> [String] {

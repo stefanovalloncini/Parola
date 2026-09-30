@@ -24,6 +24,13 @@ public enum YtDlpLocator {
         }
         return nil
     }
+
+    public static func locateBrew() -> String? {
+        for path in ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] {
+            if FileManager.default.isExecutableFile(atPath: path) { return path }
+        }
+        return nil
+    }
 }
 
 enum YouTubeProcess {

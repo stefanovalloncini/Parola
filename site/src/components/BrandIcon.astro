@@ -1,12 +1,13 @@
 ---
-import { brandBars } from "../data/brand";
+import { brandBars, nib, type Mark } from "../data/brand";
 
 interface Props {
   size?: number;
   class?: string;
+  mark?: Mark;
 }
 
-const { size = 32, class: className } = Astro.props;
+const { size = 32, class: className, mark = "pennino" } = Astro.props;
 ---
 
 <svg
@@ -18,7 +19,7 @@ const { size = 32, class: className } = Astro.props;
   focusable="false"
 >
   <rect x="100" y="100" width="824" height="824" rx="181.3" fill="#6b8a6b"></rect>
-  {brandBars.map((bar) => (
+  {brandBars(mark).map((bar) => (
     <rect
       x={bar.x}
       y={bar.y}
@@ -28,4 +29,17 @@ const { size = 32, class: className } = Astro.props;
       fill="#fcf2e6"
     />
   ))}
+  {mark === "pennino" && (
+    <g>
+      <path d={nib.outline} fill="#e8b861" />
+      <circle cx={nib.hole.cx} cy={nib.hole.cy} r={nib.hole.r} fill="#6b8a6b" />
+      <rect
+        x={nib.slit.x}
+        y={nib.slit.y}
+        width={nib.slit.width}
+        height={nib.slit.height}
+        fill="#6b8a6b"
+      />
+    </g>
+  )}
 </svg>

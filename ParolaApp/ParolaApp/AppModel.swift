@@ -2580,13 +2580,13 @@ final class AppModel {
     var ytDlpInstallError: String?
     @ObservationIgnored var ytDlpPath: String?
     var ytDlpVersion: YtDlpVersion?
-    var ytDlpUpdateRoute: YtDlpInstaller.UpdateRoute?
+    var ytDlpUpdateRoute: YtDlpUpdateRoute?
     var ytDlpUpdating: Bool = false
     var ytDlpUpdateError: String?
     @ObservationIgnored var ytDlpVersionTask: Task<Void, Never>?
     @ObservationIgnored var ytDlpUpdateTask: Task<Void, Never>?
     @ObservationIgnored var ytDlpUpdateDeadline: Duration = YtDlpInstaller.upgradeDeadline
-    @ObservationIgnored var ytDlpLocator: () -> String? = { YtDlpInstaller.locate() }
+    @ObservationIgnored var ytDlpLocator: () -> String? = { YtDlpLocator.locate() }
     @ObservationIgnored var linkFetcher: any LinkFetcher
 
     var ytDlpIsStale: Bool {
@@ -2598,7 +2598,7 @@ final class AppModel {
         ytDlpPath = path
         ytDlpAvailable = path != nil
         if ytDlpAvailable { ytDlpInstallError = nil }
-        let route = path.map { YtDlpInstaller.updateRoute(ytDlpPath: $0) }
+        let route = path.map { YtDlpUpdateRoute(ytDlpPath: $0) }
         if route != ytDlpUpdateRoute { ytDlpUpdateRoute = route }
         if path == nil, ytDlpVersion != nil { ytDlpVersion = nil }
     }
@@ -2669,7 +2669,7 @@ final class AppModel {
 
     func installYtDlpViaBrew() {
         guard !ytDlpInstalling else { return }
-        guard let brew = YtDlpInstaller.locateBrew() else {
+        guard let brew = YtDlpLocator.locateBrew() else {
             ytDlpInstallError = String(localized: "Homebrew isn't installed. Install it from https://brew.sh, then try again.")
             return
         }

@@ -20,7 +20,7 @@ extension AppModel {
 
     nonisolated static func ytDlpUpdateOffer(
         for failure: LinkDownloadFailure?,
-        route: YtDlpInstaller.UpdateRoute?,
+        route: YtDlpUpdateRoute?,
         installed: YtDlpVersion?,
         updating: Bool,
         now: Date

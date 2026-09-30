@@ -9,6 +9,7 @@ struct BrandWaveform: View {
     }
 
     let side: CGFloat
+    var mark: AppIconArtwork.Mark = .pennino
     var drive: Drive = .breathing
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -44,27 +45,41 @@ struct BrandWaveform: View {
                 }
             }
         }
-        .frame(width: usableWidth, height: usableHeight)
+        .frame(width: layout.width, height: layout.height)
         .onAppear { risen = true }
         .accessibilityHidden(true)
     }
 
     /// One row across both drives: a branch per drive would swap subtrees and snap the heights instead of easing them.
     private func bars(seconds: TimeInterval?) -> some View {
-        HStack(spacing: spacing) {
+        HStack(spacing: layout.spacing) {
             ForEach(Self.fractions.indices, id: \.self) { index in
-                Capsule(style: .continuous)
-                    .fill(DS.Color.accent)
-                    .frame(width: barWidth, height: height(index: index))
-                    .scaleEffect(y: breath(index: index, seconds: seconds), anchor: .center)
-                    .animation(rise(index: index), value: risen)
+                if mark == .pennino && index == Self.centerIndex {
+                    nib
+                } else {
+                    Capsule(style: .continuous)
+                        .fill(DS.Color.accent)
+                        .frame(width: layout.barWidth, height: height(index: index))
+                        .scaleEffect(y: breath(index: index, seconds: seconds), anchor: .center)
+                        .animation(rise(index: index), value: risen)
+                }
             }
         }
         .animation(.easeOut(duration: drive == .breathing ? Self.settleEase : Self.levelEase), value: drive)
     }
 
+    private var nib: some View {
+        let frame = layout.nibFrame
+        return NibShape()
+            .fill(DS.Color.accent)
+            .frame(width: frame.width, height: frame.height)
+            .scaleEffect(y: risen || reduceMotion ? 1 : 0.08, anchor: .center)
+            .animation(rise(index: Self.centerIndex), value: risen)
+            .offset(y: frame.midY)
+    }
+
     private func height(index: Int) -> CGFloat {
-        let full = barHeight(Self.fractions[index])
+        let full = layout.barHeight(Self.fractions[index])
         switch drive {
         case .breathing:
             return full * (risen || reduceMotion ? 1 : 0.08)
@@ -73,17 +88,7 @@ struct BrandWaveform: View {
         }
     }
 
-    private var usableWidth: CGFloat { side * 0.56 }
-    private var usableHeight: CGFloat { side * 0.72 }
-    private var spacing: CGFloat { usableWidth / (CGFloat(Self.fractions.count) * 2) }
-
-    private var barWidth: CGFloat {
-        (usableWidth - spacing * CGFloat(Self.fractions.count - 1)) / CGFloat(Self.fractions.count)
-    }
-
-    private func barHeight(_ fraction: CGFloat) -> CGFloat {
-        max(barWidth * 1.1, usableHeight * fraction)
-    }
+    private var layout: AppIconArtwork.Layout { AppIconArtwork.Layout(side: side, mark: mark) }
 
     private func rise(index: Int) -> Animation? {
         guard !reduceMotion, drive == .breathing else { return nil }
@@ -112,5 +117,11 @@ private struct BrandBarsHandoff: ViewModifier {
     func body(content: Content) -> some View {
         // An empty property set copies nothing from the source, so the bars stay put under reduce motion.
         content.matchedGeometryEffect(id: "brandBars", in: namespace, properties: reduceMotion ? [] : .frame)
+    }
+}
+
+private struct NibShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path(AppIconArtwork.nibPath(in: rect))
     }
 }

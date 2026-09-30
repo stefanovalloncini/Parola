@@ -35,7 +35,7 @@ private struct ToolStatusRow: View {
     let available: Bool
     let version: String?
     let isStale: Bool
-    let updateRoute: YtDlpInstaller.UpdateRoute?
+    let updateRoute: YtDlpUpdateRoute?
     let installing: Bool
     let updating: Bool
     let error: String?
