@@ -16,19 +16,12 @@ struct LibraryPageHeaderTests {
         #expect(LibraryPageHeader.title(category: nil, personName: "Giulia Rossi") == "Giulia Rossi")
     }
 
-    @Test("below 1000 points the filter menus fold into More")
-    func folding() {
-        #expect(LibraryPageHeader.foldsFilters(windowWidth: 920))
-        #expect(!LibraryPageHeader.foldsFilters(windowWidth: 1180))
-        #expect(!LibraryPageHeader.foldsFilters(windowWidth: 0), "a window not measured yet keeps them unfolded")
-    }
-
-    @Test("wider than 1000 points they still fold when the row laid out unfolded is wider than the header")
+    @Test("the chips fold into More only when the row laid out unfolded is wider than the header, at any window width")
     func foldsWhenTheyWouldNotFit() {
-        #expect(LibraryPageHeader.foldsFilters(windowWidth: 1180, unfoldedRowWidth: 900, rowWidth: 892))
-        #expect(!LibraryPageHeader.foldsFilters(windowWidth: 1180, unfoldedRowWidth: 880, rowWidth: 892))
-        #expect(LibraryPageHeader.foldsFilters(windowWidth: 920, unfoldedRowWidth: 400, rowWidth: 632))
-        #expect(!LibraryPageHeader.foldsFilters(windowWidth: 0, unfoldedRowWidth: 0, rowWidth: 0), "nothing measured yet")
+        #expect(LibraryPageHeader.foldsFilters(unfoldedRowWidth: 900, rowWidth: 892))
+        #expect(!LibraryPageHeader.foldsFilters(unfoldedRowWidth: 880, rowWidth: 892))
+        #expect(!LibraryPageHeader.foldsFilters(unfoldedRowWidth: 400, rowWidth: 632), "a narrow window with room keeps them out")
+        #expect(!LibraryPageHeader.foldsFilters(unfoldedRowWidth: 0, rowWidth: 0), "nothing measured yet")
     }
 
     @Test("Export and Delete wait for a selection of more than one row")
@@ -129,6 +122,7 @@ struct LibraryPageHeaderTests {
         windowWidth: CGFloat,
         selection: Set<LibraryEntry.ID> = [],
         filtering: Bool = true,
+        dimensions: Bool = true,
         locale: Locale = english,
         subtitle: String = LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60)
     ) -> HostedHeader {
@@ -143,9 +137,9 @@ struct LibraryPageHeaderTests {
                 languageFilter: .constant(filtering ? "it" : nil),
                 dateRangeFilter: .constant(filtering ? .month : .all),
                 personFilter: .constant(filtering ? giulia.id : nil),
-                labelOptions: ["Quarterly planning", "Research"],
-                languageOptions: ["en", "it"],
-                peopleOptions: [giulia]
+                labelOptions: dimensions ? ["Quarterly planning", "Research"] : [],
+                languageOptions: dimensions ? ["en", "it"] : [],
+                peopleOptions: dimensions ? [giulia] : []
             ),
             showsListControls: true,
             selection: selection,
@@ -155,7 +149,6 @@ struct LibraryPageHeaderTests {
         let host = NSHostingView(rootView: AnyView(
             header
                 .environment(model)
-                .environment(\.mainWindowWidth, windowWidth)
                 .environment(\.locale, locale)
                 .frame(width: pageWidth)
         ))
@@ -246,6 +239,13 @@ struct LibraryPageHeaderTests {
         }
         #expect(chipTitles(in: narrow) == ["Sort", "More"])
         #expect(chipTitles(in: wide).count == 6)
+    }
+
+    @Test("a narrow window with room for its chips keeps them beside the subtitle")
+    func narrowWindowWithRoom() {
+        let hosted = hostedHeader(windowWidth: MainWindowLayout.minimumWidth, filtering: false, dimensions: false)
+        defer { hosted.close() }
+        #expect(chipTitles(in: hosted) == ["Any time", "Sort", "More"])
     }
 
     @Test("with every filter on, the header's controls stay inside the page", arguments: [920.0, 1000, 1040, 1180, 1440])

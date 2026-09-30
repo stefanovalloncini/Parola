@@ -1,15 +1,9 @@
 import SwiftUI
 import ParolaCore
 
-extension EnvironmentValues {
-    /// The Library header folds by the window, not its column.
-    @Entry var mainWindowWidth: CGFloat = 0
-}
-
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.undoManager) private var windowUndoManager
-    @State private var windowWidth: CGFloat = 0
 
     var body: some View {
         Group {
@@ -81,8 +75,6 @@ struct ContentView: View {
         }
         .onAppear { model.undoManager = windowUndoManager }
         .onChange(of: windowUndoManager) { _, newValue in model.undoManager = newValue }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
-        .environment(\.mainWindowWidth, windowWidth)
     }
 }
 

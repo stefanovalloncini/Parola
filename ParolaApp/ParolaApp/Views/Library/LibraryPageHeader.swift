@@ -3,22 +3,15 @@ import ParolaCore
 
 /// The Library page's title and what it holds, with the menus that narrow and order the list.
 struct LibraryPageHeader: View {
-    static let foldWidth: CGFloat = 1000
-
     /// A person only takes the title over an unset category; narrowed within one, the category keeps it.
     static func title(category: EntryCategory?, personName: String?) -> String {
         if let category { return String(localized: String.LocalizationValue(libraryCategoryName(category))) }
         return personName ?? String(localized: "Library")
     }
 
-    /// 0 is a window not measured yet, which keeps the menus out rather than flash them folded.
-    static func foldsFilters(windowWidth: CGFloat) -> Bool {
-        windowWidth > 0 && windowWidth < foldWidth
-    }
-
-    /// Wider windows fold too when the row laid out unfolded, subtitle whole, is wider than the header.
-    static func foldsFilters(windowWidth: CGFloat, unfoldedRowWidth: CGFloat, rowWidth: CGFloat) -> Bool {
-        foldsFilters(windowWidth: windowWidth) || (rowWidth > 0 && unfoldedRowWidth > rowWidth)
+    /// Folds only when the row laid out unfolded, subtitle whole, is wider than the header; 0 is a row not measured yet.
+    static func foldsFilters(unfoldedRowWidth: CGFloat, rowWidth: CGFloat) -> Bool {
+        rowWidth > 0 && unfoldedRowWidth > rowWidth
     }
 
     static func subtitle(count: Int, totalSeconds: Double, bundle: Bundle = .main) -> String {
@@ -36,7 +29,6 @@ struct LibraryPageHeader: View {
     @Binding var pendingBulkDelete: Bool
 
     @Environment(AppModel.self) private var model
-    @Environment(\.mainWindowWidth) private var windowWidth
     @State private var rowWidth: CGFloat = 0
     @State private var unfoldedRowWidth: CGFloat = 0
 
@@ -49,7 +41,7 @@ struct LibraryPageHeader: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .accessibilityAddTraits(.isHeader)
-            row(folded: Self.foldsFilters(windowWidth: windowWidth, unfoldedRowWidth: unfoldedRowWidth, rowWidth: rowWidth))
+            row(folded: Self.foldsFilters(unfoldedRowWidth: unfoldedRowWidth, rowWidth: rowWidth))
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
                 // An unfolded copy nobody sees or reaches, measured so the header knows before it would overflow.
                 .background(alignment: .leading) {
