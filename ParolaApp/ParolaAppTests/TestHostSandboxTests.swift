@@ -14,6 +14,7 @@ struct TestHostSandboxTests {
 
         #expect(host.mode == .test)
         #expect(host.activeSideEffects.isEmpty)
+        #expect(!AppDelegate.prunesStaleWindowKeys(host.activeSideEffects))
         #expect(host.defaults !== UserDefaults.standard)
         #expect(DefaultsStore.current !== UserDefaults.standard)
         #expect(settingsStore !== UserDefaults.standard)

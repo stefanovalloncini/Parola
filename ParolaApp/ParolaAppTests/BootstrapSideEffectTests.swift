@@ -68,9 +68,10 @@ struct BootstrapSideEffectTests {
     @Test("only a normal launch prunes the stale window frames")
     func onlyANormalLaunchPrunes() throws {
         let host = try #require(AppBootstrap.testHost(environment: ["XCTestConfigurationFilePath": ""]))
-        #expect(BootstrapSideEffect.all.contains(.staleWindowKeyPrune))
-        #expect(!BootstrapSideEffect.testing.contains(.staleWindowKeyPrune))
-        #expect(!host.sideEffects.contains(.staleWindowKeyPrune))
+        #expect(AppDelegate.prunesStaleWindowKeys(BootstrapSideEffect.all))
+        #expect(!AppDelegate.prunesStaleWindowKeys(BootstrapSideEffect.testing))
+        #expect(!AppDelegate.prunesStaleWindowKeys([]))
+        #expect(!AppDelegate.prunesStaleWindowKeys(host.sideEffects))
     }
 
     @Test("AppBootstrap.test parses every test-mode flag correctly")

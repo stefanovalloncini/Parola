@@ -52,6 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sideEffects.contains(.dictationHotkey)
     }
 
+    /// The test host shares the app's own defaults domain, so only a normal launch rewrites it.
+    nonisolated static func prunesStaleWindowKeys(_ sideEffects: Set<BootstrapSideEffect>) -> Bool {
+        sideEffects.contains(.staleWindowKeyPrune)
+    }
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         if CommandLine.arguments.contains("--headless") {
             NSApp.setActivationPolicy(.accessory)
@@ -61,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let model = AppDelegate.launchModel { bind(model: model) }
         ParolaLog.info(.appLifecycle, "app launched, version \(AppVersionToken())")
-        if model?.activeSideEffects.contains(.staleWindowKeyPrune) == true { StaleWindowKeys.pruneInBackground() }
+        if let model, Self.prunesStaleWindowKeys(model.activeSideEffects) { StaleWindowKeys.pruneInBackground() }
         NSApp.servicesProvider = provider
         NSUpdateDynamicServices()
         if CommandLine.arguments.contains("--headless") {
