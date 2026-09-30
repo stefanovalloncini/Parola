@@ -51,6 +51,9 @@ struct LibraryRowList: View {
                         )
                         .equatable()
                         .onAppear { rowAppeared?(row.id) }
+                        // Out here: set in the Equatable row's own body, the list never applied them.
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
                     }
                 } header: {
                     groupHeader(group)
@@ -148,9 +151,6 @@ struct LibraryListRow: View, Equatable {
                 .accessibilityIdentifier("library.row.\(entry.id).delete")
             }
             .accessibilityIdentifier("library.row.\(entry.id)")
-            // None: the row pads itself inside its hover wash, and List(.inset)'s own 16 pt lands its badge on the 24 pt gutter.
-            .listRowInsets(EdgeInsets())
-            .listRowSeparator(.hidden)
     }
 
     @ViewBuilder
