@@ -162,8 +162,7 @@ public final class ModelStore: Sendable {
             .appendingPathComponent(source.installDirectory, isDirectory: true)
     }
 
-    /// Directories an earlier release installed a variant into, whether or not they still exist.
-    /// Any that overlaps a folder in use is dropped, since an engine update can rename its folder.
+    /// Folders an earlier release installed a variant into, existing or not, minus any overlapping a live one.
     private func supersededURLs(
         for source: ModelDownloadSource,
         among catalog: [ModelVariant] = ModelCatalog.all
@@ -186,7 +185,7 @@ public final class ModelStore: Sendable {
 
     /// Lowercased because the default APFS volume ignores case, so two spellings can name one folder.
     private static func comparablePath(_ url: URL) -> String {
-        url.standardizedFileURL.path.lowercased()
+        url.resolvingSymlinksInPath().standardizedFileURL.path.lowercased()
     }
 
     /// Leftover weights from a variant that has since moved to another folder, so a caller can

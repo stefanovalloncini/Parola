@@ -445,13 +445,14 @@ struct ModelStoreTests {
     @Test(
         "a folder that is, holds or sits inside a live install is never offered as an earlier download",
         arguments: [
-            "FluidInference/synthetic-coreml",
-            "fluidinference/Synthetic-CoreML",
-            "FluidInference",
-            "FluidInference/synthetic-coreml/Encoder.mlmodelc",
+            ("FluidInference/synthetic-coreml", false),
+            ("fluidinference/Synthetic-CoreML", false),
+            ("FluidInference", false),
+            ("FluidInference/synthetic-coreml/Encoder.mlmodelc", false),
+            ("FluidInference/synthetic-old", true),
         ]
     )
-    func supersededFolderOverlappingTheLiveOneIsNotOffered(superseded: String) throws {
+    func supersededFolderOverlappingTheLiveOneIsNotOffered(superseded: String, liveLinksToIt: Bool) throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
@@ -475,6 +476,12 @@ struct ModelStoreTests {
         )
         let store = ModelStore(modelsDirectory: tmp)
         let live = store.installedURL(for: synthetic.downloadSource)
+        if liveLinksToIt {
+            let target = tmp.appendingPathComponent("models", isDirectory: true)
+                .appendingPathComponent(superseded, isDirectory: true)
+            try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(at: live, withDestinationURL: target)
+        }
         let encoder = live.appendingPathComponent("Encoder.mlmodelc", isDirectory: true)
         try FileManager.default.createDirectory(at: encoder, withIntermediateDirectories: true)
         try Data("w".utf8).write(to: encoder.appendingPathComponent("weights.bin"))
