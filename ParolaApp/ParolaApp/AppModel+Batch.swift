@@ -36,9 +36,9 @@ extension AppModel {
         runBatchTask(jobs: jobs)
     }
 
-    /// A batch that starts or grows opens Activity, so the user sees it run; a take recording keeps the screen.
+    /// A batch that starts or grows opens Activity, so the user sees it run; a take recording, or its Stage, keeps the screen.
     func showBatchActivity() {
-        guard !takeIsRunning else { return }
+        guard !takeIsRunning, route != .recording else { return }
         openQueue()
     }
 

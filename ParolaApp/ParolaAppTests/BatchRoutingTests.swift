@@ -6,6 +6,23 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
+/// A live session that kept its audio, for a take that fails on its Stage.
+private actor KeptTakeSession: StreamingTranscriber {
+    let audio: URL
+    init(audio: URL) { self.audio = audio }
+    func start(
+        options: TranscriptionOptions,
+        speakerLabeler: (any StreamingSpeakerLabeler)?,
+        downloadProgress: (@Sendable (Double) -> Void)?
+    ) async throws -> AsyncStream<StreamingEvent> {
+        AsyncStream { $0.finish() }
+    }
+    func stop() async {}
+    func cancel() async {}
+    func currentModel() async -> String? { nil }
+    func recordingAudioURL() async -> URL? { audio }
+}
+
 extension TranscriberMockSuites {
     @MainActor
     @Suite("Batch routing", .serialized)
@@ -153,6 +170,28 @@ extension TranscriberMockSuites {
 
             #expect(model.batchJobs.map(\.url.lastPathComponent) == ["running.m4a", "late.m4a", "now.m4a", "queued.m4a"])
             #expect(model.route == route)
+        }
+
+        @Test("a batch that starts while a failed take's Stage shows leaves the Stage up")
+        func batchLeavesTheStage() async throws {
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(start: 0, end: 1, text: "queued")], gate: MockTranscriberGate())
+                let audio = try tempWAV("batch-routing-failed-take")
+                defer { try? FileManager.default.removeItem(at: audio) }
+                let file = try tempWAV("batch-routing-stage")
+                defer { try? FileManager.default.removeItem(at: file) }
+                let model = makeModel()
+                model.installTestTake(source: .microphone)
+                await model.handleStreamingEvent(.failed("The model stopped."), session: KeptTakeSession(audio: audio))
+                #expect(model.route == .recording)
+                #expect(!model.takeIsRunning)
+
+                model.startBatch(urls: [file])
+
+                #expect(model.batchJobs.count == 1)
+                #expect(model.route == .recording)
+                model.cancelAllInFlightBatchJobs()
+            }
         }
 
         @Test("a running job leaves the Library page on screen")
