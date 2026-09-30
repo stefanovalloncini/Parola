@@ -26,6 +26,8 @@ struct RecordingSession: Equatable, Sendable {
     var title: String
     /// `.user` once the title is one the user typed; nil while it is the generated name.
     var titleSource: TitleSource?
+    /// The moment the generated name is stamped with: when the take began.
+    let titleDate: Date
     var device: String?
     var isStreaming: Bool
     var audioURL: URL?
@@ -36,12 +38,16 @@ struct RecordingSession: Equatable, Sendable {
     private(set) var markers: [TimeInterval]
     private(set) var pauses: [TimeInterval]
 
-    init(takeID: Int, source: AppModel.RecordSource, category: EntryCategory, title: String, isStreaming: Bool, arming: Arming) {
+    init(
+        takeID: Int, source: AppModel.RecordSource, category: EntryCategory, title: String, isStreaming: Bool, arming: Arming,
+        titleDate: Date = Date()
+    ) {
         self.takeID = takeID
         self.source = source
         self.category = category
         self.title = title
         self.titleSource = nil
+        self.titleDate = titleDate
         self.device = nil
         self.isStreaming = isStreaming
         self.audioURL = nil
@@ -69,6 +75,11 @@ struct RecordingSession: Equatable, Sendable {
 
     var isRunning: Bool {
         isArming || state == .recording || isPaused || state == .finishing
+    }
+
+    /// The take's one generated name, from when it began and its category now.
+    var generatedTitle: String {
+        AppModel.liveRecordingTitle(category: category, endedAt: titleDate)
     }
 
     var isOver: Bool {

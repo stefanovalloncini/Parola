@@ -86,10 +86,16 @@ final class AppModel {
         var captureRequested = false
     }
 
-    /// What the user gave a take while it ran: a title they typed and the moments they marked.
+    /// What a take's session holds for its entry: the name it showed, a title the user typed, and the moments they marked.
     struct TakeAnnotations: Equatable {
+        var generatedTitle: String?
         var typedTitle: String?
         var markers: [TimeInterval] = []
+
+        /// The name the take showed, or one stamped now for a take that never had a session to show it.
+        func title(for category: EntryCategory) -> String {
+            generatedTitle ?? AppModel.liveRecordingTitle(category: category, endedAt: Date())
+        }
     }
 
     /// How long a take stays quiet before the pane warns: a mic soon, Mac audio only past a pause, unless it has heard nothing yet.
@@ -3158,13 +3164,15 @@ final class AppModel {
     private func beginCountIn(seconds: Int, source: RecordSource, then: @escaping () -> Void) {
         countdownTask?.cancel()
         let takeID = takeCounter &+ 1
+        let stamp = Date()
         beginSession(RecordingSession(
             takeID: takeID,
             source: source,
             category: pendingRecordingCategory,
-            title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date()),
+            title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: stamp),
             isStreaming: false,
-            arming: .countIn(remaining: seconds)
+            arming: .countIn(remaining: seconds),
+            titleDate: stamp
         ))
         let clock = clock
         countdownTask = Task { @MainActor [weak self] in
@@ -3232,7 +3240,8 @@ final class AppModel {
             category: take.category,
             title: Self.liveRecordingTitle(category: take.category, endedAt: startedAt),
             isStreaming: liveSource == nil,
-            arming: .startingCapture
+            arming: .startingCapture,
+            titleDate: startedAt
         )
         session.markCapturing(at: startedAt)
         beginSession(session)
@@ -3293,13 +3302,15 @@ final class AppModel {
         )
         forgetTakeRequest()
         activeTake = take
+        let stamp = Date()
         beginSession(RecordingSession(
             takeID: take.id,
             source: source,
             category: take.category,
-            title: Self.liveRecordingTitle(category: take.category, endedAt: Date()),
+            title: Self.liveRecordingTitle(category: take.category, endedAt: stamp),
             isStreaming: false,
-            arming: .startingCapture
+            arming: .startingCapture,
+            titleDate: stamp
         ))
         if source == .microphone { nameTakeDevice(take) }
         pendingRecordingSource = source.entrySource
@@ -3823,7 +3834,7 @@ final class AppModel {
         var message = reason
         let takeCategory = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
-        let takeTitle = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
+        let takeTitle = given.title(for: takeCategory)
         let savedPartial = !confirmed.isEmpty || audioURL != nil
         var saving: Task<LibraryEntry, any Error>?
         if savedPartial {
@@ -3883,7 +3894,7 @@ final class AppModel {
         // Cancelled, or followed by another take, while those ran: it goes to the library without touching the screen.
         if let take, !takeIsCurrent(take) {
             if hasContent {
-                let title = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
+                let title = given.title(for: takeCategory)
                 saveTake(
                     processed,
                     audio: processed.sourceURL,
@@ -3915,7 +3926,7 @@ final class AppModel {
         }
         let landing = Self.landingSignposter.beginInterval("install")
         defer { Self.landingSignposter.endInterval("install", landing) }
-        let title = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
+        let title = given.title(for: takeCategory)
         clearDerivedArtifacts()
         selectedEntryID = nil
         self.transcript = processed
@@ -3989,7 +4000,7 @@ final class AppModel {
         startTakeTask { [weak self] in
             guard let self else { return }
             await mediaSession.exitRecording()
-            let title = Self.liveRecordingTitle(category: category, endedAt: Date())
+            let title = given.title(for: category)
             do {
                 let url = try await source.prepare()
                 clearTakeReadouts(of: take?.id)
@@ -4423,7 +4434,7 @@ final class AppModel {
             if typed.isEmpty {
                 guard session.titleSource != nil else { return }
                 session.titleSource = nil
-                session.title = Self.liveRecordingTitle(category: session.category, endedAt: session.startedAt ?? Date())
+                session.title = session.generatedTitle
             } else if typed != session.title {
                 session.title = typed
                 session.titleSource = .user
@@ -4438,15 +4449,19 @@ final class AppModel {
         updateSession(of: take.id) { session in
             session.category = category
             guard session.titleSource == nil else { return }
-            session.title = Self.liveRecordingTitle(category: category, endedAt: session.startedAt ?? Date())
+            session.title = session.generatedTitle
         }
         writeRecordingCheckpoint()
     }
 
-    /// The title the user typed and the moments they marked, from the take's session while it is still that take's.
+    /// What the take's session holds for its entry, while the session is still that take's.
     private func annotations(of takeID: Int?) -> TakeAnnotations {
         guard let takeID, let session = recording, session.takeID == takeID else { return TakeAnnotations() }
-        return TakeAnnotations(typedTitle: session.titleSource == .user ? session.title : nil, markers: session.markers)
+        return TakeAnnotations(
+            generatedTitle: session.generatedTitle,
+            typedTitle: session.titleSource == .user ? session.title : nil,
+            markers: session.markers
+        )
     }
 
     // MARK: - Take titles
@@ -4567,7 +4582,7 @@ final class AppModel {
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let recovery = recoveryGeneration(of: take)
         let given = annotations(of: take?.id)
-        let title = Self.liveRecordingTitle(category: category, endedAt: Date())
+        let title = given.title(for: category)
         await mediaSession.exitRecording()
         var cutShort = false
         let prepared: URL?

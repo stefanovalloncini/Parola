@@ -492,6 +492,31 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("an untitled take is saved under the one name it showed, stamped when it began, through a category switch")
+        func untitledTakeKeepsTheNameItShowed() async throws {
+            let wav = try makeTakeWAV("take-shown-name")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 2, "Hi")])
+                let model = makeRecordingModel("take-shown-name")
+                let began = Date(timeIntervalSinceNow: -3_600)
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: wav), startedAt: began)
+                #expect(model.recording?.title == AppModel.liveRecordingTitle(category: .transcription, endedAt: began))
+
+                model.setTakeCategory(.meeting)
+                model.renameTake("Design review")
+                model.renameTake("")
+                let shown = AppModel.liveRecordingTitle(category: .meeting, endedAt: began)
+                #expect(model.recording?.title == shown)
+
+                model.stopRecordingAndTranscribe()
+
+                let entry = try #require(await landedEntry(model))
+                #expect(entry.title == shown)
+                #expect(entry.manifest.titleSource == nil)
+            }
+        }
+
         @Test("a live take keeps the title, category and markers it was given")
         func liveTakeKeepsWhatItWasGiven() async throws {
             try await withMocksCleared([.audioSource, .streaming]) {
