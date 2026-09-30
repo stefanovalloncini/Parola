@@ -53,6 +53,7 @@ actor StreamingRealtimeLoop {
     private let onConfirmed: @Sendable (ConfirmedAudioBatch) -> Void
     private let levelMeter: LevelMeter
     private let inbox = OSAllocatedUnfairLock(initialState: Inbox())
+    private let paused = OSAllocatedUnfairLock(initialState: false)
 
     private var window: [Float] = []
     private var windowStartSample = 0
@@ -203,8 +204,12 @@ actor StreamingRealtimeLoop {
 
     func windowStartOffsetSamples() -> Int { windowStartSample }
 
+    nonisolated func setPaused(_ value: Bool) {
+        paused.withLock { $0 = value }
+    }
+
     nonisolated private func ingest(_ buffer: [Float]) {
-        guard !buffer.isEmpty else { return }
+        guard !buffer.isEmpty, !paused.withLock({ $0 }) else { return }
         let avgEnergy = AudioProcessor.calculateEnergy(of: buffer).avg
         levelMeter.record(AudioLevel.normalised(rms: avgEnergy))
         let rel = inbox.withLock { box -> Float in

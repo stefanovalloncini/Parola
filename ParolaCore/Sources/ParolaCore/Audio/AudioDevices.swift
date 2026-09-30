@@ -39,6 +39,12 @@ public enum AudioDevices {
         #endif
     }
 
+    /// The name of the device with `uid`, or the default device's name when `uid` is nil.
+    public static func name(forUID uid: String?, in devices: [AudioInputDevice]) -> String? {
+        guard let uid else { return devices.first { $0.isDefault }?.name }
+        return devices.first { $0.uid == uid }?.name
+    }
+
     #if canImport(CoreAudio) && os(macOS)
     public static func deviceID(forUID uid: String) -> AudioDeviceID? {
         for id in systemDeviceIDs() {

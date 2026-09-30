@@ -8,6 +8,7 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
     private var isStarting = false
     private var endedWhileStarting: EndedWhileStarting?
     public nonisolated let levelMeter = LevelMeter()
+    public private(set) var pauseCalls: [Bool] = []
 
     private enum EndedWhileStarting {
         case stop
@@ -68,6 +69,10 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
         continuation.yield(.finished(Transcript(segments: [], language: response.language, modelName: response.modelName)))
         continuation.finish()
         return stream
+    }
+
+    public func setPaused(_ paused: Bool) async {
+        pauseCalls.append(paused)
     }
 
     public func stop() async {

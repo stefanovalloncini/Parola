@@ -11,6 +11,7 @@ public actor FixtureAudioSource: LiveAudioSource {
     private let fixtureURL: URL
     private let sleeper: @Sendable (Int) async throws -> Void
     private var started = false
+    private var paused = false
     private var paceTask: Task<Void, Never>?
     public nonisolated let levelMeter = LevelMeter()
 
@@ -34,6 +35,7 @@ public actor FixtureAudioSource: LiveAudioSource {
             throw ParolaError.audioLoadFailed(fixtureURL, underlying: "fixture not found")
         }
         started = true
+        paused = false
         paceTask?.cancel()
         let sleeper = sleeper
         let url = fixtureURL
@@ -51,6 +53,10 @@ public actor FixtureAudioSource: LiveAudioSource {
 
         while file.framePosition < file.length {
             if Task.isCancelled { return }
+            if paused {
+                try? await sleeper(frameDurationMs)
+                continue
+            }
             buffer.frameLength = 0
             do {
                 try file.read(into: buffer, frameCount: chunkFrames)
@@ -79,6 +85,10 @@ public actor FixtureAudioSource: LiveAudioSource {
         paceTask?.cancel()
         paceTask = nil
         levelMeter.reset()
+    }
+
+    public func setPaused(_ paused: Bool) async {
+        self.paused = paused
     }
 
     public func estimatedDuration() async -> Double? {

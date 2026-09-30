@@ -7,6 +7,8 @@ public protocol StreamingTranscriber: Sendable {
         downloadProgress: (@Sendable (Double) -> Void)?
     ) async throws -> AsyncStream<StreamingEvent>
     func stop() async
+    /// Pauses or resumes the running take; a no-op before capture has launched.
+    func setPaused(_ paused: Bool) async
     /// Ends the take without its final decode and deletes any audio it kept: nothing is saved and
     /// no `.finished` arrives.
     func cancel() async
@@ -24,6 +26,7 @@ public extension StreamingTranscriber {
     func recordingAudioURL() async -> URL? { nil }
     func audioWasCutShort() async -> Bool { false }
     var levelMeter: LevelMeter { LevelMeter() }
+    func setPaused(_ paused: Bool) async {}
 }
 
 public enum StreamingTranscriberFactory {

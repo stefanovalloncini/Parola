@@ -11,6 +11,7 @@ public final class LevelMeter: Sendable {
         var level: Float = 0
         var peak: Float = 0
         var lastSound: ContinuousClock.Instant?
+        var firstReadingAt: ContinuousClock.Instant?
     }
 
     private let reading = OSAllocatedUnfairLock(initialState: Reading())
@@ -20,11 +21,13 @@ public final class LevelMeter: Sendable {
     /// `level` is a 0...1 amplitude, as `AudioLevel` maps a buffer.
     public func record(_ level: Float) {
         let clamped = level.isFinite ? min(1, max(0, level)) : 0
-        let now: ContinuousClock.Instant? = clamped >= Self.soundFloor ? .now : nil
+        let now = ContinuousClock.now
+        let soundNow: ContinuousClock.Instant? = clamped >= Self.soundFloor ? now : nil
         reading.withLock { reading in
             reading.level = clamped
             reading.peak = max(reading.peak, clamped)
-            if let now { reading.lastSound = now }
+            if let soundNow { reading.lastSound = soundNow }
+            if reading.firstReadingAt == nil { reading.firstReadingAt = now }
         }
     }
 
@@ -45,6 +48,11 @@ public final class LevelMeter: Sendable {
     /// When a buffer last reached `soundFloor`; nil before any did.
     public var lastSound: ContinuousClock.Instant? {
         reading.withLock(\.lastSound)
+    }
+
+    /// When this meter's first reading came in, silent or not; nil before any did.
+    public var firstReadingAt: ContinuousClock.Instant? {
+        reading.withLock(\.firstReadingAt)
     }
 
     public func reset() {

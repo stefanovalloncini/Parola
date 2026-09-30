@@ -13,6 +13,7 @@ final class StreamingAudioPersister: Sendable {
     private let writerTask: Task<URL?, Never>
     private let dropped = OSAllocatedUnfairLock(initialState: false)
     private let failed: OSAllocatedUnfairLock<Bool>
+    private let paused = OSAllocatedUnfairLock(initialState: false)
 
     /// `failingAfter` is a test seam: writes past that many fail, the way a full disk would.
     init?(sampleRate: Double, failingAfter writeLimit: Int? = nil) {
@@ -72,6 +73,7 @@ final class StreamingAudioPersister: Sendable {
     }
 
     func append(_ samples: [Float]) {
+        guard !paused.withLock({ $0 }) else { return }
         if case .dropped = continuation.yield(samples) {
             noteDrop()
         }
@@ -79,6 +81,10 @@ final class StreamingAudioPersister: Sendable {
 
     func noteDrop() {
         dropped.withLock { $0 = true }
+    }
+
+    func setPaused(_ value: Bool) {
+        paused.withLock { $0 = value }
     }
 
     /// Finishes the WAV and returns its URL, or nil if nothing was written.

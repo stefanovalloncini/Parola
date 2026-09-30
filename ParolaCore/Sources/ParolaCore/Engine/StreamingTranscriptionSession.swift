@@ -259,6 +259,12 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         return stream
     }
 
+    /// Pauses or resumes the running take; a no-op before capture has launched.
+    public func setPaused(_ paused: Bool) async {
+        loop?.setPaused(paused)
+        persister?.setPaused(paused)
+    }
+
     /// Stops the mic stream, flushes a final transcript, and finishes the stream.
     public func stop() async {
         guard let loop else {

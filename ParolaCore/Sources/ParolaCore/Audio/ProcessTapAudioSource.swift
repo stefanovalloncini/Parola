@@ -171,6 +171,10 @@ public actor ProcessTapAudioSource: LiveAudioSource {
 
     public func inFlightURL() -> URL? { outputURL }
 
+    public func setPaused(_ paused: Bool) async {
+        handler?.setPaused(paused)
+    }
+
     public func cancel() async {
         await stop()
         try? FileManager.default.removeItem(at: outputURL)
@@ -237,8 +241,12 @@ private final class TapHandler: @unchecked Sendable {
         self.onLevel = onLevel
     }
 
+    func setPaused(_ paused: Bool) {
+        writer.setPaused(paused)
+    }
+
     func process(bufferList: UnsafePointer<AudioBufferList>) {
-        guard let copy = ProcessTapSampleCopy.copy(
+        guard !writer.isPaused, let copy = ProcessTapSampleCopy.copy(
             bufferList: bufferList,
             srcFormat: srcFormat,
             reusing: &sampleScratch

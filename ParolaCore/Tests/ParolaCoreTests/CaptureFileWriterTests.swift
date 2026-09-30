@@ -53,6 +53,22 @@ struct CaptureFileWriterTests {
         #expect(writer.failure == nil)
     }
 
+    @Test("a paused writer skips chunks and writes again on resume")
+    func pausedWriterSkips() {
+        let counter = WriteCounter()
+        let writer = CaptureFileWriter { _ in counter.bump() }
+        writer.write(Self.buffer())
+        writer.setPaused(true)
+        writer.write(Self.buffer())
+        writer.write(Self.buffer())
+        #expect(writer.isPaused)
+        writer.setPaused(false)
+        writer.write(Self.buffer())
+        #expect(counter.count == 2)
+        #expect(writer.failure == nil)
+        #expect(writer.droppedChunks == 0)
+    }
+
     @Test("writes land in the backing file")
     func writesLandInFile() throws {
         let url = FileManager.default.temporaryDirectory

@@ -49,3 +49,19 @@ struct LevelMeterTests {
         #expect(abs(AudioLevel.normalised(rms: 0.1) - 35.0 / 55.0) < 0.0001)
     }
 }
+
+@Suite("Level meter first reading")
+struct LevelMeterFirstReadingTests {
+    @Test("the meter remembers when its first reading came in, even a silent one")
+    func firstReading() {
+        let meter = LevelMeter()
+        #expect(meter.firstReadingAt == nil)
+        meter.record(0)
+        let first = meter.firstReadingAt
+        #expect(first != nil)
+        meter.record(0.5)
+        #expect(meter.firstReadingAt == first)
+        meter.reset()
+        #expect(meter.firstReadingAt == nil)
+    }
+}

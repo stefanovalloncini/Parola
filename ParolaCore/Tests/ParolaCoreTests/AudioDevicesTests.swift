@@ -4,6 +4,18 @@ import Testing
 
 @Suite("AudioDevices")
 struct AudioDevicesTests {
+    private let namedDevices = [
+        AudioInputDevice(uid: "BuiltIn", name: "MacBook Pro Microphone", isDefault: true),
+        AudioInputDevice(uid: "USB-1", name: "Shure MV7", isDefault: false),
+    ]
+
+    @Test("a chosen device is named, and no choice names the default")
+    func names() {
+        #expect(AudioDevices.name(forUID: "USB-1", in: namedDevices) == "Shure MV7")
+        #expect(AudioDevices.name(forUID: nil, in: namedDevices) == "MacBook Pro Microphone")
+        #expect(AudioDevices.name(forUID: "gone", in: namedDevices) == nil)
+    }
+
     @Test("inputDevices enumerates the host's real input devices with stable invariants")
     func inputDevicesInvariants() {
         let devices = AudioDevices.inputDevices()

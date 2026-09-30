@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 import os
@@ -280,6 +281,27 @@ struct StreamingTakeEndingTests {
         #expect(finished?.segments.map(\.text) == ["last words"])
         #expect(finished?.sourceURL == audio)
         #expect(FileManager.default.fileExists(atPath: audio.path))
+    }
+
+    @Test("a paused take keeps neither the sound nor the time of the pause")
+    func pausedTakeSkipsThePause() async throws {
+        let session = StreamingTranscriptionSession(persistAudio: true)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        let harness = TakeHarness()
+        let events = await launchTake(on: session, persister: persister, harness: harness)
+        #expect(await eventually { harness.installed })
+        harness.push([Float](repeating: 0.5, count: 16_000))
+        await session.setPaused(true)
+        harness.push([Float](repeating: 0.5, count: 16_000))
+        await session.setPaused(false)
+        harness.push([Float](repeating: 0.5, count: 16_000))
+        let audio = persister.url
+        defer { try? FileManager.default.removeItem(at: audio) }
+
+        await session.stop()
+
+        for await _ in events {}
+        #expect(try AVAudioFile(forReading: audio).length == 32_000)
     }
 }
 

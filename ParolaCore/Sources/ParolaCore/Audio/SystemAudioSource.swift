@@ -109,6 +109,10 @@ public actor SystemAudioSource: LiveAudioSource {
 
     public func inFlightURL() -> URL? { outputURL }
 
+    public func setPaused(_ paused: Bool) async {
+        handler?.setPaused(paused)
+    }
+
     public func cancel() async {
         try? await stop()
         try? FileManager.default.removeItem(at: outputURL)
@@ -157,8 +161,13 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         self.onLevel = onLevel
     }
 
+    func setPaused(_ paused: Bool) {
+        writer.setPaused(paused)
+    }
+
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .audio,
+              !writer.isPaused,
               sampleBuffer.isValid,
               let formatDesc = sampleBuffer.formatDescription,
               let asbd = formatDesc.audioStreamBasicDescription else {

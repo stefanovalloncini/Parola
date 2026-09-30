@@ -14,11 +14,15 @@ public protocol LiveAudioSource: AudioSource {
     /// The file this source is capturing into, once known — lets the app checkpoint
     /// an in-flight take for crash recovery. `nil` for sources that don't record to disk.
     func inFlightURL() async -> URL?
+    /// Pausing stops new audio landing in the file without ending the capture; a paused
+    /// stretch is simply absent when it resumes.
+    func setPaused(_ paused: Bool) async
 }
 
 public extension LiveAudioSource {
     func inFlightURL() async -> URL? { nil }
     var levelMeter: LevelMeter { LevelMeter() }
+    func setPaused(_ paused: Bool) async {}
 }
 
 public enum LiveAudioSourceFactory {

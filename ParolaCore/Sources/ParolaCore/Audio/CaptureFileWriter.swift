@@ -8,6 +8,7 @@ final class CaptureFileWriter: @unchecked Sendable {
     private let writeChunk: (AVAudioPCMBuffer) throws -> Void
     private let latchedFailure = OSAllocatedUnfairLock<String?>(initialState: nil)
     private let drops = OSAllocatedUnfairLock<Int>(initialState: 0)
+    private let paused = OSAllocatedUnfairLock(initialState: false)
 
     init(file: AVAudioFile) {
         self.writeChunk = { [file] buffer in try file.write(from: buffer) }
@@ -25,13 +26,21 @@ final class CaptureFileWriter: @unchecked Sendable {
         drops.withLock { $0 }
     }
 
+    var isPaused: Bool {
+        paused.withLock { $0 }
+    }
+
+    func setPaused(_ value: Bool) {
+        paused.withLock { $0 = value }
+    }
+
     /// A backlog drop leaves a gap in the take but keeps everything already on disk, so it never fails the recording.
     func noteDrop() {
         drops.withLock { $0 += 1 }
     }
 
     func write(_ buffer: AVAudioPCMBuffer) {
-        guard failure == nil else { return }
+        guard failure == nil, !isPaused else { return }
         do {
             try writeChunk(buffer)
         } catch {
