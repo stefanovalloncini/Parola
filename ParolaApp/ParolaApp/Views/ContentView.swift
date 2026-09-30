@@ -1,6 +1,11 @@
 import SwiftUI
 import ParolaCore
 
+extension EnvironmentValues {
+    /// Toolbar content has no geometry of its own, and the Library header folds by the window, not its column.
+    @Entry var mainWindowWidth: CGFloat = 0
+}
+
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.undoManager) private var windowUndoManager

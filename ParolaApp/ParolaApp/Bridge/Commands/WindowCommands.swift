@@ -85,7 +85,7 @@ extension ParolaAutomationServer {
                 kind: .mutating,
                 handler: { _, ctx in
                     try ctx.require(.youtube)
-                    ctx.model.youtubeSheetOpen = true
+                    ctx.model.openLinkSheet(prefill: nil)
                     return .object(["open": .bool(true)])
                 }
             ),

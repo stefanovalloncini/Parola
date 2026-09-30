@@ -169,7 +169,7 @@ struct ContentToolbar: ToolbarContent {
             }
             if model.features.isEnabled(.youtube) {
                 Divider()
-                Button { model.youtubeSheetOpen = true } label: { Label("YouTube URL…", systemImage: "play.rectangle") }
+                Button { model.openLinkSheet(prefill: nil) } label: { Label("YouTube URL…", systemImage: "play.rectangle") }
                     .accessibilityIdentifier("toolbar.youtube")
                     .axLeaf("Toolbar.MenuItem.NewYouTube")
             }

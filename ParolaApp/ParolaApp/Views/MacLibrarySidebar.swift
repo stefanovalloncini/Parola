@@ -32,7 +32,7 @@ struct MacLibrarySidebar: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    librarySectionHeader
+                    SidebarSectionLabel("Library")
 
                     SidebarRow(
                         title: "Library",
@@ -114,35 +114,6 @@ struct MacLibrarySidebar: View {
     private var deletedBadge: Int? {
         let n = model.deletedEntries.count
         return n > 0 ? n : nil
-    }
-
-    private var librarySectionHeader: some View {
-        HStack(spacing: 0) {
-            SidebarSectionLabel("Library")
-            Spacer(minLength: 0)
-            sortMenu
-        }
-        .padding(.trailing, DS.Spacing.tight)
-    }
-
-    private var sortMenu: some View {
-        @Bindable var model = model
-        return Menu {
-            Picker("Sort", selection: $model.librarySortOrder) {
-                ForEach(LibrarySortOrder.allCases) { order in
-                    Text(LocalizedStringKey(order.label)).tag(order)
-                }
-            }
-            .pickerStyle(.inline)
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-        }
-        .menuStyle(.button)
-        .buttonStyle(DSIconChipButtonStyle())
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Sort")
-        .axLeaf("Sidebar.Menu.Sort")
     }
 
     private var bottomPills: some View {

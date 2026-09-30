@@ -20,11 +20,8 @@ struct YouTubeURLSheet: View {
         .onAppear {
             model.youtubeURLError = nil
             model.refreshYtDlpAvailability()
-            if urlDraft.isEmpty,
-               let clipboard = NSPasteboard.general.string(forType: .string),
-               let url = URL(string: clipboard.trimmingCharacters(in: .whitespacesAndNewlines)),
-               url.isYtDlpSupported {
-                urlDraft = url.absoluteString
+            if let prefill = model.takeLinkSheetPrefill() {
+                urlDraft = prefill.absoluteString
             }
             fieldFocused = true
         }

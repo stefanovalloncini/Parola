@@ -231,16 +231,25 @@ struct RouteLayoutTests {
         }
     }
 
-    @Test("a failure's banner sits over the Library page inside the smallest window")
+    /// The browse list mounts from its own onAppear, so the page is measured once it has had a pass to appear.
+    private func settledLibraryPageHeight(_ model: AppModel) -> CGFloat {
+        let host = NSHostingView(rootView: ContentRoutes().environment(model))
+        settle(host, width: MainWindowLayout.minimumWidth - MainWindowLayout.sidebarIdealWidth, height: MainWindowLayout.minimumHeight)
+        return host.fittingSize.height
+    }
+
+    @Test("a failure's banner sits on the Library page inside the smallest window")
     func failureBannerFitsTheLibraryPage() {
         withIsolatedDefaults { defaults in
             let model = makeModel(defaults, jobs: 0)
-            let calm = NSHostingView(rootView: ContentRoutes().environment(model)).fittingSize.height
+            let calm = settledLibraryPageHeight(model)
             model.phase = .failed(message: "The file couldn't be decoded.")
-            let failed = NSHostingView(rootView: ContentRoutes().environment(model)).fittingSize.height
-            #expect(failed > calm, "the banner takes its room above the list")
+            let failed = settledLibraryPageHeight(model)
+            #expect(failed > calm, "the banner takes its room on the page")
 
-            let wanted = NSHostingView(rootView: ContentView().environment(model)).fittingSize
+            let window = NSHostingView(rootView: ContentView().environment(model))
+            settle(window, width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
+            let wanted = window.fittingSize
             #expect(wanted.width <= MainWindowLayout.minimumWidth, "the failed library wants \(wanted.width)pt of width")
             #expect(wanted.height <= MainWindowLayout.minimumHeight, "the failed library wants \(wanted.height)pt of height")
         }

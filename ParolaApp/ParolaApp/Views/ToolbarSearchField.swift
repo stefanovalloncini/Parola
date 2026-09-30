@@ -1,11 +1,6 @@
 import AppKit
 import SwiftUI
 
-extension EnvironmentValues {
-    /// Toolbar content has no geometry of its own to read, so `ContentView` measures the window for it.
-    @Entry var mainWindowWidth: CGFloat = 0
-}
-
 /// The toolbar hands out space without proposing any, so the field's width rules are arithmetic over the window.
 enum ToolbarSearchMetrics {
     static let restingWidth: CGFloat = 180

@@ -39,15 +39,29 @@ enum LibraryListContent {
     /// Shown instead of `emptyTitle` when the category has rows and the filters are what hid them.
     static let filteredEmptyTitle = "No Matches for This Filter"
 
-    /// A person only takes the title over an unset category; narrowed within one, the category keeps it.
-    static func headerTitle(for category: EntryCategory?, person: Person?) -> String {
-        if category == nil, let person { return person.name }
-        switch category {
-        case .transcription: return String(localized: "Transcriptions")
-        case .meeting: return String(localized: "Meetings")
-        case .dictation: return String(localized: "Dictations")
-        case nil: return String(localized: "Library")
+    struct PageTotals: Equatable {
+        var count = 0
+        var seconds: Double = 0
+        var bytes: Int64 = 0
+    }
+
+    /// The header speaks for the page, not for what its filters leave: a category, else a person's own page, else the library.
+    static func pageTotals(
+        of entries: [LibraryEntry],
+        category: EntryCategory?,
+        person: UUID?,
+        sizes: [String: Int64]
+    ) -> PageTotals {
+        let pagePerson = category == nil ? person : nil
+        var totals = PageTotals()
+        for entry in entries {
+            if let category, entry.category != category { continue }
+            if let pagePerson, !entry.assigns(personID: pagePerson) { continue }
+            totals.count += 1
+            totals.seconds += entry.durationSeconds ?? 0
+            totals.bytes += sizes[entry.id] ?? 0
         }
+        return totals
     }
 
     /// A browse list sits under the results only when clearing the query would show it: not over a transcript.
@@ -172,20 +186,6 @@ enum LibraryListContent {
         guard count > 0 else { return nil }
         if count == 1 { return String(localized: "1 transcript", bundle: bundle, locale: locale) }
         return String(localized: "\(count) transcripts", bundle: bundle, locale: locale)
-    }
-
-    /// The line under a list's title: how many entries, and how much audio they hold between them.
-    static func listSubtitle(
-        count: Int,
-        totalSeconds: Double,
-        bundle: Bundle = .main,
-        locale: Locale = AppFormat.locale
-    ) -> String? {
-        guard let transcripts = totalsLabel(for: count, bundle: bundle, locale: locale) else { return nil }
-        // A list whose entries carry no media length says how many there are and stops there.
-        guard totalSeconds.rounded() >= 1 else { return transcripts }
-        let span = AppFormat.duration(seconds: totalSeconds, locale: locale)
-        return String(localized: "\(transcripts) · \(span) of audio", bundle: bundle)
     }
 
     /// The search page counts two things: the entries that matched, and the hits they hold between them.
@@ -335,8 +335,7 @@ private struct LibraryBrowseList: View, Equatable {
     @State private var dateRangeFilter: LibraryDateRangeFilter = .all
     @State private var entries: [LibraryRowDisplay] = []
     @State private var rowGroups: [LibraryDateGroups.Group] = []
-    @State private var totalsLabel: String = ""
-    @State private var totalsHelp: String?
+    @State private var pageTotals = LibraryListContent.PageTotals()
     @State private var displayCache = LibraryRowDisplayCache()
     @State private var animatesRows = false
 
@@ -367,18 +366,12 @@ private struct LibraryBrowseList: View, Equatable {
             dateRange: filters.dateRange,
             personFilter: filters.person
         )
-        let sizes = model.libraryBundleSizes
-        var totalBytes: Int64 = 0
-        var totalSeconds: Double = 0
         var cache = displayCache
         cache.prune(keeping: model.libraryEntries.lazy.map(\.id))
         let headers = LibraryDateGroups.Headers(sortOrder: model.librarySortOrder, groupsByDate: model.libraryGroupsByDate)
         let usualLanguage = model.usualLanguage
         let displays = computed.map { entry -> LibraryRowDisplay in
-            let size = sizes[entry.id]
-            totalBytes += size ?? 0
-            totalSeconds += entry.durationSeconds ?? 0
-            return cache.display(
+            cache.display(
                 for: entry, excerpt: model.libraryExcerpts[entry.id],
                 when: headers.when(for: entry), usualLanguage: usualLanguage,
                 showsAITitle: model.showAITitles, showsAISummary: model.showAISummaries
@@ -387,16 +380,15 @@ private struct LibraryBrowseList: View, Equatable {
         displayCache = cache
         entries = displays
         rowGroups = headers.groups(for: displays)
-        // Count and duration, never size: bundle sizes land later and only for audio, so the label used to change shape.
-        totalsLabel = LibraryListContent.listSubtitle(count: displays.count, totalSeconds: totalSeconds) ?? ""
-        totalsHelp = totalBytes > 0 ? String(localized: "Total size: \(AppFormat.byteSize(totalBytes))") : nil
+        pageTotals = LibraryListContent.pageTotals(
+            of: model.libraryEntries, category: category, person: filters.person, sizes: model.libraryBundleSizes
+        )
         return displays
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            Divider()
+            pageTop
             if entries.isEmpty {
                 emptyState
             } else {
@@ -412,9 +404,16 @@ private struct LibraryBrowseList: View, Equatable {
                     focus: focus,
                     focusKey: .browse
                 )
+                .scrollEdgeEffectStyle(.soft, for: .top)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // A word on the clipboard leaves Paste disabled rather than opening an empty sheet.
+        .onPasteCommand(of: [.url, .plainText]) { _ in
+            model.features.isEnabled(.youtube) ? PastedLink.url(on: .general) : nil
+        } perform: { link in
+            model.openLinkSheet(prefill: link)
+        }
         .onAppear { recomputeEntries() }
         // Later than onAppear's first fill, so the rows the route opens with don't animate in.
         .task { animatesRows = true }
@@ -460,13 +459,14 @@ private struct LibraryBrowseList: View, Equatable {
         ))
     }
 
-    private var header: some View {
-        PageHeader(
-            title: headerTitle,
-            subtitle: totalsLabel.isEmpty ? nil : totalsLabel,
-            subtitleHelp: totalsHelp,
-            leading: {
-                LibraryFilterBar(
+    private var pageTop: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+            LibraryPageHeader(
+                title: LibraryPageHeader.title(category: category, personName: selectedPerson?.name),
+                subtitle: LibraryPageHeader.subtitle(count: pageTotals.count, totalSeconds: pageTotals.seconds),
+                subtitleHelp: pageTotals.bytes > 0
+                    ? String(localized: "Total size: \(AppFormat.byteSize(pageTotals.bytes))") : nil,
+                filters: LibraryFilterBar(
                     labelFilter: $labelFilter,
                     languageFilter: $languageFilter,
                     dateRangeFilter: $dateRangeFilter,
@@ -474,10 +474,17 @@ private struct LibraryBrowseList: View, Equatable {
                     labelOptions: model.knownLabels(in: category),
                     languageOptions: model.knownLanguages(in: category),
                     peopleOptions: model.knownPeople(in: category)
-                )
-            },
-            trailing: { LibraryBulkActions(selection: selection, pendingBulkDelete: $pendingBulkDelete) }
-        )
+                ),
+                showsListControls: pageTotals.count > 0,
+                selection: selection,
+                pendingBulkDelete: $pendingBulkDelete
+            )
+            IntakeStrip()
+            LibraryFailureBanner()
+        }
+        .padding(.horizontal, DS.Spacing.large)
+        .padding(.top, DS.Spacing.regular)
+        .padding(.bottom, DS.Spacing.small)
     }
 
     @ViewBuilder
@@ -539,10 +546,6 @@ private struct LibraryBrowseList: View, Equatable {
         }
     }
 
-    private var headerTitle: String {
-        LibraryListContent.headerTitle(for: category, person: selectedPerson)
-    }
-
     private var selectedPerson: Person? {
         model.personFilter.flatMap(model.person(id:))
     }
@@ -554,6 +557,17 @@ private struct LibraryBrowseList: View, Equatable {
     private var emptyIcon: String {
         guard let category else { return "tray" }
         return DS.categorySymbol(for: category)
+    }
+}
+
+/// Its own view, so a phase change repaints the banner and never the rows under it.
+private struct LibraryFailureBanner: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        if case .failed(let message) = model.phase {
+            ErrorBanner(message: message)
+        }
     }
 }
 

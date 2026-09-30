@@ -2585,6 +2585,7 @@ final class AppModel {
     // MARK: - YouTube URL
 
     var youtubeSheetOpen: Bool = false
+    var linkSheetPrefill: URL?
     var youtubeURLError: String?
     var ytDlpAvailable: Bool = false
     var ytDlpInstalling: Bool = false
@@ -2602,6 +2603,18 @@ final class AppModel {
 
     var ytDlpIsStale: Bool {
         ytDlpVersion?.isStale(asOf: Date()) ?? false
+    }
+
+    /// Every way into the link sheet comes through here, so a link one open left behind never fills the next.
+    func openLinkSheet(prefill: URL?) {
+        guard features.isEnabled(.youtube) else { return }
+        linkSheetPrefill = prefill
+        youtubeSheetOpen = true
+    }
+
+    func takeLinkSheetPrefill() -> URL? {
+        defer { linkSheetPrefill = nil }
+        return linkSheetPrefill
     }
 
     func refreshYtDlpAvailability() {

@@ -25,6 +25,7 @@ enum LibraryDateRangeFilter: String, CaseIterable, Identifiable {
     }
 }
 
+/// The Labels, People, Language and date pull-downs: header menus on a wide window, submenus of More on a narrow one.
 struct LibraryFilterBar: View {
     @Environment(AppModel.self) private var model
     @Binding var labelFilter: String?
@@ -40,84 +41,119 @@ struct LibraryFilterBar: View {
         !peopleOptions.isEmpty || personFilter != nil
     }
 
+    static func labelsTitle(_ label: String?, bundle: Bundle = .main) -> String {
+        guard let label else { return String(localized: "Labels", bundle: bundle) }
+        return String(localized: "Labels: \(capped(label))", bundle: bundle)
+    }
+
+    static func peopleTitle(_ name: String?, bundle: Bundle = .main) -> String {
+        guard let name else { return String(localized: "People", bundle: bundle) }
+        return String(localized: "People: \(capped(name))", bundle: bundle)
+    }
+
+    static func languageTitle(_ name: String?, bundle: Bundle = .main) -> String {
+        guard let name else { return String(localized: "Language", bundle: bundle) }
+        return String(localized: "Language: \(capped(name))", bundle: bundle)
+    }
+
+    /// The header folds by window width, not by what fits, so one long label mustn't be able to fill it.
+    private static let valueCharacterCap = 24
+
+    private static func capped(_ value: String) -> String {
+        value.count <= valueCharacterCap ? value : String(value.prefix(valueCharacterCap - 1)) + "…"
+    }
+
+    var isFiltering: Bool {
+        labelFilter != nil || languageFilter != nil || dateRangeFilter != .all || personFilter != nil
+    }
+
     var body: some View {
         Group {
-            if !labelOptions.isEmpty {
-                Menu {
-                    Button("All Labels") { labelFilter = nil }
-                        .axLeaf("Filter.MenuItem.AllLabels")
-                    Divider()
-                    ForEach(labelOptions, id: \.self) { label in
-                        Button(label) { labelFilter = label }
-                            .axLeaf("Filter.MenuItem.Label.\(label)")
-                    }
-                } label: {
-                    FilterPillLabel(systemImage: "tag", label: labelFilter.map { Text(verbatim: $0) } ?? Text("All Labels"))
-                }
-                .menuStyle(.button)
-                .buttonStyle(ChipButtonStyle(isSelected: labelFilter != nil))
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .axLeaf("Filter.Menu.Label")
+            if !labelOptions.isEmpty || labelFilter != nil {
+                labelsMenu
             }
             if Self.showsPersonFilter(peopleOptions: peopleOptions, personFilter: personFilter) {
-                Menu {
-                    Button("All People") { personFilter = nil }
-                        .axLeaf("Filter.MenuItem.AllPeople")
-                    if !peopleOptions.isEmpty {
-                        Divider()
-                        ForEach(peopleOptions) { person in
-                            Button(person.name) { personFilter = person.id }
-                                .axLeaf("Filter.MenuItem.Person.\(person.name)")
-                        }
-                    }
-                } label: {
-                    FilterPillLabel(
-                        systemImage: "person",
-                        label: selectedPerson.map { Text(verbatim: $0.name) } ?? Text("All People")
-                    )
-                }
-                .menuStyle(.button)
-                .buttonStyle(ChipButtonStyle(isSelected: personFilter != nil))
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .axLeaf("Filter.Menu.Person")
+                peopleMenu
             }
-            if languageOptions.count >= 2 {
-                Menu {
-                    Button("All Languages") { languageFilter = nil }
-                        .axLeaf("Filter.MenuItem.AllLanguages")
-                    Divider()
-                    ForEach(languageOptions, id: \.self) { code in
-                        Button(languageName(code)) { languageFilter = code }
-                            .axLeaf("Filter.MenuItem.Language.\(code)")
-                    }
-                } label: {
-                    FilterPillLabel(
-                        systemImage: "globe",
-                        label: languageFilter.map { Text(verbatim: languageName($0)) } ?? Text("All Languages")
-                    )
-                }
-                .menuStyle(.button)
-                .buttonStyle(ChipButtonStyle(isSelected: languageFilter != nil))
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .axLeaf("Filter.Menu.Language")
+            if languageOptions.count >= 2 || languageFilter != nil {
+                languageMenu
             }
-            Menu {
-                ForEach(LibraryDateRangeFilter.allCases) { option in
-                    Button(option.label) { dateRangeFilter = option }
-                        .axLeaf("Filter.MenuItem.Date.\(option.rawValue)")
-                }
-            } label: {
-                FilterPillLabel(systemImage: "calendar", label: Text(dateRangeFilter.label))
-            }
-            .menuStyle(.button)
-            .buttonStyle(ChipButtonStyle(isSelected: dateRangeFilter != .all))
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .axLeaf("Filter.Menu.Date")
+            dateMenu
         }
+    }
+
+    private var labelsMenu: some View {
+        Menu {
+            Button("All Labels") { labelFilter = nil }
+                .axLeaf("Library.MenuItem.AllLabels")
+            Divider()
+            ForEach(labelOptions, id: \.self) { label in
+                Toggle(isOn: choosing(label, in: $labelFilter)) { Text(verbatim: label) }
+                    .axLeaf("Library.MenuItem.Label.\(label)")
+            }
+        } label: {
+            LibraryHeaderMenuLabel(title: Self.labelsTitle(labelFilter), isActive: labelFilter != nil)
+        }
+        .libraryHeaderMenu()
+        .axLeaf("Library.Menu.Labels")
+    }
+
+    private var peopleMenu: some View {
+        Menu {
+            Button("All People") { personFilter = nil }
+                .axLeaf("Library.MenuItem.AllPeople")
+            if !peopleOptions.isEmpty {
+                Divider()
+                ForEach(peopleOptions) { person in
+                    Toggle(isOn: choosing(person.id, in: $personFilter)) { Text(verbatim: person.name) }
+                        .axLeaf("Library.MenuItem.Person.\(person.name)")
+                }
+            }
+        } label: {
+            LibraryHeaderMenuLabel(title: Self.peopleTitle(selectedPerson?.name), isActive: personFilter != nil)
+        }
+        .libraryHeaderMenu()
+        .axLeaf("Library.Menu.People")
+    }
+
+    private var languageMenu: some View {
+        Menu {
+            Button("All Languages") { languageFilter = nil }
+                .axLeaf("Library.MenuItem.AllLanguages")
+            Divider()
+            ForEach(languageOptions, id: \.self) { code in
+                Toggle(isOn: choosing(code, in: $languageFilter)) { Text(verbatim: languageName(code)) }
+                    .axLeaf("Library.MenuItem.Language.\(code)")
+            }
+        } label: {
+            LibraryHeaderMenuLabel(
+                title: Self.languageTitle(languageFilter.map(languageName)),
+                isActive: languageFilter != nil
+            )
+        }
+        .libraryHeaderMenu()
+        .axLeaf("Library.Menu.Language")
+    }
+
+    private var dateMenu: some View {
+        Menu {
+            ForEach(LibraryDateRangeFilter.allCases) { option in
+                Toggle(isOn: Binding(get: { dateRangeFilter == option }, set: { if $0 { dateRangeFilter = option } })) {
+                    Text(option.label)
+                }
+                .axLeaf("Library.MenuItem.Date.\(option.rawValue)")
+            }
+        } label: {
+            Text(dateRangeFilter.label)
+                .foregroundStyle(dateRangeFilter == .all ? DS.Color.primaryText : DS.Color.accentInk)
+        }
+        .libraryHeaderMenu()
+        .axLeaf("Library.Menu.Date")
+    }
+
+    /// A checkmark on the one value the list is narrowed to; picking it again clears the filter.
+    private func choosing<Value: Equatable>(_ value: Value, in filter: Binding<Value?>) -> Binding<Bool> {
+        Binding(get: { filter.wrappedValue == value }, set: { filter.wrappedValue = $0 ? value : nil })
     }
 
     /// Falls back to the full directory: a filtered person can be absent from this category's own options.
@@ -131,7 +167,27 @@ struct LibraryFilterBar: View {
     }
 }
 
-/// The label every filter pull-down wears: a glyph and what the list is filtered to.
+/// What a header menu reads: the menu's name at rest, what it keeps once it filters, in the accent's ink.
+private struct LibraryHeaderMenuLabel: View {
+    let title: String
+    let isActive: Bool
+
+    var body: some View {
+        Text(verbatim: title)
+            .foregroundStyle(isActive ? DS.Color.accentInk : DS.Color.primaryText)
+    }
+}
+
+extension View {
+    /// Plain text and a chevron, sized to their words: inside More the same menus render as submenus and ignore it.
+    func libraryHeaderMenu() -> some View {
+        menuStyle(.button)
+            .buttonStyle(.borderless)
+            .fixedSize()
+    }
+}
+
+/// A chip pull-down's label: a glyph and what the list is filtered to.
 struct FilterPillLabel: View {
     let systemImage: String
     let label: Text

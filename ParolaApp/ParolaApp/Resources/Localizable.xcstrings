@@ -4883,6 +4883,17 @@
         }
       }
     },
+    "Drop audio or video": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascina audio o video"
+          }
+        }
+      }
+    },
     "Drop audio or video files.": {
       "extractionState": "manual",
       "localizations": {
@@ -4901,6 +4912,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascina audio o video, oppure incolla un link YouTube."
+          }
+        }
+      }
+    },
+    "Drop audio or video, or paste a link": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascina audio o video, oppure incolla un link"
           }
         }
       }
@@ -6184,6 +6206,17 @@
         }
       }
     },
+    "Group by Date": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raggruppa per data"
+          }
+        }
+      }
+    },
     "Grouping": {
       "extractionState": "manual",
       "localizations": {
@@ -6411,6 +6444,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Come Parola traduce una trascrizione e come mostra il risultato."
+          }
+        }
+      }
+    },
+    "How many speakers to expect. Auto lets the diarizer decide.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quanti speaker aspettarsi. Con Auto decide la diarizzazione."
           }
         }
       }
@@ -7089,6 +7133,28 @@
         }
       }
     },
+    "Labels who is talking. Takes longer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indica chi parla. Richiede più tempo."
+          }
+        }
+      }
+    },
+    "Labels: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etichette: %@"
+          }
+        }
+      }
+    },
     "Language": {
       "extractionState": "manual",
       "localizations": {
@@ -7107,6 +7173,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lingua che userà una nuova trascrizione"
+          }
+        }
+      }
+    },
+    "Language: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lingua: %@"
           }
         }
       }
@@ -8059,6 +8136,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Timestamp monospace"
+          }
+        }
+      }
+    },
+    "More": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Altro"
           }
         }
       }
@@ -10073,6 +10161,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Persone"
+          }
+        }
+      }
+    },
+    "People: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Persone: %@"
           }
         }
       }
@@ -16054,6 +16153,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scrive l'orario di inizio accanto a ogni segmento."
+          }
+        }
+      }
+    },
+    "Writes the transcript in English, whatever was spoken.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrive la trascrizione in inglese, qualunque lingua si parli."
           }
         }
       }

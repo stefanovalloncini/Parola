@@ -217,11 +217,10 @@ struct PersonFilterTests {
 
     @Test("the list's page title names the selected person only when no category is set")
     func headerTitleNamesThePerson() {
-        let person = Person(name: "Ada Lovelace")
-        #expect(LibraryListContent.headerTitle(for: .meeting, person: person) == "Meetings")
-        #expect(LibraryListContent.headerTitle(for: nil, person: person) == "Ada Lovelace")
-        #expect(LibraryListContent.headerTitle(for: .meeting, person: nil) == "Meetings")
-        #expect(LibraryListContent.headerTitle(for: nil, person: nil) == "Library")
+        #expect(LibraryPageHeader.title(category: .meeting, personName: "Ada Lovelace") == "Meetings")
+        #expect(LibraryPageHeader.title(category: nil, personName: "Ada Lovelace") == "Ada Lovelace")
+        #expect(LibraryPageHeader.title(category: .meeting, personName: nil) == "Meetings")
+        #expect(LibraryPageHeader.title(category: nil, personName: nil) == "Library")
     }
 
     @Test("the person chip stays up when the filter is active, even with no options to switch to")

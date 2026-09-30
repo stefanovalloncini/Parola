@@ -129,6 +129,23 @@ struct SettingsCommandsTests {
         #expect(model.defaults.string(forKey: "inspectorMode") == "info")
     }
 
+    @Test("the bridge can turn the library's date groups off, and a backup keeps the choice")
+    func groupByDateIsWritable() async throws {
+        let (model, server, context, commands) = try makeRig()
+        #expect(model.libraryGroupsByDate)
+
+        _ = try await run(
+            commands,
+            "setSetting",
+            ["key": .string("libraryGroupsByDate"), "value": .bool(false)],
+            context
+        )
+        withExtendedLifetime(server) {}
+
+        #expect(!model.libraryGroupsByDate)
+        #expect(UnscopedSettingsKeys.all.contains("libraryGroupsByDate"))
+    }
+
     @Test("a key outside the allowlist is refused")
     func unknownSettingRefused() async throws {
         let (_, server, context, commands) = try makeRig()

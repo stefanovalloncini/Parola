@@ -198,13 +198,7 @@ struct ContentRoutes: View {
     }
 
     private func libraryPage(browses: Bool) -> some View {
-        VStack(spacing: 0) {
-            if case .failed(let message) = model.phase {
-                ErrorBanner(message: message)
-                    .padding(DS.Spacing.large)
-            }
-            LibraryListView(category: model.libraryFilter, browses: browses, searchRanking: model.searchRanking)
-        }
+        LibraryListView(category: model.libraryFilter, browses: browses, searchRanking: model.searchRanking)
     }
 
 }

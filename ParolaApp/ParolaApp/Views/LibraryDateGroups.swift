@@ -103,7 +103,7 @@ enum LibraryDateGroups {
         }
 
         func groups(for rows: [LibraryRowDisplay]) -> [Group] {
-            guard groupsByDate else { return LibraryDateGroups.ungrouped(rows) }
+            guard groupsByDate else { return LibraryDateGroups.pinnedThenRest(rows, locale: locale) }
             return LibraryDateGroups.groups(
                 for: rows, sortOrder: sortOrder, now: edges.now, calendar: edges.calendar, locale: locale
             )
@@ -121,6 +121,17 @@ enum LibraryDateGroups {
         rows.isEmpty ? [] : [Group(id: id, title: nil, rows: rows)]
     }
 
+    /// A list read without date headers still keeps its pins apart, as Notes does.
+    static func pinnedThenRest(_ rows: [LibraryRowDisplay], locale: Locale) -> [Group] {
+        let pinned = rows.filter(\.pinned)
+        guard !pinned.isEmpty else { return ungrouped(rows) }
+        return [pinnedGroup(pinned, locale: locale)] + ungrouped(rows.filter { !$0.pinned })
+    }
+
+    private static func pinnedGroup(_ rows: [LibraryRowDisplay], locale: Locale) -> Group {
+        Group(id: "pinned", title: String(localized: "Pinned", locale: locale), rows: rows)
+    }
+
     /// A header wherever the bucket changes, so newest-first and oldest-first both read in order.
     static func groups(
         for rows: [LibraryRowDisplay],
@@ -130,12 +141,14 @@ enum LibraryDateGroups {
         calendar: Calendar = .autoupdatingCurrent,
         locale: Locale = AppFormat.locale
     ) -> [Group] {
-        guard sortOrder.isChronological else { return ungrouped(rows) }
+        guard sortOrder.isChronological else {
+            return pinsFirst ? pinnedThenRest(rows, locale: locale) : ungrouped(rows)
+        }
         guard !rows.isEmpty else { return [] }
         var groups: [Group] = []
         let pinned = pinsFirst ? rows.filter(\.pinned) : []
         if !pinned.isEmpty {
-            groups.append(Group(id: "pinned", title: String(localized: "Pinned", locale: locale), rows: pinned))
+            groups.append(pinnedGroup(pinned, locale: locale))
         }
         let edges = Edges(now: now, calendar: calendar)
         var runs: [(bucket: LibraryDateBucket, rows: [LibraryRowDisplay])] = []

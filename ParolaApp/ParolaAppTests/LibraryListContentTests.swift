@@ -343,38 +343,6 @@ struct LibraryListContentTests {
         #expect(LibraryListContent.totalsLabel(for: 3, locale: english) == "3 transcripts")
     }
 
-    @Test("the header subtitle adds how long the listed entries run, and drops it at zero")
-    func listSubtitleCarriesTheSpan() {
-        let english = Locale(identifier: "en_US")
-        #expect(LibraryListContent.listSubtitle(count: 0, totalSeconds: 900, locale: english) == nil)
-        #expect(LibraryListContent.listSubtitle(count: 1, totalSeconds: 0, locale: english) == "1 transcript")
-        #expect(LibraryListContent.listSubtitle(count: 3, totalSeconds: 0.4, locale: english) == "3 transcripts")
-        #expect(
-            LibraryListContent.listSubtitle(count: 11, totalSeconds: 4800, locale: english)
-                == "11 transcripts · 1 hr, 20 min of audio"
-        )
-    }
-
-    /// The same duration means "transcribed" one page over, so the list has to say which of the two it is.
-    @Test("the header subtitle says the span is audio, in Italian too")
-    func listSubtitleNamesItsSpan() throws {
-        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
-        let bundle = try #require(Bundle(path: path))
-        let italian = Locale(identifier: "it_IT")
-        #expect(
-            LibraryListContent.listSubtitle(count: 2, totalSeconds: 120, bundle: bundle, locale: italian)
-                == "2 trascrizioni · \(AppFormat.duration(seconds: 120, locale: italian)) di audio"
-        )
-    }
-
-    /// The subtitle is one string with two locales' worth of formatting in it; both halves take the same one.
-    @Test("the header subtitle formats its span in the locale it was handed")
-    func listSubtitleFollowsTheLocale() {
-        let italian = LibraryListContent.listSubtitle(count: 2, totalSeconds: 120, locale: Locale(identifier: "it_IT"))
-        #expect(italian?.contains("min") == true)
-        #expect(italian?.hasPrefix("2 ") == true)
-    }
-
     @Test("the search caption counts the entries and the hits inside them")
     func searchTotalsLabelCountsBoth() {
         let english = Locale(identifier: "en_US")
@@ -409,31 +377,6 @@ struct LibraryListContentTests {
                 == "2 transcripts · 2 matches"
         )
         #expect(LibraryListContent.searchTotalsLabel(for: [], matches: matches([3, 4]), locale: english) == nil)
-    }
-
-    /// The subtitle is the header's claim about the list under it: under a filter it counts what is left.
-    @Test("the header counts the rows the filter left, not the whole library")
-    func subtitleCountsTheFilteredRows() {
-        let english = Locale(identifier: "en_US")
-        let entries = [
-            entry(id: "a", title: "Alpha", offset: 100, durationSeconds: 30),
-            entry(id: "b", title: "Beta", offset: 200, category: .meeting, durationSeconds: 90),
-            entry(id: "c", title: "Gamma", offset: 300, category: .meeting, durationSeconds: 30),
-        ]
-        func subtitle(_ category: EntryCategory?) -> String? {
-            let shown = LibraryListContent.rows(
-                from: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all, personFilter: nil
-            )
-            return LibraryListContent.listSubtitle(
-                count: shown.count,
-                totalSeconds: shown.reduce(0) { $0 + ($1.durationSeconds ?? 0) },
-                locale: english
-            )
-        }
-
-        #expect(subtitle(nil) == "3 transcripts · 2 min, 30 sec of audio")
-        #expect(subtitle(.meeting) == "2 transcripts · 2 min of audio")
-        #expect(subtitle(.transcription) == "1 transcript · 30 sec of audio")
     }
 
     /// An index written before the counts existed answers 0, and a caption reading "· 0 matches" would be a lie.

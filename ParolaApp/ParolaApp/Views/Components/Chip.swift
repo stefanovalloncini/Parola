@@ -75,7 +75,7 @@ struct Chip: View {
 }
 
 extension View {
-    /// The capsule every filter control wears: `Chip` for buttons, `LibraryFilterBar` for pull-downs.
+    /// The capsule every chip-style filter wears: `Chip` for buttons, `ChipButtonStyle` for pull-downs.
     func chipChrome(
         isSelected: Bool,
         size: Chip.Size = .compact,
