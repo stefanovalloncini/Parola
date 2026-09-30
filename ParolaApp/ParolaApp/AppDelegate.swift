@@ -61,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let model = AppDelegate.launchModel { bind(model: model) }
         ParolaLog.info(.appLifecycle, "app launched, version \(AppVersionToken())")
+        if model?.activeSideEffects.contains(.staleWindowKeyPrune) == true { StaleWindowKeys.pruneInBackground() }
         NSApp.servicesProvider = provider
         NSUpdateDynamicServices()
         if CommandLine.arguments.contains("--headless") {

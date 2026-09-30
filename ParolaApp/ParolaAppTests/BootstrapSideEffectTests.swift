@@ -6,14 +6,14 @@ import ParolaCore
 @Suite("Bootstrap side-effect sets + launch flag parsing")
 struct BootstrapSideEffectTests {
 
-    @Test(".all contains all 15 cases")
-    func allHasFifteenCases() {
-        #expect(BootstrapSideEffect.all.count == 15)
+    @Test(".all contains all 16 cases")
+    func allHasSixteenCases() {
+        #expect(BootstrapSideEffect.all.count == 16)
         let expected: Set<BootstrapSideEffect> = [
             .sparkle, .launchAtLogin, .menuBarExtra, .dockIconRegistration, .appIntentsDonation,
             .meetingDetector, .watchedFolders, .dictationHotkey, .micHotkey,
             .libraryPurgeOnLaunch, .refreshYtDlp, .liveCaptionsTranslateRestore,
-            .automationBridge, .modelsPathSync, .diagnosticsLog,
+            .automationBridge, .modelsPathSync, .diagnosticsLog, .staleWindowKeyPrune,
         ]
         #expect(BootstrapSideEffect.all == expected)
     }
@@ -63,6 +63,14 @@ struct BootstrapSideEffectTests {
         #expect(bootstrap.models == nil)
         #expect(sandbox.library.standardizedFileURL.path.hasPrefix(temporary))
         #expect(bootstrap.apiKeyStore is InMemoryAPIKeyStore)
+    }
+
+    @Test("only a normal launch prunes the stale window frames")
+    func onlyANormalLaunchPrunes() throws {
+        let host = try #require(AppBootstrap.testHost(environment: ["XCTestConfigurationFilePath": ""]))
+        #expect(BootstrapSideEffect.all.contains(.staleWindowKeyPrune))
+        #expect(!BootstrapSideEffect.testing.contains(.staleWindowKeyPrune))
+        #expect(!host.sideEffects.contains(.staleWindowKeyPrune))
     }
 
     @Test("AppBootstrap.test parses every test-mode flag correctly")

@@ -53,6 +53,7 @@ extension BootstrapSideEffect: LogSafe {
         case .automationBridge: return "automationBridge"
         case .modelsPathSync: return "modelsPathSync"
         case .diagnosticsLog: return "diagnosticsLog"
+        case .staleWindowKeyPrune: return "staleWindowKeyPrune"
         }
     }
 }
