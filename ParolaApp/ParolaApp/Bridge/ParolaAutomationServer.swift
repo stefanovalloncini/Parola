@@ -478,7 +478,7 @@ final class ParolaAutomationServer {
             "route": .string(model.route.rawValue),
             "settingsPane": .string(model.settingsPane),
             "libraryFilter": .string(model.libraryFilter?.rawValue ?? ""),
-            "libraryBrowsingAll": .bool(model.libraryBrowsingAll),
+            "libraryBrowsingAll": .bool(model.isBrowsingWholeLibrary),
             "libraryOrigin": .string(model.transcriptOrigin?.bridgeName ?? ""),
             "selectedModel": .string(selectedModel),
             "language": .string(language),

@@ -17,7 +17,6 @@ struct PeopleSidebarSection: View {
             route: model.route,
             searching: model.hasSearchResults,
             filter: model.libraryFilter,
-            browsingAll: model.libraryBrowsingAll,
             person: model.personFilter
         )
     }

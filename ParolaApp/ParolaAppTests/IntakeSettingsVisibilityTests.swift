@@ -16,28 +16,17 @@ struct IntakeSettingsVisibilityTests {
         )
     }
 
-    @Test("Home is not a library list")
-    func homeIsNotBrowsing() {
-        let model = makeModel()
-        model.route = .transcript
-        model.phase = .idle
-        #expect(!model.isBrowsingLibrary)
-    }
-
-    @Test("a category, All and a search all count as browsing")
+    @Test("the Library page, a category and a search all count as browsing")
     func libraryListsCountAsBrowsing() {
         let model = makeModel()
         model.route = .transcript
         model.phase = .idle
+        #expect(model.isBrowsingLibrary)
 
         model.libraryFilter = .meeting
         #expect(model.isBrowsingLibrary)
 
         model.libraryFilter = nil
-        model.libraryBrowsingAll = true
-        #expect(model.isBrowsingLibrary)
-
-        model.libraryBrowsingAll = false
         model.searchRanking = []
         #expect(model.isBrowsingLibrary)
     }
@@ -45,7 +34,6 @@ struct IntakeSettingsVisibilityTests {
     @Test("the queue and batch routes keep the intake settings")
     func activityRoutesAreNotBrowsing() {
         let model = makeModel()
-        model.libraryBrowsingAll = true
         model.phase = .idle
 
         model.route = .queue
@@ -55,17 +43,16 @@ struct IntakeSettingsVisibilityTests {
         #expect(!model.isBrowsingLibrary)
     }
 
-    @Test("a run in flight is never a library list")
+    @Test("a run in flight is never a library list, and a failure leaves the list up")
     func busyPhasesAreNotBrowsing() {
         let model = makeModel()
         model.route = .transcript
-        model.libraryBrowsingAll = true
 
         model.phase = .transcribing(file: URL(fileURLWithPath: "/tmp/a.wav"))
         #expect(!model.isBrowsingLibrary)
 
         model.phase = .failed(message: "boom")
-        #expect(!model.isBrowsingLibrary)
+        #expect(model.isBrowsingLibrary)
     }
 
     @Test("a batch detail pane keeps the intake settings")
@@ -73,7 +60,6 @@ struct IntakeSettingsVisibilityTests {
         let model = makeModel()
         model.route = .transcript
         model.phase = .idle
-        model.libraryBrowsingAll = true
         model.batchJobs = [BatchJob(url: URL(fileURLWithPath: "/tmp/a.wav"), status: .done)]
         #expect(!model.isBrowsingLibrary)
     }
@@ -105,7 +91,7 @@ struct IntakeSettingsToolbarRuleTests {
         )
     }
 
-    @Test("Home and an open transcript show the pills")
+    @Test("an open transcript and a run in flight show the pills")
     func transcriptRouteShows() {
         #expect(shows(route: .transcript))
     }
@@ -125,22 +111,29 @@ struct IntakeSettingsToolbarRuleTests {
         #expect(!shows(route: .transcript, introduction: true))
     }
 
-    @Test("every phase on the transcript route shows the pills")
+    @Test("every busy phase on the transcript route shows the pills")
     func phasesShow() {
         let model = makeModel()
         model.route = .transcript
         let phases: [AppModel.Phase] = [
-            .idle,
             .downloadingModel(name: "tiny", progress: 0.4),
             .loadingModel(name: "tiny"),
             .transcribing(file: URL(fileURLWithPath: "/tmp/a.wav")),
-            .recording(source: .microphone),
-            .ready,
-            .failed(message: "boom")
+            .recording(source: .microphone)
         ]
         for phase in phases {
             model.phase = phase
             #expect(shows(route: model.route, browsing: model.isBrowsingLibrary))
+        }
+    }
+
+    @Test("the Library page hides the pills whether it is idle, ready or showing a failure")
+    func libraryPageHides() {
+        let model = makeModel()
+        model.route = .transcript
+        for phase in [AppModel.Phase.idle, .ready, .failed(message: "boom")] {
+            model.phase = phase
+            #expect(!shows(route: model.route, browsing: model.isBrowsingLibrary), "\(phase)")
         }
     }
 

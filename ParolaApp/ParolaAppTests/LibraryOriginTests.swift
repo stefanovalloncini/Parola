@@ -54,7 +54,6 @@ struct LibraryOriginTests {
             route: model.route,
             searching: model.searchRanking != nil,
             filter: model.libraryFilter,
-            browsingAll: model.libraryBrowsingAll,
             person: model.personFilter
         )
     }
@@ -64,8 +63,8 @@ struct LibraryOriginTests {
     @Test("a search wins over the category filter underneath it")
     func searchBeatsFilter() {
         let origin = LibraryOrigin.capture(
-            sidebar: SidebarRoute.selected(route: .transcript, searching: true, filter: .meeting, browsingAll: true),
-            homeOnScreen: false
+            sidebar: SidebarRoute.selected(route: .transcript, searching: true, filter: .meeting),
+            listOnScreen: false
         )
         #expect(origin == .search)
     }
@@ -73,41 +72,32 @@ struct LibraryOriginTests {
     @Test("a category list is recorded as its category")
     func categoryList() {
         let origin = LibraryOrigin.capture(
-            sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: .dictation, browsingAll: false),
-            homeOnScreen: false
+            sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: .dictation),
+            listOnScreen: false
         )
         #expect(origin == .category(.dictation))
     }
 
-    @Test("the flat All list is recorded as All")
-    func allList() {
+    @Test("the Library page is recorded as the whole library")
+    func libraryList() {
         let origin = LibraryOrigin.capture(
-            sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: nil, browsingAll: true),
-            homeOnScreen: false
+            sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: nil),
+            listOnScreen: true
         )
         #expect(origin == .all)
     }
 
-    @Test("Home's Recent list is recorded as Home")
-    func homeRecent() {
-        let origin = LibraryOrigin.capture(
-            sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: nil, browsingAll: false),
-            homeOnScreen: true
-        )
-        #expect(origin == .home)
-    }
-
     @Test("an entry opened with no list on screen has no origin")
     func noList() {
-        let noHome = LibraryOrigin.capture(
-            sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: nil, browsingAll: false),
-            homeOnScreen: false
+        let noLibrary = LibraryOrigin.capture(
+            sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: nil),
+            listOnScreen: false
         )
-        #expect(noHome == nil)
+        #expect(noLibrary == nil)
         for route in [AppModel.Route.queue, .batch, .recentlyDeleted] {
             let origin = LibraryOrigin.capture(
-                sidebar: SidebarRoute.selected(route: route, searching: true, filter: .meeting, browsingAll: true),
-                homeOnScreen: true
+                sidebar: SidebarRoute.selected(route: route, searching: true, filter: .meeting),
+                listOnScreen: true
             )
             #expect(origin == nil, "\(route) is a page of its own, not a list a transcript came from")
         }
@@ -115,7 +105,6 @@ struct LibraryOriginTests {
 
     @Test("every origin names itself for the bridge")
     func bridgeNames() {
-        #expect(LibraryOrigin.home.bridgeName == "home")
         #expect(LibraryOrigin.all.bridgeName == "all")
         #expect(LibraryOrigin.category(.meeting).bridgeName == EntryCategory.meeting.rawValue)
         #expect(LibraryOrigin.search.bridgeName == "search")
@@ -164,15 +153,15 @@ struct LibraryOriginTests {
         #expect(sidebar(model) == .search, "no row owns the results, so none is highlighted")
     }
 
-    @Test("opening from Home's Recent list records Home")
-    func opensFromHome() async throws {
+    @Test("opening from the Library page records the whole library")
+    func opensFromTheLibrary() async throws {
         let model = makeModel()
         let entry = try await seedEntry(in: model, text: "voice memo")
 
         #expect(await openEntry(entry.id, in: model))
 
-        #expect(model.transcriptOrigin == .home)
-        #expect(sidebar(model) == .home)
+        #expect(model.transcriptOrigin == .all)
+        #expect(sidebar(model) == .library)
     }
 
     @Test("opening with a transcript already up and no list leaves no origin")
@@ -233,13 +222,13 @@ struct LibraryOriginTests {
         await model.openProjectDocument(at: base.appendingPathExtension("parola"))
 
         #expect(model.transcriptOrigin == nil, "this transcript was never in a list")
-        #expect(model.canReturnToOrigin, "the link still shows — reading Home, per B3")
+        #expect(model.canReturnToOrigin, "the link still shows — reading Library, per B3")
 
         model.returnToOrigin()
 
         #expect(await waitUntil { model.transcript == nil })
         #expect(model.libraryFilter == nil, "no origin means goHome, not the last entry's category")
-        #expect(!model.isBrowsingLibrary)
+        #expect(model.isBrowsingLibrary)
     }
 
     // MARK: - Going back
@@ -276,36 +265,20 @@ struct LibraryOriginTests {
         #expect(sidebar(model) == .search)
     }
 
-    @Test("back from an All entry shows the flat list again")
-    func backToAll() async throws {
+    @Test("back from a Library entry shows the whole library again")
+    func backToTheLibrary() async throws {
         let model = makeModel()
         let entry = try await seedEntry(in: model, text: "standup notes")
-        model.browseAll()
         #expect(await openEntry(entry.id, in: model))
 
         #expect(await goBack(in: model))
 
-        #expect(model.libraryBrowsingAll)
         #expect(model.libraryFilter == nil)
         #expect(model.isBrowsingLibrary)
-        #expect(sidebar(model) == .all)
+        #expect(sidebar(model) == .library)
     }
 
-    @Test("back from a Recent entry shows Home, not a list")
-    func backToHome() async throws {
-        let model = makeModel()
-        let entry = try await seedEntry(in: model, text: "voice memo")
-        #expect(await openEntry(entry.id, in: model))
-
-        #expect(await goBack(in: model))
-
-        #expect(!model.isBrowsingLibrary, "Home is the drop zone and Recent, not a library list")
-        #expect(model.libraryFilter == nil)
-        #expect(!model.libraryBrowsingAll)
-        #expect(sidebar(model) == .home)
-    }
-
-    @Test("back with no origin falls back to Home")
+    @Test("back with no origin falls back to the Library page")
     func backWithoutOrigin() async throws {
         let model = makeModel()
         let entry = try await seedEntry(in: model, text: "opened from the menu bar")
@@ -316,8 +289,8 @@ struct LibraryOriginTests {
         #expect(await goBack(in: model))
 
         #expect(model.libraryFilter == nil)
-        #expect(!model.isBrowsingLibrary)
-        #expect(sidebar(model) == .home)
+        #expect(model.isBrowsingLibrary)
+        #expect(sidebar(model) == .library)
     }
 
     // MARK: - Where the link shows
@@ -436,13 +409,18 @@ struct LibraryOriginTests {
     @Test("the help string names the destination in both languages")
     func helpNamesTheDestination() throws {
         #expect(TranscriptBackCopy.help(for: .category(.meeting)) == "Back to Meetings")
+        #expect(TranscriptBackCopy.help(for: .all) == "Back to Library")
 
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let italian = try #require(Bundle(path: path))
         #expect(TranscriptBackCopy.help(for: .category(.meeting), bundle: italian) == "Torna alle riunioni")
-        #expect(TranscriptBackCopy.help(for: .home, bundle: italian) == "Torna alla Home")
         #expect(TranscriptBackCopy.help(for: .search, bundle: italian) == "Torna ai risultati")
-        #expect(TranscriptBackCopy.help(for: .all, bundle: italian) == "Torna a tutti gli elementi")
+        #expect(TranscriptBackCopy.help(for: .all, bundle: italian) == "Torna alla libreria")
+    }
+
+    @Test("the link back to the whole library reads as the sidebar row does")
+    func linkNamesTheLibrary() {
+        #expect(LibraryOrigin.all.name == "Library")
     }
 
     // MARK: - Bridge

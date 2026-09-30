@@ -37,13 +37,13 @@ struct RecentlyDeletedRouteTests {
     func openSelectsTheRoute() {
         let model = makeModel()
         model.libraryFilter = .meeting
-        model.libraryBrowsingAll = true
+        model.personFilter = UUID()
 
         model.openRecentlyDeleted()
 
         #expect(model.route == .recentlyDeleted)
         #expect(model.libraryFilter == nil)
-        #expect(!model.libraryBrowsingAll)
+        #expect(model.personFilter == nil)
     }
 
     @Test("closing the page leaves the route and drops what was selected on it")
@@ -82,19 +82,16 @@ struct RecentlyDeletedRouteTests {
 
     @Test("the sidebar highlights the Recently Deleted row while the page shows")
     func sidebarSelectsTheRow() {
-        #expect(
-            SidebarRoute.selected(route: .recentlyDeleted, searching: false, filter: nil, browsingAll: false)
-                == .recentlyDeleted
-        )
+        #expect(SidebarRoute.selected(route: .recentlyDeleted, searching: false, filter: nil) == .recentlyDeleted)
     }
 
     @Test("no other sidebar row answers to the Recently Deleted route")
     func sidebarRowsAreExclusive() {
-        let selected = SidebarRoute.selected(route: .recentlyDeleted, searching: true, filter: .meeting, browsingAll: true)
+        let selected = SidebarRoute.selected(route: .recentlyDeleted, searching: true, filter: .meeting)
         #expect(selected == .recentlyDeleted)
-        #expect(SidebarRoute.selected(route: .queue, searching: false, filter: nil, browsingAll: false) == .queue)
-        #expect(SidebarRoute.selected(route: .batch, searching: false, filter: nil, browsingAll: false) == .batch)
-        #expect(SidebarRoute.selected(route: .transcript, searching: false, filter: nil, browsingAll: false) == .home)
+        #expect(SidebarRoute.selected(route: .queue, searching: false, filter: nil) == .queue)
+        #expect(SidebarRoute.selected(route: .batch, searching: false, filter: nil) == .batch)
+        #expect(SidebarRoute.selected(route: .transcript, searching: false, filter: nil) == .library)
     }
 
     @Test("the bridge opens the page by setting the route")

@@ -659,8 +659,8 @@ struct AppModelLibraryTests {
     @Test("every sidebar destination retires the query behind it")
     func destinationsRetireTheQuery() {
         let destinations: [(String, AppModel.Route, (AppModel) -> Void)] = [
-            ("Home", .transcript, { $0.goHome() }),
-            ("All", .transcript, { $0.browseAll() }),
+            ("Library", .transcript, { $0.goHome() }),
+            ("Library, as browseAll", .transcript, { $0.browseAll() }),
             ("a category", .transcript, { $0.browseCategory(.meeting) }),
             ("Queue", .queue, { $0.openQueue() }),
             ("Batch", .batch, { $0.openBatch() }),
@@ -686,8 +686,8 @@ struct AppModelLibraryTests {
     @Test("every sidebar destination clears a stale failure behind it")
     func destinationsClearTheFailedState() {
         let destinations: [(String, AppModel.Route, (AppModel) -> Void)] = [
-            ("Home", .transcript, { $0.goHome() }),
-            ("All", .transcript, { $0.browseAll() }),
+            ("Library", .transcript, { $0.goHome() }),
+            ("Library, as browseAll", .transcript, { $0.browseAll() }),
             ("a category", .transcript, { $0.browseCategory(.meeting) }),
             ("Queue", .queue, { $0.openQueue() }),
             ("Batch", .batch, { $0.openBatch() }),
@@ -765,20 +765,18 @@ struct AppModelLibraryTests {
         ]
         for (name, act) in mutations {
             let model = makeModel()
-            model.libraryBrowsingAll = true
 
             act(model)
 
             #expect(await waitUntil { model.exportNotice != nil }, "\(name)")
             #expect(model.phase == .idle, "\(name)")
-            #expect(model.libraryBrowsingAll, "\(name)")
+            #expect(model.isBrowsingLibrary, "\(name)")
         }
     }
 
-    @Test("a failed pin on the All list leaves the list on screen")
+    @Test("a failed pin on the Library page leaves the list on screen")
     func failedPinKeepsTheListOnScreen() async {
         let model = makeModel()
-        model.libraryBrowsingAll = true
         model.route = .transcript
 
         model.togglePinned(for: "missing-entry")
@@ -1060,7 +1058,7 @@ struct AppModelLibraryTests {
         #expect(model.currentSegmentNote(for: 0) == "check the mix")
     }
 
-    @Test("goHome unloads the transcript so the launcher can render under the Home row")
+    @Test("goHome unloads the transcript so the Library page can show")
     func goHomeUnloadsTranscript() async throws {
         let model = makeModel()
         let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
@@ -1078,12 +1076,12 @@ struct AppModelLibraryTests {
             try await Task.sleep(for: .milliseconds(10))
         }
         model.libraryFilter = .meeting
-        model.libraryBrowsingAll = true
+        model.personFilter = UUID()
 
         model.goHome()
 
         #expect(model.libraryFilter == nil)
-        #expect(model.libraryBrowsingAll == false)
+        #expect(model.personFilter == nil)
         #expect(model.route == .transcript)
         for _ in 0..<200 where model.transcript != nil {
             try await Task.sleep(for: .milliseconds(10))
@@ -1093,6 +1091,7 @@ struct AppModelLibraryTests {
         if case .idle = model.phase {} else {
             Issue.record("expected .idle after goHome, got \(model.phase)")
         }
+        #expect(model.isBrowsingLibrary)
     }
 
     @Test("goHome flushes a debounced transcript edit instead of dropping it")

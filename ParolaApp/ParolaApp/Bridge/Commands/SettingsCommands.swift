@@ -160,7 +160,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "setLibraryFilter",
                 area: .settings,
-                summary: "Filters the library by category the way the sidebar row does, clearing any search; 'all' selects the All row, empty string selects Home.",
+                summary: "Filters the library by category the way the sidebar row does, clearing any search; 'all' or an empty string shows the whole Library page.",
                 kind: .mutating,
                 args: [
                     .init(name: "category", kind: .string(), required: false, summary: "EntryCategory rawValue, 'all', or empty", defaultValue: .string("")),
@@ -178,7 +178,7 @@ extension ParolaAutomationServer {
                     }
                     return .object([
                         "libraryFilter": .string(raw),
-                        "libraryBrowsingAll": .bool(ctx.model.libraryBrowsingAll),
+                        "libraryBrowsingAll": .bool(ctx.model.isBrowsingWholeLibrary),
                     ])
                 }
             ),

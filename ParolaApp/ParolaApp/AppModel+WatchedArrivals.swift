@@ -231,9 +231,9 @@ extension AppModel {
         pumpWatchedLane()
     }
 
-    /// Nothing open, playing or asking: an arrival may run where the user can see it, as a file they opened would.
+    /// The whole library with nothing open, playing or asking: an arrival may run where the user can see it, as a file they opened would.
     var arrivalMayTakeWindow: Bool {
-        guard route == .transcript, batchIsEmpty, !isBrowsingLibrary, transcript == nil, !isPlaying,
+        guard route == .transcript, batchIsEmpty, isBrowsingWholeLibrary, transcript == nil, !isPlaying,
               entryWindows.openIDs.isEmpty, !introduction.isPresented, !sheetIsUp else { return false }
         switch phase {
         case .idle, .ready: return true

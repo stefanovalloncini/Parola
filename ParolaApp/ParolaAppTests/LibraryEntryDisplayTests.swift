@@ -203,7 +203,7 @@ struct LibraryEntryDisplayTests {
         #expect(cache.displays.keys.sorted() == ["e"])
     }
 
-    /// A view that shows a subset (Home's recents, a filtered category) must not let the rest of the library pile up.
+    /// A view that shows a subset, like a filtered category, must not let the rest of the library pile up.
     @Test("pruning to a subset drops the rows that fell outside it")
     func pruneToASubsetDropsTheRest() {
         let a = LibraryEntry(id: "a", bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/a.parola"), manifest: display().entry.manifest)

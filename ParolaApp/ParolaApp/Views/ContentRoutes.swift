@@ -119,7 +119,7 @@ struct ContentRoutes: View {
     private var phaseView: some View {
         switch model.phase {
         case .idle:
-            EmptyDropZone()
+            libraryPage(browses: true)
         case .downloadingModel(let name, let progress):
             ProgressPane(title: "Downloading \(AppModel.modelLabel(name))", progress: progress)
         case .loadingModel(let name):
@@ -134,10 +134,10 @@ struct ContentRoutes: View {
             if model.transcript != nil {
                 TranscriptPane()
             } else {
-                EmptyDropZone()
+                libraryPage(browses: true)
             }
-        case .failed(let message):
-            EmptyDropZone(errorMessage: message)
+        case .failed:
+            libraryPage(browses: true)
         }
     }
 
@@ -194,15 +194,17 @@ struct ContentRoutes: View {
 
     /// One call site on purpose: an `if` per case would give each branch its own identity and tear the List down on every sidebar move.
     private var libraryBrowseList: some View {
-        LibraryListView(
-            category: model.libraryFilter,
-            browses: LibraryListContent.showsBrowseList(
-                filter: model.libraryFilter,
-                browsingAll: model.libraryBrowsingAll,
-                hasTranscript: model.hasTranscript
-            ),
-            searchRanking: model.searchRanking
-        )
+        libraryPage(browses: LibraryListContent.showsBrowseList(hasTranscript: model.hasTranscript))
+    }
+
+    private func libraryPage(browses: Bool) -> some View {
+        VStack(spacing: 0) {
+            if case .failed(let message) = model.phase {
+                ErrorBanner(message: message)
+                    .padding(DS.Spacing.large)
+            }
+            LibraryListView(category: model.libraryFilter, browses: browses, searchRanking: model.searchRanking)
+        }
     }
 
 }

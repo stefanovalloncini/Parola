@@ -2,10 +2,6 @@ import Foundation
 import ParolaCore
 
 enum RecentEntries {
-    /// Rows Home draws before the layout has measured the space it has.
-    static let homeFallback = 5
-    static let homeMaximum = 24
-
     /// Selects the newest few without sorting the whole library behind them.
     static func most(of entries: [LibraryEntry], limit: Int) -> [LibraryEntry] {
         guard limit > 0 else { return [] }

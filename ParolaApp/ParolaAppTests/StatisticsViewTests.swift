@@ -133,14 +133,8 @@ struct StatisticsViewTests {
 
     @Test("the sidebar lights the Statistics row and nothing else")
     func sidebarHighlightFollowsTheRoute() {
-        #expect(
-            SidebarRoute.selected(route: .statistics, searching: false, filter: .meeting, browsingAll: true)
-                == .statistics
-        )
-        #expect(
-            SidebarRoute.selected(route: .recentlyDeleted, searching: false, filter: nil, browsingAll: false)
-                == .recentlyDeleted
-        )
+        #expect(SidebarRoute.selected(route: .statistics, searching: false, filter: .meeting) == .statistics)
+        #expect(SidebarRoute.selected(route: .recentlyDeleted, searching: false, filter: nil) == .recentlyDeleted)
     }
 
     @Test("opening the page from the sidebar drops the list the user was in")
@@ -148,14 +142,12 @@ struct StatisticsViewTests {
         withIsolatedDefaults { defaults in
             let model = makeModel(defaults, entries: [])
             model.libraryFilter = .meeting
-            model.libraryBrowsingAll = true
             model.route = .transcript
 
             model.openStatistics()
 
             #expect(model.route == .statistics)
             #expect(model.libraryFilter == nil)
-            #expect(model.libraryBrowsingAll == false)
             #expect(model.isBrowsingLibrary == false)
         }
     }
@@ -190,7 +182,6 @@ struct StatisticsViewTests {
         defer { DefaultsStore.current = previous }
         let model = makeModel(DefaultsStore.current, entries: [])
         model.libraryFilter = .meeting
-        model.libraryBrowsingAll = true
         model.route = .transcript
         model.searchQuery = "bianchi"
         model.searchRanking = []
@@ -206,13 +197,12 @@ struct StatisticsViewTests {
 
         #expect(model.route == .statistics)
         #expect(model.libraryFilter == nil)
-        #expect(model.libraryBrowsingAll == false)
         #expect(model.searchRanking == nil)
     }
 
     @Test("a transcript opened from the page records no list to go back to")
     func statisticsIsNotAList() {
-        #expect(LibraryOrigin.capture(sidebar: .statistics, homeOnScreen: false) == nil)
+        #expect(LibraryOrigin.capture(sidebar: .statistics, listOnScreen: false) == nil)
     }
 
     @Test("a Records row opens the transcript it names")

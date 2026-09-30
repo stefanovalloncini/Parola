@@ -10,7 +10,7 @@ struct ErrorPane: View {
     }
 }
 
-/// A card the route keeps behind: a failed run shouldn't cost the user the drop zone.
+/// A card the route keeps behind: a failed run shouldn't cost the user the library.
 struct ErrorBanner: View {
     let message: String
     @Environment(AppModel.self) private var model

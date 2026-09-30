@@ -362,8 +362,7 @@ extension AppModel {
             return
         }
         let selected = SidebarRoute.selected(
-            route: route, searching: hasSearchResults,
-            filter: libraryFilter, browsingAll: libraryBrowsingAll, person: personFilter
+            route: route, searching: hasSearchResults, filter: libraryFilter, person: personFilter
         )
         guard selected != .person(id) else { return }
         leaveFailedPhase()

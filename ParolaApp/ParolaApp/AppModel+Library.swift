@@ -28,19 +28,17 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 
 /// The list a transcript was opened from, so the sidebar keeps its row and the header can offer the way back.
 enum LibraryOrigin: Equatable {
-    case home
     case all
     case category(EntryCategory)
     case search
 
     /// Read through the sidebar's own selection, so a search wins over the category filter underneath it.
-    static func capture(sidebar: SidebarRoute, homeOnScreen: Bool) -> LibraryOrigin? {
+    static func capture(sidebar: SidebarRoute, listOnScreen: Bool) -> LibraryOrigin? {
         switch sidebar {
         case .search: return .search
-        case .all: return .all
+        case .library: return listOnScreen ? .all : nil
         case .category(let category): return .category(category)
-        case .home: return homeOnScreen ? .home : nil
-        // The back link reads "All" for a person's list too; personFilter itself isn't part of the origin.
+        // The back link reads "Library" for a person's list too; personFilter itself isn't part of the origin.
         case .person(_): return .all
         case .queue, .batch, .statistics, .recentlyDeleted: return nil
         }
@@ -49,8 +47,7 @@ enum LibraryOrigin: Equatable {
     /// The source key, not a `LocalizedStringKey`, so the back link can both show the name and say "Back to <name>".
     var name: String {
         switch self {
-        case .home: return "Home"
-        case .all: return "All"
+        case .all: return "Library"
         case .category(let category): return libraryCategoryName(category)
         case .search: return "Results"
         }
@@ -58,7 +55,6 @@ enum LibraryOrigin: Equatable {
 
     var bridgeName: String {
         switch self {
-        case .home: return "home"
         case .all: return "all"
         case .category(let category): return category.rawValue
         case .search: return "search"
@@ -665,27 +661,21 @@ extension AppModel {
         }
     }
 
-    /// Sidebar Home: the launcher only renders with nothing loaded, so the transcript has to go.
+    /// The Library page with every entry on it; it only shows with nothing loaded, so the transcript has to go.
     func goHome() {
         leaveFailedPhase()
         libraryFilter = nil
-        libraryBrowsingAll = false
         personFilter = nil
         showList()
     }
 
     func browseAll() {
-        leaveFailedPhase()
-        libraryFilter = nil
-        libraryBrowsingAll = true
-        personFilter = nil
-        showList()
+        goHome()
     }
 
     func browseCategory(_ category: EntryCategory) {
         leaveFailedPhase()
         libraryFilter = category
-        libraryBrowsingAll = false
         personFilter = nil
         showList()
     }
@@ -722,15 +712,12 @@ extension AppModel {
         switch transcriptOrigin {
         case .category(let category):
             libraryFilter = category
-            libraryBrowsingAll = false
         case .all:
             libraryFilter = nil
-            libraryBrowsingAll = true
         case .search:
             break
-        case .home, nil:
+        case nil:
             libraryFilter = nil
-            libraryBrowsingAll = false
             clearSearch()
         }
         forgetLibraryOrigin()
@@ -738,17 +725,16 @@ extension AppModel {
         closeTranscript()
     }
 
-    /// Nil when no list is behind the transcript: a root page, a batch, or Home with something already loaded.
+    /// Nil when no list is behind the transcript: a root page, a batch, or the library with something already loaded.
     func captureLibraryOrigin() -> LibraryOrigin? {
         LibraryOrigin.capture(
             sidebar: SidebarRoute.selected(
                 route: route,
                 searching: hasSearchResults,
                 filter: libraryFilter,
-                browsingAll: libraryBrowsingAll,
                 person: personFilter
             ),
-            homeOnScreen: batchIsEmpty && !hasTranscript
+            listOnScreen: batchIsEmpty && !hasTranscript
         )
     }
 
@@ -789,12 +775,11 @@ extension AppModel {
         leaveFailedPhase()
         leaveList(keepingTranscript: keepingTranscript)
         libraryFilter = nil
-        libraryBrowsingAll = false
         personFilter = nil
         route = page
     }
 
-    /// Home is the stand-in destination until routes remember where they were opened from.
+    /// The library is the stand-in destination until routes remember where they were opened from.
     func closeRecentlyDeleted() {
         goHome()
     }

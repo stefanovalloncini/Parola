@@ -30,7 +30,7 @@ struct SettingsCommandsTests {
         return try await command.handler(command.validate(AutomationArgs(args)), context)
     }
 
-    @Test("category 'all' reaches the sidebar's browse-all row")
+    @Test("category 'all' shows the whole Library page")
     func setLibraryFilterAll() async throws {
         let (model, server, context, commands) = try makeRig()
         model.route = .batch
@@ -39,7 +39,7 @@ struct SettingsCommandsTests {
         withExtendedLifetime(server) {}
 
         #expect(model.libraryFilter == nil)
-        #expect(model.libraryBrowsingAll)
+        #expect(model.isBrowsingLibrary)
         #expect(model.route == .transcript)
         #expect(result == .object([
             "libraryFilter": .string("all"),
@@ -49,36 +49,40 @@ struct SettingsCommandsTests {
             Issue.record("snapshotState should return an object")
             return
         }
-        #expect(state["libraryBrowsingAll"] == .bool(true), "All and Home both leave libraryFilter empty")
+        #expect(state["libraryBrowsingAll"] == .bool(true))
     }
 
-    @Test("a category filter leaves browse-all behind")
+    @Test("a category filter leaves the whole library behind")
     func setLibraryFilterCategory() async throws {
         let (model, server, context, commands) = try makeRig()
-        model.libraryBrowsingAll = true
 
-        _ = try await run(commands, "setLibraryFilter", ["category": .string("meeting")], context)
+        let result = try await run(commands, "setLibraryFilter", ["category": .string("meeting")], context)
         withExtendedLifetime(server) {}
 
         #expect(model.libraryFilter == .meeting)
-        #expect(model.libraryBrowsingAll == false)
         #expect(model.route == .transcript)
+        #expect(result == .object([
+            "libraryFilter": .string("meeting"),
+            "libraryBrowsingAll": .bool(false),
+        ]))
     }
 
-    @Test("an empty category selects Home, search and all")
+    @Test("an empty category shows the whole Library page and clears the search")
     func setLibraryFilterCleared() async throws {
         let (model, server, context, commands) = try makeRig()
         model.libraryFilter = .dictation
-        model.libraryBrowsingAll = true
         model.searchQuery = "bianchi"
 
-        _ = try await run(commands, "setLibraryFilter", ["category": .string("")], context)
+        let result = try await run(commands, "setLibraryFilter", ["category": .string("")], context)
         withExtendedLifetime(server) {}
 
         #expect(model.libraryFilter == nil)
-        #expect(model.libraryBrowsingAll == false)
         #expect(model.route == .transcript)
         #expect(model.searchQuery.isEmpty)
+        #expect(result == .object([
+            "libraryFilter": .string(""),
+            "libraryBrowsingAll": .bool(true),
+        ]))
     }
 
     @Test("an unknown category is still rejected")

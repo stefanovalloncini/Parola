@@ -109,14 +109,14 @@ struct PersonFilterTests {
 
         model.browsePerson(ada)
         #expect(model.personFilter == ada)
-        #expect(model.libraryBrowsingAll)
+        #expect(model.isBrowsingLibrary)
 
         model.browsePerson(nil)
         #expect(model.personFilter == nil)
-        #expect(model.libraryBrowsingAll)
+        #expect(model.isBrowsingLibrary)
     }
 
-    @Test("browsing to a person while on a category switches to All, not an intersection")
+    @Test("browsing to a person while on a category switches to the whole library, not an intersection")
     func personSelectionClearsTheCategory() async {
         let model = await makeModel()
         model.browseCategory(.transcription)
@@ -126,22 +126,21 @@ struct PersonFilterTests {
 
         #expect(model.personFilter == ada)
         #expect(model.libraryFilter == nil)
-        #expect(model.libraryBrowsingAll)
+        #expect(model.isBrowsingLibrary)
     }
 
-    @Test("re-picking a person the chip narrowed to a category clears back to All")
+    @Test("re-picking a person the chip narrowed to a category clears back to the whole library")
     func repickingANarrowedPersonClearsTheCategory() async {
         let model = await makeModel()
         model.browsePerson(ada)
         model.libraryFilter = .meeting
-        model.libraryBrowsingAll = false
         #expect(model.personFilter == ada)
 
         model.browsePerson(ada)
 
         #expect(model.personFilter == ada)
         #expect(model.libraryFilter == nil)
-        #expect(model.libraryBrowsingAll)
+        #expect(model.isBrowsingLibrary)
     }
 
     @Test("re-picking a person still navigates when another route took over, like a batch")
@@ -156,7 +155,7 @@ struct PersonFilterTests {
 
         #expect(model.route == .transcript)
         #expect(model.personFilter == ada)
-        #expect(model.libraryBrowsingAll)
+        #expect(model.isBrowsingLibrary)
     }
 
     @Test("choosing a category clears the person filter")
@@ -175,28 +174,26 @@ struct PersonFilterTests {
     func personFilterIsTheOnlySidebarSelection() async {
         let model = await makeModel()
         model.libraryFilter = nil
-        model.libraryBrowsingAll = true
         model.personFilter = grace
 
         let selected = SidebarRoute.selected(
             route: model.route, searching: model.hasSearchResults,
-            filter: model.libraryFilter, browsingAll: model.libraryBrowsingAll, person: model.personFilter
+            filter: model.libraryFilter, person: model.personFilter
         )
 
         #expect(selected == .person(grace))
-        #expect(selected != .all)
+        #expect(selected != .library)
     }
 
     @Test("a person narrowing a category leaves the category row lit, not the person's")
     func chipNarrowingKeepsTheCategoryLit() async {
         let model = await makeModel()
         model.libraryFilter = .meeting
-        model.libraryBrowsingAll = false
         model.personFilter = grace
 
         let selected = SidebarRoute.selected(
             route: model.route, searching: model.hasSearchResults,
-            filter: model.libraryFilter, browsingAll: model.libraryBrowsingAll, person: model.personFilter
+            filter: model.libraryFilter, person: model.personFilter
         )
 
         #expect(selected == .category(.meeting))
@@ -211,7 +208,7 @@ struct PersonFilterTests {
 
         let selected = SidebarRoute.selected(
             route: model.route, searching: model.hasSearchResults,
-            filter: model.libraryFilter, browsingAll: model.libraryBrowsingAll, person: model.personFilter
+            filter: model.libraryFilter, person: model.personFilter
         )
 
         #expect(selected == .batch)
@@ -224,7 +221,7 @@ struct PersonFilterTests {
         #expect(LibraryListContent.headerTitle(for: .meeting, person: person) == "Meetings")
         #expect(LibraryListContent.headerTitle(for: nil, person: person) == "Ada Lovelace")
         #expect(LibraryListContent.headerTitle(for: .meeting, person: nil) == "Meetings")
-        #expect(LibraryListContent.headerTitle(for: nil, person: nil) == "All")
+        #expect(LibraryListContent.headerTitle(for: nil, person: nil) == "Library")
     }
 
     @Test("the person chip stays up when the filter is active, even with no options to switch to")

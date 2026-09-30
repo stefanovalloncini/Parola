@@ -55,7 +55,7 @@ struct CustomizationPane: View {
                         .axLeaf("Customization.Toggle.MonospacedTimestamps")
                 }
                 SettingRow("List density",
-                           description: "Row spacing in the library list and on Home.") {
+                           description: "Row spacing in the library list.") {
                     Picker("", selection: $model.sidebarDensity) {
                         Text("Comfortable").tag("comfortable")
                         Text("Compact").tag("compact")

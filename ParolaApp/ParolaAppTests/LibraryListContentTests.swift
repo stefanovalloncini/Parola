@@ -177,10 +177,8 @@ struct LibraryListContentTests {
 
     @Test("a browse list waits under the results only where clearing the query would show it")
     func browseListUnderTheResults() {
-        #expect(LibraryListContent.showsBrowseList(filter: .meeting, browsingAll: false, hasTranscript: false))
-        #expect(LibraryListContent.showsBrowseList(filter: nil, browsingAll: true, hasTranscript: false))
-        #expect(!LibraryListContent.showsBrowseList(filter: nil, browsingAll: false, hasTranscript: false))
-        #expect(!LibraryListContent.showsBrowseList(filter: .meeting, browsingAll: false, hasTranscript: true))
+        #expect(LibraryListContent.showsBrowseList(hasTranscript: false))
+        #expect(!LibraryListContent.showsBrowseList(hasTranscript: true))
     }
 
     /// The list now survives sidebar moves, so what a category switch leaves behind is what the user keeps.

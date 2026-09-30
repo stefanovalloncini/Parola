@@ -46,13 +46,13 @@ enum LibraryListContent {
         case .transcription: return String(localized: "Transcriptions")
         case .meeting: return String(localized: "Meetings")
         case .dictation: return String(localized: "Dictations")
-        case nil: return String(localized: "All")
+        case nil: return String(localized: "Library")
         }
     }
 
-    /// A browse list sits under the results only when clearing the query would show it: not on Home, not over a transcript.
-    static func showsBrowseList(filter: EntryCategory?, browsingAll: Bool, hasTranscript: Bool) -> Bool {
-        !hasTranscript && (filter != nil || browsingAll)
+    /// A browse list sits under the results only when clearing the query would show it: not over a transcript.
+    static func showsBrowseList(hasTranscript: Bool) -> Bool {
+        !hasTranscript
     }
 
     /// What Clear Filters resets: every dimension the list can be narrowed by, including the person.
@@ -269,7 +269,7 @@ enum LibraryListContent {
 /// The library's content area: the browse list, with a query's results laid over it while one is open.
 struct LibraryListView: View {
     let category: EntryCategory?
-    /// Whether clearing the query would show a browse list; Home and a loaded transcript have none under their results.
+    /// Whether clearing the query would show a browse list; a loaded transcript has none under its results.
     let browses: Bool
     let searchRanking: [LibraryEntry.ID]?
 

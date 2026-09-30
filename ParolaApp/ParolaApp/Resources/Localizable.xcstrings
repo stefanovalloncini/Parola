@@ -2348,17 +2348,6 @@
         }
       }
     },
-    "Back to All": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Torna a tutti gli elementi"
-          }
-        }
-      }
-    },
     "Back to Dictations": {
       "extractionState": "manual",
       "localizations": {
@@ -2370,13 +2359,13 @@
         }
       }
     },
-    "Back to Home": {
+    "Back to Library": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Torna alla Home"
+            "value": "Torna alla libreria"
           }
         }
       }
@@ -2802,26 +2791,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli"
-          }
-        }
-      }
-    },
-    "Capture from the mic": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cattura dal microfono"
-          }
-        }
-      }
-    },
-    "Capture what your Mac plays": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cattura l'audio del Mac"
           }
         }
       }
@@ -4850,17 +4819,6 @@
         }
       }
     },
-    "Drop audio or video": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rilascia audio o video"
-          }
-        }
-      }
-    },
     "Drop audio or video files.": {
       "extractionState": "manual",
       "localizations": {
@@ -6301,17 +6259,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tieni premuto un tasto e parla. Le parole arrivano dove stai scrivendo."
-          }
-        }
-      }
-    },
-    "Home": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Home"
           }
         }
       }
@@ -9943,16 +9890,6 @@
         }
       }
     },
-    "Paste a link to transcribe": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Incolla un link da trascrivere"
-          }
-        }
-      }
-    },
     "Paste a link — Parola downloads the audio locally with yt-dlp.": {
       "comment": "A description of how to add a YouTube video.",
       "extractionState": "stale",
@@ -11502,13 +11439,13 @@
         }
       }
     },
-    "Row spacing in the library list and on Home.": {
+    "Row spacing in the library list.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Spaziatura delle righe nell'elenco della libreria e nella Home."
+            "value": "Spaziatura delle righe nell'elenco della libreria."
           }
         }
       }
@@ -15580,17 +15517,6 @@
         }
       }
     },
-    "View all (%lld)": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vedi tutte (%lld)"
-          }
-        }
-      }
-    },
     "Wait this long after dictation ends before pasting. Useful when the target app needs a beat to refocus.": {
       "extractionState": "manual",
       "localizations": {
@@ -16123,23 +16049,6 @@
         }
       }
     },
-    "YouTube URL": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "YouTube URL"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "URL YouTube"
-          }
-        }
-      }
-    },
     "YouTube URL…": {
       "extractionState": "manual",
       "localizations": {
@@ -16191,16 +16100,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "La trascrizione appare qui mentre parli"
-          }
-        }
-      }
-    },
-    "Your transcriptions show up here.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qui compaiono le tue trascrizioni."
           }
         }
       }
@@ -16443,17 +16342,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "on"
-          }
-        }
-      }
-    },
-    "or click to choose files": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "oppure fai clic per scegliere i file"
           }
         }
       }

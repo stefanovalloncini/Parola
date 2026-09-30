@@ -9,7 +9,6 @@ struct MacLibrarySidebar: View {
             route: model.route,
             searching: model.hasSearchResults,
             filter: model.libraryFilter,
-            browsingAll: model.libraryBrowsingAll,
             person: model.personFilter
         )
     }
@@ -33,28 +32,17 @@ struct MacLibrarySidebar: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
+                    librarySectionHeader
+
                     SidebarRow(
-                        title: "Home",
-                        systemImage: "house.fill",
-                        isSelected: selectedRoute == .home
+                        title: "Library",
+                        systemImage: "books.vertical",
+                        isSelected: selectedRoute == .library
                     ) {
                         model.goHome()
                     }
-                    .accessibilityIdentifier("library.home")
-                    .axLeaf("Sidebar.Button.Home")
-
-                    librarySectionHeader
-                        .padding(.top, DS.Spacing.regular)
-
-                    SidebarRow(
-                        title: "All",
-                        systemImage: "tray.full",
-                        isSelected: selectedRoute == .all
-                    ) {
-                        model.browseAll()
-                    }
                     .accessibilityIdentifier("library.filter.all")
-                    .axLeaf("Sidebar.Button.FilterAll")
+                    .axLeaf("Sidebar.Button.Library")
 
                     ForEach(categories, id: \.id) { item in
                         SidebarRow(
@@ -202,20 +190,18 @@ struct MacLibrarySidebar: View {
 enum SidebarRoute: Hashable {
     /// No row owns the search results, so none is highlighted while they show.
     case search
-    case home
-    case all
+    case library
+    case category(EntryCategory)
+    case person(UUID)
     case queue
     case batch
     case statistics
     case recentlyDeleted
-    case category(EntryCategory)
-    case person(UUID)
 
     static func selected(
         route: AppModel.Route,
         searching: Bool,
         filter: EntryCategory?,
-        browsingAll: Bool,
         person: UUID? = nil
     ) -> SidebarRoute {
         switch route {
@@ -228,7 +214,7 @@ enum SidebarRoute: Hashable {
             // A category narrowed by the filter-bar chip keeps the category row lit, not the person.
             if let person, filter == nil { return .person(person) }
             if let filter { return .category(filter) }
-            return browsingAll ? .all : .home
+            return .library
         }
     }
 }

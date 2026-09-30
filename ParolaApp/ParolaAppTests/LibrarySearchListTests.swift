@@ -40,7 +40,6 @@ struct LibrarySearchListTests {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("search-list"))
         await model.libraryRefreshTask?.value
         model.libraryEntries = entries(count)
-        model.libraryBrowsingAll = true
         model.route = .transcript
         let host = NSHostingView(rootView: AnyView(ContentRoutes().environment(model)))
         let window = NSWindow(

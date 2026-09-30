@@ -169,7 +169,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "goHome",
                 area: .library,
-                summary: "Selects the sidebar Home row: clears the library filter and any search, and unloads any transcript.",
+                summary: "Shows the Library page: clears the category and person filters and any search, and unloads any transcript.",
                 kind: .mutating,
                 handler: { _, ctx in
                     ctx.model.goHome()
@@ -189,7 +189,7 @@ extension ParolaAutomationServer {
                         "origin": .string(origin),
                         "route": .string(ctx.model.route.rawValue),
                         "libraryFilter": .string(ctx.model.libraryFilter?.rawValue ?? ""),
-                        "libraryBrowsingAll": .bool(ctx.model.libraryBrowsingAll),
+                        "libraryBrowsingAll": .bool(ctx.model.isBrowsingWholeLibrary),
                     ])
                 }
             ),

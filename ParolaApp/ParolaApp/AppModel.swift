@@ -1326,12 +1326,17 @@ final class AppModel {
     var isBrowsingLibrary: Bool {
         guard route == .transcript, batchIsEmpty else { return false }
         switch phase {
-        case .idle, .ready:
+        case .idle, .ready, .failed:
             // Results the transcript did not come from take the content area; clearing them gives it back.
             if hasTranscript { return hasSearchResults && !openedFromSearch }
-            return hasSearchResults || libraryFilter != nil || libraryBrowsingAll
+            return true
         default: return false
         }
+    }
+
+    /// The Library page with nothing narrowing it: no category or person filter, and no search results.
+    var isBrowsingWholeLibrary: Bool {
+        isBrowsingLibrary && libraryFilter == nil && personFilter == nil && !hasSearchResults
     }
 
     private var openedFromSearch: Bool {
@@ -1445,8 +1450,6 @@ final class AppModel {
         return found
     }
     var libraryFilter: EntryCategory?
-    /// True when the "All" chip is showing the flat all-categories list. Distinguishes All from Home, which both leave libraryFilter nil.
-    var libraryBrowsingAll: Bool = false
     /// Which list the open transcript was opened from; read it through `transcriptOrigin`, which pairs it with the entry.
     var libraryOrigin: LibraryOrigin?
     var libraryOriginEntryID: LibraryEntry.ID?
@@ -3811,7 +3814,7 @@ final class AppModel {
             )
         }
         if stopped {
-            // Whatever stopped the run keeps the screen; only the take's own pane gives way to Home.
+            // Whatever stopped the run keeps the screen; only the take's own pane gives way to the library.
             if phase == .transcribing(file: url) { phase = .idle }
             resolveRecordingOutcome(.failure(IntentActionError.cancelled))
             return

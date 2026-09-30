@@ -231,6 +231,21 @@ struct RouteLayoutTests {
         }
     }
 
+    @Test("a failure's banner sits over the Library page inside the smallest window")
+    func failureBannerFitsTheLibraryPage() {
+        withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, jobs: 0)
+            let calm = NSHostingView(rootView: ContentRoutes().environment(model)).fittingSize.height
+            model.phase = .failed(message: "The file couldn't be decoded.")
+            let failed = NSHostingView(rootView: ContentRoutes().environment(model)).fittingSize.height
+            #expect(failed > calm, "the banner takes its room above the list")
+
+            let wanted = NSHostingView(rootView: ContentView().environment(model)).fittingSize
+            #expect(wanted.width <= MainWindowLayout.minimumWidth, "the failed library wants \(wanted.width)pt of width")
+            #expect(wanted.height <= MainWindowLayout.minimumHeight, "the failed library wants \(wanted.height)pt of height")
+        }
+    }
+
     @Test(
         "an empty route asks for no more height than the smallest window has",
         arguments: [AppModel.Route.queue, .batch, .transcript, .statistics]
