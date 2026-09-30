@@ -14,6 +14,7 @@ struct AudioDevicesTests {
         #expect(AudioDevices.name(forUID: "USB-1", in: namedDevices) == "Shure MV7")
         #expect(AudioDevices.name(forUID: nil, in: namedDevices) == "MacBook Pro Microphone")
         #expect(AudioDevices.name(forUID: "gone", in: namedDevices) == nil)
+        #expect(AudioDevices.name(forUID: "", in: namedDevices) == "MacBook Pro Microphone")
     }
 
     @Test("inputDevices enumerates the host's real input devices with stable invariants")

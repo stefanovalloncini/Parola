@@ -39,9 +39,9 @@ public enum AudioDevices {
         #endif
     }
 
-    /// The name of the device with `uid`, or the default device's name when `uid` is nil.
+    /// The name of the device with `uid`, or the default device's name when `uid` is nil or empty.
     public static func name(forUID uid: String?, in devices: [AudioInputDevice]) -> String? {
-        guard let uid else { return devices.first { $0.isDefault }?.name }
+        guard let uid, !uid.isEmpty else { return devices.first { $0.isDefault }?.name }
         return devices.first { $0.uid == uid }?.name
     }
 
