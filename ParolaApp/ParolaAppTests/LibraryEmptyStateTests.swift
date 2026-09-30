@@ -155,30 +155,21 @@ struct EmptyLibraryHeroTests {
 }
 
 @MainActor
-@Suite("The hero on screen", .serialized)
+@Suite("The hero on screen")
 struct EmptyLibraryHeroRenderTests {
-    private static let heroSource = "App.Library.Hero.Source"
-
-    /// The test host builds no accessibility tree until an assistive app asks for one; VoiceOver asks with this attribute.
-    private func withAccessibility(_ body: () async -> Void) async {
-        let setValue = NSSelectorFromString("accessibilitySetValue:forAttribute:")
-        let enhanced = NSString(string: "AXEnhancedUserInterface")
-        _ = NSApp.perform(setValue, with: NSNumber(value: true), with: enhanced)
-        defer { _ = NSApp.perform(setValue, with: NSNumber(value: false), with: enhanced) }
-        await body()
-    }
-
-    private func identifiers(in window: NSWindow) -> Set<String> {
-        var found = Set<String>()
-        func collect(_ node: AccessibilityTreeWalker.AXNode) {
-            if let id = node.identifier { found.insert(id) }
-            node.children.forEach(collect)
+    /// SwiftUI draws the hero's own buttons itself; its source picker is an AppKit control, so it stands in for the hero.
+    private func heroPicker(in window: NSWindow) -> NSSegmentedControl? {
+        window.contentView?.layoutSubtreeIfNeeded()
+        func find(_ view: NSView) -> NSSegmentedControl? {
+            if let control = view as? NSSegmentedControl, control.segmentCount == 2,
+               control.label(forSegment: 0) == "Microphone", control.label(forSegment: 1) == "System Audio" {
+                return control
+            }
+            return view.subviews.lazy.compactMap(find).first
         }
-        collect(AccessibilityTreeWalker().walk(rootWindow: window, filter: .all, maxDepth: 40, maxElements: 3000).tree)
-        return found
+        return window.contentView.flatMap(find)
     }
 
-    /// SwiftUI's own buttons never reach the tree in the test host; the source picker is AppKit's, so it stands in for the hero.
     @Test("an empty library's Library page shows the hero; a person, a category or a first entry takes it away")
     func heroOnThePage() async {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("hero-page"))
@@ -194,28 +185,26 @@ struct EmptyLibraryHeroRenderTests {
         window.contentViewController = NSHostingController(rootView: ContentView().environment(model))
         defer { withExtendedLifetime(controller) { window.close() } }
 
-        await withAccessibility {
-            let onLibraryPage = await waitUntil { identifiers(in: window).contains(Self.heroSource) }
-            #expect(onLibraryPage, "the empty Library page shows the hero")
+        let onLibraryPage = await waitUntil { heroPicker(in: window) != nil }
+        #expect(onLibraryPage, "the empty Library page shows the hero")
 
-            model.personFilter = UUID()
-            let offPersonPage = await waitUntil { !identifiers(in: window).contains(Self.heroSource) }
-            #expect(offPersonPage, "a person's page over an empty library keeps its own state")
-            model.personFilter = nil
-            let backFromPerson = await waitUntil { identifiers(in: window).contains(Self.heroSource) }
-            #expect(backFromPerson)
+        model.personFilter = UUID()
+        let offPersonPage = await waitUntil { heroPicker(in: window) == nil }
+        #expect(offPersonPage, "a person's page over an empty library keeps its own state")
+        model.personFilter = nil
+        let backFromPerson = await waitUntil { heroPicker(in: window) != nil }
+        #expect(backFromPerson)
 
-            model.libraryFilter = .meeting
-            let offCategoryPage = await waitUntil { !identifiers(in: window).contains(Self.heroSource) }
-            #expect(offCategoryPage, "a category's page over an empty library keeps its own state")
-            model.libraryFilter = nil
-            let backFromCategory = await waitUntil { identifiers(in: window).contains(Self.heroSource) }
-            #expect(backFromCategory)
+        model.libraryFilter = .meeting
+        let offCategoryPage = await waitUntil { heroPicker(in: window) == nil }
+        #expect(offCategoryPage, "a category's page over an empty library keeps its own state")
+        model.libraryFilter = nil
+        let backFromCategory = await waitUntil { heroPicker(in: window) != nil }
+        #expect(backFromCategory)
 
-            model.libraryEntries = [libraryEntry("first", category: .transcription)]
-            let offWithAnEntry = await waitUntil { !identifiers(in: window).contains(Self.heroSource) }
-            #expect(offWithAnEntry, "the first entry puts the list in its place")
-        }
+        model.libraryEntries = [libraryEntry("first", category: .transcription)]
+        let offWithAnEntry = await waitUntil { heroPicker(in: window) == nil }
+        #expect(offWithAnEntry, "the first entry puts the list in its place")
     }
 
     /// The strongly red, opaque pixels a render holds, and the box around them.
