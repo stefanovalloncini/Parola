@@ -232,6 +232,22 @@ struct LinkPasteResponderTests {
         #expect(responder.nextResponder === replacement)
     }
 
+    @Test("⌘V stands down through a count-in, as it does through the take")
+    func notDuringACountIn() {
+        withPasteboard { pasteboard in
+            pasteboard.setString("https://youtu.be/abc123", forType: .string)
+            let model = makeModel(pasteboard: pasteboard)
+            model.recordingCountInSeconds = 3
+            model.startRecording(source: .microphone)
+            #expect(model.recordingCountdown != nil)
+            #expect(!offers(model), "the count-in is the take's first arming")
+
+            model.cancelRecordingCountdown()
+            #expect(!model.recordingActive)
+            #expect(offers(model))
+        }
+    }
+
     @Test("the link paste leaves the window's chain with the content that put it there")
     func leavesWithTheContent() {
         withPasteboard { pasteboard in

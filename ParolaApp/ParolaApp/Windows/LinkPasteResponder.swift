@@ -26,7 +26,8 @@ final class LinkPasteResponder: NSResponder, NSUserInterfaceValidations {
 
     /// Offered where the link sheet can open, judged by the kinds of data on offer: reading the data outside a paste can make macOS ask.
     static func offersPaste(for model: AppModel, windowIsKey: Bool, windowHasSheet: Bool) -> Bool {
-        guard windowIsKey, !windowHasSheet, model.features.isEnabled(.youtube), !model.introduction.isPresented else {
+        guard windowIsKey, !windowHasSheet, model.features.isEnabled(.youtube), !model.introduction.isPresented,
+              !model.recordingActive else {
             return false
         }
         switch model.phase {
