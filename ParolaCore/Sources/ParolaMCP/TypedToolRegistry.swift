@@ -142,7 +142,7 @@ public enum TypedToolRegistry {
         TypedTool(
             name: "parola_start_batch",
             bridgeCmd: "startBatch",
-            description: "Submit multiple files for batch transcription. Routes the app to the Batch view.",
+            description: "Submit multiple files for batch transcription. Opens the app's Queue, unless a take is recording.",
             properties: [.stringArray("paths", description: "Absolute file paths to enqueue.")],
             required: ["paths"]
         ),

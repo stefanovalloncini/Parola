@@ -181,13 +181,13 @@ Rows named without the `parola_app_` prefix are raw bridge commands, called thro
 | `parola_app_run_prompt` | **name** or **id** | Run a prompt against the current transcript. Requires Apple Intelligence. |
 | `parola_app_get_prompt_output` | — | Latest `{promptName, text}` or null. |
 | `parola_app_transcribe_file` | **path**, translate | Drop-equivalent: transcribe a file by absolute path. |
-| `parola_app_start_batch` | **paths** | Submit multiple files. Auto-navigates to Batch view. |
-| `parola_app_add_batch_files` | **paths** | Append more files to the existing batch. |
-| `dropFiles` | **paths**, half, confirmLarge | Routes files through the split drop zone: `now` transcribes, `queue` enqueues. A drop yielding more than 200 files waits on a prompt: the reply's `awaitingConfirmation` says so, and `confirmLarge: true` answers Add Files. |
+| `parola_app_start_batch` | **paths** | Submit multiple files. Opens the Queue, unless a take is recording. |
+| `parola_app_add_batch_files` | **paths** | Append more files to the existing batch. Opens the Queue, unless a take is recording. |
+| `dropFiles` | **paths**, half, confirmLarge | Routes files through the split drop zone: `now` transcribes, `queue` enqueues. A drop yielding more than 200 files waits on a prompt: the reply's `awaitingConfirmation` says so, and `confirmLarge: true` answers Add Files. The reply's `route` is the page on screen after the drop: `queue` once the files join a batch (a take that is recording keeps its page), `transcript` when a file starts on its own. |
 | `resolveLargeDrop` | **choice** | Answers the large-drop prompt: `add` queues the files, `cancel` drops them. `getState.pendingLargeDropCount` shows what is waiting. |
 | `previewDropZone` | payload, count, half | Test mode only: shapes the drop overlay without a drag so it can be captured. |
 | `parola_app_clear_batch` | — | Cancel and remove all queued jobs. |
-| `parola_app_select_batch_job` | **id** | Select a specific job to view its transcript. |
+| `parola_app_select_batch_job` | **id** | Open a finished job's transcript, as its Open button does: its library entry, or its own copy while the save is in flight. Replies once the entry has loaded. |
 | `parola_app_get_batch_jobs` | — | All jobs: id, file, status (pending/transcribing/done/failed/cancelled), progress, error. |
 | `parola_app_summarize_latest_entry` | options | Run the on-device summarizer against the most recent library entry. `options` merges `SummaryOptions` fields over the saved ones for this run only. |
 | `parola_app_reveal_cache_directory` | — | Open Finder showing the model cache directory. |

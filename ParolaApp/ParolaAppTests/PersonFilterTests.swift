@@ -155,7 +155,7 @@ struct PersonFilterTests {
     func repickingAPersonNavigatesFromAnotherRoute() async {
         let model = await makeModel()
         model.browsePerson(ada)
-        // Simulates addToQueue / startBatch / a duplicate-import sheet setting route directly.
+        // Simulates a page taken without the filter reset, as Settings' Open Batch or a restored queue does.
         model.route = .batch
         #expect(model.personFilter == ada)
 

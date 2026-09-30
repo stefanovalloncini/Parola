@@ -49,7 +49,7 @@ struct ContentToolbar: ToolbarContent {
         .labelStyle(.titleAndIcon)
     }
 
-    /// A batch job's run leaves the menu open, as ⌘O and drops stay open while it runs.
+    /// A batch job's run keeps the menu enabled: ⌘O and drops still work while it runs.
     static func isBusy(for model: AppModel) -> Bool {
         switch model.transcriptRoutePhase {
         case .idle, .ready, .failed: return false

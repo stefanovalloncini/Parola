@@ -551,8 +551,6 @@ final class AppModel {
             if batchIsEmpty != batchJobs.isEmpty { batchIsEmpty = batchJobs.isEmpty }
             let running = batchJobs.contains { $0.status == .transcribing }
             if batchIsRunning != running { batchIsRunning = running }
-            let hasDone = batchJobs.contains { $0.status == .done }
-            if batchHasDoneJob != hasDone { batchHasDoneJob = hasDone }
             let showsActivity = SidebarSelection.showsActivity(jobs: batchJobs)
             if sidebarShowsActivity != showsActivity { sidebarShowsActivity = showsActivity }
             saveBatchQueueSnapshot()
@@ -562,7 +560,6 @@ final class AppModel {
     private(set) var activeBatchJobCount: Int = 0
     private(set) var batchIsEmpty = true
     private(set) var batchIsRunning = false
-    private(set) var batchHasDoneJob = false
     private(set) var sidebarShowsActivity = false
     private(set) var batchBuckets = BatchJobBuckets()
     @ObservationIgnored let batchProgress = BatchProgressBoard()

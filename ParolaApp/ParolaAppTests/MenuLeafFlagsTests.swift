@@ -70,7 +70,6 @@ struct MenuLeafFlagsTests {
         _ = model.isBrowsingLibrary
         _ = model.canReturnToOrigin
         _ = model.batchIsRunning
-        _ = model.batchHasDoneJob
     }
 
     private func entry(_ id: String, title: String, favorites: [Int] = []) -> LibraryEntry {
