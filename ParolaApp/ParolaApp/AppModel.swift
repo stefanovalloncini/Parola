@@ -2273,12 +2273,11 @@ final class AppModel {
         if recordingActive { return "Stop the recording before downloading a model." }
         switch phase {
         case .transcribing, .loadingModel, .fetchingLink:
-            break
+            return "Wait for the current job to finish before downloading a model."
         default:
             // A take's run holds the run slot off the phase, so a download finishing under it could not hand the phase back.
-            guard takeTranscription != nil else { return nil }
+            return takeTranscription == nil ? nil : "Wait for the current job to finish before downloading a model."
         }
-        return "Wait for the current job to finish before downloading a model."
     }
 
     /// A pick that never starts downloading, or stops without installing, must not stick as the
@@ -4439,7 +4438,7 @@ final class AppModel {
         )
     }
 
-    func makeTakePartialCoalescer(run: Int) -> MainActorCoalescer<String> {
+    private func makeTakePartialCoalescer(run: Int) -> MainActorCoalescer<String> {
         MainActorCoalescer { [weak self] text in
             guard let self, self.takeTranscription?.run == run, self.takePartialText != text else { return }
             self.takePartialText = text
@@ -4447,7 +4446,7 @@ final class AppModel {
     }
 
     /// The engine counts seconds of the file; the session knows how long the take is.
-    func makeTakeProgressCoalescer(run: Int, takeID: Int) -> MainActorCoalescer<Double> {
+    private func makeTakeProgressCoalescer(run: Int, takeID: Int) -> MainActorCoalescer<Double> {
         let throttle = ProgressThrottle()
         return MainActorCoalescer { [weak self] seconds in
             guard let self, self.takeTranscription?.run == run, let session = self.recording, session.takeID == takeID,
@@ -4456,7 +4455,7 @@ final class AppModel {
         }
     }
 
-    func makeTakeStageHandler(run: Int) -> @Sendable (TranscribeStage) -> Void {
+    private func makeTakeStageHandler(run: Int) -> @Sendable (TranscribeStage) -> Void {
         { [weak self] stage in
             Task { @MainActor in
                 guard let self, self.takeTranscription?.run == run, self.takeTranscribeStage != stage else { return }

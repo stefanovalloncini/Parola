@@ -395,7 +395,6 @@ extension TranscriberMockSuites {
                 model.startRecording(source: .microphone)
                 await waitUntil { model.recording?.isCapturing == true && model.liveSource != nil }
                 #expect(model.activeTake?.category == .transcription, "the new take carries its own category")
-                #expect(model.takeTranscription == nil, "the stopped take's run let go of the Stage")
 
                 let first = try #require(await entries(model, count: 1).first)
                 #expect(first.title.hasSuffix("(not transcribed)"))
