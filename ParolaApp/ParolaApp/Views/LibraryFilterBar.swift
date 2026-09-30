@@ -213,7 +213,7 @@ extension View {
             .buttonStyle(.bordered)
             .buttonBorderShape(.capsule)
             .controlSize(.small)
-            .tint(isActive ? DS.Color.accent : nil)
+            .tint(isActive ? DS.Color.accentInk : nil)
             .fixedSize()
     }
 }
