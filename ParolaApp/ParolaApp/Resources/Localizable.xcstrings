@@ -3777,6 +3777,17 @@
         }
       }
     },
+    "Could not delete %@: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile eliminare %1$@: %2$@"
+          }
+        }
+      }
+    },
     "Could not launch brew: %@": {
       "extractionState": "manual",
       "localizations": {

@@ -106,13 +106,18 @@ extension AppModel {
             do {
                 try await AppModel.offMainIO { try store.deleteLeftovers(variant: variantID) }
                 failure = nil
+            } catch ParolaError.modelNotFound {
+                // Already gone: a model delete or the CLI cleared it first.
+                failure = nil
             } catch {
                 failure = error
             }
             guard let self else { return }
             self.modelsBeingDeleted.subtract(keys)
             if let failure {
-                self.modelActionError = "Could not delete \(first.displayName): \(failure.localizedDescription)"
+                self.modelActionError = String(
+                    localized: "Could not delete \(first.displayName): \(failure.localizedDescription)"
+                )
             } else {
                 self.supersededCopies.removeAll { $0.variantID == variantID }
             }
