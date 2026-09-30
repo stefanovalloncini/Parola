@@ -293,6 +293,20 @@ struct LibraryOriginTests {
         #expect(sidebar(model) == .library)
     }
 
+    @Test("back with no origin leaves a person's list for the whole library")
+    func backWithoutOriginLeavesThePerson() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "dropped on a person's list")
+        model.browsePerson(UUID())
+        #expect(await openEntry(entry.id, in: model))
+        model.forgetLibraryOrigin()
+
+        #expect(await goBack(in: model))
+
+        #expect(model.personFilter == nil)
+        #expect(model.isBrowsingWholeLibrary)
+    }
+
     // MARK: - Where the link shows
 
     @Test("the back link needs a transcript standing on its own")

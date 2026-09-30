@@ -718,6 +718,7 @@ extension AppModel {
             break
         case nil:
             libraryFilter = nil
+            personFilter = nil
             clearSearch()
         }
         forgetLibraryOrigin()
