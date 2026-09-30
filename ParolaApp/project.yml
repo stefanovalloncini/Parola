@@ -188,6 +188,8 @@ targets:
         product: ParolaDictation
       - package: ParolaCore
         product: ParolaTestSupport
+      - package: ParolaCore
+        product: ParolaMCP
       - package: Sparkle
         product: Sparkle
     settings:

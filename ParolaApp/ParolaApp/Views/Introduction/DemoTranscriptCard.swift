@@ -41,7 +41,7 @@ struct DemoTranscriptCard: View {
 
     private func header(at time: Double) -> some View {
         HStack(spacing: DS.Spacing.regular) {
-            BrandWaveform(side: Self.barsSide, drive: drive(at: time))
+            BrandWaveform(side: Self.barsSide, mark: .waveform, drive: drive(at: time))
                 .brandBars(in: brand)
             Text(verbatim: clock(at: time))
                 .font(DS.Font.mono)

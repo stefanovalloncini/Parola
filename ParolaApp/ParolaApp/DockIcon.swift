@@ -8,10 +8,13 @@ enum DockIcon {
     struct Colors: Equatable {
         var background: RGBA
         var foreground: RGBA
+        var nib: RGBA
     }
 
     static let cream = RGBA(0.99, 0.95, 0.90)
     static let ink = RGBA(0.10, 0.10, 0.10)
+    static let gold = RGBA(0.91, 0.72, 0.38)
+    static let nibContrastMinimum = 1.3
 
     /// The Dock draws at most 256 pt on a 2x screen, so a 1024 px rep only adds to what each assignment ships.
     private static let largestRep = 512
@@ -27,9 +30,11 @@ enum DockIcon {
     }
 
     static func colors(accent: RGBA) -> Colors {
-        Colors(
+        let foreground = accent.relativeLuminance > RGBA.darkForegroundLuminance ? ink : cream
+        return Colors(
             background: accent,
-            foreground: accent.relativeLuminance > RGBA.darkForegroundLuminance ? ink : cream
+            foreground: foreground,
+            nib: gold.contrast(against: accent) >= nibContrastMinimum ? gold : foreground
         )
     }
 
@@ -50,7 +55,8 @@ enum DockIcon {
             guard let cgImage = AppIconArtwork.cgImage(
                 pixels: pixels,
                 background: colors.background.nsColor,
-                foreground: colors.foreground.nsColor
+                foreground: colors.foreground.nsColor,
+                nib: colors.nib.nsColor
             ) else { continue }
             let rep = NSBitmapImageRep(cgImage: cgImage)
             rep.size = NSSize(width: pixels, height: pixels)

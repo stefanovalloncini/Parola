@@ -1,15 +1,14 @@
 import Foundation
-import ParolaCore
 
 /// Pure split/merge transforms over a segment list. Returns nil when the request is a no-op,
 /// so callers can skip the undo registration entirely.
-enum SegmentSurgery {
+public enum SegmentSurgery {
 
     /// The split list and the two ids it minted, so a caller remapping what the old id carried
     /// does not have to work them out again.
-    typealias Split = (segments: [TranscriptSegment], firstID: Int, secondID: Int)
+    public typealias Split = (segments: [TranscriptSegment], firstID: Int, secondID: Int)
 
-    static func split(segments: [TranscriptSegment], id: TranscriptSegment.ID, atWordIndex index: Int) -> Split? {
+    public static func split(segments: [TranscriptSegment], id: TranscriptSegment.ID, atWordIndex index: Int) -> Split? {
         guard let position = segments.firstIndex(where: { $0.id == id }) else { return nil }
         let segment = segments[position]
         guard let words = segment.words, (1..<words.count).contains(index) else { return nil }
@@ -39,7 +38,7 @@ enum SegmentSurgery {
         return (out, firstID, secondID)
     }
 
-    static func split(segments: [TranscriptSegment], id: TranscriptSegment.ID, atFraction fraction: Double) -> Split? {
+    public static func split(segments: [TranscriptSegment], id: TranscriptSegment.ID, atFraction fraction: Double) -> Split? {
         guard let position = segments.firstIndex(where: { $0.id == id }) else { return nil }
         let segment = segments[position]
         if let words = segment.words, words.count >= 2 {
@@ -61,7 +60,7 @@ enum SegmentSurgery {
         return (out, firstID, secondID)
     }
 
-    static func mergeWithNext(segments: [TranscriptSegment], id: TranscriptSegment.ID) -> [TranscriptSegment]? {
+    public static func mergeWithNext(segments: [TranscriptSegment], id: TranscriptSegment.ID) -> [TranscriptSegment]? {
         guard let position = segments.firstIndex(where: { $0.id == id }), position + 1 < segments.count else { return nil }
         let first = segments[position]
         let second = segments[position + 1]
@@ -101,17 +100,8 @@ enum SegmentSurgery {
         return best
     }
 
-    // Mirrors Diarization.joinWordTexts: a plain space-join would turn WhisperKit's ["l", "'altro"] into "l 'altro".
-    private static func joinWords(_ tokens: some Sequence<String>) -> String {
-        var text = ""
-        for token in tokens {
-            if text.isEmpty || token.first == "'" || token.first == "\u{2019}" {
-                text += token
-            } else {
-                text += " " + token
-            }
-        }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    private static func joinWords(_ tokens: [String]) -> String {
+        DiarizationService.joinWordTexts(tokens).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func reindex(_ words: [WordTiming], segmentID: Int) -> [WordTiming] {

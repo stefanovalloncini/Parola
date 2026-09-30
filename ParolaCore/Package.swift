@@ -10,6 +10,7 @@ let package = Package(
     products: [
         .library(name: "ParolaCore", targets: ["ParolaCore"]),
         .library(name: "ParolaDictation", targets: ["ParolaDictation"]),
+        .library(name: "ParolaMCP", targets: ["ParolaMCP"]),
         .library(name: "ScenarioKit", targets: ["ScenarioKit"]),
         .library(name: "ParolaTestSupport", targets: ["ParolaTestSupport"]),
         .executable(name: "parola", targets: ["parola"]),

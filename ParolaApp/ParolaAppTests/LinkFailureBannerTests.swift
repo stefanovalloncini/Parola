@@ -28,7 +28,7 @@ struct YtDlpUpdateOfferTests {
 
     private func offer(
         _ failure: LinkDownloadFailure?,
-        route: YtDlpInstaller.UpdateRoute? = .homebrew(brewPath: "/opt/homebrew/bin/brew"),
+        route: YtDlpUpdateRoute? = .homebrew(brewPath: "/opt/homebrew/bin/brew"),
         installed: String? = "2026.03.17",
         updating: Bool = false
     ) -> AppModel.YtDlpUpdateOffer {
