@@ -20,7 +20,6 @@ struct MacRecentlyDeletedView: View {
     var body: some View {
         VStack(spacing: 0) {
             RecentlyDeletedHeader(
-                searchText: $searchText,
                 categoryFilter: $categoryFilter,
                 sortOption: $sortOption,
                 confirmingEmpty: $confirmingEmpty,
@@ -52,6 +51,7 @@ struct MacRecentlyDeletedView: View {
         .task(id: searchText.isEmpty ? "" : categoryFilter.rawValue) { await loadPreviewsForSearch() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
+        .toolbarSearch(text: $searchText, prompt: "Search Recently Deleted")
         .confirmationDialog(
             "Delete permanently?",
             isPresented: isPurgingSingle

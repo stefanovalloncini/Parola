@@ -43,8 +43,6 @@ struct PageHeader<Leading: View, Trailing: View>: View {
         self.trailing = trailing()
     }
 
-    @State private var measuredWidth: CGFloat = 0
-
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.hair) {
             HStack(spacing: DS.Spacing.regular) {
@@ -65,8 +63,6 @@ struct PageHeader<Leading: View, Trailing: View>: View {
         }
         .padding(.horizontal, DS.Spacing.large)
         .padding(.vertical, DS.Spacing.regular)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { measuredWidth = $0 }
-        .environment(\.pageHeaderWidth, measuredWidth)
     }
 
     @ViewBuilder

@@ -18,7 +18,7 @@ struct ContentRoutes: View {
     private var routedContent: some View {
         ZStack {
             content
-                .id(routeID)
+                .id(model.route)
                 .transition(.opacity)
         }
         .animation(reduceMotion ? nil : DS.Motion.route, value: routeID)
@@ -55,9 +55,28 @@ struct ContentRoutes: View {
             case .recentlyDeleted:
                 MacRecentlyDeletedView()
             case .transcript:
-                transcriptContent
+                transcriptPage
             }
         }
+    }
+
+    /// Statistics has nothing to search; every other page puts its own field in the toolbar.
+    static func hasSearchField(_ route: AppModel.Route) -> Bool {
+        route != .statistics
+    }
+
+    /// Outside the identity the list, the panes and the batch take turns under: results replacing a transcript mid-query must not rebuild the field.
+    private var transcriptPage: some View {
+        ZStack {
+            transcriptContent
+                .id(routeID)
+                .transition(.opacity)
+        }
+        .toolbarSearch(text: librarySearch, prompt: "Search Library")
+    }
+
+    private var librarySearch: Binding<String> {
+        Binding(get: { model.searchQuery }, set: { model.search($0) })
     }
 
     private var routeID: RouteID { Self.routeID(for: model) }

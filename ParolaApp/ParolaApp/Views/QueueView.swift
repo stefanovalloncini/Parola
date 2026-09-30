@@ -26,6 +26,7 @@ struct QueueView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
+        .toolbarSearch(text: $searchText, prompt: "Search Queue")
         .axBranch("Queue")
     }
 
@@ -34,7 +35,6 @@ struct QueueView: View {
             title: "Queue",
             subtitle: QueueCount.label(for: model.batchJobs),
             trailing: {
-                CollapsingSearchPill(text: $searchText, placeholder: "Search queue", leaf: "Toolbar.TextField.Search", width: 240)
                 sortMenu
                 Button {
                     model.clearFinishedBatchJobs()

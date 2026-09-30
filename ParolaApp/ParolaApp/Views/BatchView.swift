@@ -4,6 +4,7 @@ import ParolaCore
 struct BatchView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("batch.exportPaneVisible", store: DefaultsStore.current) private var exportPaneVisible: Bool = true
+    @State private var searchText = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,6 +29,7 @@ struct BatchView: View {
                 }
             }
         }
+        .toolbarSearch(text: $searchText, prompt: "Search Batch")
         .axBranch("Batch")
     }
 
@@ -120,7 +122,7 @@ struct BatchView: View {
                 // The notice above says what is happening; an empty state would invite a second drop.
                 if model.batchFilesBeingChecked == 0 { BatchEmptyState() }
             } else {
-                BatchJobList()
+                BatchJobList(searchText: $searchText)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

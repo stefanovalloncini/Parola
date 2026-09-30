@@ -37,7 +37,6 @@ struct ContentView: View {
         } detail: {
             ContentRoutes()
                 .toolbar { ContentToolbar() }
-                .modifier(LibrarySearchField())
                 .modifier(HideToolbarTitleIfAvailable())
         }
         .contentSheets()
@@ -82,23 +81,6 @@ struct ContentView: View {
         .onChange(of: windowUndoManager) { _, newValue in model.undoManager = newValue }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
         .environment(\.mainWindowWidth, windowWidth)
-    }
-}
-
-/// The system search field at the toolbar's end; Edit ▸ Search Library puts the caret in it.
-private struct LibrarySearchField: ViewModifier {
-    @Environment(AppModel.self) private var model
-    @FocusState private var focused: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .searchable(text: query, placement: .toolbar, prompt: Text("Search Library"))
-            .searchFocused($focused)
-            .onChange(of: model.librarySearchFocusRequests) { _, _ in focused = true }
-    }
-
-    private var query: Binding<String> {
-        Binding(get: { model.searchQuery }, set: { model.search($0) })
     }
 }
 

@@ -52,7 +52,6 @@ enum RecentlyDeletedSort: String, CaseIterable, Identifiable {
 
 struct RecentlyDeletedHeader: View {
     @Environment(AppModel.self) private var model
-    @Binding var searchText: String
     @Binding var categoryFilter: RecentlyDeletedCategoryFilter
     @Binding var sortOption: RecentlyDeletedSort
     @Binding var confirmingEmpty: Bool
@@ -68,7 +67,6 @@ struct RecentlyDeletedHeader: View {
             ),
             leading: { kindMenu },
             trailing: {
-                CollapsingSearchPill(text: $searchText, placeholder: "Search", leaf: "Toolbar.TextField.Search")
                 sortMenu
                 if selection.isEmpty {
                     deleteAllButton

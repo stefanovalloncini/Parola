@@ -11996,6 +11996,17 @@
         }
       }
     },
+    "Search Batch": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca nel batch"
+          }
+        }
+      }
+    },
     "Search Library": {
       "extractionState": "manual",
       "localizations": {
@@ -12003,6 +12014,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cerca nella libreria"
+          }
+        }
+      }
+    },
+    "Search Queue": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca nella coda"
+          }
+        }
+      }
+    },
+    "Search Recently Deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca in Eliminati di recente"
           }
         }
       }
@@ -12036,17 +12069,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cerca correzioni…"
-          }
-        }
-      }
-    },
-    "Search files…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cerca file…"
           }
         }
       }
@@ -12102,17 +12124,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cerca prompt…"
-          }
-        }
-      }
-    },
-    "Search queue": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cerca nella coda"
           }
         }
       }

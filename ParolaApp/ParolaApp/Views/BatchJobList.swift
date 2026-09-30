@@ -3,7 +3,7 @@ import ParolaCore
 
 struct BatchJobList: View {
     @Environment(AppModel.self) private var model
-    @State private var searchText = ""
+    @Binding var searchText: String
     @State private var sortOrder: BatchSortOrder = .addedFirst
     @State private var fileSizes: [URL: Int] = [:]
     @FocusState private var focusedJob: BatchJob.ID?
@@ -11,7 +11,7 @@ struct BatchJobList: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: DS.Spacing.small) {
-                SearchPill(text: $searchText, placeholder: "Search files…", leaf: "Toolbar.TextField.Search")
+                Spacer(minLength: 0)
                 sortMenu
                 Button("Clear") { model.clearBatch() }
                     .buttonStyle(.borderless)

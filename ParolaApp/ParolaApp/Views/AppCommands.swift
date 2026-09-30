@@ -123,7 +123,7 @@ struct EditCommands: View {
         Divider()
         Button("Search Library") { model.focusLibrarySearch() }
             .keyboardShortcut("f", modifiers: [.command, .option])
-            .disabled(model.introduction.isPresented)
+            .disabled(model.introduction.isPresented || !ContentRoutes.hasSearchField(model.route))
             .axLeaf("Menu.Edit.SearchLibrary")
         Divider()
         Button("Auto-Detect Language") { model.selectedLanguage = nil }
