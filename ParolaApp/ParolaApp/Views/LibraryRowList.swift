@@ -44,7 +44,7 @@ enum LibraryListItem: Identifiable, Equatable {
 }
 
 /// The rows of one library page, with their menu, drag and open gesture. Browsing and search results each own one.
-struct LibraryRowList: View {
+struct LibraryRowList<Top: View>: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let items: [LibraryListItem]
@@ -55,9 +55,13 @@ struct LibraryRowList: View {
     let focus: FocusState<LibraryListFocus?>.Binding
     let focusKey: LibraryListFocus
     var rowAppeared: ((LibraryEntry.ID) -> Void)?
+    /// The page's own top as the list's first row, so it scrolls away with the rows under it.
+    var top: Top?
 
     /// List(.inset) indents its rows by 16 pt of its own; this lands a title on the 24 pt gutter.
-    private static let titleInsets = EdgeInsets(top: 0, leading: DS.Spacing.small, bottom: 0, trailing: DS.Spacing.small)
+    private static var titleInsets: EdgeInsets {
+        EdgeInsets(top: 0, leading: DS.Spacing.small, bottom: 0, trailing: DS.Spacing.small)
+    }
 
     private var rowSelection: Binding<Set<LibraryEntry.ID>> {
         Binding(
@@ -68,6 +72,12 @@ struct LibraryRowList: View {
 
     var body: some View {
         List(selection: rowSelection) {
+            if let top {
+                top
+                    .listRowInsets(Self.titleInsets)
+                    .listRowSeparator(.hidden)
+                    .selectionDisabled()
+            }
             ForEach(items) { item in
                 switch item {
                 case .header(_, let title):

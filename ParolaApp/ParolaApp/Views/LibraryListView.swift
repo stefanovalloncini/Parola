@@ -397,10 +397,8 @@ private struct LibraryBrowseList: View, Equatable {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            pageTop(showsIntake: !showsHero)
-            switch emptyKind {
-            case .none:
+        Group {
+            if emptyKind == .none {
                 LibraryRowList(
                     items: rowItems,
                     selection: $selection,
@@ -411,18 +409,19 @@ private struct LibraryBrowseList: View, Equatable {
                         renamingEntry = entry
                     },
                     focus: focus,
-                    focusKey: .browse
+                    focusKey: .browse,
+                    top: pageTop(showsIntake: true)
+                        .padding(.top, DS.Spacing.small)
+                        .padding(.bottom, DS.Spacing.tight)
                 )
                 .scrollEdgeEffectStyle(.soft, for: .top)
-            case .noMatches:
-                noMatchesState
-            case .emptyLibrary:
-                if showsHero {
-                    heroState
-                } else if let category {
-                    emptyState(of: category)
-                } else {
-                    noMatchesState
+            } else {
+                VStack(spacing: 0) {
+                    pageTop(showsIntake: !showsHero)
+                        .padding(.horizontal, DS.Spacing.large)
+                        .padding(.top, DS.Spacing.regular)
+                        .padding(.bottom, DS.Spacing.small)
+                    emptyContent
                 }
             }
         }
@@ -472,6 +471,17 @@ private struct LibraryBrowseList: View, Equatable {
         ))
     }
 
+    @ViewBuilder
+    private var emptyContent: some View {
+        if showsHero {
+            heroState
+        } else if emptyKind == .emptyLibrary, let category {
+            emptyState(of: category)
+        } else {
+            noMatchesState
+        }
+    }
+
     /// The hero on an empty library says what the intake strip would, so the strip stands aside for it.
     private func pageTop(showsIntake: Bool) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
@@ -498,9 +508,6 @@ private struct LibraryBrowseList: View, Equatable {
             }
             LibraryFailureBanner()
         }
-        .padding(.horizontal, DS.Spacing.large)
-        .padding(.top, DS.Spacing.regular)
-        .padding(.bottom, DS.Spacing.small)
     }
 
     private var heroState: some View {

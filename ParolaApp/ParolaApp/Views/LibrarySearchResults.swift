@@ -83,7 +83,7 @@ struct LibrarySearchResults: View {
             if rows.isEmpty {
                 emptyState
             } else {
-                LibraryRowList(
+                LibraryRowList<EmptyView>(
                     items: items,
                     selection: selectionBinding,
                     // Read over every result, not the realised rows, so the column doesn't jump as pages land.

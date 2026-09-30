@@ -162,6 +162,28 @@ struct LibraryListLayoutTests {
         #expect(Set(table.selectedRowIndexes) == Set(takes))
     }
 
+    @Test("the page's top is the list's first row, and neither the arrow keys nor Select All land on it")
+    func pageTopIsTheFirstRow() async throws {
+        let shown = entries(3)
+        let hosted = await host(shown, groupsByDate: false)
+        defer { close(hosted) }
+        let table = try #require(table(hosted))
+        _ = await settled(hosted)
+
+        #expect(table.numberOfRows == shown.count + 1)
+        #expect(table.rect(ofRow: 0).height > 100, "the title, the chips and the intake strip: \(table.rect(ofRow: 0))")
+
+        hosted.window.makeFirstResponder(table)
+        table.selectRowIndexes([1], byExtendingSelection: false)
+        _ = await settled(hosted)
+        let up = try await press(126, NSUpArrowFunctionKey, times: 2, on: table, in: hosted)
+        #expect(up == [1, 1])
+
+        table.selectAll(nil)
+        _ = await settled(hosted)
+        #expect(Set(table.selectedRowIndexes) == [1, 2, 3])
+    }
+
     @Test("titles and entries run as one list, and a group with no title adds no row")
     func itemsRunInOneList() {
         let now = Date()
