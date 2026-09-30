@@ -61,6 +61,7 @@ struct TranscriptionSessionFileReadTests {
         in directory: URL,
         transcriber: (any Transcriber)? = nil,
         fileReadDeadline: Duration = .seconds(3),
+        fileReadClock: any Clock<Duration> = ContinuousClock(),
         abandonGrace: Duration = .seconds(5)
     ) async throws -> TranscriptionSession {
         let registry = EngineRegistry()
@@ -75,7 +76,8 @@ struct TranscriptionSessionFileReadTests {
             modelStore: store,
             registry: registry,
             fileReadDeadline: fileReadDeadline,
-            abandonGrace: abandonGrace
+            abandonGrace: abandonGrace,
+            fileReadClock: fileReadClock
         )
     }
 
@@ -94,13 +96,16 @@ struct TranscriptionSessionFileReadTests {
         let readable = dir.appendingPathComponent("readable.wav")
         try Data("RIFFstub".utf8).write(to: readable)
 
-        let session = try await makeSession(in: dir)
+        let clock = TestClock()
+        let session = try await makeSession(in: dir, fileReadClock: clock)
         let options = TranscriptionOptions(model: "openai_whisper-tiny")
 
         await FIFOFixture.holding(wedged) {
             let run = GuardedTask {
                 try await session.transcribe(source: FileAudioSource(url: wedged), options: options)
             }
+            await clock.waitForSleeper()
+            clock.advance(by: .seconds(3))
             do {
                 if try await run.value("the run on a file that never opens to give up") != nil {
                     Issue.record("a run on a file that never opens should fail")
@@ -168,16 +173,26 @@ struct TranscriptionSessionFileReadTests {
         let audioURL = dir.appendingPathComponent("vanishes.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)
 
-        let session = try await makeSession(in: dir, transcriber: SwapsTheFileForAFifo())
+        let clock = TestClock()
+        let session = try await makeSession(in: dir, transcriber: SwapsTheFileForAFifo(), fileReadClock: clock)
+        let sink = CapturingDiagnosticsSink()
         let transcript = try await FIFOFixture.holding(audioURL) {
             let run = GuardedTask {
-                try await session.transcribe(
-                    source: FileAudioSource(url: audioURL),
-                    options: TranscriptionOptions(model: "openai_whisper-tiny")
-                )
+                try await ParolaLog.withSink(sink) {
+                    try await session.transcribe(
+                        source: FileAudioSource(url: audioURL),
+                        options: TranscriptionOptions(model: "openai_whisper-tiny")
+                    )
+                }
             }
+            // Two sleepers before the energy pass: the gate's, which outlives its quick read, and the duration fallback's.
+            await clock.waitForSleeper(count: 2)
+            clock.advance(by: .seconds(3))
+            await clock.waitForSleeper()
+            clock.advance(by: .seconds(3))
             return try await run.value("the run to finish while its file no longer reads")
         }
         #expect(transcript?.segments.count == 1)
+        #expect(sink.records.contains { $0.message.rendered == "skipped the energy pass: the file stopped reading" })
     }
 }

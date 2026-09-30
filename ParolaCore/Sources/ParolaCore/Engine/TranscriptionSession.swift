@@ -29,6 +29,7 @@ public actor TranscriptionSession {
 
     /// How long the readability probe waits before the file counts as out of reach.
     private let fileReadDeadline: Duration
+    private let fileReadClock: any Clock<Duration>
 
     /// How long a cancelled run has to unwind before its slot is taken away from it.
     private let abandonGrace: Duration
@@ -45,12 +46,36 @@ public actor TranscriptionSession {
         fileReadDeadline: Duration = FileReadDeadline.header,
         abandonGrace: Duration = .seconds(5)
     ) {
+        self.init(
+            modelStore: modelStore,
+            registry: registry,
+            idleTimeout: idleTimeout,
+            clock: clock,
+            managedConfiguration: managedConfiguration,
+            fileReadDeadline: fileReadDeadline,
+            abandonGrace: abandonGrace,
+            fileReadClock: ContinuousClock()
+        )
+    }
+
+    /// The file-read deadlines keep their own clock, so a test clock driving them never counts the idle timers, or the reverse.
+    init(
+        modelStore: ModelStore = .shared,
+        registry: EngineRegistry = .shared,
+        idleTimeout: TimeInterval = 600,
+        clock: any Clock<Duration> = ContinuousClock(),
+        managedConfiguration: ManagedConfiguration = .shared,
+        fileReadDeadline: Duration = FileReadDeadline.header,
+        abandonGrace: Duration = .seconds(5),
+        fileReadClock: any Clock<Duration>
+    ) {
         self.modelStore = modelStore
         self.registry = registry
         self.idleTimeout = idleTimeout
         self.clock = clock
         self.managedConfiguration = managedConfiguration
         self.fileReadDeadline = fileReadDeadline
+        self.fileReadClock = fileReadClock
         self.abandonGrace = abandonGrace
     }
 
@@ -120,7 +145,7 @@ public actor TranscriptionSession {
         // The gate itself can run its full deadline, so a cancel during it arms the same abandon
         // the engine call uses rather than leaving the next run queued behind a stopped one.
         let probe = await withTaskCancellationHandler { [readabilityProbe] in
-            await BoundedFileRead.run(deadline: fileReadDeadline) { readabilityProbe(audioURL) }
+            await BoundedFileRead.run(deadline: fileReadDeadline, clock: fileReadClock) { readabilityProbe(audioURL) }
         } onCancel: {
             Task { await self.abandonIfCancelledRunStalls(runID) }
         }
@@ -171,7 +196,7 @@ public actor TranscriptionSession {
         // readability gate — AVFoundation's own asset queue can wedge exactly like AVAudioFile),
         // then the transcript itself.
         let estimatedDuration: Double? = probedDuration == nil
-            ? await AsyncTimeout.run(fileReadDeadline) {
+            ? await AsyncTimeout.run(fileReadDeadline, clock: fileReadClock) {
                 await FileAudioSource(url: audioURL).estimatedDuration()
             } ?? nil
             : nil
@@ -183,7 +208,8 @@ public actor TranscriptionSession {
             engine: engineID,
             options: options,
             audioURL: audioURL,
-            readDeadline: fileReadDeadline
+            readDeadline: fileReadDeadline,
+            readClock: fileReadClock
         ) { [options] tidied in
             guard options.diarize else { return tidied }
             try Task.checkCancellation()
