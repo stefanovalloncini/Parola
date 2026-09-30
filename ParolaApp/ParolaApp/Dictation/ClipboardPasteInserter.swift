@@ -8,6 +8,7 @@ import ParolaDictation
 struct ClipboardPasteInserter: TextInserter {
     var preDelayMs: Int = 0
     var trustCheck: @Sendable () -> Bool = { AXIsProcessTrusted() }
+    var pasteboardName: NSPasteboard.Name = .general
 
     /// Leaves the dictated text on the pasteboard this long before restoring the prior contents;
     /// must outlast the target app's read of the pasteboard or the insertion is lost.
@@ -18,7 +19,7 @@ struct ClipboardPasteInserter: TextInserter {
             try? await Task.sleep(for: .milliseconds(preDelayMs))
         }
         try await MainActor.run {
-            let pasteboard = NSPasteboard.general
+            let pasteboard = NSPasteboard(name: pasteboardName)
             let prior = PasteboardSnapshot.capture(from: pasteboard)
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)

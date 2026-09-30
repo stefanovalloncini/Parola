@@ -7,6 +7,7 @@ import ParolaDictation
 
 struct KeystrokeTextInserter: TextInserter {
     var trustCheck: @Sendable () -> Bool = { AXIsProcessTrusted() }
+    var pasteboardName: NSPasteboard.Name = .general
 
     private static let paceBatchSize = 8
 
@@ -33,7 +34,7 @@ struct KeystrokeTextInserter: TextInserter {
         guard trustCheck() else {
             ParolaLog.notice(.appPermissions, "keystroke insertion blocked: accessibility not granted")
             await MainActor.run {
-                let pasteboard = NSPasteboard.general
+                let pasteboard = NSPasteboard(name: pasteboardName)
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
             }

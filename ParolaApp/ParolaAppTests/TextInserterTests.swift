@@ -5,42 +5,48 @@ import Testing
 
 @Suite("Text inserters", .serialized)
 struct TextInserterTests {
-    @Test("untrusted paste leaves the text on the clipboard and throws")
-    func untrustedPaste() async throws {
-        try await withPasteboardRestored {
-            let inserter = ClipboardPasteInserter(trustCheck: { false })
-            var thrown: Error?
-            do {
-                try await inserter.insert("dictated text")
-            } catch {
-                thrown = error
-            }
-            #expect(thrown is TextInsertionError)
-            await MainActor.run {
-                #expect(NSPasteboard.general.string(forType: .string) == "dictated text")
-            }
-            try await Task.sleep(for: .milliseconds(450))
-            await MainActor.run {
-                #expect(NSPasteboard.general.string(forType: .string) == "dictated text")
-            }
-        }
+    // The general pasteboard is shared with every other test and process on the Mac.
+    @MainActor
+    private func makePasteboard() -> NSPasteboard {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("text-inserter-test-\(UUID().uuidString)"))
+        pasteboard.clearContents()
+        pasteboard.setString("earlier clip", forType: .string)
+        return pasteboard
     }
 
+    @MainActor
+    @Test("untrusted paste leaves the text on the clipboard and throws")
+    func untrustedPaste() async throws {
+        let pasteboard = makePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        let inserter = ClipboardPasteInserter(trustCheck: { false }, pasteboardName: pasteboard.name)
+        var thrown: Error?
+        do {
+            try await inserter.insert("dictated text")
+        } catch {
+            thrown = error
+        }
+        #expect(thrown is TextInsertionError)
+        #expect(pasteboard.string(forType: .string) == "dictated text")
+        // Outlasts the 300 ms after which a trusted paste puts the earlier clip back; nothing schedules one here.
+        try await Task.sleep(for: .milliseconds(450))
+        #expect(pasteboard.string(forType: .string) == "dictated text")
+    }
+
+    @MainActor
     @Test("untrusted keystrokes fall back to the clipboard and throw")
     func untrustedKeystrokes() async throws {
-        await withPasteboardRestored {
-            let inserter = KeystrokeTextInserter(trustCheck: { false })
-            var thrown: Error?
-            do {
-                try await inserter.insert("typed text")
-            } catch {
-                thrown = error
-            }
-            #expect(thrown is TextInsertionError)
-            await MainActor.run {
-                #expect(NSPasteboard.general.string(forType: .string) == "typed text")
-            }
+        let pasteboard = makePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        let inserter = KeystrokeTextInserter(trustCheck: { false }, pasteboardName: pasteboard.name)
+        var thrown: Error?
+        do {
+            try await inserter.insert("typed text")
+        } catch {
+            thrown = error
         }
+        #expect(thrown is TextInsertionError)
+        #expect(pasteboard.string(forType: .string) == "typed text")
     }
 
     @Test("the error explains the clipboard recovery")
