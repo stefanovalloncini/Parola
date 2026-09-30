@@ -1,8 +1,24 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
 import ParolaTestSupport
+
+private func libraryEntry(_ id: String, category: EntryCategory, labels: [String] = [], person: UUID? = nil) -> LibraryEntry {
+    let manifest = ParolaDocument.Manifest(
+        createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+        originalAudioName: "\(id).m4a",
+        title: id,
+        modelName: "stub",
+        language: "en",
+        category: category,
+        labels: labels,
+        speakerAssignments: person.map { ["Speaker 1": $0] } ?? [:]
+    )
+    return LibraryEntry(id: id, bundleURL: URL(fileURLWithPath: "/tmp/LibraryEmptyStateTests/\(id).parola"), manifest: manifest)
+}
 
 @Suite("Library empty states")
 struct LibraryEmptyStateTests {
@@ -18,20 +34,6 @@ struct LibraryEmptyStateTests {
     func noMatchesNeedsAFilter() {
         #expect(LibraryEmptyState.kind(entryCount: 12, visibleCount: 0, filtersActive: false) == .none)
         #expect(LibraryEmptyState.kind(entryCount: 12, visibleCount: 12, filtersActive: false) == .none)
-    }
-
-    private func entry(_ id: String, category: EntryCategory, labels: [String] = [], person: UUID? = nil) -> LibraryEntry {
-        let manifest = ParolaDocument.Manifest(
-            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
-            originalAudioName: "\(id).m4a",
-            title: id,
-            modelName: "stub",
-            language: "en",
-            category: category,
-            labels: labels,
-            speakerAssignments: person.map { ["Speaker 1": $0] } ?? [:]
-        )
-        return LibraryEntry(id: id, bundleURL: URL(fileURLWithPath: "/tmp/LibraryEmptyStateTests/\(id).parola"), manifest: manifest)
     }
 
     private func kind(
@@ -54,8 +56,8 @@ struct LibraryEmptyStateTests {
     func filteredPageIsNotAnEmptyPage() {
         let anna = UUID()
         let library = [
-            entry("standup", category: .meeting, labels: ["weekly"]),
-            entry("memo", category: .transcription, person: anna),
+            libraryEntry("standup", category: .meeting, labels: ["weekly"]),
+            libraryEntry("memo", category: .transcription, person: anna),
         ]
 
         #expect(kind(of: library, category: .meeting, filters: .init(label: "recap")) == .noMatches)
@@ -71,9 +73,9 @@ struct LibraryEmptyStateTests {
     @Test("the page's count is its category's, before any filter or person")
     func entryCountIgnoresFilters() {
         let library = [
-            entry("a", category: .meeting, labels: ["weekly"]),
-            entry("b", category: .meeting, person: UUID()),
-            entry("c", category: .transcription),
+            libraryEntry("a", category: .meeting, labels: ["weekly"]),
+            libraryEntry("b", category: .meeting, person: UUID()),
+            libraryEntry("c", category: .transcription),
         ]
         #expect(LibraryEmptyState.entryCount(in: library, category: nil) == 3)
         #expect(LibraryEmptyState.entryCount(in: library, category: .meeting) == 2)
@@ -150,20 +152,107 @@ struct EmptyLibraryHeroTests {
         #expect(relaunched.lastRecordSource == .systemAudio)
         #expect(UnscopedSettingsKeys.all.contains("lastRecordSource"), "a backup keeps it and a full reset clears it")
     }
+}
 
-    private func source(_ name: String) throws -> String {
-        let path = #filePath.replacingOccurrences(
-            of: "ParolaAppTests/LibraryEmptyStateTests.swift",
-            with: "ParolaApp/\(name).swift"
-        )
-        return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+@MainActor
+@Suite("The hero on screen", .serialized)
+struct EmptyLibraryHeroRenderTests {
+    private static let heroSource = "App.Library.Hero.Source"
+
+    /// The test host builds no accessibility tree until an assistive app asks for one; VoiceOver asks with this attribute.
+    private func withAccessibility(_ body: () async -> Void) async {
+        let setValue = NSSelectorFromString("accessibilitySetValue:forAttribute:")
+        let enhanced = NSString(string: "AXEnhancedUserInterface")
+        _ = NSApp.perform(setValue, with: NSNumber(value: true), with: enhanced)
+        defer { _ = NSApp.perform(setValue, with: NSNumber(value: false), with: enhanced) }
+        await body()
     }
 
-    @Test("the circle starts the source it shows, and Paste a link opens the link sheet the way ⌘V does")
-    func heroWiring() throws {
-        let hero = try source("Views/Library/EmptyLibraryHero")
-        #expect(hero.contains("model.startRecording(source: source)"))
-        #expect(hero.contains(".disabled(!model.canStartTake(source))"))
-        #expect(hero.contains("Button(\"Paste a link\") { model.openLinkSheet(prefill: nil) }"))
+    private func identifiers(in window: NSWindow) -> Set<String> {
+        var found = Set<String>()
+        func collect(_ node: AccessibilityTreeWalker.AXNode) {
+            if let id = node.identifier { found.insert(id) }
+            node.children.forEach(collect)
+        }
+        collect(AccessibilityTreeWalker().walk(rootWindow: window, filter: .all, maxDepth: 40, maxElements: 3000).tree)
+        return found
+    }
+
+    /// SwiftUI's own buttons never reach the tree in the test host; the source picker is AppKit's, so it stands in for the hero.
+    @Test("an empty library's Library page shows the hero; a person, a category or a first entry takes it away")
+    func heroOnThePage() async {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("hero-page"))
+        await model.libraryRefreshTask?.value
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        let controller = NSWindowController(window: window)
+        window.contentViewController = NSHostingController(rootView: ContentView().environment(model))
+        defer { withExtendedLifetime(controller) { window.close() } }
+
+        await withAccessibility {
+            let onLibraryPage = await waitUntil { identifiers(in: window).contains(Self.heroSource) }
+            #expect(onLibraryPage, "the empty Library page shows the hero")
+
+            model.personFilter = UUID()
+            let offPersonPage = await waitUntil { !identifiers(in: window).contains(Self.heroSource) }
+            #expect(offPersonPage, "a person's page over an empty library keeps its own state")
+            model.personFilter = nil
+            let backFromPerson = await waitUntil { identifiers(in: window).contains(Self.heroSource) }
+            #expect(backFromPerson)
+
+            model.libraryFilter = .meeting
+            let offCategoryPage = await waitUntil { !identifiers(in: window).contains(Self.heroSource) }
+            #expect(offCategoryPage, "a category's page over an empty library keeps its own state")
+            model.libraryFilter = nil
+            let backFromCategory = await waitUntil { identifiers(in: window).contains(Self.heroSource) }
+            #expect(backFromCategory)
+
+            model.libraryEntries = [libraryEntry("first", category: .transcription)]
+            let offWithAnEntry = await waitUntil { !identifiers(in: window).contains(Self.heroSource) }
+            #expect(offWithAnEntry, "the first entry puts the list in its place")
+        }
+    }
+
+    /// The strongly red, opaque pixels a render holds, and the box around them.
+    private func recordRed(in view: some View) throws -> (count: Int, box: CGRect) {
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 1
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        var count = 0
+        var box = CGRect.null
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB),
+                      color.alphaComponent > 0.9, color.redComponent > 0.6,
+                      color.greenComponent < 0.35, color.blueComponent < 0.35 else { continue }
+                count += 1
+                box = box.union(CGRect(x: x, y: y, width: 1, height: 1))
+            }
+        }
+        return (count, box)
+    }
+
+    @Test("the circle draws its 28 pt recording-red dot, faded while no take can start")
+    func recordDot() throws {
+        let model = AppModel(bootstrap: AppBootstrap(
+            mode: .test,
+            library: makeTempLibraryURL("hero-dot"),
+            defaultsOverride: temporaryDefaults(),
+            sideEffects: [],
+            filePicker: SystemFilePicker(),
+            enabledFeaturesOverride: [.micRecording]
+        ))
+        let ready = try recordRed(in: EmptyLibraryHero().environment(model))
+        #expect(ready.count > 400)
+        #expect(abs(ready.box.width - 28) <= 2 && abs(ready.box.height - 28) <= 2, "the red is the dot alone: \(ready.box)")
+
+        model.quitPending = true
+        let refused = try recordRed(in: EmptyLibraryHero().environment(model))
+        #expect(refused.count == 0, "a circle that can't start a take fades")
     }
 }

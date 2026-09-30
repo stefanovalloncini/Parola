@@ -49,7 +49,10 @@ struct EmptyLibraryHero: View {
         Button {
             model.startRecording(source: source)
         } label: {
-            RecordDot()
+            // An explicit fill, so the dot stays red in an inactive window; the plain style fades it while disabled.
+            Circle()
+                .fill(DS.Color.recordingFill)
+                .frame(width: 28, height: 28)
                 .frame(width: 96, height: 96)
                 .contentShape(Circle())
         }
@@ -112,17 +115,5 @@ struct EmptyLibraryHero: View {
         Text(verbatim: "·")
             .foregroundStyle(DS.Color.secondaryText)
             .accessibilityHidden(true)
-    }
-}
-
-/// Recording red, faded while no take can start; an explicit fill keeps it red in an inactive window.
-private struct RecordDot: View {
-    @Environment(\.isEnabled) private var isEnabled
-
-    var body: some View {
-        Circle()
-            .fill(DS.Color.recordingFill)
-            .frame(width: 28, height: 28)
-            .opacity(isEnabled ? 1 : DS.Opacity.disabled)
     }
 }
