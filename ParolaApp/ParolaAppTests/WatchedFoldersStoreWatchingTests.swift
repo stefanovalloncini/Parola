@@ -59,15 +59,6 @@ struct WatchedFoldersStoreWatchingTests {
         try FileManager.default.moveItem(at: staging, to: url)
     }
 
-    private func waitUntil(timeoutMs: Int = 5000, _ condition: @MainActor () -> Bool) async -> Bool {
-        let deadline = ContinuousClock.now + .milliseconds(timeoutMs)
-        while ContinuousClock.now < deadline {
-            if condition() { return true }
-            try? await Task.sleep(for: .milliseconds(15))
-        }
-        return condition()
-    }
-
     @Test("a file added while no store was running arrives when the next one starts; older files don't")
     func relaunchPicksUpFilesAddedWhileQuit() async throws {
         let rig = try makeRig("relaunch")
@@ -76,12 +67,12 @@ struct WatchedFoldersStoreWatchingTests {
 
         let arrivals = Arrivals()
         let first = makeStore(rig, arrivals: arrivals)
-        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        await pollUntil("the first baseline save") { FileManager.default.fileExists(atPath: rig.baselineURL.path) }
         await first.stopWatching()
 
         try writeSettled(rig.folder.appendingPathComponent("while-quit.wav"))
         let second = makeStore(rig, arrivals: arrivals)
-        #expect(await waitUntil { arrivals.names.contains("while-quit.wav") })
+        await pollUntil("while-quit.wav to arrive") { arrivals.names.contains("while-quit.wav") }
         await second.stopWatching()
 
         #expect(arrivals.names == ["while-quit.wav"])
@@ -93,7 +84,7 @@ struct WatchedFoldersStoreWatchingTests {
         defer { try? FileManager.default.removeItem(at: rig.root) }
 
         let store = makeStore(rig, arrivals: Arrivals())
-        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        await pollUntil("the first baseline save") { FileManager.default.fileExists(atPath: rig.baselineURL.path) }
         store.removeFolder(rig.folderID)
         await WatchedFolderBaselines(directory: rig.baselineDirectory).settle()
 
@@ -115,14 +106,14 @@ struct WatchedFoldersStoreWatchingTests {
         ) { url in
             arrivals.urls.append(url)
         }
-        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        await pollUntil("the first baseline save") { FileManager.default.fileExists(atPath: rig.baselineURL.path) }
 
         let settling = rig.folder.appendingPathComponent("settling.m4a")
         try Data(count: 4096).write(to: settling)
         try await Task.sleep(for: .milliseconds(200))
         store.reloadFromDefaults()
 
-        #expect(await waitUntil { arrivals.names == ["settling.m4a"] })
+        await pollUntil("settling.m4a to arrive") { arrivals.names == ["settling.m4a"] }
         await store.stopWatching()
     }
 
@@ -135,14 +126,14 @@ struct WatchedFoldersStoreWatchingTests {
 
         let arrivals = Arrivals()
         let store = makeStore(rig, arrivals: arrivals)
-        #expect(await waitUntil { store.folders.first?.displayName == "Recordings" })
+        await pollUntil("the folder to follow its rename to Recordings") { store.folders.first?.displayName == "Recordings" }
         #expect(!store.isUnavailable(rig.folderID))
         let saved = try JSONDecoder().decode([WatchedFolder].self, from: #require(rig.defaults.data(forKey: "watchedFolders")))
         #expect(saved.map(\.displayName) == ["Recordings"])
 
-        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        await pollUntil("the first baseline save") { FileManager.default.fileExists(atPath: rig.baselineURL.path) }
         try writeSettled(renamed.appendingPathComponent("new.m4a"))
-        #expect(await waitUntil { arrivals.names == ["new.m4a"] })
+        await pollUntil("new.m4a to arrive") { arrivals.names == ["new.m4a"] }
         await store.stopWatching()
     }
 
@@ -154,14 +145,14 @@ struct WatchedFoldersStoreWatchingTests {
 
         let arrivals = Arrivals()
         let store = makeStore(rig, arrivals: arrivals)
-        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        await pollUntil("the first baseline save") { FileManager.default.fileExists(atPath: rig.baselineURL.path) }
 
         let renamed = rig.root.appendingPathComponent("Archive", isDirectory: true)
         try FileManager.default.moveItem(at: rig.folder, to: renamed)
-        #expect(await waitUntil { store.folders.first?.displayName == "Archive" })
+        await pollUntil("the folder to follow its rename to Archive") { store.folders.first?.displayName == "Archive" }
         try writeSettled(renamed.appendingPathComponent("after-rename.wav"))
 
-        #expect(await waitUntil { arrivals.names.contains("after-rename.wav") })
+        await pollUntil("after-rename.wav to arrive") { arrivals.names.contains("after-rename.wav") }
         #expect(arrivals.names == ["after-rename.wav"])
         #expect(!store.isUnavailable(rig.folderID))
         await store.stopWatching()
@@ -174,16 +165,16 @@ struct WatchedFoldersStoreWatchingTests {
 
         let arrivals = Arrivals()
         let store = makeStore(rig, arrivals: arrivals)
-        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        await pollUntil("the first baseline save") { FileManager.default.fileExists(atPath: rig.baselineURL.path) }
 
         try FileManager.default.removeItem(at: rig.folder)
-        #expect(await waitUntil { store.isUnavailable(rig.folderID) })
+        await pollUntil("the deleted folder to read as unavailable") { store.isUnavailable(rig.folderID) }
 
         try FileManager.default.createDirectory(at: rig.folder, withIntermediateDirectories: true)
         try writeSettled(rig.folder.appendingPathComponent("back.m4a"))
         store.retryUnavailableFolders()
 
-        #expect(await waitUntil { arrivals.names == ["back.m4a"] })
+        await pollUntil("back.m4a to arrive") { arrivals.names == ["back.m4a"] }
         #expect(!store.isUnavailable(rig.folderID))
         await store.stopWatching()
     }
@@ -196,7 +187,7 @@ struct WatchedFoldersStoreWatchingTests {
 
         let arrivals = Arrivals()
         let first = makeStore(rig, arrivals: arrivals)
-        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        await pollUntil("the first baseline save") { FileManager.default.fileExists(atPath: rig.baselineURL.path) }
         await first.stopWatching()
 
         let parked = DispatchQueue(label: "parola.test.parked-scan")
@@ -209,16 +200,16 @@ struct WatchedFoldersStoreWatchingTests {
         ) { url in
             arrivals.urls.append(url)
         }
-        let watching = await waitUntil { store.watcher(for: rig.folderID) != nil }
+        await pollUntil("the folder's watcher to start") { store.watcher(for: rig.folderID) != nil }
         let parkedWatcher = store.watcher(for: rig.folderID)
         store.adopt(rig.folder, for: rig.folderID)
-        let replaced = await waitUntil { store.watcher(for: rig.folderID).map { $0 !== parkedWatcher } ?? false }
+        await pollUntil("the re-add to replace the parked watcher") {
+            store.watcher(for: rig.folderID).map { $0 !== parkedWatcher } ?? false
+        }
         parked.resume()
-        #expect(watching)
-        #expect(replaced)
 
         try writeSettled(rig.folder.appendingPathComponent("new.wav"))
-        #expect(await waitUntil { arrivals.names.contains("new.wav") })
+        await pollUntil("new.wav to arrive") { arrivals.names.contains("new.wav") }
         try await Task.sleep(for: .milliseconds(200))
         #expect(arrivals.names == ["new.wav"])
         await store.stopWatching()
@@ -230,7 +221,7 @@ struct WatchedFoldersStoreWatchingTests {
         defer { try? FileManager.default.removeItem(at: rig.root) }
 
         let store = makeStore(rig, arrivals: Arrivals())
-        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        await pollUntil("the folder's watcher to start") { store.watcher(for: rig.folderID) != nil }
         let before = store.watcher(for: rig.folderID)
         rig.defaults.set(true, forKey: "someOtherSetting")
         store.reloadFromDefaults()
@@ -244,13 +235,20 @@ struct WatchedFoldersStoreWatchingTests {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-watched-volume-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
         let image = DiskImage(image: scratch.appendingPathComponent("card.dmg"), mountPoint: scratch.appendingPathComponent("Card"))
-        defer {
-            image.detach()
-            try? FileManager.default.removeItem(at: scratch)
+        try await image.create()
+        try await image.attach()
+        do {
+            try await ejectAndMountAgain(image)
+        } catch {
+            await image.detach()
+            throw error
         }
-        try image.create()
-        try image.attach()
+        await image.detach()
+    }
+
+    private func ejectAndMountAgain(_ image: DiskImage) async throws {
         let folder = image.mountPoint.appendingPathComponent("Inbox", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try writeSettled(folder.appendingPathComponent("old.m4a"))
@@ -260,18 +258,18 @@ struct WatchedFoldersStoreWatchingTests {
         let arrivals = Arrivals()
         let store = makeStore(rig, arrivals: arrivals)
         do {
-            #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+            await pollUntil("the first baseline save") { FileManager.default.fileExists(atPath: rig.baselineURL.path) }
 
-            image.detach()
-            #expect(await waitUntil { store.isUnavailable(rig.folderID) })
+            await image.detach()
+            await pollUntil("the folder to read as unavailable once its volume is gone") { store.isUnavailable(rig.folderID) }
             store.retryUnavailableFolders()
             try await Task.sleep(for: .milliseconds(300))
             #expect(store.isUnavailable(rig.folderID), "a retry with the volume away leaves the folder unavailable")
 
-            try image.attach()
+            try await image.attach()
             try writeSettled(folder.appendingPathComponent("new.wav"))
             store.retryUnavailableFolders()
-            #expect(await waitUntil { arrivals.names.contains("new.wav") })
+            await pollUntil("new.wav to arrive") { arrivals.names.contains("new.wav") }
             #expect(arrivals.names == ["new.wav"])
             #expect(!store.isUnavailable(rig.folderID))
         } catch {
@@ -287,7 +285,7 @@ struct WatchedFoldersStoreWatchingTests {
         defer { try? FileManager.default.removeItem(at: rig.root) }
 
         let first = makeStore(rig, arrivals: Arrivals())
-        #expect(await waitUntil { FileManager.default.fileExists(atPath: rig.baselineURL.path) })
+        await pollUntil("the first baseline save") { FileManager.default.fileExists(atPath: rig.baselineURL.path) }
         await first.stopWatching()
 
         let arrivals = Arrivals()
@@ -299,16 +297,18 @@ struct WatchedFoldersStoreWatchingTests {
         ) { url in
             arrivals.urls.append(url)
         }
-        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        await pollUntil("the folder's watcher to start") { store.watcher(for: rig.folderID) != nil }
         try writeSettled(rig.folder.appendingPathComponent("arrived.wav"))
-        #expect(await waitUntil { arrivals.names == ["arrived.wav"] })
+        await pollUntil("arrived.wav to arrive") { arrivals.names == ["arrived.wav"] }
 
         let before = store.watcher(for: rig.folderID)
         store.adopt(rig.folder, for: rig.folderID)
         store.adopt(rig.folder, for: rig.folderID)
-        #expect(await waitUntil { store.watcher(for: rig.folderID).map { $0 !== before } ?? false })
+        await pollUntil("a new watcher to replace the old one") {
+            store.watcher(for: rig.folderID).map { $0 !== before } ?? false
+        }
         try writeSettled(rig.folder.appendingPathComponent("later.wav"))
-        #expect(await waitUntil { arrivals.names.contains("later.wav") })
+        await pollUntil("later.wav to arrive") { arrivals.names.contains("later.wav") }
         try await Task.sleep(for: .milliseconds(200))
         #expect(arrivals.names == ["arrived.wav", "later.wav"])
         await store.stopWatching()
@@ -325,7 +325,7 @@ struct WatchedFoldersStoreWatchingTests {
             baselineWriteDelay: .seconds(1),
             baselineMaxWait: .milliseconds(200)
         ) { _ in }
-        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        await pollUntil("the folder's watcher to start") { store.watcher(for: rig.folderID) != nil }
 
         var savedDuringStream = false
         for _ in 0..<20 {
@@ -351,9 +351,9 @@ struct WatchedFoldersStoreWatchingTests {
         ) { url in
             arrivals.urls.append(url)
         }
-        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        await pollUntil("the folder's watcher to start") { store.watcher(for: rig.folderID) != nil }
         try writeSettled(rig.folder.appendingPathComponent("arrived.wav"))
-        #expect(await waitUntil { arrivals.names == ["arrived.wav"] })
+        await pollUntil("arrived.wav to arrive") { arrivals.names == ["arrived.wav"] }
         #expect(!FileManager.default.fileExists(atPath: rig.baselineURL.path))
 
         await store.pendingBaselineFlush()()
@@ -377,7 +377,7 @@ struct WatchedFoldersStoreWatchingTests {
             watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50)),
             baselineWriteDelay: .seconds(60)
         ) { _ in }
-        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        await pollUntil("the folder's watcher to start") { store.watcher(for: rig.folderID) != nil }
         let before = store.watcher(for: rig.folderID)
 
         store.adopt(rig.folder, for: rig.folderID)
@@ -386,7 +386,9 @@ struct WatchedFoldersStoreWatchingTests {
         rig.defaults.set(try JSONEncoder().encode([moved]), forKey: "watchedFolders")
         store.reloadFromDefaults()
 
-        #expect(await waitUntil { store.watcher(for: rig.folderID).map { $0 !== before } ?? false })
+        await pollUntil("a new watcher to replace the old one") {
+            store.watcher(for: rig.folderID).map { $0 !== before } ?? false
+        }
         try await Task.sleep(for: .milliseconds(100))
         await WatchedFolderBaselines(directory: rig.baselineDirectory).settle()
         #expect(!FileManager.default.fileExists(atPath: rig.baselineURL.path))
@@ -404,12 +406,12 @@ struct WatchedFoldersStoreWatchingTests {
             baselineWriteDelay: .seconds(1),
             baselineMaxWait: .zero
         ) { _ in }
-        #expect(await waitUntil { store.baselineSaves >= 1 })
+        await pollUntil("the first baseline save") { store.baselineSaves >= 1 }
         let before = store.baselineSaves
 
         store.scheduleBaselineWrite(for: rig.folderID)
         store.scheduleBaselineWrite(for: rig.folderID)
-        #expect(await waitUntil { store.baselineSaves == before + 2 })
+        await pollUntil("the overdue save and its second pass") { store.baselineSaves == before + 2 }
         await store.stopWatching()
     }
 
@@ -418,7 +420,7 @@ struct WatchedFoldersStoreWatchingTests {
         let rig = try makeRig("flush-barrier")
         defer { try? FileManager.default.removeItem(at: rig.root) }
         let store = makeStore(rig, arrivals: Arrivals())
-        #expect(await waitUntil { store.watcher(for: rig.folderID) != nil })
+        await pollUntil("the folder's watcher to start") { store.watcher(for: rig.folderID) != nil }
         await store.stopWatching()
 
         let other = UUID()
@@ -436,40 +438,42 @@ struct WatchedFoldersStoreWatchingTests {
     }
 }
 
+@MainActor
 private struct DiskImage {
     let image: URL
     let mountPoint: URL
 
-    func create() throws {
-        try run(["create", "-size", "4m", "-fs", "HFS+", "-volname", "ParolaTest", image.path])
+    func create() async throws {
+        try await run(["create", "-size", "4m", "-fs", "HFS+", "-volname", "ParolaTest", image.path])
     }
 
-    func attach() throws {
-        try run(["attach", image.path, "-mountpoint", mountPoint.path, "-nobrowse"])
+    func attach() async throws {
+        try await run(["attach", image.path, "-mountpoint", mountPoint.path, "-nobrowse"])
     }
 
-    func detach() {
-        try? run(["detach", mountPoint.path, "-force"])
+    func detach() async {
+        try? await run(["detach", mountPoint.path, "-force"])
     }
 
     private struct Failed: Error {
         let status: Int32
     }
 
-    private func run(_ arguments: [String]) throws {
+    private func run(_ arguments: [String]) async throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
         process.arguments = arguments + ["-quiet"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
+        let (exited, exit) = AsyncStream<Void>.makeStream()
+        process.terminationHandler = { _ in exit.finish() }
         try process.run()
-        let deadline = Date().addingTimeInterval(60)
-        while process.isRunning, Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.05)
-        }
-        if process.isRunning {
+        let exitedInTime = await awaitGuarded("hdiutil \(arguments[0])", timeout: .seconds(60)) {
+            for await _ in exited {}
+            return true
+        } ?? false
+        guard exitedInTime else {
             process.terminate()
-            process.waitUntilExit()
             throw Failed(status: -1)
         }
         guard process.terminationStatus == 0 else { throw Failed(status: process.terminationStatus) }
