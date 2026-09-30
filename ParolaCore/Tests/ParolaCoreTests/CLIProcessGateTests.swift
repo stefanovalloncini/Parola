@@ -4,8 +4,14 @@ import Testing
 
 @Suite("CLI process gating", .serialized, .enabled(if: parolaBinaryURL != nil))
 struct CLIProcessGateTests {
-    private func runParola(_ arguments: [String], plist: String) async throws -> (output: String, status: Int32) {
-        let run = try await ParolaCoreTests.runParola(arguments, environment: ["PAROLA_MANAGED_PLIST": plist])
+    private func runParola(
+        _ arguments: [String],
+        plist: String,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) async throws -> (output: String, status: Int32) {
+        let run = try await ParolaCoreTests.runParola(
+            arguments, environment: ["PAROLA_MANAGED_PLIST": plist], sourceLocation: sourceLocation
+        )
         return (run.output, run.status)
     }
 
