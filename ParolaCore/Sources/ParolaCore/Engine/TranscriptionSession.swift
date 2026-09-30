@@ -17,6 +17,7 @@ public actor TranscriptionSession {
     private let clock: any Clock<Duration>
     private var transcriber: (any Transcriber)?
     private var transcriberEngineID: EngineID?
+    private var transcriberIsMock = false
     private var idleTask: Task<Void, Never>?
     private var diarizerIdleTask: Task<Void, Never>?
     private var idleEpoch: Int = 0
@@ -121,7 +122,9 @@ public actor TranscriptionSession {
             [.model: .safe(ModelToken(modelName))]
         )
 
-        if await needsDownload(modelName, engineID: engineID) {
+        // One read decides both the download and the engine that runs, so the two can't disagree.
+        let mock = await registry.mock(for: engineID)
+        if mock == nil, !modelStore.isInstalled(modelName) {
             _ = try await modelStore.download(
                 variant: modelName, progress: downloadProgress, registry: registry
             )
@@ -134,7 +137,7 @@ public actor TranscriptionSession {
         // loaded model resident with no idle timer until the next successful run. An abandoned
         // run no longer owns the slot, and its timers would outlive whatever took it over.
         defer { if activeRun == runID { scheduleIdleUnload() } }
-        let activeTranscriber = try await ensureTranscriber(for: engineID)
+        let activeTranscriber = try await ensureTranscriber(for: engineID, mock: mock)
         try await activeTranscriber.load(model: modelName)
         try Task.checkCancellation()
 
@@ -334,7 +337,8 @@ public actor TranscriptionSession {
         do {
             cancelIdleTimer()
             defer { scheduleIdleUnload() }
-            let active = try await ensureTranscriber(for: engineID)
+            let mock = await registry.mock(for: engineID)
+            let active = try await ensureTranscriber(for: engineID, mock: mock)
             try await active.load(model: modelName)
         } catch {
             ParolaLog.debug(
@@ -465,16 +469,20 @@ public actor TranscriptionSession {
         }
     }
 
-    private func ensureTranscriber(for engineID: EngineID) async throws -> any Transcriber {
-        if let existing = transcriber, transcriberEngineID == engineID {
+    private func ensureTranscriber(
+        for engineID: EngineID,
+        mock: MockTranscriberResponse?
+    ) async throws -> any Transcriber {
+        if let existing = transcriber, transcriberEngineID == engineID, transcriberIsMock == (mock != nil) {
             return existing
         }
         if let old = transcriber {
             await old.unload()
         }
-        let fresh = try await registry.transcriber(for: engineID, store: modelStore)
+        let fresh = try await registry.transcriber(for: engineID, store: modelStore, mock: mock)
         transcriber = fresh
         transcriberEngineID = engineID
+        transcriberIsMock = mock != nil
         return fresh
     }
 
@@ -485,13 +493,9 @@ public actor TranscriptionSession {
     /// The model a `transcribe` with these options would run, and whether it has to be fetched first.
     public func modelPlan(for options: TranscriptionOptions) async -> (model: String, needsDownload: Bool) {
         let model = options.model ?? defaultModelName(for: options)
+        guard !modelStore.isInstalled(model) else { return (model, false) }
         let engineID = ModelCatalog.variant(id: model)?.engineID ?? .whisperKit
-        return (model, await needsDownload(model, engineID: engineID))
-    }
-
-    private func needsDownload(_ modelName: String, engineID: EngineID) async -> Bool {
-        guard !modelStore.isInstalled(modelName) else { return false }
-        return await !registry.servesMock(for: engineID)
+        return (model, await registry.mock(for: engineID) == nil)
     }
 
     private func scheduleIdleUnload() {

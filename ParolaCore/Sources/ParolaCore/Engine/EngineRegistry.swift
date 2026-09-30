@@ -48,13 +48,23 @@ public actor EngineRegistry {
         entries.removeAll()
     }
 
-    /// True when an installed mock answers for the engine, so its models never need to be on disk.
-    public func servesMock(for engineID: EngineID) async -> Bool {
-        await mocks.resolve(for: engineID) != nil
+    /// The mock answering for the engine, if any. A model it serves never needs to be on disk.
+    func mock(for engineID: EngineID) async -> MockTranscriberResponse? {
+        await mocks.resolve(for: engineID)
     }
 
     public func transcriber(for engineID: EngineID, store: ModelStore) async throws -> any Transcriber {
-        if let mock = await mocks.resolve(for: engineID) {
+        let installed = await mock(for: engineID)
+        return try transcriber(for: engineID, store: store, mock: installed)
+    }
+
+    /// Builds from a mock the caller already read, so its download decision and the engine it runs agree.
+    func transcriber(
+        for engineID: EngineID,
+        store: ModelStore,
+        mock: MockTranscriberResponse?
+    ) throws -> any Transcriber {
+        if let mock {
             return MockTranscriber.make(response: mock, clock: clock)
         }
         guard let entry = entries[engineID] else {
