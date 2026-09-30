@@ -60,21 +60,29 @@ struct BatchQueueTests {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let missing = dir.appendingPathComponent("gone.wav")
+        let clock = TestClock()
+        let probe = UninterruptibleGate()
+        defer { probe.open() }
         let queue = BatchQueue(
-            session: TranscriptionSession(), features: .all, durationProbeDeadline: .milliseconds(200)
+            session: TranscriptionSession(), features: .all, durationProbeDeadline: .milliseconds(200), clock: clock
         ) { _ in
-            try? await Task.sleep(for: .seconds(3600))
+            await probe.wait()
             return nil
         }
 
-        let started = ContinuousClock.now
-        var finished = false
-        for await event in await queue.process(jobs: [BatchJob(url: missing)], options: TranscriptionOptions(model: "openai_whisper-tiny")) {
-            if case .finished = event { finished = true }
+        let run = GuardedTask {
+            var finished = false
+            let events = await queue.process(jobs: [BatchJob(url: missing)], options: TranscriptionOptions(model: "openai_whisper-tiny"))
+            for await event in events {
+                if case .finished = event { finished = true }
+            }
+            return finished
         }
+        await probe.arrivals.wait(atLeast: 1, "the queue to ask for the duration")
+        await clock.waitForSleeper()
+        clock.advance(by: .milliseconds(200))
 
-        #expect(finished)
-        #expect(started.duration(to: .now) < .seconds(10))
+        #expect(try await run.value("the queue to finish while the probe is still parked") == true)
     }
 
     @Test("BatchEvent.cancelled exists alongside .failed in the enum surface")
@@ -133,20 +141,11 @@ struct BatchQueueTests {
         // Wait until the stub is actually parked in-flight, not just for the .started event:
         // a cancel that lands before the hang unwinds the job at a cancellation checkpoint,
         // and there is legitimately nothing left for cancelInFlight to tear down.
-        for _ in 0..<200 {
-            if await setup.factory.hangEntered { break }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
+        await setup.factory.hangs.wait(atLeast: 1, "the stub to park in flight")
         consumer.cancel()
         _ = await consumer.value
 
-        for _ in 0..<200 {
-            let cancelled = await setup.factory.cancelledCount
-            if cancelled > 0 { break }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
-        let cancelled = await setup.factory.cancelledCount
-        #expect(cancelled >= 1, "cancelInFlight should fire when the consuming task is cancelled")
+        await setup.factory.cancellations.wait(atLeast: 1, "cancelInFlight to fire when the consuming task is cancelled")
     }
 
     @Test("a session called from a cancelled task throws even when the engine hands back a result")
@@ -159,11 +158,7 @@ struct BatchQueueTests {
             )
         }
         defer { run.cancel() }
-        for _ in 0..<200 {
-            if await setup.factory.hangEntered { break }
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-        try #require(await setup.factory.hangEntered, "the cancel has to land inside the engine call")
+        try #require(await setup.factory.hangs.wait(atLeast: 1, "the cancel to have an engine call to land in"))
         run.cancel()
 
         await #expect(throws: CancellationError.self) { _ = try await run.value }
@@ -207,8 +202,7 @@ struct BatchQueueTests {
         for await _ in events {}
 
         try? await Task.sleep(for: .milliseconds(300))
-        let cancelled = await setup.factory.cancelledCount
-        #expect(cancelled == 0, "onTermination after .finished must not fire cancelInFlight on a shared session")
+        #expect(setup.factory.cancellations.value == 0, "onTermination after .finished must not fire cancelInFlight on a shared session")
     }
 
     @Test("two sequential waves through one shared session resolve the transcriber once")
@@ -348,12 +342,10 @@ struct BatchQueueTests {
     }
 }
 
-actor StubFactory {
-    var cancelledCount = 0
-    var hangEntered = false
+final class StubFactory: Sendable {
+    let hangs = Awaitable(0)
+    let cancellations = Awaitable(0)
     init(behavior: StubTranscriber.Behavior) {}
-    func recordCancellation() { cancelledCount += 1 }
-    func recordHangEntered() { hangEntered = true }
 }
 
 actor StubTranscriber: Transcriber {
@@ -392,7 +384,7 @@ actor StubTranscriber: Transcriber {
         case .cancel:
             throw CancellationError()
         case .returnAfterCancel:
-            await factory.recordHangEntered()
+            factory.hangs.increment()
             while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(5)) }
             return result(for: url)
         case .hang:
@@ -401,7 +393,7 @@ actor StubTranscriber: Transcriber {
                 throw CancellationError()
             }
             inFlight = task
-            await factory.recordHangEntered()
+            factory.hangs.increment()
             return try await task.value
         }
     }
@@ -409,7 +401,7 @@ actor StubTranscriber: Transcriber {
     func cancelInFlight() async {
         inFlight?.cancel()
         inFlight = nil
-        await factory.recordCancellation()
+        factory.cancellations.increment()
     }
 
     private func result(for url: URL) -> Transcript {

@@ -65,6 +65,7 @@ public actor BatchQueue {
     private let session: TranscriptionSession
     private let features: FeatureSet
     private let durationProbeDeadline: Duration
+    private let clock: any Clock<Duration>
     private let durationProbe: @Sendable (URL) async -> Double?
     private var jobInFlight = false
 
@@ -78,11 +79,13 @@ public actor BatchQueue {
         session: TranscriptionSession,
         features: FeatureSet,
         durationProbeDeadline: Duration,
+        clock: any Clock<Duration> = ContinuousClock(),
         durationProbe: @escaping @Sendable (URL) async -> Double?
     ) {
         self.session = session
         self.features = features
         self.durationProbeDeadline = durationProbeDeadline
+        self.clock = clock
         self.durationProbe = durationProbe
     }
 
@@ -133,7 +136,7 @@ public actor BatchQueue {
             do {
                 let source = FileAudioSource(url: job.url)
                 // AVFoundation's asset queue can park on a file that never opens, and one parked load stalls the rest.
-                let duration = await AsyncTimeout.run(durationProbeDeadline) { [durationProbe, url = job.url] in
+                let duration = await AsyncTimeout.run(durationProbeDeadline, clock: clock) { [durationProbe, url = job.url] in
                     await durationProbe(url)
                 } ?? nil
                 let forwarder = Self.progressForwarder(

@@ -108,16 +108,11 @@ struct BatchLoggingTests {
             let consumer = Task {
                 await drain(queue.process(jobs: [job], options: TranscriptionOptions(model: "openai_whisper-tiny")))
             }
-            for _ in 0..<200 {
-                if await factory.hangEntered { break }
-                try? await Task.sleep(for: .milliseconds(10))
-            }
-            #expect(await factory.hangEntered)
+            await factory.hangs.wait(atLeast: 1, "the stub to park in the engine call")
             consumer.cancel()
             await consumer.value
-            for _ in 0..<300 {
-                if !batchRecords(sink, message: "batch finished").isEmpty { break }
-                try? await Task.sleep(for: .milliseconds(10))
+            await pollUntil("the queue to log that it finished") {
+                !batchRecords(sink, message: "batch finished").isEmpty
             }
 
             let finished = try #require(batchRecords(sink, message: "batch finished").first)
