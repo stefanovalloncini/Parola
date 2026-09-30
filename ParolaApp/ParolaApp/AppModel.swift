@@ -3419,24 +3419,28 @@ final class AppModel {
             await source.cancel()
             return false
         }
-        guard stopRequestedDuringStart else {
-            liveSource = source
-            showTakeLevels(source.levelMeter, take: take)
-            takeCaptureCameUp(take)
-            let inFlight = await source.inFlightURL()
-            // A stop or a cancel that landed during that read owns the take now.
-            guard takeIsCurrent(take), liveSource != nil else { return false }
-            // One audio-only checkpoint per take: a crash mid-recording leaves a
-            // pointer to the in-flight file instead of losing the take outright.
-            liveRecordingAudioURL = inFlight
-            updateSession(of: take.id) { $0.audioURL = inFlight }
-            if liveRecordingAudioURL != nil {
-                activeTake?.recovery = beginRecordingRecovery()
-                activeTake?.recoveryStartedAt = recordingRecoveryStartedAt
-                writeRecordingCheckpoint()
-            }
-            return true
+        guard !stopRequestedDuringStart else { return await dropCaptureStoppedDuringStart(source, take: take) }
+        liveSource = source
+        showTakeLevels(source.levelMeter, take: take)
+        takeCaptureCameUp(take)
+        let inFlight = await source.inFlightURL()
+        // A Discard during that read holds its stop for this start, as a Cancel before capture does.
+        if takeIsCurrent(take), stopRequestedDuringStart { return await dropCaptureStoppedDuringStart(source, take: take) }
+        // A stop or a cancel that landed during that read owns the take now.
+        guard takeIsCurrent(take), liveSource != nil else { return false }
+        // One audio-only checkpoint per take: a crash mid-recording leaves a
+        // pointer to the in-flight file instead of losing the take outright.
+        liveRecordingAudioURL = inFlight
+        updateSession(of: take.id) { $0.audioURL = inFlight }
+        if liveRecordingAudioURL != nil {
+            activeTake?.recovery = beginRecordingRecovery()
+            activeTake?.recoveryStartedAt = recordingRecoveryStartedAt
+            writeRecordingCheckpoint()
         }
+        return true
+    }
+
+    private func dropCaptureStoppedDuringStart(_ source: any LiveAudioSource, take: TakeContext) async -> Bool {
         clearTakeReadouts(of: take.id)
         endSession(of: take.id)
         stopRecordingWatch()

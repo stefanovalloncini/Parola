@@ -9,17 +9,30 @@ import ParolaTestSupport
 private actor ScriptedCapture: LiveAudioSource {
     nonisolated let levelMeter = LevelMeter()
     private let file: URL
+    private var holdsInFlightRead: Bool
+    private var heldRead: CheckedContinuation<Void, Never>?
     private(set) var pauseCalls: [Bool] = []
 
-    init(file: URL) {
+    init(file: URL, holdsInFlightRead: Bool = false) {
         self.file = file
+        self.holdsInFlightRead = holdsInFlightRead
     }
 
     func start() async throws {}
     func prepare() async throws -> URL { file }
     func cancel() async {}
     func setPaused(_ paused: Bool) async { pauseCalls.append(paused) }
-    func inFlightURL() async -> URL? { file }
+
+    func inFlightURL() async -> URL? {
+        if holdsInFlightRead { await withCheckedContinuation { heldRead = $0 } }
+        return file
+    }
+
+    func letGo() {
+        holdsInFlightRead = false
+        heldRead?.resume()
+        heldRead = nil
+    }
 }
 
 private struct SleepRequest {
@@ -338,6 +351,23 @@ extension TranscriberMockSuites {
 
             #expect(model.recordingCountdown == nil)
             #expect(!model.takeIsRunning)
+        }
+
+        @Test("a Discard while the capture's file is still being read leaves no take behind")
+        func discardWhileTheCaptureComesUp() async throws {
+            let audio = try makeTakeWAV("take-discard-coming-up", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeRecordingModel("take-discard-coming-up")
+            let capture = ScriptedCapture(file: audio, holdsInFlightRead: true)
+            try await startScriptedTake(model, capture)
+
+            await model.discardTake()
+            await capture.letGo()
+
+            let settled = await waitUntil { !model.recordingActive && model.activeTake == nil }
+            #expect(settled)
+            #expect(model.recording == nil)
+            #expect(model.phase == .idle)
         }
 
         @Test("after Stop, Pause and Discard do nothing; the take finishes and lands")
