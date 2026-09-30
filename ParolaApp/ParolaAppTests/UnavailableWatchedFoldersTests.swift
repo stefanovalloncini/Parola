@@ -29,13 +29,15 @@ struct UnavailableWatchedFoldersTests {
             watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50))
         ) { _ in }
 
-        #expect(await waitUntil { store.unavailableFolders.map(\.id) == [watched.id] })
+        let mapWait = await waitUntil { store.unavailableFolders.map(\.id) == [watched.id] }
+        #expect(mapWait)
 
         let moved = root.appendingPathComponent("Recordings", isDirectory: true)
         try FileManager.default.createDirectory(at: moved, withIntermediateDirectories: true)
         store.adopt(moved, for: watched.id)
 
-        #expect(await waitUntil { store.unavailableFolders.isEmpty && store.watcher(for: watched.id) != nil })
+        let isEmptyWait = await waitUntil { store.unavailableFolders.isEmpty && store.watcher(for: watched.id) != nil }
+        #expect(isEmptyWait)
         #expect(store.folders.map(\.displayPath) == [moved.path])
         await store.stopWatching()
     }
@@ -61,7 +63,8 @@ struct UnavailableWatchedFoldersTests {
         var starts = 0
         store.onFolderWatching = { starts += 1 }
 
-        #expect(await waitUntil { starts == 1 })
+        let startsWait = await waitUntil { starts == 1 }
+        #expect(startsWait)
         let real = URL(fileURLWithPath: inbox.resolvingSymlinksInPath().path)
         #expect(store.folder(containing: real.appendingPathComponent("Sub/memo.m4a"))?.id == watched.id)
         #expect(store.folder(containing: inbox.appendingPathComponent("memo.m4a"))?.id == watched.id)
@@ -123,12 +126,14 @@ extension UnavailableWatchedFoldersTests {
         }
         model.watchedArrivals = [missing]
         model.pumpWatchedLane()
-        #expect(await waitUntil { model.watchedFolders.watcher(for: watched.id) != nil })
+        let watcherWait = await waitUntil { model.watchedFolders.watcher(for: watched.id) != nil }
+        #expect(watcherWait)
         #expect(model.watchedFolderVouches(for: missing))
         answer.signal()
         answer.signal()
 
-        #expect(await waitUntil { model.watchedArrivals.isEmpty })
+        let isEmptyWait = await waitUntil { model.watchedArrivals.isEmpty }
+        #expect(isEmptyWait)
         #expect(model.unreachableArrivalIDs.isEmpty)
         await model.watchedFolders.stopWatching()
     }

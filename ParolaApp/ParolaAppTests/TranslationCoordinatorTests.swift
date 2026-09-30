@@ -115,7 +115,8 @@ struct TranslationCoordinatorTests {
         coordinator.translatorOverride = GatedTranslator(gate: gate)
 
         async let first = coordinator.translate(entryID: "e1", transcript: transcript(segments: 2), to: "en")
-        #expect(await waitUntil { coordinator.isRunning })
+        let isRunningWait = await waitUntil { coordinator.isRunning }
+        #expect(isRunningWait)
 
         let second = await coordinator.translate(entryID: "e1", transcript: transcript(segments: 2), to: "fr")
         #expect(second == nil, "the run in flight owns the state until it ends")

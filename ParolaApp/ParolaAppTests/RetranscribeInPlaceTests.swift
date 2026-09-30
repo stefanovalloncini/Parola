@@ -115,8 +115,10 @@ extension TranscriberMockSuites {
                 #expect(request.language == "it")
 
                 await gate.open()
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
-                #expect(await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" })
+                let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(retranscribeRequestWait)
+                let transcriptWait = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" }
+                #expect(transcriptWait)
             }
         }
 
@@ -143,7 +145,8 @@ extension TranscriberMockSuites {
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "en")
 
-                #expect(await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" })
+                let transcriptWait = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" }
+                #expect(transcriptWait)
                 #expect(model.transcript?.sourceURL == page)
                 let stored = try await model.library.load(entry.id).document.transcript
                 #expect(stored.segments.first?.text == "the new take")
@@ -165,8 +168,10 @@ extension TranscriberMockSuites {
                 #expect(await load(model, entry.id))
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "it")
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
-                #expect(await waitUntil(timeoutMs: 10_000) { model.libraryEntry(id: entry.id)?.aiTitle == nil })
+                let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(retranscribeRequestWait)
+                let libraryEntryWait = await waitUntil(timeoutMs: 10_000) { model.libraryEntry(id: entry.id)?.aiTitle == nil }
+                #expect(libraryEntryWait)
 
                 let reloaded = try #require(model.libraryEntry(id: entry.id))
                 #expect(model.libraryEntries.count == 1)
@@ -209,7 +214,8 @@ extension TranscriberMockSuites {
                 #expect(model.isSummarising)
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "it")
-                #expect(await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" })
+                let transcriptWait = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" }
+                #expect(transcriptWait)
                 #expect(!model.isSummarising)
                 releaser.finish()
                 await settle()
@@ -237,8 +243,10 @@ extension TranscriberMockSuites {
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: nil)
 
-                #expect(await waitUntil(timeoutMs: 10_000) { counter.plays == 1 })
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
+                let playsWait = await waitUntil(timeoutMs: 10_000) { counter.plays == 1 }
+                #expect(playsWait)
+                let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(retranscribeRequestWait)
                 #expect(counter.plays == 1)
             }
         }
@@ -264,7 +272,8 @@ extension TranscriberMockSuites {
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: nil)
 
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
+                let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(retranscribeRequestWait)
                 #expect(model.fileTranscribeTask == nil)
                 #expect(model.cardJobsPending == 2)
                 releaser.finish()
@@ -293,8 +302,10 @@ extension TranscriberMockSuites {
                 }
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "it")
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
-                #expect(await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask == nil })
+                let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(retranscribeRequestWait)
+                let fileTranscribeTaskWait = await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask == nil }
+                #expect(fileTranscribeTaskWait)
 
                 let stored = try await model.library.load(entry.id)
                 #expect(stored.document.transcript.segments.map(\.text) == ["the old take"])
@@ -323,8 +334,10 @@ extension TranscriberMockSuites {
                 #expect(await load(model, entry.id))
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "it")
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
-                #expect(await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask == nil })
+                let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(retranscribeRequestWait)
+                let fileTranscribeTaskWait = await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask == nil }
+                #expect(fileTranscribeTaskWait)
 
                 let stored = try await model.library.load(entry.id)
                 #expect(stored.document.transcript.segments.map(\.text) == ["the old take"])
@@ -364,8 +377,10 @@ extension TranscriberMockSuites {
 
                 model.cancelCurrentWork()
                 await gate.open()
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
-                #expect(await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask == nil })
+                let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(retranscribeRequestWait)
+                let fileTranscribeTaskWait = await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask == nil }
+                #expect(fileTranscribeTaskWait)
 
                 let stored = try await model.library.load(entry.id)
                 #expect(stored.document.transcript.segments.map(\.text) == ["the old take"])
@@ -401,8 +416,10 @@ extension TranscriberMockSuites {
                 try FileManager.default.removeItem(at: entry.bundleURL)
                 await gate.open()
 
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
-                #expect(await waitUntil(timeoutMs: 10_000) { model.nonFatalWarning != nil })
+                let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(retranscribeRequestWait)
+                let nonFatalWarningWait = await waitUntil(timeoutMs: 10_000) { model.nonFatalWarning != nil }
+                #expect(nonFatalWarningWait)
                 #expect(model.phase == .idle)
                 #expect(model.canCancel == false)
                 #expect(model.fileTranscribeTask == nil)
@@ -450,7 +467,8 @@ extension TranscriberMockSuites {
                 #expect(model.retranscribeRequest?.language == "it")
 
                 await gate.open()
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
+                let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(retranscribeRequestWait)
             }
         }
 
@@ -490,7 +508,8 @@ extension TranscriberMockSuites {
                 #expect(model.selectedEntryID == entry.id)
 
                 await gate.open()
-                #expect(await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil })
+                let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
+                #expect(retranscribeRequestWait)
             }
         }
     }

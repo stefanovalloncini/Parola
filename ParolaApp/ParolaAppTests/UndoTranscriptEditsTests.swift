@@ -302,17 +302,19 @@ struct UndoTranscriptEditsTests {
         model.persistChapters(chapters)
         model.summariseOperation = { _, _ in Summary(text: "recap") }
         model.summariseTranscript()
-        #expect(await waitUntil { !model.isSummarising && model.transcript?.summary?.text == "recap" })
+        let isSummarisingWait = await waitUntil { !model.isSummarising && model.transcript?.summary?.text == "recap" }
+        #expect(isSummarisingWait)
 
         undo.undo()
         #expect(model.transcript?.segments[0].text == "original")
         #expect(model.transcript?.summary?.text == "recap")
         #expect(model.transcript?.chapters == chapters)
         try await waitForPendingSave(model)
-        #expect(await waitUntil {
+        let storedWait = await waitUntil {
             guard let stored = try? await model.library.load(entry.id).document.transcript else { return false }
             return stored.segments.first?.text == "original" && stored.summary?.text == "recap" && stored.chapters == chapters
-        })
+        }
+        #expect(storedWait)
 
         undo.redo()
         #expect(model.transcript?.segments[0].text == "edited")

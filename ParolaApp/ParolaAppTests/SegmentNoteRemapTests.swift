@@ -50,16 +50,19 @@ struct SegmentNoteEditTests {
             category: .transcription
         )
         model.loadEntry(seeded.id)
-        #expect(await waitUntil { model.selectedEntryID == seeded.id && model.transcript != nil })
+        let selectedEntryIDWait = await waitUntil { model.selectedEntryID == seeded.id && model.transcript != nil }
+        #expect(selectedEntryIDWait)
         // loadEntry ends by stamping the open and refreshing the library; a note patched in before that refresh lands would be overwritten.
-        #expect(await waitUntil { model.libraryEntry(id: seeded.id)?.lastOpenedAt != nil })
+        let libraryEntryWait = await waitUntil { model.libraryEntry(id: seeded.id)?.lastOpenedAt != nil }
+        #expect(libraryEntryWait)
         await model.libraryRefreshTask?.value
         return model
     }
 
     private func note(_ model: AppModel, _ text: String, on segmentID: Int) async {
         model.setSegmentNote(text, segmentID: segmentID)
-        #expect(await waitUntil { model.currentSegmentNote(for: segmentID) == text })
+        let currentSegmentNoteWait = await waitUntil { model.currentSegmentNote(for: segmentID) == text }
+        #expect(currentSegmentNoteWait)
     }
 
     @Test("every opening of the note editor starts from the stored note")
@@ -116,9 +119,10 @@ struct SegmentNoteEditTests {
         #expect(model.currentSegmentNote(for: 0) == nil)
         undo.undo()
         #expect(model.currentSegmentNote(for: 0) == "first")
-        #expect(await waitUntil {
+        let libraryWait = await waitUntil {
             (try? await model.library.load(entryID).entry.segmentNotes) == ["0": "first"]
-        })
+        }
+        #expect(libraryWait)
     }
 
     @Test("splitting moves the note to the first half, and undo and redo carry it")
@@ -132,13 +136,16 @@ struct SegmentNoteEditTests {
         model.splitSegment(id: 0, atFraction: 0.5)
         let firstHalfID = try #require(model.transcript?.segments.first?.id)
         #expect(firstHalfID != 0)
-        #expect(await waitUntil { model.segmentNotesByID == [firstHalfID: "why this matters"] })
+        let segmentNotesByIDWait = await waitUntil { model.segmentNotesByID == [firstHalfID: "why this matters"] }
+        #expect(segmentNotesByIDWait)
 
         undo.undo()
-        #expect(await waitUntil { model.segmentNotesByID == [0: "why this matters"] })
+        let segmentNotesByIDWait2 = await waitUntil { model.segmentNotesByID == [0: "why this matters"] }
+        #expect(segmentNotesByIDWait2)
 
         undo.redo()
-        #expect(await waitUntil { model.segmentNotesByID == [firstHalfID: "why this matters"] })
+        let segmentNotesByIDWait3 = await waitUntil { model.segmentNotesByID == [firstHalfID: "why this matters"] }
+        #expect(segmentNotesByIDWait3)
     }
 
     @Test("merging joins both notes, and deleting drops the one it removed")
@@ -148,9 +155,11 @@ struct SegmentNoteEditTests {
         await note(model, "second", on: 1)
 
         model.mergeSegmentWithNext(id: 0)
-        #expect(await waitUntil { model.segmentNotesByID == [0: "first\n\nsecond"] })
+        let segmentNotesByIDWait = await waitUntil { model.segmentNotesByID == [0: "first\n\nsecond"] }
+        #expect(segmentNotesByIDWait)
 
         model.deleteSegment(id: 0)
-        #expect(await waitUntil { model.segmentNotesByID.isEmpty })
+        let isEmptyWait = await waitUntil { model.segmentNotesByID.isEmpty }
+        #expect(isEmptyWait)
     }
 }

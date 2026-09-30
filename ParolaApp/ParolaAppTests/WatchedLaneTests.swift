@@ -123,7 +123,8 @@ extension TranscriberMockSuites {
 
                 arrive(model, arrived)
 
-                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+                let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle }
+                #expect(watchedLaneIsIdleWait)
                 await model.awaitLandingSteps()
                 let entries = await model.library.list()
                 let landed = try #require(entries.first { $0.id != own.id })
@@ -141,7 +142,8 @@ extension TranscriberMockSuites {
                 #expect(model.arrivalNotice?.name == "Standup")
 
                 model.openArrivalNotice()
-                #expect(await waitUntil(timeoutMs: 10_000) { model.selectedEntryID == landed.id })
+                let selectedEntryIDWait = await waitUntil(timeoutMs: 10_000) { model.selectedEntryID == landed.id }
+                #expect(selectedEntryIDWait)
                 #expect(model.arrivalNotice == nil)
             }
         }
@@ -158,10 +160,12 @@ extension TranscriberMockSuites {
 
                 arrive(model, arrived)
 
-                #expect(await waitUntil { model.fileTranscribeTask != nil })
+                let fileTranscribeTaskWait = await waitUntil { model.fileTranscribeTask != nil }
+                #expect(fileTranscribeTaskWait)
                 #expect(model.sourceFileURL == arrived)
                 await gate.open()
-                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle && model.selectedEntryID != nil })
+                let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle && model.selectedEntryID != nil }
+                #expect(watchedLaneIsIdleWait)
                 #expect(model.transcript?.segments.first?.text == "from the watched folder")
                 #expect(model.phase == .ready)
                 #expect(model.arrivalNotice == nil)
@@ -190,11 +194,13 @@ extension TranscriberMockSuites {
 
                 arrive(model, try makeWAV("Beside", in: rig.folder))
 
-                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+                let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle }
+                #expect(watchedLaneIsIdleWait)
                 #expect(model.transcript == nil)
                 #expect(model.phase == .idle)
                 #expect(model.recentFiles.isEmpty)
-                #expect(await waitUntil(timeoutMs: 10_000) { model.arrivalNotice != nil })
+                let arrivalNoticeWait = await waitUntil(timeoutMs: 10_000) { model.arrivalNotice != nil }
+                #expect(arrivalNoticeWait)
             }
         }
 
@@ -208,14 +214,16 @@ extension TranscriberMockSuites {
                 let model = rig.model
                 let arrived = try makeWAV("Arrived", in: rig.folder)
                 arrive(model, arrived)
-                #expect(await waitUntil(timeoutMs: 10_000) { model.visibleArrivalID != nil })
+                let visibleArrivalIDWait = await waitUntil(timeoutMs: 10_000) { model.visibleArrivalID != nil }
+                #expect(visibleArrivalIDWait)
 
                 let own = try await openOwnEntry(rig)
                 model.isPlaying = true
                 let player = try #require(model.player)
                 await gate.open()
 
-                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle }
+                #expect(watchedLaneIsIdleWait)
                 await model.awaitLandingSteps()
                 let landed = try #require(await model.library.list().first { $0.id != own.id })
                 #expect(model.selectedEntryID == own.id)
@@ -237,12 +245,14 @@ extension TranscriberMockSuites {
                 let model = rig.model
                 let arrived = try makeWAV("Broken", in: rig.folder)
                 arrive(model, arrived)
-                #expect(await waitUntil(timeoutMs: 10_000) { model.visibleArrivalID != nil })
+                let visibleArrivalIDWait = await waitUntil(timeoutMs: 10_000) { model.visibleArrivalID != nil }
+                #expect(visibleArrivalIDWait)
 
                 let own = try await openOwnEntry(rig)
                 await gate.open()
 
-                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle && model.fileTranscribeTask == nil })
+                let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle && model.fileTranscribeTask == nil }
+                #expect(watchedLaneIsIdleWait)
                 #expect(model.phase == .ready)
                 #expect(model.selectedEntryID == own.id)
                 #expect(model.transcript?.segments.first?.text == "my own notes")
@@ -272,11 +282,14 @@ extension TranscriberMockSuites {
                 #expect(model.watchedArrivals.map(\.url) == files)
                 await gate.open()
 
-                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
-                #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 5 })
+                let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle }
+                #expect(watchedLaneIsIdleWait)
+                let libraryWait = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 5 }
+                #expect(libraryWait)
                 await model.awaitLandingSteps()
                 await model.awaitCardMetadataQueue()
-                #expect(await waitUntil(timeoutMs: 10_000) { await rig.recorder.recorded().count == 5 })
+                let rigWait = await waitUntil(timeoutMs: 10_000) { await rig.recorder.recorded().count == 5 }
+                #expect(rigWait)
                 let sidecars = try FileManager.default.contentsOfDirectory(atPath: rig.folder.path)
                     .filter { $0.hasSuffix(".txt") }
                 #expect(Set(sidecars) == Set(files.map { $0.deletingPathExtension().lastPathComponent + ".txt" }))
@@ -300,7 +313,8 @@ extension TranscriberMockSuites {
                 let file = try makeWAV("Growing", in: rig.folder)
                 let other = try makeWAV("Other", in: rig.folder, seconds: 0.5)
                 arrive(model, file)
-                #expect(await waitUntil { model.backgroundArrivalID != nil })
+                let backgroundArrivalIDWait = await waitUntil { model.backgroundArrivalID != nil }
+                #expect(backgroundArrivalIDWait)
 
                 arrive(model, file)
                 arrive(model, other)
@@ -308,7 +322,8 @@ extension TranscriberMockSuites {
 
                 #expect(model.watchedArrivals.map(\.url) == [file, file, other])
                 await gate.open()
-                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle })
+                let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle }
+                #expect(watchedLaneIsIdleWait)
             }
         }
 
@@ -325,16 +340,20 @@ extension TranscriberMockSuites {
                 let opened = try makeWAV("Opened", in: rig.folder, seconds: 0.5)
 
                 arrive(model, arrived)
-                #expect(await waitUntil { model.backgroundArrivalID != nil })
+                let backgroundArrivalIDWait = await waitUntil { model.backgroundArrivalID != nil }
+                #expect(backgroundArrivalIDWait)
 
                 model.transcribe(fileURL: opened)
-                #expect(await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask != nil })
+                let fileTranscribeTaskWait = await waitUntil(timeoutMs: 10_000) { model.fileTranscribeTask != nil }
+                #expect(fileTranscribeTaskWait)
                 #expect(model.watchedLaneTask == nil)
                 #expect(model.watchedArrivals.map(\.url) == [arrived])
                 await gate.open()
 
-                #expect(await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle && model.fileTranscribeTask == nil })
-                #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 3 })
+                let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle && model.fileTranscribeTask == nil }
+                #expect(watchedLaneIsIdleWait)
+                let libraryWait = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 3 }
+                #expect(libraryWait)
                 let titles = Set(await model.library.list().filter { $0.id != own.id }.map(LibraryEntryDisplay.title(for:)))
                 #expect(titles == ["Arrived", "Opened"])
             }
@@ -357,7 +376,8 @@ extension TranscriberMockSuites {
 
                 model.fileTranscribeTask = nil
 
-                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+                let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle }
+                #expect(watchedLaneIsIdleWait)
                 #expect(model.arrivalNotice == nil)
                 #expect(model.fileTranscribeTask == nil)
                 #expect(await model.library.list().isEmpty)
@@ -378,7 +398,8 @@ extension TranscriberMockSuites {
 
                 arrive(model, arrived)
 
-                #expect(await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle })
+                let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 10_000) { model.watchedLaneIsIdle }
+                #expect(watchedLaneIsIdleWait)
                 #expect(model.arrivalNotice?.name == "Broken")
                 guard case .failed(let reason) = model.arrivalNotice?.state else {
                     Issue.record("expected a failure notice")
