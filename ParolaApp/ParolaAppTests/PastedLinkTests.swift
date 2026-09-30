@@ -5,6 +5,14 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
+/// A pasteboard of its own, so no test reads or writes the user's clipboard.
+private func withPrivatePasteboard<Result>(_ body: (NSPasteboard) throws -> Result) rethrows -> Result {
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("PastedLinkTests-\(UUID().uuidString)"))
+    defer { pasteboard.releaseGlobally() }
+    pasteboard.clearContents()
+    return try body(pasteboard)
+}
+
 @Suite("Pasted links")
 struct PastedLinkTests {
     @Test("a pasted web address opens the link flow")
@@ -23,11 +31,10 @@ struct PastedLinkTests {
     }
 
     private func withPasteboard(_ fill: (NSPasteboard) -> Void) -> URL? {
-        let pasteboard = NSPasteboard(name: NSPasteboard.Name("PastedLinkTests-\(UUID().uuidString)"))
-        defer { pasteboard.releaseGlobally() }
-        pasteboard.clearContents()
-        fill(pasteboard)
-        return PastedLink.url(on: pasteboard)
+        withPrivatePasteboard { pasteboard in
+            fill(pasteboard)
+            return PastedLink.url(on: pasteboard)
+        }
     }
 
     @Test("a link copied from a browser arrives as a URL item")
@@ -53,8 +60,11 @@ struct PastedLinkTests {
 @MainActor
 @Suite("The link sheet")
 struct LinkSheetTests {
-    private func makeModel(features: Set<ParolaFeature> = Set(ParolaFeature.allCases)) -> AppModel {
-        AppModel(bootstrap: AppBootstrap(
+    private func makeModel(
+        features: Set<ParolaFeature> = Set(ParolaFeature.allCases),
+        clipboard: NSPasteboard
+    ) -> AppModel {
+        let model = AppModel(bootstrap: AppBootstrap(
             mode: .test,
             library: makeTempLibraryURL("linksheet"),
             defaultsOverride: temporaryDefaults(),
@@ -62,40 +72,90 @@ struct LinkSheetTests {
             filePicker: SystemFilePicker(),
             enabledFeaturesOverride: features
         ))
+        model.linkPasteboard = clipboard
+        return model
+    }
+
+    private func withClipboard(holding text: String?, _ body: (NSPasteboard) -> Void) {
+        withPrivatePasteboard { pasteboard in
+            if let text { pasteboard.setString(text, forType: .string) }
+            body(pasteboard)
+        }
     }
 
     private let link = URL(string: "https://youtu.be/abc123")!
 
     @Test("a pasted link opens the sheet with the link filled in, once")
     func prefilledOnce() {
-        let model = makeModel()
+        withClipboard(holding: nil) { clipboard in
+            let model = makeModel(clipboard: clipboard)
 
-        model.openLinkSheet(prefill: link)
+            model.openLinkSheet(prefill: link)
 
-        #expect(model.youtubeSheetOpen)
-        #expect(model.takeLinkSheetPrefill() == link)
-        #expect(model.takeLinkSheetPrefill() == nil, "a later open must start empty")
+            #expect(model.youtubeSheetOpen)
+            #expect(model.takeLinkSheetPrefill() == link)
+            #expect(model.takeLinkSheetPrefill() == nil, "a later open must start empty")
+        }
     }
 
     @Test("opening the sheet without a link drops one left from before")
     func emptyOpenClearsAStalePrefill() {
-        let model = makeModel()
-        model.openLinkSheet(prefill: link)
-        model.youtubeSheetOpen = false
+        withClipboard(holding: nil) { clipboard in
+            let model = makeModel(clipboard: clipboard)
+            model.openLinkSheet(prefill: link)
+            model.youtubeSheetOpen = false
 
-        model.openLinkSheet(prefill: nil)
+            model.openLinkSheet(prefill: nil)
 
-        #expect(model.youtubeSheetOpen)
-        #expect(model.takeLinkSheetPrefill() == nil)
+            #expect(model.youtubeSheetOpen)
+            #expect(model.takeLinkSheetPrefill() == nil)
+        }
+    }
+
+    @Test("opened from the menu, the sheet takes a link already on the clipboard")
+    func clipboardLinkPrefills() {
+        withClipboard(holding: "https://youtu.be/abc") { clipboard in
+            let model = makeModel(clipboard: clipboard)
+
+            model.openLinkSheet(prefill: nil)
+
+            #expect(model.youtubeSheetOpen)
+            #expect(model.takeLinkSheetPrefill()?.absoluteString == "https://youtu.be/abc")
+        }
+    }
+
+    @Test("a word on the clipboard leaves the field empty")
+    func clipboardWordLeavesItEmpty() {
+        withClipboard(holding: "hello world") { clipboard in
+            let model = makeModel(clipboard: clipboard)
+
+            model.openLinkSheet(prefill: nil)
+
+            #expect(model.youtubeSheetOpen)
+            #expect(model.takeLinkSheetPrefill() == nil)
+        }
+    }
+
+    @Test("⌘V's link is the one the sheet opens with, whatever else the clipboard holds")
+    func pastedLinkWins() {
+        withClipboard(holding: "https://vimeo.com/42") { clipboard in
+            let model = makeModel(clipboard: clipboard)
+
+            model.openLinkSheet(prefill: link)
+
+            #expect(model.takeLinkSheetPrefill() == link)
+        }
     }
 
     @Test("a build without links opens no link sheet")
     func gatedOff() {
-        let model = makeModel(features: Set(ParolaFeature.allCases).subtracting([.youtube]))
+        withClipboard(holding: "https://youtu.be/abc") { clipboard in
+            let model = makeModel(features: Set(ParolaFeature.allCases).subtracting([.youtube]), clipboard: clipboard)
 
-        model.openLinkSheet(prefill: link)
+            model.openLinkSheet(prefill: nil)
 
-        #expect(!model.youtubeSheetOpen)
-        #expect(model.takeLinkSheetPrefill() == nil)
+            #expect(!model.youtubeSheetOpen)
+            #expect(model.takeLinkSheetPrefill() == nil)
+        }
     }
 }

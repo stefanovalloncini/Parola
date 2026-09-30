@@ -2586,6 +2586,8 @@ final class AppModel {
 
     var youtubeSheetOpen: Bool = false
     var linkSheetPrefill: URL?
+    /// The clipboard a link sheet opened from a menu looks at; tests hand in a private one.
+    @ObservationIgnored var linkPasteboard: NSPasteboard = .general
     var youtubeURLError: String?
     var ytDlpAvailable: Bool = false
     var ytDlpInstalling: Bool = false
@@ -2605,10 +2607,10 @@ final class AppModel {
         ytDlpVersion?.isStale(asOf: Date()) ?? false
     }
 
-    /// Every way into the link sheet comes through here, so a link one open left behind never fills the next.
+    /// Every way into the link sheet comes through here: ⌘V's link, else one already on the clipboard, never a stale one.
     func openLinkSheet(prefill: URL?) {
         guard features.isEnabled(.youtube) else { return }
-        linkSheetPrefill = prefill
+        linkSheetPrefill = prefill ?? PastedLink.url(on: linkPasteboard)
         youtubeSheetOpen = true
     }
 
