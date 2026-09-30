@@ -2,35 +2,33 @@ import Foundation
 import Testing
 import ParolaTestSupport
 
-@Suite("No closures inside #expect/#require arguments")
+@Suite("No #expect/#require closure inside a wrapper closure")
 struct MacroArgumentClosureGuardTests {
-    /// The T38 recording (W3) lane still owns these files; remove an entry once it binds that file's waits.
-    static let pendingRecordingLaneSweep: Set<String> = [
-        "TakeLibraryEntryTests.swift",
-        "TakeMarkerFavoriteTests.swift",
-    ]
-
     private var testsDirectory: URL {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
     }
 
-    @Test("no #expect/#require argument holds an unbound awaited closure")
-    func noAwaitedClosureInsideMacroArguments() throws {
-        let violations = try swiftFiles(under: testsDirectory)
-            .filter { !Self.pendingRecordingLaneSweep.contains($0.lastPathComponent) }
-            .flatMap { file -> [String] in
-                let source = try String(contentsOf: file, encoding: .utf8)
-                return MacroArgumentClosureScanner.violations(in: source).map { violation in
-                    "\(file.lastPathComponent):\(violation.line): \(violation.snippet)"
-                }
-            }
-        #expect(violations.isEmpty, Comment(rawValue: violations.joined(separator: "\n")))
-    }
+    @Test("every #expect/#require argument and trailing closure sits outside any wrapper closure")
+    func noClosureInsideMacroArgumentsWithinAWrapperClosure() throws {
+        let walker = try #require(FileManager.default.enumerator(at: testsDirectory, includingPropertiesForKeys: nil))
 
-    private func swiftFiles(under root: URL) throws -> [URL] {
-        guard let enumerator = FileManager.default.enumerator(
-            at: root, includingPropertiesForKeys: nil
-        ) else { return [] }
-        return enumerator.compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
+        let ownFileName = URL(fileURLWithPath: #filePath).lastPathComponent
+        var scanned = 0
+        var scannedSelf = false
+        var violations: [String] = []
+        for case let url as URL in walker where url.pathExtension == "swift" {
+            scanned += 1
+            if url.lastPathComponent == ownFileName {
+                scannedSelf = true
+            }
+            let source = try String(contentsOf: url, encoding: .utf8)
+            for violation in MacroArgumentClosureScanner.violations(in: source) {
+                violations.append("\(url.lastPathComponent):\(violation.line): \(violation.snippet)")
+            }
+        }
+
+        #expect(scanned > 50, "expected far more than \(scanned) Swift files under \(testsDirectory.path)")
+        #expect(scannedSelf, "the walk never reached this guard's own file, so the count above can't be trusted")
+        #expect(violations.isEmpty, Comment(rawValue: violations.joined(separator: "\n")))
     }
 }
