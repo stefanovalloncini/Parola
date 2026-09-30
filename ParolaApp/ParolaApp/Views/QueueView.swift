@@ -68,11 +68,15 @@ struct QueueView: View {
         .axLeaf("Toolbar.Menu.Sort")
     }
 
+    /// Not while files are checked: the notice above says what is happening, and an empty state would invite a second drop.
+    static func showsEmptyState(for model: AppModel) -> Bool {
+        model.batchIsEmpty && model.batchFilesBeingChecked == 0
+    }
+
     @ViewBuilder
     private var mainContent: some View {
         if model.batchIsEmpty {
-            // The notice above says what is happening; an empty state would invite a second drop.
-            if model.batchFilesBeingChecked == 0 { empty } else { Spacer(minLength: 0) }
+            if Self.showsEmptyState(for: model) { empty } else { Spacer(minLength: 0) }
         } else {
             let sections = visibleSections
             if sections.isEmpty {

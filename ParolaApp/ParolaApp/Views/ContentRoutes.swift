@@ -150,7 +150,9 @@ struct ContentRoutes: View {
         return "Downloading \(videoTitle)"
     }
 
-    private var phaseViewID: Int {
+    private var phaseViewID: Int { Self.phaseViewID(for: model) }
+
+    static func phaseViewID(for model: AppModel) -> Int {
         switch model.transcriptRoutePhase {
         case .idle: 0
         case .downloadingModel: 1

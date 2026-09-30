@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
@@ -179,6 +181,56 @@ extension TranscriberMockSuites {
 
             model.phase = .transcribing(file: URL(fileURLWithPath: "/tmp/BatchRoutingTests/single.m4a"))
             #expect(ContentToolbar.isBusy(for: model))
+        }
+
+        @Test("a running job keeps the pane under it, and a file's own run gets its own")
+        func phaseViewDuringARun() async throws {
+            let model = makeModel()
+            let entry = try await seedEntry(in: model, text: "open while the batch runs")
+            let opened = await open(entry, in: model)
+            #expect(opened)
+            let readyPane = ContentRoutes.phaseViewID(for: model)
+            let job = Self.job("running")
+            model.batchJobs = [job]
+
+            await model.handleBatchEvent(.started(jobID: job.id))
+            #expect(ContentRoutes.routeID(for: model) == .phase)
+            #expect(ContentRoutes.phaseViewID(for: model) == readyPane)
+
+            model.goHome()
+            await model.awaitTranscriptClose()
+            #expect(ContentRoutes.routeID(for: model) == .library)
+
+            model.phase = .transcribing(file: URL(fileURLWithPath: "/tmp/BatchRoutingTests/single.m4a"))
+            #expect(ContentRoutes.routeID(for: model) == .phase)
+            #expect(ContentRoutes.phaseViewID(for: model) != readyPane)
+        }
+
+        @Test("the queue page shows the import check instead of its empty state")
+        func queueShowsTheCheck() {
+            let model = makeModel()
+            model.batchFilesBeingChecked = 2
+            #expect(!QueueView.showsEmptyState(for: model))
+            #expect(Self.draws(NSProgressIndicator.self, in: model))
+
+            model.batchFilesBeingChecked = 0
+            #expect(QueueView.showsEmptyState(for: model))
+            #expect(!Self.draws(NSProgressIndicator.self, in: model))
+        }
+
+        private static func draws(_ type: NSView.Type, in model: AppModel) -> Bool {
+            let host = NSHostingView(rootView: QueueView().environment(model))
+            host.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+            host.layoutSubtreeIfNeeded()
+            var found = false
+            func walk(_ view: NSView) {
+                for sub in view.subviews {
+                    if sub.isKind(of: type) { found = true }
+                    walk(sub)
+                }
+            }
+            walk(host)
+            return found
         }
 
         @Test("a file's own run shows its pane, even a file a finished batch ran")
