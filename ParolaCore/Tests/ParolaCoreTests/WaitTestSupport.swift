@@ -213,6 +213,7 @@ final class UninterruptibleGate: Sendable {
     }
 }
 
+// @unchecked is safe: currentInstant, sleepers and cancelledIDs are only touched under `lock`; `parked` locks itself.
 final class TestClock: Clock, @unchecked Sendable {
     struct Instant: InstantProtocol, Hashable {
         var offset: Swift.Duration
