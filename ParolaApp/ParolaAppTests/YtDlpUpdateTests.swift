@@ -65,8 +65,10 @@ struct YtDlpUpdateTests {
         model.ytDlpUpdateDeadline = .milliseconds(200)
 
         model.updateYtDlpViaBrew()
+        let update = try #require(model.ytDlpUpdateTask)
 
-        await waitUntil { !model.ytDlpUpdating }
+        await awaitGuarded("the yt-dlp update") { await update.value }
+        #expect(!model.ytDlpUpdating)
         #expect(model.ytDlpUpdateError == AppModel.ytDlpUpdateTimedOutMessage(.milliseconds(200)))
     }
 
@@ -86,10 +88,12 @@ struct YtDlpUpdateTests {
         model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
 
         model.updateYtDlpViaBrew()
+        let update = try #require(model.ytDlpUpdateTask)
         #expect(model.ytDlpUpdating)
         model.cancelYtDlpUpdate()
 
-        await waitUntil { !model.ytDlpUpdating }
+        await awaitGuarded("the cancelled yt-dlp update") { await update.value }
+        #expect(!model.ytDlpUpdating)
         #expect(model.ytDlpUpdateError == nil)
     }
 
@@ -240,9 +244,11 @@ struct YtDlpUpdateTests {
         #expect(model.ytDlpIsStale)
 
         model.updateYtDlpViaBrew()
+        let update = try #require(model.ytDlpUpdateTask)
 
         #expect(model.ytDlpUpdating)
-        await waitUntil { !model.ytDlpUpdating }
+        await awaitGuarded("the yt-dlp update") { await update.value }
+        #expect(!model.ytDlpUpdating)
         #expect(model.ytDlpVersion?.text == "2099.01.01")
         #expect(!model.ytDlpIsStale)
         #expect(model.ytDlpUpdateError == nil)
@@ -266,8 +272,10 @@ struct YtDlpUpdateTests {
         model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
 
         model.updateYtDlpViaBrew()
+        let update = try #require(model.ytDlpUpdateTask)
 
-        await waitUntil { !model.ytDlpUpdating }
+        await awaitGuarded("the yt-dlp update") { await update.value }
+        #expect(!model.ytDlpUpdating)
         #expect(!model.ytDlpAvailable)
         #expect(model.ytDlpVersion == nil)
         #expect(model.ytDlpUpdateError == "yt-dlp: Failed to download resource")
@@ -289,8 +297,10 @@ struct YtDlpUpdateTests {
         model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
 
         model.updateYtDlpViaBrew()
+        let update = try #require(model.ytDlpUpdateTask)
 
-        await waitUntil { !model.ytDlpUpdating }
+        await awaitGuarded("the yt-dlp update") { await update.value }
+        #expect(!model.ytDlpUpdating)
         #expect(model.ytDlpVersion == nil)
         #expect(model.ytDlpUpdateError == "Homebrew finished, but Parola couldn't read yt-dlp's version.")
     }
@@ -311,8 +321,10 @@ struct YtDlpUpdateTests {
         model.ytDlpUpdateRoute = .homebrew(brewPath: brew.path)
 
         model.updateYtDlpViaBrew()
+        let update = try #require(model.ytDlpUpdateTask)
 
-        await waitUntil { !model.ytDlpUpdating }
+        await awaitGuarded("the yt-dlp update") { await update.value }
+        #expect(!model.ytDlpUpdating)
         #expect(model.ytDlpIsStale)
         #expect(model.ytDlpUpdateError == "Homebrew finished, but yt-dlp is still out of date.")
     }
@@ -327,8 +339,10 @@ struct YtDlpUpdateTests {
         model.ytDlpUpdateError = "yt-dlp: Failed to download resource"
 
         model.refreshYtDlpStatus()
+        let refresh = try #require(model.ytDlpVersionTask)
 
-        await waitUntil { model.ytDlpVersion?.text == "2099.01.01" }
+        await awaitGuarded("the version check") { await refresh.value }
+        #expect(model.ytDlpVersion?.text == "2099.01.01")
         #expect(model.ytDlpUpdateError == nil)
     }
 
@@ -342,8 +356,10 @@ struct YtDlpUpdateTests {
         model.ytDlpUpdateError = "yt-dlp: Failed to download resource"
 
         model.refreshYtDlpStatus()
+        let refresh = try #require(model.ytDlpVersionTask)
 
-        await waitUntil { model.ytDlpVersion?.text == "2026.03.17" }
+        await awaitGuarded("the version check") { await refresh.value }
+        #expect(model.ytDlpVersion?.text == "2026.03.17")
         #expect(model.ytDlpUpdateError == "yt-dlp: Failed to download resource")
     }
 

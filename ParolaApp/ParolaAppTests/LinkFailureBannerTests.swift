@@ -125,9 +125,11 @@ extension TranscriberMockSuites {
             #expect(model.ytDlpUpdateOffer == .update)
 
             model.updateYtDlpViaBrew()
+            let update = try #require(model.ytDlpUpdateTask)
 
             #expect(model.ytDlpUpdateOffer == .updating)
-            await waitUntil { !model.ytDlpUpdating }
+            await awaitGuarded("the yt-dlp update") { await update.value }
+            #expect(!model.ytDlpUpdating)
             #expect(model.ytDlpUpdateOffer == .updated("2099.01.01"))
             #expect(model.canRetryFailedTranscription)
             #expect(model.phase == .failed(message: staleRefusalMessage))
