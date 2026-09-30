@@ -91,8 +91,8 @@ extension AppModel {
     }
 
     /// Batch imports never prompt. Unless the policy is Transcribe it again, files the library
-    /// already holds are dropped and counted, and the batch page says how many.
-    func importBatchFiles(_ urls: [URL]) {
+    /// already holds are dropped and counted, and the queue says how many.
+    func importBatchFiles(_ urls: [URL], showsActivity: Bool = true) {
         guard !urls.isEmpty else { return }
         batchDuplicatesSkipped = 0
         // Chained, not concurrent: two drops racing would interleave their jobs and leave the
@@ -101,7 +101,7 @@ extension AppModel {
         let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
         if skipsDuplicates {
             batchFilesBeingChecked += urls.count
-            if features.isEnabled(.batch), !transcribeTaskRunning { showBatchActivity() }
+            if showsActivity, features.isEnabled(.batch), !transcribeTaskRunning { showBatchActivity() }
         }
         batchImportTask = Task { [weak self] in
             await previous?.value
@@ -125,12 +125,12 @@ extension AppModel {
             guard !Task.isCancelled else { return }
             self.batchDuplicatesSkipped = skipped
             if keep.isEmpty {
-                if skipped > 0, self.features.isEnabled(.batch) { self.showBatchActivity() }
+                if showsActivity, skipped > 0, self.features.isEnabled(.batch) { self.showBatchActivity() }
                 // Links dropped beside these files waited for a batch that never starts.
                 self.foregroundLetGo()
                 return
             }
-            self.addBatchJobs(keep)
+            self.addBatchJobs(keep, showsActivity: showsActivity)
         }
     }
 

@@ -112,6 +112,31 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("files parked behind a run join the batch without leaving the page they landed on", arguments: [false, true])
+        func drainStaysOnThePage(batchListed: Bool) async throws {
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(start: 0, end: 1, text: "drained")], gate: MockTranscriberGate())
+                let model = makeModel()
+                let entry = try await seedEntry(in: model, text: "the transcript that just landed")
+                let opened = await open(entry, in: model)
+                #expect(opened)
+                if batchListed { model.batchJobs = [Self.job("finished", .done)] }
+                let file = try tempWAV("batch-routing-drain")
+                defer { try? FileManager.default.removeItem(at: file) }
+                model.deferredArrivals = [file]
+
+                model.drainDeferredArrivals()
+                await model.awaitBatchImport()
+
+                let joined = model.batchJobs.last?.url
+                #expect(joined == file)
+                #expect(model.route == .transcript)
+                #expect(model.selectedEntryID == entry.id)
+                #expect(model.sidebarShowsActivity)
+                model.cancelAllInFlightBatchJobs()
+            }
+        }
+
         @Test("a batch that grows while a take records leaves the take on screen")
         func takeKeepsTheScreen() async {
             let model = makeModel()

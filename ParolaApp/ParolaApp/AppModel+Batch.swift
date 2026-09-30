@@ -12,14 +12,15 @@ extension AppModel {
         startBatch(jobs: urls.map { BatchJob(url: $0) })
     }
 
-    func startBatch(jobs: [BatchJob]) {
+    /// `showsActivity` is false for files a finished run drains: the page it landed on stays.
+    func startBatch(jobs: [BatchJob], showsActivity: Bool = true) {
         guard features.isEnabled(.batch) else {
             phase = .failed(message: ParolaError.featureDisabled(.batch).description)
             return
         }
         // Replacing batchJobs would strand the running job and the pending ones Resume waits on.
         if batchJobs.contains(where: { $0.status == .pending || $0.status == .transcribing }) {
-            addBatchJobs(jobs)
+            addBatchJobs(jobs, showsActivity: showsActivity)
             return
         }
         // A single-file or YouTube run owns phase and transcript until it drains; starting here
@@ -31,7 +32,7 @@ extension AppModel {
         }
         batchJobs = jobs
         selectedBatchJobID = jobs.first?.id
-        showBatchActivity()
+        if showsActivity { showBatchActivity() }
         runBatchTask(jobs: jobs)
     }
 
@@ -183,7 +184,7 @@ extension AppModel {
         addBatchJobs(urls.map { BatchJob(url: $0) })
     }
 
-    func addBatchJobs(_ jobs: [BatchJob]) {
+    func addBatchJobs(_ jobs: [BatchJob], showsActivity: Bool = true) {
         guard features.isEnabled(.batch) else {
             phase = .failed(message: ParolaError.featureDisabled(.batch).description)
             return
@@ -191,16 +192,16 @@ extension AppModel {
         guard !jobs.isEmpty else { return }
         if batchIsRunning {
             batchJobs.append(contentsOf: jobs)
-            showBatchActivity()
+            if showsActivity { showBatchActivity() }
         } else if batchJobs.isEmpty {
-            startBatch(jobs: jobs)
+            startBatch(jobs: jobs, showsActivity: showsActivity)
         } else if takeIsRunning || transcribeTaskRunning {
             deferredArrivals.append(contentsOf: jobs.map(\.url))
             if takeIsRunning { noteRunWaitsForTake() }
         } else {
             batchJobs.append(contentsOf: jobs)
             resumeBatch(pendingJobs: jobs)
-            showBatchActivity()
+            if showsActivity { showBatchActivity() }
         }
     }
 
@@ -255,7 +256,7 @@ extension AppModel {
         for url in subtitleURLs { importSubtitle(fileURL: url) }
         if !audioURLs.isEmpty {
             if features.isEnabled(.batch) {
-                importBatchFiles(audioURLs)
+                importBatchFiles(audioURLs, showsActivity: false)
             } else {
                 transcribe(fileURL: audioURLs[0])
                 deferredArrivals.append(contentsOf: audioURLs.dropFirst())
