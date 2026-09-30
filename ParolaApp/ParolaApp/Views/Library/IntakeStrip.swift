@@ -64,8 +64,9 @@ enum IntakeSummary {
         bundle: Bundle = .main
     ) -> [String] {
         var parts = [model, language]
-        if translates { parts.append(String(localized: "Translate", bundle: bundle)) }
-        if identifiesSpeakers { parts.append(String(localized: "Speakers", bundle: bundle)) }
+        // Keys of their own: the shared Translate and Speakers read as a verb and as people in Italian.
+        if translates { parts.append(String(localized: "Intake.Option.Translate", defaultValue: "Translate", bundle: bundle)) }
+        if identifiesSpeakers { parts.append(String(localized: "Intake.Option.Speakers", defaultValue: "Speakers", bundle: bundle)) }
         return parts
     }
 

@@ -6834,6 +6834,42 @@
         }
       }
     },
+    "Intake.Option.Speakers": {
+      "comment": "An option named on the intake strip's settings button, after the model and the language.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speakers"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speaker"
+          }
+        }
+      }
+    },
+    "Intake.Option.Translate": {
+      "comment": "An option named on the intake strip's settings button, after the model and the language.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Translate"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traduzione"
+          }
+        }
+      }
+    },
     "Integrations": {
       "extractionState": "manual",
       "localizations": {

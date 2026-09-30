@@ -33,14 +33,16 @@ struct IntakeStripTests {
             == "Whisper Turbo · Auto · Translate · Speakers")
     }
 
-    @Test("the options read in Italian with the words the rest of the app uses")
+    @Test("the options read in Italian with words of their own, not the shared Translate and Speakers")
     func italianSummary() throws {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let italian = try #require(Bundle(path: path))
         #expect(
             IntakeSummary.text(model: "Whisper Turbo", language: "Auto", translates: true, identifiesSpeakers: true, bundle: italian)
-                == "Whisper Turbo · Auto · Traduci · Persone"
+                == "Whisper Turbo · Auto · Traduzione · Speaker"
         )
+        #expect(String(localized: "Translate", bundle: italian) == "Traduci")
+        #expect(String(localized: "Speakers", bundle: italian) == "Persone")
     }
 
     @Test("Translate shows only while the chosen model can translate")
