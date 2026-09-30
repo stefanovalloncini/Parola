@@ -156,8 +156,8 @@ struct ModelStoreTests {
         #expect(store.isInstalled("openai_whisper-tiny"))
     }
 
-    @Test("a stale directory from an older layout is listed as an orphan the user can delete")
-    func staleLayoutDirectoryIsListedAsOrphan() throws {
+    @Test("the Parakeet copy from before installDirectory is an earlier download, and clearing it spares the live one")
+    func preInstallDirectoryParakeetCopyIsAnEarlierDownload() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
@@ -167,12 +167,23 @@ struct ModelStoreTests {
         let stale = tmp.appendingPathComponent(
             "models/FluidInference/parakeet-tdt-0.6b-v2-coreml", isDirectory: true
         )
-        try FileManager.default.createDirectory(at: stale, withIntermediateDirectories: true)
-        try Data("x".utf8).write(to: stale.appendingPathComponent("Encoder.mlmodelc"))
+        let live = store.installedURL(for: "nvidia_parakeet-tdt-0.6b-v2")
+        for folder in [stale, live] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data("x".utf8).write(to: folder.appendingPathComponent("Encoder.mlmodelc"))
+        }
 
-        #expect(try store.installedModels().contains { $0.name == "parakeet-tdt-0.6b-v2-coreml" })
-        try store.deleteAny(idOrPath: "parakeet-tdt-0.6b-v2-coreml")
+        #expect(try !store.installedModels().contains { $0.name == "parakeet-tdt-0.6b-v2-coreml" })
+        let leftovers = store.supersededInstalls()
+        #expect(leftovers.map(\.variantID) == ["nvidia_parakeet-tdt-0.6b-v2"])
+        #expect(leftovers.first?.displayName == "Parakeet TDT 0.6B v2")
+        #expect(leftovers.first?.url.standardizedFileURL == stale.standardizedFileURL)
+
+        try store.deleteLeftovers(variant: "nvidia_parakeet-tdt-0.6b-v2")
         #expect(!FileManager.default.fileExists(atPath: stale.path))
+        #expect(FileManager.default.fileExists(atPath: live.path))
+        #expect(store.isInstalled("nvidia_parakeet-tdt-0.6b-v2"))
+        #expect(store.supersededInstalls().isEmpty)
     }
 
     @Test("the diarizer models a service owns are never offered as deletable leftovers")

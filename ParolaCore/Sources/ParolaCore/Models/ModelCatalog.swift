@@ -53,7 +53,8 @@ public enum ModelCatalog {
             downloadSource: ModelDownloadSource(
                 huggingFaceRepo: "FluidInference/parakeet-tdt-0.6b-v2-coreml",
                 subpath: "",
-                installDirectory: "FluidInference/\(Repo.parakeetV2.folderName)"
+                installDirectory: "FluidInference/\(Repo.parakeetV2.folderName)",
+                supersededInstallDirectories: ["FluidInference/parakeet-tdt-0.6b-v2-coreml"]
             ),
             category: .fastest,
             speedTier: .fastest,
