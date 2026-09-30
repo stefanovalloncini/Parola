@@ -77,7 +77,7 @@ struct DropRoutingTests {
         model.transcribeNow(urls: [Self.media("late.wav")])
         await model.awaitBatchImport()
 
-        #expect(model.route == .batch)
+        #expect(model.route == .queue)
         #expect(model.batchJobs.map(\.url.lastPathComponent) == ["running.wav", "late.wav"])
         #expect(model.deferredArrivals.isEmpty)
     }
@@ -90,7 +90,7 @@ struct DropRoutingTests {
         model.addToQueue(urls: [Self.media("a.wav"), Self.media("b.wav")])
         await model.awaitBatchImport()
 
-        #expect(model.route == .batch)
+        #expect(model.route == .queue)
         #expect(model.batchJobs.map(\.url.lastPathComponent) == ["running.wav", "a.wav", "b.wav"])
     }
 

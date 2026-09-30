@@ -253,7 +253,7 @@ extension AppModel {
 
     /// The whole library with nothing open, playing, recording or asking: an arrival may run where the user can see it, as a file they opened would.
     var arrivalMayTakeWindow: Bool {
-        guard route == .transcript, batchIsEmpty, isBrowsingWholeLibrary, transcript == nil, !isPlaying, !takeIsRunning,
+        guard route == .transcript, isBrowsingWholeLibrary, transcript == nil, !isPlaying, !takeIsRunning,
               entryWindows.openIDs.isEmpty, !introduction.isPresented, !sheetIsUp else { return false }
         switch phase {
         case .idle, .ready: return true

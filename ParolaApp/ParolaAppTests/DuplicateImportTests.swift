@@ -211,7 +211,7 @@ extension TranscriberMockSuites {
 
                 model.importBatchFiles([known, fresh])
                 #expect(model.batchCheckingNotice == "Checking 2 files…")
-                #expect(model.route == .batch)
+                #expect(model.route == .queue)
                 await model.awaitBatchImport()
 
                 #expect(model.batchCheckingNotice == nil)
@@ -359,7 +359,7 @@ extension TranscriberMockSuites {
 
             #expect(model.batchJobs.isEmpty)
             #expect(model.batchDuplicateNotice == "2 already in your library")
-            #expect(model.route == .batch)
+            #expect(model.route == .queue)
         }
 
         @Test("a duplicate deferred during a run is still filtered when the queue drains")

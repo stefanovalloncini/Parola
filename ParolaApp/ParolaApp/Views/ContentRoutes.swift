@@ -62,7 +62,7 @@ struct ContentRoutes: View {
         }
     }
 
-    /// Outside the identity the list, the panes and the batch take turns under: results replacing a transcript mid-query must not rebuild the field.
+    /// Outside the identity the list and the panes take turns under: results replacing a transcript mid-query must not rebuild the field.
     private var transcriptPage: some View {
         ZStack {
             transcriptContent
@@ -88,7 +88,6 @@ struct ContentRoutes: View {
         case .recentlyDeleted: return .recentlyDeleted
         case .recording: return .stage
         case .transcript:
-            if !model.batchIsEmpty { return .batchDetail }
             return model.isBrowsingLibrary ? .library : .phase
         }
     }
@@ -100,24 +99,13 @@ struct ContentRoutes: View {
         case statistics
         case recentlyDeleted
         case stage
-        case batchDetail
         case library
         case phase
     }
 
     @ViewBuilder
     private var transcriptContent: some View {
-        if !model.batchIsEmpty {
-            // Fixed width rather than a split: TranscriptPane already nests an HSplitView, and
-            // two nested ones overflow the window instead of compressing — the batch list ate
-            // the slack until the sidebar and the inspector both clipped at their window edges.
-            HStack(spacing: 0) {
-                BatchSidebar()
-                    .frame(width: 260)
-                Divider()
-                batchDetail
-            }
-        } else if showsLibraryBrowse {
+        if showsLibraryBrowse {
             libraryBrowseList
         } else {
             phaseContent
@@ -135,7 +123,7 @@ struct ContentRoutes: View {
 
     @ViewBuilder
     private var phaseView: some View {
-        switch model.phase {
+        switch model.transcriptRoutePhase {
         case .idle:
             libraryPage(browses: true)
         case .downloadingModel(let name, let progress):
@@ -163,7 +151,7 @@ struct ContentRoutes: View {
     }
 
     private var phaseViewID: Int {
-        switch model.phase {
+        switch model.transcriptRoutePhase {
         case .idle: 0
         case .downloadingModel: 1
         case .loadingModel: 2
@@ -171,35 +159,6 @@ struct ContentRoutes: View {
         case .ready: 5
         case .failed: 6
         case .fetchingLink: 8
-        }
-    }
-
-    @ViewBuilder
-    private var batchDetail: some View {
-        if case .failed(let message) = model.phase {
-            ErrorPane(message: message)
-        } else if model.transcript != nil {
-            TranscriptPane()
-        } else {
-            switch BatchDetailPlaceholder(
-                isRunning: model.batchIsRunning,
-                hasCompletedJob: model.batchHasDoneJob
-            ) {
-            case .running:
-                ProgressPane(title: "Transcribing batch…", progress: nil)
-            case .selectFile:
-                EmptyStateView(
-                    systemImage: "doc.text",
-                    title: "Select a File",
-                    message: "Choose a completed file to see its transcript."
-                )
-            case .noTranscripts:
-                EmptyStateView(
-                    systemImage: "exclamationmark.triangle",
-                    title: "No Transcripts",
-                    message: "None of these files was transcribed. Check the list for details."
-                )
-            }
         }
     }
 

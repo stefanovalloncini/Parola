@@ -83,7 +83,7 @@ extension AppModel {
         }
         if batchIsRunning {
             importBatchFiles(files.media)
-            route = .batch
+            showBatchActivity()
             return
         }
         // The take's Stage stays up; the files wait for it.
@@ -120,7 +120,7 @@ extension AppModel {
             return
         }
         importBatchFiles(files.media)
-        if !batchJobs.isEmpty { route = .batch }
+        if !batchJobs.isEmpty { showBatchActivity() }
     }
 
     /// Every link a drop carries is taken: alone, the first starts and the rest queue; beside media, all wait for it.

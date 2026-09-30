@@ -741,7 +741,7 @@ extension AppModel {
 
     /// Flush first, so a debounced edit from the last second still reaches the library.
     func closeTranscript() {
-        guard case .ready = phase, transcript != nil else { return }
+        guard transcriptRoutePhase == .ready, transcript != nil else { return }
         transcriptCloseTask = Task { [weak self] in
             await self?.flushPendingTranscriptSave()
             self?.clearLoadedEntry()
@@ -761,7 +761,7 @@ extension AppModel {
         openPage(.recentlyDeleted, keepingTranscript: false)
     }
 
-    /// A batch writes `route` itself while one is running, so stepping in from the sidebar leaves what is loaded alone.
+    /// A batch opens this page on its own when it starts or grows, so it leaves what is loaded alone.
     func openQueue() {
         openPage(.queue, keepingTranscript: true)
     }

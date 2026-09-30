@@ -54,7 +54,7 @@ struct DropCommandsTests {
         #expect(result == .object([
             "half": .string("queue"),
             "count": .int(1),
-            "route": .string("batch"),
+            "route": .string("queue"),
             "awaitingConfirmation": .bool(false),
         ]))
         #expect(model.batchJobs.map(\.url.lastPathComponent) == ["running.wav", "clip.mkv"])

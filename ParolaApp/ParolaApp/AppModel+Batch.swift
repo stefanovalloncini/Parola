@@ -31,8 +31,20 @@ extension AppModel {
         }
         batchJobs = jobs
         selectedBatchJobID = jobs.first?.id
-        route = .batch
+        showBatchActivity()
         runBatchTask(jobs: jobs)
+    }
+
+    /// A batch that starts or grows opens Activity, so the user sees it run; a take recording keeps the screen.
+    func showBatchActivity() {
+        guard !takeIsRunning else { return }
+        openQueue()
+    }
+
+    /// True while `phase` shows the running job, which the queue shows instead of the transcript route.
+    var batchOwnsPhase: Bool {
+        guard let batchPhaseFile else { return false }
+        return phase == .transcribing(file: batchPhaseFile)
     }
 
     func handleBatchEvent(_ event: BatchEvent) async {
@@ -40,7 +52,9 @@ extension AppModel {
         case .started(let id):
             guard !isCancelled(id) else { return }
             mutateBatchJob(id) { $0.status = .transcribing }
-            phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
+            let file = batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/")
+            batchPhaseFile = file
+            phase = .transcribing(file: file)
         case .progress(let id, let fraction):
             guard !isCancelled(id) else { return }
             batchProgress.advance(id, to: fraction)
@@ -56,7 +70,8 @@ extension AppModel {
                 $0.transcript = processed
                 $0.segmentCount = processed.segments.count
             }
-            if id == selectedBatchJobID {
+            // The transcript route shows what the user opened; a finished job never replaces it.
+            if id == selectedBatchJobID, route != .transcript {
                 showUnsavedBatchJob(id, processed)
             }
             if let job = batchJobs.first(where: { $0.id == id }) {
@@ -69,6 +84,7 @@ extension AppModel {
             mutateBatchJob(id) { $0.status = .cancelled }
         case .finished:
             phase = .ready
+            batchPhaseFile = nil
             refreshLibraryOnceBatchAddsLand()
             // The pending wave ends in another .finished, and the batch lets go of the foreground there.
             let pending = batchJobs.filter { $0.status == .pending }
@@ -82,10 +98,12 @@ extension AppModel {
         }
     }
 
-    /// Every way a run ends short of its .finished: the refresh that event would have made happens here.
+    /// Every way a run ends short of its .finished: the refresh and the phase that event would have settled happen here.
     private func stopBatchRun() {
         batchTask?.cancel()
         batchTask = nil
+        if batchOwnsPhase { phase = transcript == nil ? .idle : .ready }
+        batchPhaseFile = nil
         if !batchLibraryAdds.isEmpty { refreshLibraryOnceBatchAddsLand() }
     }
 
@@ -177,6 +195,7 @@ extension AppModel {
         guard !jobs.isEmpty else { return }
         if batchIsRunning {
             batchJobs.append(contentsOf: jobs)
+            showBatchActivity()
         } else if batchJobs.isEmpty {
             startBatch(jobs: jobs)
         } else if takeIsRunning || transcribeTaskRunning {
@@ -185,6 +204,7 @@ extension AppModel {
         } else {
             batchJobs.append(contentsOf: jobs)
             resumeBatch(pendingJobs: jobs)
+            showBatchActivity()
         }
     }
 

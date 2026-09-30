@@ -310,7 +310,7 @@ struct LibraryOriginTests {
         #expect(model.canReturnToOrigin)
 
         model.batchJobs = [BatchJob(url: URL(fileURLWithPath: "/tmp/library-origin.wav"))]
-        #expect(!model.canReturnToOrigin, "the batch list is already beside the transcript")
+        #expect(model.canReturnToOrigin, "a listed batch stays on its own page")
 
         model.batchJobs = []
         model.route = .queue

@@ -101,9 +101,7 @@ extension AppModel {
         let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
         if skipsDuplicates {
             batchFilesBeingChecked += urls.count
-            if batchIsEmpty, features.isEnabled(.batch), !takeIsRunning, !transcribeTaskRunning {
-                route = .batch
-            }
+            if features.isEnabled(.batch), !transcribeTaskRunning { showBatchActivity() }
         }
         batchImportTask = Task { [weak self] in
             await previous?.value
@@ -127,7 +125,7 @@ extension AppModel {
             guard !Task.isCancelled else { return }
             self.batchDuplicatesSkipped = skipped
             if keep.isEmpty {
-                if skipped > 0, self.features.isEnabled(.batch) { self.route = .batch }
+                if skipped > 0, self.features.isEnabled(.batch) { self.showBatchActivity() }
                 // Links dropped beside these files waited for a batch that never starts.
                 self.foregroundLetGo()
                 return

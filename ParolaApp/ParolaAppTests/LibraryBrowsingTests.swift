@@ -55,12 +55,12 @@ struct LibraryBrowsingTests {
         #expect(model.isBrowsingLibrary)
     }
 
-    @Test("a batch detail pane is not the library list")
-    func batchDetailIsNotBrowsing() {
+    @Test("a listed batch leaves the library list up")
+    func listedBatchIsBrowsing() {
         let model = makeModel()
         model.route = .transcript
         model.phase = .idle
         model.batchJobs = [BatchJob(url: URL(fileURLWithPath: "/tmp/a.wav"), status: .done)]
-        #expect(!model.isBrowsingLibrary)
+        #expect(model.isBrowsingLibrary)
     }
 }

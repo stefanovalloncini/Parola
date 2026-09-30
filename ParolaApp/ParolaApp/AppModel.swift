@@ -579,6 +579,8 @@ final class AppModel {
     /// Where each finished job's sidecars landed, which is not always `<stem>.<ext>`.
     @ObservationIgnored var batchSidecars: [BatchJob.ID: [URL]] = [:]
     var selectedBatchJobID: BatchJob.ID?
+    /// The file of the job whose run `phase` shows; nil once the batch lets go of the phase.
+    @ObservationIgnored var batchPhaseFile: URL?
     @ObservationIgnored var batchTask: Task<Void, Never>? {
         didSet {
             if oldValue == nil, batchTask != nil { foregroundClaimedSession() }
@@ -1421,14 +1423,19 @@ final class AppModel {
     var librarySearchFocusRequests: Int = 0
     /// True while the content area shows a library list instead of the phase machine's panes.
     var isBrowsingLibrary: Bool {
-        guard route == .transcript, batchIsEmpty else { return false }
-        switch phase {
+        guard route == .transcript else { return false }
+        switch transcriptRoutePhase {
         case .idle, .ready, .failed:
             // Results the transcript did not come from take the content area; clearing them gives it back.
             if hasTranscript { return hasSearchResults && !openedFromSearch }
             return true
         default: return false
         }
+    }
+
+    /// The phase the transcript route draws: a batch job's run shows under Activity, so the page it would cover stays up.
+    var transcriptRoutePhase: Phase {
+        batchOwnsPhase ? .ready : phase
     }
 
     /// The Library page with nothing narrowing it: no category or person filter, and no search results.
@@ -1447,9 +1454,9 @@ final class AppModel {
         return libraryOrigin
     }
 
-    /// The transcript is a drill-down only when it stands alone; in a batch the list is already beside it.
+    /// The transcript is a drill-down only while it is the page on screen.
     var canReturnToOrigin: Bool {
-        hasTranscript && batchIsEmpty && route == .transcript && !isBrowsingLibrary
+        hasTranscript && route == .transcript && !isBrowsingLibrary
     }
     /// Why each result matched, keyed by entry: the snippet the results list shows under the row.
     var searchMatches: [String: LibrarySearchIndex.Match] = [:]

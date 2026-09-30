@@ -300,6 +300,7 @@ struct AppModelBatchTests {
         let job = Self.makeJob("clip", status: .transcribing)
         model.batchJobs = [job]
         model.selectedBatchJobID = job.id
+        model.route = .batch
 
         let raw = Transcript(
             segments: [
@@ -463,6 +464,7 @@ struct AppModelBatchTests {
         let job = BatchJob(url: source, status: .transcribing)
         model.batchJobs = [job]
         model.selectedBatchJobID = job.id
+        model.route = .batch
         let (release, releaser) = AsyncStream<Void>.makeStream()
         model.summariseOperation = { _, _ in
             for await _ in release { break }
@@ -600,6 +602,7 @@ struct AppModelBatchTests {
         let job = BatchJob(url: source, status: .transcribing)
         model.batchJobs = [job]
         model.selectedBatchJobID = job.id
+        model.route = .batch
 
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
         #expect(model.selectedEntryID == nil)
@@ -625,6 +628,7 @@ struct AppModelBatchTests {
         let other = BatchJob(url: Self.makeURL("other"), status: .done, transcript: Self.makeTranscript())
         model.batchJobs = [job, other]
         model.selectedBatchJobID = job.id
+        model.route = .batch
 
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
         model.editSegment(id: 0, newText: "kept")

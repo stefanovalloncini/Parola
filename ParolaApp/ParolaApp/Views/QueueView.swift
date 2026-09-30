@@ -22,6 +22,7 @@ struct QueueView: View {
         VStack(spacing: 0) {
             toolbar
             Divider()
+            BatchImportNotices()
             mainContent
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -70,7 +71,8 @@ struct QueueView: View {
     @ViewBuilder
     private var mainContent: some View {
         if model.batchIsEmpty {
-            empty
+            // The notice above says what is happening; an empty state would invite a second drop.
+            if model.batchFilesBeingChecked == 0 { empty } else { Spacer(minLength: 0) }
         } else {
             let sections = visibleSections
             if sections.isEmpty {
