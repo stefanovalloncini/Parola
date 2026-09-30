@@ -30,16 +30,16 @@ enum PeopleTestSupport {
         // A no-Spotlight store on the model's library dir: the real indexer can hang in the test host.
         let store = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
         let entry = try await store.add(transcript: transcript(text: text), audioSource: nil, category: .transcription)
+        // The model's store cached its list at init, so another store's write only shows once that cache goes.
+        await model.library.dropCaches()
         await model.refreshLibraryAndWait()
         return entry
     }
 
     static func open(_ model: AppModel, entry: LibraryEntry) async throws {
-        model.loadEntry(entry.id)
-        await waitUntil(timeoutMs: 3000) { model.selectedEntryID == entry.id && model.transcript != nil }
-        // loadEntry ends with a library refresh; letting it land keeps its snapshot from
-        // overwriting the map a later assignment patches in.
-        await model.libraryRefreshTask?.value
+        try await awaitGuarded("opening \(entry.id)") { try await model.openEntry(entry.id) }
+        // The open ends with a library refresh; letting it land keeps its snapshot from overwriting the map a later assignment patches in.
+        await awaitGuarded("the open's library refresh") { await model.libraryRefreshTask?.value }
     }
 
     static func openSeededEntry(_ model: AppModel) async throws -> LibraryEntry {
@@ -211,7 +211,7 @@ struct AssignSpeakerPeopleTests {
         let grace = try #require(model.person(named: "Grace"))
 
         model.renameSpeakerLabel("SPEAKER_01", to: "Grace")
-        await waitUntil(timeoutMs: 3000) { model.people.first?.usageCount == 2 }
+        await pollUntil("the rename to count as a second use") { model.people.first?.usageCount == 2 }
 
         #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_00", "Grace", "SPEAKER_00"])
         #expect(model.speakerAssignments == ["Grace": grace.id])
@@ -228,7 +228,7 @@ struct AssignSpeakerPeopleTests {
         let grace = try #require(model.person(named: "Grace Hopper"))
 
         model.renameSpeakerLabel("SPEAKER_01", to: "grace hopper")
-        await waitUntil(timeoutMs: 3000) { model.people.first?.usageCount == 2 }
+        await pollUntil("the rename to count as a second use") { model.people.first?.usageCount == 2 }
 
         #expect(model.speakerAssignments == ["grace hopper": grace.id])
         // Counting the use must not rewrite the person to the typed spelling.
@@ -370,7 +370,7 @@ struct AssignSpeakerPeopleTests {
         await model.addPerson(named: "Grace")
 
         model.assignSpeaker("Grace", toSegmentID: 1)
-        await waitUntil(timeoutMs: 3000) { model.person(forSpeaker: "Grace")?.usageCount == 2 }
+        await pollUntil("the pick to count as a second use") { model.person(forSpeaker: "Grace")?.usageCount == 2 }
 
         let grace = try #require(model.person(forSpeaker: "Grace"))
         #expect(grace.usageCount == 2)
