@@ -24,7 +24,7 @@ struct RecordControl: View {
     }
 
     var body: some View {
-        if case .recording = model.phase {
+        if model.takeIsRunning && model.recordingCountdown == nil {
             RecordingToolbarButton()
         } else if let source = Self.primarySource(features: model.features) {
             recordButton(source)

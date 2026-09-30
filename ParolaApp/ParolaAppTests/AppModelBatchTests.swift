@@ -978,7 +978,7 @@ struct AppModelBatchTests {
     @Test("arrivals during recording defer instead of stomping capture")
     func recordingDefersArrivals() {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         let url = URL(fileURLWithPath: "/tmp/arrival.wav")
         model.transcribe(fileURL: url)
         #expect(model.deferredArrivals == [url])
@@ -1188,12 +1188,9 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.isEmpty)
     }
 
-    @Test("only a recording defers arrivals")
-    func phaseDeferralMatrix() {
+    @Test("only a take defers arrivals, whatever the phase")
+    func takeDeferralMatrix() {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
-        #expect(model.phaseDefersArrivals)
-
         let passThrough: [AppModel.Phase] = [
             .idle, .ready, .failed(message: "x"),
             .loadingModel(name: "m"),
@@ -1202,14 +1199,20 @@ struct AppModelBatchTests {
         ]
         for phase in passThrough {
             model.phase = phase
-            #expect(!model.phaseDefersArrivals)
+            #expect(!model.takeIsRunning)
+        }
+
+        model.installTestTake(source: .microphone)
+        for phase in passThrough {
+            model.phase = phase
+            #expect(model.takeIsRunning)
         }
     }
 
     @Test("deferred arrivals drain into the batch when recording finishes")
     func deferredArrivalsDrainOnFinish() async {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         let url = Self.makeFile("arrival.wav")
         model.transcribe(fileURL: url)
         let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
@@ -1223,7 +1226,7 @@ struct AppModelBatchTests {
     @Test("cancelling discards deferred arrivals")
     func cancelDiscardsDeferredArrivals() {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         model.transcribe(fileURL: URL(fileURLWithPath: "/tmp/arrival.wav"))
         model.cancelCurrentWork()
         #expect(model.deferredArrivals.isEmpty)
@@ -1246,7 +1249,7 @@ struct AppModelBatchTests {
     func parolaDropDuringRecordingDefers() {
         let model = makeModel()
         model.transcript = Transcript(segments: [], language: "en", modelName: "m")
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         let url = URL(fileURLWithPath: "/tmp/arrival.parola")
         model.transcribe(fileURL: url)
         #expect(model.deferredArrivals == [url])
@@ -1257,7 +1260,7 @@ struct AppModelBatchTests {
     @Test(".parola arrivals drain separately from audio arrivals")
     func parolaArrivalsDrainSeparately() async {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         let audio = Self.makeFile("audio.wav")
         let parola = Self.makeFile("doc.parola")
         model.transcribe(fileURL: audio)

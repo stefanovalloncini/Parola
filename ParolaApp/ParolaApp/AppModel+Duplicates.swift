@@ -101,7 +101,7 @@ extension AppModel {
         let skipsDuplicates = duplicateImportPolicy.batchSkipsDuplicates
         if skipsDuplicates {
             batchFilesBeingChecked += urls.count
-            if batchIsEmpty, features.isEnabled(.batch), !phaseDefersArrivals, !transcribeTaskRunning {
+            if batchIsEmpty, features.isEnabled(.batch), !takeIsRunning, !transcribeTaskRunning {
                 route = .batch
             }
         }

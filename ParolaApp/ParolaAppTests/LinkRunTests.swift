@@ -94,9 +94,9 @@ final class PhaseRecorder {
     }
 
     private func track() {
-        let name = ParolaAutomationServer.phaseName(model.phase)
+        let name = ParolaAutomationServer.phaseName(for: model)
         if names.last != name { names.append(name) }
-        withObservationTracking { _ = model.phase } onChange: { [weak self] in
+        withObservationTracking { _ = ParolaAutomationServer.phaseName(for: model) } onChange: { [weak self] in
             Task { @MainActor in self?.track() }
         }
     }

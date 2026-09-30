@@ -20,7 +20,7 @@ struct IntentActionsTests {
     @Test("transcribe-file intent throws while recording")
     func transcribeThrowsWhileRecording() async {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         await #expect(throws: IntentActionError.recordingInProgress) {
             _ = try await model.transcribeFileFromIntent(URL(fileURLWithPath: "/tmp/a.wav"))
         }
@@ -116,7 +116,7 @@ struct IntentActionsTests {
         let model = makeModel()
         _ = try await seedTwoEntries(in: model)
 
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         await #expect(throws: IntentActionError.recordingInProgress) {
             _ = try await model.openLatestFromIntent()
         }
@@ -134,7 +134,7 @@ struct IntentActionsTests {
         )
         model.summariseOperation = { _, _ in Summary(text: "recap") }
         _ = try await seedTwoEntries(in: model)
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         model.summarizeLatestEntry()
         await settle()
@@ -181,10 +181,10 @@ struct IntentActionsTests {
         }
     }
 
-    @Test("stop-recording intent throws when the recording phase has no capture behind it")
-    func stopThrowsOnStalePhase() async {
+    @Test("stop-recording intent throws when the take has no capture behind it")
+    func stopThrowsOnATakeWithoutACapture() async {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         await #expect(throws: IntentActionError.notRecording) {
             _ = try await model.stopRecordingFromIntent()
         }

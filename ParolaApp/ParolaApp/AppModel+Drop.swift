@@ -16,7 +16,7 @@ extension AppModel {
             for: payload,
             batchEnabled: features.isEnabled(.batch),
             youtubeEnabled: features.isEnabled(.youtube),
-            arrivalsDeferred: phaseDefersArrivals || linksWait
+            arrivalsDeferred: takeIsRunning || linksWait
         )
     }
 
@@ -87,7 +87,7 @@ extension AppModel {
             return
         }
         route = .transcript
-        guard !phaseDefersArrivals, !transcribeTaskRunning else {
+        guard !takeIsRunning, !transcribeTaskRunning else {
             deferredArrivals.append(contentsOf: files.media)
             return
         }

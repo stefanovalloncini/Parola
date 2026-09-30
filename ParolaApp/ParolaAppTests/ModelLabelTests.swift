@@ -343,7 +343,7 @@ struct DownloadCompletionPhaseTests {
     @Test("a take that took the phase over is left alone")
     func recordingSurvivesTheDownload() {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         model.finishModelDownload()
 
@@ -364,7 +364,7 @@ struct DownloadCompletionPhaseTests {
     func progressTickLeavesARecordingAlone() async {
         let model = makeModel()
         let tick = model.makeDownloadProgressHandler(for: installed)
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         tick(0.5)
         let moved = await waitUntil(timeoutMs: 300) { model.phase != .recording(source: .microphone) }

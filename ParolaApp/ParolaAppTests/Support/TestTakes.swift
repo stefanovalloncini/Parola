@@ -1,4 +1,17 @@
 import Foundation
+import ParolaCore
+
+/// A capture that is already done: Stop hands back its file.
+struct StubSource: LiveAudioSource {
+    let url: URL
+    func start() async throws {}
+    func prepare() async throws -> URL { url }
+    func cancel() async {}
+}
+
+func tempWAV(_ label: String = "take") throws -> URL {
+    try makeTakeWAV(label, prefix: "parola-test")
+}
 
 func makeTakeWAV(_ label: String, seconds: Double = 0.3, in directory: URL? = nil, prefix: String = "parola-trust") throws -> URL {
     let sampleRate = 16_000, channels = 1, bytesPerSample = 2

@@ -138,7 +138,7 @@ struct SubtitleImportTests {
         let scratch = try Self.makeScratchDirectory()
         defer { try? FileManager.default.removeItem(at: scratch) }
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         let url = try Self.writeSrt(named: "deferred", in: scratch)
 
         model.importSubtitle(fileURL: url)
@@ -168,7 +168,7 @@ struct SubtitleImportTests {
         let scratch = try Self.makeScratchDirectory()
         defer { try? FileManager.default.removeItem(at: scratch) }
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         let srt = try Self.writeSrt(named: "drained", in: scratch)
         let audio = scratch.appendingPathComponent("audio.wav")
         try Data("RIFF".utf8).write(to: audio)

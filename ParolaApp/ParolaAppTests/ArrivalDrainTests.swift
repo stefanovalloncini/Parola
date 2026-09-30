@@ -40,7 +40,7 @@ struct ForegroundSlotTests {
         model.fileTranscribeTask = Task {}
         model.deferredArrivals = [parked]
         switch holder {
-        case "recording": model.phase = .recording(source: .microphone)
+        case "recording": model.installTestTake(source: .microphone)
         case "duplicate sheet": model.duplicateImport = DuplicateImport(
             entryID: "e", entryTitle: "t", modelName: "m", createdAt: Date(), durationSeconds: nil,
             fileURL: parked, digest: "d", translateOverride: nil
@@ -53,7 +53,7 @@ struct ForegroundSlotTests {
         #expect(model.deferredArrivals == [parked])
 
         switch holder {
-        case "recording": model.phase = .idle
+        case "recording": model.endTestTake()
         case "duplicate sheet": model.duplicateImport = nil
         default: model.duplicateCheckTask = nil
         }

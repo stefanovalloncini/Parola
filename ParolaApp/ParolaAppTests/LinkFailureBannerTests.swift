@@ -82,10 +82,10 @@ extension TranscriberMockSuites {
         @Test("a link parked behind a take ends with the same message once it runs")
         func parkedPath() async {
             let model = makeModel()
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone)
             #expect(model.transcribeYouTube(urlString: Self.link) == .parked)
 
-            model.phase = .idle
+            model.endTestTake()
             model.drainDeferredArrivals()
 
             await waitUntil { model.phase == .failed(message: staleRefusalMessage) }

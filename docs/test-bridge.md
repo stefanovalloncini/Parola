@@ -67,6 +67,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_set_use_streaming` | **on** | Toggle the live-mic streaming path. |
 | `parola_app_toggle_live_captions` | — | Show or hide the Live Captions overlay. |
 | `parola_app_wait_for_phase` | **phase**, timeoutMs | Poll until phase matches or timeout fires. Returns `{matched, state}`. |
+| `waitForRecordingState` | **state**, timeoutMs | Poll until the take's session reaches `state` (`arming`, `recording`, `paused`, `finishing`, `transcribing`, `done`, `failed`, or `none` for no take) or the timeout fires. Replies `{matched, observed}`, plus `recording` as `getState.recording` shows it once matched. |
 | `parola_app_get_transcript` | — | Text + language + modelName + segment count + duration. Null if none loaded. |
 | `parola_app_clear_transcript` | — | Drop the in-memory transcript. |
 | `parola_app_list_entries` | category, limit | Library entries with id, title (as stored), displayTitle (what the rows show), category, createdAt, durationSeconds, language. |
@@ -113,6 +114,12 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `introductionChooseEngine` | **id** | Pick one of the engine cards; the id comes from `engineChoices`. Nothing downloads until the introduction moves on. |
 
 The five introduction commands and `getState.introduction` all reply `{visible, step, steps, engine, engineChoices}`.
+
+`getState.recording` is the take the window shows, from its count-in until the next take starts, or `null` when there is none:
+`{state, elapsed, startedAt, paused, markers, title, category, source, isStreaming, device}`. `state` is one of `arming` /
+`recording` / `paused` / `finishing` / `transcribing` / `done` / `failed`; `elapsed` and `markers` are seconds of the take;
+`startedAt` is seconds since 1970, `null` until the first audio; `device` names the input a mic take listens on.
+`phase` reads `recording` whenever that take is arming, recording or paused.
 
 `getState.burn` is the subtitle burn running beside the phase, `{state, progress, output}` with `state` one of
 `running` / `finished` / `failed` (a failed one adds `message`), or `null` when there is none.

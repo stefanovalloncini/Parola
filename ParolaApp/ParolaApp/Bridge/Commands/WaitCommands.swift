@@ -20,8 +20,37 @@ extension ParolaAutomationServer {
                     return await waitForCondition(
                         ctx: ctx,
                         timeoutMs: timeoutMs,
-                        observed: { ["phase": .string(ParolaAutomationServer.phaseName(ctx.model.phase))] },
-                        predicate: { ParolaAutomationServer.phaseName(ctx.model.phase) == expected }
+                        observed: { ["phase": .string(ParolaAutomationServer.phaseName(for: ctx.model))] },
+                        predicate: { ParolaAutomationServer.phaseName(for: ctx.model) == expected }
+                    )
+                }
+            ),
+
+            AutomationCommand(
+                name: "waitForRecordingState",
+                area: .recording,
+                summary: "Resolves once the take's session reaches the named state; none means no take.",
+                kind: .waiter,
+                args: [
+                    .init(
+                        name: "state",
+                        kind: .string(enum: ["arming", "recording", "paused", "finishing", "transcribing", "done", "failed", "none"]),
+                        required: true,
+                        summary: "Target session state"
+                    ),
+                    .init(name: "timeoutMs", kind: .integer, required: false, summary: "Timeout in ms", defaultValue: .int(10_000)),
+                ],
+                handler: { args, ctx in
+                    let target = try args.string("state")
+                    let timeoutMs = (try args.optionalInt("timeoutMs")) ?? 10_000
+                    return await waitForCondition(
+                        ctx: ctx,
+                        timeoutMs: timeoutMs,
+                        observed: { ["state": .string(takeStateName(ctx.model))] },
+                        predicate: { takeStateName(ctx.model) == target },
+                        successFields: {
+                            ["recording": ParolaAutomationServer.recordingState(ctx.model.recording, now: Date())]
+                        }
                     )
                 }
             ),
@@ -276,6 +305,11 @@ private func waitForCondition(
         "timedOut": .bool(true),
         "observed": .object(observed()),
     ])
+}
+
+@MainActor
+private func takeStateName(_ model: AppModel) -> String {
+    model.recording.map { ParolaAutomationServer.recordingStateName($0.state) } ?? "none"
 }
 
 @MainActor

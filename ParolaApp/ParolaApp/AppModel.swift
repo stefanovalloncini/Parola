@@ -81,6 +81,8 @@ final class AppModel {
         /// The take's own checkpoint once it has one, so its end never touches whichever run is active by then.
         var recovery: Int?
         var recoveryStartedAt: Date?
+        /// Set once the take asks its capture to start; a Stop before then waits for the start to drop it.
+        var captureRequested = false
     }
 
     /// How long a take stays quiet before the pane warns: a mic soon, Mac audio only past a pause, unless it has heard nothing yet.
@@ -124,10 +126,7 @@ final class AppModel {
     var dropHighlight: DropHalf?
     var dragOverComposer = false
     var phase: Phase = .idle {
-        didSet {
-            forgetFailedSource()
-            if case .recording = oldValue, !phaseDefersArrivals { foregroundLetGo() }
-        }
+        didSet { forgetFailedSource() }
     }
     var transcript: Transcript? {
         didSet {
@@ -205,10 +204,8 @@ final class AppModel {
     private(set) var recording: RecordingSession? {
         didSet {
             let countdown = Self.countIn(of: recording)
-            guard countdown != recordingCountdown else { return }
-            let countInEnded = recordingCountdown != nil && countdown == nil
-            recordingCountdown = countdown
-            if countInEnded { foregroundLetGo() }
+            if countdown != recordingCountdown { recordingCountdown = countdown }
+            if oldValue?.isRunning == true, !takeIsRunning { foregroundLetGo() }
         }
     }
     /// The take's levels at ten a second, for as long as its session lasts; `takeLevelTick` moves with each one.
@@ -458,9 +455,11 @@ final class AppModel {
     }
 
     func toggleMicRecording() {
+        if let take = recording, take.isRunning {
+            if take.source == .microphone { stopRecordingAndTranscribe() }
+            return
+        }
         switch phase {
-        case .recording(.microphone):
-            stopRecordingAndTranscribe()
         case .idle, .ready, .failed:
             startRecording(source: .microphone)
         case .transcribing where takeRun != nil:
@@ -1623,7 +1622,8 @@ final class AppModel {
     @ObservationIgnored private(set) var youtubeSubsTask: Task<Void, Never>? {
         didSet { if oldValue != nil, youtubeSubsTask == nil { foregroundLetGo() } }
     }
-    @ObservationIgnored private var recordingStartInFlight = false {
+    /// Observed, so a view reading `recordingActive` hears a start that ends after its take's session did.
+    private var recordingStartInFlight = false {
         didSet {
             if !oldValue, recordingStartInFlight { foregroundClaimedSession() }
             if oldValue, !recordingStartInFlight { foregroundLetGo() }
@@ -1702,6 +1702,8 @@ final class AppModel {
     private func teardownActiveCapture(exitsMedia: Bool = true) {
         let takeRecovery = activeTake?.recovery
         endSession(of: activeTake?.id)
+        // A stopped take still finishing its file lands on its own; it no longer holds up the next take.
+        updateSession(of: recording?.takeID) { if $0.state == .finishing { $0.land(entryID: nil) } }
         if recordingStartInFlight, liveSource == nil {
             stopRequestedDuringStart = true
         } else {
@@ -2303,12 +2305,6 @@ final class AppModel {
         }
     }
 
-    // Arrivals must never stomp an active capture or batch (drops, watched folders, Services, URL scheme).
-    var phaseDefersArrivals: Bool {
-        if case .recording = phase { return true }
-        return false
-    }
-
     /// A batch runs on the global translate setting, so the override only reaches a single-file run.
     func handleIncomingFiles(_ urls: [URL], translateOverride: Bool? = nil) {
         let files = DroppedFiles.classify(urls)
@@ -2347,7 +2343,7 @@ final class AppModel {
     }
 
     func importSubtitle(fileURL: URL) {
-        if phaseDefersArrivals {
+        if takeIsRunning {
             deferredArrivals.append(fileURL)
             return
         }
@@ -2394,7 +2390,7 @@ final class AppModel {
             transcribeYouTube(urlString: fileURL.absoluteString)
             return
         }
-        if phaseDefersArrivals {
+        if takeIsRunning {
             deferredArrivals.append(fileURL)
             return
         }
@@ -2831,7 +2827,7 @@ final class AppModel {
 
     /// A batch in flight owns the phase until its last job ends, so a link waits for it the way a file does.
     var linkArrivalsDeferred: Bool {
-        phaseDefersArrivals || transcribeTaskRunning
+        takeIsRunning || transcribeTaskRunning
             || (batchTask != nil && batchJobs.contains { $0.status == .pending || $0.status == .transcribing })
     }
 
@@ -2842,7 +2838,7 @@ final class AppModel {
             return .rejected
         }
         guard let url = makeYouTubeURL(urlString) else { return .rejected }
-        // The download flips phase off .recording, and every stop affordance is keyed on it.
+        // The download would take the phase, and the take's pane with it, off a take still recording.
         if linkArrivalsDeferred {
             deferredLinks.append(.transcribe(url.absoluteString))
             return .parked
@@ -3203,6 +3199,38 @@ final class AppModel {
         if session != recording { recording = session }
     }
 
+    #if DEBUG
+    /// Test seam: a take already capturing since `startedAt`; with no source it is a live take whose events the test sends.
+    func installTestTake(source: RecordSource, liveSource: AudioSource? = nil, startedAt: Date = Date()) {
+        takeCounter &+= 1
+        var take = TakeContext(id: takeCounter, source: source, category: pendingRecordingCategory, captureTargets: [])
+        take.captureRequested = true
+        forgetTakeRequest()
+        activeTake = take
+        pendingRecordingSource = source.entrySource
+        self.liveSource = liveSource
+        var session = RecordingSession(
+            takeID: take.id,
+            source: source,
+            category: take.category,
+            title: Self.liveRecordingTitle(category: take.category, endedAt: startedAt),
+            isStreaming: liveSource == nil,
+            arming: .startingCapture
+        )
+        session.markCapturing(at: startedAt)
+        beginSession(session)
+        phase = .recording(source: source)
+    }
+
+    /// Test seam: the installed take ends the way a cancel ends one, leaving nothing behind.
+    func endTestTake() {
+        liveSource = nil
+        activeTake = nil
+        endSession(of: recording?.takeID)
+        phase = .idle
+    }
+    #endif
+
     /// The streaming mic path drives WhisperKit off the live mic and never consults
     /// MockAudioSourceRegistry. With a mic fixture installed (test-mode) we must avoid it and take the
     /// file-capture path instead, so the fixture transcribes the same way system audio does.
@@ -3212,14 +3240,14 @@ final class AppModel {
         return await MockAudioSourceRegistry.shared.resolve(for: .mic) == nil
     }
 
+    /// A take from its count-in until its capture has wound down: arming, recording, paused or finishing.
+    var takeIsRunning: Bool { recording?.isRunning ?? false }
+
     /// True from the moment a take is requested until its capture is torn down; the guard in
     /// `startRecording` uses it so a second trigger (menu bar, intent, meeting banner) can't
     /// silently discard the running take and leak its capture.
     var recordingActive: Bool {
-        if recordingStartInFlight || liveSource != nil || streamingSession != nil { return true }
-        if recordingCountdown != nil { return true }
-        if case .recording = phase { return true }
-        return false
+        takeIsRunning || recordingStartInFlight || liveSource != nil || streamingSession != nil
     }
 
     /// What Record and File ▸ New Recording ask before they offer a take from `source`.
@@ -3312,6 +3340,7 @@ final class AppModel {
             guard takeIsCurrent(take) else { return }
             do {
                 beginTakeArming(.startingCapture, take: take, streaming: false)
+                activeTake?.captureRequested = true
                 phase = .recording(source: source)
                 switch source {
                 case .microphone:
@@ -3345,12 +3374,11 @@ final class AppModel {
                 await mediaSession.exitRecording()
                 guard takeIsCurrent(take) else { return }
                 stopRecordingWatch()
-                clearTakeReadouts()
+                clearTakeReadouts(of: take.id)
                 activeTake = nil
                 let message = Self.recordingFailureMessage(for: error, source: source)
                 updateSession(of: take.id) { $0.fail(message) }
-                // Startup can take 20s; anything that already moved the phase on owns it now.
-                if case .recording = phase { phase = .failed(message: message) }
+                phase = .failed(message: message)
                 recordingStartInFlight = false
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             }
@@ -3380,13 +3408,13 @@ final class AppModel {
             }
             return true
         }
-        clearTakeReadouts()
+        clearTakeReadouts(of: take.id)
         endSession(of: take.id)
         stopRecordingWatch()
         await source.cancel()
         await mediaSession.exitRecording()
         guard takeIsCurrent(take) else { return false }
-        if case .recording = phase { phase = .idle }
+        phase = .idle
         activeTake = nil
         recordingStartInFlight = false
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
@@ -3401,7 +3429,7 @@ final class AppModel {
         recordingAutoStopTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(limit * 60), clock: clock)
             guard !Task.isCancelled, let self else { return }
-            guard case .recording = self.phase else { return }
+            guard self.takeIsRunning else { return }
             self.stopRecordingAndTranscribe()
         }
     }
@@ -3544,7 +3572,7 @@ final class AppModel {
         if let take, let active = activeTake, active.id != take.id { return }
         recordingAutoStopTask?.cancel()
         recordingAutoStopTask = nil
-        clearTakeReadouts()
+        if let take { clearTakeReadouts(of: take.id) } else { clearTakeReadouts() }
         stopSilenceWatch()
         stopRecordingWatch()
         if let recovery = recoveryGeneration(of: take ?? activeTake) { endRecovery(recovery) }
@@ -3582,7 +3610,7 @@ final class AppModel {
         let lastSound = recordingLevelMeter?.lastSound
         let heard = lastSound.map { $0.duration(to: .now) < .seconds(1) } ?? false
         // Mac audio has pauses a mic take doesn't: it warns early only if it has heard nothing yet.
-        if case .recording(.systemAudio) = phase {
+        if activeTake?.source == .systemAudio {
             silenceDetector.threshold = lastSound == nil ? silenceRule.macAudioBeforeSound : silenceRule.macAudioAfterSound
         } else {
             silenceDetector.threshold = silenceRule.microphone
@@ -3609,6 +3637,7 @@ final class AppModel {
         livePartialText = ""
         liveVoiceActive = false
         beginTakeArming(.preparingModel(name: modelName, download: nil), take: take, streaming: true)
+        take.captureRequested = true
         phase = .recording(source: .microphone)
         take.recovery = beginRecordingRecovery()
         take.recoveryStartedAt = recordingRecoveryStartedAt
@@ -3873,7 +3902,7 @@ final class AppModel {
         recordingAutoStopTask?.cancel()
         recordingAutoStopTask = nil
         // Nothing captured yet ends here and says so; a capture that came up stops normally and keeps its file.
-        if let arming = takeArming, case .recording = phase, !captureIsUp(arming) {
+        if let arming = takeArming, activeTake?.captureRequested == true, !captureIsUp(arming) {
             endTakeBeforeCapture(reporting: Self.nothingRecordedMessage(for: arming))
             return
         }
@@ -3989,7 +4018,11 @@ final class AppModel {
 
     /// Cancel on a take that has captured nothing: there is nothing to lose, so it ends without a word.
     func cancelRecordingBeforeCapture() {
-        guard takeArming != nil, case .recording = phase else { return }
+        guard takeArming != nil else { return }
+        guard activeTake?.captureRequested == true else {
+            if recordingStartInFlight { stopRequestedDuringStart = true }
+            return
+        }
         endTakeBeforeCapture(reporting: nil)
     }
 
@@ -4145,7 +4178,7 @@ final class AppModel {
             + " " + String(localized: "The audio was saved to your library.")
         updateSession(of: take) { $0.fail(message) }
         // A take recording since then keeps the pane; the failed one waits in the library.
-        if case .recording = phase {
+        if takeIsRunning {
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             return
         }
@@ -4289,10 +4322,10 @@ final class AppModel {
 
     // MARK: - Quitting during a take
 
-    /// A take whose capture is up, so quitting now would drop what it holds. One still starting has nothing to lose.
+    /// A take whose capture is up, paused or not, so quitting now would drop what it holds. One still starting has nothing to lose.
     var takeInProgress: Bool {
         guard liveSource != nil || streamingSession != nil else { return false }
-        return recordingStartedAt != nil || takeIsUnheard
+        return recording?.isCapturing == true || takeIsUnheard
     }
 
     /// A live take finishing, a take transcribing, or a take's save still on its way to the library.
@@ -4339,7 +4372,7 @@ final class AppModel {
         catchUpFirstBuffer()
         recordingAutoStopTask?.cancel()
         recordingAutoStopTask = nil
-        if let arming = takeArming, case .recording = phase, !captureIsUp(arming) {
+        if let arming = takeArming, activeTake?.captureRequested == true, !captureIsUp(arming) {
             endTakeBeforeCapture(reporting: nil)
             return
         }

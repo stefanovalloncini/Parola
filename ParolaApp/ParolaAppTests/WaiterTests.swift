@@ -56,6 +56,46 @@ struct WaiterTests {
         #expect(matched(result) == true)
     }
 
+    @Test("waitForRecordingState resolves once the take's session reaches the state")
+    func waitForRecordingStateResolves() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let command = try #require(commands["waitForRecordingState"])
+        let args = try command.validate(AutomationArgs([
+            "state": .string("recording"),
+            "timeoutMs": .int(1_000),
+        ]))
+
+        let install = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(20), clock: ContinuousClock())
+            model.installTestTake(source: .microphone)
+        }
+
+        let result = try await command.handler(args, context)
+        await install.value
+        withExtendedLifetime(server) {}
+
+        #expect(matched(result) == true)
+    }
+
+    @Test("waitForRecordingState matches none with no take, and times out on a state the take never reaches")
+    func waitForRecordingStateNoneAndTimeout() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let command = try #require(commands["waitForRecordingState"])
+
+        let none = try await command.handler(
+            try command.validate(AutomationArgs(["state": .string("none"), "timeoutMs": .int(50)])), context
+        )
+        model.installTestTake(source: .microphone)
+        let paused = try await command.handler(
+            try command.validate(AutomationArgs(["state": .string("paused"), "timeoutMs": .int(80)])), context
+        )
+        withExtendedLifetime(server) {}
+
+        #expect(matched(none) == true)
+        #expect(matched(paused) == false)
+        #expect(timedOut(paused) == true)
+    }
+
     @Test("waitForRevision returns matched:false + timedOut:true when revision never reaches min")
     func waitForRevisionTimesOut() async throws {
         let (_, server, context, commands) = try makeRig()

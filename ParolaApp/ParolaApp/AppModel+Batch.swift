@@ -24,7 +24,7 @@ extension AppModel {
         }
         // A single-file or YouTube run owns phase and transcript until it drains; starting here
         // would let both flows write them and leave whichever finished last on screen.
-        if phaseDefersArrivals || transcribeTaskRunning {
+        if takeIsRunning || transcribeTaskRunning {
             deferredArrivals.append(contentsOf: jobs.map(\.url))
             return
         }
@@ -39,8 +39,7 @@ extension AppModel {
         case .started(let id):
             guard !isCancelled(id) else { return }
             mutateBatchJob(id) { $0.status = .transcribing }
-            // A live recording owns the phase: every stop affordance is keyed on .recording,
-            // so a batch overwrite would leave a hot mic nothing can reach.
+            // A take owns the phase while it records; a job starting would take the take's pane away.
             if !recordingActive {
                 phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
             }
@@ -184,7 +183,7 @@ extension AppModel {
             batchJobs.append(contentsOf: jobs)
         } else if batchJobs.isEmpty {
             startBatch(jobs: jobs)
-        } else if phaseDefersArrivals || transcribeTaskRunning {
+        } else if takeIsRunning || transcribeTaskRunning {
             deferredArrivals.append(contentsOf: jobs.map(\.url))
         } else {
             batchJobs.append(contentsOf: jobs)

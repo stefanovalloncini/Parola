@@ -32,7 +32,7 @@ extension TranscriberMockSuites {
         @Test("transcribeYouTube owns up to parking a link handed over during a take")
         func transcribeYouTubeReportsParked() async throws {
             let (model, server, context, commands) = try makeRig()
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone)
             let command = try #require(commands["transcribeYouTube"])
             let args = try command.validate(AutomationArgs(["url": .string(Self.link)]))
 
@@ -62,7 +62,7 @@ extension TranscriberMockSuites {
         @Test("fetchYouTubeSubs owns up to parking a fetch handed over during a take")
         func fetchYouTubeSubsReportsParked() async throws {
             let (model, server, context, commands) = try makeRig()
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone)
             let command = try #require(commands["fetchYouTubeSubs"])
             let args = try command.validate(AutomationArgs(["url": .string(Self.link)]))
 

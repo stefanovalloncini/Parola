@@ -87,7 +87,7 @@ struct AppModelSelectionSafetyTests {
         let model = makeModel()
         let job = BatchJob(url: URL(fileURLWithPath: "/tmp/selection-safety.wav"))
         model.batchJobs = [job]
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         await model.handleBatchEvent(.started(jobID: job.id))
         #expect(

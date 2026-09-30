@@ -165,7 +165,7 @@ extension TranscriberMockSuites {
 
             model.startRecording(source: .microphone)
             _ = await waitUntil { !model.recordingActive }
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone)
             await model.checkRecordingDiskSpace()
 
             #expect(onMain.withLock { $0 } == [false, false])
@@ -182,7 +182,7 @@ extension TranscriberMockSuites {
         @Test("checkRecordingDiskSpace flips the warning both ways while recording")
         func midRecordingWarnAndClear() async {
             let model = makeModel()
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone)
 
             model.freeDiskSpaceProvider = { 500_000_000 }
             await model.checkRecordingDiskSpace()
@@ -237,7 +237,7 @@ extension TranscriberMockSuites {
         @Test("the recording watch runs the disk check on the clock cadence")
         func watchTicksDiskCheck() async {
             let model = makeModel(clock: ImmediateClock())
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone)
             model.freeDiskSpaceProvider = { 500_000_000 }
 
             model.startRecordingWatch(checkpoints: false)

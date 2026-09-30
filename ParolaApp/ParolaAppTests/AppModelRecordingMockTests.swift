@@ -153,8 +153,7 @@ extension TranscriberMockSuites {
         @Test("stop hands off the live source synchronously so a second stop is a no-op")
         func doubleStopSingleHandoff() {
             let model = makeModel()
-            model.liveSource = StubAudioSource()
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone, liveSource: StubAudioSource())
             model.stopRecordingAndTranscribe()
             #expect(model.liveSource == nil)
         }

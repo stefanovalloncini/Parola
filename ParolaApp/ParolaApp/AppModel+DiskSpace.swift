@@ -80,10 +80,10 @@ extension AppModel {
     }
 
     func checkRecordingDiskSpace() async {
-        guard case .recording = phase else { return }
+        guard takeIsRunning else { return }
         let freeBytes = await Self.freeDiskSpace(freeDiskSpaceProvider)
         // The take can end while the volume is statted.
-        guard case .recording = phase else { return }
+        guard takeIsRunning else { return }
         switch Self.diskSpaceVerdict(freeBytes: freeBytes) {
         case .refuse:
             stopRecordingAndTranscribe()

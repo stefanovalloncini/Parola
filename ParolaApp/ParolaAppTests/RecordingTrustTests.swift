@@ -7,13 +7,6 @@ import ParolaCore
 import ParolaTestSupport
 import UniformTypeIdentifiers
 
-private struct StubTake: LiveAudioSource {
-    let url: URL
-    func start() async throws {}
-    func prepare() async throws -> URL { url }
-    func cancel() async {}
-}
-
 /// A take whose file stopped taking writes partway.
 private struct CutShortTake: LiveAudioSource {
     let url: URL
@@ -100,6 +93,12 @@ private actor NameRecordingPicker: FilePicker {
     }
 }
 
+/// Every label a Dock badge showed, in order.
+@MainActor
+private final class DockLabels {
+    var labels: [String?] = []
+}
+
 /// Whether a quit asked, and the reply it handed back once the take was wound down.
 @MainActor
 private final class QuitReply {
@@ -146,8 +145,7 @@ extension TranscriberMockSuites {
 
         /// A take's transcription held by the gate, so the test acts while it is running.
         private func transcribingTake(_ model: AppModel, wav: URL) async {
-            model.liveSource = StubTake(url: wav)
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
             model.stopRecordingAndTranscribe()
             await waitUntil { model.phase == .transcribing(file: wav) }
         }
@@ -289,8 +287,7 @@ extension TranscriberMockSuites {
                 ))
                 let model = makeModel()
                 model.beforeLandingSave = { throw URLError(.cannotWriteToFile) }
-                model.liveSource = StubTake(url: wav)
-                model.phase = .recording(source: .microphone)
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
                 model.stopRecordingAndTranscribe()
                 await waitUntil {
                     if case .failed = model.phase { return !model.hasPendingTakeWork }
@@ -618,7 +615,8 @@ extension TranscriberMockSuites {
 
                 #expect(model.recordingStartedAt == startedAt)
                 #expect(model.recordingLevelTrace === trace)
-                #expect(AppDelegate.recordingBadge(startedAt: startedAt, now: startedAt.addingTimeInterval(75)) == "1:15")
+                let take = try #require(model.recording)
+                #expect(DockBadge.recordingBadge(for: take, now: startedAt.addingTimeInterval(75)) == "1:15")
 
                 model.cancelCurrentWork()
             }
@@ -627,10 +625,52 @@ extension TranscriberMockSuites {
         @Test("the Dock badge waits while a take arms and turns over with the take's own seconds")
         func dockBadgeReadsTheTakeClock() {
             let start = Date(timeIntervalSinceReferenceDate: 1_000)
-            #expect(AppDelegate.recordingBadge(startedAt: nil, now: start) == "…")
-            #expect(AppDelegate.recordingBadge(startedAt: start, now: start.addingTimeInterval(3_725)) == "1:02:05")
-            #expect(abs(AppDelegate.secondsToNextTick(startedAt: start, now: start.addingTimeInterval(2.3)) - 0.7) < 0.000_1)
-            #expect(AppDelegate.secondsToNextTick(startedAt: nil, now: start) == 1)
+            var take = RecordingSession(
+                takeID: 1, source: .microphone, category: .transcription, title: "Recording", isStreaming: false,
+                arming: .startingCapture
+            )
+            #expect(DockBadge.recordingBadge(for: take, now: start) == "…")
+            #expect(DockBadge.secondsToNextTick(for: take, now: start) == 1)
+
+            take.markCapturing(at: start)
+
+            #expect(DockBadge.recordingBadge(for: take, now: start.addingTimeInterval(3_725)) == "1:02:05")
+            #expect(abs(DockBadge.secondsToNextTick(for: take, now: start.addingTimeInterval(2.3)) - 0.7) < 0.000_1)
+        }
+
+        @Test("the Dock badge holds still while a take is paused, and after it stops")
+        func dockBadgeHoldsWhatTheTakeHolds() {
+            let start = Date(timeIntervalSinceReferenceDate: 1_000)
+            var take = RecordingSession(
+                takeID: 1, source: .microphone, category: .transcription, title: "Recording", isStreaming: false,
+                arming: .startingCapture
+            )
+            take.markCapturing(at: start)
+            take.pause(at: start.addingTimeInterval(10))
+            #expect(DockBadge.recordingBadge(for: take, now: start.addingTimeInterval(70)) == "0:10")
+
+            take.resume(at: start.addingTimeInterval(70))
+            take.finish(at: start.addingTimeInterval(95))
+            #expect(DockBadge.recordingBadge(for: take, now: start.addingTimeInterval(200)) == "0:35")
+        }
+
+        @Test("the Dock badge follows a take from the app delegate, with no window open")
+        func dockBadgeFollowsTheTakeWithoutAWindow() async throws {
+            let wav = try makeTakeWAV("dock")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            let model = makeModel()
+            let shown = DockLabels()
+            let badge = DockBadge { shown.labels.append($0) }
+            badge.bind(model)
+
+            model.installTestTake(source: .microphone, liveSource: StubSource(url: wav), startedAt: Date(timeIntervalSinceNow: -75))
+            let counting = await waitUntil { shown.labels.last??.hasPrefix("1:1") == true }
+            #expect(counting)
+
+            model.endTestTake()
+            let cleared = await waitUntil { shown.labels.last == .some(nil) }
+            #expect(cleared)
+            withExtendedLifetime(badge) {}
         }
 
         // MARK: - Silence
@@ -667,8 +707,7 @@ extension TranscriberMockSuites {
             defer { try? FileManager.default.removeItem(at: wav) }
             try zeroSizes(of: wav)
             let model = makeModel()
-            model.liveSource = CutShortTake(url: wav)
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone, liveSource: CutShortTake(url: wav))
 
             model.stopRecordingAndTranscribe()
 
@@ -691,7 +730,7 @@ extension TranscriberMockSuites {
             defer { try? FileManager.default.removeItem(at: wav) }
             try zeroSizes(of: wav)
             let model = makeModel()
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone)
 
             await model.handleStreamingEvent(.finished(Transcript(
                 segments: [TranscriptSegment(id: 0, start: 0, end: 0.2, text: "until the disk filled")],
@@ -715,8 +754,7 @@ extension TranscriberMockSuites {
                     segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "a titled take")]
                 ))
                 let model = makeModel()
-                model.liveSource = StubTake(url: wav)
-                model.phase = .recording(source: .microphone)
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
                 model.stopRecordingAndTranscribe()
 
                 await waitUntil { model.phase == .ready }
@@ -737,7 +775,7 @@ extension TranscriberMockSuites {
             let wav = try makeTakeWAV("no-words")
             defer { try? FileManager.default.removeItem(at: wav) }
             let model = makeModel()
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone)
 
             await model.handleStreamingEvent(.failed("the engine stopped"), session: AudioOnlySession(audio: wav))
 

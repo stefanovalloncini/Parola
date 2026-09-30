@@ -229,7 +229,7 @@ struct BurnSubtitlesTests {
         }
         await Self.waitUntil { model.burnIsRunning }
 
-        #expect(!model.phaseDefersArrivals)
+        #expect(!model.takeIsRunning)
         #expect(model.downloadBlockedReason == nil)
         #expect(model.entryOpenRefusal == nil)
         model.cancelBurn()

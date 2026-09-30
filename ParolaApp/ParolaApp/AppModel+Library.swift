@@ -609,8 +609,7 @@ extension AppModel {
 
     /// Opening sets `.ready`, which a capture couldn't survive; a burn keeps its own copy of the transcript.
     var entryOpenRefusal: IntentActionError? {
-        if case .recording = phase { return .recordingInProgress }
-        return nil
+        takeIsRunning ? .recordingInProgress : nil
     }
 
     @discardableResult

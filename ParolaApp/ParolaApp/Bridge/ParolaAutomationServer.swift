@@ -472,9 +472,10 @@ final class ParolaAutomationServer {
         let translate = defaults.bool(forKey: "translate")
 
         return .object([
-            "phase": .string(Self.phaseName(model.phase)),
-            "phaseDetail": Self.phaseDetail(model.phase, progress: TranscribeProgress(model: model)),
+            "phase": .string(Self.phaseName(for: model)),
+            "phaseDetail": Self.phaseDetail(for: model),
             "recordingStartedAt": model.recordingStartedAt.map { .double($0.timeIntervalSince1970) } ?? .null,
+            "recording": Self.recordingState(model.recording, now: Date()),
             "route": .string(model.route.rawValue),
             "settingsPane": .string(model.settingsPane),
             "libraryFilter": .string(model.libraryFilter?.rawValue ?? ""),
@@ -569,7 +570,18 @@ final class ParolaAutomationServer {
         ])
     }
 
-    static func phaseName(_ phase: AppModel.Phase) -> String {
+    /// A take arming or capturing reads "recording" whatever the phase says, so a script's wait for it still matches.
+    static func phaseName(for model: AppModel) -> String {
+        if liveTake(of: model) != nil { return "recording" }
+        return phaseName(model.phase)
+    }
+
+    private static func liveTake(of model: AppModel) -> RecordingSession? {
+        guard let take = model.recording, take.isArming || take.isCapturing else { return nil }
+        return take
+    }
+
+    private static func phaseName(_ phase: AppModel.Phase) -> String {
         switch phase {
         case .idle: return "idle"
         case .downloadingModel: return "downloadingModel"
@@ -580,6 +592,11 @@ final class ParolaAutomationServer {
         case .ready: return "ready"
         case .failed: return "failed"
         }
+    }
+
+    static func phaseDetail(for model: AppModel) -> AutomationValue {
+        if let take = liveTake(of: model) { return .object(["source": .string(take.source.rawValue)]) }
+        return phaseDetail(model.phase, progress: TranscribeProgress(model: model))
     }
 
     static func phaseDetail(
@@ -609,6 +626,35 @@ final class ParolaAutomationServer {
             return .object(["source": .string(source.rawValue)])
         case .failed(let message):
             return .object(["message": .string(message)])
+        }
+    }
+
+    /// The take the surfaces show, from its count-in until the next take; null when there is none.
+    static func recordingState(_ take: RecordingSession?, now: Date) -> AutomationValue {
+        guard let take else { return .null }
+        return .object([
+            "state": .string(recordingStateName(take.state)),
+            "elapsed": .double(take.elapsed(at: now)),
+            "startedAt": take.startedAt.map { .double($0.timeIntervalSince1970) } ?? .null,
+            "paused": .bool(take.isPaused),
+            "markers": .array(take.markers.map { .double($0) }),
+            "title": .string(take.title),
+            "category": .string(take.category.rawValue),
+            "source": .string(take.source.rawValue),
+            "isStreaming": .bool(take.isStreaming),
+            "device": take.device.map { .string($0) } ?? .null,
+        ])
+    }
+
+    static func recordingStateName(_ state: RecordingSession.State) -> String {
+        switch state {
+        case .arming: return "arming"
+        case .recording: return "recording"
+        case .paused: return "paused"
+        case .finishing: return "finishing"
+        case .transcribing: return "transcribing"
+        case .done: return "done"
+        case .failed: return "failed"
         }
     }
 

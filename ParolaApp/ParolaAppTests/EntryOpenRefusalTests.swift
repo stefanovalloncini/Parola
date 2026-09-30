@@ -13,8 +13,6 @@ struct EntryOpenRefusalTests {
         var count = 0
     }
 
-    private let busyPhases: [AppModel.Phase] = [.recording(source: .microphone)]
-
     private func makeModel(_ label: String) -> (AppModel, BeepCounter) {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL(label))
         let beeps = BeepCounter()
@@ -44,26 +42,24 @@ struct EntryOpenRefusalTests {
 
     @Test("a library row, a menu-bar item or a Statistics row beeps and changes nothing", .timeLimit(.minutes(1)))
     func libraryOpenRefuses() async throws {
-        for phase in busyPhases {
-            let (model, beeps) = makeModel("refuse-row")
-            let entry = try await addEntry(to: model)
-            model.phase = phase
+        let (model, beeps) = makeModel("refuse-row")
+        let entry = try await addEntry(to: model)
+        model.installTestTake(source: .microphone)
 
-            #expect(!model.openEntryFromLibrary(entry.id, inNewWindow: false))
-            await settle()
+        #expect(!model.openEntryFromLibrary(entry.id, inNewWindow: false))
+        await settle()
 
-            #expect(model.phase == phase)
-            #expect(model.selectedEntryID == nil)
-            #expect(model.transcript == nil)
-            #expect(beeps.count == 1)
-        }
+        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.selectedEntryID == nil)
+        #expect(model.transcript == nil)
+        #expect(beeps.count == 1)
     }
 
     @Test("a parola://open link beeps and changes nothing", .timeLimit(.minutes(1)))
     func urlOpenRefuses() async throws {
         let (model, beeps) = makeModel("refuse-url")
         let entry = try await addEntry(to: model)
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         handleParolaOpen(try #require(URL(string: "parola://open?entry=\(entry.id)&t=5")), model: model)
         await settle()
@@ -78,7 +74,7 @@ struct EntryOpenRefusalTests {
     func bridgeOpenRefuses() async throws {
         let (model, beeps) = makeModel("refuse-bridge")
         let entry = try await addEntry(to: model)
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         let (command, context, server) = try loadEntryCommand(model)
         let args = try command.validate(AutomationArgs(["id": .string(entry.id)]))
 

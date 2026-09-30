@@ -302,7 +302,7 @@ struct IntroductionBackstopTests {
     func transcribeDefers() {
         let model = makeModel()
         model.introduction.restart()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         #expect(model.introduction.isPresented)
 
         model.transcribe(fileURL: URL(fileURLWithPath: "/tmp/parola-introduction-backstop.wav"))

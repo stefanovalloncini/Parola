@@ -1,5 +1,6 @@
 import AppKit
 import CoreSpotlight
+import Observation
 import ParolaCore
 
 @MainActor
@@ -13,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dictationSubscription: DictationSubscription?
     private var settingsResetSubscription: (any NSObjectProtocol)?
     private let menuBar = MenuBarController()
-    private var recordingTickTask: Task<Void, Never>?
+    private let dockBadge = DockBadge()
     private let playbackKeys = PlaybackKeyMonitor()
 
     func bind(model: AppModel) {
@@ -21,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.model = model
         provider.model = model
         menuBar.bind(model)
+        dockBadge.bind(model)
         playbackKeys.bind(model)
         model.activationPolicyApplier = { NSApp.setActivationPolicy($0) }
         model.applyAppVisibilityMode()
@@ -162,58 +164,100 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         components.queryItems = [URLQueryItem(name: "entry", value: entryID)]
         return components.url
     }
+}
 
-    /// A burn shows its progress only while nothing in the window reports its own.
-    func updateDockBadge(for phase: AppModel.Phase, burnProgress: Double? = nil) {
-        switch phase {
-        case .idle, .ready, .failed:
-            stopRecordingTick()
-            NSApp.dockTile.badgeLabel = burnProgress.map { "\(Int($0 * 100))%" }
-        case .downloadingModel(_, let progress):
-            stopRecordingTick()
-            NSApp.dockTile.badgeLabel = "\(Int(progress * 100))%"
-        case .loadingModel, .fetchingLink(_, nil):
-            stopRecordingTick()
-            NSApp.dockTile.badgeLabel = "…"
-        case .fetchingLink(_, let progress?):
-            stopRecordingTick()
-            NSApp.dockTile.badgeLabel = "\(Int(progress * 100))%"
-        case .transcribing:
-            stopRecordingTick()
-            NSApp.dockTile.badgeLabel = "•"
-        case .recording:
-            startRecordingTick()
+/// The Dock badge, kept by the app delegate so it follows a take with no window open.
+@MainActor
+final class DockBadge {
+    private weak var model: AppModel?
+    private let show: @MainActor (String?) -> Void
+    private var shown: String??
+    private var tick: Task<Void, Never>?
+
+    init(show: @escaping @MainActor (String?) -> Void = { NSApp.dockTile.badgeLabel = $0 }) {
+        self.show = show
+    }
+
+    func bind(_ model: AppModel) {
+        self.model = model
+        observe()
+    }
+
+    private func observe() {
+        guard let model else { return }
+        withObservationTracking {
+            update(model)
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in self?.observe() }
         }
     }
 
+    private func update(_ model: AppModel) {
+        if let take = model.recording, take.isRunning {
+            display(Self.recordingBadge(for: take, now: Date()))
+            startTick()
+        } else {
+            stopTick()
+            display(Self.badge(for: model.phase, burnProgress: model.burnJob?.progress))
+        }
+    }
+
+    private func display(_ label: String?) {
+        guard shown != .some(label) else { return }
+        shown = .some(label)
+        show(label)
+    }
+
     /// Reads the take's own clock each second, turning over with the pane's.
-    private func startRecordingTick() {
-        if recordingTickTask != nil { return }
-        recordingTickTask = Task { @MainActor [weak self] in
+    private func startTick() {
+        guard tick == nil else { return }
+        tick = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                let startedAt = self?.model?.recordingStartedAt
-                NSApp.dockTile.badgeLabel = Self.recordingBadge(startedAt: startedAt, now: Date())
-                try? await Task.sleep(for: .seconds(Self.secondsToNextTick(startedAt: startedAt, now: Date())))
+                guard let wait = self?.showTakeClock() else { return }
+                try? await Task.sleep(for: .seconds(wait))
             }
         }
     }
 
-    private func stopRecordingTick() {
-        recordingTickTask?.cancel()
-        recordingTickTask = nil
+    private func stopTick() {
+        tick?.cancel()
+        tick = nil
+    }
+
+    private func showTakeClock() -> Double {
+        guard let take = model?.recording, take.isRunning else { return 1 }
+        let now = Date()
+        display(Self.recordingBadge(for: take, now: now))
+        return Self.secondsToNextTick(for: take, now: now)
     }
 
     /// A take still starting has no time to show yet.
-    nonisolated static func recordingBadge(startedAt: Date?, now: Date) -> String {
-        guard let startedAt else { return "…" }
-        return AppFormat.elapsed(now.timeIntervalSince(startedAt))
+    nonisolated static func recordingBadge(for take: RecordingSession, now: Date) -> String {
+        guard take.startedAt != nil else { return "…" }
+        return AppFormat.elapsed(take.elapsed(at: now))
     }
 
-    nonisolated static func secondsToNextTick(startedAt: Date?, now: Date) -> Double {
-        guard let startedAt else { return 1 }
-        let elapsed = max(0, now.timeIntervalSince(startedAt))
+    nonisolated static func secondsToNextTick(for take: RecordingSession, now: Date) -> Double {
+        guard take.startedAt != nil else { return 1 }
+        let elapsed = take.elapsed(at: now)
         let next = elapsed.rounded(.down) + 1 - elapsed
         return max(0.05, next)
+    }
+
+    /// A burn shows its progress only while nothing in the window reports its own.
+    nonisolated static func badge(for phase: AppModel.Phase, burnProgress: Double?) -> String? {
+        switch phase {
+        case .idle, .ready, .failed, .recording:
+            return burnProgress.map { "\(Int($0 * 100))%" }
+        case .downloadingModel(_, let progress):
+            return "\(Int(progress * 100))%"
+        case .loadingModel, .fetchingLink(_, nil):
+            return "…"
+        case .fetchingLink(_, let progress?):
+            return "\(Int(progress * 100))%"
+        case .transcribing:
+            return "•"
+        }
     }
 }
 

@@ -28,6 +28,7 @@ extension ParolaAutomationServer {
                         throw AutomationError.precondition("simulateHotkey is only available in --test-mode")
                     }
                     let name = try args.string("name")
+                    let micTakeRunning = ctx.model.takeIsRunning && ctx.model.recording?.source == .microphone
                     switch name {
                     case "dictation.start":
                         ctx.model.startDictationFromIntent()
@@ -40,16 +41,11 @@ extension ParolaAutomationServer {
                             ctx.model.startDictationFromIntent()
                         }
                     case "mic.start":
-                        guard case .recording(.microphone) = ctx.model.phase else {
-                            ctx.model.toggleMicRecording()
-                            break
-                        }
+                        if !micTakeRunning { ctx.model.toggleMicRecording() }
                     case "mic.toggle":
                         ctx.model.toggleMicRecording()
                     case "mic.stop":
-                        if case .recording(.microphone) = ctx.model.phase {
-                            ctx.model.toggleMicRecording()
-                        }
+                        if micTakeRunning { ctx.model.toggleMicRecording() }
                     default:
                         throw AutomationError.invalidArgs(field: "name", reason: "unknown hotkey: \(name)")
                     }

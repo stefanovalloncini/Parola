@@ -309,6 +309,29 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Cancel while the take is still starting is held until the start can drop it, quietly")
+        func cancelDuringStartupIsHeld() async throws {
+            let fixture = try makeSilentWAV()
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+
+                let model = makeRecordingModel()
+                model.useStreaming = false
+                model.selectedModel = "openai_whisper-tiny"
+                model.recordingCountInSeconds = 0
+
+                model.startRecording(source: .microphone)
+                model.cancelRecordingBeforeCapture()
+                #expect(model.stopHeldForStartup)
+
+                let settled = await waitUntil { !model.recordingActive }
+                #expect(settled, "the cancel must not be swallowed by the startup window")
+                #expect(model.liveSource == nil)
+                #expect(model.recording == nil)
+                #expect(model.phase == .idle)
+            }
+        }
+
         @Test("a stop held for startup resolves its waiter as cancelled", .timeLimit(.minutes(1)))
         func stopHeldForStartupResolvesWaiter() async throws {
             let fixture = try makeSilentWAV()

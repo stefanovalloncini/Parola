@@ -60,7 +60,7 @@ struct DropRoutingTests {
     @Test("a drop while recording goes to the deferred pile rather than stomping the take")
     func dropWhileRecordingDefers() {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         model.transcribeNow(urls: [Self.media("arrival.wav")])
 
@@ -96,7 +96,7 @@ struct DropRoutingTests {
     @Test("the Add to Queue half never lands a gated build on a failure pane")
     func addToQueueFallsBackWithoutBatch() {
         let model = makeModel(features: [.youtube])
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         model.addToQueue(urls: [Self.media("a.wav"), Self.media("b.wav")])
 
@@ -136,7 +136,7 @@ struct DropRoutingTests {
     @Test("a link dropped while recording parks instead of taking the phase off the take")
     func linkWhileRecordingParks() {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         model.transcribeNow(urls: [Self.link])
 
@@ -144,6 +144,7 @@ struct DropRoutingTests {
         #expect(model.deferredLinks == [.transcribe(Self.link.absoluteString)])
         #expect(model.transcribeTaskRunning == false)
 
+        model.endTestTake()
         model.phase = .ready
         model.drainDeferredArrivals()
 
@@ -155,7 +156,7 @@ struct DropRoutingTests {
     @Test("transcribeYouTube parks a link handed straight to it during a take")
     func transcribeYouTubeParksWhileRecording() {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         model.transcribeYouTube(urlString: Self.link.absoluteString)
 
@@ -167,7 +168,7 @@ struct DropRoutingTests {
     @Test("a subtitle fetch asked for during a take waits for the take and then runs")
     func fetchYouTubeSubsParksWhileRecording() {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         model.fetchYouTubeSubs(urlString: Self.link.absoluteString)
 
@@ -175,6 +176,7 @@ struct DropRoutingTests {
         #expect(model.deferredLinks == [.subtitles(Self.link.absoluteString)])
         #expect(model.transcribeTaskRunning == false)
 
+        model.endTestTake()
         model.phase = .ready
         model.drainDeferredArrivals()
 
@@ -186,7 +188,7 @@ struct DropRoutingTests {
     @Test("the Add to Queue half parks a link rather than dropping it on the floor")
     func addToQueueParksLink() {
         let model = makeModel()
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
 
         model.addToQueue(urls: [Self.link])
 
@@ -419,7 +421,7 @@ struct DropRoutingTests {
         model.dropDragPayload = .media(count: 2)
         #expect(model.dropZonePlan == .split(count: 2))
 
-        model.phase = .recording(source: .microphone)
+        model.installTestTake(source: .microphone)
         #expect(model.dropZonePlan == .queueOnly(count: 2))
     }
 

@@ -4,13 +4,6 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
-private struct StubLiveSource: LiveAudioSource {
-    let url: URL
-    func start() async throws {}
-    func prepare() async throws -> URL { url }
-    func cancel() async {}
-}
-
 private func makeTakeWAV(label: String) throws -> URL {
     let sampleRate = 16_000, channels = 1, bytesPerSample = 2
     let frames = Int(Double(sampleRate) * 0.3)
@@ -80,7 +73,7 @@ extension TranscriberMockSuites {
                 let wav = try makeTakeWAV(label: "failed")
                 defer { try? FileManager.default.removeItem(at: wav) }
 
-                model.liveSource = StubLiveSource(url: wav)
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
                 model.stopRecordingAndTranscribe()
 
                 let failed = await waitUntil {
@@ -146,7 +139,7 @@ extension TranscriberMockSuites {
         @Test("a take stopped before capture came up saves nothing and says so")
         func emptyTakeWithoutAudioIsNotSaved() async {
             let model = makeModel()
-            model.phase = .recording(source: .microphone)
+            model.installTestTake(source: .microphone)
 
             await model.handleStreamingEvent(.finished(Transcript(
                 segments: [], language: "en", modelName: "openai_whisper-tiny"
