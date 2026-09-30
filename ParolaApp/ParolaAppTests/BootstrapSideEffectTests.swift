@@ -42,10 +42,27 @@ struct BootstrapSideEffectTests {
         #expect(BootstrapSideEffect.testing.isSubset(of: BootstrapSideEffect.all))
     }
 
-    @Test("AppBootstrap.test returns nil without --test-mode")
+    @Test("AppBootstrap.test returns nil without --test-mode outside a test host")
     func testReturnsNilWithoutFlag() {
-        let bootstrap = AppBootstrap.test(from: ["Parola", "--library=/tmp/x"])
+        let bootstrap = AppBootstrap.test(from: ["Parola", "--library=/tmp/x"], environment: [:])
         #expect(bootstrap == nil)
+    }
+
+    @Test("the unit-test host boots in test mode on its own suite, library and key store, with no side effects")
+    func testHostGetsItsOwnSandbox() throws {
+        let environment = ["XCTestConfigurationFilePath": ""]
+        let bootstrap = try #require(AppBootstrap.test(from: ["Parola"], environment: environment))
+        let sandbox = TestHostSandbox.current
+        let temporary = FileManager.default.temporaryDirectory.standardizedFileURL.path
+
+        #expect(bootstrap.mode == .test)
+        #expect(bootstrap.sideEffects.isEmpty)
+        #expect(bootstrap.defaultsSuite == sandbox.defaultsSuite)
+        #expect(sandbox.defaultsSuite.hasPrefix(TestHostSandbox.namePrefix))
+        #expect(bootstrap.library == sandbox.library)
+        #expect(bootstrap.models == nil)
+        #expect(sandbox.library.standardizedFileURL.path.hasPrefix(temporary))
+        #expect(bootstrap.apiKeyStore is InMemoryAPIKeyStore)
     }
 
     @Test("AppBootstrap.test parses every test-mode flag correctly")

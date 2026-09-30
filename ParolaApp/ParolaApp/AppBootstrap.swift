@@ -58,8 +58,12 @@ struct AppBootstrap: @unchecked Sendable {
         filePicker: SystemFilePicker()
     )
 
-    static func test(from args: [String]) -> AppBootstrap? {
-        guard args.contains("--test-mode") else { return nil }
+    /// A `--test-mode` launch reads its sandbox from the flags; the unit-test host gets one of its own.
+    static func test(
+        from args: [String],
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> AppBootstrap? {
+        guard args.contains("--test-mode") else { return testHost(environment: environment) }
         let map = parseKeyValueFlags(args)
         return AppBootstrap(
             mode: .test,
@@ -74,6 +78,21 @@ struct AppBootstrap: @unchecked Sendable {
                 Set(raw.split(separator: ",").compactMap { ParolaFeature(rawValue: String($0)) })
             },
             showsIntroduction: args.contains("--show-introduction")
+        )
+    }
+
+    /// Every test builds its own AppModel; the host's only has to stay off the user's settings, library and keychain.
+    static func testHost(environment: [String: String]) -> AppBootstrap? {
+        guard TestHostSandbox.isTestHost(environment) else { return nil }
+        let sandbox = TestHostSandbox.current
+        // No models override: recording tests still take their default model from what is installed.
+        return AppBootstrap(
+            mode: .test,
+            library: sandbox.library,
+            defaultsSuite: sandbox.defaultsSuite,
+            sideEffects: [],
+            filePicker: TestFilePicker(),
+            apiKeyStore: InMemoryAPIKeyStore()
         )
     }
 
