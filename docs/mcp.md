@@ -37,6 +37,12 @@ bare `parola mcp` works too:
 claude mcp add parola -- parola mcp
 ```
 
+To reach the app's bundled CLI as a bare `parola`, put a small wrapper script
+on your `PATH` that runs `exec /Applications/Parola.app/Contents/MacOS/parola "$@"`
+(a shell alias is enough for your own terminal) rather than a symlink: a
+symlinked binary keeps its own compiled-model cache, so it compiles every model
+again the first time it loads it.
+
 ### Claude Desktop
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
