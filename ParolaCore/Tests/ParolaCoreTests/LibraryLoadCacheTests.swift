@@ -170,8 +170,10 @@ struct LibraryLoadCacheTests {
             }
         }
 
-        /// Runs `body` once `count` decodes are parked, then lets them all answer.
-        func holding(_ count: Int, _ body: () async throws -> Void) async rethrows {
+        /// Starts the decodes only once the gate is armed, runs `body` when `count` of them are parked, then lets them all answer.
+        func holding<Started>(
+            _ count: Int, starting start: () -> Started, _ body: () async throws -> Void
+        ) async rethrows -> Started {
             let release = DispatchSemaphore(value: 0)
             let (parked, signal) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
             state.withLock { $0 = Arming(release: release, allParked: signal, remaining: count, parked: 0) }
@@ -180,6 +182,7 @@ struct LibraryLoadCacheTests {
                 signal.finish()
                 for _ in 0..<count { release.signal() }
             }
+            let started = start()
             if !reported.withLock({ $0 }) {
                 let reached = await signalled(parked)
                 if !reached, state.withLock({ $0?.parked ?? count }) < count {
@@ -188,6 +191,7 @@ struct LibraryLoadCacheTests {
                 }
             }
             try await body()
+            return started
         }
 
         /// The last decode to park signals, so a starved pool delays the answer instead of faking a timeout.
@@ -218,8 +222,7 @@ struct LibraryLoadCacheTests {
         for i in 0..<8 {
             // Also on the first pass: the add left the entry cached, and this load has to decode.
             try await store.updateTranscript(makeTranscript("original \(i)"), for: entry.id)
-            let loading = Task { try await store.load(entry.id) }
-            try await gate.holding(1) {
+            let loading = try await gate.holding(1, starting: { Task { try await store.load(entry.id) } }) {
                 try await store.updateTranscript(makeTranscript("edited \(i)"), for: entry.id)
             }
 
@@ -238,9 +241,9 @@ struct LibraryLoadCacheTests {
         for i in 0..<8 {
             // Also on the first pass: the add left the entry cached, and these loads have to decode.
             try await store.updateTranscript(makeTranscript("original \(i)", segments: 8), for: entry.id)
-            let first = Task { try await store.load(entry.id) }
-            let second = Task { try await store.load(entry.id) }
-            try await gate.holding(2) {
+            let (first, second) = try await gate.holding(2, starting: {
+                (Task { try await store.load(entry.id) }, Task { try await store.load(entry.id) })
+            }) {
                 try await store.updateTranscript(makeTranscript("edited \(i)", segments: 8), for: entry.id)
             }
 
