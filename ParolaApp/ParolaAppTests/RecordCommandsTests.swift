@@ -83,6 +83,19 @@ extension TranscriberMockSuites {
             #expect(!RecordControl.offersModes(features: FeatureSet(enabled: [.micRecording, .batch])))
             #expect(!RecordControl.offersModes(features: FeatureSet(enabled: [.meetings])))
         }
+
+        @Test("the meeting item follows the running app the menu bar shows, not the alert's flag")
+        func meetingItem() {
+            let model = makeModel()
+            model.meetingDetector.detectedAppName = "Zoom"
+            model.meetingDetectedApp = nil
+            #expect(RecordControl.detectedMeetingApp(for: model) == "Zoom", "no alert has to be up")
+            #expect(RecordControl.offersModes(features: FeatureSet(enabled: [.meetings]), detectedMeetingApp: "Zoom"))
+            #expect(!RecordControl.offersModes(features: FeatureSet(enabled: [.micRecording]), detectedMeetingApp: "Zoom"))
+
+            let gated = makeModel(features: [.micRecording])
+            #expect(RecordControl.detectedMeetingApp(for: gated) == nil)
+        }
     }
 }
 

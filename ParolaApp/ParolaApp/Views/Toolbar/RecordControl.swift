@@ -13,8 +13,15 @@ struct RecordControl: View {
     }
 
     /// A menu holding only what the button already does would be a second way to the same take.
-    static func offersModes(features: FeatureSet) -> Bool {
-        [ParolaFeature.micRecording, .meetings, .liveCaptions, .dictation].filter(features.isEnabled).count > 1
+    static func offersModes(features: FeatureSet, detectedMeetingApp: String? = nil) -> Bool {
+        let modes = [ParolaFeature.micRecording, .meetings, .liveCaptions, .dictation].filter(features.isEnabled).count
+        return modes > 1 || (features.isEnabled(.meetings) && detectedMeetingApp != nil)
+    }
+
+    /// The meeting app the menu bar offers too; the model's own flag is set only while its alert blocks the window.
+    static func detectedMeetingApp(for model: AppModel) -> String? {
+        guard model.features.isEnabled(.meetings) else { return nil }
+        return model.meetingDetector.detectedAppName
     }
 
     var body: some View {
@@ -26,7 +33,7 @@ struct RecordControl: View {
     }
 
     private var showsModes: Bool {
-        Self.offersModes(features: model.features) || model.meetingDetectedApp != nil
+        Self.offersModes(features: model.features, detectedMeetingApp: Self.detectedMeetingApp(for: model))
     }
 
     private func recordButton(_ source: AppModel.RecordSource) -> some View {
@@ -78,8 +85,8 @@ struct RecordControl: View {
                     .keyboardShortcut("n", modifiers: [.command, .option])
                     .disabled(!model.canStartTake(.systemAudio))
                     .axLeaf("Toolbar.MenuItem.RecordSystemAudio")
-                    if let app = model.meetingDetectedApp {
-                        Button { model.startMeetingRecording() } label: {
+                    if let app = Self.detectedMeetingApp(for: model) {
+                        Button { model.startMeetingRecording(appName: app) } label: {
                             Label("Record \(app) Meeting", systemImage: DS.categorySymbol(for: .meeting))
                         }
                         .disabled(!model.canStartTake(.systemAudio))
