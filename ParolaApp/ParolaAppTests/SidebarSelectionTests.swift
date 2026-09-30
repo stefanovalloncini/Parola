@@ -54,6 +54,14 @@ struct SidebarSelectionTests {
         #expect(SidebarSelection.destination(of: page(listShowing: false, person: giulia)) == nil)
     }
 
+    @Test("the user's place stays put under a transcript, a progress pane or results")
+    func places() {
+        #expect(SidebarSelection.place(of: page(listShowing: false, filter: .meeting)) == .category(.meeting))
+        #expect(SidebarSelection.place(of: page(searching: true, person: giulia)) == .person(giulia))
+        #expect(SidebarSelection.place(of: page(listShowing: false)) == .library)
+        #expect(SidebarSelection.place(of: page(route: .statistics)) == nil)
+    }
+
     @Test("Activity shows while a job waits, runs or failed")
     func activity() {
         let file = URL(fileURLWithPath: "/tmp/a.m4a")

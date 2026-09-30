@@ -65,11 +65,13 @@ struct LibraryOriginTests {
     @Test("a search wins over the category filter underneath it")
     func searchBeatsFilter() {
         #expect(LibraryOrigin.capture(from: page(searching: true, filter: .meeting)) == .search)
+        #expect(LibraryOrigin.capture(from: page(listShowing: false, searching: true, filter: .meeting)) == .search)
     }
 
-    @Test("a category list is recorded as its category")
+    @Test("a category is recorded as the place the user is in, even under a transcript")
     func categoryList() {
         #expect(LibraryOrigin.capture(from: page(filter: .dictation)) == .category(.dictation))
+        #expect(LibraryOrigin.capture(from: page(listShowing: false, filter: .dictation)) == .category(.dictation))
     }
 
     @Test("the Library page is recorded as the whole library")
@@ -80,14 +82,12 @@ struct LibraryOriginTests {
     @Test("a person's list is recorded as the whole library, whether or not the sidebar lists them")
     func personList() {
         #expect(LibraryOrigin.capture(from: page(person: UUID())) == .all)
+        #expect(LibraryOrigin.capture(from: page(listShowing: false, person: UUID())) == .all)
     }
 
-    @Test("an entry opened with no list on screen has no origin, whatever lies under the transcript")
+    @Test("an entry opened with no list on screen has no origin")
     func noList() {
         #expect(LibraryOrigin.capture(from: page(listShowing: false)) == nil)
-        #expect(LibraryOrigin.capture(from: page(listShowing: false, filter: .meeting)) == nil)
-        #expect(LibraryOrigin.capture(from: page(listShowing: false, person: UUID())) == nil)
-        #expect(LibraryOrigin.capture(from: page(listShowing: false, searching: true)) == nil)
         for route in [AppModel.Route.queue, .batch, .statistics, .recentlyDeleted] {
             let origin = LibraryOrigin.capture(from: page(route: route, searching: true, filter: .meeting))
             #expect(origin == nil, "\(route) is a page of its own, not a list a transcript came from")
@@ -166,20 +166,6 @@ struct LibraryOriginTests {
         #expect(await openEntry(second.id, in: model))
 
         #expect(model.transcriptOrigin == nil, "the menu bar extra opens entries with no list behind them")
-    }
-
-    @Test("opening over an entry from a category leaves no origin either")
-    func opensOverACategoryEntry() async throws {
-        let model = makeModel()
-        let meeting = try await seedEntry(in: model, text: "quarterly review", category: .meeting)
-        let memo = try await seedEntry(in: model, text: "voice memo")
-        model.browseCategory(.meeting)
-        #expect(await openEntry(meeting.id, in: model))
-
-        #expect(await openEntry(memo.id, in: model))
-
-        #expect(model.transcriptOrigin == nil, "the Meetings list is under the transcript, not on screen")
-        #expect(model.libraryFilter == .meeting)
     }
 
     @Test("an entry opened while a page is up takes the content area")
@@ -489,6 +475,27 @@ struct LibraryOriginTests {
         }
         #expect(fields["origin"] == .string("meeting"))
         #expect(fields["route"] == .string("transcript"))
+    }
+
+    @Test("an entry the bridge or the menu bar opens over a Meetings entry still goes back to Meetings")
+    func openingOverACategoryEntryKeepsThePlace() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let meeting = try await seedEntry(in: model, text: "quarterly review", category: .meeting)
+        let memo = try await seedEntry(in: model, text: "voice memo")
+        model.browseCategory(.meeting)
+        #expect(await openEntry(meeting.id, in: model))
+        let load = try #require(commands["loadEntry"])
+
+        _ = try await load.handler(try load.validate(AutomationArgs(["id": .string(memo.id)])), context)
+        withExtendedLifetime(server) {}
+        let memoUp = await waitUntil { model.selectedEntryID == memo.id && model.transcript != nil }
+        #expect(memoUp)
+        #expect(model.transcriptOrigin == .category(.meeting), "the user is still in Meetings, whatever is on screen")
+
+        #expect(await goBack(in: model))
+
+        #expect(model.libraryFilter == .meeting)
+        #expect(model.isBrowsingLibrary)
     }
 
     @Test("goBack from a Library entry replies once the whole library is back")

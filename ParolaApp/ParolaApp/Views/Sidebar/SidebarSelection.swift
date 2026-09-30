@@ -29,12 +29,17 @@ enum SidebarSelection {
 
     /// The place on screen, row or no row; none over a transcript, a progress pane or results, as a native list ignores a click on its lit row.
     static func destination(of page: Page) -> SidebarItem? {
+        if page.route == .transcript, !page.listShowing || page.searching { return nil }
+        return place(of: page)
+    }
+
+    /// Where the user is, whatever covers the list.
+    static func place(of page: Page) -> SidebarItem? {
         switch page.route {
         case .recentlyDeleted: return .recentlyDeleted
         case .queue: return .activity
         case .batch, .statistics: return nil
         case .transcript:
-            guard page.listShowing, !page.searching else { return nil }
             // A person picked in the header narrows the category; the person's own row means the whole library.
             if let category = page.libraryFilter { return .category(category) }
             if let person = page.personFilter { return .person(person) }

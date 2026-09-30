@@ -32,13 +32,15 @@ enum LibraryOrigin: Equatable {
     case category(EntryCategory)
     case search
 
-    /// The list on screen as the entry opens; results win over the category filter underneath them.
+    /// Read off the user's place rather than the lit row, so a search wins over the category filter underneath it.
     static func capture(from page: SidebarSelection.Page) -> LibraryOrigin? {
-        if page.route == .transcript, page.listShowing, page.searching { return .search }
-        switch SidebarSelection.destination(of: page) {
-        // The back link reads "Library" for a person's list too; personFilter itself isn't part of the origin.
-        case .library?, .person?: return .all
+        guard page.route == .transcript else { return nil }
+        if page.searching { return .search }
+        switch SidebarSelection.place(of: page) {
+        case .library?: return page.listShowing ? .all : nil
         case .category(let category)?: return .category(category)
+        // The back link reads "Library" for a person's list too; personFilter itself isn't part of the origin.
+        case .person?: return .all
         case .activity?, .recentlyDeleted?, nil: return nil
         }
     }
@@ -739,7 +741,7 @@ extension AppModel {
         closeTranscript()
     }
 
-    /// Nil when no list is on screen: a page of its own, a batch, or a transcript already up, whatever lies under it.
+    /// Nil when no list is behind the transcript: a page of its own, a batch, or the Library page with something already loaded.
     func captureLibraryOrigin() -> LibraryOrigin? {
         LibraryOrigin.capture(from: sidebarPage)
     }
