@@ -64,7 +64,8 @@ struct AppModelAIFailureTests {
             let model = makeModel()
 
             model.runPrompt(try #require(Prompt.builtIns.first))
-            #expect(await waitUntil { model.promptOutput != nil })
+            let promptOutputWait = await waitUntil { model.promptOutput != nil }
+            #expect(promptOutputWait)
 
             #expect(model.phase == .ready)
             #expect(model.promptOutput?.failure?.contains("Apple Intelligence is off.") == true)
@@ -77,7 +78,8 @@ struct AppModelAIFailureTests {
             let model = makeModel()
 
             model.extractActionItems()
-            #expect(await waitUntil { model.actionItemsError != nil })
+            let actionItemsErrorWait = await waitUntil { model.actionItemsError != nil }
+            #expect(actionItemsErrorWait)
 
             #expect(model.phase == .ready)
             #expect(model.actionItems.isEmpty)
@@ -90,7 +92,8 @@ struct AppModelAIFailureTests {
             let model = makeModel()
 
             model.extractSmartChapters()
-            #expect(await waitUntil { model.chaptersError != nil })
+            let chaptersErrorWait = await waitUntil { model.chaptersError != nil }
+            #expect(chaptersErrorWait)
 
             #expect(model.phase == .ready)
             #expect(model.smartChapters.isEmpty)
@@ -112,7 +115,8 @@ struct AppModelAIFailureTests {
 
         model.extractSmartChapters()
 
-        #expect(await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening", "Fresh close"] })
+        let mapWait = await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening", "Fresh close"] }
+        #expect(mapWait)
         #expect(model.transcript?.summary?.chapters.map(\.title) == ["Fresh opening", "Fresh close"])
         }
     }
@@ -142,7 +146,8 @@ struct AppModelAIFailureTests {
 
             model.extractSmartChapters()
 
-            #expect(await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening"] })
+            let mapWait = await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening"] }
+            #expect(mapWait)
             #expect(model.transcript?.chapters?.map(\.title) == ["Fresh opening"])
             #expect(model.transcript?.summary == nil)
         }

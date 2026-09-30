@@ -100,7 +100,8 @@ struct AICallSiteTests {
             pick(openAI(), for: .prompts, on: model)
 
             model.runPrompt(try #require(Prompt.builtIns.first))
-            #expect(await waitUntil { model.promptOutput != nil })
+            let promptOutputWait = await waitUntil { model.promptOutput != nil }
+            #expect(promptOutputWait)
             #expect(model.promptOutput?.text == "from openai")
         }
     }
@@ -112,7 +113,8 @@ struct AICallSiteTests {
             pick(openAI(), for: .prompts, on: model)
 
             model.extractActionItems()
-            #expect(await waitUntil { !model.actionItems.isEmpty })
+            let isEmptyWait = await waitUntil { !model.actionItems.isEmpty }
+            #expect(isEmptyWait)
             #expect(model.actionItems.map(\.task) == ["from openai"])
         }
     }
@@ -124,7 +126,8 @@ struct AICallSiteTests {
             pick(ollama(), for: .summary, on: model)
 
             model.generateYouTubeChapters()
-            #expect(await waitUntil { model.promptOutput != nil })
+            let promptOutputWait = await waitUntil { model.promptOutput != nil }
+            #expect(promptOutputWait)
             #expect(model.promptOutput?.text == "from ollama")
         }
     }
@@ -136,7 +139,8 @@ struct AICallSiteTests {
             pick(ollama(), for: .summary, on: model)
 
             model.summariseTranscript()
-            #expect(await waitUntil { model.transcript?.summary != nil })
+            let transcriptWait = await waitUntil { model.transcript?.summary != nil }
+            #expect(transcriptWait)
             #expect(model.transcript?.summary?.text == "from ollama")
             #expect(model.transcript?.summary?.provider == "Ollama · llama3.2:3b")
         }
@@ -148,7 +152,8 @@ struct AICallSiteTests {
             let model = makeModel()
 
             model.summariseTranscript()
-            #expect(await waitUntil { model.transcript?.summary != nil })
+            let transcriptWait = await waitUntil { model.transcript?.summary != nil }
+            #expect(transcriptWait)
             #expect(model.transcript?.summary?.provider == Summary.onDeviceProvider)
         }
     }
@@ -247,7 +252,8 @@ struct AICallSiteTests {
             _ = try await first.ask("di cosa si parla?")
 
             #expect(await digests.count == 1)
-            #expect(await waitUntil { model.transcript?.summary?.text == "the digest" })
+            let transcriptWait = await waitUntil { model.transcript?.summary?.text == "the digest" }
+            #expect(transcriptWait)
             #expect(model.smartChapters.map(\.title) == ["Start"])
             let stored = try await model.library.load(entry.id).document.transcript
             #expect(stored.summary?.text == "the digest")
@@ -279,7 +285,8 @@ struct AICallSiteTests {
             let session = try await model.makeChatSession(transcript: long, history: [], entryID: entry.id)
             _ = try await session.ask("di cosa si parla?")
 
-            #expect(await waitUntil { model.transcript?.summary?.text == "the digest" })
+            let transcriptWait = await waitUntil { model.transcript?.summary?.text == "the digest" }
+            #expect(transcriptWait)
             #expect(model.transcript?.chapters?.map(\.title) == ["Generated"])
             let stored = try await model.library.load(entry.id).document.transcript
             #expect(stored.summary?.text == "the digest")
@@ -308,7 +315,8 @@ struct AICallSiteTests {
             let session = try await model.makeChatSession(transcript: long, history: [], entryID: entry.id)
             _ = try await session.ask("di cosa si parla?")
 
-            #expect(await waitUntil { model.transcript?.summary != nil })
+            let transcriptWait = await waitUntil { model.transcript?.summary != nil }
+            #expect(transcriptWait)
             #expect(model.transcript?.summary?.text == "from ollama")
             #expect(model.transcript?.summary?.provider == model.languageModelLabel(for: .chat))
             #expect(await MockLanguageModelStore.shared.lastPrompt(for: .openAI) == nil)
@@ -359,11 +367,13 @@ struct AICallSiteTests {
             #expect(model.isExtractingChapters && model.isExtractingActionItems)
 
             model.loadEntry(b.id)
-            #expect(await waitUntil { model.selectedEntryID == b.id })
+            let selectedEntryIDWait = await waitUntil { model.selectedEntryID == b.id }
+            #expect(selectedEntryIDWait)
             #expect(!model.isExtractingChapters && !model.isExtractingActionItems)
-            #expect(await waitUntil(timeoutMs: 3000) {
+            let isRunningWait = await waitUntil(timeoutMs: 3000) {
                 !model.aiJobs.isRunning(.chapters, for: a.id) && !model.aiJobs.isRunning(.actionItems, for: a.id)
-            })
+            }
+            #expect(isRunningWait)
             #expect(model.smartChapters.isEmpty)
             #expect(model.actionItems.isEmpty)
             let storedA = try await model.library.load(a.id).document.transcript
@@ -371,7 +381,8 @@ struct AICallSiteTests {
             #expect(storedA.actionItems?.map(\.task) == ["send the deck"])
 
             model.loadEntry(a.id)
-            #expect(await waitUntil { model.selectedEntryID == a.id && !model.smartChapters.isEmpty })
+            let selectedEntryIDWait2 = await waitUntil { model.selectedEntryID == a.id && !model.smartChapters.isEmpty }
+            #expect(selectedEntryIDWait2)
             #expect(model.actionItems.map(\.assignee) == ["Ada"])
         }
     }
@@ -406,7 +417,8 @@ struct AICallSiteTests {
 
             model.runPrompt(prompt)
 
-            #expect(await waitUntil { model.promptOutput != nil })
+            let promptOutputWait = await waitUntil { model.promptOutput != nil }
+            #expect(promptOutputWait)
             #expect(await MockLanguageModelStore.shared.lastInstructions(for: .foundation) == prompt.instructions)
             #expect(await MockLanguageModelStore.shared.lastPrompt(for: .foundation) == "Input:\nwe ship the patch on Friday")
         }
@@ -422,7 +434,8 @@ struct AICallSiteTests {
             }
 
             model.runPrompt(try #require(Prompt.builtIns.first))
-            #expect(await waitUntil { model.promptOutput != nil })
+            let promptOutputWait = await waitUntil { model.promptOutput != nil }
+            #expect(promptOutputWait)
             #expect(model.promptOutput?.text == "from apple")
         }
     }
@@ -438,7 +451,8 @@ struct AICallSiteTests {
             #expect(model.resolvedLanguageModelChoice(for: .prompts) == .onDevice)
 
             model.runPrompt(try #require(Prompt.builtIns.first))
-            #expect(await waitUntil { model.promptOutput != nil })
+            let promptOutputWait = await waitUntil { model.promptOutput != nil }
+            #expect(promptOutputWait)
             #expect(model.promptOutput?.text == "from apple")
         }
     }

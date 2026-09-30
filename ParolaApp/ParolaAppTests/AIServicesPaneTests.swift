@@ -92,7 +92,8 @@ struct AIServicesPaneTests {
         #expect(try await keyStore.get(for: .openAI) == "sk-secret-value")
 
         model.removeAIService(id: second.id)
-        #expect(await waitUntil { (try? await keyStore.get(for: .openAI)) == .some(nil) })
+        let keyStoreWait = await waitUntil { (try? await keyStore.get(for: .openAI)) == .some(nil) }
+        #expect(keyStoreWait)
     }
 
     @Test("resetting the pane deletes every configured kind's key")
@@ -108,8 +109,10 @@ struct AIServicesPaneTests {
 
         model.forgetAIServiceKeys()
 
-        #expect(await waitUntil { (try? await keyStore.get(for: .openAI)) == .some(nil) })
-        #expect(await waitUntil { (try? await keyStore.get(for: .groq)) == .some(nil) })
+        let keyStoreWait = await waitUntil { (try? await keyStore.get(for: .openAI)) == .some(nil) }
+        #expect(keyStoreWait)
+        let keyStoreWait2 = await waitUntil { (try? await keyStore.get(for: .groq)) == .some(nil) }
+        #expect(keyStoreWait2)
     }
 
     @Test("the one-time notice gates remote choices only, and only until it is accepted")

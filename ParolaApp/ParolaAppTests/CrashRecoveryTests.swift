@@ -338,7 +338,8 @@ extension TranscriberMockSuites {
             model.declinePendingRecovery()
 
             #expect(model.pendingRecovery == nil)
-            #expect(await waitUntil { !self.recoveryFileExists(model) })
+            let recoveryFileExistsWait = await waitUntil { !self.recoveryFileExists(model) }
+            #expect(recoveryFileExistsWait)
             let entries = await model.library.list()
             #expect(entries.count == 1)
             #expect(entries.first?.title.hasSuffix("(recovered)") == true)
@@ -372,7 +373,8 @@ extension TranscriberMockSuites {
             #expect(entries.count == 1)
             #expect(entries.first?.title.hasPrefix("Recording ") == true)
             #expect(entries.first?.title.hasSuffix("(recovered)") == true)
-            #expect(await waitUntil { !self.recoveryFileExists(model) }, "the checkpoint goes once the restored take is in the library")
+            let recoveryFileExistsWait = await waitUntil { !self.recoveryFileExists(model) }
+            #expect(recoveryFileExistsWait, "the checkpoint goes once the restored take is in the library")
         }
 
         /// The probe is the same await window loadEntry has, and a page opened inside it is the user's last word.
@@ -394,7 +396,8 @@ extension TranscriberMockSuites {
             model.acceptPendingRecovery()
             model.openStatistics()
 
-            #expect(await waitUntil { model.transcript?.segments == segments })
+            let transcriptWait = await waitUntil { model.transcript?.segments == segments }
+            #expect(transcriptWait)
             #expect(model.route == .statistics)
         }
 
@@ -477,7 +480,8 @@ extension TranscriberMockSuites {
 
             model.declinePendingRecovery()
 
-            #expect(await waitUntil { !FileManager.default.fileExists(atPath: model.legacyRecoveryFileURL.path) })
+            let fileExistsWait = await waitUntil { !FileManager.default.fileExists(atPath: model.legacyRecoveryFileURL.path) }
+            #expect(fileExistsWait)
             #expect(await model.library.list().count == 1)
         }
 
@@ -496,11 +500,13 @@ extension TranscriberMockSuites {
 
             let model = makeModel(libraryURL: lib)
             #expect(model.pendingRecovery?.id == newer.id)
-            #expect(await waitUntil { model.recoveryCheckpointFiles.map(\.lastPathComponent) == ["\(newer.id.uuidString).json"] })
+            let mapWait = await waitUntil { model.recoveryCheckpointFiles.map(\.lastPathComponent) == ["\(newer.id.uuidString).json"] }
+            #expect(mapWait)
             #expect(await model.library.list().count == 1, "the older take is kept, not dropped")
 
             model.declinePendingRecovery()
-            #expect(await waitUntil { !self.recoveryFileExists(model) })
+            let recoveryFileExistsWait = await waitUntil { !self.recoveryFileExists(model) }
+            #expect(recoveryFileExistsWait)
             #expect(await model.library.list().count == 2)
         }
 

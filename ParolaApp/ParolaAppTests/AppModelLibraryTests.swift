@@ -320,20 +320,23 @@ struct AppModelLibraryTests {
             category: .transcription
         )
         model.loadEntry(seeded.id)
-        #expect(await waitUntil { model.selectedEntryID == seeded.id && model.transcript != nil })
+        let selectedEntryIDWait = await waitUntil { model.selectedEntryID == seeded.id && model.transcript != nil }
+        #expect(selectedEntryIDWait)
 
         let chapters = [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 30)]
         model.smartChapters = chapters
         model.persistChapters(chapters)
-        #expect(await waitUntil {
+        let libraryWait = await waitUntil {
             (try? await model.library.load(seeded.id).document.transcript.chapters) == chapters
-        })
+        }
+        #expect(libraryWait)
 
         model.clearLoadedEntry()
         #expect(model.smartChapters.isEmpty)
         model.loadEntry(seeded.id)
 
-        #expect(await waitUntil { model.smartChapters == chapters })
+        let smartChaptersWait = await waitUntil { model.smartChapters == chapters }
+        #expect(smartChaptersWait)
         #expect(model.transcript?.summary == nil)
     }
 
@@ -351,27 +354,32 @@ struct AppModelLibraryTests {
             category: .transcription
         )
         model.loadEntry(seeded.id)
-        #expect(await waitUntil { model.selectedEntryID == seeded.id && model.transcript != nil })
+        let selectedEntryIDWait = await waitUntil { model.selectedEntryID == seeded.id && model.transcript != nil }
+        #expect(selectedEntryIDWait)
 
         let generated = [Chapter(title: "Generated", start: 0)]
         model.smartChapters = generated
         model.persistChapters(generated)
-        #expect(await waitUntil {
+        let libraryWait = await waitUntil {
             (try? await model.library.load(seeded.id).document.transcript.chapters) == generated
-        })
+        }
+        #expect(libraryWait)
 
         let summarized = [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 30)]
         model.summariseOperation = { _, _ in Summary(text: "recap", chapters: summarized) }
         model.summariseTranscript()
-        #expect(await waitUntil { !model.isSummarising && model.transcript?.summary != nil })
+        let isSummarisingWait = await waitUntil { !model.isSummarising && model.transcript?.summary != nil }
+        #expect(isSummarisingWait)
         #expect(model.smartChapters == summarized)
-        #expect(await waitUntil {
+        let libraryWait2 = await waitUntil {
             (try? await model.library.load(seeded.id).document.transcript.chapters) == summarized
-        })
+        }
+        #expect(libraryWait2)
 
         model.clearLoadedEntry()
         model.loadEntry(seeded.id)
-        #expect(await waitUntil { model.smartChapters == summarized })
+        let smartChaptersWait = await waitUntil { model.smartChapters == summarized }
+        #expect(smartChaptersWait)
         #expect(model.transcript?.summary?.chapters == summarized)
     }
 
@@ -736,7 +744,8 @@ struct AppModelLibraryTests {
 
         #expect(model.phase == .idle)
         #expect(model.route == .transcript)
-        #expect(await waitUntil { model.hasSearchResults })
+        let hasSearchResultsWait = await waitUntil { model.hasSearchResults }
+        #expect(hasSearchResultsWait)
     }
 
     @Test("re-publishing the same query does not clear a failure that just landed")
@@ -769,7 +778,8 @@ struct AppModelLibraryTests {
 
             act(model)
 
-            #expect(await waitUntil { model.exportNotice != nil }, "\(name)")
+            let exportNoticeWait = await waitUntil { model.exportNotice != nil }
+            #expect(exportNoticeWait, "\(name)")
             #expect(model.phase == .idle, "\(name)")
             #expect(model.libraryFilter == .meeting, "\(name)")
             #expect(model.isBrowsingLibrary, "\(name)")
@@ -783,7 +793,8 @@ struct AppModelLibraryTests {
 
         model.togglePinned(for: "missing-entry")
 
-        #expect(await waitUntil { model.exportNotice != nil })
+        let exportNoticeWait = await waitUntil { model.exportNotice != nil }
+        #expect(exportNoticeWait)
         #expect(model.libraryFilter == .meeting)
         #expect(model.isBrowsingLibrary)
         #expect(model.phase == .idle)
@@ -806,7 +817,8 @@ struct AppModelLibraryTests {
         await model.refreshLibraryAndWait()
 
         model.renameEntry(seeded.id, to: "My real title")
-        #expect(await waitUntil { model.libraryEntry(id: seeded.id)?.manifest.title == "My real title" })
+        let libraryEntryWait = await waitUntil { model.libraryEntry(id: seeded.id)?.manifest.title == "My real title" }
+        #expect(libraryEntryWait)
 
         let renamed = try #require(model.libraryEntry(id: seeded.id))
         #expect(renamed.manifest.titleSource == .user)

@@ -52,7 +52,8 @@ struct DeliveryHookTests {
 
         model.land(RunLanding(kind: .file, transcript: Self.transcript(), title: "Riunione"))
 
-        #expect(await waitUntil(timeoutMs: 10_000) { await !recorder.recorded().isEmpty }, "the entry should have been sent")
+        let recorderWait = await waitUntil(timeoutMs: 10_000) { await !recorder.recorded().isEmpty }
+        #expect(recorderWait, "the entry should have been sent")
         let entries = await model.library.list()
         #expect(await recorder.recorded().map(\.entryID) == entries.map(\.id))
         #expect(await recorder.recorded().first?.title == "Riunione")
@@ -66,10 +67,12 @@ struct DeliveryHookTests {
 
         model.land(RunLanding(kind: .file, transcript: Self.transcript(), title: "Riunione"))
 
-        #expect(await waitUntil(timeoutMs: 10_000) { await !recorder.recorded().isEmpty })
+        let recorderWait = await waitUntil(timeoutMs: 10_000) { await !recorder.recorded().isEmpty }
+        #expect(recorderWait)
         let entryID = try #require(await recorder.recorded().first?.entryID)
         let loaded = try await model.library.load(entryID)
-        #expect(await waitUntil(timeoutMs: 10_000) { (try? await model.library.load(entryID).entry.deliveries.count) == 1 })
+        let libraryWait = await waitUntil(timeoutMs: 10_000) { (try? await model.library.load(entryID).entry.deliveries.count) == 1 }
+        #expect(libraryWait)
         #expect(loaded.entry.title == "Riunione")
     }
 
@@ -81,7 +84,8 @@ struct DeliveryHookTests {
 
         model.land(RunLanding(kind: .salvagedTake, transcript: Self.transcript()))
 
-        #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 }, "the entry should still be saved")
+        let libraryWait = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 }
+        #expect(libraryWait, "the entry should still be saved")
         #expect(await recorder.recorded().isEmpty)
     }
 
@@ -101,7 +105,8 @@ struct DeliveryHookTests {
 
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.transcript()))
 
-        #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 }, "the batch entry should be saved")
+        let libraryWait = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 }
+        #expect(libraryWait, "the batch entry should be saved")
         #expect(await recorder.recorded().isEmpty)
     }
 
@@ -113,7 +118,8 @@ struct DeliveryHookTests {
 
         model.land(RunLanding(kind: .file, transcript: Self.transcript()))
 
-        #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 })
+        let libraryWait = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 }
+        #expect(libraryWait)
         #expect(await recorder.recorded().isEmpty)
         #expect(model.deliveryNotice == nil)
     }
@@ -126,7 +132,8 @@ struct DeliveryHookTests {
 
         model.land(RunLanding(kind: .file, transcript: Self.transcript()))
 
-        #expect(await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 })
+        let libraryWait = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 1 }
+        #expect(libraryWait)
         #expect(await recorder.recorded().isEmpty)
         #expect(model.deliveryNotice == nil)
     }
@@ -171,11 +178,13 @@ struct DeliveryHookTests {
         let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: libraryURL)
 
         let note = vault.appendingPathComponent("Riunione.md")
+        let fileExistsWait = await waitUntil(timeoutMs: 10_000) { FileManager.default.fileExists(atPath: note.path) }
         #expect(
-            await waitUntil(timeoutMs: 10_000) { FileManager.default.fileExists(atPath: note.path) },
+            fileExistsWait,
             "the queued delivery should have run at launch"
         )
-        #expect(await waitUntil(timeoutMs: 10_000) { store.loadQueue().isEmpty })
+        let loadQueueWait = await waitUntil(timeoutMs: 10_000) { store.loadQueue().isEmpty }
+        #expect(loadQueueWait)
         #expect(model.destinations.count == 1)
     }
 
@@ -313,7 +322,8 @@ struct DeliveryHookTests {
         fixed.name = "Mock vault, found"
         model.updateDestination(.mock(fixed))
 
-        #expect(await waitUntil(timeoutMs: 10_000) { await model.deliveryEngine.pending().isEmpty })
+        let deliveryEngineWait = await waitUntil(timeoutMs: 10_000) { await model.deliveryEngine.pending().isEmpty }
+        #expect(deliveryEngineWait)
         #expect(await recorder.recorded().map(\.entryID) == [seeded.id])
     }
 
@@ -346,7 +356,8 @@ struct DeliveryHookTests {
         await recorder.setReachable(true, for: mock.id)
         center.post(name: NSWorkspace.didMountNotification, object: nil)
 
-        #expect(await waitUntil(timeoutMs: 10_000) { await model.deliveryEngine.pending().isEmpty })
+        let deliveryEngineWait = await waitUntil(timeoutMs: 10_000) { await model.deliveryEngine.pending().isEmpty }
+        #expect(deliveryEngineWait)
         #expect(await recorder.recorded().map(\.entryID) == [seeded.id])
     }
 }

@@ -629,13 +629,16 @@ struct AppModelDictationTests {
         model.dictationController.transcriptionStopGrace = .milliseconds(50)
         model.dictationEnabled = true
         model.dictationController.simulatePress()
-        #expect(await waitUntil { model.dictationState == .listening })
+        let dictationStateWait = await waitUntil { model.dictationState == .listening }
+        #expect(dictationStateWait)
 
         model.stopDictationFromIntent()
-        #expect(await waitUntil { model.dictationState == .transcribing })
+        let dictationStateWait2 = await waitUntil { model.dictationState == .transcribing }
+        #expect(dictationStateWait2)
 
         model.stopDictationFromBridge()
-        #expect(await waitUntil { recorders.made.count == 2 })
+        let countWait = await waitUntil { recorders.made.count == 2 }
+        #expect(countWait)
         #expect(model.dictationState == .idle)
         #expect(model.dictationController.state == .idle)
         #expect(model.dictationController.isRunning)
@@ -652,9 +655,11 @@ struct AppModelDictationTests {
         model.dictationController.transcriptionStopGrace = .milliseconds(50)
         model.dictationEnabled = true
         model.dictationController.simulatePress()
-        #expect(await waitUntil { model.dictationState == .listening })
+        let dictationStateWait = await waitUntil { model.dictationState == .listening }
+        #expect(dictationStateWait)
         model.stopDictationFromIntent()
-        #expect(await waitUntil { model.dictationState == .transcribing })
+        let dictationStateWait2 = await waitUntil { model.dictationState == .transcribing }
+        #expect(dictationStateWait2)
 
         model.stopDictationFromIntent()
         try await Task.sleep(for: .milliseconds(250))
@@ -662,7 +667,8 @@ struct AppModelDictationTests {
         #expect(recorders.made.count == 1)
 
         for recorder in recorders.made { await recorder.release() }
-        #expect(await waitUntil { model.dictationState == .idle })
+        let dictationStateWait3 = await waitUntil { model.dictationState == .idle }
+        #expect(dictationStateWait3)
         model.abortDictation()
     }
 
@@ -674,13 +680,16 @@ struct AppModelDictationTests {
         model.dictationController.transcriptionStopGrace = .seconds(60)
         model.dictationEnabled = true
         model.dictationController.simulatePress()
-        #expect(await waitUntil { model.dictationState == .listening })
+        let dictationStateWait = await waitUntil { model.dictationState == .listening }
+        #expect(dictationStateWait)
         model.stopDictationFromIntent()
-        #expect(await waitUntil { model.dictationState == .transcribing })
+        let dictationStateWait2 = await waitUntil { model.dictationState == .transcribing }
+        #expect(dictationStateWait2)
 
         model.dictationController.cancelTranscription()
 
-        #expect(await waitUntil(timeoutMs: 2000) { recorders.made.count == 2 })
+        let countWait = await waitUntil(timeoutMs: 2000) { recorders.made.count == 2 }
+        #expect(countWait)
         #expect(model.dictationState == .idle)
         for recorder in recorders.made { await recorder.release() }
         model.abortDictation()
@@ -695,9 +704,11 @@ struct AppModelDictationTests {
         model.dictationController.inserterFactory = { CapturingTextInserter(store: pasted) }
         model.dictationEnabled = true
         model.dictationController.simulatePress()
-        #expect(await waitUntil { model.dictationState == .listening })
+        let dictationStateWait = await waitUntil { model.dictationState == .listening }
+        #expect(dictationStateWait)
         model.stopDictationFromIntent()
-        #expect(await waitUntil { model.dictationState == .transcribing })
+        let dictationStateWait2 = await waitUntil { model.dictationState == .transcribing }
+        #expect(dictationStateWait2)
         return (model, recorders, pasted)
     }
 
@@ -710,7 +721,8 @@ struct AppModelDictationTests {
         #expect(!model.dictationController.isRunning)
 
         for recorder in recorders.made { await recorder.release() }
-        #expect(await waitUntil { await recorders.made.first?.returned == true })
+        let recordersWait = await waitUntil { await recorders.made.first?.returned == true }
+        #expect(recordersWait)
         try await Task.sleep(for: .milliseconds(150))
         #expect(pasted.all().isEmpty)
     }
@@ -723,7 +735,8 @@ struct AppModelDictationTests {
         #expect(model.dictationController.isRunning)
 
         for recorder in recorders.made { await recorder.release() }
-        #expect(await waitUntil { pasted.all() == ["spoken words"] })
+        let allWait = await waitUntil { pasted.all() == ["spoken words"] }
+        #expect(allWait)
         model.abortDictation()
     }
 

@@ -97,7 +97,8 @@ extension TranscriberMockSuites {
             await model.awaitDuplicateCheck()
 
             #expect(model.duplicateImport == nil)
-            #expect(await waitUntil { model.selectedEntryID == existing.id })
+            let selectedEntryIDWait = await waitUntil { model.selectedEntryID == existing.id }
+            #expect(selectedEntryIDWait)
             #expect(model.fileTranscribeTask == nil)
         }
 
