@@ -24,16 +24,18 @@ struct TestHostSandboxTests {
         #expect(host.apiKeyStore is InMemoryAPIKeyStore)
     }
 
-    @Test("a setting the host writes never lands in the app's own defaults domain")
-    func hostSettingsStayOutOfTheAppDomain() {
+    @Test("a setting the host writes lands in its own suite, never in the app's own defaults domain")
+    func hostSettingsStayOutOfTheAppDomain() throws {
+        let hostSuite = try #require(ManagedConfiguration.userSettingsStore)
         let key = "parola-test-host-probe-\(UUID().uuidString)"
-        DefaultsStore.current.set(true, forKey: key)
-        defer { DefaultsStore.current.removeObject(forKey: key) }
+        hostSuite.set(true, forKey: key)
+        defer { hostSuite.removeObject(forKey: key) }
 
-        let written = DefaultsStore.current.object(forKey: key)
+        let stored = hostSuite.persistentDomain(forName: TestHostSandbox.current.defaultsSuite)?[key]
         let leaked = UserDefaults.standard.object(forKey: key)
-        #expect(written != nil)
+        #expect(stored != nil)
         #expect(leaked == nil)
+        #expect(DefaultsStore.current !== UserDefaults.standard)
     }
 
     @Test("a finished host's suite and folder are swept, a running host's and anything else stay")
