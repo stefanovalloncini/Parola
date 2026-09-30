@@ -486,6 +486,8 @@ final class AppModel {
             if batchIsRunning != running { batchIsRunning = running }
             let hasDone = batchJobs.contains { $0.status == .done }
             if batchHasDoneJob != hasDone { batchHasDoneJob = hasDone }
+            let showsActivity = SidebarSelection.showsActivity(jobs: batchJobs)
+            if sidebarShowsActivity != showsActivity { sidebarShowsActivity = showsActivity }
             saveBatchQueueSnapshot()
         }
     }
@@ -494,6 +496,7 @@ final class AppModel {
     private(set) var batchIsEmpty = true
     private(set) var batchIsRunning = false
     private(set) var batchHasDoneJob = false
+    private(set) var sidebarShowsActivity = false
     private(set) var batchBuckets = BatchJobBuckets()
     @ObservationIgnored let batchProgress = BatchProgressBoard()
     struct UnsavedBatchJob {
@@ -1295,11 +1298,15 @@ final class AppModel {
             libraryVersion &+= 1
             let counts = Self.personUsageCounts(in: libraryEntries)
             if counts != personUsageCounts { personUsageCounts = counts }
+            let badges = LibraryCounts(libraryEntries)
+            if badges != libraryCounts { libraryCounts = badges }
             updateSelectedEntryHasFavorites()
         }
     }
     /// How many speaker labels across the library stand for each person. Read off the maps, so an assignment an undo takes back stops counting.
     private(set) var personUsageCounts: [UUID: Int] = [:]
+    /// The sidebar's counts, set only when one moves, so a rename or an open repaints no badge.
+    private(set) var libraryCounts = LibraryCounts()
     private(set) var libraryVersion: Int = 0
     var deletedEntries: [LibraryEntry] = []
     /// What Recently Deleted's bulk actions act on. It lives here so the page's header and the bridge read one selection.

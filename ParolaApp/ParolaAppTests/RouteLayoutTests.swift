@@ -43,6 +43,8 @@ struct RouteLayoutTests {
             for sub in view.subviews {
                 // AppKit parks its key-view proxy off to the left of the window; it never draws.
                 if String(describing: type(of: sub)) == "KeyViewProxy" { continue }
+                // Nor does a hidden view, like the scroller the sidebar list hides and parks there.
+                if sub.isHidden { continue }
                 let frame = sub.convert(sub.bounds, to: host)
                 let pastSides = frame.minX < -0.5 || frame.maxX > host.bounds.width + 0.5
                 let pastEnds = frame.minY < -0.5 || frame.maxY > host.bounds.height + 0.5

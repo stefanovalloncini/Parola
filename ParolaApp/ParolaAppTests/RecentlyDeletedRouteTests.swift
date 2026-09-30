@@ -80,18 +80,26 @@ struct RecentlyDeletedRouteTests {
         #expect(model.recentlyDeletedSelection == ["a"], "a filter change is not a route change")
     }
 
+    private func lit(
+        _ route: AppModel.Route, searching: Bool = false, filter: EntryCategory? = nil
+    ) -> SidebarItem? {
+        let page = SidebarSelection.Page(
+            route: route, listShowing: route == .transcript, searching: searching, libraryFilter: filter, personFilter: nil
+        )
+        return SidebarSelection.current(page, sidebarPeople: [], showsActivity: true)
+    }
+
     @Test("the sidebar highlights the Recently Deleted row while the page shows")
     func sidebarSelectsTheRow() {
-        #expect(SidebarRoute.selected(route: .recentlyDeleted, searching: false, filter: nil) == .recentlyDeleted)
+        #expect(lit(.recentlyDeleted) == .recentlyDeleted)
     }
 
     @Test("no other sidebar row answers to the Recently Deleted route")
     func sidebarRowsAreExclusive() {
-        let selected = SidebarRoute.selected(route: .recentlyDeleted, searching: true, filter: .meeting)
-        #expect(selected == .recentlyDeleted)
-        #expect(SidebarRoute.selected(route: .queue, searching: false, filter: nil) == .queue)
-        #expect(SidebarRoute.selected(route: .batch, searching: false, filter: nil) == .batch)
-        #expect(SidebarRoute.selected(route: .transcript, searching: false, filter: nil) == .library)
+        #expect(lit(.recentlyDeleted, searching: true, filter: .meeting) == .recentlyDeleted)
+        #expect(lit(.queue) == .activity)
+        #expect(lit(.batch) == nil)
+        #expect(lit(.transcript) == .library)
     }
 
     @Test("the bridge opens the page by setting the route")

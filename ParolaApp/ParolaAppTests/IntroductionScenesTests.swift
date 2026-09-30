@@ -13,7 +13,7 @@ struct FeaturesSceneRowsTests {
     @Test("every feature gets a row, transcription first")
     func everyRow() {
         let items = FeaturesScene.rows(features: .all)
-        #expect(items.map(\.symbol) == ["text.alignleft", "person.2", "text.cursor", "captions.bubble.fill"])
+        #expect(items.map(\.symbol) == ["text.alignleft", "person.2", "keyboard", "captions.bubble.fill"])
         #expect(items[0].title == "Transcribe files and links")
         #expect(items[0].line == "Drop audio or video, or paste a YouTube link.")
         #expect(items[1].title == "Record meetings")
@@ -34,7 +34,7 @@ struct FeaturesSceneRowsTests {
         #expect(rows(.youtube).map(\.symbol) == ["text.alignleft"])
         #expect(rows(.youtube, .meetings).map(\.symbol) == ["text.alignleft", "person.2"])
         #expect(rows(.youtube, .liveCaptions).map(\.symbol) == ["text.alignleft", "captions.bubble.fill"])
-        #expect(rows(.dictation).map(\.symbol) == ["text.alignleft", "text.cursor"])
+        #expect(rows(.dictation).map(\.symbol) == ["text.alignleft", "keyboard"])
     }
 }
 

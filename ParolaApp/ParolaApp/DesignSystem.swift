@@ -243,7 +243,7 @@ enum DS {
         switch category {
         case .transcription: return "text.alignleft"
         case .meeting: return "person.2"
-        case .dictation: return "text.cursor"
+        case .dictation: return "keyboard"
         }
     }
 

@@ -1516,17 +1516,6 @@
         }
       }
     },
-    "Add People…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi persone…"
-          }
-        }
-      }
-    },
     "Add Preset": {
       "extractionState": "manual",
       "localizations": {
@@ -12399,17 +12388,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Imposta le chiavi SUFeedURL e SUPublicEDKey in Info.plist prima del rilascio. Genera la keypair una volta con lo strumento generate_keys di Sparkle."
-          }
-        }
-      }
-    },
-    "Settings": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impostazioni"
           }
         }
       }

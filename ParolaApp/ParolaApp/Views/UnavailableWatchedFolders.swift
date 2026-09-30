@@ -8,16 +8,14 @@ struct UnavailableWatchedFolders: View {
     var body: some View {
         let folders = store.unavailableFolders
         if !folders.isEmpty {
-            VStack(alignment: .leading, spacing: 2) {
-                SidebarSectionLabel("Watched Folders")
-                    .padding(.top, DS.Spacing.regular)
+            Section("Watched Folders") {
                 ForEach(folders) { folder in
                     UnavailableWatchedFolderRow(folder: folder) {
                         store.reattach(folder.id)
                     }
                 }
+                .axBranch("WatchedFolders")
             }
-            .axBranch("Sidebar.WatchedFolders")
         }
     }
 }
@@ -43,10 +41,9 @@ private struct UnavailableWatchedFolderRow: View {
             Spacer(minLength: 0)
             Button("Locate…", action: locate)
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                .axLeaf("Sidebar.Button.LocateWatchedFolder")
+                .axLeaf("Button.Locate")
         }
-        .padding(.horizontal, DS.Spacing.small)
-        .padding(.vertical, 6)
+        .padding(.vertical, DS.Spacing.hair)
         .help(folder.displayPath)
     }
 }

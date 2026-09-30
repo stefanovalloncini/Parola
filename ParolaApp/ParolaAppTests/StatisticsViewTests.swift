@@ -131,13 +131,15 @@ struct StatisticsViewTests {
         }
     }
 
-    @Test("the sidebar lights the Statistics row and nothing else")
+    @Test("Statistics has no sidebar row, so its page lights none")
     func sidebarHighlightFollowsTheRoute() {
-        #expect(SidebarRoute.selected(route: .statistics, searching: false, filter: .meeting) == .statistics)
-        #expect(SidebarRoute.selected(route: .recentlyDeleted, searching: false, filter: nil) == .recentlyDeleted)
+        let statistics = SidebarSelection.Page(
+            route: .statistics, listShowing: false, searching: false, libraryFilter: .meeting, personFilter: nil
+        )
+        #expect(SidebarSelection.current(statistics, sidebarPeople: [], showsActivity: true) == nil)
     }
 
-    @Test("opening the page from the sidebar drops the list the user was in")
+    @Test("opening the page drops the list the user was in")
     func openingStatisticsLeavesTheList() {
         withIsolatedDefaults { defaults in
             let model = makeModel(defaults, entries: [])
@@ -175,7 +177,7 @@ struct StatisticsViewTests {
     }
 
     /// The bridge is how scenarios navigate; taking a shortcut past the helper would let it reach a state no click can.
-    @Test("setRoute takes the page the way the sidebar row does")
+    @Test("setRoute takes the page the way the menus do")
     func setRouteLeavesTheList() async throws {
         let previous = DefaultsStore.current
         DefaultsStore.current = temporaryDefaults("test-statistics-")
@@ -202,7 +204,10 @@ struct StatisticsViewTests {
 
     @Test("a transcript opened from the page records no list to go back to")
     func statisticsIsNotAList() {
-        #expect(LibraryOrigin.capture(sidebar: .statistics, listOnScreen: false) == nil)
+        let statistics = SidebarSelection.Page(
+            route: .statistics, listShowing: false, searching: false, libraryFilter: nil, personFilter: nil
+        )
+        #expect(LibraryOrigin.capture(from: statistics) == nil)
     }
 
     @Test("a Records row opens the transcript it names")

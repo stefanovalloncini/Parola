@@ -49,56 +49,47 @@ struct LibraryOriginTests {
         return await waitUntil { model.transcript == nil }
     }
 
-    private func sidebar(_ model: AppModel) -> SidebarRoute {
-        SidebarRoute.selected(
-            route: model.route,
-            searching: model.searchRanking != nil,
-            filter: model.libraryFilter,
-            person: model.personFilter
-        )
+    private func sidebar(_ model: AppModel) -> SidebarItem? {
+        SidebarSelection.current(model.sidebarPage, sidebarPeople: [], showsActivity: model.sidebarShowsActivity)
+    }
+
+    private func page(
+        route: AppModel.Route = .transcript, listShowing: Bool = true, searching: Bool = false,
+        filter: EntryCategory? = nil, person: UUID? = nil
+    ) -> SidebarSelection.Page {
+        .init(route: route, listShowing: listShowing, searching: searching, libraryFilter: filter, personFilter: person)
     }
 
     // MARK: - The capture rule
 
     @Test("a search wins over the category filter underneath it")
     func searchBeatsFilter() {
-        let origin = LibraryOrigin.capture(
-            sidebar: SidebarRoute.selected(route: .transcript, searching: true, filter: .meeting),
-            listOnScreen: false
-        )
-        #expect(origin == .search)
+        #expect(LibraryOrigin.capture(from: page(searching: true, filter: .meeting)) == .search)
     }
 
     @Test("a category list is recorded as its category")
     func categoryList() {
-        let origin = LibraryOrigin.capture(
-            sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: .dictation),
-            listOnScreen: false
-        )
-        #expect(origin == .category(.dictation))
+        #expect(LibraryOrigin.capture(from: page(filter: .dictation)) == .category(.dictation))
     }
 
     @Test("the Library page is recorded as the whole library")
     func libraryList() {
-        let origin = LibraryOrigin.capture(
-            sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: nil),
-            listOnScreen: true
-        )
-        #expect(origin == .all)
+        #expect(LibraryOrigin.capture(from: page()) == .all)
     }
 
-    @Test("an entry opened with no list on screen has no origin")
+    @Test("a person's list is recorded as the whole library, whether or not the sidebar lists them")
+    func personList() {
+        #expect(LibraryOrigin.capture(from: page(person: UUID())) == .all)
+    }
+
+    @Test("an entry opened with no list on screen has no origin, whatever lies under the transcript")
     func noList() {
-        let noLibrary = LibraryOrigin.capture(
-            sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: nil),
-            listOnScreen: false
-        )
-        #expect(noLibrary == nil)
-        for route in [AppModel.Route.queue, .batch, .recentlyDeleted] {
-            let origin = LibraryOrigin.capture(
-                sidebar: SidebarRoute.selected(route: route, searching: true, filter: .meeting),
-                listOnScreen: true
-            )
+        #expect(LibraryOrigin.capture(from: page(listShowing: false)) == nil)
+        #expect(LibraryOrigin.capture(from: page(listShowing: false, filter: .meeting)) == nil)
+        #expect(LibraryOrigin.capture(from: page(listShowing: false, person: UUID())) == nil)
+        #expect(LibraryOrigin.capture(from: page(listShowing: false, searching: true)) == nil)
+        for route in [AppModel.Route.queue, .batch, .statistics, .recentlyDeleted] {
+            let origin = LibraryOrigin.capture(from: page(route: route, searching: true, filter: .meeting))
             #expect(origin == nil, "\(route) is a page of its own, not a list a transcript came from")
         }
     }
@@ -123,7 +114,7 @@ struct LibraryOriginTests {
         #expect(model.transcriptOrigin == .category(.meeting))
         #expect(model.libraryFilter == .meeting)
         #expect(!model.isBrowsingLibrary, "the transcript takes the content area while it is open")
-        #expect(sidebar(model) == .category(.meeting), "the sidebar keeps the row the entry came from")
+        #expect(sidebar(model) == nil, "no row is lit over the transcript, so the category row can bring the list back")
     }
 
     @Test("opening an entry clears a stale failure before the load lands")
@@ -150,7 +141,7 @@ struct LibraryOriginTests {
         #expect(model.transcriptOrigin == .search)
         #expect(model.searchRanking == [entry.id])
         #expect(model.searchQuery == "bianchi")
-        #expect(sidebar(model) == .search, "no row owns the results, so none is highlighted")
+        #expect(sidebar(model) == nil, "no row owns the results or the transcript, so none is highlighted")
     }
 
     @Test("opening from the Library page records the whole library")
@@ -161,7 +152,7 @@ struct LibraryOriginTests {
         #expect(await openEntry(entry.id, in: model))
 
         #expect(model.transcriptOrigin == .all)
-        #expect(sidebar(model) == .library)
+        #expect(sidebar(model) == nil, "Library stays clickable over the transcript")
     }
 
     @Test("opening with a transcript already up and no list leaves no origin")
@@ -175,6 +166,20 @@ struct LibraryOriginTests {
         #expect(await openEntry(second.id, in: model))
 
         #expect(model.transcriptOrigin == nil, "the menu bar extra opens entries with no list behind them")
+    }
+
+    @Test("opening over an entry from a category leaves no origin either")
+    func opensOverACategoryEntry() async throws {
+        let model = makeModel()
+        let meeting = try await seedEntry(in: model, text: "quarterly review", category: .meeting)
+        let memo = try await seedEntry(in: model, text: "voice memo")
+        model.browseCategory(.meeting)
+        #expect(await openEntry(meeting.id, in: model))
+
+        #expect(await openEntry(memo.id, in: model))
+
+        #expect(model.transcriptOrigin == nil, "the Meetings list is under the transcript, not on screen")
+        #expect(model.libraryFilter == .meeting)
     }
 
     @Test("an entry opened while a page is up takes the content area")
@@ -262,7 +267,7 @@ struct LibraryOriginTests {
         #expect(model.searchRanking == [entry.id])
         #expect(model.searchQuery == "bianchi")
         #expect(model.isBrowsingLibrary)
-        #expect(sidebar(model) == .search)
+        #expect(sidebar(model) == nil)
     }
 
     @Test("back from a Library entry shows the whole library again")
@@ -340,6 +345,24 @@ struct LibraryOriginTests {
         #expect(model.transcriptOrigin == nil)
     }
 
+    @Test("a person's row takes their list back from a transcript opened off it")
+    func personRowLeavesTheTranscript() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "call with Giulia")
+        let giulia = UUID()
+        model.browsePerson(giulia)
+        #expect(await openEntry(entry.id, in: model))
+        #expect(SidebarSelection.current(model.sidebarPage, sidebarPeople: [giulia], showsActivity: false) == nil)
+
+        model.browsePerson(giulia)
+
+        let closed = await waitUntil { model.transcript == nil }
+        #expect(closed)
+        #expect(model.personFilter == giulia)
+        #expect(model.isBrowsingLibrary)
+        #expect(SidebarSelection.current(model.sidebarPage, sidebarPeople: [giulia], showsActivity: false) == .person(giulia))
+    }
+
     @Test("a sidebar list row retires the search that would mask it")
     func sidebarRowClearsTheSearch() async throws {
         let model = makeModel()
@@ -401,7 +424,7 @@ struct LibraryOriginTests {
 
         #expect(model.transcriptOrigin == .category(.meeting), "the transcript never moved; the query did")
         #expect(model.canReturnToOrigin)
-        #expect(sidebar(model) == .category(.meeting), "and the header agrees with the sidebar")
+        #expect(sidebar(model) == nil, "the transcript is back on screen, so no row is lit")
     }
 
     @Test("the same query written again leaves the open transcript where it is")

@@ -26,21 +26,20 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
     }
 }
 
-/// The list a transcript was opened from, so the sidebar keeps its row and the header can offer the way back.
+/// The list a transcript was opened from, so the header can offer the way back.
 enum LibraryOrigin: Equatable {
     case all
     case category(EntryCategory)
     case search
 
-    /// Read through the sidebar's own selection, so a search wins over the category filter underneath it.
-    static func capture(sidebar: SidebarRoute, listOnScreen: Bool) -> LibraryOrigin? {
-        switch sidebar {
-        case .search: return .search
-        case .library: return listOnScreen ? .all : nil
-        case .category(let category): return .category(category)
+    /// The list on screen as the entry opens; results win over the category filter underneath them.
+    static func capture(from page: SidebarSelection.Page) -> LibraryOrigin? {
+        if page.route == .transcript, page.listShowing, page.searching { return .search }
+        switch SidebarSelection.destination(of: page) {
         // The back link reads "Library" for a person's list too; personFilter itself isn't part of the origin.
-        case .person(_): return .all
-        case .queue, .batch, .statistics, .recentlyDeleted: return nil
+        case .library?, .person?: return .all
+        case .category(let category)?: return .category(category)
+        case .activity?, .recentlyDeleted?, nil: return nil
         }
     }
 
@@ -59,6 +58,20 @@ enum LibraryOrigin: Equatable {
         case .category(let category): return category.rawValue
         case .search: return "search"
         }
+    }
+}
+
+struct LibraryCounts: Equatable {
+    private(set) var total = 0
+    private var byCategory: [EntryCategory: Int] = [:]
+
+    init(_ entries: [LibraryEntry] = []) {
+        total = entries.count
+        for entry in entries { byCategory[entry.category, default: 0] += 1 }
+    }
+
+    func count(of category: EntryCategory) -> Int {
+        byCategory[category] ?? 0
     }
 }
 
@@ -726,16 +739,18 @@ extension AppModel {
         closeTranscript()
     }
 
-    /// Nil when no list is behind the transcript: a root page, a batch, or the library with something already loaded.
+    /// Nil when no list is on screen: a page of its own, a batch, or a transcript already up, whatever lies under it.
     func captureLibraryOrigin() -> LibraryOrigin? {
-        LibraryOrigin.capture(
-            sidebar: SidebarRoute.selected(
-                route: route,
-                searching: hasSearchResults,
-                filter: libraryFilter,
-                person: personFilter
-            ),
-            listOnScreen: batchIsEmpty && !hasTranscript
+        LibraryOrigin.capture(from: sidebarPage)
+    }
+
+    var sidebarPage: SidebarSelection.Page {
+        SidebarSelection.Page(
+            route: route,
+            listShowing: isBrowsingLibrary,
+            searching: hasSearchResults,
+            libraryFilter: libraryFilter,
+            personFilter: personFilter
         )
     }
 

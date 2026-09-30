@@ -145,7 +145,7 @@ extension ParolaAutomationServer {
                         throw AutomationError.invalidArgs(field: "route", reason: "unknown route: \(raw)")
                     }
                     ctx.model.settingsRoutePreview = false
-                    // Through the same helpers a sidebar click takes, or the bridge could leave a state no click can.
+                    // Through the same helpers a click takes, or the bridge could leave a state no click can.
                     switch route {
                     case .transcript: ctx.model.route = .transcript
                     case .queue: ctx.model.openQueue()

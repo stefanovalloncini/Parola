@@ -25,13 +25,16 @@ struct SidebarBadgeCountTests {
         return model
     }
 
-    private func entry(_ id: String, title: String? = nil, pinned: Bool = false) -> LibraryEntry {
+    private func entry(
+        _ id: String, title: String? = nil, category: EntryCategory = .transcription, pinned: Bool = false
+    ) -> LibraryEntry {
         let manifest = ParolaDocument.Manifest(
             createdAt: Self.baseDate,
             originalAudioName: "\(id).m4a",
             title: title ?? id.uppercased(),
             modelName: "stub",
             language: "en",
+            category: category,
             pinned: pinned
         )
         return LibraryEntry(
@@ -62,13 +65,30 @@ struct SidebarBadgeCountTests {
         #expect(model.activeBatchJobCount == 0)
     }
 
-    @Test("a progress tick that leaves the count alone does not invalidate the badge")
+    @Test("the Activity row stays while a job waits, runs or failed, and goes once every job settles")
+    func activityFollowsInPlaceStatus() async {
+        let model = await makeModel()
+        #expect(!model.sidebarShowsActivity)
+
+        model.batchJobs = [job("a", status: .pending), job("b", status: .done)]
+        #expect(model.sidebarShowsActivity)
+
+        model.batchJobs[0].status = .failed
+        #expect(model.sidebarShowsActivity, "a failure keeps the row up, with no count on it")
+        #expect(model.activeBatchJobCount == 0)
+
+        model.batchJobs[0].status = .cancelled
+        #expect(!model.sidebarShowsActivity)
+    }
+
+    @Test("a progress tick that leaves the count alone does not invalidate the badge or the Activity row")
     func queueBadgeSkipsUnchangedCount() async {
         let model = await makeModel()
         model.batchJobs = [job("a", status: .transcribing)]
         let invalidated = InvalidationFlag()
         withObservationTracking {
             _ = model.activeBatchJobCount
+            _ = model.sidebarShowsActivity
         } onChange: {
             invalidated.fired = true
         }
@@ -79,6 +99,40 @@ struct SidebarBadgeCountTests {
         #expect(!invalidated.fired)
 
         model.batchJobs[0].status = .done
+        #expect(invalidated.fired)
+    }
+
+    @Test("the library badges count every entry and each category")
+    func libraryBadgesCountTheCategories() async {
+        let model = await makeModel()
+        model.libraryEntries = [
+            entry("a"),
+            entry("b", category: .meeting),
+            entry("c", category: .meeting),
+            entry("d", category: .dictation),
+        ]
+
+        #expect(model.libraryCounts.total == 4)
+        #expect(model.libraryCounts.count(of: .transcription) == 1)
+        #expect(model.libraryCounts.count(of: .meeting) == 2)
+        #expect(model.libraryCounts.count(of: .dictation) == 1)
+    }
+
+    @Test("a library write that keeps every count leaves the library badges alone")
+    func libraryBadgesSkipUnchangedCounts() async {
+        let model = await makeModel()
+        model.libraryEntries = [entry("a"), entry("b", category: .meeting)]
+        let invalidated = InvalidationFlag()
+        withObservationTracking {
+            _ = model.libraryCounts
+        } onChange: {
+            invalidated.fired = true
+        }
+
+        model.libraryEntries = [entry("a", title: "Renamed"), entry("b", category: .meeting, pinned: true)]
+        #expect(!invalidated.fired)
+
+        model.libraryEntries = [entry("a", title: "Renamed")]
         #expect(invalidated.fired)
     }
 

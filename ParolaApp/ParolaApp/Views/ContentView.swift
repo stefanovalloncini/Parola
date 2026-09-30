@@ -33,7 +33,7 @@ struct ContentView: View {
 
     private var home: some View {
         NavigationSplitView {
-            MacLibrarySidebar()
+            LibrarySidebar()
         } detail: {
             ContentRoutes()
                 .toolbar { ContentToolbar() }

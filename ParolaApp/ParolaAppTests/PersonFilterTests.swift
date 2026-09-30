@@ -176,10 +176,7 @@ struct PersonFilterTests {
         model.libraryFilter = nil
         model.personFilter = grace
 
-        let selected = SidebarRoute.selected(
-            route: model.route, searching: model.hasSearchResults,
-            filter: model.libraryFilter, person: model.personFilter
-        )
+        let selected = SidebarSelection.current(model.sidebarPage, sidebarPeople: [grace], showsActivity: false)
 
         #expect(selected == .person(grace))
         #expect(selected != .library)
@@ -191,10 +188,7 @@ struct PersonFilterTests {
         model.libraryFilter = .meeting
         model.personFilter = grace
 
-        let selected = SidebarRoute.selected(
-            route: model.route, searching: model.hasSearchResults,
-            filter: model.libraryFilter, person: model.personFilter
-        )
+        let selected = SidebarSelection.current(model.sidebarPage, sidebarPeople: [grace], showsActivity: false)
 
         #expect(selected == .category(.meeting))
         #expect(selected != .person(grace))
@@ -206,13 +200,9 @@ struct PersonFilterTests {
         model.route = .batch
         model.personFilter = grace
 
-        let selected = SidebarRoute.selected(
-            route: model.route, searching: model.hasSearchResults,
-            filter: model.libraryFilter, person: model.personFilter
-        )
+        let selected = SidebarSelection.current(model.sidebarPage, sidebarPeople: [grace], showsActivity: false)
 
-        #expect(selected == .batch)
-        #expect(selected != .person(grace))
+        #expect(selected == nil)
     }
 
     @Test("the list's page title names the selected person only when no category is set")

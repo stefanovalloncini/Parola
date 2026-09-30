@@ -1,8 +1,9 @@
 import SwiftUI
 import ParolaCore
 
-/// The PEOPLE rows under LIBRARY: the people assigned most often, each one a filter.
+/// The people assigned most often, each one a place of its own: the whole library narrowed to them.
 struct PeopleSidebarSection: View {
+    let people: [Person]
     @Environment(AppModel.self) private var model
 
     static let rowLimit = 5
@@ -12,41 +13,22 @@ struct PeopleSidebarSection: View {
         showMostUsed && !people.isEmpty
     }
 
-    private var selectedRoute: SidebarRoute {
-        SidebarRoute.selected(
-            route: model.route,
-            searching: model.hasSearchResults,
-            filter: model.libraryFilter,
-            person: model.personFilter
-        )
-    }
-
     var body: some View {
-        if Self.isVisible(showMostUsed: model.showMostUsedPeople, people: model.people) {
-            SidebarSectionLabel("People")
-                .padding(.top, DS.Spacing.regular)
-
-            ForEach(model.mostUsedPeople(limit: Self.rowLimit)) { person in
-                SidebarRow(
-                    titleVerbatim: person.name,
-                    systemImage: "person.crop.circle",
-                    isSelected: selectedRoute == .person(person.id)
-                ) {
-                    model.browsePerson(person.id)
+        Section("People") {
+            ForEach(people) { person in
+                Label {
+                    Text(verbatim: person.name)
+                } icon: {
+                    Image(systemName: "person.crop.circle")
+                        .foregroundStyle(DS.speakerColor(for: person.name, colorIndex: person.colorIndex))
                 }
-                .accessibilityIdentifier("library.person.\(person.id.uuidString)")
-                .axLeaf("Sidebar.Button.Person.\(person.name)")
+                .tag(SidebarItem.person(person.id))
+                .contextMenu {
+                    Button("Manage People…") { model.showingPeopleSheet = true }
+                        .axLeaf("MenuItem.ManagePeople")
+                }
+                .axLeaf("Row.Person.\(person.name)")
             }
-
-            SidebarRow(
-                title: "Add People…",
-                systemImage: "person.badge.plus",
-                isSelected: false
-            ) {
-                model.showingPeopleSheet = true
-            }
-            .accessibilityIdentifier("library.people.manage")
-            .axLeaf("Sidebar.Button.ManagePeople")
         }
     }
 }
