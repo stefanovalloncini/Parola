@@ -24,6 +24,8 @@ struct RecordingSession: Equatable, Sendable {
     let source: AppModel.RecordSource
     var category: EntryCategory
     var title: String
+    /// `.user` once the title is one the user typed; nil while it is the generated name.
+    var titleSource: TitleSource?
     var device: String?
     var isStreaming: Bool
     var audioURL: URL?
@@ -39,6 +41,7 @@ struct RecordingSession: Equatable, Sendable {
         self.source = source
         self.category = category
         self.title = title
+        self.titleSource = nil
         self.device = nil
         self.isStreaming = isStreaming
         self.audioURL = nil

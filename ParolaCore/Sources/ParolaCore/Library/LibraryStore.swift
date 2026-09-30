@@ -592,7 +592,8 @@ public actor LibraryStore {
         titleSource: TitleSource? = nil,
         sourceDigest: String? = nil,
         source: EntrySource? = nil,
-        consumesAudio: Bool = false
+        consumesAudio: Bool = false,
+        takeMarkers: [TimeInterval]? = nil
     ) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
@@ -613,7 +614,8 @@ public actor LibraryStore {
                     titleSource: titleSource,
                     sourceDigest: digest,
                     entrySource: source,
-                    movesAudio: consumesAudio
+                    movesAudio: consumesAudio,
+                    takeMarkers: takeMarkers
                 )
                 didWriteBundle?()
             }
@@ -1067,6 +1069,20 @@ public actor LibraryStore {
 
     public func setFavoriteSegments(_ ids: Set<Int>, for id: LibraryEntry.ID) throws {
         try updateFavorites(for: id) { $0 = ids }
+    }
+
+    /// The favourites become the segments the entry's take markers pick, or none when it has no markers:
+    /// what a new transcript does to favourites that named the old segments.
+    @discardableResult
+    public func replaceFavoritesWithTakeMarkers(in segments: [TranscriptSegment], for id: LibraryEntry.ID) throws -> LibraryEntry {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.favoriteSegments = TakeMarkers.favoriteSegmentIDs(markers: manifest.takeMarkers ?? [], segments: segments)
+        }
+        return try recacheEntry(at: bundleURL)
     }
 
     private func updateFavorites(for id: LibraryEntry.ID, _ mutate: (inout Set<Int>) -> Void) throws {

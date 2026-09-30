@@ -76,13 +76,20 @@ final class AppModel {
     struct TakeContext: Equatable {
         let id: Int
         let source: RecordSource
-        let category: EntryCategory
+        /// Changes only while the take is the active one, through `setTakeCategory`.
+        var category: EntryCategory
         let captureTargets: Set<String>
         /// The take's own checkpoint once it has one, so its end never touches whichever run is active by then.
         var recovery: Int?
         var recoveryStartedAt: Date?
         /// Set once the take asks its capture to start; a Stop before then waits for the start to drop it.
         var captureRequested = false
+    }
+
+    /// What the user gave a take while it ran: a title they typed and the moments they marked.
+    struct TakeAnnotations: Equatable {
+        var typedTitle: String?
+        var markers: [TimeInterval] = []
     }
 
     /// How long a take stays quiet before the pane warns: a mic soon, Mac audio only past a pause, unless it has heard nothing yet.
@@ -517,6 +524,7 @@ final class AppModel {
     @ObservationIgnored var failedTakeTitle: String?
     @ObservationIgnored var failedTakeCategory: EntryCategory?
     @ObservationIgnored var failedTakeSource: EntrySource?
+    @ObservationIgnored var failedTakeAnnotations: TakeAnnotations?
     @ObservationIgnored var pendingDictationRestart: Task<Void, Never>?
     @ObservationIgnored var pendingDictationProcessorRebuild: Task<Void, Never>?
 
@@ -1284,6 +1292,16 @@ final class AppModel {
     @ObservationIgnored var silenceRule = SilenceRule()
     @ObservationIgnored var silenceWatchTask: Task<Void, Never>?
     @ObservationIgnored var recordingAutoStopTask: Task<Void, Never>?
+    @ObservationIgnored private var recordingAutoStop: AutoStopBudget?
+    /// The last pause or resume on its way to the capture; the next one waits for it.
+    @ObservationIgnored private var takePauseWrites: Task<Void, Never>?
+
+    /// What is left of a take's recording limit, and since when it has been running down; a pause stops it running.
+    private struct AutoStopBudget {
+        let takeID: Int
+        var remaining: Duration
+        var runningSince: ContinuousClock.Instant?
+    }
 
     private func readString(_ key: String, default fallback: String) -> String {
         defaults.string(forKey: key) ?? fallback
@@ -1709,8 +1727,7 @@ final class AppModel {
         } else {
             activeTake = nil
         }
-        recordingAutoStopTask?.cancel()
-        recordingAutoStopTask = nil
+        cancelRecordingAutoStop()
         stopSilenceWatch()
         clearTakeReadouts()
         stopRecordingWatch()
@@ -1783,7 +1800,7 @@ final class AppModel {
         batchTask?.cancel(); batchTask = nil
         matchesDebounce?.cancel(); matchesDebounce = nil
         silenceWatchTask?.cancel(); silenceWatchTask = nil
-        recordingAutoStopTask?.cancel(); recordingAutoStopTask = nil
+        cancelRecordingAutoStop()
         recordingWatchTask?.cancel(); recordingWatchTask = nil
         searchTask?.cancel(); searchTask = nil
         downloadTask?.cancel(); downloadTask = nil
@@ -3401,6 +3418,7 @@ final class AppModel {
             // One audio-only checkpoint per take: a crash mid-recording leaves a
             // pointer to the in-flight file instead of losing the take outright.
             liveRecordingAudioURL = inFlight
+            updateSession(of: take.id) { $0.audioURL = inFlight }
             if liveRecordingAudioURL != nil {
                 activeTake?.recovery = beginRecordingRecovery()
                 activeTake?.recoveryStartedAt = recordingRecoveryStartedAt
@@ -3421,17 +3439,42 @@ final class AppModel {
         return false
     }
 
-    private func scheduleRecordingAutoStop() {
-        recordingAutoStopTask?.cancel()
+    private func scheduleRecordingAutoStop(for take: TakeContext) {
+        cancelRecordingAutoStop()
         let limit = recordingMaxMinutes
         guard limit > 0 else { return }
+        recordingAutoStop = AutoStopBudget(takeID: take.id, remaining: .seconds(limit * 60))
+        runRecordingAutoStop()
+    }
+
+    /// Counts down what is left of the take's limit on the model's clock, then stops the take.
+    private func runRecordingAutoStop() {
+        guard var budget = recordingAutoStop, budget.runningSince == nil else { return }
+        budget.runningSince = .now
+        recordingAutoStop = budget
         let clock = clock
         recordingAutoStopTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(limit * 60), clock: clock)
+            try? await Task.sleep(for: budget.remaining, clock: clock)
             guard !Task.isCancelled, let self else { return }
-            guard self.takeIsRunning else { return }
+            guard self.takeIsRunning, self.activeTake?.id == budget.takeID else { return }
             self.stopRecordingAndTranscribe()
         }
+    }
+
+    /// A paused take keeps what is left of its limit for when it resumes.
+    private func holdRecordingAutoStop() {
+        recordingAutoStopTask?.cancel()
+        recordingAutoStopTask = nil
+        guard var budget = recordingAutoStop, let since = budget.runningSince else { return }
+        budget.remaining = max(.zero, budget.remaining - since.duration(to: .now))
+        budget.runningSince = nil
+        recordingAutoStop = budget
+    }
+
+    private func cancelRecordingAutoStop() {
+        recordingAutoStopTask?.cancel()
+        recordingAutoStopTask = nil
+        recordingAutoStop = nil
     }
 
     private func makeTakeCapture(_ source: RecordSource, take: TakeContext) async -> any LiveAudioSource {
@@ -3462,7 +3505,7 @@ final class AppModel {
     private func takeCaptureCameUp(_ take: TakeContext) {
         captureStart = CaptureStart(takeID: take.id, at: .now)
         startSilenceWatch()
-        scheduleRecordingAutoStop()
+        scheduleRecordingAutoStop(for: take)
     }
 
     /// The take's first audio, so its clock starts there rather than when Record was pressed.
@@ -3570,8 +3613,7 @@ final class AppModel {
     /// A live take is over: its clock, meter, watches and checkpoint stop, unless a newer take owns them by now.
     private func endLiveTake(_ take: TakeContext?) {
         if let take, let active = activeTake, active.id != take.id { return }
-        recordingAutoStopTask?.cancel()
-        recordingAutoStopTask = nil
+        cancelRecordingAutoStop()
         if let take { clearTakeReadouts(of: take.id) } else { clearTakeReadouts() }
         stopSilenceWatch()
         stopRecordingWatch()
@@ -3627,7 +3669,8 @@ final class AppModel {
     }
 
     private func startStreamingMic(_ take: TakeContext) {
-        var take = take
+        // The active copy, which holds a category chosen since Record.
+        var take = activeTake ?? take
         streamingConsumer?.cancel()
         let modelName = selectedModel
         let s = StreamingTranscriberFactory.make(clock: clock, deviceUID: preferredInputDeviceUID, persistAudio: true)
@@ -3677,6 +3720,7 @@ final class AppModel {
             let audio = await s.recordingAudioURL()
             guard takeIsCurrent(take) else { return }
             liveRecordingAudioURL = audio
+            updateSession(of: take.id) { $0.audioURL = audio }
             writeRecordingCheckpoint()
             phase = .recording(source: .microphone)
             for await event in events {
@@ -3744,7 +3788,8 @@ final class AppModel {
     ) async {
         // A take that ended in the pane while its session ran on has nothing left to report.
         if let take, !takeIsCurrent(take) { return }
-        let owner = take ?? activeTake
+        // The active copy rather than the one the stream started with: a take's category can change while it records.
+        let owner = activeTake ?? take
         switch event {
         case .partial(let text):
             markTakeCapturing(owner)
@@ -3771,6 +3816,7 @@ final class AppModel {
         // Held first, so the teardown below leaves the checkpoint for the save to end.
         if let recovery { recoveryHeldByTake.insert(recovery) }
         let confirmed = liveSegments
+        let given = annotations(of: take?.id)
         updateSession(of: take?.id) { $0.fail(reason) }
         teardownStreaming()
         let audioURL = await session?.recordingAudioURL()
@@ -3794,7 +3840,8 @@ final class AppModel {
                 category: takeCategory,
                 activate: false,
                 recovery: recovery,
-                take: take?.id
+                take: take?.id,
+                annotations: given
             )
             message += " " + String(localized: "The recording up to this point was saved to your library.")
         } else if let recovery {
@@ -3809,7 +3856,10 @@ final class AppModel {
         phase = .failed(message: message)
         // After the phase: its didSet forgets whatever the last failure left behind.
         if savedPartial, let audioURL {
-            armTakeRetry(url: audioURL, title: takeTitle, source: takeSource, category: takeCategory, save: saving, recovery: recovery)
+            armTakeRetry(
+                url: audioURL, title: takeTitle, source: takeSource, category: takeCategory, save: saving, recovery: recovery,
+                annotations: given
+            )
         }
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
@@ -3820,6 +3870,7 @@ final class AppModel {
         // Held until the save ends it, so a cancel's cleanup during the awaits below leaves it on disk.
         if let recovery { recoveryHeldByTake.insert(recovery) }
         let arming = takeArming
+        let given = annotations(of: take?.id)
         stopRecordingWatch()
         let takeCategory = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
@@ -3841,7 +3892,8 @@ final class AppModel {
                     category: takeCategory,
                     activate: false,
                     recovery: recovery,
-                    take: take.id
+                    take: take.id,
+                    annotations: given
                 )
             } else if let recovery {
                 recoveryHeldByTake.remove(recovery)
@@ -3870,7 +3922,7 @@ final class AppModel {
         phase = .ready
         updateSession(of: take?.id) { $0.land(entryID: nil) }
         if let audioURL = processed.sourceURL {
-            recordedTake = RecordedTake(file: audioURL, title: title)
+            recordedTake = RecordedTake(file: audioURL, title: given.typedTitle ?? title)
             sourceFileURL = audioURL
             installPlayer(for: audioURL)
             adoptLoadedMediaDuration()
@@ -3883,7 +3935,8 @@ final class AppModel {
             category: takeCategory,
             activate: true,
             recovery: recovery,
-            take: take?.id
+            take: take?.id,
+            annotations: given
         )
         endLiveTake(take)
         if cutShort {
@@ -3899,8 +3952,7 @@ final class AppModel {
     func stopRecordingAndTranscribe() {
         // Before the auto-stop is cancelled: a capture marked here schedules one.
         catchUpFirstBuffer()
-        recordingAutoStopTask?.cancel()
-        recordingAutoStopTask = nil
+        cancelRecordingAutoStop()
         // Nothing captured yet ends here and says so; a capture that came up stops normally and keeps its file.
         if let arming = takeArming, activeTake?.captureRequested == true, !captureIsUp(arming) {
             endTakeBeforeCapture(reporting: Self.nothingRecordedMessage(for: arming))
@@ -3933,6 +3985,7 @@ final class AppModel {
         let category = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let recovery = recoveryGeneration(of: take)
+        let given = annotations(of: take?.id)
         startTakeTask { [weak self] in
             guard let self else { return }
             await mediaSession.exitRecording()
@@ -3945,13 +3998,15 @@ final class AppModel {
                     return
                 }
                 await transcribeRecordedTake(
-                    url: url, title: title, source: takeSource, category: category, replacing: recovery, take: take?.id
+                    url: url, title: title, source: takeSource, category: category, replacing: recovery, take: take?.id,
+                    annotations: given
                 )
             } catch let cut as CaptureInterrupted {
                 clearTakeReadouts(of: take?.id)
                 liveRecordingAudioURL = nil
                 await keepCutShortTake(
-                    cut, title: title, source: takeSource, category: category, recovery: recovery, take: take?.id
+                    cut, title: title, source: takeSource, category: category, recovery: recovery, take: take?.id,
+                    annotations: given
                 )
             } catch {
                 clearTakeReadouts(of: take?.id)
@@ -3995,7 +4050,8 @@ final class AppModel {
 
     /// A take whose file stopped taking writes keeps the audio that landed, saved as interrupted, with Retry.
     private func keepCutShortTake(
-        _ cut: CaptureInterrupted, title: String, source: EntrySource, category: EntryCategory, recovery: Int?, take: Int?
+        _ cut: CaptureInterrupted, title: String, source: EntrySource, category: EntryCategory, recovery: Int?, take: Int?,
+        annotations: TakeAnnotations
     ) async {
         let message = String(localized: "Parola couldn't keep writing the recording to disk.")
             + " " + String(localized: "The recording up to this point was saved to your library.")
@@ -4009,10 +4065,14 @@ final class AppModel {
             category: category,
             activate: false,
             recovery: recovery,
-            take: take
+            take: take,
+            annotations: annotations
         )
         phase = .failed(message: message)
-        armTakeRetry(url: cut.url, title: title, source: source, category: category, save: saving, recovery: recovery)
+        armTakeRetry(
+            url: cut.url, title: title, source: source, category: category, save: saving, recovery: recovery,
+            annotations: annotations
+        )
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
@@ -4088,17 +4148,18 @@ final class AppModel {
     /// Transcribes a finished take from its working file, retiring the checkpoint it replaces; a failure or a stop still saves it.
     func transcribeRecordedTake(
         url: URL, title: String, source: EntrySource, category: EntryCategory = .transcription,
-        replacing previous: Int? = nil, take: Int? = nil
+        replacing previous: Int? = nil, take: Int? = nil, annotations: TakeAnnotations = TakeAnnotations()
     ) async {
         liveRecordingAudioURL = nil
         takeRunCounter &+= 1
         let run = takeRunCounter
         takeRun = run
         defer { if takeRun == run { takeRun = nil } }
-        let recovery = beginFileTranscribeRecovery(sourceURL: url, title: title, source: source, category: category)
+        let named = annotations.typedTitle ?? title
+        let recovery = beginFileTranscribeRecovery(sourceURL: url, title: named, source: source, category: category)
         // Held by the run itself, so a Cancel's cleanup leaves it for the save that follows.
         recoveryHeldByTake.insert(recovery)
-        recordedTake = RecordedTake(file: url, title: title)
+        recordedTake = RecordedTake(file: url, title: named)
         sourceFileURL = url
         installPlayer(for: url)
         phase = .transcribing(file: url)
@@ -4119,7 +4180,7 @@ final class AppModel {
             guard !Task.isCancelled else {
                 saveTake(
                     processed, audio: url, title: title, source: source, category: category, activate: false,
-                    recovery: recovery, take: take
+                    recovery: recovery, take: take, annotations: annotations
                 )
                 resolveRecordingOutcome(.success(processed.text))
                 return
@@ -4134,13 +4195,13 @@ final class AppModel {
             phase = .ready
             saveTake(
                 processed, audio: url, title: title, source: source, category: category, activate: true,
-                recovery: recovery, take: take
+                recovery: recovery, take: take, annotations: annotations
             )
             resolveRecordingOutcome(.success(processed.text))
         } catch {
             keepUntranscribedTake(
                 url: url, title: title, source: source, category: category, error: error,
-                recovery: recovery, forNewWork: takeRunStoppedByNewWork == run, take: take
+                recovery: recovery, forNewWork: takeRunStoppedByNewWork == run, take: take, annotations: annotations
             )
         }
     }
@@ -4148,7 +4209,7 @@ final class AppModel {
     /// A take whose transcription failed or was stopped goes to the library as audio; only a failure reports.
     private func keepUntranscribedTake(
         url: URL, title: String, source: EntrySource, category: EntryCategory, error: any Error,
-        recovery: Int?, forNewWork: Bool, take: Int?
+        recovery: Int?, forNewWork: Bool, take: Int?, annotations: TakeAnnotations
     ) {
         let stopped = error is CancellationError || Task.isCancelled
         let saving = saveTake(
@@ -4159,7 +4220,8 @@ final class AppModel {
             category: category,
             activate: false,
             recovery: recovery,
-            take: take
+            take: take,
+            annotations: annotations
         ) { [weak self] _ in
             guard forNewWork else { return }
             self?.exportNotice = ExportNotice(
@@ -4183,22 +4245,26 @@ final class AppModel {
             return
         }
         phase = .failed(message: message)
-        armTakeRetry(url: url, title: title, source: source, category: category, save: saving, recovery: recovery)
+        armTakeRetry(
+            url: url, title: title, source: source, category: category, save: saving, recovery: recovery,
+            annotations: annotations
+        )
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
     /// After the phase is set: its didSet forgets whatever the last failure left behind.
     private func armTakeRetry(
         url: URL, title: String, source: EntrySource, category: EntryCategory,
-        save: Task<LibraryEntry, any Error>?, recovery: Int?
+        save: Task<LibraryEntry, any Error>?, recovery: Int?, annotations: TakeAnnotations
     ) {
         failureKind = .transcription
         failedTakeAudioURL = url
         failedTakeSave = save
         failedTakeRecovery = recovery
-        failedTakeTitle = title
+        failedTakeTitle = annotations.typedTitle ?? title
         failedTakeCategory = category
         failedTakeSource = source
+        failedTakeAnnotations = annotations
     }
 
     /// Stops a take's transcription. The take is saved to the library untranscribed, so the recording survives.
@@ -4219,15 +4285,19 @@ final class AppModel {
         activate: Bool,
         recovery: Int?,
         take: Int? = nil,
+        annotations: TakeAnnotations = TakeAnnotations(),
         onSaved: (@MainActor (LibraryEntry) -> Void)? = nil
     ) -> Task<LibraryEntry, any Error> {
+        // A typed title is the user's: it replaces the generated one, and carries none of its notes.
         let saving = land(RunLanding(
             kind: activate ? .recording : .salvagedTake,
             transcript: transcript,
             audioSource: audio,
             source: source,
             category: category,
-            title: title
+            title: annotations.typedTitle ?? title,
+            titleSource: annotations.typedTitle == nil ? nil : .user,
+            takeMarkers: annotations.markers
         ))
         if let recovery { recoveryHeldByTake.insert(recovery) }
         if let audio { takeFilesBeingSaved[audio, default: 0] += 1 }
@@ -4274,6 +4344,109 @@ final class AppModel {
     func recordedTakeTitle(playing file: URL?) -> String? {
         guard let file, let recordedTake, recordedTake.file == file else { return nil }
         return recordedTake.title
+    }
+
+    // MARK: - Take controls
+
+    /// The take from Record until Stop, which its controls act on; nil during a count-in and once Stop is pressed.
+    private var controlledTake: TakeContext? {
+        guard let take = activeTake, let session = recording, session.takeID == take.id,
+              session.isArming || session.isCapturing else { return nil }
+        return take
+    }
+
+    /// Pauses a take that is capturing: its file stops growing, its clock and auto-stop hold, and its silence watch rests.
+    @discardableResult
+    func pauseTake() -> Bool {
+        guard let take = controlledTake else { return false }
+        var paused = false
+        updateSession(of: take.id) { paused = $0.pause(at: Date()) }
+        guard paused else { return false }
+        setCapturePaused(true)
+        stopSilenceWatch()
+        holdRecordingAutoStop()
+        return true
+    }
+
+    @discardableResult
+    func resumeTake() -> Bool {
+        guard let take = controlledTake else { return false }
+        var resumed = false
+        updateSession(of: take.id) { resumed = $0.resume(at: Date()) }
+        guard resumed else { return false }
+        setCapturePaused(false)
+        startSilenceWatch()
+        runRecordingAutoStop()
+        return true
+    }
+
+    /// One change after another, so a quick pause and resume reach the capture in the order they were made.
+    private func setCapturePaused(_ paused: Bool) {
+        let capture = liveSource as? any LiveAudioSource
+        let stream = streamingSession
+        let earlier = takePauseWrites
+        takePauseWrites = Task {
+            await earlier?.value
+            await capture?.setPaused(paused)
+            await stream?.setPaused(paused)
+        }
+    }
+
+    /// Marks this moment, whose sentence becomes a favourite once the take has words; nil when nothing is capturing or the last mark is under a second old.
+    @discardableResult
+    func addTakeMarker() -> TimeInterval? {
+        guard let take = controlledTake else { return nil }
+        var mark: TimeInterval?
+        updateSession(of: take.id) { mark = $0.addMarker(at: Date()) }
+        return mark
+    }
+
+    /// The confirmed Discard: the take's audio and checkpoint are deleted and nothing is saved; a take still arming ends as Cancel ends it.
+    func discardTake() async {
+        if recordingCountdown != nil {
+            cancelRecordingCountdown()
+            return
+        }
+        guard controlledTake != nil, let session = recording else { return }
+        guard session.isCapturing else {
+            cancelRecordingBeforeCapture()
+            return
+        }
+        await discardCapture()
+    }
+
+    /// A title the user typed becomes the entry's own; an empty one gives the take its generated name back.
+    func renameTake(_ title: String) {
+        guard let take = controlledTake else { return }
+        let typed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        updateSession(of: take.id) { session in
+            if typed.isEmpty {
+                guard session.titleSource != nil else { return }
+                session.titleSource = nil
+                session.title = Self.liveRecordingTitle(category: session.category, endedAt: session.startedAt ?? Date())
+            } else if typed != session.title {
+                session.title = typed
+                session.titleSource = .user
+            }
+        }
+    }
+
+    /// Note or Meeting for the take in progress: its entry is saved under it, and a generated title follows it.
+    func setTakeCategory(_ category: EntryCategory) {
+        guard let take = controlledTake, take.category != category else { return }
+        activeTake?.category = category
+        updateSession(of: take.id) { session in
+            session.category = category
+            guard session.titleSource == nil else { return }
+            session.title = Self.liveRecordingTitle(category: category, endedAt: session.startedAt ?? Date())
+        }
+        writeRecordingCheckpoint()
+    }
+
+    /// The title the user typed and the moments they marked, from the take's session while it is still that take's.
+    private func annotations(of takeID: Int?) -> TakeAnnotations {
+        guard let takeID, let session = recording, session.takeID == takeID else { return TakeAnnotations() }
+        return TakeAnnotations(typedTitle: session.titleSource == .user ? session.title : nil, markers: session.markers)
     }
 
     // MARK: - Take titles
@@ -4340,7 +4513,7 @@ final class AppModel {
         if choice == .stopAndSave { savingTakesBeforeQuit = true }
         await withinQuitLimit { [weak self] in
             if choice == .discard {
-                await self?.discardTakeForQuit()
+                await self?.discardCapture()
             } else {
                 await self?.saveTakeForQuit()
             }
@@ -4370,8 +4543,7 @@ final class AppModel {
     /// A quit can't wait for a model, so a file take is saved as audio; a live take keeps what it transcribed.
     private func saveTakeForQuit() async {
         catchUpFirstBuffer()
-        recordingAutoStopTask?.cancel()
-        recordingAutoStopTask = nil
+        cancelRecordingAutoStop()
         if let arming = takeArming, activeTake?.captureRequested == true, !captureIsUp(arming) {
             endTakeBeforeCapture(reporting: nil)
             return
@@ -4394,6 +4566,7 @@ final class AppModel {
         let category = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let recovery = recoveryGeneration(of: take)
+        let given = annotations(of: take?.id)
         let title = Self.liveRecordingTitle(category: category, endedAt: Date())
         await mediaSession.exitRecording()
         var cutShort = false
@@ -4432,11 +4605,14 @@ final class AppModel {
             category: category,
             activate: false,
             recovery: recovery,
-            take: take?.id
+            take: take?.id,
+            annotations: given
         )
     }
 
-    private func discardTakeForQuit() async {
+    /// Stops the capture without keeping anything: the take's audio and checkpoint are deleted, and no entry is made.
+    private func discardCapture() async {
+        let audio = recording?.takeID == activeTake?.id ? recording?.audioURL : nil
         let streaming = streamingSession
         let capture = liveSource
         let consumer = streamingConsumer
@@ -4448,6 +4624,8 @@ final class AppModel {
         // After the consumer's own exit, so this one is the exit that restores muted or paused media before the reply.
         await consumer?.value
         await mediaSession.exitRecording()
+        // Whatever the capture left of its file goes too, so the launch sweep can't bring a discarded take back.
+        if let audio { releaseTakeFile(audio) }
         phase = .idle
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
     }
@@ -4465,6 +4643,7 @@ final class AppModel {
         failedTakeTitle = nil
         failedTakeCategory = nil
         failedTakeSource = nil
+        failedTakeAnnotations = nil
     }
 
     var canRetryFailedTranscription: Bool {
@@ -4511,6 +4690,7 @@ final class AppModel {
         let title = failedTakeTitle ?? Self.liveRecordingTitle(category: .transcription, endedAt: Date())
         let source = failedTakeSource ?? .microphone
         let category = failedTakeCategory ?? .transcription
+        let annotations = failedTakeAnnotations ?? TakeAnnotations()
         let saving = failedTakeSave
         let recovery = failedTakeRecovery
         Task { [weak self] in
@@ -4521,7 +4701,7 @@ final class AppModel {
             }
             self?.startTakeTask { [weak self] in
                 await self?.transcribeRecordedTake(
-                    url: url, title: title, source: source, category: category, replacing: recovery
+                    url: url, title: title, source: source, category: category, replacing: recovery, annotations: annotations
                 )
             }
         }

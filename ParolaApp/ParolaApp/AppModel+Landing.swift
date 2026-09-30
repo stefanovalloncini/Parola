@@ -30,6 +30,8 @@ struct RunLanding {
     var category: EntryCategory = .transcription
     var title: String?
     var titleSource: TitleSource?
+    /// A take's markers, kept in its entry so every transcript it gets favourites their sentences.
+    var takeMarkers: [TimeInterval] = []
     var sourceDigest: String?
     var consumesAudio = false
     /// The job a `.batchJob` landing finishes.
@@ -200,7 +202,8 @@ extension AppModel {
                     titleSource: landing.titleSource,
                     sourceDigest: landing.sourceDigest,
                     source: landing.source,
-                    consumesAudio: landing.consumesAudio
+                    consumesAudio: landing.consumesAudio,
+                    takeMarkers: landing.takeMarkers
                 )
                 self?.place(entry, landing, navigation: navigation)
                 return entry
@@ -213,7 +216,7 @@ extension AppModel {
         return saving
     }
 
-    /// Favorites, notes, the speaker map and the card metadata all name segments and labels the re-run replaced.
+    /// Favorites, notes, the speaker map and the card metadata all name segments and labels the re-run replaced; a take's markers pick favourites anew.
     private func replaceEntry(_ entryID: LibraryEntry.ID, with landing: RunLanding) -> Task<LibraryEntry, any Error> {
         aiJobs.cancelAll(for: entryID)
         let transcript = landing.transcript
@@ -223,7 +226,7 @@ extension AppModel {
                 try await library.setTranscriptionDetails(
                     modelName: transcript.modelName, language: transcript.language, for: entryID
                 )
-                try await library.setFavoriteSegments([], for: entryID)
+                try await library.replaceFavoritesWithTakeMarkers(in: transcript.segments, for: entryID)
                 for segmentID in landing.clearingNotes.keys.compactMap(Int.init) {
                     try await library.setSegmentNote(nil, segmentID: segmentID, for: entryID)
                 }

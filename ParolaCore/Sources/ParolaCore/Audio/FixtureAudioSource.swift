@@ -91,6 +91,11 @@ public actor FixtureAudioSource: LiveAudioSource {
         self.paused = paused
     }
 
+    /// The fixture stands in for the file a real capture writes, which is what `prepare()` hands back.
+    public func inFlightURL() async -> URL? {
+        started ? fixtureURL : nil
+    }
+
     public func estimatedDuration() async -> Double? {
         let asset = AVURLAsset(url: fixtureURL)
         do {

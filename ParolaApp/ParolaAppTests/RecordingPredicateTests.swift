@@ -26,6 +26,8 @@ struct RecordingPredicateTests {
         let model = makeModel()
         model.installTestTake(source: .microphone, liveSource: StubSource(url: try tempWAV()))
         #expect(model.takeIsRunning)
+        #expect(model.pauseTake())
+        #expect(model.takeIsRunning)
         #expect(model.takeInProgress)
     }
 

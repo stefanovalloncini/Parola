@@ -45,6 +45,8 @@ public struct ParolaDocument: Sendable {
         /// Which person each speaker label in this transcript stands for, keyed by the label the
         /// segments carry now.
         public var speakerAssignments: [String: UUID]
+        /// Moments marked while the take recorded, kept so every transcript it gets favourites them again.
+        public var takeMarkers: [TimeInterval]?
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -71,7 +73,8 @@ public struct ParolaDocument: Sendable {
             aiTitle: String? = nil,
             shortSummary: String? = nil,
             deliveries: [DeliveryReceipt] = [],
-            speakerAssignments: [String: UUID] = [:]
+            speakerAssignments: [String: UUID] = [:],
+            takeMarkers: [TimeInterval]? = nil
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -98,6 +101,7 @@ public struct ParolaDocument: Sendable {
             self.shortSummary = shortSummary
             self.deliveries = deliveries
             self.speakerAssignments = speakerAssignments
+            self.takeMarkers = takeMarkers
         }
 
         /// A bundle written before the field kept one trace of a link: the sentinel a caption fetcher stamps.
@@ -131,6 +135,7 @@ public struct ParolaDocument: Sendable {
             case shortSummary
             case deliveries
             case speakerAssignments
+            case takeMarkers
         }
 
         public init(from decoder: any Decoder) throws {
@@ -161,6 +166,7 @@ public struct ParolaDocument: Sendable {
             shortSummary = try c.decodeIfPresent(String.self, forKey: .shortSummary)
             deliveries = try c.decodeIfPresent([DeliveryReceipt].self, forKey: .deliveries) ?? []
             speakerAssignments = try c.decodeIfPresent([String: UUID].self, forKey: .speakerAssignments) ?? [:]
+            takeMarkers = try c.decodeIfPresent([TimeInterval].self, forKey: .takeMarkers)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -202,6 +208,7 @@ public struct ParolaDocument: Sendable {
             if !speakerAssignments.isEmpty {
                 try c.encode(speakerAssignments, forKey: .speakerAssignments)
             }
+            try c.encodeIfPresent(takeMarkers, forKey: .takeMarkers)
         }
     }
 
@@ -228,7 +235,8 @@ public struct ParolaDocument: Sendable {
         titleSource: TitleSource? = nil,
         sourceDigest: String? = nil,
         entrySource: EntrySource? = nil,
-        movesAudio: Bool = false
+        movesAudio: Bool = false,
+        takeMarkers: [TimeInterval]? = nil
     ) throws -> URL {
         let target = destination.pathExtension == "parola"
             ? destination
@@ -259,6 +267,7 @@ public struct ParolaDocument: Sendable {
                 audioFilename = audioName
             }
             let title = titleOverride.flatMap { $0.isEmpty ? nil : $0 }
+            let markers = takeMarkers.flatMap { $0.isEmpty ? nil : $0 }
 
             let manifest = Manifest(
                 originalAudioName: originalAudioName,
@@ -269,11 +278,13 @@ public struct ParolaDocument: Sendable {
                 category: category,
                 deletedAt: deletedAt,
                 audioFilename: audioFilename,
+                favoriteSegments: TakeMarkers.favoriteSegmentIDs(markers: markers ?? [], segments: transcript.segments),
                 durationSeconds: transcript.durationSeconds.flatMap { $0 > 0 ? $0 : nil },
                 sourceDigest: source == nil ? nil : sourceDigest,
                 transcriptionSeconds: transcript.transcriptionSeconds,
                 wordCount: transcript.wordCount,
-                source: entrySource
+                source: entrySource,
+                takeMarkers: markers
             )
             try writeJSON(manifest, to: staging.appendingPathComponent("manifest.json"))
             // Word timings make transcript.json the biggest file in the bundle; indenting it costs more than it's worth.

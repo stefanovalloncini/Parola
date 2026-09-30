@@ -62,6 +62,22 @@ struct FixtureAudioSourceTests {
         await source.cancel()
     }
 
+    @Test("a started fixture names itself as the file in flight, through the protocol and on the concrete type")
+    func fixtureIsTheFileInFlight() async throws {
+        let url = try writeWav(duration: 0.05)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let fixture = FixtureAudioSource.make(fixtureURL: url, clock: ImmediateClock())
+        let source: any LiveAudioSource = fixture
+        #expect(await source.inFlightURL() == nil)
+
+        try await fixture.start()
+        #expect(await source.inFlightURL() == url)
+        #expect(await fixture.inFlightURL() == url)
+
+        await fixture.cancel()
+        #expect(await source.inFlightURL() == nil)
+    }
+
     @Test("start() throws audioLoadFailed when the fixture is missing")
     func startThrowsWhenMissing() async {
         let missing = URL(fileURLWithPath: "/tmp/parola-fixture-\(UUID().uuidString).wav")
