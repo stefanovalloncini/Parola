@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
@@ -87,14 +89,29 @@ extension TranscriberMockSuites {
         @Test("the meeting item follows the running app the menu bar shows, not the alert's flag")
         func meetingItem() {
             let model = makeModel()
-            model.meetingDetector.detectedAppName = "Zoom"
+            model.detectedMeetingAppName = "Zoom"
             model.meetingDetectedApp = nil
             #expect(RecordControl.detectedMeetingApp(for: model) == "Zoom", "no alert has to be up")
             #expect(RecordControl.offersModes(features: FeatureSet(enabled: [.meetings]), detectedMeetingApp: "Zoom"))
             #expect(!RecordControl.offersModes(features: FeatureSet(enabled: [.micRecording]), detectedMeetingApp: "Zoom"))
 
             let gated = makeModel(features: [.micRecording])
+            gated.detectedMeetingAppName = "Zoom"
             #expect(RecordControl.detectedMeetingApp(for: gated) == nil)
+        }
+
+        @Test("in test mode the Record control and the menu bar show the meeting app without starting the detector")
+        func detectorStaysOff() {
+            let model = makeModel()
+            model.detectedMeetingAppName = "Zoom"
+            model.showMenuBarExtra = true
+            let host = NSHostingView(rootView: RecordControl().environment(model))
+            host.frame = NSRect(x: 0, y: 0, width: 240, height: 44)
+            host.layoutSubtreeIfNeeded()
+
+            #expect(host.fittingSize.width > 0, "the control rendered")
+            #expect(MenuBarController.snapshot(for: model).detectedMeetingApp == "Zoom")
+            #expect(!model.meetingDetectorStarted)
         }
     }
 }

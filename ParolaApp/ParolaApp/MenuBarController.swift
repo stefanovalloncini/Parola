@@ -63,7 +63,7 @@ final class MenuBarController: NSObject {
             _ = model.libraryEntries
             _ = model.inputDeviceUID
             if model.features.isEnabled(.meetings) {
-                _ = model.meetingDetector.detectedAppName
+                _ = model.detectedMeetingAppName
             }
             if model.features.isEnabled(.liveCaptions) {
                 _ = model.selectedModel
@@ -87,7 +87,7 @@ final class MenuBarController: NSObject {
         )
         guard mode == .full else { return snapshot }
         if model.features.isEnabled(.meetings) {
-            snapshot.detectedMeetingApp = model.meetingDetector.detectedAppName
+            snapshot.detectedMeetingApp = model.detectedMeetingAppName
         }
         if model.features.isEnabled(.liveCaptions) {
             snapshot.captionsShown = true

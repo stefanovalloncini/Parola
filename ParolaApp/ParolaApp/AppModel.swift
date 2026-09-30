@@ -1279,20 +1279,31 @@ final class AppModel {
     // MARK: - Meeting detection
 
     var meetingDetectedApp: String?
+    /// The meeting app the detector saw last, for the Record menu and the menu bar; it outlives the alert `meetingDetectedApp` raises.
+    var detectedMeetingAppName: String?
     var meetingCaptureAppOnly: Bool = false { didSet { defaults.set(meetingCaptureAppOnly, forKey: "meetingCaptureAppOnly") } }
     @ObservationIgnored var pendingRecordingCategory: EntryCategory = .transcription
     /// Where the take in flight is listening, for the manifest a persist writes after the phase has moved on.
     @ObservationIgnored var pendingRecordingSource: EntrySource = .microphone
     @ObservationIgnored var pendingCaptureBundleIDs: Set<String>?
-    @ObservationIgnored lazy var meetingDetector: MeetingDetector = MeetingDetector { [weak self] appName in
-        guard let self else { return }
-        // Never prompt over in-flight work: accepting would stomp a live recording.
-        switch self.phase {
-        case .idle, .ready, .failed:
-            // A presented alert's title never updates, so keep the first prompt — accept
-            // and decline must act on the app name the user is actually reading.
-            if self.meetingDetectedApp == nil { self.meetingDetectedApp = appName }
-        default: break
+    /// Reading it starts it, and test mode leaves it off, so views read `detectedMeetingAppName` instead.
+    @ObservationIgnored lazy var meetingDetector: MeetingDetector = startMeetingDetector()
+    /// Test seam: whether anything has started the detector.
+    @ObservationIgnored private(set) var meetingDetectorStarted = false
+
+    private func startMeetingDetector() -> MeetingDetector {
+        meetingDetectorStarted = true
+        return MeetingDetector { [weak self] appName in
+            guard let self else { return }
+            self.detectedMeetingAppName = appName
+            // Never prompt over in-flight work: accepting would stomp a live recording.
+            switch self.phase {
+            case .idle, .ready, .failed:
+                // A presented alert's title never updates, so keep the first prompt — accept
+                // and decline must act on the app name the user is actually reading.
+                if self.meetingDetectedApp == nil { self.meetingDetectedApp = appName }
+            default: break
+            }
         }
     }
 

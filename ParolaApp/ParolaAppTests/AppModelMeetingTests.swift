@@ -25,6 +25,7 @@ extension TranscriberMockSuites {
             model.meetingDetector.fire(appName: "Acme Conference")
 
             #expect(model.meetingDetectedApp == "Acme Conference")
+            #expect(model.detectedMeetingAppName == "Acme Conference", "what the Record menu and the menu bar offer")
         }
 
         @Test("a second detection while the prompt is up keeps the first app")

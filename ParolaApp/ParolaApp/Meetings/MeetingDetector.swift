@@ -20,7 +20,6 @@ final class MeetingDetector {
         Set(knownMeetingApps.filter { $0.value == name }.keys)
     }
 
-    var detectedAppName: String?
     var isEnabled: Bool {
         didSet { DefaultsStore.current.set(isEnabled, forKey: Self.defaultsKey) }
     }
@@ -90,7 +89,6 @@ final class MeetingDetector {
            now.timeIntervalSince(last) < Self.dedupWindow { return }
         lastFiredApp = appName
         lastFiredAt = now
-        detectedAppName = appName
         onDetected(appName)
     }
 

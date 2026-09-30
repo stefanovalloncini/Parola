@@ -20,8 +20,7 @@ struct RecordControl: View {
 
     /// The meeting app the menu bar offers too; the model's own flag is set only while its alert blocks the window.
     static func detectedMeetingApp(for model: AppModel) -> String? {
-        guard model.features.isEnabled(.meetings) else { return nil }
-        return model.meetingDetector.detectedAppName
+        model.features.isEnabled(.meetings) ? model.detectedMeetingAppName : nil
     }
 
     var body: some View {
