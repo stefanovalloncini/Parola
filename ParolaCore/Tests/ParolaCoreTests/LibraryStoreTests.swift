@@ -238,11 +238,13 @@ struct LibraryStoreTests {
     }
 
     private struct HangingIndexer: LibraryIndexer {
+        let gate = UninterruptibleGate()
+
         func index(id: String, title: String, text: String, createdAt: Date) async {
-            try? await Task.sleep(for: .seconds(3600))
+            await gate.wait()
         }
         func deindex(id: String) async {
-            try? await Task.sleep(for: .seconds(3600))
+            await gate.wait()
         }
     }
 
@@ -251,21 +253,16 @@ struct LibraryStoreTests {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-library-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        let store = LibraryStore(libraryURL: tmp, extraIndexer: HangingIndexer())
+        let indexer = HangingIndexer()
+        defer { indexer.gate.open() }
+        let store = LibraryStore(libraryURL: tmp, extraIndexer: indexer)
         let audio = try makeFakeAudio()
         let transcript = makeTranscript()
 
-        let added: LibraryEntry? = try await withThrowingTaskGroup(of: LibraryEntry?.self) { group in
-            group.addTask { try await store.add(transcript: transcript, audioSource: audio) }
-            group.addTask {
-                try? await Task.sleep(for: .seconds(5))
-                return nil
-            }
-            let first = try await group.next() ?? nil
-            group.cancelAll()
-            return first
-        }
-        #expect(added != nil, "add() must return even when the extra indexer stalls")
+        let add = GuardedTask { try await store.add(transcript: transcript, audioSource: audio) }
+        let added = try await add.value("add() to return while the extra indexer stalls", timeout: .seconds(60))
+        #expect(added != nil)
+        await indexer.gate.arrivals.wait(atLeast: 1, "the extra indexer to be handed the new entry")
     }
 
     @Test("add writes a .parola bundle and list returns it")
@@ -424,11 +421,11 @@ struct LibraryStoreTests {
         #expect(hit.highlights.isEmpty == false)
     }
 
-    /// Fix round 1, R1.4 finding #5: the query path must never read a bundle off disk. This times
-    /// `search` against a scratch library holding one entry the size of Stefano's 1h42m real file
-    /// (961 segments, ~64,000 characters) to show the in-memory v9 index keeps it fast.
-    @Test("search stays fast on a scratch library with one multi-hour entry")
-    func searchQueryPathTimingOnAMultiHourEntry() async throws {
+    /// Fix round 1, R1.4 finding #5: the query path must never read a bundle off disk. The entry is
+    /// the size of Stefano's 1h42m real file (961 segments, ~64,000 characters), and its transcript
+    /// is made unreadable before the search, keeping the size and date the index checks.
+    @Test("search answers a multi-hour entry from the index without reading its bundle")
+    func searchQueryPathSkipsTheBundle() async throws {
         let (store, _) = try makeTempLibrary()
         let audio = try makeFakeAudio()
         let words = "grazie a tutti per la vostra pazienza durante questa lunga riunione di oggi pomeriggio"
@@ -438,17 +435,18 @@ struct LibraryStoreTests {
         segments.append(TranscriptSegment(id: 960, start: 5760, end: 5765, text: "zzyzxmarker closing remarks"))
         let transcript = Transcript(segments: segments, language: "it", modelName: "tiny")
         #expect(transcript.text.count > 60_000)
-        _ = try await store.add(transcript: transcript, audioSource: audio)
+        let entry = try await store.add(transcript: transcript, audioSource: audio)
         await store.flush()
 
-        let clock = ContinuousClock()
-        let start = clock.now
-        let hits = await store.search("zzyzxmarker")
-        let elapsed = clock.now - start
+        let transcriptFile = entry.bundleURL.appendingPathComponent("transcript.json")
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: transcriptFile.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: transcriptFile.path) }
+        #expect(FileManager.default.isReadableFile(atPath: transcriptFile.path) == false)
 
+        let hits = await store.search("zzyzxmarker")
+
+        #expect(hits.map(\.entryID) == [entry.id])
         #expect(hits.first?.snippet.lowercased().contains("zzyzxmarker") == true)
-        print("search-query-path-timing: \(transcript.text.count) chars, 961 segments, elapsed \(elapsed)")
-        #expect(elapsed < .milliseconds(50))
     }
 
     @Test("a bundle whose manifest version is newer than the app is dropped from the list")
