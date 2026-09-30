@@ -68,12 +68,29 @@ func startFixtureTake(_ model: AppModel, copyingFixture: Bool = false, seconds: 
     return fixture
 }
 
-/// Every file transcription answers with these segments until the mocks are cleared.
-func installMockTranscriber(segments: [(start: Double, end: Double, text: String)], gate: MockTranscriberGate? = nil) async {
+/// Every file transcription answers with these segments until the mocks are cleared, reporting the partials and seconds on the way.
+func installMockTranscriber(
+    segments: [(start: Double, end: Double, text: String)] = [],
+    partials: [String] = [],
+    progressSeconds: [Double] = [],
+    delayMs: Int = 0,
+    gate: MockTranscriberGate? = nil
+) async {
     await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
         segments: segments.map { TranscriptSegmentSeed(start: $0.start, end: $0.end, text: $0.text) },
+        partials: partials,
+        progressSeconds: progressSeconds,
+        delayMs: delayMs,
         gate: gate
     ))
+}
+
+/// A mic take that has been capturing for `seconds`, stopped now: `audio` is its file, which transcribes on the batch path.
+@MainActor
+func recordAndStop(_ model: AppModel, audio: URL, seconds: Double) {
+    model.useStreaming = false
+    model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -seconds))
+    model.stopRecordingAndTranscribe()
 }
 
 /// The newest entry in the model's library, once one has landed.

@@ -204,7 +204,8 @@ final class DockBadge {
             startTick()
         } else {
             stopTick()
-            display(Self.badge(for: model.phase, burnProgress: model.burnJob?.progress))
+            let takeTranscribing = model.recording?.isTranscribing ?? false
+            display(Self.badge(for: model.phase, takeTranscribing: takeTranscribing, burnProgress: model.burnJob?.progress))
         }
     }
 
@@ -250,10 +251,11 @@ final class DockBadge {
         return max(0.05, next)
     }
 
-    /// A burn shows its progress only while nothing in the window reports its own.
-    nonisolated static func badge(for phase: AppModel.Phase, burnProgress: Double?) -> String? {
+    /// A burn shows its progress only while nothing in the window reports its own; a take transcribing reports as a file's run does.
+    nonisolated static func badge(for phase: AppModel.Phase, takeTranscribing: Bool, burnProgress: Double?) -> String? {
         switch phase {
         case .idle, .ready, .failed:
+            if takeTranscribing { return "•" }
             return burnProgress.map { "\(Int($0 * 100))%" }
         case .downloadingModel(_, let progress):
             return "\(Int(progress * 100))%"

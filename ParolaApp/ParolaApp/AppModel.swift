@@ -110,6 +110,13 @@ final class AppModel {
         let title: String
     }
 
+    /// A take's transcription run, the take it belongs to and the file it reads.
+    struct TakeTranscription: Equatable {
+        let run: Int
+        let takeID: Int
+        let file: URL
+    }
+
     /// The answers the quit prompt offers while a take is capturing.
     enum QuitDuringTake {
         case stopAndSave
@@ -287,6 +294,10 @@ final class AppModel {
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
+    /// The take run the Stage shows while it transcribes; nil once the run ends or is stopped, so its late callbacks land nowhere.
+    private(set) var takeTranscription: TakeTranscription?
+    private(set) var takePartialText: String = ""
+    private(set) var takeTranscribeStage: TranscribeStage?
     /// A link run's video title with the file it was downloaded to, so the pane never names the working file.
     var linkRunTitle: LinkRunTitle?
 
@@ -487,10 +498,9 @@ final class AppModel {
         switch phase {
         case .idle, .ready, .failed:
             startRecording(source: .microphone)
-        case .transcribing where takeRun != nil:
-            startRecording(source: .microphone)
         default:
-            return
+            // A take still transcribing gives way to the next one, whatever else holds the phase.
+            if takeRun != nil { startRecording(source: .microphone) }
         }
     }
 
@@ -1718,14 +1728,19 @@ final class AppModel {
             duplicateCheckTask = nil
         }
         if fileTranscribeTask != nil { retireCurrentFileRun() }
-        // New work outranks a take still transcribing: that one is saved as it is, and says so.
-        takeRunStoppedByNewWork = takeRun
+        stopTakeRunForNewWork()
         fileTranscribeTask?.cancel()
         fileTranscribeTask = nil
         youtubeTranscribeTask?.cancel()
         youtubeTranscribeTask = nil
         youtubeSubsTask?.cancel()
         youtubeSubsTask = nil
+    }
+
+    /// New work outranks a take still transcribing: its pane comes down now, and its save says why.
+    func stopTakeRunForNewWork() {
+        takeRunStoppedByNewWork = takeRun
+        endTakeTranscription()
     }
 
     var canCancel: Bool {
@@ -1782,6 +1797,7 @@ final class AppModel {
         cancelAndTrack(&downloadTask)
         cancelAndTrack(&fileTranscribeTask)
         retireCurrentFileRun()
+        endTakeTranscription()
         cancelAndTrack(&youtubeTranscribeTask)
         cancelAndTrack(&youtubeSubsTask)
         // Cancel stops what the window shows; a burn behind a run is stopped from its own strip.
@@ -1826,6 +1842,7 @@ final class AppModel {
         searchTask?.cancel(); searchTask = nil
         downloadTask?.cancel(); downloadTask = nil
         fileTranscribeTask?.cancel(); fileTranscribeTask = nil
+        endTakeTranscription()
         youtubeTranscribeTask?.cancel(); youtubeTranscribeTask = nil
         youtubeSubsTask?.cancel(); youtubeSubsTask = nil
         burnTask?.cancel(); burnTask = nil
@@ -2659,9 +2676,20 @@ final class AppModel {
         }
     }
 
-    @MainActor private final class FileProgressThrottle {
+    @MainActor private final class ProgressThrottle {
         var lastPercent = -1
         var lastFraction: Double = 0
+
+        /// The fraction to show for `seconds` of `duration`, never lower than the last; nil while it rounds to the percent already shown.
+        func advance(to seconds: Double, of duration: Double) -> Double? {
+            guard duration > 0 else { return nil }
+            let fraction = min(1, max(lastFraction, seconds / duration))
+            let percent = Int(fraction * 100)
+            guard percent != lastPercent else { return nil }
+            lastPercent = percent
+            lastFraction = fraction
+            return fraction
+        }
     }
 
     func makeFileProgressHandler(runToken: Int) -> @Sendable (Double) -> Void {
@@ -2670,15 +2698,10 @@ final class AppModel {
     }
 
     func makeFileProgressCoalescer(runToken: Int) -> MainActorCoalescer<Double> {
-        let throttle = FileProgressThrottle()
+        let throttle = ProgressThrottle()
         return MainActorCoalescer { [weak self] seconds in
-            guard let self, self.fileRunGeneration == runToken,
-                  let duration = self.mediaDurationSeconds, duration > 0 else { return }
-            let fraction = min(1, max(throttle.lastFraction, seconds / duration))
-            let percent = Int(fraction * 100)
-            guard percent != throttle.lastPercent else { return }
-            throttle.lastPercent = percent
-            throttle.lastFraction = fraction
+            guard let self, self.fileRunGeneration == runToken, let duration = self.mediaDurationSeconds,
+                  let fraction = throttle.advance(to: seconds, of: duration) else { return }
             self.fileTranscribeFraction = fraction
         }
     }
@@ -4104,6 +4127,7 @@ final class AppModel {
 
     /// A take's prepare and transcription run as the file run, and as take work, so a quit stops them and waits for the save they leave.
     func startTakeTask(_ body: @escaping @MainActor () async -> Void) {
+        stopTakeRunForNewWork()
         fileTranscribeTask?.cancel()
         let task = Task { @MainActor [weak self] in
             await body()
@@ -4233,14 +4257,21 @@ final class AppModel {
         takeRunCounter &+= 1
         let run = takeRunCounter
         takeRun = run
-        defer { if takeRun == run { takeRun = nil } }
+        defer {
+            if takeRun == run { takeRun = nil }
+            endTakeTranscription(run)
+        }
         let named = annotations.typedTitle ?? title
         let recovery = beginFileTranscribeRecovery(sourceURL: url, title: named, source: source, category: category)
         // Held by the run itself, so a Cancel's cleanup leaves it for the save that follows.
         recoveryHeldByTake.insert(recovery)
         recordedTake = RecordedTake(file: url, title: named)
-        // Stopped from another page, a take transcribes out of sight; one with no session is a run like a file's.
-        if take == nil || stageIsVisible { phase = .transcribing(file: url) }
+        // A take's run reports to its session and its Stage; one with no session is a run like a file's.
+        if let take {
+            beginTakeTranscription(TakeTranscription(run: run, takeID: take, file: url))
+        } else {
+            phase = .transcribing(file: url)
+        }
         updateSession(of: take) { $0.transcribing(progress: nil) }
         if let previous {
             await pendingRecoveryWrite?.value
@@ -4249,9 +4280,13 @@ final class AppModel {
         do {
             // A take stopped before its run began, by a quit say, goes straight to its save.
             try Task.checkCancellation()
+            let handlers = take.map { makeTakeHandlers(run: run, takeID: $0) } ?? TranscribeHandlers()
             let result = try await session.transcribe(
                 source: FileAudioSource(url: url),
-                options: currentOptions
+                options: currentOptions,
+                partialHandler: handlers.onPartial,
+                progressHandler: handlers.onProgress,
+                stageHandler: handlers.onStage
             )
             let processed = await postProcessDetached(result)
             // A run stopped after its words were ready keeps them, out of the way of whatever stopped it.
@@ -4264,7 +4299,6 @@ final class AppModel {
                 return
             }
             guard take == nil || stageIsVisible else {
-                handBackTakePane(url)
                 saveTake(
                     processed, audio: url, title: title, source: source, category: category, landingAs: .backgroundTake,
                     recovery: recovery, take: take, annotations: annotations
@@ -4349,10 +4383,61 @@ final class AppModel {
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
-    /// The transcribing pane a take's run put up comes down; anything that took the phase since keeps it.
+    /// The transcribing pane a run with no session put up comes down; anything that took the phase since keeps it.
     private func handBackTakePane(_ file: URL?) {
         guard let file, phase == .transcribing(file: file) else { return }
         phase = transcript == nil ? .idle : .ready
+    }
+
+    /// A take's run takes over the Stage's readouts, starting from nothing.
+    private func beginTakeTranscription(_ transcription: TakeTranscription) {
+        endTakeTranscription()
+        takeTranscription = transcription
+    }
+
+    /// The Stage lets go of the take run it shows, or only of `run`, and of what that run painted.
+    private func endTakeTranscription(_ run: Int? = nil) {
+        guard let shown = takeTranscription, run == nil || shown.run == run else { return }
+        takeTranscription = nil
+        if !takePartialText.isEmpty { takePartialText = "" }
+        if takeTranscribeStage != nil { takeTranscribeStage = nil }
+    }
+
+    /// What a take's run reports, stamped with the run, so one that was stopped or replaced changes nothing.
+    func makeTakeHandlers(run: Int, takeID: Int) -> TranscribeHandlers {
+        let partials = makeTakePartialCoalescer(run: run)
+        let progress = makeTakeProgressCoalescer(run: run, takeID: takeID)
+        return TranscribeHandlers(
+            onPartial: { partials.send($0) },
+            onProgress: { progress.send($0) },
+            onStage: makeTakeStageHandler(run: run)
+        )
+    }
+
+    func makeTakePartialCoalescer(run: Int) -> MainActorCoalescer<String> {
+        MainActorCoalescer { [weak self] text in
+            guard let self, self.takeTranscription?.run == run, self.takePartialText != text else { return }
+            self.takePartialText = text
+        }
+    }
+
+    /// The engine counts seconds of the file; the session knows how long the take is.
+    func makeTakeProgressCoalescer(run: Int, takeID: Int) -> MainActorCoalescer<Double> {
+        let throttle = ProgressThrottle()
+        return MainActorCoalescer { [weak self] seconds in
+            guard let self, self.takeTranscription?.run == run, let session = self.recording, session.takeID == takeID,
+                  let length = session.endedElapsed, let fraction = throttle.advance(to: seconds, of: length) else { return }
+            self.updateSession(of: takeID) { $0.transcribing(progress: fraction) }
+        }
+    }
+
+    func makeTakeStageHandler(run: Int) -> @Sendable (TranscribeStage) -> Void {
+        { [weak self] stage in
+            Task { @MainActor in
+                guard let self, self.takeTranscription?.run == run, self.takeTranscribeStage != stage else { return }
+                self.takeTranscribeStage = stage
+            }
+        }
     }
 
     /// What Retry needs of a take whose audio was saved untranscribed.
@@ -4377,6 +4462,7 @@ final class AppModel {
         guard let run = takeRun else { return }
         takeRunStoppedByStopTranscribing = run
         cancelAndTrack(&fileTranscribeTask)
+        endTakeTranscription(run)
         handBackTakePane(recordedTake?.file)
     }
 

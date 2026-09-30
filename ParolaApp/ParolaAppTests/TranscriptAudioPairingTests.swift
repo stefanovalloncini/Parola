@@ -141,7 +141,7 @@ extension TranscriberMockSuites {
                 #expect(recording)
 
                 model.stopRecordingAndTranscribe()
-                let transcribing = await waitUntil { model.phase == .transcribing(file: fixture) }
+                let transcribing = await waitUntil { model.takeTranscription?.file == fixture }
                 #expect(transcribing)
 
                 let other = try await openOtherEntry(in: model)

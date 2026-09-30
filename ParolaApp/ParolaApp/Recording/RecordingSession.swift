@@ -93,6 +93,11 @@ struct RecordingSession: Equatable, Sendable {
         isArming || state == .recording || isPaused || state == .finishing
     }
 
+    var isTranscribing: Bool {
+        if case .transcribing = state { return true }
+        return false
+    }
+
     /// The take's one generated name, from when it began and its category now.
     var generatedTitle: String {
         AppModel.liveRecordingTitle(category: category, endedAt: titleDate)

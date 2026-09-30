@@ -145,9 +145,11 @@ extension TranscriberMockSuites {
 
         /// A take's transcription held by the gate, so the test acts while it is running.
         private func transcribingTake(_ model: AppModel, wav: URL) async {
+            model.useStreaming = false
+            model.selectedModel = "openai_whisper-tiny"
             model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
             model.stopRecordingAndTranscribe()
-            await waitUntil { model.phase == .transcribing(file: wav) }
+            await waitUntil { ContentRoutes.stageTranscription(for: model)?.file == wav }
         }
 
         private func startStreamingTake(
@@ -188,7 +190,7 @@ extension TranscriberMockSuites {
                 #expect(take.title.hasPrefix("Recording "), "the pane names the take, not its file")
 
                 model.stopTranscribingTake()
-                #expect(model.phase == .idle)
+                #expect(ContentRoutes.stageTranscription(for: model) == nil, "the take's pane comes down at once")
 
                 let saved = try #require(await entries(model, count: 1).first)
                 #expect(saved.title == take.title + " (not transcribed)")
@@ -200,6 +202,8 @@ extension TranscriberMockSuites {
                 #expect(notice.message == "Saved without a transcript.")
                 #expect(notice.actions.map(\.title) == ["Transcribe"])
                 #expect(notice.actions.map(\.handler) == [.transcribeEntry(saved.id)])
+                let done = await waitUntil { model.recording?.state == .done(entryID: saved.id) }
+                #expect(done, "the take's session lands on the entry its save made")
                 #expect(model.phase == .idle, "a stop is not a failure")
             }
         }
@@ -380,15 +384,18 @@ extension TranscriberMockSuites {
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
                 let model = makeModel()
                 model.useStreaming = false
+                model.selectedModel = "openai_whisper-tiny"
                 model.pendingRecordingCategory = .meeting
                 model.startRecording(source: .microphone)
                 await waitUntil { model.liveSource != nil }
                 model.stopRecordingAndTranscribe()
-                await waitUntil { if case .transcribing = model.phase { return true }; return false }
+                await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                #expect(model.phase == .idle, "the take's run never writes the phase")
 
                 model.startRecording(source: .microphone)
                 await waitUntil { model.recording?.isCapturing == true && model.liveSource != nil }
                 #expect(model.activeTake?.category == .transcription, "the new take carries its own category")
+                #expect(model.takeTranscription == nil, "the stopped take's run let go of the Stage")
 
                 let first = try #require(await entries(model, count: 1).first)
                 #expect(first.title.hasSuffix("(not transcribed)"))

@@ -55,7 +55,7 @@ struct ContentRoutes: View {
             case .recentlyDeleted:
                 MacRecentlyDeletedView()
             case .recording:
-                StageRoute(library: libraryPage(browses: true), transcription: phaseContent)
+                StageRoute(library: libraryPage(browses: true), phasePage: phaseContent)
             case .transcript:
                 transcriptPage
             }
@@ -177,22 +177,33 @@ struct ContentRoutes: View {
         LibraryListView(category: model.libraryFilter, browses: browses, searchRanking: model.searchRanking)
     }
 
+    /// The run the Stage shows while its take transcribes; nil once that run lets go, even before the take's save lands.
+    static func stageTranscription(for model: AppModel) -> AppModel.TakeTranscription? {
+        guard let take = model.recording, take.isTranscribing, let run = model.takeTranscription,
+              run.takeID == take.takeID else { return nil }
+        return run
+    }
+
 }
 
 /// The take's page, read here rather than in `ContentRoutes`, which a title typed or a marker set would otherwise redraw whole.
-private struct StageRoute<Library: View, Transcription: View>: View {
+private struct StageRoute<Library: View, PhasePage: View>: View {
     @Environment(AppModel.self) private var model
     let library: Library
-    /// What the phase shows while the take transcribes: its progress pane, or the library once Stop Transcribing lets go.
-    let transcription: Transcription
+    /// What the transcript page shows: the Stage hands over to it once a take's run lets go, before its save lands the take.
+    let phasePage: PhasePage
 
     var body: some View {
         if let take = model.recording {
             switch take.state {
             case .arming, .recording, .paused, .finishing:
                 RecordingPane(source: take.source)
-            case .transcribing:
-                transcription
+            case .transcribing(let progress):
+                if let run = ContentRoutes.stageTranscription(for: model) {
+                    TakeTranscribingPane(file: run.file, progress: progress)
+                } else {
+                    phasePage
+                }
             case .failed(let message):
                 ErrorPane(message: message, take: take)
             case .done:
@@ -201,6 +212,23 @@ private struct StageRoute<Library: View, Transcription: View>: View {
         } else {
             library
         }
+    }
+}
+
+/// Owns the take's per-partial reads, as `LiveTranscribingPane` does for a file, so its words redraw this pane alone.
+private struct TakeTranscribingPane: View {
+    @Environment(AppModel.self) private var model
+    let file: URL
+    let progress: Double?
+
+    var body: some View {
+        TranscribingPane(
+            file: file,
+            partial: model.takePartialText,
+            progress: progress,
+            expectsPartials: model.activeEngineStreamsPartials,
+            stage: model.takeTranscribeStage
+        )
     }
 }
 
