@@ -141,4 +141,20 @@ struct RecordingSessionTests {
         arming.fail("Nothing was recorded.", at: t0.addingTimeInterval(3))
         #expect(arming.elapsed(at: t0.addingTimeInterval(60)) == 0)
     }
+
+    @Test("a take that lands while it still captures stops its clock there")
+    func landingFreezesTheClock() {
+        var recording = session()
+        _ = recording.markCapturing(at: t0)
+        recording.land(entryID: "E1", at: t0.addingTimeInterval(5))
+        #expect(recording.state == .done(entryID: "E1"))
+        #expect(recording.elapsed(at: t0.addingTimeInterval(60)) == 5)
+
+        var finished = session()
+        _ = finished.markCapturing(at: t0)
+        _ = finished.finish(at: t0.addingTimeInterval(9))
+        finished.land(entryID: nil, at: t0.addingTimeInterval(40))
+        finished.land(entryID: "E2", at: t0.addingTimeInterval(50))
+        #expect(finished.elapsed(at: t0.addingTimeInterval(60)) == 9)
+    }
 }

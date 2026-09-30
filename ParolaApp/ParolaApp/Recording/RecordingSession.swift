@@ -146,8 +146,9 @@ struct RecordingSession: Equatable, Sendable {
         }
     }
 
-    mutating func land(entryID: String?) {
+    mutating func land(entryID: String?, at date: Date = Date()) {
         if case .failed = state { return }
+        if isCapturing { endedElapsed = elapsed(at: date) }
         state = .done(entryID: entryID)
     }
 
