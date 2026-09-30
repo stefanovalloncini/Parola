@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -66,7 +67,7 @@ public struct TokenBudget: Sendable, Hashable {
 
     /// Apple's on-device model: the window the OS reports (4,096 before macOS 27), a quarter kept for the answer.
     public static var onDevice: TokenBudget {
-        let context = onDeviceContextSize()
+        let context = ReportedContextSize.onDevice.value(orElse: 4096)
         return TokenBudget(contextTokens: context, answerTokens: context / 4, counting: .onDevice)
     }
 
@@ -124,14 +125,14 @@ public struct TokenBudget: Sendable, Hashable {
         return await count(text) <= limit
     }
 
-    private static func onDeviceContextSize() -> Int {
+    fileprivate static func readOnDeviceContextSize() -> Int? {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
             let size = SystemLanguageModel.default.contextSize
             if size > 0 { return size }
         }
         #endif
-        return 4096
+        return nil
     }
 
     private static func onDeviceTokenCount(_ text: String) async -> Int? {
@@ -174,5 +175,24 @@ public struct TokenBudget: Sendable, Hashable {
         if used > limit {
             throw CloudLLMError.tokenBudgetExceeded(provider: provider, used: used, limit: limit)
         }
+    }
+}
+
+/// Reading the OS's window size blocks, so an answer is kept for the process; a failed read is not, as Apple Intelligence can turn on later.
+final class ReportedContextSize: Sendable {
+    static let onDevice = ReportedContextSize(read: TokenBudget.readOnDeviceContextSize)
+
+    private let read: @Sendable () -> Int?
+    private let reported = OSAllocatedUnfairLock<Int?>(initialState: nil)
+
+    init(read: @escaping @Sendable () -> Int?) {
+        self.read = read
+    }
+
+    func value(orElse fallback: Int) -> Int {
+        if let size = reported.withLock({ $0 }) { return size }
+        guard let size = read() else { return fallback }
+        reported.withLock { $0 = size }
+        return size
     }
 }

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import os
 @testable import ParolaCore
 
 @Suite("Token budget guardrail")
@@ -46,5 +47,22 @@ struct TokenBudgetTests {
         default:
             Issue.record("expected tokenBudgetExceeded, got \(String(describing: thrown))")
         }
+    }
+
+    @Test("a window size the OS reports is read once; a failed read is tried again")
+    func reportedContextSizeKeepsOnlyAnAnswer() {
+        let reads = OSAllocatedUnfairLock(initialState: 0)
+        let answers: [Int?] = [nil, 8192, 16_384]
+        let size = ReportedContextSize {
+            reads.withLock { count in
+                defer { count += 1 }
+                return answers[min(count, answers.count - 1)]
+            }
+        }
+
+        #expect(size.value(orElse: 4096) == 4096)
+        #expect(size.value(orElse: 4096) == 8192)
+        #expect(size.value(orElse: 4096) == 8192)
+        #expect(reads.withLock { $0 } == 2)
     }
 }
