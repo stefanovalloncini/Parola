@@ -197,9 +197,13 @@ extension TranscriberMockSuites {
                     failure: MockTranscriberFailure(code: .transcriptionFailed, message: "auto-stop fired")
                 ))
 
+                let appleSpeech = ModelCatalog.all.first { $0.engineID == .appleSpeech }
+                let apple = try #require(appleSpeech)
                 let model = makeRecordingModel(clock: ImmediateClock())
                 model.useStreaming = false
-                model.selectedModel = "openai_whisper-tiny"
+                // Apple Speech reads as installed without touching disk, so the take's
+                // transcription reaches the mock instead of downloading a Whisper model.
+                model.selectedModel = apple.id
                 model.recordingCountInSeconds = 0
                 model.recordingMaxMinutes = 1
 

@@ -273,6 +273,7 @@ extension TranscriberMockSuites {
             defer { MockStreamingTranscriberRegistry.shared.clear() }
             let model = makeModel()
             model.useStreaming = true
+            model.selectedModel = "openai_whisper-tiny"
 
             model.startRecording(source: .microphone)
 

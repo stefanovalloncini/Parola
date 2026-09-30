@@ -18,6 +18,7 @@ extension TranscriberMockSuites {
             await MockAudioSourceRegistry.shared.clear()
             let model = makeModel()
             model.useStreaming = true
+            model.selectedModel = "openai_whisper-tiny"
 
             #expect(await model.shouldUseStreamingMic())
         }
