@@ -741,10 +741,15 @@ extension AppModel {
     /// Flush first, so a debounced edit from the last second still reaches the library.
     func closeTranscript() {
         guard case .ready = phase, transcript != nil else { return }
-        Task { [weak self] in
+        transcriptCloseTask = Task { [weak self] in
             await self?.flushPendingTranscriptSave()
             self?.clearLoadedEntry()
         }
+    }
+
+    /// A navigation's list shows only once the transcript over it has closed, which `closeTranscript()` does after a flush.
+    func awaitTranscriptClose() async {
+        await transcriptCloseTask?.value
     }
 
     func openStatistics() {

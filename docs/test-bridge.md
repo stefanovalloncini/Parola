@@ -57,7 +57,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `openRecentlyDeleted` | — | Route the main window to the Recently Deleted page. Replies `{open, route}`. |
 | `closeRecentlyDeleted` | — | Leave that page for the Library page. Replies `{open, route}`. |
 | `goHome` | — | Show the Library page, the one the app opens on: clear the category and person filters and any search, and unload the transcript. Replies `{route}`. |
-| `goBack` | — | Follow the transcript header's back link: unload the transcript and restore the list it was opened from. Replies `{origin, route, libraryFilter, libraryBrowsingAll}`. |
+| `goBack` | — | Follow the transcript header's back link: unload the transcript and restore the list it was opened from. Replies `{origin, route, libraryFilter, libraryBrowsingAll}` once that list is back. |
 | `parola_app_set_library_filter` | category | `transcription` / `meeting` / `dictation`, or `all` or empty for the whole Library page. Clears any search and unloads the transcript, like clicking the row. |
 | `parola_app_transcribe_youtube` | **url** | Paste a YouTube URL and start the download-then-transcribe flow. Replies `{started, parked}`: a link handed over during a recording or another run comes back `parked: true` and waits for that work to finish. |
 | `parola_app_fetch_youtube_subs` | **url** | Same input, but fetch existing captions instead of running Whisper. Replies `{started, parked}` on the same terms. |

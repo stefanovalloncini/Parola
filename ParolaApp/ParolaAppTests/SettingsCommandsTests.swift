@@ -52,6 +52,26 @@ struct SettingsCommandsTests {
         #expect(state["libraryBrowsingAll"] == .bool(true))
     }
 
+    @Test("category 'all' over an open transcript replies once the Library page is up")
+    func setLibraryFilterAllOverATranscript() async throws {
+        let (model, server, context, commands) = try makeRig()
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "still open")],
+            language: "en",
+            modelName: "stub"
+        )
+        model.phase = .ready
+
+        let result = try await run(commands, "setLibraryFilter", ["category": .string("all")], context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.transcript == nil)
+        #expect(result == .object([
+            "libraryFilter": .string("all"),
+            "libraryBrowsingAll": .bool(true),
+        ]))
+    }
+
     @Test("a category filter leaves the whole library behind")
     func setLibraryFilterCategory() async throws {
         let (model, server, context, commands) = try makeRig()

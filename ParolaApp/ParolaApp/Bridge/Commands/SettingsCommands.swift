@@ -176,6 +176,7 @@ extension ParolaAutomationServer {
                     } else {
                         throw AutomationError.invalidArgs(field: "category", reason: "unknown category: \(raw)")
                     }
+                    await ctx.model.awaitTranscriptClose()
                     return .object([
                         "libraryFilter": .string(raw),
                         "libraryBrowsingAll": .bool(ctx.model.isBrowsingWholeLibrary),

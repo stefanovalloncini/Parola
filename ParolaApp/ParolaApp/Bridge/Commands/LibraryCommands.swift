@@ -180,11 +180,12 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "goBack",
                 area: .library,
-                summary: "Follows the transcript header's back link: unloads the transcript and restores the list it was opened from.",
+                summary: "Follows the transcript header's back link: unloads the transcript and restores the list it was opened from, replying once that list is back.",
                 kind: .mutating,
                 handler: { _, ctx in
                     let origin = ctx.model.transcriptOrigin?.bridgeName ?? ""
                     ctx.model.returnToOrigin()
+                    await ctx.model.awaitTranscriptClose()
                     return .object([
                         "origin": .string(origin),
                         "route": .string(ctx.model.route.rawValue),

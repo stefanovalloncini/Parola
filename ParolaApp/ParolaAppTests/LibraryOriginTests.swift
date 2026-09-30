@@ -454,6 +454,25 @@ struct LibraryOriginTests {
         #expect(fields["route"] == .string("transcript"))
     }
 
+    @Test("goBack from a Library entry replies once the whole library is back")
+    func bridgeGoBackToTheLibrary() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let entry = try await seedEntry(in: model, text: "standup notes")
+        #expect(await openEntry(entry.id, in: model))
+        let command = try #require(commands["goBack"])
+
+        let result = try await command.handler(try command.validate(AutomationArgs()), context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.transcript == nil)
+        guard case .object(let fields) = result else {
+            Issue.record("goBack should answer with an object")
+            return
+        }
+        #expect(fields["origin"] == .string("all"))
+        #expect(fields["libraryBrowsingAll"] == .bool(true))
+    }
+
     @Test("getState reports the origin a scenario can assert")
     func bridgeStateCarriesTheOrigin() async throws {
         let (model, server, _, _) = try makeRig()
