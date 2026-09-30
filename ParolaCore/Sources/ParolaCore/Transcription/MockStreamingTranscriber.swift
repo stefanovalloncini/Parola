@@ -83,7 +83,7 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
         }
         await emitTask?.value
         emitTask = nil
-        continuation?.yield(.finished(response.materialise(sourceURL: nil)))
+        continuation?.yield(.finished(response.materialise(sourceURL: response.recordedAudio)))
         continuation?.finish()
         continuation = nil
     }
@@ -101,4 +101,6 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
     }
 
     public func currentModel() async -> String? { response.modelName }
+
+    public func recordingAudioURL() async -> URL? { response.recordedAudio }
 }

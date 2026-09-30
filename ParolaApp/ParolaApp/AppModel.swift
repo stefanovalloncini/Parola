@@ -1616,7 +1616,7 @@ final class AppModel {
     @ObservationIgnored var pendingOpenedFiles: [URL] = []
     var pendingLargeDrop: PendingLargeDrop?
     @ObservationIgnored var openedFilesFlushTask: Task<Void, Never>?
-    @ObservationIgnored private var streamingSession: (any StreamingTranscriber)? {
+    @ObservationIgnored private(set) var streamingSession: (any StreamingTranscriber)? {
         didSet { if oldValue != nil, streamingSession == nil { foregroundLetGo() } }
     }
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?

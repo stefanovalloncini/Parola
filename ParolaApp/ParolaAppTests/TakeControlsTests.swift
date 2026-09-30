@@ -163,6 +163,72 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a live take's stream is told to pause and resume, in order")
+        func pauseReachesTheStream() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeRecordingModel("take-pause-stream")
+                startLiveTake(model, MockTranscriberResponse(partials: ["live"], delayMs: 5_000))
+                let recording = await waitUntil { model.recording?.state == .recording }
+                #expect(recording)
+                let stream = try #require(model.streamingSession as? MockStreamingTranscriber)
+
+                #expect(model.pauseTake())
+                #expect(model.resumeTake())
+
+                let told = await waitUntil { await stream.pauseCalls == [true, false] }
+                #expect(told)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("a file take stopped while paused lands with its audio")
+        func stopWhilePausedFileTake() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let model = makeRecordingModel("take-stop-paused")
+                await installMockTranscriber(segments: [(0, 2, "Hi")])
+                try await startFixtureTake(model)
+                #expect(model.pauseTake())
+
+                model.stopRecordingAndTranscribe()
+
+                #expect(model.recording?.state == .finishing)
+                let entry = try #require(await landedEntry(model))
+                let stored = try await model.library.load(entry.id).document
+                #expect(stored.audioURL != nil)
+                #expect(stored.transcript.text == "Hi")
+                let landed = await waitUntil { model.recording?.state == .done(entryID: entry.id) }
+                #expect(landed, "the take lands; it is not \"Nothing was recorded\"")
+            }
+        }
+
+        @Test("a live take stopped while paused lands with its words and its audio")
+        func stopWhilePausedLiveTake() async throws {
+            let audio = try makeTakeWAV("take-stop-paused-live", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeRecordingModel("take-stop-paused-live")
+                startLiveTake(model, MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "said before the pause")],
+                    partials: ["said"], delayMs: 200, recordedAudio: audio
+                ))
+                let recording = await waitUntil { model.recording?.state == .recording }
+                #expect(recording)
+                #expect(model.pauseTake())
+
+                model.stopRecordingAndTranscribe()
+
+                #expect(model.recording?.state == .finishing)
+                let entry = try #require(await landedEntry(model))
+                let stored = try await model.library.load(entry.id).document
+                #expect(stored.audioURL != nil)
+                #expect(stored.transcript.text == "said before the pause")
+                let landed = await waitUntil { model.recording?.state == .done(entryID: entry.id) }
+                #expect(landed, "the take lands; it is not \"Nothing was recorded\"")
+            }
+        }
+
         @Test("a pause holds the auto-stop: resuming counts down what was left, not a new limit")
         func pauseHoldsTheAutoStop() async throws {
             let audio = try makeTakeWAV("take-auto-stop", seconds: 1)

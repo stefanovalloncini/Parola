@@ -148,6 +148,25 @@ struct MockStreamingTranscriberTests {
         await #expect(throws: CancellationError.self) { _ = try await starting.value }
     }
 
+    @Test("a mock with recorded audio names it while it runs and ends with a transcript that carries it")
+    func recordedAudioRidesAlong() async throws {
+        let audio = URL(fileURLWithPath: "/tmp/parola-mock-recorded-\(UUID().uuidString).wav")
+        let mock = MockStreamingTranscriber(
+            response: MockTranscriberResponse(segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "kept")], recordedAudio: audio),
+            clock: ContinuousClock()
+        )
+        let source: any StreamingTranscriber = mock
+        let stream = try await mock.start(options: TranscriptionOptions(model: "mock"), speakerLabeler: nil, downloadProgress: nil)
+        #expect(await source.recordingAudioURL() == audio)
+        let finished = Task { () -> Transcript? in
+            for await event in stream { if case .finished(let transcript) = event { return transcript } }
+            return nil
+        }
+        await mock.stop()
+        let transcript = await finished.value
+        #expect(transcript?.sourceURL == audio)
+    }
+
     @Test("setPaused records each call, in order")
     func setPausedRecordsCalls() async {
         let mock = MockStreamingTranscriber(response: MockTranscriberResponse(), clock: ContinuousClock())

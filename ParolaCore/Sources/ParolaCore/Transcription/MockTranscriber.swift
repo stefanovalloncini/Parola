@@ -122,6 +122,8 @@ public struct MockTranscriberResponse: Sendable {
     public var delayMs: Int
     public var failure: MockTranscriberFailure?
     public var gate: MockTranscriberGate?
+    /// The file a streaming mock says it records to: named while it runs, and carried by its final transcript.
+    public var recordedAudio: URL?
 
     public init(
         segments: [TranscriptSegmentSeed] = [],
@@ -133,7 +135,8 @@ public struct MockTranscriberResponse: Sendable {
         modelName: String = "mock",
         delayMs: Int = 0,
         failure: MockTranscriberFailure? = nil,
-        gate: MockTranscriberGate? = nil
+        gate: MockTranscriberGate? = nil,
+        recordedAudio: URL? = nil
     ) {
         self.segments = segments
         self.partials = partials
@@ -145,6 +148,7 @@ public struct MockTranscriberResponse: Sendable {
         self.delayMs = delayMs
         self.failure = failure
         self.gate = gate
+        self.recordedAudio = recordedAudio
     }
 
     func materialise(sourceURL: URL?) -> Transcript {
