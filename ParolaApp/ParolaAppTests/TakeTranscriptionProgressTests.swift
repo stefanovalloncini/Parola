@@ -205,6 +205,34 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a drop while a take transcribes on its Stage waits behind the run and leaves the Stage up")
+        func dropWaitsBehindTheTakesRun() async throws {
+            let audio = try makeTakeWAV("take-drop", seconds: 2)
+            let dropped = try makeTakeWAV("take-drop-file")
+            defer {
+                try? FileManager.default.removeItem(at: audio)
+                try? FileManager.default.removeItem(at: dropped)
+            }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "held")], gate: gate)
+                let model = makeModel("take-drop")
+                recordAndStop(model, audio: audio, seconds: 2)
+                let transcribing = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                #expect(transcribing)
+
+                model.transcribeNow(urls: [dropped])
+
+                #expect(model.route == .recording, "the Stage stays on the take")
+                #expect(ContentRoutes.stageTranscription(for: model)?.file == audio)
+                #expect(model.deferredArrivals == [dropped])
+                model.deferredArrivals = []
+                await gate.open()
+                let landed = await waitUntil { model.transcript?.text == "held" && !model.hasPendingTakeWork }
+                #expect(landed)
+            }
+        }
+
         @Test("new work stops a take's transcription, takes its pane down at once and keeps the take untranscribed")
         func newWorkTakesThePaneDown() async throws {
             let audio = try makeTakeWAV("take-new-work", seconds: 3)

@@ -92,6 +92,11 @@ extension AppModel {
             noteRunWaitsForTake()
             return
         }
+        // A take's transcription keeps its Stage up the same way, with the files behind its run.
+        guard takeRun == nil else {
+            deferredArrivals.append(contentsOf: files.media)
+            return
+        }
         route = .transcript
         guard !transcribeTaskRunning else {
             deferredArrivals.append(contentsOf: files.media)
