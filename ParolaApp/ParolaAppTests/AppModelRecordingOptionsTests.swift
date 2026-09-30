@@ -201,8 +201,7 @@ extension TranscriberMockSuites {
                 let apple = try #require(appleSpeech)
                 let model = makeRecordingModel(clock: ImmediateClock())
                 model.useStreaming = false
-                // Apple Speech reads as installed without touching disk, so the take's
-                // transcription reaches the mock instead of downloading a Whisper model.
+                // Apple Speech reads as installed without a download, so the mock catches the transcription.
                 model.selectedModel = apple.id
                 model.recordingCountInSeconds = 0
                 model.recordingMaxMinutes = 1
