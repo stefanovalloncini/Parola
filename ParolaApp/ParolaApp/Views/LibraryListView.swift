@@ -408,10 +408,11 @@ private struct LibraryBrowseList: View, Equatable {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // A word on the clipboard leaves Paste disabled rather than opening an empty sheet.
+        // Paste is offered by type alone; the contents are read once the paste happens, and anything but a link is dropped.
         .onPasteCommand(of: [.url, .plainText]) { _ in
-            model.features.isEnabled(.youtube) ? PastedLink.url(on: .general) : nil
-        } perform: { link in
+            model.features.isEnabled(.youtube) && PastedLink.mayHoldLink(on: .general) ? () : nil
+        } perform: { _ in
+            guard let link = PastedLink.url(on: .general) else { return }
             model.openLinkSheet(prefill: link)
         }
         .onAppear { recomputeEntries() }

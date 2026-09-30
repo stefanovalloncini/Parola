@@ -15,10 +15,16 @@ private func withPrivatePasteboard<Result>(_ body: (NSPasteboard) throws -> Resu
 
 @Suite("Pasted links")
 struct PastedLinkTests {
-    @Test("a pasted web address opens the link flow")
+    @Test("a pasted link Parola can fetch opens the link flow")
     func webAddress() {
         #expect(PastedLink.url(from: "https://youtu.be/abc123")?.host() == "youtu.be")
-        #expect(PastedLink.url(from: "  https://example.com/talk.mp4\n")?.path() == "/talk.mp4")
+        #expect(PastedLink.url(from: "  https://vimeo.com/76979871\n")?.path() == "/76979871")
+    }
+
+    @Test("a web page on a site Parola can't fetch from opens nothing")
+    func unsupportedSite() {
+        #expect(PastedLink.url(from: "https://example.com/talk.mp4") == nil)
+        #expect(PastedLink.url(from: "https://www.youtube.com/") == nil, "a channel's front page is no video")
     }
 
     @Test("words, files, other schemes and two links don't")
@@ -49,11 +55,29 @@ struct PastedLinkTests {
         #expect(link?.absoluteString == "https://vimeo.com/42")
     }
 
-    @Test("a copied word or a copied file opens nothing")
+    @Test("a copied word, a copied file or a page Parola can't fetch opens nothing")
     func notLinksOnThePasteboard() {
         #expect(withPasteboard { $0.setString("meeting notes", forType: .string) } == nil)
         #expect(withPasteboard { $0.writeObjects([URL(fileURLWithPath: "/tmp/a.m4a") as NSURL]) } == nil)
+        #expect(withPasteboard { $0.setString("https://example.com/talk.mp4", forType: .string) } == nil)
         #expect(withPasteboard { _ in } == nil)
+    }
+
+    @Test("Paste is offered for text or a URL on the pasteboard, judged by type alone")
+    func pasteOfferedByType() {
+        #expect(withPrivatePasteboard { pasteboard in
+            pasteboard.setString("meeting notes", forType: .string)
+            return PastedLink.mayHoldLink(on: pasteboard)
+        })
+        #expect(withPrivatePasteboard { pasteboard in
+            pasteboard.writeObjects([URL(string: "https://youtu.be/abc123")! as NSURL])
+            return PastedLink.mayHoldLink(on: pasteboard)
+        })
+        #expect(!withPrivatePasteboard { pasteboard in
+            pasteboard.setData(Data([0x89, 0x50, 0x4E, 0x47]), forType: .png)
+            return PastedLink.mayHoldLink(on: pasteboard)
+        })
+        #expect(!withPrivatePasteboard { PastedLink.mayHoldLink(on: $0) })
     }
 }
 
@@ -124,9 +148,11 @@ struct LinkSheetTests {
         }
     }
 
-    @Test("a word on the clipboard leaves the field empty")
-    func clipboardWordLeavesItEmpty() {
-        withClipboard(holding: "hello world") { clipboard in
+    @Test("a word or a page Parola can't fetch leaves the field empty", arguments: [
+        "hello world", "https://example.com/talk.mp4",
+    ])
+    func clipboardWordLeavesItEmpty(clipboardText: String) {
+        withClipboard(holding: clipboardText) { clipboard in
             let model = makeModel(clipboard: clipboard)
 
             model.openLinkSheet(prefill: nil)
