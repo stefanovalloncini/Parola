@@ -4,6 +4,20 @@ import ParolaCore
 
 extension AppModel {
 
+    /// Where the main window stands: closed, out of sight (minimized, or hidden with the app), or on screen.
+    enum MainWindowPresence: Equatable {
+        case closed
+        case hidden
+        case onScreen
+    }
+
+    /// Unit tests have no window: they count as on screen unless a test says otherwise.
+    var mainWindowPresence: MainWindowPresence {
+        if let mainWindowPresenceOverride { return mainWindowPresenceOverride }
+        guard let mainWindow else { return mode == .test ? .onScreen : .closed }
+        return mainWindow.isVisible ? .onScreen : .hidden
+    }
+
     /// A take's Stop and Cancel are in the main window: it comes forward, or `open` makes a new one after it closed.
     func showMainWindow(orOpen open: () -> Void) {
         NSApp.activate(ignoringOtherApps: true)

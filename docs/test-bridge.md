@@ -119,10 +119,14 @@ The five introduction commands and `getState.introduction` all reply `{visible, 
 `{state, elapsed, startedAt, paused, markers, title, category, source, isStreaming, device}`. `state` is one of `arming` /
 `recording` / `paused` / `finishing` / `transcribing` / `done` / `failed`; `elapsed` and `markers` are seconds of the take;
 `startedAt` is seconds since 1970, `null` until the first audio; `device` names the input a mic take listens on.
-`phase` reads `recording` whenever that take is arming, recording or paused. A take never moves the phase otherwise: its
-failure shows on its Stage as `recording.state` `failed`, while `phase` stays on whatever the rest of the window shows.
-While a take runs, entries open as usual, and a file, link or batch handed over waits for the take (a link replies
-`parked: true`); `retranscribeEntry` is `PRECONDITION` until it ends.
+`phase` reads `recording` whenever that take is arming, recording or paused. Its capture never moves the phase: a failure
+shows on its Stage as `recording.state` `failed` (and, when another page shows, as an `exportNotice`), while `phase`
+stays on whatever the rest of the window shows. A take stopped with its Stage up lands there: a file take reads
+`transcribing` first, and either kind ends `ready` with its transcript loaded. One stopped while another page shows, or
+after the main window closed, lands in the library with a toast and loads no transcript, so `waitForPhase ready` and
+`getTranscript` need the Stage up when the take stops (`setRoute recording`). While a take runs, entries open as usual,
+and a file, link or batch handed over waits for the take (a link replies `parked: true`); `retranscribeEntry` is
+`PRECONDITION` until it ends.
 
 `getState.burn` is the subtitle burn running beside the phase, `{state, progress, output}` with `state` one of
 `running` / `finished` / `failed` (a failed one adds `message`), or `null` when there is none.

@@ -192,4 +192,22 @@ struct ExportNoticeTests {
         let notice = ExportNotice(message: "m", failures: [], folder: nil, tone: .failure)
         #expect(!notice.autoDismisses)
     }
+
+    @Test("a take's notice names the take its buttons act on; other notices name none")
+    func takeNoticeNamesItsTake() {
+        let take = ExportNotice(
+            message: "m", failures: [], folder: nil, tone: .failure,
+            actions: [
+                ExportNotice.Action(title: "Retry", handler: .retryTake(3)),
+                ExportNotice.Action(title: "Show", handler: .showTake(3)),
+            ]
+        )
+        #expect(take.takeID == 3)
+        #expect(!take.autoDismisses)
+        let entry = ExportNotice(
+            message: "m", failures: [], folder: nil, tone: .info,
+            actions: [ExportNotice.Action(title: "Open", handler: .openEntry("entry-1"))]
+        )
+        #expect(entry.takeID == nil)
+    }
 }

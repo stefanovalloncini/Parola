@@ -564,4 +564,15 @@ extension AppModel {
     func dismissArrivalNotice() {
         arrivalNotice = nil
     }
+
+    /// A toast that goes on its own counts down only once its window is on screen, so one raised while it was hidden waits for the user.
+    func dismissArrivalNoticeOnceSeen(_ notice: ArrivalNotice, after delay: Duration) async {
+        while mainWindowPresence != .onScreen {
+            try? await Task.sleep(for: .milliseconds(250))
+            if Task.isCancelled { return }
+        }
+        try? await Task.sleep(for: delay)
+        guard !Task.isCancelled, arrivalNotice == notice else { return }
+        dismissArrivalNotice()
+    }
 }

@@ -143,7 +143,6 @@ struct DropRoutingTests {
         model.transcribeNow(urls: [Self.link])
 
         #expect(model.recording?.isCapturing == true)
-
         #expect(model.route == .recording)
         #expect(model.deferredLinks == [.transcribe(Self.link.absoluteString)])
         #expect(model.transcribeTaskRunning == false)
@@ -165,7 +164,6 @@ struct DropRoutingTests {
         model.transcribeYouTube(urlString: Self.link.absoluteString)
 
         #expect(model.recording?.isCapturing == true)
-
         #expect(model.route == .recording)
         #expect(model.deferredLinks == [.transcribe(Self.link.absoluteString)])
         #expect(model.transcribeTaskRunning == false)
@@ -179,7 +177,6 @@ struct DropRoutingTests {
         model.fetchYouTubeSubs(urlString: Self.link.absoluteString)
 
         #expect(model.recording?.isCapturing == true)
-
         #expect(model.route == .recording)
         #expect(model.deferredLinks == [.subtitles(Self.link.absoluteString)])
         #expect(model.transcribeTaskRunning == false)

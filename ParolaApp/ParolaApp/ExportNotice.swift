@@ -16,6 +16,17 @@ struct ExportNotice: Equatable, Identifiable {
         enum Handler: Equatable {
             case openEntry(LibraryEntry.ID)
             case transcribeEntry(LibraryEntry.ID)
+            /// A failed take's Retry, for that take only.
+            case retryTake(Int)
+            /// Back to a failed take's Stage.
+            case showTake(Int)
+
+            var takeID: Int? {
+                switch self {
+                case .retryTake(let id), .showTake(let id): id
+                case .openEntry, .transcribeEntry: nil
+                }
+            }
         }
 
         let id = UUID()
@@ -33,6 +44,8 @@ struct ExportNotice: Equatable, Identifiable {
     var actions: [Action] = []
 
     var succeeded: Bool { tone == .success }
+    /// The take a notice's buttons act on; the notice lasts only as long as that take's session.
+    var takeID: Int? { actions.lazy.compactMap(\.handler.takeID).first }
     /// A notice with actions waits to be dismissed or acted on, whatever its tone.
     var autoDismisses: Bool { tone != .failure && actions.isEmpty }
 

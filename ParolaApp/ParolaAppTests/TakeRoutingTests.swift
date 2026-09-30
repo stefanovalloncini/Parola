@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Parola
@@ -177,6 +178,43 @@ struct TakeRoutingTests {
         #expect(model.route == .transcript)
     }
 
+    @Test("someone who leaves the Stage during a count-in keeps their page when the take begins")
+    func countInLeftKeepsThePage() async throws {
+        let file = try tempWAV("count-in-left")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let capture = HeldStartCapture(file: file)
+        let model = makeModel()
+        model.useStreaming = false
+        model.takeCaptureOverride = { _ in capture }
+        model.recordingCountInSeconds = 1
+        model.startRecording(source: .microphone)
+        #expect(model.route == .recording)
+
+        model.openStatistics()
+        let began = await waitUntil { model.activeTake != nil }
+
+        #expect(began)
+        #expect(model.route == .statistics)
+        #expect(model.takeIsRunning)
+        model.cancelCurrentWork()
+        await capture.letGo()
+        await waitUntil { !model.recordingActive }
+    }
+
+    @Test("a reset clears a take left on its Stage and goes back to the library")
+    func resetForgetsAFailedTake() async {
+        let model = makeModel()
+        model.installTestTake(source: .microphone)
+        await model.handleStreamingEvent(.failed("The model stopped."))
+        #expect(model.route == .recording)
+
+        model.cancelAllTasks()
+        model.forgetTakeSession()
+
+        #expect(model.recording == nil)
+        #expect(model.route == .transcript)
+    }
+
     @Test("a reset ends a count-in along with everything else")
     func resetEndsACountIn() {
         let model = makeModel()
@@ -237,6 +275,65 @@ struct TakeRoutingTests {
         #expect(ArrivalNotice.savedTitle(name: "Riunione", origin: .take, bundle: italian) == "Salvato Riunione")
     }
 
+    // MARK: - Where the main window is
+
+    @Test("the main window's presence reads the real window: none is closed, one out of sight is hidden")
+    func mainWindowPresence() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("presence"))
+        #expect(model.mainWindowPresence == .closed)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: true)
+        model.mainWindow = window
+        #expect(model.mainWindowPresence == .hidden)
+        withExtendedLifetime(window) {}
+    }
+
+    @Test("a take that stops while its window is minimized or hidden still lands on its Stage")
+    func hiddenWindowKeepsTheStage() async throws {
+        let model = makeModel()
+        model.mainWindowPresenceOverride = .hidden
+        model.installTestTake(source: .microphone)
+        #expect(model.stageIsVisible)
+
+        await model.handleStreamingEvent(.finished(Self.transcript("said while minimized")))
+
+        #expect(model.route == .transcript)
+        #expect(model.transcript?.text == "said while minimized")
+        #expect(model.arrivalNotice == nil)
+        await waitUntil { !model.hasPendingTakeWork }
+    }
+
+    @Test("a take that stops after the main window closed lands in the library with a toast")
+    func closedWindowLandsInTheBackground() async throws {
+        let model = makeModel()
+        model.installTestTake(source: .microphone)
+        model.mainWindowPresenceOverride = .closed
+        #expect(!model.stageIsVisible)
+
+        await model.handleStreamingEvent(.finished(Self.transcript("said with the window closed")))
+
+        #expect(model.transcript == nil)
+        #expect(model.route == .transcript)
+        let announced = await waitUntil { model.arrivalNotice?.origin == .take }
+        #expect(announced)
+    }
+
+    @Test("a toast raised while the window is out of sight waits for the user before it counts down")
+    func toastWaitsToBeSeen() async {
+        let model = makeModel()
+        model.mainWindowPresenceOverride = .hidden
+        let notice = ArrivalNotice(failed: URL(fileURLWithPath: "/tmp/memo.wav"), reason: "unreadable")
+        model.arrivalNotice = notice
+        let countdown = Task { await model.dismissArrivalNoticeOnceSeen(notice, after: .milliseconds(50)) }
+
+        await settle(for: .milliseconds(600))
+        #expect(model.arrivalNotice == notice, "nobody has seen it yet")
+
+        model.mainWindowPresenceOverride = .onScreen
+        let dismissed = await waitUntil { model.arrivalNotice == nil }
+        #expect(dismissed)
+        await countdown.value
+    }
+
     // MARK: - Failures
 
     @Test("a take that fails while an entry is open leaves the entry alone, and its Retry outlives the phase")
@@ -259,9 +356,21 @@ struct TakeRoutingTests {
         #expect(failed)
         #expect(model.recording?.failure?.audioURL == audio)
         #expect(model.exportNotice?.tone == .failure, "a failure off the Stage is told where the user is")
+        let take = try #require(model.recording?.takeID)
+        let notice = try #require(model.exportNotice)
+        let titles = notice.actions.map(\.title)
+        let handlers = notice.actions.map(\.handler)
+        #expect(titles == ["Retry", "Show"])
+        #expect(handlers == [.retryTake(take), .showTake(take)])
 
         model.phase = .idle
         #expect(model.recording?.failure?.audioURL == audio, "a phase change never costs a take its Retry")
+
+        let show = try #require(notice.actions.last)
+        model.performNoticeAction(show)
+        #expect(model.route == .recording, "Show goes back to the failed take's Stage")
+        #expect(model.exportNotice == nil)
+        await waitUntil { !model.hasPendingTakeWork }
     }
 
     @Test("a take that fails on its Stage shows it there, and Dismiss gives the page back")
@@ -283,6 +392,49 @@ struct TakeRoutingTests {
 
         #expect(model.recording == nil)
         #expect(model.route == .transcript)
+        await waitUntil { !model.hasPendingTakeWork }
+    }
+
+    @Test("a failed take's notice goes when the next take starts")
+    func failureNoticeGoesWithItsTake() async throws {
+        let model = makeModel()
+        model.installTestTake(source: .microphone)
+        model.goHome()
+        await model.handleStreamingEvent(.failed("The model stopped."))
+        let titles = model.exportNotice?.actions.map(\.title)
+        #expect(titles == ["Show"], "nothing kept, so nothing to retry")
+
+        model.installTestTake(source: .microphone)
+
+        #expect(model.exportNotice == nil)
+    }
+
+    @Test("new work started while a failed take shows gives the page back to it")
+    func newWorkLeavesAFailedStage() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("parola-stage-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let subtitles = folder.appendingPathComponent("talk.srt")
+        try "1\n00:00:00,000 --> 00:00:01,000\nsubtitled words\n".write(to: subtitles, atomically: true, encoding: .utf8)
+        let model = makeModel()
+        model.installTestTake(source: .microphone)
+        await model.handleStreamingEvent(.failed("The model stopped."))
+        #expect(model.route == .recording)
+
+        model.importSubtitle(fileURL: subtitles)
+
+        #expect(model.route == .transcript)
+        #expect(model.transcript?.text == "subtitled words")
+        let kept: Bool = if case .failed = model.recording?.state { true } else { false }
+        #expect(kept, "the failed take stays for its Retry")
+
+        #expect(model.showStage())
+        let gate = FetchGate()
+        model.linkFetcher = ScriptedLinkFetcher(fixture: folder.appendingPathComponent("never.wav"), gate: gate)
+        #expect(model.transcribeYouTube(urlString: "https://www.youtube.com/watch?v=dQw4w9WgXcQ") == .started)
+        #expect(model.route == .transcript)
+        model.cancelCurrentWork()
+        await gate.open()
     }
 
     @Test("a take cut short while an entry is open leaves the entry alone")
@@ -355,6 +507,21 @@ struct TakeRoutingTests {
 
         #expect(model.phase == .idle)
         withExtendedLifetime(captions) {}
+    }
+
+    @Test("a notice with buttons stays when a run asked for during a take waits")
+    func waitingRunKeepsAnActionableNotice() {
+        let model = makeModel()
+        let saved = ExportNotice(
+            message: "Saved the previous recording without transcribing it.", failures: [], folder: nil, tone: .info,
+            actions: [ExportNotice.Action(title: "Open", handler: .openEntry("entry-1"))]
+        )
+        model.exportNotice = saved
+        model.installTestTake(source: .microphone)
+
+        model.transcribe(fileURL: URL(fileURLWithPath: "/tmp/parola-take-routing-waits.wav"))
+
+        #expect(model.exportNotice?.id == saved.id)
     }
 
     @Test("a file opened during a take waits for it, and says so")
@@ -467,6 +634,71 @@ extension TranscriberMockSuites {
                 #expect(landed)
                 #expect(model.route == .transcript)
                 #expect(model.phase == .ready)
+                await waitUntil { !model.hasPendingTakeWork }
+            }
+        }
+
+        @Test("a take that fails while the library shows offers Retry and Show, and Retry lands it as the take would have")
+        func noticeRetryLandsTheTake() async throws {
+            let wav = try tempWAV("notice-retry")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine boom")
+                ))
+                let model = makeRecordingModel("take-landing-notice-retry")
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
+                model.goHome()
+                model.stopRecordingAndTranscribe()
+                let failed = await waitUntil { model.recording?.failure != nil && !model.hasPendingTakeWork }
+                #expect(failed)
+                let take = try #require(model.recording?.takeID)
+                let notice = try #require(model.exportNotice)
+                let titles = notice.actions.map(\.title)
+                let handlers = notice.actions.map(\.handler)
+                #expect(notice.tone == .failure)
+                #expect(titles == ["Retry", "Show"])
+                #expect(handlers == [.retryTake(take), .showTake(take)])
+                #expect(!notice.autoDismisses)
+                let saved = try #require(await landedEntry(model))
+                #expect(saved.title.hasSuffix("(transcription failed)"))
+
+                await installMockTranscriber(segments: [(0, 1, "second time lucky")])
+                await model.unloadTranscriptionSession()
+                let retry = try #require(notice.actions.first)
+                model.performNoticeAction(retry)
+                let landed = await waitUntil { model.selectedEntryID == saved.id && model.transcript?.text == "second time lucky" }
+
+                #expect(landed)
+                #expect(model.exportNotice == nil)
+                #expect(model.recording == nil, "Retry hands the take to its entry")
+                await model.awaitLandingSteps()
+                let entries = await model.library.list()
+                #expect(entries.count == 1, "Retry fills in the entry the failure saved")
+                #expect(entries.first?.title.hasSuffix("(transcription failed)") == false)
+            }
+        }
+
+        @Test("a meeting that starts while a take transcribes out of sight raises no prompt")
+        func meetingPromptWaitsForTheTakesTranscription() async throws {
+            let wav = try tempWAV("meeting-transcribing")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "held")], gate: gate)
+                let model = makeRecordingModel("take-landing-meeting")
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
+                model.goHome()
+                model.stopRecordingAndTranscribe()
+                let transcribing = await waitUntil { model.recording?.state == .transcribing(progress: nil) }
+                #expect(transcribing)
+                #expect(model.phase == .idle)
+                model.meetingDetector.isEnabled = true
+
+                model.meetingDetector.fire(appName: "Acme Conference")
+
+                #expect(model.meetingDetectedApp == nil)
+                await gate.open()
                 await waitUntil { !model.hasPendingTakeWork }
             }
         }

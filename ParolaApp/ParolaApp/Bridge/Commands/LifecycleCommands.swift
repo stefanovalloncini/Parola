@@ -35,6 +35,7 @@ extension ParolaAutomationServer {
                     }
                     let model = ctx.model
                     model.cancelAllTasks()
+                    model.forgetTakeSession()
                     model.abortDictation()
                     await model.unloadTranscriptionSession()
                     model.batchJobs = []

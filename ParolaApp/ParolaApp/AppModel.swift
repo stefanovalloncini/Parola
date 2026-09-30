@@ -221,6 +221,7 @@ final class AppModel {
             if countdown != recordingCountdown { recordingCountdown = countdown }
             if oldValue?.isRunning == true, !takeIsRunning { foregroundLetGo() }
             if route == .recording, !Self.stageHasSomethingToShow(recording) { route = .transcript }
+            if let noticeTake = exportNotice?.takeID, noticeTake != recording?.takeID { exportNotice = nil }
         }
     }
     /// The take's levels at ten a second, for as long as its session lasts; `takeLevelTick` moves with each one.
@@ -1368,7 +1369,7 @@ final class AppModel {
             guard let self else { return }
             self.detectedMeetingAppName = appName
             // Never prompt over in-flight work: accepting would stomp a live recording.
-            guard !self.takeIsRunning else { return }
+            guard !self.takeIsRunning, self.takeRun == nil else { return }
             switch self.phase {
             case .idle, .ready, .failed:
                 // A presented alert's title never updates, so keep the first prompt — accept
@@ -1470,6 +1471,8 @@ final class AppModel {
 
     /// The window the library and a take's controls live in; nil once it closed.
     @ObservationIgnored weak var mainWindow: NSWindow?
+    /// Test seam: stands in for where the main window is, which a unit test can't show, minimize or close.
+    @ObservationIgnored var mainWindowPresenceOverride: MainWindowPresence?
     @ObservationIgnored let entryWindows = EntryWindowRegistry()
     @ObservationIgnored var openEntryWindowAction: ((LibraryEntry.ID) -> Void)?
     var keyViewerEntryIDs: Set<LibraryEntry.ID> = []
@@ -2374,6 +2377,7 @@ final class AppModel {
             deferredArrivals.append(fileURL)
             return
         }
+        leaveFinishedStage()
         if RunLanding.Kind.subtitles.policy.recents { noteRecentFile(fileURL) }
         let imported: Transcript
         do {
@@ -2418,6 +2422,7 @@ final class AppModel {
             noteRunWaitsForTake()
             return
         }
+        leaveFinishedStage()
         if fileURL.pathExtension == "parola" {
             Task { [weak self] in await self?.openProjectDocument(at: fileURL) }
             return
@@ -2439,6 +2444,7 @@ final class AppModel {
         fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil, fetchedLink: FetchedLink? = nil,
         arrival: WatchedArrival? = nil
     ) {
+        leaveFinishedStage()
         // Before the new token: cancelling retires the old run's token; a file opened mid-download keeps its duplicate check.
         cancelTranscriptionRuns(keepingDuplicateCheck: fetchedLink != nil)
         let runToken = nextFileRunToken()
@@ -2867,6 +2873,7 @@ final class AppModel {
             if takeIsRunning { noteRunWaitsForTake() }
             return .parked
         }
+        leaveFinishedStage()
 
         cancelTranscriptionRuns()
         let runToken = nextFileRunToken()
@@ -2953,6 +2960,7 @@ final class AppModel {
             if takeIsRunning { noteRunWaitsForTake() }
             return .parked
         }
+        leaveFinishedStage()
 
         cancelTranscriptionRuns()
         let fetcher = linkFetcher
@@ -3147,8 +3155,8 @@ final class AppModel {
         // (global hotkey, menu bar) it would delay the take invisibly and uncancellably.
         let overlayVisible = mode == .test || NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
         if countIn > 0, overlayVisible {
-            beginCountIn(seconds: countIn, source: source) { [weak self] in
-                self?.beginRecordingNow(source: source, diskCheck: diskCheck)
+            beginCountIn(seconds: countIn, source: source) { [weak self] showsStage in
+                self?.beginRecordingNow(source: source, diskCheck: diskCheck, showsStage: showsStage)
             }
             refuseDuringCountIn(diskCheck)
         } else {
@@ -3163,7 +3171,8 @@ final class AppModel {
     }
 
     /// The count-in is the take's first arming, under the id the take will get.
-    private func beginCountIn(seconds: Int, source: RecordSource, then: @escaping () -> Void) {
+    /// `then` learns whether the Stage is still up: someone who left it during the count-in keeps their page.
+    private func beginCountIn(seconds: Int, source: RecordSource, then: @escaping (_ showsStage: Bool) -> Void) {
         countdownTask?.cancel()
         let takeID = takeCounter &+ 1
         let stamp = Date()
@@ -3185,8 +3194,9 @@ final class AppModel {
                 try? await Task.sleep(for: .seconds(1), clock: clock)
             }
             guard !Task.isCancelled else { return }
+            let showsStage = self?.route == .recording
             self?.endCountIn()
-            then()
+            then(showsStage)
         }
     }
 
@@ -3279,9 +3289,20 @@ final class AppModel {
         return true
     }
 
-    /// The Stage is where the user is looking: its route is up, in a window on screen. Test mode has no window to ask.
+    /// New work shows on the transcript page, so a Stage whose take is over gives way to it; a landed take never holds the Stage.
+    func leaveFinishedStage() {
+        guard route == .recording, recording?.isOver ?? true else { return }
+        route = .transcript
+    }
+
+    /// Whatever take the session still holds, failed or landed, goes with it; a reset starts from the library.
+    func forgetTakeSession() {
+        endSession(of: recording?.takeID)
+    }
+
+    /// The Stage is what the user comes back to: its route is up in a main window that is still open, even minimized or hidden.
     var stageIsVisible: Bool {
-        route == .recording && (mode == .test || mainWindow?.isVisible == true)
+        route == .recording && mainWindowPresence != .closed
     }
 
     /// A take's failure shows on its Stage, and in a notice when the Stage isn't on screen; with no take to hold it, the page's banner says it.
@@ -3299,11 +3320,17 @@ final class AppModel {
             failed = true
         }
         guard failed, !stageIsVisible else { return }
-        exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure)
+        var actions = [ExportNotice.Action(title: String(localized: "Show"), handler: .showTake(takeID))]
+        if retry != nil {
+            actions.insert(ExportNotice.Action(title: String(localized: "Retry"), handler: .retryTake(takeID)), at: 0)
+        }
+        exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure, actions: actions)
     }
 
     /// A run asked for while a take records waits for it, or is turned away; either way the user hears why.
     func noteRunWaitsForTake() {
+        // One with buttons, like a saved take's Open and Transcribe, is worth more than this.
+        guard exportNotice?.actions.isEmpty ?? true else { return }
         exportNotice = ExportNotice(
             message: String(localized: "Finish the recording first."), failures: [], folder: nil, tone: .info
         )
@@ -3326,7 +3353,7 @@ final class AppModel {
         activeTake?.id == take.id
     }
 
-    private func beginRecordingNow(source: RecordSource, diskCheck: Task<Int64?, Never>) {
+    private func beginRecordingNow(source: RecordSource, diskCheck: Task<Int64?, Never>, showsStage: Bool = true) {
         // A count-in that ends after a quit began would start a take the quit can only cut off.
         guard !quitPending else {
             forgetTakeRequest()
@@ -3352,7 +3379,7 @@ final class AppModel {
             arming: .startingCapture,
             titleDate: stamp
         ))
-        showStage()
+        if showsStage { showStage() }
         if source == .microphone { nameTakeDevice(take) }
         pendingRecordingSource = source.entrySource
         let config = recordingMediaConfig(for: source)
@@ -4891,6 +4918,7 @@ final class AppModel {
     func openProjectDocument(at url: URL) async {
         do {
             let doc = try await Self.offMainIO { try ParolaDocument.read(at: url) }
+            leaveFinishedStage()
             // Like every other transcript-install path: drop the library selection first, or
             // the debounced save pairs the stale entry id with this document's transcript.
             loadEntryGeneration &+= 1

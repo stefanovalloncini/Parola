@@ -103,6 +103,26 @@ extension AppModel {
         exportNotice = nil
     }
 
+    /// A notice's button: the notice goes first, then its action runs.
+    func performNoticeAction(_ action: ExportNotice.Action) {
+        dismissExportNotice()
+        switch action.handler {
+        case .openEntry(let id):
+            openEntryFromLibrary(id, inNewWindow: false)
+        case .transcribeEntry(let id):
+            Task { [weak self] in
+                guard let self, (try? await self.openEntry(id)) != nil else { return }
+                self.transcribeLoadedEntry()
+            }
+        case .retryTake(let takeID):
+            guard recording?.takeID == takeID else { return }
+            retryFailedTake()
+        case .showTake(let takeID):
+            guard recording?.takeID == takeID else { return }
+            showStage()
+        }
+    }
+
     func jumpToNextSpeaker() {
         guard let transcript, !transcript.segments.isEmpty else { return }
         let segments = transcript.segments

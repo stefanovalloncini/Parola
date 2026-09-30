@@ -46,7 +46,7 @@ struct ExportNoticeStrip: View {
                     .axLeaf("ExportNotice.Button.Reveal")
             }
             ForEach(notice.actions) { action in
-                Button(action.title) { perform(action) }
+                Button(action.title) { model.performNoticeAction(action) }
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("ExportNotice.Button.\(axName(for: action.handler))")
             }
@@ -90,23 +90,12 @@ struct ExportNoticeStrip: View {
         }
     }
 
-    private func perform(_ action: ExportNotice.Action) {
-        model.dismissExportNotice()
-        switch action.handler {
-        case .openEntry(let id):
-            model.openEntryFromLibrary(id, inNewWindow: false)
-        case .transcribeEntry(let id):
-            Task {
-                guard (try? await model.openEntry(id)) != nil else { return }
-                model.transcribeLoadedEntry()
-            }
-        }
-    }
-
     private func axName(for handler: ExportNotice.Action.Handler) -> String {
         switch handler {
         case .openEntry: "Open"
         case .transcribeEntry: "Transcribe"
+        case .retryTake: "Retry"
+        case .showTake: "Show"
         }
     }
 }

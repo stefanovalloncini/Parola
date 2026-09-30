@@ -80,9 +80,7 @@ struct ArrivalToast: View {
         .padding(DS.Spacing.regular)
         .task(id: notice) {
             guard notice.dismissesItself else { return }
-            try? await Task.sleep(for: DeliveryToast.dismissAfter)
-            guard !Task.isCancelled, model.arrivalNotice == notice else { return }
-            model.dismissArrivalNotice()
+            await model.dismissArrivalNoticeOnceSeen(notice, after: DeliveryToast.dismissAfter)
         }
         .axBranch("ArrivalToast")
     }

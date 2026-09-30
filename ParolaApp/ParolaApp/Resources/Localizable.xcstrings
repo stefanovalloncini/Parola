@@ -12669,6 +12669,17 @@
         }
       }
     },
+    "Show": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra"
+          }
+        }
+      }
+    },
     "Show Chat": {
       "extractionState": "manual",
       "localizations": {
