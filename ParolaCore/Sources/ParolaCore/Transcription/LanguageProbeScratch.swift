@@ -10,6 +10,7 @@ enum LanguageProbeScratch {
     static func withScratch<Value>(
         from source: URL,
         deadline: Duration? = nil,
+        clock: any Clock<Duration> = ContinuousClock(),
         extract: @escaping Extract = { source, scratch in
             (try? ProbeAudioExtractor.extract(from: source, to: scratch))?.isEmpty == false
         },
@@ -19,7 +20,7 @@ enum LanguageProbeScratch {
             .appendingPathComponent("parola-language-probe-\(UUID().uuidString).caf")
         defer { try? FileManager.default.removeItem(at: scratch) }
         let phase = OSAllocatedUnfairLock(initialState: Phase.extracting)
-        let read = await BoundedFileRead.run(deadline: deadline ?? FileReadDeadline.forReading(source)) {
+        let read = await BoundedFileRead.run(deadline: deadline ?? FileReadDeadline.forReading(source), clock: clock) {
             let extracted = extract(source, scratch)
             // A read that resumes after the deadline writes the scratch after the defer above has run.
             let abandoned = phase.withLock { phase -> Bool in

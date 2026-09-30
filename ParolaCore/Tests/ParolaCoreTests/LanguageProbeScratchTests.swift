@@ -21,54 +21,61 @@ struct LanguageProbeScratchTests {
         let fifo = dir.appendingPathComponent("stalled.wav")
         #expect(mkfifo(fifo.path, 0o644) == 0)
 
-        var bodyRan = false
-        var timedOut = false
-        var elapsed = Duration.zero
-        try await FIFOFixture.holding(fifo) {
-            let startedAt = ContinuousClock.now
-            defer { elapsed = startedAt.duration(to: .now) }
-            do {
-                _ = try await LanguageProbeScratch.withScratch(from: fifo, deadline: .milliseconds(300)) { _ in
-                    bodyRan = true
+        let clock = TestClock()
+        let bodyRan = TestSignal()
+        let timedOut = try await FIFOFixture.holding(fifo) {
+            let probe = GuardedTask { () -> Bool in
+                do {
+                    _ = try await LanguageProbeScratch.withScratch(
+                        from: fifo, deadline: .milliseconds(300), clock: clock
+                    ) { _ in bodyRan.fire() }
+                    return false
+                } catch ParolaError.fileReadTimedOut(let name) {
+                    return name == "stalled.wav"
                 }
-            } catch ParolaError.fileReadTimedOut(let name) {
-                timedOut = name == "stalled.wav"
             }
+            await clock.waitForSleeper()
+            clock.advance(by: .milliseconds(300))
+            return try await probe.value("the probe to time out while the source is still parked")
         }
 
-        #expect(timedOut)
-        #expect(!bodyRan)
-        #expect(elapsed < .seconds(5))
+        #expect(timedOut == true)
+        #expect(!bodyRan.fired)
     }
 
     @Test("a read that resumes after the deadline deletes the scratch it went on to write")
     func lateWriteCleansUpAfterItself() async throws {
-        let written = OSAllocatedUnfairLock<URL?>(initialState: nil)
+        let clock = TestClock()
+        let resume = DispatchSemaphore(value: 0)
+        let written = Awaitable<URL?>(nil)
         let source = URL(fileURLWithPath: "/tmp/parola-stalled-share.wav")
-
-        await #expect(throws: ParolaError.self) {
-            _ = try await LanguageProbeScratch.withScratch(
+        let probe = GuardedTask {
+            try await LanguageProbeScratch.withScratch(
                 from: source,
                 deadline: .milliseconds(100),
+                clock: clock,
                 extract: { _, scratch in
-                    Thread.sleep(forTimeInterval: 0.4)
+                    resume.wait()
                     FileManager.default.createFile(atPath: scratch.path, contents: Data("late".utf8))
-                    written.withLock { $0 = scratch }
+                    written.update { $0 = scratch }
                     return true
                 }
             ) { _ in }
         }
 
-        let deadline = ContinuousClock.now + .seconds(5)
-        while written.withLock({ $0 }) == nil, ContinuousClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(20))
+        await clock.waitForSleeper()
+        clock.advance(by: .milliseconds(100))
+        await #expect(throws: ParolaError.self) {
+            _ = try await probe.value("the probe to time out while the read is still parked")
         }
-        let scratch = try #require(written.withLock { $0 })
-        while FileManager.default.fileExists(atPath: scratch.path), ContinuousClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(20))
+        resume.signal()
+
+        guard await written.wait(until: { $0 != nil }, "the late read to write its scratch"),
+              let scratch = written.value else { return }
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        await pollUntil("the late read to delete its scratch") {
+            !FileManager.default.fileExists(atPath: scratch.path)
         }
-        #expect(!FileManager.default.fileExists(atPath: scratch.path))
-        try? FileManager.default.removeItem(at: scratch)
     }
 
     @Test("the scratch exists while the probe listens and is gone afterwards")

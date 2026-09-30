@@ -15,20 +15,25 @@ struct BoundedFileReadTests {
     }
 
     @Test("a read that never returns stops holding the caller at the deadline")
-    func parkedReadTimesOut() async {
+    func parkedReadTimesOut() async throws {
+        let clock = TestClock()
         let unblock = DispatchSemaphore(value: 0)
-        let started = ContinuousClock.now
-        let outcome = await BoundedFileRead.run(deadline: .milliseconds(200)) { () -> Int in
-            unblock.wait()
-            return 1
+        defer { unblock.signal() }
+        let read = GuardedTask {
+            await BoundedFileRead.run(deadline: .milliseconds(200), clock: clock) { () -> Int in
+                unblock.wait()
+                return 1
+            }
         }
-        let elapsed = started.duration(to: .now)
-        unblock.signal()
-        guard case .timedOut = outcome else {
-            Issue.record("expected a timeout, got \(outcome)")
+
+        await clock.waitForSleeper()
+        clock.advance(by: .milliseconds(200))
+
+        let outcome = try await read.value("the caller to get control back while the read is still parked")
+        guard case .timedOut? = outcome else {
+            Issue.record("expected a timeout, got \(String(describing: outcome))")
             return
         }
-        #expect(elapsed < .seconds(3), "the caller waited \(elapsed) past a 200 ms deadline")
     }
 
     @Test("small files get the header budget and large ones get a proportional one")

@@ -25,7 +25,7 @@ struct AsyncTimeoutTests {
             return "late"
         }
 
-        await waitForDeadlineSleeper(on: clock)
+        await clock.waitForSleeper()
         clock.advance(by: .milliseconds(50))
 
         #expect(await raced == nil)
@@ -42,14 +42,5 @@ struct AsyncTimeoutTests {
             return Task.isCancelled ? "cancelled" : "slept"
         }
         #expect(value == nil)
-    }
-
-    private func waitForDeadlineSleeper(on clock: TestClock, timeout: Duration = .seconds(5)) async {
-        let deadline = ContinuousClock.now + timeout
-        while ContinuousClock.now < deadline {
-            if clock.sleeperCount > 0 { return }
-            try? await Task.sleep(for: .milliseconds(1))
-        }
-        Issue.record("the deadline sleeper never registered on the test clock")
     }
 }
