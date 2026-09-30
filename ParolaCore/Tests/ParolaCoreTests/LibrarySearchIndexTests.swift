@@ -1135,14 +1135,17 @@ final class LibrarySearchIndexTests {
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         let first = Task { await index.flush() }
-        #expect(await eventually { log.withLock { $0.written.count } > 0 })
+        let withLockWait = await eventually { log.withLock { $0.written.count } > 0 }
+        #expect(withLockWait)
 
         await index.index(id: "e2", title: "Two", text: "retro feedback", createdAt: Date())
         let second = Task { await index.flush() }
-        #expect(await eventually { await index.snapshotGeneration >= 2 })
+        let indexWait = await eventually { await index.snapshotGeneration >= 2 }
+        #expect(indexWait)
         await index.index(id: "e3", title: "Three", text: "alpha review", createdAt: Date())
         let third = Task { await index.flush() }
-        #expect(await eventually { await index.snapshotGeneration >= 3 })
+        let indexWait2 = await eventually { await index.snapshotGeneration >= 3 }
+        #expect(indexWait2)
 
         gate.signal()
         await first.value
@@ -1208,7 +1211,8 @@ final class LibrarySearchIndexTests {
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         let manifestPath = manifestURL(in: url).path
-        #expect(await eventually { FileManager.default.fileExists(atPath: manifestPath) })
+        let fileExistsWait = await eventually { FileManager.default.fileExists(atPath: manifestPath) }
+        #expect(fileExistsWait)
     }
 
     @Test("a missing snapshot asks for a rebuild")

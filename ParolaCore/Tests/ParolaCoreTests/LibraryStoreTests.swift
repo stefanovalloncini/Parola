@@ -714,20 +714,26 @@ struct LibraryStoreTests {
 
     @Test("a manifest edit patches the list cache instead of rescanning every bundle")
     func manifestEditsPatchTheListCache() async throws {
-        #expect(try await listAfterMutation { try await $0.setPinned(true, for: $1) }.first?.pinned == true)
-        #expect(try await listAfterMutation { try await $0.setCategory(.meeting, for: $1) }.first?.category == .meeting)
-        #expect(try await listAfterMutation { try await $0.setLabels(["work"], for: $1) }.first?.labels == ["work"])
-        #expect(try await listAfterMutation { try await $0.renameEntry($1, to: "Standup") }.first?.title == "Standup")
-        #expect(try await listAfterMutation {
+        let setPinnedWait = try await listAfterMutation { try await $0.setPinned(true, for: $1) }
+        #expect(setPinnedWait.first?.pinned == true)
+        let setCategoryWait = try await listAfterMutation { try await $0.setCategory(.meeting, for: $1) }
+        #expect(setCategoryWait.first?.category == .meeting)
+        let setLabelsWait = try await listAfterMutation { try await $0.setLabels(["work"], for: $1) }
+        #expect(setLabelsWait.first?.labels == ["work"])
+        let renameEntryWait = try await listAfterMutation { try await $0.renameEntry($1, to: "Standup") }
+        #expect(renameEntryWait.first?.title == "Standup")
+        let setSegmentNoteWait = try await listAfterMutation {
             try await $0.setSegmentNote("kanban", segmentID: 0, for: $1)
-        }.first?.note(forSegment: 0) == "kanban")
+        }
+        #expect(setSegmentNoteWait.first?.note(forSegment: 0) == "kanban")
 
         let when = Date(timeIntervalSince1970: 1_900_000_000)
-        #expect(try await listAfterMutation {
+        let editedWait = try await listAfterMutation {
             var edited = makeTranscript()
             edited.segments[0].text = "edited"
             try await $0.updateTranscript(edited, for: $1, at: when)
-        }.first?.updatedAt == when)
+        }
+        #expect(editedWait.first?.updatedAt == when)
     }
 
     @Test("delete moves the entry into the cached trash list in deletion order")

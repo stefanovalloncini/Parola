@@ -189,7 +189,8 @@ struct StreamingRealtimeLoopTests {
             onConfirmed: { _ in }
         )
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.push(seconds: 0.1, value: 0.1)
         #expect(abs(meter.level - AudioLevel.normalised(rms: 0.1)) < 0.001)
@@ -224,37 +225,44 @@ struct StreamingRealtimeLoopTests {
             [segment(2, 6, "d"), segment(6, 10, "e"), segment(10, 12, "f")],
         ])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.pushRamp(seconds: 10)
-        #expect(await eventually { await script.callCount == 1 })
+        let scriptWait = await eventually { await script.callCount == 1 }
+        #expect(scriptWait)
         let call1 = try #require(await script.calls.first)
         #expect(call1.sampleCount == 10 * sampleRate)
         #expect(call1.clip == [0])
 
-        #expect(await eventually { recorder.batches.count == 1 })
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
         let batch1 = try #require(recorder.batches.first)
         #expect(batch1.segments.map(\.text) == ["a"])
         #expect(batch1.segments.map(\.start) == [0])
         #expect(batch1.segments.map(\.end) == [4])
 
-        #expect(await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate })
+        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
+        #expect(loopWait)
         #expect(await loop.windowSampleCount() == 8 * sampleRate)
 
         capture.push(seconds: 6, value: 0.5)
-        #expect(await eventually { await script.callCount == 2 })
+        let scriptWait2 = await eventually { await script.callCount == 2 }
+        #expect(scriptWait2)
         let call2 = try #require(await script.calls.last)
         #expect(call2.sampleCount == 14 * sampleRate)
         #expect(call2.clip == [2])
         #expect(call2.firstSample == Float(2 * sampleRate) / Float(10 * sampleRate))
 
-        #expect(await eventually { recorder.batches.count == 2 })
+        let countWait2 = await eventually { recorder.batches.count == 2 }
+        #expect(countWait2)
         let batch2 = try #require(recorder.batches.last)
         #expect(batch2.segments.map(\.text) == ["d"])
         #expect(batch2.segments.map(\.start) == [4])
         #expect(batch2.segments.map(\.end) == [8])
 
-        #expect(await eventually { await loop.windowStartOffsetSamples() == 6 * sampleRate })
+        let loopWait2 = await eventually { await loop.windowStartOffsetSamples() == 6 * sampleRate }
+        #expect(loopWait2)
         #expect(await loop.windowSampleCount() == 10 * sampleRate)
 
         #expect(recorder.partials.contains("b c"))
@@ -274,17 +282,21 @@ struct StreamingRealtimeLoopTests {
             wantsConfirmedAudio: true
         )
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.pushRamp(seconds: 10)
-        #expect(await eventually { recorder.batches.count == 1 })
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
         let batch1 = try #require(recorder.batches.first)
         #expect(batch1.windowStartSeconds == 0)
         #expect(batch1.audioWindow.count == Int(4.5 * Double(sampleRate)))
 
         capture.push(seconds: 6, value: 0.5)
-        #expect(await eventually { await script.callCount == 2 })
-        #expect(await eventually { recorder.batches.count == 2 })
+        let scriptWait = await eventually { await script.callCount == 2 }
+        #expect(scriptWait)
+        let countWait2 = await eventually { recorder.batches.count == 2 }
+        #expect(countWait2)
         let batch2 = try #require(recorder.batches.last)
         #expect(batch2.windowStartSeconds == 3.5)
         #expect(batch2.audioWindow.count == 5 * sampleRate)
@@ -304,20 +316,25 @@ struct StreamingRealtimeLoopTests {
             ],
         ])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.push(seconds: 10, value: 0.5)
-        #expect(await eventually { recorder.batches.count == 1 })
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
         #expect(recorder.batches.first?.segments.map(\.text) == ["a"])
 
         capture.push(seconds: 6, value: 0.5)
-        #expect(await eventually { await script.callCount == 2 })
-        #expect(await eventually { recorder.batches.count == 2 })
+        let scriptWait = await eventually { await script.callCount == 2 }
+        #expect(scriptWait)
+        let countWait2 = await eventually { recorder.batches.count == 2 }
+        #expect(countWait2)
         let batch = try #require(recorder.batches.last)
         #expect(batch.segments.map(\.text) == ["d", "e"], "the segment behind the watermark is the only one dropped")
         #expect(batch.segments.map(\.end) == [8, 12])
 
-        #expect(await eventually { await loop.windowStartOffsetSamples() == 10 * sampleRate })
+        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 10 * sampleRate }
+        #expect(loopWait)
 
         await loop.stop()
         _ = await runTask.value
@@ -333,15 +350,19 @@ struct StreamingRealtimeLoopTests {
             wantsConfirmedAudio: true
         )
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.pushRamp(seconds: 10)
-        #expect(await eventually { recorder.batches.count == 1 })
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
         #expect(recorder.batches.first?.segments.map(\.text) == ["a"])
-        #expect(await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate })
+        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
+        #expect(loopWait)
 
         capture.push(seconds: 2, value: 0.5)
-        #expect(await eventually { await script.callCount == 2 })
+        let scriptWait = await eventually { await script.callCount == 2 }
+        #expect(scriptWait)
 
         await loop.stop()
         _ = await runTask.value
@@ -365,17 +386,21 @@ struct StreamingRealtimeLoopTests {
             ],
         ])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.push(seconds: 5, value: 0.5)
-        #expect(await eventually { recorder.batches.count == 1 })
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
+        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 3 * sampleRate }
         #expect(
-            await eventually { await loop.windowStartOffsetSamples() == 3 * sampleRate },
+            loopWait,
             "the watermark stops at the 5 s actually decoded, so the purge keeps the speech"
         )
 
         capture.push(seconds: 5, value: 0.5)
-        #expect(await eventually { await script.callCount == 2 })
+        let scriptWait = await eventually { await script.callCount == 2 }
+        #expect(scriptWait)
         let call2 = try #require(await script.calls.last)
         #expect(call2.sampleCount == 7 * sampleRate)
         #expect(call2.clip == [2], "the decode starts inside the window, not past everything it holds")
@@ -397,13 +422,16 @@ struct StreamingRealtimeLoopTests {
             [segment(2, 4, "b"), segment(4, 6, "c"), segment(6, 8, "d")],
         ])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.push(seconds: 10, value: 0.5)
-        #expect(await eventually { await loop.windowStartOffsetSamples() == 1 * sampleRate })
+        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 1 * sampleRate }
+        #expect(loopWait)
 
         capture.push(seconds: 2, value: 0.5)
-        #expect(await eventually { await script.callCount == 2 })
+        let scriptWait = await eventually { await script.callCount == 2 }
+        #expect(scriptWait)
         let call2 = try #require(await script.calls.last)
         #expect(call2.sampleCount == 11 * sampleRate)
         #expect(call2.clip == [2], "3 s in, where the retained segment starts")
@@ -419,15 +447,20 @@ struct StreamingRealtimeLoopTests {
             [segment(1, 2, "two"), segment(2, 6, "three"), segment(6, 7, "four"), segment(7, 9, "five")],
         ])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.push(seconds: 10, value: 0.5)
-        #expect(await eventually { recorder.batches.count == 1 })
-        #expect(await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate })
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
+        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
+        #expect(loopWait)
 
         capture.push(seconds: 4, value: 0.5)
-        #expect(await eventually { await script.callCount == 2 })
-        #expect(await eventually { recorder.batches.count == 2 })
+        let scriptWait = await eventually { await script.callCount == 2 }
+        #expect(scriptWait)
+        let countWait2 = await eventually { recorder.batches.count == 2 }
+        #expect(countWait2)
 
         await loop.stop()
         _ = await runTask.value
@@ -448,10 +481,12 @@ struct StreamingRealtimeLoopTests {
             wantsConfirmedAudio: true
         )
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.pushRamp(seconds: 10)
-        #expect(await eventually { recorder.batches.count == 1 })
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
         let batch = try #require(recorder.batches.first)
         #expect(batch.segments.map(\.text) == ["late", "early"])
         #expect(batch.windowStartSeconds == 0)
@@ -481,7 +516,8 @@ struct StreamingRealtimeLoopTests {
             useVAD: true
         )
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.pushBuffers(count: 30, secondsEach: 0.1, value: 0)
         try await Task.sleep(nanoseconds: 100_000_000)
@@ -489,7 +525,8 @@ struct StreamingRealtimeLoopTests {
         #expect(recorder.partials.contains("Waiting for speech..."))
 
         capture.pushBuffers(count: 20, secondsEach: 0.1, value: 0.5)
-        #expect(await eventually { await script.callCount >= 1 })
+        let scriptWait = await eventually { await script.callCount >= 1 }
+        #expect(scriptWait)
 
         await loop.stop()
         _ = await runTask.value
@@ -499,14 +536,17 @@ struct StreamingRealtimeLoopTests {
     func silenceCapsWindow() async throws {
         let (loop, capture, script, _) = makeLoop(responses: [], useVAD: true)
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.pushBuffers(count: 70, secondsEach: 1, value: 0)
-        #expect(await eventually { await loop.windowStartOffsetSamples() == 10 * sampleRate })
+        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 10 * sampleRate }
+        #expect(loopWait)
         #expect(await loop.windowSampleCount() == 60 * sampleRate)
 
         capture.pushBuffers(count: 10, secondsEach: 1, value: 0)
-        #expect(await eventually { await loop.windowStartOffsetSamples() == 20 * sampleRate })
+        let loopWait2 = await eventually { await loop.windowStartOffsetSamples() == 20 * sampleRate }
+        #expect(loopWait2)
         #expect(await loop.windowSampleCount() == 60 * sampleRate)
         #expect(await script.callCount == 0)
 
@@ -518,15 +558,18 @@ struct StreamingRealtimeLoopTests {
     func capBoundsDecodeWithoutConfirmations() async throws {
         let (loop, capture, script, _) = makeLoop(responses: [[], []], maxWindowSeconds: 4)
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.push(seconds: 3, value: 0.5)
-        #expect(await eventually { await script.callCount == 1 })
+        let scriptWait = await eventually { await script.callCount == 1 }
+        #expect(scriptWait)
         let call1 = try #require(await script.calls.first)
         #expect(call1.sampleCount == 3 * sampleRate)
 
         capture.push(seconds: 3, value: 0.5)
-        #expect(await eventually { await script.callCount == 2 })
+        let scriptWait2 = await eventually { await script.callCount == 2 }
+        #expect(scriptWait2)
         let call2 = try #require(await script.calls.last)
         #expect(call2.sampleCount == 4 * sampleRate)
         #expect(await loop.windowStartOffsetSamples() == 2 * sampleRate)
@@ -542,10 +585,12 @@ struct StreamingRealtimeLoopTests {
             [segment(2, 6, "d"), segment(6, 10, "e"), segment(10, 12, "f")],
         ])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.pushRamp(seconds: 10)
-        #expect(await eventually { recorder.batches.count == 1 })
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
 
         await loop.stop()
         let outcome = await runTask.value
@@ -570,11 +615,14 @@ struct StreamingRealtimeLoopTests {
             [segment(1, 2, "b"), segment(2, 3, "c"), segment(3, 3.5, "tail")],
         ])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.push(seconds: 3, value: 0.5)
-        #expect(await eventually { await script.callCount == 1 })
-        #expect(await eventually { recorder.batches.count == 1 })
+        let scriptWait = await eventually { await script.callCount == 1 }
+        #expect(scriptWait)
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
 
         capture.push(seconds: 0.5, value: 0.5)
         await loop.stop()
@@ -594,14 +642,17 @@ struct StreamingRealtimeLoopTests {
             useVAD: true
         )
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         // The voice arrives as one buffer: split across many, an iteration landing mid-push
         // would leave undecoded speech in the tail and the flush would rightly decode it.
         capture.pushBuffers(count: 1, secondsEach: 0.1, value: 0)
         capture.push(seconds: 3, value: 0.5)
-        #expect(await eventually { await script.callCount == 1 })
-        #expect(await eventually { recorder.batches.count == 1 })
+        let scriptWait = await eventually { await script.callCount == 1 }
+        #expect(scriptWait)
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
 
         capture.pushBuffers(count: 20, secondsEach: 0.1, value: 0)
         await loop.stop()
@@ -619,11 +670,14 @@ struct StreamingRealtimeLoopTests {
             [segment(1, 2, "b"), segment(2, 3, "c"), segment(3, 3.5, "tail")],
         ])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.push(seconds: 3, value: 0.5)
-        #expect(await eventually { await script.callCount == 1 })
-        #expect(await eventually { recorder.batches.count == 1 })
+        let scriptWait = await eventually { await script.callCount == 1 }
+        #expect(scriptWait)
+        let countWait = await eventually { recorder.batches.count == 1 }
+        #expect(countWait)
 
         capture.push(seconds: 0.5, value: 0.5)
         runTask.cancel()
@@ -642,7 +696,8 @@ struct StreamingRealtimeLoopTests {
     func cancelThenStopStopsCaptureOnce() async throws {
         let (loop, capture, _, _) = makeLoop(responses: [])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         runTask.cancel()
         _ = await runTask.value
@@ -654,7 +709,8 @@ struct StreamingRealtimeLoopTests {
     func stopThenCancelStopsCaptureOnce() async throws {
         let (loop, capture, _, _) = makeLoop(responses: [])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         await loop.stop()
         let outcome = await runTask.value
@@ -681,7 +737,8 @@ struct StreamingRealtimeLoopTests {
     func cancelSkipsTheFlush() async throws {
         let (loop, capture, script, recorder) = makeLoop(responses: [[segment(0, 0.5, "tail")]])
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.push(seconds: 0.5, value: 0.5)
         await loop.cancel()
@@ -701,7 +758,8 @@ struct StreamingRealtimeLoopTests {
         let prompt = PermissionPrompt()
         let (loop, capture, script, _) = makeLoop(responses: [], requestPermission: { await prompt.ask() })
         let runTask = Task { await loop.run() }
-        #expect(await eventually { await prompt.isShowing })
+        let promptWait = await eventually { await prompt.isShowing }
+        #expect(promptWait)
 
         await loop.stop()
         await prompt.answer(true)
@@ -726,10 +784,12 @@ struct StreamingRealtimeLoopTests {
             if case .stopped = outcome { stopped = true } else { stopped = false }
             ended.withLock { $0 = stopped }
         }
-        #expect(await eventually { await prompt.isShowing })
+        let promptWait = await eventually { await prompt.isShowing }
+        #expect(promptWait)
 
         await loop.stop()
-        #expect(await eventually { ended.withLock { $0 } != nil }, "an unanswered prompt must not park the stop")
+        let withLockWait = await eventually { ended.withLock { $0 } != nil }
+        #expect(withLockWait, "an unanswered prompt must not park the stop")
         #expect(ended.withLock { $0 } == true)
 
         await prompt.answer(true)
@@ -741,7 +801,8 @@ struct StreamingRealtimeLoopTests {
     func transcribeFailureStopsCapture() async throws {
         let (loop, capture, _, _) = makeLoop(responses: [], failure: ScriptError())
         let runTask = Task { await loop.run() }
-        #expect(await eventually { capture.installed })
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
 
         capture.push(seconds: 2, value: 0.5)
         let outcome = await runTask.value

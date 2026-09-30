@@ -307,9 +307,11 @@ struct FolderWatcherSettleTests {
 
         try await scheduler.advance(ticks: 2)
         #expect(placeholder.requests.count == 1)
-        #expect(await waitFor { placeholder.reads.count == 1 })
+        let countWait = await waitFor { placeholder.reads.count == 1 }
+        #expect(countWait)
         // The read's result re-arms the tick; advancing before that would run the replaced tick, which is ignored.
-        #expect(await waitFor { scheduler.intervals.last == .milliseconds(50) })
+        let lastWait = await waitFor { scheduler.intervals.last == .milliseconds(50) }
+        #expect(lastWait)
         try await scheduler.waitForArmedTick()
         #expect(collected.snapshot().isEmpty)
 
@@ -343,11 +345,13 @@ struct FolderWatcherSettleTests {
         await watcher.checkForNewFiles()
         try await scheduler.advanceAndWait()
 
-        #expect(await waitFor { reads.active == 2 })
+        let activeWait = await waitFor { reads.active == 2 }
+        #expect(activeWait)
         try await Task.sleep(for: .milliseconds(100))
         #expect(reads.most == 2)
         reads.open()
-        #expect(await waitFor { reads.finished == 5 })
+        let finishedWait = await waitFor { reads.finished == 5 }
+        #expect(finishedWait)
         #expect(reads.most == 2)
         await watcher.stop()
     }
@@ -368,7 +372,8 @@ struct FolderWatcherSettleTests {
         await watcher.checkForNewFiles()
 
         try await scheduler.advance(ticks: 2)
-        #expect(await waitFor { !collected.snapshot().isEmpty })
+        let snapshotWait = await waitFor { !collected.snapshot().isEmpty }
+        #expect(snapshotWait)
         #expect(await watcher.pendingPaths.isEmpty)
         await watcher.stop()
         #expect(collected.snapshot().map(\.lastPathComponent) == ["offline.m4a"])

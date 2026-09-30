@@ -117,8 +117,9 @@ final class DeliveryEngineTests {
         #expect(attempt == 1)
         #expect(nextAt.timeIntervalSinceNow > 30, "the first retry is a minute out")
         #expect(await engine.pending().count == 1)
+        let sleeperCountWait = await poll { clock.sleeperCount == 1 }
         #expect(
-            await poll { clock.sleeperCount == 1 },
+            sleeperCountWait,
             "the retry timer should be armed on the injected clock"
         )
 
@@ -133,7 +134,8 @@ final class DeliveryEngineTests {
         #expect(await engine.pending().isEmpty, "the retry should have cleared the queue")
         #expect(await receipts.entries.values.contains("entry-1"))
         #expect(await recorder.recorded().count == 1)
-        #expect(await poll { clock.sleeperCount == 0 }, "the armed timer should have been cancelled")
+        let sleeperCountWait2 = await poll { clock.sleeperCount == 0 }
+        #expect(sleeperCountWait2, "the armed timer should have been cancelled")
     }
 
     @Test("a delivery that never works is dropped after the last attempt")
@@ -181,7 +183,8 @@ final class DeliveryEngineTests {
             return
         }
         #expect(attempt == 1)
-        #expect(await poll { clock.sleeperCount == 1 }, "the retry timer should be armed")
+        let sleeperCountWait = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait, "the retry timer should be armed")
 
         // Taken before the clock moves, awaited after: the retry is a suspension point here,
         // never a wait on real time.
@@ -203,7 +206,8 @@ final class DeliveryEngineTests {
         let engine = makeEngine(destinations: [.mock(destination)], store: try makeStore(), clock: clock)
 
         _ = await engine.send(entryID: "entry-1", to: destination.id)
-        #expect(await poll { clock.sleeperCount == 1 })
+        let sleeperCountWait = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait)
         let timer = await engine.timerTask(for: "entry-1", destinationID: destination.id)
         clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
         await timer?.value
@@ -235,7 +239,8 @@ final class DeliveryEngineTests {
 
         let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
 
-        #expect(await poll { clock.sleeperCount == 1 }, "the stored delivery should have armed a timer")
+        let sleeperCountWait = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait, "the stored delivery should have armed a timer")
         clock.advance(by: .seconds(60))
         #expect(clock.sleeperCount == 1, "a minute in, the timer is still waiting out the rest")
         #expect(await recorder.recorded().isEmpty)
@@ -350,7 +355,8 @@ final class DeliveryEngineTests {
         )
 
         _ = await engine.send(entryID: "entry-1", to: destination.id)
-        #expect(await poll { clock.sleeperCount == 1 })
+        let sleeperCountWait = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait)
         let first = await engine.timerTask(for: "entry-1", destinationID: destination.id)
         clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
         await first?.value
@@ -359,7 +365,8 @@ final class DeliveryEngineTests {
         #expect(queued.attempt == 2)
         #expect(await engine.recentLog().last?.event == .queued)
 
-        #expect(await poll { clock.sleeperCount == 1 })
+        let sleeperCountWait2 = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait2)
         let second = await engine.timerTask(for: "entry-1", destinationID: destination.id)
         clock.advance(by: DeliveryEngine.delay(forAttempt: 2))
         await second?.value
@@ -383,7 +390,8 @@ final class DeliveryEngineTests {
         )
 
         _ = await engine.send(entryID: "entry-1", to: destination.id)
-        #expect(await poll { clock.sleeperCount == 1 })
+        let sleeperCountWait = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait)
         let retry = await engine.timerTask(for: "entry-1", destinationID: destination.id)
         clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
         await retry?.value
@@ -429,12 +437,14 @@ final class DeliveryEngineTests {
             clock: clock
         )
         _ = await engine.send(entryID: "entry-1", to: destination.id)
-        #expect(await poll { clock.sleeperCount == 1 })
+        let sleeperCountWait = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait)
         let retry = await engine.timerTask(for: "entry-1", destinationID: destination.id)
 
         await gate.arm()
         let cancelling = Task { await engine.cancel(entryID: "entry-1") }
-        #expect(await poll { await gate.isHolding })
+        let gateWait = await poll { await gate.isHolding }
+        #expect(gateWait)
         clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
         await retry?.value
         await gate.release()
@@ -511,7 +521,8 @@ final class DeliveryEngineTests {
 
         let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: TestClock())
 
-        #expect(await poll { await engine.pending().isEmpty }, "the stored delivery should have run")
+        let engineWait = await poll { await engine.pending().isEmpty }
+        #expect(engineWait, "the stored delivery should have run")
         #expect(await recorder.recorded().map(\.entryID) == ["entry-1"])
         #expect(store.loadQueue().isEmpty)
     }
@@ -542,7 +553,8 @@ final class DeliveryEngineTests {
             Issue.record("expected the send to wait for its destination, got \(outcome)")
             return
         }
-        #expect(await poll { clock.sleeperCount == 1 })
+        let sleeperCountWait = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait)
         let timer = await engine.timerTask(for: "entry-1", destinationID: destination.id)
         clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
         await timer?.value
@@ -569,7 +581,8 @@ final class DeliveryEngineTests {
         ])
         let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
 
-        #expect(await poll { await engine.pending().isEmpty })
+        let engineWait = await poll { await engine.pending().isEmpty }
+        #expect(engineWait)
         #expect(await engine.recentLog().last?.event == .dropped)
     }
 
@@ -603,7 +616,8 @@ final class DeliveryEngineTests {
             payload: { try await payloads.build($0) }
         )
 
-        #expect(await poll { await engine.pending().first { $0.entryID == "entry-1" }?.unreachableChecks == 1 })
+        let engineWait = await poll { await engine.pending().first { $0.entryID == "entry-1" }?.unreachableChecks == 1 }
+        #expect(engineWait)
 
         let pending = await engine.pending()
         #expect(pending.first { $0.entryID == "entry-2" }?.unreachableChecks == 1, "the other due delivery moved with it")
@@ -624,8 +638,10 @@ final class DeliveryEngineTests {
 
         let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
 
-        #expect(await poll { await recorder.recorded().count == 1 })
-        #expect(await poll { clock.sleeperCount == 2 }, "the other two wait their turn")
+        let recorderWait = await poll { await recorder.recorded().count == 1 }
+        #expect(recorderWait)
+        let sleeperCountWait = await poll { clock.sleeperCount == 2 }
+        #expect(sleeperCountWait, "the other two wait their turn")
         #expect(await recorder.recorded().map(\.entryID) == ["entry-1"])
 
         let second = await engine.timerTask(for: "entry-2", destinationID: destination.id)
@@ -633,7 +649,8 @@ final class DeliveryEngineTests {
         await second?.value
         #expect(await recorder.recorded().map(\.entryID) == ["entry-1", "entry-2"])
 
-        #expect(await poll { clock.sleeperCount == 1 })
+        let sleeperCountWait2 = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait2)
         let third = await engine.timerTask(for: "entry-3", destinationID: destination.id)
         clock.advance(by: DeliveryEngine.catchUpSpacing)
         await third?.value
@@ -647,7 +664,8 @@ final class DeliveryEngineTests {
         let destination = await mock(failuresBeforeSuccess: 1, recorder: recorder)
         let engine = makeEngine(destinations: [.mock(destination)], store: try makeStore(), clock: clock)
         _ = await engine.send(entryID: "entry-1", to: destination.id)
-        #expect(await poll { clock.sleeperCount == 1 })
+        let sleeperCountWait = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait)
         let armed = await engine.timerTask(for: "entry-1", destinationID: destination.id)
 
         await engine.resumeQueue()
@@ -672,8 +690,10 @@ final class DeliveryEngineTests {
         await recorder.setReachable(true, for: destination.id)
         await engine.retryNow(destinationID: destination.id)
 
-        #expect(await poll { await recorder.recorded().count == 1 })
-        #expect(await poll { clock.sleeperCount == 1 }, "the second waits its turn")
+        let recorderWait = await poll { await recorder.recorded().count == 1 }
+        #expect(recorderWait)
+        let sleeperCountWait = await poll { clock.sleeperCount == 1 }
+        #expect(sleeperCountWait, "the second waits its turn")
         let second = await engine.timerTask(for: "entry-2", destinationID: destination.id)
         clock.advance(by: DeliveryEngine.catchUpSpacing)
         await second?.value
@@ -695,11 +715,13 @@ final class DeliveryEngineTests {
             ),
         ])
         let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
-        #expect(await poll { clock.sleeperCount == 2 })
+        let sleeperCountWait = await poll { clock.sleeperCount == 2 }
+        #expect(sleeperCountWait)
 
         await engine.retryNow(destinationID: destination.id)
 
-        #expect(await poll { await recorder.recorded().count == 1 })
+        let recorderWait = await poll { await recorder.recorded().count == 1 }
+        #expect(recorderWait)
         #expect(await recorder.recorded().map(\.entryID) == ["was-away"])
         let left = try #require(await engine.pending().first)
         #expect(left.entryID == "write-failed")

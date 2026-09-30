@@ -143,7 +143,8 @@ struct StreamingTakeEndingTests {
         let session = StreamingTranscriptionSession()
         let loader = SuspendingLoader()
         let starting = Task { try await session.loadingModel { await loader.load() } }
-        #expect(await eventually { await loader.isLoading })
+        let loaderWait = await eventually { await loader.isLoading }
+        #expect(loaderWait)
 
         await session.stop()
         await loader.finish()
@@ -156,7 +157,8 @@ struct StreamingTakeEndingTests {
         let session = StreamingTranscriptionSession()
         let loader = SuspendingLoader()
         let starting = Task { try await session.loadingModel { await loader.load() } }
-        #expect(await eventually { await loader.isLoading })
+        let loaderWait = await eventually { await loader.isLoading }
+        #expect(loaderWait)
 
         await session.cancel()
         await loader.finish()
@@ -170,7 +172,8 @@ struct StreamingTakeEndingTests {
         await session.stop()
         let loader = SuspendingLoader()
         let starting = Task { try await session.loadingModel { await loader.load() } }
-        #expect(await eventually { await loader.isLoading })
+        let loaderWait = await eventually { await loader.isLoading }
+        #expect(loaderWait)
 
         await loader.finish()
 
@@ -202,7 +205,8 @@ struct StreamingTakeEndingTests {
         let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
         let harness = TakeHarness()
         let events = await launchTake(on: session, persister: persister, harness: harness)
-        #expect(await eventually { harness.installed })
+        let installedWait = await eventually { harness.installed }
+        #expect(installedWait)
         harness.push([Float](repeating: 0.5, count: 8_000))
         let audio = persister.url
 
@@ -224,7 +228,8 @@ struct StreamingTakeEndingTests {
         let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
         let harness = TakeHarness()
         let events = await launchTake(on: session, persister: persister, harness: harness, useVAD: true)
-        #expect(await eventually { harness.installed })
+        let installedWait = await eventually { harness.installed }
+        #expect(installedWait)
         var iterator = events.makeAsyncIterator()
 
         let first = await iterator.next()
@@ -249,7 +254,8 @@ struct StreamingTakeEndingTests {
         let persister = try #require(StreamingAudioPersister(sampleRate: 16_000, failingAfter: 1))
         let harness = TakeHarness()
         let events = await launchTake(on: session, persister: persister, harness: harness)
-        #expect(await eventually { harness.installed })
+        let installedWait = await eventually { harness.installed }
+        #expect(installedWait)
         harness.push([Float](repeating: 0.5, count: 8_000))
         harness.push([Float](repeating: 0.5, count: 8_000))
         let audio = persister.url
@@ -272,7 +278,8 @@ struct StreamingTakeEndingTests {
         let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
         let harness = TakeHarness()
         let events = await launchTake(on: session, persister: persister, harness: harness)
-        #expect(await eventually { harness.installed })
+        let installedWait = await eventually { harness.installed }
+        #expect(installedWait)
         harness.push([Float](repeating: 0.5, count: 8_000))
         let audio = persister.url
         defer { try? FileManager.default.removeItem(at: audio) }
@@ -295,7 +302,8 @@ struct StreamingTakeEndingTests {
         let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
         let harness = TakeHarness()
         let events = await launchTake(on: session, persister: persister, harness: harness)
-        #expect(await eventually { harness.installed })
+        let installedWait = await eventually { harness.installed }
+        #expect(installedWait)
         harness.push([Float](repeating: 0.5, count: 16_000))
         await session.setPaused(true)
         harness.push([Float](repeating: 0.5, count: 16_000))
