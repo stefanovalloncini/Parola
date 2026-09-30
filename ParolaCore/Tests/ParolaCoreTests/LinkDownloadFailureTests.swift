@@ -254,8 +254,11 @@ struct YtDlpProcessTests {
     func readsInstalledVersion() async throws {
         let fake = try script(#"[ "$1" = "--version" ] && echo 2026.03.17"#)
         defer { try? FileManager.default.removeItem(at: fake) }
+        let clock = TestClock()
 
-        #expect(await YtDlpVersion.installed(at: fake.path)?.text == "2026.03.17")
+        let check = GuardedTask { await YtDlpVersion.installed(at: fake.path, clock: clock) }
+        let version = try await check.value("the version check to finish") ?? nil
+        #expect(version?.text == "2026.03.17")
     }
 
     @Test("a yt-dlp that fails or can't run has no version")
@@ -271,14 +274,19 @@ struct YtDlpProcessTests {
     func failureAsksForTheVersion() async throws {
         let fake = try script("echo 2026.03.17")
         defer { try? FileManager.default.removeItem(at: fake) }
+        let clock = TestClock()
 
-        let failure = await YouTubeProcess.failure(
-            exitStatus: 1,
-            stderr: "ERROR: [youtube] 9XUo28kxQt4: Requested format is not available",
-            stdout: "",
-            ytDlpPath: fake.path,
-            site: "YouTube"
-        )
+        let reading = GuardedTask {
+            await YouTubeProcess.failure(
+                exitStatus: 1,
+                stderr: "ERROR: [youtube] 9XUo28kxQt4: Requested format is not available",
+                stdout: "",
+                ytDlpPath: fake.path,
+                site: "YouTube",
+                clock: clock
+            )
+        }
+        let failure = try #require(try await reading.value("the failure to be read with its version"))
 
         #expect(failure.reason == .refused(httpStatus: nil))
         #expect(failure.ytDlpVersion?.text == "2026.03.17")
