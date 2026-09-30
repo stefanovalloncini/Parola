@@ -4149,6 +4149,7 @@ final class AppModel {
 
     /// A take's prepare and transcription run as the file run, and as take work, so a quit stops them and waits for the save they leave.
     func startTakeTask(_ body: @escaping @MainActor () async -> Void) {
+        if fileTranscribeTask != nil { retireCurrentFileRun() }
         stopTakeRunForNewWork()
         fileTranscribeTask?.cancel()
         let task = Task { @MainActor [weak self] in

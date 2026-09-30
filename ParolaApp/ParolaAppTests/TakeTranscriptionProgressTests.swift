@@ -269,6 +269,43 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a file run a take's run replaced can't stop that take when its own read times out")
+        func replacedFileRunLeavesTheTakeAlone() async throws {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("parola-take-fifo-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let wedged = dir.appendingPathComponent("wedged.m4a")
+            #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
+            let audio = try makeTakeWAV("take-after-wedged", seconds: 2)
+            defer {
+                FIFOFixture.release(wedged)
+                try? FileManager.default.removeItem(at: dir)
+                try? FileManager.default.removeItem(at: audio)
+            }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "never reached")])
+                let model = AppModel(bootstrap: AppBootstrap(
+                    mode: .test, library: makeTempLibraryURL("take-fifo"), defaultsOverride: temporaryDefaults(),
+                    sideEffects: [], filePicker: TestFilePicker(), clock: ContinuousClock(), fileReadDeadline: .milliseconds(300)
+                ))
+                model.cardMetadataOperation = { _ in nil }
+                model.useStreaming = false
+                model.selectedModel = Self.pinnedModel
+                model.beginFileTranscription(fileURL: wedged, translateOverride: nil)
+                await settle(for: .milliseconds(100))
+                model.startTakeTask {
+                    await model.transcribeRecordedTake(url: audio, title: "Retried take", source: .microphone)
+                }
+                await settle(for: .milliseconds(900))
+
+                #expect(model.phase == .transcribing(file: audio), "the replaced file's timeout leaves the take's run on")
+                #expect(model.fileTranscribeTask != nil)
+                model.stopTranscribingTake()
+                FIFOFixture.release(wedged)
+                let saved = await waitUntil(timeoutMs: 10_000) { !model.hasPendingTakeWork }
+                #expect(saved)
+            }
+        }
+
         @Test("new work stops a take's transcription, takes its pane down at once and keeps the take untranscribed")
         func newWorkTakesThePaneDown() async throws {
             let audio = try makeTakeWAV("take-new-work", seconds: 3)
