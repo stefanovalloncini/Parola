@@ -184,6 +184,25 @@ struct LibraryListLayoutTests {
         #expect(Set(table.selectedRowIndexes) == [1, 2, 3])
     }
 
+    @Test("a failure's banner opens up the list's first row, and the row closes again once it clears")
+    func failureBannerGrowsTheTopRow() async throws {
+        let hosted = await host(entries(3), groupsByDate: false)
+        defer { close(hosted) }
+        _ = await settled(hosted)
+        // Looked up each time: a phase change may hand the page a table of its own.
+        func topRow() -> CGFloat { table(hosted)?.rect(ofRow: 0).height ?? 0 }
+        let calm = topRow()
+        #expect(calm > 100)
+
+        hosted.model.phase = .failed(message: "The file couldn't be decoded.")
+        let grew = await settled(hosted) { topRow() > calm + 20 }
+        #expect(grew, "row 0 stayed \(topRow()) pt")
+
+        hosted.model.phase = .idle
+        let shrank = await settled(hosted) { topRow() == calm }
+        #expect(shrank, "row 0 stayed \(topRow()) pt")
+    }
+
     @Test("titles and entries run as one list, and a group with no title adds no row")
     func itemsRunInOneList() {
         let now = Date()
