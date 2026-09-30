@@ -34,6 +34,34 @@ struct FixtureAudioSourceTests {
         #expect(source.levelMeter.level == 0)
     }
 
+    @Test("pausing a fixture stops its level meter, and resuming starts it again")
+    func setPausedStopsAndResumesPacing() async throws {
+        let url = try writeWav(duration: 2.0, amplitude: 0.3)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let source = FixtureAudioSource.make(fixtureURL: url, clock: ContinuousClock())
+        try await source.start()
+        let firstDeadline = ContinuousClock.now + .seconds(5)
+        while source.levelMeter.lastSound == nil, ContinuousClock.now < firstDeadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(source.levelMeter.lastSound != nil)
+
+        await source.setPaused(true)
+        source.levelMeter.reset()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(source.levelMeter.lastSound == nil, "a paused fixture should not feed the meter")
+
+        await source.setPaused(false)
+        let resumedDeadline = ContinuousClock.now + .seconds(5)
+        while source.levelMeter.lastSound == nil, ContinuousClock.now < resumedDeadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(source.levelMeter.lastSound != nil, "resuming should feed the meter again")
+
+        await source.cancel()
+    }
+
     @Test("start() throws audioLoadFailed when the fixture is missing")
     func startThrowsWhenMissing() async {
         let missing = URL(fileURLWithPath: "/tmp/parola-fixture-\(UUID().uuidString).wav")

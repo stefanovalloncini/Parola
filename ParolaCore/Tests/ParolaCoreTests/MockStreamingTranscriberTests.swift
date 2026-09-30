@@ -148,6 +148,14 @@ struct MockStreamingTranscriberTests {
         await #expect(throws: CancellationError.self) { _ = try await starting.value }
     }
 
+    @Test("setPaused records each call, in order")
+    func setPausedRecordsCalls() async {
+        let mock = MockStreamingTranscriber(response: MockTranscriberResponse(), clock: ContinuousClock())
+        await mock.setPaused(true)
+        await mock.setPaused(false)
+        #expect(await mock.pauseCalls == [true, false])
+    }
+
     @Test("a failure with canned segments confirms them before failing")
     func failureAfterSegmentsConfirmsFirst() async throws {
         let response = MockTranscriberResponse(
