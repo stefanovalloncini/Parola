@@ -183,8 +183,7 @@ extension TranscriberMockSuites {
         }
 
         private func isRecording(_ model: AppModel) -> Bool {
-            if case .recording = model.phase { return true }
-            return false
+            model.activeTake?.captureRequested == true && model.takeIsRunning
         }
 
         @Test("a positive max-minutes auto-stops the recording on its own")
@@ -207,7 +206,7 @@ extension TranscriberMockSuites {
                 model.startRecording(source: .microphone)
 
                 let stopped = await waitUntil {
-                    if case .failed = model.phase { return true }
+                    if case .failed = model.recording?.state { return true }
                     return false
                 }
                 #expect(stopped)
@@ -255,8 +254,7 @@ extension TranscriberMockSuites {
         }
 
         private func isRecording(_ model: AppModel) -> Bool {
-            if case .recording = model.phase { return true }
-            return false
+            model.activeTake?.captureRequested == true && model.takeIsRunning
         }
 
         @Test("a stop that lands while the capture is still starting discards the take")
@@ -389,7 +387,7 @@ extension TranscriberMockSuites {
         private func waitUntilRecording(_ model: AppModel, timeoutMs: Int = 3000) async -> Bool {
             var elapsed = 0
             while elapsed < timeoutMs {
-                if case .recording = model.phase { return true }
+                if model.activeTake?.captureRequested == true { return true }
                 try? await Task.sleep(for: .milliseconds(15))
                 elapsed += 15
             }

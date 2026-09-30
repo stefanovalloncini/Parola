@@ -315,14 +315,14 @@ extension TranscriberMockSuites {
                 try await Task.sleep(for: .milliseconds(500))
                 #expect(model.addTakeMarker() != nil)
                 model.stopRecordingAndTranscribe()
-                let failed = await waitUntil { model.canRetryFailedTranscription && !model.hasPendingTakeWork }
+                let failed = await waitUntil { model.recording?.failure != nil && !model.hasPendingTakeWork }
                 #expect(failed)
                 let saved = try #require(await landedEntry(model))
                 #expect(saved.favoriteSegments.isEmpty)
 
                 await installMockTranscriber(segments: [(0, 0.2, "Hi"), (0.2, 9, "The launch is on the 14th")])
                 await model.unloadTranscriptionSession()
-                model.retryFailedTranscription()
+                model.retryFailedTake()
                 let favoured = await waitUntil { model.libraryEntry(id: saved.id)?.favoriteSegments == [1] }
                 #expect(favoured)
                 #expect(await model.library.list().count == 1, "Retry lands in the entry the failure saved")

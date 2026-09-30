@@ -38,7 +38,8 @@ extension AppModel {
         if forced || openEntriesInNewWindow {
             return openEntryWindow(id)
         }
-        return loadEntry(id)
+        loadEntry(id)
+        return true
     }
 
     func entryWindowSession(for id: LibraryEntry.ID) -> EntryWindowSession {

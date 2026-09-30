@@ -65,7 +65,8 @@ struct DropRoutingTests {
         model.transcribeNow(urls: [Self.media("arrival.wav")])
 
         #expect(model.deferredArrivals.map(\.lastPathComponent) == ["arrival.wav"])
-        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.recording?.isCapturing == true)
+        #expect(model.route == .recording)
     }
 
     @Test("the Transcribe Now half joins a running batch instead of racing it")
@@ -102,7 +103,8 @@ struct DropRoutingTests {
 
         #expect(model.batchJobs.isEmpty)
         #expect(model.deferredArrivals.count == 2)
-        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.recording?.isCapturing == true)
+        #expect(model.route == .recording)
     }
 
     @Test("a dropped folder of mkv files reaches the queue")
@@ -140,7 +142,9 @@ struct DropRoutingTests {
 
         model.transcribeNow(urls: [Self.link])
 
-        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.recording?.isCapturing == true)
+
+        #expect(model.route == .recording)
         #expect(model.deferredLinks == [.transcribe(Self.link.absoluteString)])
         #expect(model.transcribeTaskRunning == false)
 
@@ -160,7 +164,9 @@ struct DropRoutingTests {
 
         model.transcribeYouTube(urlString: Self.link.absoluteString)
 
-        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.recording?.isCapturing == true)
+
+        #expect(model.route == .recording)
         #expect(model.deferredLinks == [.transcribe(Self.link.absoluteString)])
         #expect(model.transcribeTaskRunning == false)
     }
@@ -172,7 +178,9 @@ struct DropRoutingTests {
 
         model.fetchYouTubeSubs(urlString: Self.link.absoluteString)
 
-        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.recording?.isCapturing == true)
+
+        #expect(model.route == .recording)
         #expect(model.deferredLinks == [.subtitles(Self.link.absoluteString)])
         #expect(model.transcribeTaskRunning == false)
 
@@ -194,7 +202,8 @@ struct DropRoutingTests {
 
         #expect(model.deferredLinks == [.transcribe(Self.link.absoluteString)])
         #expect(model.batchJobs.isEmpty)
-        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.recording?.isCapturing == true)
+        #expect(model.route == .recording)
     }
 
     private static let secondLink = URL(string: "https://vimeo.com/76979871")!

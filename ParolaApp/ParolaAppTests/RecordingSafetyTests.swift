@@ -77,11 +77,11 @@ extension TranscriberMockSuites {
                 model.stopRecordingAndTranscribe()
 
                 let failed = await waitUntil {
-                    if case .failed(let message) = model.phase { return message.contains("saved to your library") }
+                    if case .failed(let message) = model.recording?.state { return message.contains("saved to your library") }
                     return false
                 }
                 #expect(failed)
-                #expect(model.failedTakeAudioURL == wav)
+                #expect(model.recording?.failure?.audioURL == wav)
 
                 let saved = await entries(model, count: 1)
                 #expect(saved.count == 1)
@@ -103,7 +103,7 @@ extension TranscriberMockSuites {
 
                 let ready = await waitUntil { model.phase == .ready && model.transcript?.text == "recovered text" }
                 #expect(ready)
-                #expect(model.failedTakeAudioURL == nil)
+                #expect(model.recording == nil, "Retry hands the take to its entry")
                 #expect(model.selectedEntryID == saved.first?.id, "Retry opens the take's entry")
                 let after = await model.library.list()
                 #expect(after.count == 1, "the entry is filled in, not joined by a twin")
@@ -145,7 +145,8 @@ extension TranscriberMockSuites {
                 segments: [], language: "en", modelName: "openai_whisper-tiny"
             )))
 
-            #expect(model.phase == .failed(message: AppModel.nothingRecordedMessage()))
+            #expect(model.recording?.state == .failed(message: AppModel.nothingRecordedMessage()))
+            #expect(model.phase == .idle)
             #expect(model.transcript == nil)
             try? await Task.sleep(for: .milliseconds(300))
             #expect(await model.library.list().isEmpty)
@@ -276,14 +277,14 @@ extension TranscriberMockSuites {
             model.startRecording(source: .microphone)
 
             let failed = await waitUntil {
-                if case .failed = model.phase { return true }
+                if case .failed = model.recording?.state { return true }
                 return false
             }
             #expect(failed)
             // The mock's stop() yields .finished after the failure; give it time to land wrongly.
             try? await Task.sleep(for: .milliseconds(300))
             let stillFailed: Bool
-            if case .failed = model.phase { stillFailed = true } else { stillFailed = false }
+            if case .failed = model.recording?.state { stillFailed = true } else { stillFailed = false }
             #expect(stillFailed)
             #expect(model.transcript == nil)
             let saved = await model.library.list()

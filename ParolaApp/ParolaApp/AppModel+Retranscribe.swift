@@ -37,6 +37,10 @@ extension AppModel {
     /// Runs the loaded entry's own audio again and replaces what the entry holds; the one entry point. A take's Retry lands as the take would have.
     func retranscribeCurrentEntry(model modelName: String, language: String?, landingAs kind: RunLanding.Kind = .rerun) {
         guard let entryID = selectedEntryID, canRetranscribeSelectedEntry, retranscribeRequest == nil else { return }
+        guard !takeIsRunning else {
+            noteRunWaitsForTake()
+            return
+        }
         // Always transcribe: translating to English would ignore the language the menu just picked.
         let options = makeOptions(task: .transcribe, model: modelName, language: language)
         retranscribeRequest = RetranscribeRequest(

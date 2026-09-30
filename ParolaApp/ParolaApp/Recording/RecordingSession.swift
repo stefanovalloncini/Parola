@@ -18,6 +18,19 @@ struct RecordingSession: Equatable, Sendable {
         case failed(message: String)
     }
 
+    /// What Retry needs of a take whose audio was saved but not transcribed.
+    struct Failure: Equatable, Sendable {
+        let audioURL: URL
+        /// The save that put the take in the library, so Retry fills in that entry instead of adding a twin.
+        let save: Task<LibraryEntry, any Error>?
+        /// The take's checkpoint, which a Retry from the working file retires once its own is on disk.
+        let recovery: Int?
+        let title: String
+        let category: EntryCategory
+        let source: EntrySource
+        let annotations: AppModel.TakeAnnotations
+    }
+
     private static let markerDedupeWindow: TimeInterval = 1
 
     let takeID: Int
@@ -31,6 +44,8 @@ struct RecordingSession: Equatable, Sendable {
     var device: String?
     var isStreaming: Bool
     var audioURL: URL?
+    /// Set with a failure that kept audio, for its Retry; it lasts as long as the session.
+    var failure: Failure?
     private(set) var state: State
     private(set) var startedAt: Date?
     private(set) var pausedTotal: TimeInterval
@@ -51,6 +66,7 @@ struct RecordingSession: Equatable, Sendable {
         self.device = nil
         self.isStreaming = isStreaming
         self.audioURL = nil
+        self.failure = nil
         self.state = .arming(arming)
         self.startedAt = nil
         self.pausedTotal = 0

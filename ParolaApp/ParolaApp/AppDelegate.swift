@@ -253,7 +253,7 @@ final class DockBadge {
     /// A burn shows its progress only while nothing in the window reports its own.
     nonisolated static func badge(for phase: AppModel.Phase, burnProgress: Double?) -> String? {
         switch phase {
-        case .idle, .ready, .failed, .recording:
+        case .idle, .ready, .failed:
             return burnProgress.map { "\(Int($0 * 100))%" }
         case .downloadingModel(_, let progress):
             return "\(Int(progress * 100))%"

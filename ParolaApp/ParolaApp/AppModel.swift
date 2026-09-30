@@ -21,7 +21,6 @@ final class AppModel {
         /// yt-dlp downloading a link's audio; nil progress while the site hasn't said how big it is.
         case fetchingLink(title: String?, progress: Double?)
         case transcribing(file: URL)
-        case recording(source: RecordSource)
         case ready
         case failed(message: String)
     }
@@ -124,6 +123,8 @@ final class AppModel {
         case queue
         case statistics
         case recentlyDeleted
+        /// The take's Stage, from Record until the take is in the library or gone; a failed one stays until dismissed.
+        case recording
     }
 
     var route: Route = .transcript {
@@ -219,6 +220,7 @@ final class AppModel {
             let countdown = Self.countIn(of: recording)
             if countdown != recordingCountdown { recordingCountdown = countdown }
             if oldValue?.isRunning == true, !takeIsRunning { foregroundLetGo() }
+            if route == .recording, !Self.stageHasSomethingToShow(recording) { route = .transcript }
         }
     }
     /// The take's levels at ten a second, for as long as its session lasts; `takeLevelTick` moves with each one.
@@ -435,6 +437,13 @@ final class AppModel {
     private(set) var recordingCountdown: Int?
     @ObservationIgnored private(set) var countdownTask: Task<Void, Never>?
 
+    /// A take that ended, or is in the library now, leaves nothing on its Stage.
+    private static func stageHasSomethingToShow(_ session: RecordingSession?) -> Bool {
+        guard let session else { return false }
+        if case .done = session.state { return false }
+        return true
+    }
+
     private static func countIn(of session: RecordingSession?) -> Int? {
         guard case .arming(.countIn(let remaining)) = session?.state else { return nil }
         return remaining
@@ -517,22 +526,14 @@ final class AppModel {
 
     /// Every phase change resets this, so only the transcription paths that opt back in get a named card.
     private(set) var failureKind: FailureKind = .other
-    /// A recorded take whose transcription failed; the file backs the error pane's Retry.
-    var failedTakeAudioURL: URL?
-    /// The save that put the failed take in the library, so Retry fills in that entry instead of adding a twin.
-    @ObservationIgnored var failedTakeSave: Task<LibraryEntry, any Error>?
-    /// The failed take's checkpoint, which a Retry from its working file retires once its own is on disk.
-    @ObservationIgnored var failedTakeRecovery: Int?
+    /// A take's run that failed with no session to show it, a recovered take's or a Retry's: the error card's Retry.
+    var failedTakeRetry: RecordingSession.Failure?
     /// The file a failed file transcription was reading; the error card retries and reveals it.
     var failedFileURL: URL?
     /// The translate setting the failed run used, so Retry repeats it rather than the current toggle.
     var failedTranslateOverride: Bool?
     var failedLink: DeferredLink?
     var failedLinkDownload: LinkDownloadFailure?
-    @ObservationIgnored var failedTakeTitle: String?
-    @ObservationIgnored var failedTakeCategory: EntryCategory?
-    @ObservationIgnored var failedTakeSource: EntrySource?
-    @ObservationIgnored var failedTakeAnnotations: TakeAnnotations?
     @ObservationIgnored var pendingDictationRestart: Task<Void, Never>?
     @ObservationIgnored var pendingDictationProcessorRebuild: Task<Void, Never>?
 
@@ -898,6 +899,7 @@ final class AppModel {
         guard features.isEnabled(.liveCaptions) else { return }
         guard let liveCaptions else { return }
         if !liveCaptions.isActive, let reason = liveCaptionsUnavailableReason {
+            guard !takeIsRunning else { return }
             switch phase {
             case .idle, .ready, .failed:
                 phase = .failed(message: reason)
@@ -1366,6 +1368,7 @@ final class AppModel {
             guard let self else { return }
             self.detectedMeetingAppName = appName
             // Never prompt over in-flight work: accepting would stomp a live recording.
+            guard !self.takeIsRunning else { return }
             switch self.phase {
             case .idle, .ready, .failed:
                 // A presented alert's title never updates, so keep the first prompt — accept
@@ -1807,7 +1810,7 @@ final class AppModel {
     }
 
     func cancelAllTasks() {
-        countdownTask?.cancel(); countdownTask = nil
+        cancelRecordingCountdown()
         batchTask?.cancel(); batchTask = nil
         matchesDebounce?.cancel(); matchesDebounce = nil
         silenceWatchTask?.cancel(); silenceWatchTask = nil
@@ -2364,6 +2367,7 @@ final class AppModel {
     func importSubtitle(fileURL: URL) {
         if takeIsRunning {
             deferredArrivals.append(fileURL)
+            noteRunWaitsForTake()
             return
         }
         if batchIsRunning {
@@ -2411,6 +2415,7 @@ final class AppModel {
         }
         if takeIsRunning {
             deferredArrivals.append(fileURL)
+            noteRunWaitsForTake()
             return
         }
         if fileURL.pathExtension == "parola" {
@@ -2857,9 +2862,9 @@ final class AppModel {
             return .rejected
         }
         guard let url = makeYouTubeURL(urlString) else { return .rejected }
-        // The download would take the phase, and the take's pane with it, off a take still recording.
         if linkArrivalsDeferred {
             deferredLinks.append(.transcribe(url.absoluteString))
+            if takeIsRunning { noteRunWaitsForTake() }
             return .parked
         }
 
@@ -2945,6 +2950,7 @@ final class AppModel {
         guard let url = makeYouTubeURL(urlString) else { return .rejected }
         if linkArrivalsDeferred {
             deferredLinks.append(.subtitles(url.absoluteString))
+            if takeIsRunning { noteRunWaitsForTake() }
             return .parked
         }
 
@@ -3170,6 +3176,7 @@ final class AppModel {
             arming: .countIn(remaining: seconds),
             titleDate: stamp
         ))
+        showStage()
         let clock = clock
         countdownTask = Task { @MainActor [weak self] in
             for value in stride(from: seconds, to: 0, by: -1) {
@@ -3192,7 +3199,7 @@ final class AppModel {
 
     /// A count-in refused before its take began ends there, with the reason.
     func failCountIn(_ message: String) {
-        if recordingCountdown != nil { updateSession(of: recording?.takeID) { $0.fail(message) } }
+        if recordingCountdown != nil { reportTakeFailure(message, take: recording?.takeID) }
         cancelRecordingCountdown()
     }
 
@@ -3241,7 +3248,7 @@ final class AppModel {
         )
         session.markCapturing(at: startedAt)
         beginSession(session)
-        phase = .recording(source: source)
+        showStage()
     }
 
     /// Test seam: the installed take ends the way a cancel ends one, leaving nothing behind.
@@ -3249,7 +3256,6 @@ final class AppModel {
         liveSource = nil
         activeTake = nil
         endSession(of: recording?.takeID)
-        phase = .idle
     }
     #endif
 
@@ -3264,6 +3270,44 @@ final class AppModel {
 
     /// A take from its count-in until its capture has wound down: arming, recording, paused or finishing.
     var takeIsRunning: Bool { recording?.isRunning ?? false }
+
+    /// The take's page; false, and nothing changes, without a take to show on it.
+    @discardableResult
+    func showStage() -> Bool {
+        guard Self.stageHasSomethingToShow(recording) else { return false }
+        route = .recording
+        return true
+    }
+
+    /// The Stage is where the user is looking: its route is up, in a window on screen. Test mode has no window to ask.
+    var stageIsVisible: Bool {
+        route == .recording && (mode == .test || mainWindow?.isVisible == true)
+    }
+
+    /// A take's failure shows on its Stage, and in a notice when the Stage isn't on screen; with no take to hold it, the page's banner says it.
+    private func reportTakeFailure(_ message: String, take takeID: Int?, retry: RecordingSession.Failure? = nil) {
+        guard let takeID else {
+            phase = .failed(message: message)
+            if let retry { armTakeRetry(retry) }
+            return
+        }
+        var failed = false
+        updateSession(of: takeID) { session in
+            session.fail(message)
+            guard case .failed = session.state else { return }
+            session.failure = retry
+            failed = true
+        }
+        guard failed, !stageIsVisible else { return }
+        exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure)
+    }
+
+    /// A run asked for while a take records waits for it, or is turned away; either way the user hears why.
+    func noteRunWaitsForTake() {
+        exportNotice = ExportNotice(
+            message: String(localized: "Finish the recording first."), failures: [], folder: nil, tone: .info
+        )
+    }
 
     /// True from the moment a take is requested until its capture is torn down; the guard in
     /// `startRecording` uses it so a second trigger (menu bar, intent, meeting banner) can't
@@ -3308,6 +3352,7 @@ final class AppModel {
             arming: .startingCapture,
             titleDate: stamp
         ))
+        showStage()
         if source == .microphone { nameTakeDevice(take) }
         pendingRecordingSource = source.entrySource
         let config = recordingMediaConfig(for: source)
@@ -3323,7 +3368,7 @@ final class AppModel {
             // Before anything is cancelled: a take refused for space leaves what was running alone.
             guard await passesPreRecordingDiskCheck(diskCheck) else {
                 if takeIsCurrent(take) { activeTake = nil }
-                updateSession(of: take.id) { $0.fail(Self.diskSpaceRefusalMessage()) }
+                reportTakeFailure(Self.diskSpaceRefusalMessage(), take: take.id)
                 resolveRecordingOutcome(.failure(IntentActionError.failed(Self.diskSpaceRefusalMessage())))
                 return
             }
@@ -3342,8 +3387,7 @@ final class AppModel {
                 ParolaLog.notice(.appPermissions, "microphone access request was denied")
                 activeTake = nil
                 let message = Self.microphoneAccessOffMessage()
-                updateSession(of: take.id) { $0.fail(message) }
-                phase = .failed(message: message)
+                reportTakeFailure(message, take: take.id)
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
                 return
             }
@@ -3365,7 +3409,6 @@ final class AppModel {
             do {
                 beginTakeArming(.startingCapture, take: take, streaming: false)
                 activeTake?.captureRequested = true
-                phase = .recording(source: source)
                 switch source {
                 case .microphone:
                     let mic = await makeTakeCapture(.microphone, take: take)
@@ -3401,8 +3444,7 @@ final class AppModel {
                 clearTakeReadouts(of: take.id)
                 activeTake = nil
                 let message = Self.recordingFailureMessage(for: error, source: source)
-                updateSession(of: take.id) { $0.fail(message) }
-                phase = .failed(message: message)
+                reportTakeFailure(message, take: take.id)
                 recordingStartInFlight = false
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             }
@@ -3443,7 +3485,6 @@ final class AppModel {
         await source.cancel()
         await mediaSession.exitRecording()
         guard takeIsCurrent(take) else { return false }
-        phase = .idle
         activeTake = nil
         recordingStartInFlight = false
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
@@ -3692,7 +3733,6 @@ final class AppModel {
         liveVoiceActive = false
         beginTakeArming(.preparingModel(name: modelName, download: nil), take: take, streaming: true)
         take.captureRequested = true
-        phase = .recording(source: .microphone)
         take.recovery = beginRecordingRecovery()
         take.recoveryStartedAt = recordingRecoveryStartedAt
         activeTake = take
@@ -3733,7 +3773,6 @@ final class AppModel {
             liveRecordingAudioURL = audio
             updateSession(of: take.id) { $0.audioURL = audio }
             writeRecordingCheckpoint()
-            phase = .recording(source: .microphone)
             for await event in events {
                 await handleStreamingEvent(event, take: take, session: s)
                 // Self-cancellation inside the .failed handler races the stream's buffer;
@@ -3744,9 +3783,8 @@ final class AppModel {
             // A cancelled load is not a failure, and the next take may already own the session this would tear down.
             guard !(error is CancellationError), !Task.isCancelled, takeIsCurrent(take) else { return }
             let message = Self.transcriptionFailureMessage(for: error)
-            updateSession(of: take.id) { $0.fail(message) }
-            teardownStreaming()
-            phase = .failed(message: message)
+            reportTakeFailure(message, take: take.id)
+            teardownStreaming(take)
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
         }
     }
@@ -3781,14 +3819,14 @@ final class AppModel {
 
     /// Stops and clears the live streaming session, its consumer, and the silence watch.
     /// Without this a failed stream left the audio engine and observers running.
-    private func teardownStreaming() {
+    private func teardownStreaming(_ take: TakeContext?) {
         streamingConsumer?.cancel()
         streamingConsumer = nil
         if let session = streamingSession {
             streamingSession = nil
             Task { await session.stop() }
         }
-        endLiveTake(nil)
+        endLiveTake(take)
     }
 
     /// Partials, segments and voice activity only arrive once the session captures, so the first marks the take's first audio.
@@ -3829,7 +3867,7 @@ final class AppModel {
         let confirmed = liveSegments
         let given = annotations(of: take?.id)
         updateSession(of: take?.id) { $0.fail(reason) }
-        teardownStreaming()
+        teardownStreaming(take)
         let audioURL = await session?.recordingAudioURL()
         var message = reason
         let takeCategory = take?.category ?? pendingRecordingCategory
@@ -3849,7 +3887,7 @@ final class AppModel {
                 title: Self.takeTitle(takeTitle, suffix: .interrupted),
                 source: takeSource,
                 category: takeCategory,
-                activate: false,
+                landingAs: .salvagedTake,
                 recovery: recovery,
                 take: take?.id,
                 annotations: given
@@ -3859,19 +3897,17 @@ final class AppModel {
             recoveryHeldByTake.remove(recovery)
             endRecovery(recovery)
         }
-        // A take started while this one was being kept owns the screen now; this one is in the library.
+        // A take started while this one was being kept has the Stage now; this one is in the library.
         guard activeTake == nil else { return }
         liveSegments = []
         livePartialText = ""
-        updateSession(of: take?.id) { $0.fail(message) }
-        phase = .failed(message: message)
-        // After the phase: its didSet forgets whatever the last failure left behind.
-        if savedPartial, let audioURL {
-            armTakeRetry(
-                url: audioURL, title: takeTitle, source: takeSource, category: takeCategory, save: saving, recovery: recovery,
+        let retry = audioURL.map {
+            Self.takeRetry(
+                url: $0, title: takeTitle, source: takeSource, category: takeCategory, save: saving, recovery: recovery,
                 annotations: given
             )
         }
+        reportTakeFailure(message, take: take?.id, retry: retry)
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
@@ -3901,7 +3937,7 @@ final class AppModel {
                     title: cutShort ? Self.takeTitle(title, suffix: .interrupted) : title,
                     source: takeSource,
                     category: takeCategory,
-                    activate: false,
+                    landingAs: .salvagedTake,
                     recovery: recovery,
                     take: take.id,
                     annotations: given
@@ -3918,33 +3954,37 @@ final class AppModel {
         guard hasContent else {
             let message = Self.nothingRecordedMessage(for: arming)
             if let recovery { recoveryHeldByTake.remove(recovery) }
-            updateSession(of: take?.id) { $0.fail(message) }
+            reportTakeFailure(message, take: take?.id)
             endLiveTake(take)
-            phase = .failed(message: message)
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             return
         }
-        let landing = Self.landingSignposter.beginInterval("install")
-        defer { Self.landingSignposter.endInterval("install", landing) }
         let title = given.title(for: takeCategory)
-        clearDerivedArtifacts()
-        selectedEntryID = nil
-        self.transcript = processed
-        phase = .ready
-        updateSession(of: take?.id) { $0.land(entryID: nil) }
-        if let audioURL = processed.sourceURL {
-            recordedTake = RecordedTake(file: audioURL, title: given.typedTitle ?? title)
-            sourceFileURL = audioURL
-            installPlayer(for: audioURL)
-            adoptLoadedMediaDuration()
+        // Watched on its Stage, the take opens as the transcript; from any other page it goes to the library with a toast.
+        let inPlace = take == nil || stageIsVisible
+        if inPlace {
+            let landing = Self.landingSignposter.beginInterval("install")
+            clearDerivedArtifacts()
+            selectedEntryID = nil
+            self.transcript = processed
+            phase = .ready
+            route = .transcript
+            if let audioURL = processed.sourceURL {
+                recordedTake = RecordedTake(file: audioURL, title: given.typedTitle ?? title)
+                sourceFileURL = audioURL
+                installPlayer(for: audioURL)
+                adoptLoadedMediaDuration()
+            }
+            Self.landingSignposter.endInterval("install", landing)
         }
+        updateSession(of: take?.id) { $0.land(entryID: nil) }
         saveTake(
             processed,
             audio: processed.sourceURL,
             title: cutShort ? Self.takeTitle(title, suffix: .interrupted) : title,
             source: takeSource,
             category: takeCategory,
-            activate: true,
+            landingAs: inPlace ? .recording : .backgroundTake,
             recovery: recovery,
             take: take?.id,
             annotations: given
@@ -4025,8 +4065,7 @@ final class AppModel {
                 if let recovery { endRecovery(recovery) }
                 liveRecordingAudioURL = nil
                 let message = Self.transcriptionFailureMessage(for: error)
-                updateSession(of: take?.id) { $0.fail(message) }
-                phase = .failed(message: message)
+                reportTakeFailure(message, take: take?.id)
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             }
         }
@@ -4075,16 +4114,16 @@ final class AppModel {
             title: Self.takeTitle(title, suffix: .interrupted),
             source: source,
             category: category,
-            activate: false,
+            landingAs: .salvagedTake,
             recovery: recovery,
             take: take,
             annotations: annotations
         )
-        phase = .failed(message: message)
-        armTakeRetry(
+        let retry = Self.takeRetry(
             url: cut.url, title: title, source: source, category: category, save: saving, recovery: recovery,
             annotations: annotations
         )
+        reportTakeFailure(message, take: take, retry: retry)
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
@@ -4107,7 +4146,7 @@ final class AppModel {
             Task { await s.stop() }
         }
         if let message {
-            updateSession(of: take?.id) { $0.fail(message) }
+            reportTakeFailure(message, take: take?.id)
         } else {
             endSession(of: take?.id)
         }
@@ -4116,10 +4155,8 @@ final class AppModel {
         stopRequestedDuringStart = false
         teardownActiveCapture()
         if let message {
-            phase = .failed(message: message)
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
         } else {
-            phase = .idle
             resolveRecordingOutcome(.failure(IntentActionError.cancelled))
         }
     }
@@ -4152,8 +4189,7 @@ final class AppModel {
         liveRecordingAudioURL = nil
         releaseTakeFile(file)
         let message = Self.nothingRecordedMessage()
-        updateSession(of: take) { $0.fail(message) }
-        phase = .failed(message: message)
+        reportTakeFailure(message, take: take)
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
@@ -4172,9 +4208,8 @@ final class AppModel {
         // Held by the run itself, so a Cancel's cleanup leaves it for the save that follows.
         recoveryHeldByTake.insert(recovery)
         recordedTake = RecordedTake(file: url, title: named)
-        sourceFileURL = url
-        installPlayer(for: url)
-        phase = .transcribing(file: url)
+        // Stopped from another page, a take transcribes out of sight; one with no session is a run like a file's.
+        if take == nil || stageIsVisible { phase = .transcribing(file: url) }
         updateSession(of: take) { $0.transcribing(progress: nil) }
         if let previous {
             await pendingRecoveryWrite?.value
@@ -4191,7 +4226,16 @@ final class AppModel {
             // A run stopped after its words were ready keeps them, out of the way of whatever stopped it.
             guard !Task.isCancelled else {
                 saveTake(
-                    processed, audio: url, title: title, source: source, category: category, activate: false,
+                    processed, audio: url, title: title, source: source, category: category, landingAs: .salvagedTake,
+                    recovery: recovery, take: take, annotations: annotations
+                )
+                resolveRecordingOutcome(.success(processed.text))
+                return
+            }
+            guard take == nil || stageIsVisible else {
+                handBackTakePane(url)
+                saveTake(
+                    processed, audio: url, title: title, source: source, category: category, landingAs: .backgroundTake,
                     recovery: recovery, take: take, annotations: annotations
                 )
                 resolveRecordingOutcome(.success(processed.text))
@@ -4205,8 +4249,9 @@ final class AppModel {
             transcript = processed
             adoptLoadedMediaDuration()
             phase = .ready
+            if route == .recording { route = .transcript }
             saveTake(
-                processed, audio: url, title: title, source: source, category: category, activate: true,
+                processed, audio: url, title: title, source: source, category: category, landingAs: .recording,
                 recovery: recovery, take: take, annotations: annotations
             )
             resolveRecordingOutcome(.success(processed.text))
@@ -4231,7 +4276,7 @@ final class AppModel {
             title: Self.takeTitle(title, suffix: stopped ? .notTranscribed : .transcriptionFailed),
             source: source,
             category: category,
-            activate: false,
+            landingAs: .salvagedTake,
             recovery: recovery,
             take: take,
             annotations: annotations
@@ -4254,41 +4299,46 @@ final class AppModel {
                 )
             }
         }
+        // Whatever stopped the run keeps the screen; only the take's own pane gives way.
+        handBackTakePane(url)
         if stopped {
-            // Whatever stopped the run keeps the screen; only the take's own pane gives way to the library.
-            if phase == .transcribing(file: url) { phase = .idle }
             resolveRecordingOutcome(.failure(IntentActionError.cancelled))
             return
         }
         let message = Self.transcriptionFailureMessage(for: error)
             + " " + String(localized: "The audio was saved to your library.")
-        updateSession(of: take) { $0.fail(message) }
-        // A take recording since then keeps the pane; the failed one waits in the library.
-        if takeIsRunning {
-            resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
-            return
+        // A take recording since then keeps the page; the failed one waits in the library.
+        if take != nil || !takeIsRunning {
+            let retry = Self.takeRetry(
+                url: url, title: title, source: source, category: category, save: saving, recovery: recovery,
+                annotations: annotations
+            )
+            reportTakeFailure(message, take: take, retry: retry)
         }
-        phase = .failed(message: message)
-        armTakeRetry(
-            url: url, title: title, source: source, category: category, save: saving, recovery: recovery,
-            annotations: annotations
-        )
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
-    /// After the phase is set: its didSet forgets whatever the last failure left behind.
-    private func armTakeRetry(
+    /// The transcribing pane a take's run put up comes down; anything that took the phase since keeps it.
+    private func handBackTakePane(_ file: URL?) {
+        guard let file, phase == .transcribing(file: file) else { return }
+        phase = transcript == nil ? .idle : .ready
+    }
+
+    /// What Retry needs of a take whose audio was saved untranscribed.
+    private static func takeRetry(
         url: URL, title: String, source: EntrySource, category: EntryCategory,
         save: Task<LibraryEntry, any Error>?, recovery: Int?, annotations: TakeAnnotations
-    ) {
+    ) -> RecordingSession.Failure {
+        RecordingSession.Failure(
+            audioURL: url, save: save, recovery: recovery, title: annotations.typedTitle ?? title,
+            category: category, source: source, annotations: annotations
+        )
+    }
+
+    /// After the phase is set: its didSet forgets whatever the last failure left behind.
+    private func armTakeRetry(_ retry: RecordingSession.Failure) {
         failureKind = .transcription
-        failedTakeAudioURL = url
-        failedTakeSave = save
-        failedTakeRecovery = recovery
-        failedTakeTitle = annotations.typedTitle ?? title
-        failedTakeCategory = category
-        failedTakeSource = source
-        failedTakeAnnotations = annotations
+        failedTakeRetry = retry
     }
 
     /// Stops a take's transcription. The take is saved to the library untranscribed, so the recording survives.
@@ -4296,7 +4346,7 @@ final class AppModel {
         guard let run = takeRun else { return }
         takeRunStoppedByStopTranscribing = run
         cancelAndTrack(&fileTranscribeTask)
-        phase = .idle
+        handBackTakePane(recordedTake?.file)
     }
 
     /// A take's library save: the checkpoint and working file stay until the entry exists, and a quit waits for it.
@@ -4307,7 +4357,7 @@ final class AppModel {
         title: String,
         source: EntrySource,
         category: EntryCategory,
-        activate: Bool,
+        landingAs kind: RunLanding.Kind,
         recovery: Int?,
         take: Int? = nil,
         annotations: TakeAnnotations = TakeAnnotations(),
@@ -4315,7 +4365,7 @@ final class AppModel {
     ) -> Task<LibraryEntry, any Error> {
         // A typed title is the user's: it replaces the generated one, and carries none of its notes.
         let saving = land(RunLanding(
-            kind: activate ? .recording : .salvagedTake,
+            kind: kind,
             transcript: transcript,
             audioSource: audio,
             source: source,
@@ -4616,7 +4666,6 @@ final class AppModel {
         } else {
             updateSession(of: take?.id) { $0.land(entryID: nil) }
         }
-        phase = .idle
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
         // Without a file the checkpoint stays, so the next launch offers what it points at.
         guard let url = prepared else { return }
@@ -4632,7 +4681,7 @@ final class AppModel {
             title: Self.takeTitle(title, suffix: cutShort ? .interrupted : .notTranscribed),
             source: takeSource,
             category: category,
-            activate: false,
+            landingAs: .salvagedTake,
             recovery: recovery,
             take: take?.id,
             annotations: given
@@ -4655,7 +4704,6 @@ final class AppModel {
         await mediaSession.exitRecording()
         // Whatever the capture left of its file goes too, so the launch sweep can't bring a discarded take back.
         if let audio { releaseTakeFile(audio) }
-        phase = .idle
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
     }
 
@@ -4666,29 +4714,27 @@ final class AppModel {
         if failedTranslateOverride != nil { failedTranslateOverride = nil }
         if failedLink != nil { failedLink = nil }
         if failedLinkDownload != nil { failedLinkDownload = nil }
-        if failedTakeAudioURL != nil { failedTakeAudioURL = nil }
-        failedTakeSave = nil
-        failedTakeRecovery = nil
-        failedTakeTitle = nil
-        failedTakeCategory = nil
-        failedTakeSource = nil
-        failedTakeAnnotations = nil
+        if failedTakeRetry != nil { failedTakeRetry = nil }
     }
 
     var canRetryFailedTranscription: Bool {
-        failureKind == .transcription && (failedTakeAudioURL != nil || failedFileURL != nil || failedLink != nil)
+        failureKind == .transcription && (failedTakeRetry != nil || failedFileURL != nil || failedLink != nil)
     }
 
     /// What the error card names: a recorded take by its title, an opened file by its file name.
     var failedSourceName: String? {
         guard failureKind == .transcription else { return nil }
-        if failedTakeAudioURL != nil { return failedTakeTitle }
+        if let failedTakeRetry { return failedTakeRetry.title }
         return failedFileURL?.lastPathComponent
     }
 
     func retryFailedTranscription() {
-        if failedTakeAudioURL != nil {
-            retryFailedTake()
+        guard !takeIsRunning else {
+            noteRunWaitsForTake()
+            return
+        }
+        if let failedTakeRetry {
+            retryTake(failedTakeRetry)
             return
         }
         if let link = failedLink {
@@ -4713,24 +4759,32 @@ final class AppModel {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
-    /// Re-runs a failed take's transcription in the entry its failure saved, so no twin appears; from its working file when that save never landed.
+    /// Retry on a failed take's Stage: the take hands over to the library, where its entry runs again.
     func retryFailedTake() {
-        guard let url = failedTakeAudioURL else { return }
-        let title = failedTakeTitle ?? Self.liveRecordingTitle(category: .transcription, endedAt: Date())
-        let source = failedTakeSource ?? .microphone
-        let category = failedTakeCategory ?? .transcription
-        let annotations = failedTakeAnnotations ?? TakeAnnotations()
-        let saving = failedTakeSave
-        let recovery = failedTakeRecovery
+        guard let session = recording, let failure = session.failure else { return }
+        endSession(of: session.takeID)
+        retryTake(failure)
+    }
+
+    /// Dismiss on a failed take's Stage: what it kept is in the library, so the page goes back there.
+    func dismissTakeFailure() {
+        guard let session = recording, case .failed = session.state else { return }
+        endSession(of: session.takeID)
+    }
+
+    /// Re-runs a failed take's transcription in the entry its failure saved, so no twin appears; from its working file when that save never landed.
+    private func retryTake(_ failure: RecordingSession.Failure) {
+        let url = failure.audioURL
         Task { [weak self] in
-            if let entry = try? await saving?.value, let self, (try? await self.openEntry(entry.id)) != nil {
+            if let entry = try? await failure.save?.value, let self, (try? await self.openEntry(entry.id)) != nil {
                 self.retranscribeCurrentEntry(model: self.selectedModel, language: self.selectedLanguage, landingAs: .retriedTake)
                 self.releaseTakeFile(url)
                 return
             }
             self?.startTakeTask { [weak self] in
                 await self?.transcribeRecordedTake(
-                    url: url, title: title, source: source, category: category, replacing: recovery, annotations: annotations
+                    url: url, title: failure.title, source: failure.source, category: failure.category,
+                    replacing: failure.recovery, annotations: failure.annotations
                 )
             }
         }
@@ -4999,7 +5053,6 @@ extension AppModel.Phase: LogSafe {
         case .loadingModel: return "loadingModel"
         case .fetchingLink: return "fetchingLink"
         case .transcribing: return "transcribing"
-        case .recording: return "recording"
         case .ready: return "ready"
         case .failed: return "failed"
         }

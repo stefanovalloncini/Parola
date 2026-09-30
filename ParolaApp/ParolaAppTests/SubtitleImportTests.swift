@@ -144,7 +144,8 @@ struct SubtitleImportTests {
         model.importSubtitle(fileURL: url)
 
         #expect(model.deferredArrivals == [url])
-        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.recording?.isCapturing == true)
+        #expect(model.route == .recording)
         #expect(model.transcript == nil)
     }
 

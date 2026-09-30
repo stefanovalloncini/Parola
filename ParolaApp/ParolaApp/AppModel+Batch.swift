@@ -26,6 +26,7 @@ extension AppModel {
         // would let both flows write them and leave whichever finished last on screen.
         if takeIsRunning || transcribeTaskRunning {
             deferredArrivals.append(contentsOf: jobs.map(\.url))
+            if takeIsRunning { noteRunWaitsForTake() }
             return
         }
         batchJobs = jobs
@@ -39,10 +40,7 @@ extension AppModel {
         case .started(let id):
             guard !isCancelled(id) else { return }
             mutateBatchJob(id) { $0.status = .transcribing }
-            // A take owns the phase while it records; a job starting would take the take's pane away.
-            if !recordingActive {
-                phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
-            }
+            phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
         case .progress(let id, let fraction):
             guard !isCancelled(id) else { return }
             batchProgress.advance(id, to: fraction)
@@ -70,9 +68,7 @@ extension AppModel {
         case .cancelled(let id):
             mutateBatchJob(id) { $0.status = .cancelled }
         case .finished:
-            if !recordingActive {
-                phase = .ready
-            }
+            phase = .ready
             refreshLibraryOnceBatchAddsLand()
             // The pending wave ends in another .finished, and the batch lets go of the foreground there.
             let pending = batchJobs.filter { $0.status == .pending }
@@ -185,6 +181,7 @@ extension AppModel {
             startBatch(jobs: jobs)
         } else if takeIsRunning || transcribeTaskRunning {
             deferredArrivals.append(contentsOf: jobs.map(\.url))
+            if takeIsRunning { noteRunWaitsForTake() }
         } else {
             batchJobs.append(contentsOf: jobs)
             resumeBatch(pendingJobs: jobs)

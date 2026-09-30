@@ -57,19 +57,15 @@ extension AppModel {
         }
     }
 
-    /// Opening puts the phase to `.ready`, which would leave a running capture with nothing to stop it.
+    /// Opens the newest entry, whatever else is running: a take keeps recording on its own page.
     func openLatestFromIntent() async throws -> String {
-        try ensurePhaseAllowsOpening()
         guard let latest = await library.list().first else { throw IntentActionError.libraryEmpty }
-        try ensurePhaseAllowsOpening()
         return try await openEntryForIntent(latest.id)
     }
 
     private func openEntryForIntent(_ id: LibraryEntry.ID) async throws -> String {
         do {
             return try await openEntry(id).text
-        } catch let refusal as IntentActionError {
-            throw refusal
         } catch is CancellationError {
             throw IntentActionError.cancelled
         } catch {
@@ -111,20 +107,18 @@ extension AppModel {
 
     /// Checked again after every await: a drop or a recording can start while the file hashes.
     private func ensureIntentCanStartFileRun() throws {
-        try ensurePhaseAllowsOpening()
+        if takeIsRunning { throw IntentActionError.recordingInProgress }
         if batchIsRunning { throw IntentActionError.batchInProgress }
         if transcribeTaskRunning { throw IntentActionError.transcriptionInProgress }
     }
 
-    private func ensurePhaseAllowsOpening() throws {
-        if let refusal = entryOpenRefusal { throw refusal }
-    }
-
     func stopRecordingFromIntent() async throws -> String {
-        guard takeIsRunning, recordingCountdown == nil else { throw IntentActionError.notRecording }
+        guard takeIsRunning, recordingCountdown == nil, let take = recording?.takeID else { throw IntentActionError.notRecording }
         stopRecordingAndTranscribe()
-        // A take stopped before it captured anything ends on the spot, with the reason as its phase.
-        if case .failed(let message) = phase { throw IntentActionError.failed(message) }
+        // A take stopped before it captured anything ends on the spot, with the reason on its session.
+        if let session = recording, session.takeID == take, case .failed(let message) = session.state {
+            throw IntentActionError.failed(message)
+        }
         guard streamingConsumer != nil || fileTranscribeTask != nil || stopHeldForStartup else {
             throw IntentActionError.notRecording
         }

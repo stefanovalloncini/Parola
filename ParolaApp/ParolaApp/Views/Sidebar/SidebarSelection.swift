@@ -38,7 +38,7 @@ enum SidebarSelection {
         switch page.route {
         case .recentlyDeleted: return .recentlyDeleted
         case .queue: return .activity
-        case .batch, .statistics: return nil
+        case .batch, .statistics, .recording: return nil
         case .transcript:
             // A person picked in the header narrows the category; the person's own row means the whole library.
             if let category = page.libraryFilter { return .category(category) }

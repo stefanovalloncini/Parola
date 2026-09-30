@@ -1,14 +1,14 @@
 import SwiftUI
 
 extension AppModel.Route {
-    /// The page's search field and Edit ▸ Search both use this name; Statistics has nothing to search.
+    /// The page's search field and Edit ▸ Search both use this name; Statistics and the Stage have nothing to search.
     func searchTitle(bundle: Bundle = .main) -> String? {
         switch self {
         case .transcript: String(localized: "Search Library", bundle: bundle)
         case .queue: String(localized: "Search Queue", bundle: bundle)
         case .batch: String(localized: "Search Batch", bundle: bundle)
         case .recentlyDeleted: String(localized: "Search Recently Deleted", bundle: bundle)
-        case .statistics: nil
+        case .statistics, .recording: nil
         }
     }
 }

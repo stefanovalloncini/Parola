@@ -152,6 +152,10 @@ extension ParolaAutomationServer {
                     case .batch: ctx.model.openBatch()
                     case .statistics: ctx.model.openStatistics()
                     case .recentlyDeleted: ctx.model.openRecentlyDeleted()
+                    case .recording:
+                        guard ctx.model.showStage() else {
+                            throw AutomationError.precondition("there is no take to show")
+                        }
                     }
                     return .object(["route": .string(route.rawValue)])
                 }

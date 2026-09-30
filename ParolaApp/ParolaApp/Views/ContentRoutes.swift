@@ -54,6 +54,8 @@ struct ContentRoutes: View {
                 StatisticsView()
             case .recentlyDeleted:
                 MacRecentlyDeletedView()
+            case .recording:
+                StageRoute(library: libraryPage(browses: true), transcription: phaseContent)
             case .transcript:
                 transcriptPage
             }
@@ -84,6 +86,7 @@ struct ContentRoutes: View {
         case .queue: return .queue
         case .statistics: return .statistics
         case .recentlyDeleted: return .recentlyDeleted
+        case .recording: return .stage
         case .transcript:
             if !model.batchIsEmpty { return .batchDetail }
             return model.isBrowsingLibrary ? .library : .phase
@@ -96,6 +99,7 @@ struct ContentRoutes: View {
         case queue
         case statistics
         case recentlyDeleted
+        case stage
         case batchDetail
         case library
         case phase
@@ -142,8 +146,6 @@ struct ContentRoutes: View {
             ProgressPane(title: Self.fetchingTitle(title), progress: progress)
         case .transcribing(let file):
             LiveTranscribingPane(file: file)
-        case .recording(let source):
-            RecordingPane(source: source)
         case .ready:
             if model.transcript != nil {
                 TranscriptPane()
@@ -166,7 +168,6 @@ struct ContentRoutes: View {
         case .downloadingModel: 1
         case .loadingModel: 2
         case .transcribing: 3
-        case .recording: 4
         case .ready: 5
         case .failed: 6
         case .fetchingLink: 8
@@ -215,6 +216,31 @@ struct ContentRoutes: View {
         LibraryListView(category: model.libraryFilter, browses: browses, searchRanking: model.searchRanking)
     }
 
+}
+
+/// The take's page, read here rather than in `ContentRoutes`, which a title typed or a marker set would otherwise redraw whole.
+private struct StageRoute<Library: View, Transcription: View>: View {
+    @Environment(AppModel.self) private var model
+    let library: Library
+    /// What the phase shows while the take transcribes: its progress pane, or the library once Stop Transcribing lets go.
+    let transcription: Transcription
+
+    var body: some View {
+        if let take = model.recording {
+            switch take.state {
+            case .arming, .recording, .paused, .finishing:
+                RecordingPane(source: take.source)
+            case .transcribing:
+                transcription
+            case .failed(let message):
+                ErrorPane(message: message, take: take)
+            case .done:
+                library
+            }
+        } else {
+            library
+        }
+    }
 }
 
 /// Owns the route's only reads of the per-partial properties, which arrive several times a second.

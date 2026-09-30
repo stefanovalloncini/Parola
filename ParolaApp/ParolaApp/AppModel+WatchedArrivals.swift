@@ -49,7 +49,7 @@ struct UnsavedLanding {
     let install: Int?
 }
 
-/// What the toast says about a watched-folder file out of sight: running, landed or failed.
+/// What the toast says about a watched-folder file out of sight: running, landed or failed; or about a take saved out of sight.
 struct ArrivalNotice: Equatable, Identifiable {
     enum State: Equatable {
         case running
@@ -61,9 +61,16 @@ struct ArrivalNotice: Equatable, Identifiable {
         case unsaved(String)
     }
 
+    enum Origin: Equatable {
+        case watchedFolder
+        /// A take that finished while another page showed.
+        case take
+    }
+
     let id = UUID()
     let name: String
     let state: State
+    var origin: Origin = .watchedFolder
 
     var reason: String? {
         switch state {
@@ -80,9 +87,22 @@ struct ArrivalNotice: Equatable, Identifiable {
         }
     }
 
-    init(landed entry: LibraryEntry) {
+    init(landed entry: LibraryEntry, origin: Origin = .watchedFolder) {
         name = LibraryEntryDisplay.title(for: entry)
         state = .saved(entry.id)
+        self.origin = origin
+    }
+
+    /// A take only says it was saved; a watched file also says where it came from.
+    static func savedTitle(name: String, origin: Origin, bundle: Bundle = .main) -> String {
+        switch origin {
+        case .take: String(localized: "Saved \(name)", bundle: bundle)
+        case .watchedFolder: String(localized: "Transcribed \(name) from a watched folder", bundle: bundle)
+        }
+    }
+
+    func savedTitle(bundle: Bundle = .main) -> String {
+        Self.savedTitle(name: name, origin: origin, bundle: bundle)
     }
 
     init(failed url: URL, reason: String) {
@@ -231,9 +251,9 @@ extension AppModel {
         pumpWatchedLane()
     }
 
-    /// The whole library with nothing open, playing or asking: an arrival may run where the user can see it, as a file they opened would.
+    /// The whole library with nothing open, playing, recording or asking: an arrival may run where the user can see it, as a file they opened would.
     var arrivalMayTakeWindow: Bool {
-        guard route == .transcript, batchIsEmpty, isBrowsingWholeLibrary, transcript == nil, !isPlaying,
+        guard route == .transcript, batchIsEmpty, isBrowsingWholeLibrary, transcript == nil, !isPlaying, !takeIsRunning,
               entryWindows.openIDs.isEmpty, !introduction.isPresented, !sheetIsUp else { return false }
         switch phase {
         case .idle, .ready: return true

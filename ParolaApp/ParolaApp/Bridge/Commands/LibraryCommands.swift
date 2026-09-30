@@ -87,10 +87,6 @@ extension ParolaAutomationServer {
                 followsWith: ["waitForPhase"],
                 handler: { args, ctx in
                     let id = try args.string("id")
-                    // Checked here, not left to the model's refusal: a bridge caller gets the reason, not a beep.
-                    if !ctx.model.openEntriesInNewWindow, let refusal = ctx.model.entryOpenRefusal {
-                        throw AutomationError.precondition(refusal.localizedDescription)
-                    }
                     ctx.model.openEntryFromLibrary(id, inNewWindow: false)
                     return .object([
                         "loaded": .string(id),
@@ -115,10 +111,11 @@ extension ParolaAutomationServer {
                     guard let entry = ctx.model.libraryEntry(id: id) else {
                         throw AutomationError.invalidArgs(field: "entryID", reason: "no library entry with id \(id)")
                     }
+                    // A re-run is a transcription, which waits for a take like any other.
+                    if ctx.model.takeIsRunning {
+                        throw AutomationError.precondition(IntentActionError.recordingInProgress.localizedDescription)
+                    }
                     if ctx.model.selectedEntryID != id {
-                        if let refusal = ctx.model.entryOpenRefusal {
-                            throw AutomationError.precondition(refusal.localizedDescription)
-                        }
                         ctx.model.loadEntry(id)
                         var waitedMs = 0
                         while ctx.model.selectedEntryID != id, waitedMs < 4_000 {

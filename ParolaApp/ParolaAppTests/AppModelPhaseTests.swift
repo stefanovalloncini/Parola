@@ -29,12 +29,6 @@ struct AppModelPhaseTests {
         #expect(a != c)
     }
 
-    @Test("recording compares on source")
-    func recordingEquality() {
-        #expect(AppModel.Phase.recording(source: .microphone) == .recording(source: .microphone))
-        #expect(AppModel.Phase.recording(source: .microphone) != .recording(source: .systemAudio))
-    }
-
     @Test("failed compares on message")
     func failedEquality() {
         let a = AppModel.Phase.failed(message: "boom")
@@ -57,9 +51,9 @@ struct AppModelPhaseTests {
         #expect(AppModel.RecordSource.systemAudio.label == "System audio")
     }
 
-    @Test("Route enum covers transcript, batch, queue, Statistics and Recently Deleted")
+    @Test("Route enum covers transcript, batch, queue, Statistics, Recently Deleted and the take's Stage")
     func routeAllCases() {
         let raws = AppModel.Route.allCases.map(\.rawValue).sorted()
-        #expect(raws == ["batch", "queue", "recentlyDeleted", "statistics", "transcript"])
+        #expect(raws == ["batch", "queue", "recentlyDeleted", "recording", "statistics", "transcript"])
     }
 }

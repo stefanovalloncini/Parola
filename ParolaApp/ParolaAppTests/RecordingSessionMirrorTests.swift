@@ -290,7 +290,7 @@ extension TranscriberMockSuites {
                 let message = AppModel.nothingRecordedMessage()
                 let ended = await waitUntil { model.recording?.state == .failed(message: message) }
                 #expect(ended)
-                #expect(model.phase == .failed(message: message))
+                #expect(model.phase == .idle, "the take's failure shows on its Stage, not in the phase")
                 #expect(!FileManager.default.fileExists(atPath: empty.path), "an empty take's file goes")
                 await settle()
                 let saved = await model.library.list()
@@ -306,7 +306,7 @@ extension TranscriberMockSuites {
             let capture = StubCapture(file: audio, holdsStart: true)
             startStubTake(model, capture)
             let starting = await waitUntil {
-                model.takeArming == .startingCapture && model.phase == .recording(source: .microphone)
+                model.takeArming == .startingCapture && model.activeTake?.captureRequested == true
             }
             #expect(starting)
             #expect(model.liveSource == nil)
@@ -315,7 +315,7 @@ extension TranscriberMockSuites {
 
             let message = AppModel.nothingRecordedMessage()
             #expect(model.recording?.state == .failed(message: message))
-            #expect(model.phase == .failed(message: message))
+            #expect(model.phase == .idle)
             await capture.letGo()
             let settled = await waitUntil { !model.recordingActive }
             #expect(settled)
@@ -438,7 +438,8 @@ extension TranscriberMockSuites {
             let refusal = AppModel.diskSpaceRefusalMessage()
             let refused = await waitUntil { model.recording?.state == .failed(message: refusal) }
             #expect(refused)
-            #expect(model.phase == .failed(message: refusal))
+            #expect(model.phase == .idle)
+            #expect(model.route == .recording, "the refusal shows on the take's Stage")
         }
 
         @Test("a take cancelled while it records leaves no session")

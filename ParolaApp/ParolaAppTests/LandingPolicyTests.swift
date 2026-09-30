@@ -156,6 +156,10 @@ struct LandingPolicyTests {
                 selection: .none, sound: false, card: true, summary: .always,
                 export: .rules, autoSend: true, recents: false, announces: true
             ),
+            .backgroundTake: LandingPolicy(
+                selection: .none, sound: true, card: true, summary: .always,
+                export: .rules, autoSend: true, recents: false, announces: true
+            ),
         ]
         #expect(Set(expected.keys) == Set(RunLanding.Kind.allCases))
         for kind in RunLanding.Kind.allCases {
@@ -283,5 +287,11 @@ extension LandingPolicyTests {
             == "La trascrizione è ancora aperta, ma Parola non è riuscita a salvarla nella libreria. Disco pieno.")
         #expect(AppModel.landingFailureMessage(background, reason: "Disk full.")
             == "Memo.m4a was transcribed, but Parola couldn't save it to your library. Disk full.")
+        let take = RunLanding(
+            kind: .backgroundTake, transcript: transcript, audioSource: URL(fileURLWithPath: "/tmp/parola-mic-1.wav"),
+            title: "Recording 30 Sep 2026 at 13:39"
+        )
+        #expect(AppModel.landingFailureMessage(take, reason: "Disk full.")
+            == "Recording 30 Sep 2026 at 13:39 was transcribed, but Parola couldn't save it to your library. Disk full.")
     }
 }

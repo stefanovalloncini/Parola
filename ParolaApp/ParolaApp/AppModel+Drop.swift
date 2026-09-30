@@ -86,8 +86,14 @@ extension AppModel {
             route = .batch
             return
         }
+        // The take's Stage stays up; the files wait for it.
+        guard !takeIsRunning else {
+            deferredArrivals.append(contentsOf: files.media)
+            noteRunWaitsForTake()
+            return
+        }
         route = .transcript
-        guard !takeIsRunning, !transcribeTaskRunning else {
+        guard !transcribeTaskRunning else {
             deferredArrivals.append(contentsOf: files.media)
             return
         }

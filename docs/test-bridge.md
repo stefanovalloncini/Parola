@@ -53,7 +53,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_select_model` | **name** | Set selectedModel to a catalog id. |
 | `parola_app_set_language` | code | Two-letter language code, or empty string to auto-detect. |
 | `parola_app_set_theme` | **theme** | `light` / `dark` / `system`. |
-| `parola_app_set_route` | **route** | `transcript` / `batch` / `queue` / `statistics` / `recentlyDeleted`. Takes the page the way the app's own controls do: clears any search and the category filter. |
+| `parola_app_set_route` | **route** | `transcript` / `batch` / `queue` / `statistics` / `recentlyDeleted` / `recording`. Takes the page the way the app's own controls do: clears any search and the category filter. `recording` is the take's Stage and needs a take that hasn't landed yet (`getState.recording` set, its `state` not `done`); otherwise it is `PRECONDITION`. |
 | `openRecentlyDeleted` | — | Route the main window to the Recently Deleted page. Replies `{open, route}`. |
 | `closeRecentlyDeleted` | — | Leave that page for the Library page. Replies `{open, route}`. |
 | `goHome` | — | Show the Library page, the one the app opens on: clear the category and person filters and any search, and unload the transcript. Replies `{route}`. |
@@ -119,7 +119,10 @@ The five introduction commands and `getState.introduction` all reply `{visible, 
 `{state, elapsed, startedAt, paused, markers, title, category, source, isStreaming, device}`. `state` is one of `arming` /
 `recording` / `paused` / `finishing` / `transcribing` / `done` / `failed`; `elapsed` and `markers` are seconds of the take;
 `startedAt` is seconds since 1970, `null` until the first audio; `device` names the input a mic take listens on.
-`phase` reads `recording` whenever that take is arming, recording or paused.
+`phase` reads `recording` whenever that take is arming, recording or paused. A take never moves the phase otherwise: its
+failure shows on its Stage as `recording.state` `failed`, while `phase` stays on whatever the rest of the window shows.
+While a take runs, entries open as usual, and a file, link or batch handed over waits for the take (a link replies
+`parked: true`); `retranscribeEntry` is `PRECONDITION` until it ends.
 
 `getState.burn` is the subtitle burn running beside the phase, `{state, progress, output}` with `state` one of
 `running` / `finished` / `failed` (a failed one adds `message`), or `null` when there is none.

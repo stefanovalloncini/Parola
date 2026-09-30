@@ -60,7 +60,6 @@ extension AppModel {
                   let countdown, countdownTask == countdown else { return }
             let message = Self.diskSpaceRefusalMessage()
             failCountIn(message)
-            phase = .failed(message: message)
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
         }
     }
@@ -68,7 +67,6 @@ extension AppModel {
     func passesPreRecordingDiskCheck(_ check: Task<Int64?, Never>) async -> Bool {
         switch Self.diskSpaceVerdict(freeBytes: await check.value) {
         case .refuse:
-            phase = .failed(message: Self.diskSpaceRefusalMessage())
             return false
         case .warn:
             recordingDiskSpaceLow = true

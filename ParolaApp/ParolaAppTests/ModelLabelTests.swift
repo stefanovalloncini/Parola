@@ -341,14 +341,16 @@ struct DownloadCompletionPhaseTests {
 
     // The phases below are taken over mid-download, which no instant download can stage, so these
     // drive the completion step the task runs.
-    @Test("a take that took the phase over is left alone")
+    @Test("a take recording beside the download is left alone")
     func recordingSurvivesTheDownload() {
         let model = makeModel()
         model.installTestTake(source: .microphone)
 
         model.finishModelDownload()
 
-        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.recording?.isCapturing == true)
+        #expect(model.route == .recording)
+        #expect(model.phase == .idle)
     }
 
     @Test("a run that finished a beat before the download keeps its ready phase")
@@ -361,15 +363,16 @@ struct DownloadCompletionPhaseTests {
         #expect(model.phase == .ready)
     }
 
-    @Test("a progress tick arriving while a take owns the phase is dropped")
+    @Test("a progress tick arriving while nothing downloads is dropped, and a take is left alone")
     func progressTickLeavesARecordingAlone() async {
         let model = makeModel()
         let tick = model.makeDownloadProgressHandler(for: installed)
         model.installTestTake(source: .microphone)
 
         tick(0.5)
-        let moved = await waitUntil(timeoutMs: 300) { model.phase != .recording(source: .microphone) }
-        #expect(!moved)
+        await settle(for: .milliseconds(300))
+        #expect(model.phase == .idle)
+        #expect(model.recording?.isCapturing == true)
 
         model.phase = .downloadingModel(name: installed, progress: 0)
         tick(0.75)

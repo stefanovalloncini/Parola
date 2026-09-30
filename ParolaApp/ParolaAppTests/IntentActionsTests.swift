@@ -111,21 +111,21 @@ struct IntentActionsTests {
         #expect(try storedText(older) == "the older take")
     }
 
-    @Test("Open Last Transcript leaves a recording in charge of the phase", .timeLimit(.minutes(1)))
-    func openLatestRefusesDuringCapture() async throws {
+    @Test("Open Last Transcript opens the newest entry during a take, and the take keeps recording", .timeLimit(.minutes(1)))
+    func openLatestDuringATake() async throws {
         let model = makeModel()
-        _ = try await seedTwoEntries(in: model)
-
+        let (_, newest) = try await seedTwoEntries(in: model)
         model.installTestTake(source: .microphone)
-        await #expect(throws: IntentActionError.recordingInProgress) {
-            _ = try await model.openLatestFromIntent()
-        }
-        #expect(model.phase == .recording(source: .microphone))
-        #expect(model.selectedEntryID == nil)
+
+        let text = try await model.openLatestFromIntent()
+
+        #expect(text == "the newest take")
+        #expect(model.selectedEntryID == newest.id)
+        #expect(model.recording?.isCapturing == true)
     }
 
-    @Test("Summarize Last Transcript does nothing while a recording owns the phase", .timeLimit(.minutes(1)))
-    func summarizeLatestWaitsOutARecording() async throws {
+    @Test("Summarize Last Transcript opens and summarises the newest entry during a take", .timeLimit(.minutes(1)))
+    func summarizeLatestDuringATake() async throws {
         let model = AppModel(
             skipBootstrap: true,
             defaults: temporaryDefaults(),
@@ -133,15 +133,14 @@ struct IntentActionsTests {
             features: Set(ParolaFeature.allCases)
         )
         model.summariseOperation = { _, _ in Summary(text: "recap") }
-        _ = try await seedTwoEntries(in: model)
+        let (_, newest) = try await seedTwoEntries(in: model)
         model.installTestTake(source: .microphone)
 
         model.summarizeLatestEntry()
-        await settle()
 
-        #expect(model.phase == .recording(source: .microphone))
-        #expect(model.selectedEntryID == nil)
-        #expect(model.transcript == nil)
+        let summarized = await waitUntil { model.selectedEntryID == newest.id && model.transcript?.summary?.text == "recap" }
+        #expect(summarized)
+        #expect(model.recording?.isCapturing == true)
     }
 
     @Test("Open Last Transcript on an empty library says so")

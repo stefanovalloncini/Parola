@@ -588,7 +588,6 @@ final class ParolaAutomationServer {
         case .loadingModel: return "loadingModel"
         case .fetchingLink: return "fetchingLink"
         case .transcribing: return "transcribing"
-        case .recording: return "recording"
         case .ready: return "ready"
         case .failed: return "failed"
         }
@@ -622,8 +621,6 @@ final class ParolaAutomationServer {
                 "stage": progress.stage.map { .string(Self.stageName($0)) } ?? .null,
                 "hasPartialText": .bool(progress.hasPartialText),
             ])
-        case .recording(let source):
-            return .object(["source": .string(source.rawValue)])
         case .failed(let message):
             return .object(["message": .string(message)])
         }

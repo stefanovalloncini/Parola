@@ -41,7 +41,8 @@ extension TranscriberMockSuites {
 
             #expect(result == .object(["started": .bool(false), "parked": .bool(true)]))
             #expect(model.deferredLinks == [.transcribe(Self.link)])
-            #expect(model.phase == .recording(source: .microphone))
+            #expect(model.recording?.isCapturing == true)
+            #expect(model.route == .recording)
         }
 
         @Test("transcribeYouTube reports a run it really started")
@@ -71,7 +72,8 @@ extension TranscriberMockSuites {
 
             #expect(result == .object(["started": .bool(false), "parked": .bool(true)]))
             #expect(model.deferredLinks == [.subtitles(Self.link)])
-            #expect(model.phase == .recording(source: .microphone))
+            #expect(model.recording?.isCapturing == true)
+            #expect(model.route == .recording)
         }
 
         @Test("the bridge refuses both subtitle doors with YouTube off", arguments: [

@@ -121,7 +121,7 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("a recording's transcript lands with the recording's audio, not the entry opened meanwhile")
+        @Test("a take that finishes after the user opened another entry is saved with its own audio, and the entry keeps its own")
         func recordingPairsWithItsSource() async throws {
             let fixture = try makeSilentWAV(label: "take")
             defer { try? FileManager.default.removeItem(at: fixture) }
@@ -141,7 +141,7 @@ extension TranscriberMockSuites {
                 #expect(recording)
 
                 model.stopRecordingAndTranscribe()
-                let transcribing = await waitUntil { model.sourceFileURL == fixture }
+                let transcribing = await waitUntil { model.phase == .transcribing(file: fixture) }
                 #expect(transcribing)
 
                 let other = try await openOtherEntry(in: model)
@@ -149,19 +149,19 @@ extension TranscriberMockSuites {
                 try #require(model.transcript?.text.contains("own words") != true, "the take must still be transcribing")
 
                 await gate.open()
-                let finished = await waitUntil { model.phase == .ready && model.selectedEntryID != other.id }
-                #expect(finished, "the take never landed")
-                #expect(model.sourceFileURL != other.audio, "the take landed on the entry's audio instead of its own")
-                #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
-                // Once the library holds the take, it plays from its own entry's copy of the recording.
-                let playsItsOwnEntry = await waitUntil {
-                    guard let id = model.selectedEntryID, id != other.id, let entry = model.libraryEntry(id: id) else {
-                        return false
-                    }
-                    return model.sourceFileURL?.deletingLastPathComponent().lastPathComponent == entry.bundleURL.lastPathComponent
-                }
-                #expect(playsItsOwnEntry, "the take's transcript should play the take's own audio")
-                #expect(playerURL(model) == model.sourceFileURL, "the take's transcript would play the entry's audio")
+                let landed = await waitUntil { model.arrivalNotice?.origin == .take }
+                #expect(landed, "the take never landed")
+                #expect(model.selectedEntryID == other.id, "the take took the entry the user opened")
+                #expect(model.sourceFileURL == other.audio, "the entry lost its own audio to the take")
+                #expect(playerURL(model) == other.audio, "the entry would play the take's audio")
+                let saved = await model.library.list().filter { $0.id != other.id }
+                let take = try #require(saved.first)
+                let stored = try await model.library.load(take.id).document
+                #expect(stored.transcript.text.contains("own words"), mockWentMissing)
+                #expect(
+                    stored.audioURL?.deletingLastPathComponent().lastPathComponent == take.bundleURL.lastPathComponent,
+                    "the take keeps its own recording"
+                )
             }
         }
 

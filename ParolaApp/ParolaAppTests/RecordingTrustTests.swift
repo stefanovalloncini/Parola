@@ -167,7 +167,7 @@ extension TranscriberMockSuites {
             model.useStreaming = true
             model.selectedModel = "openai_whisper-tiny"
             model.startRecording(source: .microphone)
-            await waitUntil { model.phase == .recording(source: .microphone) }
+            await waitUntil { model.activeTake?.captureRequested == true }
         }
 
         // MARK: - Stopping a take's transcription
@@ -294,7 +294,7 @@ extension TranscriberMockSuites {
                 model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
                 model.stopRecordingAndTranscribe()
                 await waitUntil {
-                    if case .failed = model.phase { return !model.hasPendingTakeWork }
+                    if case .failed = model.recording?.state { return !model.hasPendingTakeWork }
                     return false
                 }
                 #expect(model.recoveryCheckpointFiles.count == 1, "the failed save left its checkpoint")
@@ -387,7 +387,7 @@ extension TranscriberMockSuites {
                 await waitUntil { if case .transcribing = model.phase { return true }; return false }
 
                 model.startRecording(source: .microphone)
-                await waitUntil { model.phase == .recording(source: .microphone) && model.liveSource != nil }
+                await waitUntil { model.recording?.isCapturing == true && model.liveSource != nil }
                 #expect(model.activeTake?.category == .transcription, "the new take carries its own category")
 
                 let first = try #require(await entries(model, count: 1).first)
@@ -398,7 +398,8 @@ extension TranscriberMockSuites {
                 #expect(notice.tone == .info)
                 #expect(notice.actions.map(\.title) == ["Open", "Transcribe"])
                 #expect(notice.actions.map(\.handler) == [.openEntry(first.id), .transcribeEntry(first.id)])
-                #expect(model.phase == .recording(source: .microphone), "the save never takes the new take's pane")
+                #expect(model.route == .recording, "the save never takes the new take's Stage")
+                #expect(model.recording?.isCapturing == true)
 
                 model.cancelCurrentWork()
             }
@@ -503,10 +504,10 @@ extension TranscriberMockSuites {
 
                 let expected = AppModel.nothingRecordedMessage(for: .preparingModel(name: "openai_whisper-tiny", download: nil))
                 #expect(expected == "Nothing was recorded — the model was still loading.")
-                #expect(model.phase == .failed(message: expected))
+                #expect(model.recording?.state == .failed(message: expected))
                 await waitUntil { !model.recordingActive }
                 await settle()
-                #expect(model.phase == .failed(message: expected), "the load finishing later must not replace the message")
+                #expect(model.recording?.state == .failed(message: expected), "the load finishing later must not replace the message")
                 #expect(await model.library.list().isEmpty)
             }
         }
@@ -568,7 +569,8 @@ extension TranscriberMockSuites {
                     language: "en", modelName: "mock"
                 )), take: ended)
 
-                #expect(model.phase == .recording(source: .microphone))
+                #expect(model.recording?.isCapturing == true)
+                #expect(model.route == .recording)
                 #expect(model.recordingStartedAt == startedAt)
                 #expect(model.livePartialText != "an older take")
                 #expect(model.takeInProgress)
@@ -728,10 +730,10 @@ extension TranscriberMockSuites {
             let kept = try #require(try await model.library.load(saved.id).document.audioURL)
             #expect(try AVAudioFile(forReading: kept).length > 0, "its header counts the audio that landed")
             await waitUntil {
-                if case .failed(let message) = model.phase { return message.contains("saved to your library") }
+                if case .failed(let message) = model.recording?.state { return message.contains("saved to your library") }
                 return false
             }
-            #expect(model.failedTakeAudioURL == wav, "Retry transcribes what was kept")
+            #expect(model.recording?.failure?.audioURL == wav, "Retry transcribes what was kept")
         }
 
         @Test("a live take cut short by a write failure gets its header rewritten before it is saved")
@@ -825,16 +827,22 @@ extension TranscriberMockSuites {
             defer { try? FileManager.default.removeItem(at: wav) }
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "unsaved")],
-                    gate: MockTranscriberGate()
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "unsaved")]
                 ))
                 let model = makeModel()
-                await transcribingTake(model, wav: wav)
+                let (held, release) = AsyncStream<Void>.makeStream()
+                model.beforeLandingSave = { for await _ in held { break } }
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
+                model.stopRecordingAndTranscribe()
+                let landed = await waitUntil { model.transcript?.text == "unsaved" }
+                #expect(landed)
                 let title = try #require(model.recordedTake?.title)
 
+                #expect(model.sourceFileURL == wav, "the take still plays from its working file")
                 #expect(model.currentTranscriptTitle == title)
                 #expect(!model.currentTranscriptTitle.contains("parola-trust"))
-                model.stopTranscribingTake()
+                release.finish()
+                await waitUntil { !model.hasPendingTakeWork }
             }
         }
 
@@ -871,8 +879,7 @@ extension TranscriberMockSuites {
             defer { try? FileManager.default.removeItem(at: wav) }
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "unsaved")],
-                    gate: MockTranscriberGate()
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "unsaved")]
                 ))
                 let picker = NameRecordingPicker()
                 let model = AppModel(bootstrap: AppBootstrap(
@@ -881,15 +888,21 @@ extension TranscriberMockSuites {
                 ))
                 model.recordingCountInSeconds = 0
                 model.freeDiskSpaceProvider = { 50_000_000_000 }
-                await transcribingTake(model, wav: wav)
-                model.transcript = Transcript(segments: [], language: "en", modelName: "m")
+                model.cardMetadataOperation = { _ in nil }
+                let (held, release) = AsyncStream<Void>.makeStream()
+                model.beforeLandingSave = { for await _ in held { break } }
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
+                model.stopRecordingAndTranscribe()
+                let landed = await waitUntil { model.transcript?.text == "unsaved" }
+                #expect(landed)
                 let title = try #require(model.recordedTake?.title)
 
                 model.saveProjectDocument()
 
                 await waitUntil { await !picker.suggestedNames.isEmpty }
                 #expect(await picker.suggestedNames == [TranscriptShareFile.safeName(for: title) + ".parola"])
-                model.stopTranscribingTake()
+                release.finish()
+                await waitUntil { !model.hasPendingTakeWork }
             }
         }
 
@@ -1018,7 +1031,10 @@ extension TranscriberMockSuites {
             await model.inflightSweep?.value
             let take = try makeTakeWAV("in-use", seconds: 1, in: inflight, prefix: "parola-mic")
             try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-3_600)], ofItemAtPath: take.path)
-            model.failedTakeAudioURL = take
+            model.failedTakeRetry = RecordingSession.Failure(
+                audioURL: take, save: nil, recovery: nil, title: "Recording", category: .transcription, source: .microphone,
+                annotations: AppModel.TakeAnnotations()
+            )
 
             model.sweepInflightRecordings()
             await model.inflightSweep?.value
@@ -1026,7 +1042,7 @@ extension TranscriberMockSuites {
             #expect(FileManager.default.fileExists(atPath: take.path))
             #expect(await model.library.list().isEmpty)
 
-            model.failedTakeAudioURL = nil
+            model.failedTakeRetry = nil
             model.sweepInflightRecordings()
             await model.inflightSweep?.value
 
@@ -1271,7 +1287,7 @@ extension TranscriberMockSuites {
                 model.acceptPendingRecovery()
 
                 #expect(model.pendingRecovery != nil, "the offer waits")
-                #expect(model.phase == .recording(source: .microphone))
+                #expect(model.takeIsRunning)
                 #expect(model.exportNotice?.message == "Finish the recording first. Parola offers the recovered one again when it ends.")
                 #expect(model.exportNotice?.tone == .info)
 

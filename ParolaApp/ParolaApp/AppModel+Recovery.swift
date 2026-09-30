@@ -494,7 +494,7 @@ extension AppModel {
                     title: Self.takeTitle(title, suffix: .notTranscribed),
                     source: checkpoint.source ?? .microphone,
                     category: checkpoint.category ?? .transcription,
-                    activate: false,
+                    landingAs: .salvagedTake,
                     recovery: self.adoptRecovery(checkpoint),
                     onSaved: release
                 )
@@ -514,7 +514,7 @@ extension AppModel {
                     title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt, category: checkpoint.category ?? .transcription),
                     source: checkpoint.source ?? .microphone,
                     category: checkpoint.category ?? .transcription,
-                    activate: false,
+                    landingAs: .salvagedTake,
                     recovery: self.adoptRecovery(checkpoint),
                     onSaved: release
                 )
@@ -589,7 +589,7 @@ extension AppModel {
             title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt, category: checkpoint.category ?? .transcription),
             source: checkpoint.source ?? .microphone,
             category: checkpoint.category ?? .transcription,
-            activate: true,
+            landingAs: .recording,
             recovery: adoptRecovery(checkpoint)
         )
     }
@@ -619,7 +619,10 @@ extension AppModel {
 
     /// The working files this session still reads: playing, retrying, recording, transcribing, saving, or offering one back.
     var inflightFilesInUse: Set<String> {
-        var readers = [sourceFileURL, failedTakeAudioURL, liveRecordingAudioURL, pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
+        var readers = [
+            sourceFileURL, failedTakeRetry?.audioURL, recording?.failure?.audioURL, liveRecordingAudioURL,
+            pendingRecovery?.sourceURL, pendingRecovery?.audioURL,
+        ]
         if takeRun != nil { readers.append(recordedTake?.file) }
         let paths = (readers.compactMap { $0 } + takeFilesBeingSaved.keys).map { $0.resolvingSymlinksInPath().path }
         return recoveryReferencedFiles.union(paths)

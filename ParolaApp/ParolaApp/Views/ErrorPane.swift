@@ -2,9 +2,10 @@ import SwiftUI
 
 struct ErrorPane: View {
     let message: String
+    var take: RecordingSession?
 
     var body: some View {
-        ErrorBanner(message: message)
+        ErrorBanner(message: message, take: take)
             .padding(DS.Spacing.large)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -13,10 +14,22 @@ struct ErrorPane: View {
 /// A card the route keeps behind: a failed run shouldn't cost the user the library.
 struct ErrorBanner: View {
     let message: String
+    /// A failed take on its Stage: Retry and Dismiss act on the take, and nothing a file or link run left behind shows.
+    var take: RecordingSession?
     @Environment(AppModel.self) private var model
 
+    private var canRetry: Bool {
+        guard let take else { return model.canRetryFailedTranscription }
+        return take.failure != nil
+    }
+
+    private var failedName: String? {
+        guard let take else { return model.failedSourceName }
+        return take.failure?.title
+    }
+
     var body: some View {
-        let offer = model.ytDlpUpdateOffer
+        let offer = take == nil ? model.ytDlpUpdateOffer : .none
         let updateLeads = offer == .update || offer == .updating
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -40,18 +53,18 @@ struct ErrorBanner: View {
                     if updateLeads {
                         updateButton(updating: offer == .updating)
                     }
-                    if model.canRetryFailedTranscription {
-                        Button("Retry") { model.retryFailedTranscription() }
+                    if canRetry {
+                        Button("Retry") { retry() }
                             .buttonStyle(DSPillButtonStyle(kind: updateLeads ? .secondary : .primary, size: .compact))
                             .disabled(offer == .updating)
                             .axLeaf("Error.Button.Retry")
                     }
-                    if model.failedFileURL != nil {
+                    if take == nil, model.failedFileURL != nil {
                         Button("Reveal in Finder") { model.revealFailedFile() }
                             .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                             .axLeaf("Error.Button.RevealInFinder")
                     }
-                    Button("Dismiss") { model.dismissError() }
+                    Button("Dismiss") { dismiss() }
                         .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                         .axLeaf("Error.Button.Dismiss")
                 }
@@ -120,7 +133,15 @@ struct ErrorBanner: View {
     }
 
     private var title: LocalizedStringKey {
-        guard let name = model.failedSourceName, !name.isEmpty else { return "Something went wrong" }
+        guard let name = failedName, !name.isEmpty else { return "Something went wrong" }
         return "Couldn't transcribe \(name)"
+    }
+
+    private func retry() {
+        if take == nil { model.retryFailedTranscription() } else { model.retryFailedTake() }
+    }
+
+    private func dismiss() {
+        if take == nil { model.dismissError() } else { model.dismissTakeFailure() }
     }
 }

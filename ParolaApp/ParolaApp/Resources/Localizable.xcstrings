@@ -6046,6 +6046,17 @@
         }
       }
     },
+    "Finish the recording first.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termina prima la registrazione."
+          }
+        }
+      }
+    },
     "Finish the recording first. Parola offers the recovered one again when it ends.": {
       "extractionState": "manual",
       "localizations": {
@@ -12082,6 +12093,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salva le tue impostazioni in un file `.parola-settings`, o ripristinane uno. I modelli scaricati e la libreria dei prompt non sono inclusi."
+          }
+        }
+      }
+    },
+    "Saved %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvato %@"
           }
         }
       }

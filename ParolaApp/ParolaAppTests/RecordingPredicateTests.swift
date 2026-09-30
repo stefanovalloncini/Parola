@@ -23,8 +23,10 @@ struct RecordingPredicateTests {
 
     @Test("a paused take is still a take in progress")
     func pausedCounts() throws {
+        let wav = try tempWAV()
+        defer { try? FileManager.default.removeItem(at: wav) }
         let model = makeModel()
-        model.installTestTake(source: .microphone, liveSource: StubSource(url: try tempWAV()))
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
         #expect(model.takeIsRunning)
         #expect(model.pauseTake())
         #expect(model.takeIsRunning)
@@ -33,8 +35,10 @@ struct RecordingPredicateTests {
 
     @Test("the bridge still calls a running take \"recording\"")
     func bridgePhaseName() throws {
+        let wav = try tempWAV()
+        defer { try? FileManager.default.removeItem(at: wav) }
         let model = makeModel()
-        model.installTestTake(source: .microphone, liveSource: StubSource(url: try tempWAV()))
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
         #expect(ParolaAutomationServer.phaseName(for: model) == "recording")
     }
 
@@ -46,21 +50,10 @@ struct RecordingPredicateTests {
 
         #expect(model.takeIsRunning)
         #expect(model.recordingActive)
-        #expect(model.entryOpenRefusal == .recordingInProgress)
         #expect(ParolaAutomationServer.phaseName(for: model) == "recording")
         let arrival = URL(fileURLWithPath: "/tmp/parola-predicates-arrival.wav")
         model.transcribe(fileURL: arrival)
         #expect(model.deferredArrivals == [arrival])
-    }
-
-    @Test("a phase left on recording with no take behind it holds nothing")
-    func stalePhaseHoldsNothing() {
-        let model = makeModel()
-        model.phase = .recording(source: .microphone)
-
-        #expect(!model.takeIsRunning)
-        #expect(!model.recordingActive)
-        #expect(model.entryOpenRefusal == nil)
     }
 
     @Test("an installed take lets go of everything when it ends")
@@ -76,18 +69,31 @@ struct RecordingPredicateTests {
         #expect(model.recording == nil)
     }
 
-    @Test("a Stop intent during a count-in finds nothing to stop yet")
+    @Test("a Stop intent during a count-in finds nothing to stop yet, even with a file transcribing behind it")
     func stopIntentDuringCountIn() async {
         let model = makeModel()
+        model.fileTranscribeTask = Task { try? await Task.sleep(for: .seconds(30)) }
+        defer {
+            model.fileTranscribeTask?.cancel()
+            model.fileTranscribeTask = nil
+        }
         model.recordingCountInSeconds = 60
         model.startRecording(source: .microphone)
         #expect(model.recordingCountdown == 60)
         #expect(model.takeIsRunning)
 
-        await #expect(throws: IntentActionError.notRecording) {
-            _ = try await model.stopRecordingFromIntent()
+        let answer = await awaitGuarded("the Stop intent's answer", timeout: .seconds(2)) { () async -> IntentActionError? in
+            do {
+                _ = try await model.stopRecordingFromIntent()
+                return nil
+            } catch {
+                return error as? IntentActionError
+            }
         }
+        // Frees a waiter the guard would have let through, so a failing run doesn't leave it hanging.
+        model.resolveRecordingOutcome(.failure(IntentActionError.cancelled))
 
+        #expect(answer == .some(.notRecording))
         model.cancelRecordingCountdown()
         #expect(!model.takeIsRunning)
     }

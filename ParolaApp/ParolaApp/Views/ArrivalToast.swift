@@ -92,7 +92,7 @@ struct ArrivalToast: View {
         case .running:
             return Text("Transcribing \(notice.name) from a watched folder")
         case .saved:
-            return Text("Transcribed \(notice.name) from a watched folder")
+            return Text(verbatim: notice.savedTitle())
         case .failed, .paused:
             return Text("Couldn't transcribe \(notice.name)")
         case .unsaved:

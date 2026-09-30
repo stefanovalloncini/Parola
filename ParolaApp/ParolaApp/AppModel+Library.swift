@@ -583,22 +583,15 @@ extension AppModel {
         return .bulk(exported: entries.count - failures.count, of: entries.count, failures: failures, folder: folder)
     }
 
-    /// False, with a beep and nothing changed, while a recording owns the phase.
-    @discardableResult
-    func loadEntry(_ id: LibraryEntry.ID) -> Bool {
-        do {
-            try startOpeningEntry(id)
-            return true
-        } catch {
-            refusalBeep?()
-            return false
-        }
+    /// Opens an entry into the main pane, whatever else is running: a take keeps recording on its own page.
+    func loadEntry(_ id: LibraryEntry.ID) {
+        startOpeningEntry(id)
     }
 
     /// For a list that shows the transcript beside itself, like the batch: the page, the phase and the origin stay as they are.
     @discardableResult
-    func openEntryInPlace(_ id: LibraryEntry.ID) -> Task<Transcript, any Error>? {
-        try? startOpeningEntry(id, inPlace: true)
+    func openEntryInPlace(_ id: LibraryEntry.ID) -> Task<Transcript, any Error> {
+        startOpeningEntry(id, inPlace: true)
     }
 
     /// `loadEntry` for a caller that needs what it opened; a later open makes this one throw `CancellationError`.
@@ -607,17 +600,8 @@ extension AppModel {
         try await startOpeningEntry(id).value
     }
 
-    /// Opening sets `.ready`, which a capture couldn't survive; a burn keeps its own copy of the transcript.
-    var entryOpenRefusal: IntentActionError? {
-        takeIsRunning ? .recordingInProgress : nil
-    }
-
     @discardableResult
-    private func startOpeningEntry(
-        _ id: LibraryEntry.ID,
-        inPlace: Bool = false
-    ) throws(IntentActionError) -> Task<Transcript, any Error> {
-        if !inPlace, let refusal = entryOpenRefusal { throw refusal }
+    private func startOpeningEntry(_ id: LibraryEntry.ID, inPlace: Bool = false) -> Task<Transcript, any Error> {
         // The batch's in-place open leaves the phase exactly as it is; only a full navigation clears a stale failure.
         if !inPlace { leaveFailedPhase() }
         introduction.defer()

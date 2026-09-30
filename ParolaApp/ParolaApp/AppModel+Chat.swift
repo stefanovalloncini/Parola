@@ -13,12 +13,12 @@ extension AppModel {
         }
     }
 
-    /// A recording owns the phase, and opening would set it to `.ready` under it.
+    /// Opens the newest entry and summarises it; a take keeps recording on its own page meanwhile.
     func summarizeLatestEntry(options: SummaryOptions? = nil) {
         introduction.defer()
-        guard features.isEnabled(.ai), !takeIsRunning else { return }
+        guard features.isEnabled(.ai) else { return }
         Task { [weak self, library] in
-            guard let self, let latest = await library.list().first, !self.takeIsRunning else { return }
+            guard let self, let latest = await library.list().first else { return }
             do { try await self.openEntry(latest.id) } catch { return }
             self.summariseTranscript(options: options)
         }

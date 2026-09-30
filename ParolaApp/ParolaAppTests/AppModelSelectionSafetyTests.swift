@@ -82,23 +82,21 @@ struct AppModelSelectionSafetyTests {
         )
     }
 
-    @Test("batch events do not stomp an active recording's phase")
-    func batchEventsPreserveRecordingPhase() async {
+    @Test("batch events paint the batch's phase and leave a take recording on its Stage")
+    func batchEventsLeaveTheTake() async {
         let model = makeModel()
         let job = BatchJob(url: URL(fileURLWithPath: "/tmp/selection-safety.wav"))
         model.batchJobs = [job]
         model.installTestTake(source: .microphone)
 
         await model.handleBatchEvent(.started(jobID: job.id))
-        #expect(
-            model.phase == .recording(source: .microphone),
-            "a batch job starting must not hide the live recording's stop affordances"
-        )
+        #expect(model.phase == .transcribing(file: job.url))
+        #expect(model.recording?.isCapturing == true)
+        #expect(model.route == .recording, "a batch job starting must not hide the take's Stage")
 
         await model.handleBatchEvent(.finished)
-        #expect(
-            model.phase == .recording(source: .microphone),
-            "a batch finishing must not flip the phase away from the live recording"
-        )
+        #expect(model.phase == .ready)
+        #expect(model.recording?.isCapturing == true)
+        #expect(model.route == .recording)
     }
 }

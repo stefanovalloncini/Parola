@@ -14,13 +14,14 @@ struct ToolbarSearchTests {
         return try String(contentsOfFile: path, encoding: .utf8)
     }
 
-    @Test("each page's search is named for the page, and Statistics has none")
+    @Test("each page's search is named for the page, and Statistics and the Stage have none")
     func titles() {
         #expect(AppModel.Route.transcript.searchTitle() == "Search Library")
         #expect(AppModel.Route.queue.searchTitle() == "Search Queue")
         #expect(AppModel.Route.batch.searchTitle() == "Search Batch")
         #expect(AppModel.Route.recentlyDeleted.searchTitle() == "Search Recently Deleted")
         #expect(AppModel.Route.statistics.searchTitle() == nil)
+        #expect(AppModel.Route.recording.searchTitle() == nil)
     }
 
     @Test("the page names read in Italian")

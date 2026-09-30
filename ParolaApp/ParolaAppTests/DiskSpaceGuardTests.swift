@@ -63,8 +63,7 @@ extension TranscriberMockSuites {
         }
 
         private func isRecording(_ model: AppModel) -> Bool {
-            if case .recording = model.phase { return true }
-            return false
+            model.recording?.isCapturing == true
         }
 
         @Test("verdict: refuse under 200 MB, warn under 1 GB, ok above or unknown")
@@ -85,11 +84,11 @@ extension TranscriberMockSuites {
             model.startRecording(source: .microphone)
 
             let refused = await waitUntil {
-                if case .failed = model.phase { return true }
+                if case .failed = model.recording?.state { return true }
                 return false
             }
             #expect(refused)
-            if case .failed(let message) = model.phase { #expect(message.contains("200 MB")) }
+            if case .failed(let message) = model.recording?.state { #expect(message.contains("200 MB")) }
             #expect(model.liveSource == nil)
             let stoppedRecording = await waitUntil { !model.recordingActive }
             #expect(stoppedRecording)
@@ -106,7 +105,7 @@ extension TranscriberMockSuites {
             #expect(model.recordingCountdown == 3)
 
             let refused = await waitUntil {
-                if case .failed = model.phase { return true }
+                if case .failed = model.recording?.state { return true }
                 return false
             }
             #expect(refused)
@@ -228,7 +227,7 @@ extension TranscriberMockSuites {
                 await model.checkRecordingDiskSpace()
 
                 let stopped = await waitUntil {
-                    if case .failed = model.phase { return true }
+                    if case .failed = model.recording?.state { return true }
                     return false
                 }
                 #expect(stopped)

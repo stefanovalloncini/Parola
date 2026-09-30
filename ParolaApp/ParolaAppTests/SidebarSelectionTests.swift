@@ -37,6 +37,8 @@ struct SidebarSelectionTests {
         #expect(SidebarSelection.current(page(listShowing: false), sidebarPeople: [], showsActivity: false) == nil)
         #expect(SidebarSelection.current(page(searching: true), sidebarPeople: [], showsActivity: false) == nil)
         #expect(SidebarSelection.current(page(route: .statistics), sidebarPeople: [], showsActivity: false) == nil)
+        #expect(SidebarSelection.current(page(route: .recording), sidebarPeople: [], showsActivity: false) == nil)
+        #expect(SidebarSelection.place(of: page(route: .recording)) == nil)
     }
 
     @Test("Recently Deleted and Activity own their pages")

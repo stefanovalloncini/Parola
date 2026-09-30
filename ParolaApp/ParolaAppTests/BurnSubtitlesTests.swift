@@ -231,7 +231,6 @@ struct BurnSubtitlesTests {
 
         #expect(!model.takeIsRunning)
         #expect(model.downloadBlockedReason == nil)
-        #expect(model.entryOpenRefusal == nil)
         model.cancelBurn()
     }
 

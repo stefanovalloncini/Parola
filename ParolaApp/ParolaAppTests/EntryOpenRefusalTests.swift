@@ -5,7 +5,7 @@ import ParolaCore
 import ParolaTestSupport
 
 @MainActor
-@Suite("Opening an entry during a recording")
+@Suite("Opening an entry during a take")
 struct EntryOpenRefusalTests {
 
     @MainActor
@@ -40,55 +40,49 @@ struct EntryOpenRefusalTests {
         return (try #require(commands["loadEntry"]), context, server)
     }
 
-    @Test("a library row, a menu-bar item or a Statistics row beeps and changes nothing", .timeLimit(.minutes(1)))
-    func libraryOpenRefuses() async throws {
-        let (model, beeps) = makeModel("refuse-row")
+    @Test("a library row, a menu-bar item or a Statistics row opens the entry and the take keeps recording", .timeLimit(.minutes(1)))
+    func libraryOpenDuringATake() async throws {
+        let (model, beeps) = makeModel("take-row")
         let entry = try await addEntry(to: model)
         model.installTestTake(source: .microphone)
 
-        #expect(!model.openEntryFromLibrary(entry.id, inNewWindow: false))
-        await settle()
+        #expect(model.openEntryFromLibrary(entry.id, inNewWindow: false))
+        let opened = await waitUntil { model.selectedEntryID == entry.id && model.transcript?.text == "an older take" }
 
-        #expect(model.phase == .recording(source: .microphone))
-        #expect(model.selectedEntryID == nil)
-        #expect(model.transcript == nil)
-        #expect(beeps.count == 1)
+        #expect(opened)
+        #expect(model.route == .transcript)
+        #expect(model.recording?.isCapturing == true)
+        #expect(beeps.count == 0)
     }
 
-    @Test("a parola://open link beeps and changes nothing", .timeLimit(.minutes(1)))
-    func urlOpenRefuses() async throws {
-        let (model, beeps) = makeModel("refuse-url")
+    @Test("a parola://open link opens the entry and the take keeps recording", .timeLimit(.minutes(1)))
+    func urlOpenDuringATake() async throws {
+        let (model, beeps) = makeModel("take-url")
         let entry = try await addEntry(to: model)
         model.installTestTake(source: .microphone)
 
         handleParolaOpen(try #require(URL(string: "parola://open?entry=\(entry.id)&t=5")), model: model)
-        await settle()
+        let opened = await waitUntil { model.selectedEntryID == entry.id }
 
-        #expect(model.phase == .recording(source: .microphone))
-        #expect(model.selectedEntryID == nil)
-        #expect(model.transcript == nil)
-        #expect(beeps.count == 1)
+        #expect(opened)
+        #expect(model.recording?.isCapturing == true)
+        #expect(beeps.count == 0)
     }
 
-    @Test("the bridge's loadEntry answers with the reason, no beep, nothing changed", .timeLimit(.minutes(1)))
-    func bridgeOpenRefuses() async throws {
-        let (model, beeps) = makeModel("refuse-bridge")
+    @Test("the bridge's loadEntry opens the entry during a take", .timeLimit(.minutes(1)))
+    func bridgeOpenDuringATake() async throws {
+        let (model, beeps) = makeModel("take-bridge")
         let entry = try await addEntry(to: model)
         model.installTestTake(source: .microphone)
         let (command, context, server) = try loadEntryCommand(model)
         let args = try command.validate(AutomationArgs(["id": .string(entry.id)]))
 
-        do {
-            _ = try await command.handler(args, context)
-            Issue.record("loadEntry should refuse while recording")
-        } catch let error as AutomationError {
-            #expect(error.code == "PRECONDITION")
-            #expect(error.message == IntentActionError.recordingInProgress.localizedDescription)
-        }
+        _ = try await command.handler(args, context)
         withExtendedLifetime(server) {}
+        let opened = await waitUntil { model.selectedEntryID == entry.id }
 
-        #expect(model.phase == .recording(source: .microphone))
-        #expect(model.selectedEntryID == nil)
+        #expect(opened)
+        #expect(model.recording?.isCapturing == true)
         #expect(beeps.count == 0)
     }
 
@@ -114,7 +108,6 @@ struct EntryOpenRefusalTests {
         model.burnSubtitlesIntoVideo()
         await waitUntil { model.burnJob?.state == .running(progress: 0.25) }
 
-        #expect(model.entryOpenRefusal == nil)
         #expect(model.openEntryFromLibrary(entry.id, inNewWindow: false))
         await waitUntil { model.selectedEntryID == entry.id && model.transcript?.text == "an older take" }
         #expect(model.burnIsRunning)

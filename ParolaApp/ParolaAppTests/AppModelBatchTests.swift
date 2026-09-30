@@ -984,7 +984,8 @@ struct AppModelBatchTests {
         let url = URL(fileURLWithPath: "/tmp/arrival.wav")
         model.transcribe(fileURL: url)
         #expect(model.deferredArrivals == [url])
-        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.recording?.isCapturing == true)
+        #expect(model.route == .recording)
         #expect(model.batchJobs.isEmpty)
 
         model.startBatch(urls: [URL(fileURLWithPath: "/tmp/b.wav")])
@@ -1255,7 +1256,8 @@ struct AppModelBatchTests {
         let url = URL(fileURLWithPath: "/tmp/arrival.parola")
         model.transcribe(fileURL: url)
         #expect(model.deferredArrivals == [url])
-        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.recording?.isCapturing == true)
+        #expect(model.route == .recording)
         #expect(model.transcript?.segments.isEmpty == true)
     }
 
