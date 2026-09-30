@@ -254,16 +254,6 @@ enum LibraryListContent {
         guard ids.count == 1, let id = ids.first else { return nil }
         return OpenRequest(id: id, inNewWindow: modifiers.contains(.option))
     }
-
-    /// Search results run under one unheadered group; every other order the list shows breaks into days.
-    static func groups(
-        for rows: [LibraryRowDisplay],
-        sortOrder: LibrarySortOrder,
-        isSearchResult: Bool
-    ) -> [LibraryDateGroups.Group] {
-        guard !isSearchResult else { return LibraryDateGroups.ungrouped(rows, id: "results") }
-        return LibraryDateGroups.groups(for: rows, sortOrder: sortOrder)
-    }
 }
 
 /// The library's content area: the browse list, with a query's results laid over it while one is open.
@@ -325,7 +315,7 @@ struct LibraryListView: View {
     }
 }
 
-/// A category's rows, or all of them, with the filters and the day groups.
+/// A category's rows, or all of them, with the filters and the date groups.
 private struct LibraryBrowseList: View, Equatable {
     @Environment(AppModel.self) private var model
     let category: EntryCategory?
@@ -382,18 +372,21 @@ private struct LibraryBrowseList: View, Equatable {
         var totalSeconds: Double = 0
         var cache = displayCache
         cache.prune(keeping: model.libraryEntries.lazy.map(\.id))
+        let headers = LibraryDateGroups.Headers(sortOrder: model.librarySortOrder, groupsByDate: model.libraryGroupsByDate)
+        let usualLanguage = model.usualLanguage
         let displays = computed.map { entry -> LibraryRowDisplay in
             let size = sizes[entry.id]
             totalBytes += size ?? 0
             totalSeconds += entry.durationSeconds ?? 0
             return cache.display(
                 for: entry, excerpt: model.libraryExcerpts[entry.id],
+                when: headers.when(for: entry), usualLanguage: usualLanguage,
                 showsAITitle: model.showAITitles, showsAISummary: model.showAISummaries
             )
         }
         displayCache = cache
         entries = displays
-        rowGroups = LibraryListContent.groups(for: displays, sortOrder: model.librarySortOrder, isSearchResult: false)
+        rowGroups = headers.groups(for: displays)
         // Count and duration, never size: bundle sizes land later and only for audio, so the label used to change shape.
         totalsLabel = LibraryListContent.listSubtitle(count: displays.count, totalSeconds: totalSeconds) ?? ""
         totalsHelp = totalBytes > 0 ? String(localized: "Total size: \(AppFormat.byteSize(totalBytes))") : nil
@@ -435,6 +428,7 @@ private struct LibraryBrowseList: View, Equatable {
         .onChange(of: model.personFilter) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeEntries() }
+        .onChange(of: model.libraryGroupsByDate) { _, _ in recomputeEntries() }
         .onChange(of: category) { _, newCategory in
             // Navigation owns personFilter now; this only decides what to keep for label/language/date.
             var kept = LibraryListContent.filters(
@@ -449,7 +443,7 @@ private struct LibraryBrowseList: View, Equatable {
             let newEntries = recomputeEntries(with: kept)
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
-        // The day headers are written when the groups are built, so midnight has to rewrite them.
+        // Headers and row times are written when the groups are built, so midnight has to rewrite them.
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             recomputeEntries()
         }

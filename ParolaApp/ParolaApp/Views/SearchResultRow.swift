@@ -3,9 +3,6 @@ import ParolaCore
 
 /// A library row whose detail line is the hit that matched, not the opening of the transcript.
 struct SearchResultRow: View {
-    /// Where the row's separator starts, so it runs under the text instead of under the badge.
-    nonisolated static let separatorInset: CGFloat = DS.Spacing.small + EntryRowMetrics.textInset
-
     let display: LibraryRowDisplay
     let match: LibrarySearchIndex.Match?
     var isSelected: Bool = false
@@ -20,8 +17,7 @@ struct SearchResultRow: View {
                 timecode: Self.timestamp(for: match),
                 reservesTimecode: showsTimestamp
             ),
-            isSelected: isSelected,
-            showsTimeOnly: false
+            isSelected: isSelected
         ) {
             matchCount
         }

@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ParolaCore
 @testable import Parola
@@ -6,14 +8,6 @@ import ParolaTestSupport
 
 @Suite("Entry row")
 struct EntryRowTests {
-    @Test("a row that somebody else wraps in chrome draws none of its own")
-    func wrappedRowsLeaveTheChromeToTheirCaller() {
-        #expect(EntryRowStyle.list.paintsRowChrome(drawsHover: true))
-        // Home wraps the row in a button that hovers; Recently Deleted washes the row and its expiry bar together.
-        #expect(!EntryRowStyle.home.paintsRowChrome(drawsHover: true))
-        #expect(!EntryRowStyle.list.paintsRowChrome(drawsHover: false))
-    }
-
     @Test("an excerpt stops on the last whole word that fits and says it was cut")
     func excerptCutsOnAWordBoundary() {
         let text = "Il primo paragrafo della trascrizione continua ben oltre il limite richiesto."
@@ -99,6 +93,113 @@ struct EntryRowTests {
     func everyKindHasItsOwnGlyph() {
         let kinds: [EntrySourceKind] = [.meeting, .dictation, .audio, .video, .web]
         #expect(Set(kinds.map(\.symbol)).count == kinds.count)
+    }
+}
+
+@MainActor
+@Suite("Entry row layout")
+struct EntryRowLayoutTests {
+    private static let width: CGFloat = 520
+
+    private func entry(
+        _ title: String,
+        model: String = "stub",
+        language: String = "en",
+        labels: [String] = [],
+        notes: Int = 0,
+        pinned: Bool = false,
+        seconds: Double? = nil
+    ) -> LibraryEntry {
+        let manifest = ParolaDocument.Manifest(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            originalAudioName: "\(title).m4a",
+            title: title,
+            modelName: model,
+            language: language,
+            labels: labels,
+            segmentNotes: Dictionary(uniqueKeysWithValues: (0..<notes).map { ("\($0)", "note") }),
+            pinned: pinned,
+            durationSeconds: seconds
+        )
+        return LibraryEntry(id: "e", bundleURL: URL(fileURLWithPath: "/tmp/EntryRowLayoutTests/e.parola"), manifest: manifest)
+    }
+
+    private func makeModel() async -> AppModel {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("entry-row-layout"))
+        await model.libraryRefreshTask?.value
+        return model
+    }
+
+    private func height(_ row: some View, in model: AppModel, typeSize: DynamicTypeSize = .large) -> CGFloat {
+        let host = NSHostingView(
+            rootView: row
+                .environment(model)
+                .environment(\.dynamicTypeSize, typeSize)
+                .frame(width: Self.width)
+        )
+        host.layoutSubtreeIfNeeded()
+        return host.fittingSize.height
+    }
+
+    private var plain: LibraryRowDisplay {
+        LibraryRowDisplay(entry: entry("Standup"))
+    }
+
+    private var busy: LibraryRowDisplay {
+        LibraryRowDisplay(
+            entry: entry(
+                String(repeating: "Weekly product sync ", count: 6),
+                language: "it",
+                labels: ["draft", "shared", "q4"],
+                notes: 2,
+                pinned: true,
+                seconds: 4320
+            ),
+            excerpt: String(repeating: "parola ", count: 80),
+            usualLanguage: "EN"
+        )
+    }
+
+    private var snippet: EntryRowDetail {
+        .snippet(AttributedString(String(repeating: "parola ", count: 80)), timecode: "1:02:34", reservesTimecode: true)
+    }
+
+    @Test("every row is 50 pt tall, whatever it carries")
+    func everyRowIsOneHeight() async {
+        let model = await makeModel()
+
+        #expect(height(EntryRow(display: plain), in: model) == EntryRowMetrics.height)
+        #expect(height(EntryRow(display: busy, detail: .excerpt(busy.excerpt)), in: model) == EntryRowMetrics.height)
+        #expect(height(EntryRow(display: busy, detail: snippet) { Text(verbatim: "12 matches") }, in: model)
+            == EntryRowMetrics.height)
+    }
+
+    /// The height is declared so the table never measures a row; at an accessibility size the row measures itself.
+    @Test("what the busiest row holds fits the height every row declares")
+    func theBusiestRowFits() async {
+        let model = await makeModel()
+
+        #expect(height(EntryRow(display: busy, detail: .excerpt(busy.excerpt)), in: model, typeSize: .accessibility1)
+            <= EntryRowMetrics.height)
+        #expect(height(EntryRow(display: busy, detail: snippet), in: model, typeSize: .accessibility1)
+            <= EntryRowMetrics.height)
+    }
+
+    @Test("a row never names the model it was transcribed with")
+    func rowsLeaveTheModelOut() {
+        let display = LibraryRowDisplay(entry: entry("Weekly sync", model: "openai_whisper-large-v3-v20240930_turbo"))
+        let said = Mirror(reflecting: display).children.compactMap { $0.value as? String }
+
+        #expect(said.contains("Weekly sync"))
+        #expect(!said.contains { $0.localizedCaseInsensitiveContains("whisper") })
+    }
+
+    /// The slot is fixed so every row's time lines up; too narrow a one would cut the longest length short.
+    @Test("the length slot fits the longest length a row shows")
+    func durationSlotFitsTheLongestLength() throws {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        let longest = try #require(LibraryRowFormat.duration(23 * 3600 + 59 * 60))
+        #expect((longest as NSString).size(withAttributes: [.font: font]).width <= EntryRowMetrics.durationWidth)
     }
 }
 

@@ -57,16 +57,38 @@ struct LibraryDateGroupsTests {
         )
     }
 
-    @Test("today, yesterday and then the date itself")
-    func headersReadAsDays() {
-        let grouped = groups(
-            [row("a", "2026-09-13T09:30"), row("b", "2026-09-12T23:10"), row("c", "2026-09-04T08:00")],
-            now: "2026-09-13T10:00"
-        )
+    private var spread: [LibraryRowDisplay] {
+        [
+            row("today", "2026-09-30T09:30"),
+            row("yesterday", "2026-09-29T23:10"),
+            row("friday", "2026-09-25T08:00"),
+            row("september", "2026-09-10T08:00"),
+            row("late-august", "2026-08-20T08:00"),
+            row("early-august", "2026-08-02T08:00"),
+            row("last-december", "2025-12-03T08:00"),
+        ]
+    }
 
-        let older = AppFormat.day(at("2026-09-04T08:00"), locale: Self.english)
-        #expect(grouped.map(\.title) == ["Today", "Yesterday", older])
-        #expect(grouped.map { $0.rows.map(\.id) } == [["a"], ["b"], ["c"]])
+    @Test("rows read under Today, Yesterday, Previous 7 Days, Previous 30 Days, then one header per month")
+    func headersReadLikeNotes() {
+        let grouped = groups(spread, now: "2026-09-30T10:00")
+
+        #expect(grouped.map(\.title) == [
+            "Today", "Yesterday", "Previous 7 Days", "Previous 30 Days", "August", "December 2025",
+        ])
+        #expect(grouped.map { $0.rows.map(\.id) } == [
+            ["today"], ["yesterday"], ["friday"], ["september"], ["late-august", "early-august"], ["last-december"],
+        ])
+    }
+
+    @Test("oldest first reads the same headers the other way round")
+    func oldestFirstReversesTheHeaders() {
+        let grouped = groups(spread.reversed(), now: "2026-09-30T10:00", sortOrder: .oldest)
+
+        #expect(grouped.map(\.title) == [
+            "December 2025", "August", "Previous 30 Days", "Previous 7 Days", "Yesterday", "Today",
+        ])
+        #expect(grouped[1].rows.map(\.id) == ["early-august", "late-august"])
     }
 
     /// The day breaks at local midnight, not 24 hours back: 00:05 and 23:55 are different days an hour apart.
@@ -81,27 +103,16 @@ struct LibraryDateGroupsTests {
         #expect(grouped.first?.rows.map(\.id) == ["late"])
     }
 
-    @Test("rows made on the same day share one header however many there are")
-    func oneHeaderPerDay() {
+    /// Pinned rows sort ahead of everything, so bucketing them would print one header twice.
+    @Test("pinned rows keep their own group above the buckets")
+    func pinnedRowsLeadWithoutBreakingTheBuckets() {
         let grouped = groups(
-            [row("a", "2026-09-11T18:00"), row("b", "2026-09-11T09:00"), row("c", "2026-09-10T09:00")],
-            now: "2026-09-13T10:00"
-        )
-
-        #expect(grouped.count == 2)
-        #expect(grouped.first?.rows.map(\.id) == ["a", "b"])
-    }
-
-    /// Pinned rows sort ahead of everything, so dating them would print one day's header twice.
-    @Test("pinned rows keep their own group above the days")
-    func pinnedRowsLeadWithoutBreakingTheDays() {
-        let grouped = groups(
-            [row("p", "2026-08-01T10:00", pinned: true), row("a", "2026-09-13T09:00"), row("b", "2026-09-12T09:00")],
-            now: "2026-09-13T10:00"
+            [row("p", "2026-09-30T08:00", pinned: true), row("a", "2026-09-30T09:00"), row("b", "2026-09-29T09:00")],
+            now: "2026-09-30T10:00"
         )
 
         #expect(grouped.map(\.title) == ["Pinned", "Today", "Yesterday"])
-        #expect(grouped.map(\.showsTime) == [false, true, true])
+        #expect(grouped.map { $0.rows.map(\.id) } == [["p"], ["a"], ["b"]])
     }
 
     @Test("a sort that has nothing to do with dates runs under no header at all")
@@ -115,29 +126,20 @@ struct LibraryDateGroupsTests {
         #expect(LibraryDateGroups.groups(for: [], sortOrder: .newest).isEmpty)
     }
 
-    /// The id only has to tell one group from another; formatting a date to get one cost 199 µs per day group.
-    @Test("a day group is identified by the day itself, not by a formatted date")
-    func dayGroupIDsAreCheapAndStable() {
+    @Test("a group is identified by its bucket, never by a formatted date")
+    func groupIDsAreCheapAndStable() {
         let rows = [
             row("p", "2026-08-01T10:00", pinned: true),
-            row("a", "2026-09-13T09:00"),
-            row("b", "2026-09-13T08:00"),
-            row("c", "2026-09-12T09:00"),
+            row("a", "2026-09-30T09:00"),
+            row("b", "2026-09-30T08:00"),
+            row("c", "2026-09-29T09:00"),
+            row("d", "2026-08-20T09:00"),
         ]
-        let first = groups(rows, now: "2026-09-13T10:00")
-        let second = groups(rows, now: "2026-09-13T10:00")
+        let first = groups(rows, now: "2026-09-30T10:00")
+        let second = groups(rows, now: "2026-09-30T10:00")
 
+        #expect(first.map(\.id) == ["pinned", "today", "yesterday", "month-2026-8"])
         #expect(first.map(\.id) == second.map(\.id))
-        #expect(Set(first.map(\.id)).count == first.count)
-        #expect(first.first?.id == "pinned")
-
-        let today = calendar.startOfDay(for: at("2026-09-13T09:00"))
-        let yesterday = calendar.startOfDay(for: at("2026-09-12T09:00"))
-        #expect(first.map(\.id) == [
-            "pinned",
-            "day-\(Int(today.timeIntervalSinceReferenceDate))",
-            "day-\(Int(yesterday.timeIntervalSinceReferenceDate))",
-        ])
         #expect(LibraryDateGroups.ungrouped(rows).first?.id == "all")
         #expect(LibraryDateGroups.ungrouped(rows, id: "results").first?.id == "results")
     }
@@ -145,28 +147,78 @@ struct LibraryDateGroupsTests {
     /// Headers are frozen when the groups are built, so a list left open over midnight has to rebuild them.
     @Test("the same rows read as Today before midnight and as Yesterday after it")
     func headersFollowTheDayTurningOver() {
-        let rows = [row("a", "2026-09-13T23:50"), row("b", "2026-09-12T10:00")]
-        let before = groups(rows, now: "2026-09-13T23:55")
-        let after = groups(rows, now: "2026-09-14T00:05")
+        let rows = [row("a", "2026-09-29T23:50"), row("b", "2026-09-28T10:00")]
+        let before = groups(rows, now: "2026-09-29T23:55")
+        let after = groups(rows, now: "2026-09-30T00:05")
 
-        let older = AppFormat.day(at("2026-09-12T10:00"), locale: Self.english)
         #expect(before.map(\.title) == ["Today", "Yesterday"])
-        #expect(after.map(\.title) == ["Yesterday", older])
-        // The ids are the days themselves, so the rebuilt groups are the same groups with new headers.
-        #expect(before.map(\.id) == after.map(\.id))
+        #expect(after.map(\.title) == ["Yesterday", "Previous 7 Days"])
     }
 
-    @Test("the header takes the locale it is given")
-    func headersFollowTheLocale() {
-        let day = at("2026-09-04T08:00")
-        let italian = LibraryDateGroups.title(
-            for: day,
-            now: at("2026-09-13T10:00"),
-            calendar: calendar,
-            locale: Locale(identifier: "it_IT")
-        )
+    @Test("a month header takes the locale it is given, capitalised as a heading")
+    func monthHeadersFollowTheLocale() {
+        let august = LibraryDateBucket.month(year: 2026, month: 8)
+        let now = at("2026-09-30T10:00")
 
-        #expect(italian == AppFormat.day(day, locale: Locale(identifier: "it_IT")))
-        #expect(italian != LibraryDateGroups.title(for: day, now: at("2026-09-13T10:00"), calendar: calendar, locale: Self.english))
+        #expect(LibraryDateGroups.title(for: august, now: now, calendar: calendar, locale: Locale(identifier: "it_IT")) == "Agosto")
+        #expect(LibraryDateGroups.title(for: august, now: now, calendar: calendar, locale: Self.english) == "August")
+    }
+
+    private func headers(
+        now: String,
+        sortOrder: LibrarySortOrder = .newest,
+        groupsByDate: Bool = true
+    ) -> LibraryDateGroups.Headers {
+        LibraryDateGroups.Headers(
+            sortOrder: sortOrder,
+            groupsByDate: groupsByDate,
+            now: at(now),
+            calendar: calendar,
+            locale: Self.english
+        )
+    }
+
+    @Test("a row under a date header says only what the header leaves out; a pinned row names its day")
+    func rowsSayWhatTheirHeaderLeavesOut() {
+        let list = headers(now: "2026-09-30T10:00")
+        let morning = list.when(for: row("a", "2026-09-30T09:05").entry)
+
+        #expect(morning.hasPrefix("9:05"))
+        #expect(morning.hasSuffix("AM"))
+        #expect(list.when(for: row("friday", "2026-09-25T16:40").entry).hasPrefix("Fri"))
+        #expect(list.when(for: row("p", "2026-09-29T18:00", pinned: true).entry).hasPrefix("Yesterday"))
+    }
+
+    @Test("the rows of a list say their times under the headers the list shows")
+    func rowsAndHeadersAgree() {
+        let list = headers(now: "2026-09-30T10:00")
+        let rows = spread.map { LibraryRowDisplay(entry: $0.entry, when: list.when(for: $0.entry)) }
+        let grouped = list.groups(for: rows)
+
+        #expect(grouped.map(\.title) == [
+            "Today", "Yesterday", "Previous 7 Days", "Previous 30 Days", "August", "December 2025",
+        ])
+        #expect(grouped[4].rows.map(\.when) == ["Aug 20", "Aug 2"])
+        #expect(grouped[5].rows.map(\.when) == ["Dec 3, 2025"])
+    }
+
+    @Test("with grouping off the list runs under no header, and every row names its day")
+    func groupingOffDropsTheHeaders() {
+        let list = headers(now: "2026-09-30T10:00", groupsByDate: false)
+        let rows = [row("a", "2026-09-30T09:05"), row("p", "2026-09-29T18:00", pinned: true)]
+        let grouped = list.groups(for: rows)
+
+        #expect(grouped.map(\.id) == ["all"])
+        #expect(grouped.first?.title == nil)
+        #expect(list.when(for: rows[0].entry).hasPrefix("Today"))
+    }
+
+    @Test("an order that isn't by date names every row's day, grouping or not")
+    func undatedOrderNamesEveryDay() {
+        let list = headers(now: "2026-09-30T10:00", sortOrder: .titleAZ)
+        let today = row("a", "2026-09-30T09:05")
+
+        #expect(list.when(for: today.entry).hasPrefix("Today"))
+        #expect(list.groups(for: [today]).map(\.title) == [nil])
     }
 }

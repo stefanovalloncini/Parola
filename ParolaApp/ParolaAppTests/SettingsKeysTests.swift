@@ -27,7 +27,6 @@ struct SettingsPaneScopeTests {
         let keys = SettingsPaneScope.customization.defaultsKeys
         #expect(keys.contains("appTheme"))
         #expect(keys.contains("appAccentColor"))
-        #expect(keys.contains("sidebarDensity"))
         #expect(keys.contains("themeIsCustom"))
         #expect(keys.contains("themeCustomPaletteJSON"))
     }

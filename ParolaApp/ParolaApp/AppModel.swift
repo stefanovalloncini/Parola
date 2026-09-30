@@ -898,7 +898,6 @@ final class AppModel {
 
     var appTheme: String = "system" { didSet { defaults.set(appTheme, forKey: "appTheme") } }  // "system" | "light" | "dark"
     var monospacedTimestamps: Bool = true { didSet { defaults.set(monospacedTimestamps, forKey: "monospacedTimestamps") } }
-    var sidebarDensity: String = "comfortable" { didSet { defaults.set(sidebarDensity, forKey: "sidebarDensity") } }  // "comfortable" | "compact"
 
     var transcriptDisplayModeRaw: String = TranscriptDisplayMode.transcript.rawValue {
         didSet { defaults.set(transcriptDisplayModeRaw, forKey: "transcriptDisplayMode") }
@@ -997,7 +996,6 @@ final class AppModel {
         self.translate = defaults.bool(forKey: "translate")
         self.appTheme = defaults.string(forKey: "appTheme") ?? "system"
         self.monospacedTimestamps = readBool("monospacedTimestamps", default: true)
-        self.sidebarDensity = defaults.string(forKey: "sidebarDensity") ?? "comfortable"
         self.appAccentRaw = Self.migratedAccentRaw(from: defaults)
         self.themeIsCustom = defaults.bool(forKey: "themeIsCustom")
         self.themeCustomPaletteJSON = defaults.string(forKey: "themeCustomPaletteJSON") ?? ""
@@ -1008,6 +1006,7 @@ final class AppModel {
         self.remoteAIAcknowledged = defaults.bool(forKey: "remoteAIAcknowledged")
         self.showMostUsedPeople = readBool("showMostUsedPeople", default: true)
         self.openEntriesInNewWindow = defaults.bool(forKey: "openEntriesInNewWindow")
+        self.libraryGroupsByDate = readBool("libraryGroupsByDate", default: true)
         introduction.reloadFromDefaults()
     }
 
@@ -1402,6 +1401,7 @@ final class AppModel {
         var labels: [String] = []
         var languages: [String] = []
         var personIDs: [UUID] = []
+        var usualLanguage: String?
     }
 
     @ObservationIgnored private var cachedVocabulary: [EntryCategory?: FilterVocabulary] = [:]
@@ -1415,6 +1415,9 @@ final class AppModel {
 
     /// Every label in the library. Label suggestions are not scoped to the category the entry happens to be in.
     var allKnownLabels: [String] { knownLabels(in: nil) }
+
+    /// The language most of the library is in, as a code; a row names its own language only when it differs.
+    var usualLanguage: String? { vocabulary(in: nil).usualLanguage }
 
     /// The people with at least one entry in one category, in the order every people list shows them.
     func knownPeople(in category: EntryCategory?) -> [Person] {
@@ -1433,12 +1436,14 @@ final class AppModel {
         var seenLanguages = Set<String>()
         var seenPeople = Set<UUID>()
         var found = FilterVocabulary()
+        var codes: [String] = []
         for entry in libraryEntries where category == nil || entry.category == category {
             for label in entry.labels where seenLabels.insert(label).inserted {
                 found.labels.append(label)
             }
-            if let code = LanguageDisplay.code(for: entry.language), seenLanguages.insert(code).inserted {
-                found.languages.append(code)
+            if let code = LanguageDisplay.code(for: entry.language) {
+                codes.append(code)
+                if seenLanguages.insert(code).inserted { found.languages.append(code) }
             }
             for id in entry.personIDs where seenPeople.insert(id).inserted {
                 found.personIDs.append(id)
@@ -1446,6 +1451,7 @@ final class AppModel {
         }
         found.labels.sort { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
         found.languages.sort()
+        found.usualLanguage = LibraryRowFormat.usualLanguage(codes: codes)
         cachedVocabulary[category] = found
         return found
     }
@@ -1460,6 +1466,7 @@ final class AppModel {
             if librarySortOrder == .lastOpened { refreshLibrary() }
         }
     }
+    var libraryGroupsByDate: Bool = true { didSet { defaults.set(libraryGroupsByDate, forKey: "libraryGroupsByDate") } }
     // Observed on purpose: the settings pane reads these, and refreshBundleSizes fills them asynchronously, so the assignment must re-render.
     var libraryBundleSizes: [String: Int64] = [:] {
         didSet { libraryBundleSizesVersion &+= 1 }

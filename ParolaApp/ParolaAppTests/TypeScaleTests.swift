@@ -65,6 +65,8 @@ struct TypeScaleTests {
         #expect(measured(DS.Font.transcriptEmphasis) != measured(.system(size: 17, weight: .semibold)))
         #expect(measured(DS.Font.transcriptCompact) == measured(.system(size: 15, design: .serif)))
         #expect(measured(DS.Font.transcriptCompact) != measured(.system(size: 15)))
+        #expect(measured(DS.Font.excerpt) == measured(.system(size: 13, design: .serif)))
+        #expect(measured(DS.Font.excerpt) != measured(DS.Font.body))
         #expect(measured(DS.Font.body) == measured(.system(size: 13)))
     }
 

@@ -366,7 +366,7 @@ final class ParolaAutomationServer {
         "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt",
         "diarize", "selectedModel", "selectedLanguageRaw",
         "translate", "dictationEnabled", "appTheme", "monospacedTimestamps",
-        "sidebarDensity", "dictationCleanupPromptID", "dictationPerAppOverridesJSON",
+        "dictationCleanupPromptID", "dictationPerAppOverridesJSON",
         "meetingDetectorEnabled", "dictationModeRaw", "dictationKeyCode",
         "dictationIndicatorStyleRaw", "automationBridgeEnabled",
         "transcriptDisplayMode", "generateCardMetadata", "showAITitles", "showAISummaries",

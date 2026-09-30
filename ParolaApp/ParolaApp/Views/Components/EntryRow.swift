@@ -52,27 +52,16 @@ enum EntrySourceKind: Equatable {
     }
 }
 
-/// What a row is tall, by density and by whether it has something to say under its title.
+/// How tall every row of entries is, and where its parts sit.
 enum EntryRowMetrics {
-    static let detail: CGFloat = 66
-    static let compactDetail: CGFloat = 42
-    /// The badge, not the text, is what a row with nothing to quote is as tall as.
-    static let titleOnly: CGFloat = 44
-    static let compactTitleOnly: CGFloat = 36
+    static let height: CGFloat = 50
     static let badgeSide: CGFloat = 28
-    /// Where a row's text starts, so a separator runs under the text instead of under the badge.
+    /// Where a row's text starts, so what runs under a row lines up with its text instead of its badge.
     static let textInset: CGFloat = badgeSide + DS.Spacing.regular
     /// Wide enough for h:mm:ss under ten hours, so the snippets of a mixed list start on the same column.
     static let timecodeWidth: CGFloat = 52
-
-    static func height(compact: Bool, hasDetail: Bool) -> CGFloat {
-        switch (compact, hasDetail) {
-        case (false, true): return detail
-        case (true, true): return compactDetail
-        case (false, false): return titleOnly
-        case (true, false): return compactTitleOnly
-        }
-    }
+    /// Wide enough for "23 h 59 min", so every row's time sits on the same column.
+    static let durationWidth: CGFloat = 70
 }
 
 /// The tinted square a row or a job leads with.
@@ -95,31 +84,17 @@ struct EntryBadge: View {
     }
 }
 
-/// Who paints a row: a `List` paints its own selection, Home paints its own hover.
-enum EntryRowStyle {
-    case list
-    case home
-
-    /// Home and Recently Deleted wrap the row in chrome of their own, so the row draws none inside it.
-    func paintsRowChrome(drawsHover: Bool) -> Bool {
-        self == .list && drawsHover
-    }
-}
-
 /// The line under a row's title: what the entry says, or where a search hit it.
 enum EntryRowDetail {
     case excerpt(String?)
     case snippet(AttributedString, timecode: String?, reservesTimecode: Bool)
 }
 
-/// The one row every list of entries draws: Home Recent, the library lists, search results and Recently Deleted.
+/// The one row every list of entries draws: the library, search results and Recently Deleted.
 struct EntryRow<Accessory: View, Actions: View>: View {
     let display: LibraryRowDisplay
-    var style: EntryRowStyle = .list
     var detail: EntryRowDetail = .excerpt(nil)
     var isSelected: Bool = false
-    /// Grouped lists carry the day in their header, so their rows show the time of day instead.
-    var showsTimeOnly: Bool = true
     var help: String?
     /// Off for a caller that draws something under the row and washes the two together.
     var drawsHover: Bool = true
@@ -133,27 +108,21 @@ struct EntryRow<Accessory: View, Actions: View>: View {
 
     init(
         display: LibraryRowDisplay,
-        style: EntryRowStyle = .list,
         detail: EntryRowDetail = .excerpt(nil),
         isSelected: Bool = false,
-        showsTimeOnly: Bool = true,
         help: String? = nil,
         drawsHover: Bool = true,
         @ViewBuilder accessory: () -> Accessory,
         @ViewBuilder trailingActions: () -> Actions
     ) {
         self.display = display
-        self.style = style
         self.detail = detail
         self.isSelected = isSelected
-        self.showsTimeOnly = showsTimeOnly
         self.help = help
         self.drawsHover = drawsHover
         self.accessory = accessory()
         self.trailingActions = trailingActions()
     }
-
-    private var compact: Bool { model.sidebarDensity == "compact" }
 
     private var detailText: AttributedString? {
         switch detail {
@@ -165,12 +134,15 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         }
     }
 
-    private var detailLines: Int { compact ? 1 : 2 }
+    /// A search hit stays in the chrome's face, so its highlight reads as it always has.
+    private var detailFont: Font {
+        if case .snippet = detail { return DS.Font.body }
+        return DS.Font.excerpt
+    }
 
     /// Declaring the height keeps NSTableView off its uncached automatic-row-height path; accessibility sizes outgrow the constant, so they go back to measuring.
     private var rowHeight: CGFloat? {
-        guard style == .list, !typeSize.isAccessibilitySize else { return nil }
-        return EntryRowMetrics.height(compact: compact, hasDetail: detailText != nil)
+        typeSize.isAccessibilitySize ? nil : EntryRowMetrics.height
     }
 
     /// The system flips `.secondary` white regardless of what `onAccent` solved to, so the row sets its own ink — the same one the badge and chips already use.
@@ -188,9 +160,10 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             .onHover { isHovering = $0 }
     }
 
+    /// The row pads itself inside its hover wash, so the wash spans what the system selection spans.
     @ViewBuilder
     private var chromedRow: some View {
-        let row = HStack(alignment: .top, spacing: DS.Spacing.regular) {
+        let row = HStack(spacing: DS.Spacing.regular) {
             EntryBadge(kind: display.sourceKind, onAccent: onAccent)
             VStack(alignment: .leading, spacing: DS.Spacing.hair) {
                 titleLine
@@ -199,47 +172,62 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             trailingActions
         }
-        .padding(.vertical, compact ? DS.Spacing.tight : DS.Spacing.small)
-        .frame(height: rowHeight, alignment: .top)
+        .frame(minHeight: EntryRowMetrics.height)
+        .frame(height: rowHeight)
         .frame(maxWidth: .infinity, alignment: .leading)
 
-        if style.paintsRowChrome(drawsHover: drawsHover) {
-            row.rowChrome(selected: isSelected, hovered: isHovering, selection: .native)
+        if drawsHover {
+            row
+                .padding(.horizontal, DS.Spacing.small)
+                .rowChrome(selected: isSelected, hovered: isHovering, selection: .native)
         } else {
             row
         }
     }
 
     private var titleLine: some View {
-        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
-            HStack(spacing: DS.Spacing.tight) {
-                if display.pinned {
-                    Image(systemName: "pin.fill")
-                        .font(DS.Font.caption)
-                        .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.accent)
-                }
-                Text(display.title)
-                    .font(DS.Font.bodyStrong)
-                    .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.primaryText)
-                    .lineLimit(1)
-                if display.noteCount > 0 { noteChip }
+        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.snug) {
+            Text(display.title)
+                .font(DS.Font.body.weight(.semibold))
+                .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.primaryText)
+                .lineLimit(1)
+            if display.pinned {
+                Image(systemName: "pin.fill")
+                    .font(DS.Font.caption)
+                    .imageScale(.small)
+                    .foregroundStyle(secondaryStyle)
+                    .accessibilityLabel("Pinned")
             }
-            Text(showsTimeOnly ? display.timeOfDay : display.shortDate)
+            if display.noteCount > 0 { noteChip }
+            labelChips
+            if let language = display.language {
+                chip {
+                    HStack(spacing: DS.Spacing.hair) {
+                        Image(systemName: "globe")
+                            .accessibilityHidden(true)
+                        Text(verbatim: language)
+                    }
+                }
+            }
+            Spacer(minLength: DS.Spacing.regular)
+            Text(verbatim: display.when)
                 .font(DS.Font.secondary)
                 .monospacedDigit()
                 .foregroundStyle(secondaryStyle)
                 .lineLimit(1)
                 .fixedSize()
-            Spacer(minLength: DS.Spacing.small)
-            labelChips
-            MetaLine(timecode: display.durationLabel, [display.languageLabel, display.modelLabel], tint: secondaryStyle)
-                .layoutPriority(1)
+            Text(verbatim: display.duration ?? "")
+                .font(DS.Font.secondary)
+                .monospacedDigit()
+                .foregroundStyle(secondaryStyle)
+                .lineLimit(1)
+                .frame(width: EntryRowMetrics.durationWidth, alignment: .trailing)
+                .accessibilityHidden(display.duration == nil)
         }
     }
 
-    @ViewBuilder
     private var detailLine: some View {
-        HStack(alignment: .top, spacing: DS.Spacing.small) {
+        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
             if case .snippet(_, let timecode, let reserves) = detail, reserves {
                 // Hidden rather than empty: an empty Text sits on a different baseline and shifts the row.
                 Text(timecode ?? "00:00")
@@ -253,9 +241,9 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             }
             if let detailText {
                 Text(detailText)
-                    .font(DS.Font.body)
+                    .font(detailFont)
                     .foregroundStyle(secondaryStyle)
-                    .lineLimit(detailLines)
+                    .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             accessory
@@ -283,53 +271,44 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         if !shown.isEmpty {
             HStack(spacing: DS.Spacing.tight) {
                 ForEach(shown, id: \.self) { label in
-                    chip(Text(verbatim: label))
+                    chip { Text(verbatim: label) }
                 }
                 if hidden > 0 {
-                    chip(Text(verbatim: "+\(AppFormat.integer(hidden))"))
+                    chip { Text(verbatim: "+\(AppFormat.integer(hidden))") }
                 }
             }
             .help(display.labels.joined(separator: ", "))
         }
     }
 
-    /// Sized to the text so it doesn't steal the excerpt's line, and veiled in the foreground so it reads on a selected row's accent fill.
-    private func chip(_ label: Text) -> some View {
-        label
+    /// Sized to its text so the title gives way first, and veiled in the foreground so it reads on a selected row's accent fill.
+    private func chip<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
             .font(DS.Font.caption)
             .monospacedDigit()
             .foregroundStyle(secondaryStyle)
             .lineLimit(1)
             .padding(.horizontal, DS.Spacing.snug)
+            .padding(.vertical, 1)
             .background(
                 Capsule(style: .continuous)
-                    .fill(onAccent ? DS.Color.onAccentWash : DS.Color.surfaceElevated)
+                    .fill(onAccent ? DS.Color.onAccentWash : DS.Palette.subtleFill)
             )
-            .overlay(
-                Capsule(style: .continuous)
-                    .strokeBorder(
-                        onAccent ? DS.Color.onAccent.opacity(0.35) : DS.Color.separator.opacity(0.4),
-                        lineWidth: 0.5
-                    )
-            )
+            .fixedSize()
     }
 }
 
 extension EntryRow where Accessory == EmptyView, Actions == EmptyView {
     init(
         display: LibraryRowDisplay,
-        style: EntryRowStyle = .list,
         detail: EntryRowDetail = .excerpt(nil),
         isSelected: Bool = false,
-        showsTimeOnly: Bool = true,
         help: String? = nil
     ) {
         self.init(
             display: display,
-            style: style,
             detail: detail,
             isSelected: isSelected,
-            showsTimeOnly: showsTimeOnly,
             help: help,
             accessory: { EmptyView() },
             trailingActions: { EmptyView() }
@@ -340,19 +319,15 @@ extension EntryRow where Accessory == EmptyView, Actions == EmptyView {
 extension EntryRow where Actions == EmptyView {
     init(
         display: LibraryRowDisplay,
-        style: EntryRowStyle = .list,
         detail: EntryRowDetail = .excerpt(nil),
         isSelected: Bool = false,
-        showsTimeOnly: Bool = true,
         help: String? = nil,
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.init(
             display: display,
-            style: style,
             detail: detail,
             isSelected: isSelected,
-            showsTimeOnly: showsTimeOnly,
             help: help,
             accessory: accessory,
             trailingActions: { EmptyView() }

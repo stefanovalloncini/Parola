@@ -47,7 +47,6 @@ struct LibraryRowList: View {
                             row: row,
                             detail: detail,
                             isSelected: selection.contains(row.id),
-                            showsTime: group.showsTime,
                             rename: rename
                         )
                         .equatable()
@@ -56,6 +55,7 @@ struct LibraryRowList: View {
                 } header: {
                     groupHeader(group)
                 }
+                .listSectionSeparator(.hidden)
             }
         }
         .listStyle(.inset)
@@ -79,8 +79,8 @@ struct LibraryRowList: View {
     private func groupHeader(_ group: LibraryDateGroups.Group) -> some View {
         if let title = group.title {
             Text(verbatim: title)
-                .font(DS.Font.heading)
-                .foregroundStyle(DS.Color.primaryText)
+                .font(DS.Font.body.weight(.semibold))
+                .foregroundStyle(DS.Color.secondaryText)
                 .textCase(nil)
                 .listRowInsets(EdgeInsets(
                     top: DS.Spacing.regular,
@@ -99,18 +99,15 @@ struct LibraryListRow: View, Equatable {
     let row: LibraryRowDisplay
     let detail: LibraryRowList.Detail
     let isSelected: Bool
-    let showsTime: Bool
     let rename: (LibraryEntry) -> Void
 
     nonisolated static func == (lhs: LibraryListRow, rhs: LibraryListRow) -> Bool {
-        lhs.row == rhs.row && lhs.detail == rhs.detail && lhs.isSelected == rhs.isSelected && lhs.showsTime == rhs.showsTime
+        lhs.row == rhs.row && lhs.detail == rhs.detail && lhs.isSelected == rhs.isSelected
     }
 
     var body: some View {
         let entry = row.entry
         return rowContent
-            // Both branches draw the same anatomy, so the rule runs under the text, never under the badge.
-            .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + SearchResultRow.separatorInset }
             .contentShape(Rectangle())
             .draggable(entry.bundleURL)
             .contextMenu {
@@ -151,25 +148,16 @@ struct LibraryListRow: View, Equatable {
                 .accessibilityIdentifier("library.row.\(entry.id).delete")
             }
             .accessibilityIdentifier("library.row.\(entry.id)")
-            // List(.inset) indents its rows by 16pt of its own; this lands them on the 24pt gutter.
-            .listRowInsets(EdgeInsets(
-                top: DS.Spacing.tight,
-                leading: DS.Spacing.small,
-                bottom: DS.Spacing.tight,
-                trailing: DS.Spacing.small
-            ))
+            // None: the row pads itself inside its hover wash, and List(.inset)'s own 16 pt lands its badge on the 24 pt gutter.
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
     }
 
     @ViewBuilder
     private var rowContent: some View {
         switch detail {
         case .excerpt:
-            EntryRow(
-                display: row,
-                detail: .excerpt(row.excerpt),
-                isSelected: isSelected,
-                showsTimeOnly: showsTime
-            )
+            EntryRow(display: row, detail: .excerpt(row.excerpt), isSelected: isSelected)
         case .match(let showsTimestamp):
             SearchResultRow(
                 display: row,

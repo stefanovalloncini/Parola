@@ -91,27 +91,55 @@ struct LibraryListContentTests {
     }
 
     /// The list holds these in state; `body` only reads them, so a row click no longer regroups the library.
-    @Test("the groups the list holds follow its entries and its sort order")
+    @Test("the groups the list holds follow its sort order and the Group by Date setting")
     func groupsFollowTheSortOrder() {
         let displays = [
             entry(id: "a", title: "Alpha", offset: 0),
-            entry(id: "b", title: "Beta", offset: -90_000),
+            entry(id: "b", title: "Beta", offset: -3 * 86_400),
         ].map { LibraryRowDisplay(entry: $0) }
+        func groups(_ sortOrder: LibrarySortOrder, byDate: Bool = true) -> [LibraryDateGroups.Group] {
+            LibraryDateGroups.Headers(sortOrder: sortOrder, groupsByDate: byDate, now: Self.baseDate).groups(for: displays)
+        }
 
-        let byDay = LibraryListContent.groups(for: displays, sortOrder: .newest, isSearchResult: false)
-        #expect(byDay.map { $0.rows.map(\.id) } == [["a"], ["b"]])
-        #expect(byDay.map(\.showsTime) == [true, true])
-        #expect(Set(byDay.map(\.id)).count == 2)
+        #expect(groups(.newest).map { $0.rows.map(\.id) } == [["a"], ["b"]])
+        #expect(groups(.newest).map(\.id) == ["today", "week"])
+        #expect(groups(.titleAZ).map(\.id) == ["all"])
+        #expect(groups(.titleAZ).first?.title == nil)
+        #expect(groups(.newest, byDate: false).map(\.id) == ["all"])
+        #expect(groups(.newest, byDate: false).first?.rows.map(\.id) == ["a", "b"])
+        #expect(LibraryDateGroups.Headers(sortOrder: .newest, groupsByDate: true).groups(for: []).isEmpty)
+    }
 
-        let byTitle = LibraryListContent.groups(for: displays, sortOrder: .titleAZ, isSearchResult: false)
-        #expect(byTitle.map(\.id) == ["all"])
-        #expect(byTitle.first?.title == nil)
+    /// Rows name their language against the whole library, so a filtered all-Italian page still says so on each row.
+    @Test("the usual language is the library's, whatever the page shows or the trash holds")
+    func usualLanguageIsTheLibrarys() async {
+        let model = await makeModel()
+        model.libraryEntries = [
+            entry(id: "a", title: "Alpha", offset: 0, language: "en"),
+            entry(id: "b", title: "Beta", offset: 10, language: "en"),
+            entry(id: "c", title: "Gamma", offset: 20, category: .meeting, language: "it"),
+        ]
+        model.deletedEntries = (0..<5).map { entry(id: "d\($0)", title: "Deleted \($0)", offset: 30, language: "it") }
+        #expect(model.usualLanguage == "EN")
 
-        let results = LibraryListContent.groups(for: displays, sortOrder: .newest, isSearchResult: true)
-        #expect(results.map(\.id) == ["results"])
-        #expect(results.first?.rows.map(\.id) == ["a", "b"])
+        model.libraryEntries += [
+            entry(id: "e", title: "Epsilon", offset: 40, language: "it"),
+            entry(id: "f", title: "Zeta", offset: 50, language: "it"),
+        ]
+        #expect(model.usualLanguage == "IT")
+    }
 
-        #expect(LibraryListContent.groups(for: [], sortOrder: .newest, isSearchResult: false).isEmpty)
+    @Test("Group by Date starts on and is remembered across launches")
+    func groupingByDateIsRemembered() async {
+        let defaults = temporaryDefaults()
+        let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("group-by-date"))
+        await model.libraryRefreshTask?.value
+        #expect(model.libraryGroupsByDate)
+
+        model.libraryGroupsByDate = false
+        let relaunched = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("group-by-date-2"))
+        await relaunched.libraryRefreshTask?.value
+        #expect(!relaunched.libraryGroupsByDate)
     }
 
     /// The list recomputes on `libraryVersion`; that is how the sort menu reaches it without an `onChange` of its own.
@@ -207,66 +235,8 @@ struct LibraryListContentTests {
         #expect(selection == ["a", "b", "c"])
     }
 
-    /// Library rows are laid out in the sidebar, not the transcript pane; the width is this suite's own.
+    /// A width of this suite's own: a row keeps its one height at any width.
     private static let measuredRowWidth: CGFloat = 520
-
-    private func rowHeight(
-        density: String,
-        style: EntryRowStyle,
-        excerpt: String? = nil,
-        labels: [String] = []
-    ) async -> CGFloat {
-        let model = await makeModel()
-        model.sidebarDensity = density
-        let display = LibraryRowDisplay(
-            entry: entry(id: "a", title: "Alpha", offset: 0, labels: labels),
-            excerpt: excerpt
-        )
-        let host = NSHostingView(
-            rootView: EntryRow(display: display, style: style, detail: .excerpt(excerpt))
-                .environment(model)
-                .frame(width: Self.measuredRowWidth)
-        )
-        host.layoutSubtreeIfNeeded()
-        return host.fittingSize.height
-    }
-
-    /// The home style carries the same content without the declared height, so it measures what the library row
-    /// is pinned to. Comparing the two is what can fail: asserting the library row's own constant cannot.
-    @Test("the declared library row height is the height the row would have measured")
-    func rowHeightMatchesMeasuredContent() async {
-        let excerpt = String(repeating: "parola ", count: 60)
-        let comfortable = await rowHeight(density: "comfortable", style: .home, excerpt: excerpt)
-        let compact = await rowHeight(density: "compact", style: .home, excerpt: excerpt)
-        let titleOnly = await rowHeight(density: "comfortable", style: .home)
-        let compactTitleOnly = await rowHeight(density: "compact", style: .home)
-
-        #expect(comfortable == EntryRowMetrics.detail)
-        #expect(compact == EntryRowMetrics.compactDetail)
-        #expect(titleOnly == EntryRowMetrics.titleOnly)
-        #expect(compactTitleOnly == EntryRowMetrics.compactTitleOnly)
-        #expect(await rowHeight(density: "comfortable", style: .list, excerpt: excerpt) == comfortable)
-        #expect(await rowHeight(density: "compact", style: .list, excerpt: excerpt) == compact)
-        #expect(await rowHeight(density: "comfortable", style: .list) == titleOnly)
-    }
-
-    /// A chip taller than the title line would pay for itself with the excerpt's second line.
-    @Test("label chips leave the excerpt the same room as a row without them")
-    func labelChipsDoNotShortenTheExcerpt() async {
-        let excerpt = String(repeating: "parola ", count: 60)
-        let plain = await rowHeight(density: "comfortable", style: .home, excerpt: excerpt)
-        let labelled = await rowHeight(
-            density: "comfortable",
-            style: .home,
-            excerpt: excerpt,
-            labels: ["draft", "shared", "q4"]
-        )
-
-        #expect(labelled == plain)
-        #expect(labelled == EntryRowMetrics.detail)
-        #expect(await rowHeight(density: "compact", style: .home, excerpt: excerpt, labels: ["draft"])
-            == EntryRowMetrics.compactDetail)
-    }
 
     private func mixedLibrary() -> [LibraryEntry] {
         [
@@ -541,12 +511,12 @@ struct LibraryListContentTests {
             host.layoutSubtreeIfNeeded()
             return host.fittingSize.height
         }
-        let twoLines = height(String(repeating: "parola ", count: 40))
-        #expect(twoLines == EntryRowMetrics.detail)
-        #expect(twoLines == height(String(repeating: "parola ", count: 400)))
-        #expect(height("breve") == twoLines)
-        #expect(height("") == twoLines)
-        #expect(height("breve", at: 754) == twoLines)
-        #expect(height(String(repeating: "parola ", count: 400), at: 754) == twoLines)
+        let long = height(String(repeating: "parola ", count: 40))
+        #expect(long == EntryRowMetrics.height)
+        #expect(long == height(String(repeating: "parola ", count: 400)))
+        #expect(height("breve") == long)
+        #expect(height("") == long)
+        #expect(height("breve", at: 754) == long)
+        #expect(height(String(repeating: "parola ", count: 400), at: 754) == long)
     }
 }

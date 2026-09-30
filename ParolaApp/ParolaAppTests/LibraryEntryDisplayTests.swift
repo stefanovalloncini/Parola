@@ -272,52 +272,39 @@ struct LibraryEntryDisplayTests {
         #expect(cache.displays.count == 1)
     }
 
-    @Test("the row caption names the model the entry was transcribed with")
-    func rowCarriesTheModelName() {
-        #expect(display(modelName: "openai_whisper-large-v3_turbo").modelLabel == "Whisper Large v3 Turbo")
-        #expect(display(modelName: "stub").modelLabel == "stub")
-        #expect(display(modelName: "  ").modelLabel == nil)
+    @Test("a model is named the way the catalogue names it")
+    func modelNameComesFromTheCatalogue() {
+        #expect(LibraryEntryDisplay.modelName(raw: "openai_whisper-large-v3_turbo") == "Whisper Large v3 Turbo")
+        #expect(LibraryEntryDisplay.modelName(raw: "stub") == "stub")
+        #expect(LibraryEntryDisplay.modelName(raw: "  ") == nil)
     }
 
     @Test("a subtitle import names no model")
     func importedSubtitlesHaveNoModel() {
-        #expect(display(modelName: "imported-srt").modelLabel == nil)
-        #expect(display(modelName: "imported-vtt").modelLabel == nil)
+        #expect(LibraryEntryDisplay.modelName(raw: "imported-srt") == nil)
+        #expect(LibraryEntryDisplay.modelName(raw: "imported-vtt") == nil)
     }
 
     @Test("a video's own captions read as captions, not as an internal id")
     func youtubeCaptionsReadPlainly() {
-        #expect(display(modelName: "youtube-subs").modelLabel == "YouTube subtitles")
-        #expect(display(modelName: "youtube-auto-subs").modelLabel == "YouTube auto subtitles")
+        #expect(LibraryEntryDisplay.modelName(raw: "youtube-subs") == "YouTube subtitles")
+        #expect(LibraryEntryDisplay.modelName(raw: "youtube-auto-subs") == "YouTube auto subtitles")
     }
 
-    @Test("two runs of the same recording differ by their model caption")
-    func sameRecordingDifferentModels() {
-        let turbo = display(modelName: "openai_whisper-large-v3_turbo")
-        let speech = display(modelName: "apple-speech-analyzer")
-        #expect(turbo.title == speech.title)
-        #expect(turbo.shortDate == speech.shortDate)
-        #expect(turbo.modelLabel != speech.modelLabel)
-    }
-
-    @Test("a named date replaces the slot a bare day would fill")
-    func dateLabelNamesTheSlot() {
+    @Test("a named time takes the place of the day the row would state")
+    func namedTimeReplacesTheDay() {
         let plain = display()
-        let stated = date.addingTimeInterval(-86_400)
-        let named = LibraryRowDisplay(entry: plain.entry, date: stated, dateLabel: "Deleted 12 Sep")
+        let named = LibraryRowDisplay(entry: plain.entry, when: "Deleted 12 Sep")
 
-        #expect(named.shortDate == "Deleted 12 Sep")
-        #expect(named.timeOfDay == "Deleted 12 Sep")
-        #expect(plain.shortDate != named.shortDate)
+        #expect(named.when == "Deleted 12 Sep")
+        #expect(plain.when != named.when)
     }
 
-    @Test("without a label the stated date is formatted as a day")
-    func statedDateFallsBackToTheDay() {
+    @Test("without a named time the row states the day it was made, as a row with no header over it does")
+    func unnamedTimeStatesTheDay() {
         let plain = display()
-        let stated = date.addingTimeInterval(-86_400)
-        let dated = LibraryRowDisplay(entry: plain.entry, date: stated)
 
-        #expect(dated.shortDate == AppFormat.dayAndMonth(stated))
+        #expect(plain.when == LibraryRowFormat.when(date, under: nil))
     }
 
     @Test("the row's hover strings are formatted with the entry, not with every cell")
@@ -345,7 +332,7 @@ struct LibraryEntryDisplayTests {
         )
 
         var cache = LibraryRowDisplayCache()
-        let row = cache.display(for: entry, date: entry.deletedAt, dateLabel: "Deleted 12 Sep", showsAITitle: true)
+        let row = cache.display(for: entry, when: "Deleted 12 Sep", showsAITitle: true)
 
         #expect(row.title == "Grocery list")
     }

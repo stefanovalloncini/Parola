@@ -33,16 +33,17 @@ struct LibrarySearchResults: View {
         let resolved = ranking.compactMap { model.libraryEntry(id: $0) }
         var cache = displayCache
         cache.prune(keeping: ranking)
+        let usualLanguage = model.usualLanguage
         let displays = resolved.prefix(shownCount).map {
             cache.display(
-                for: $0, excerpt: nil,
+                for: $0, excerpt: nil, usualLanguage: usualLanguage,
                 showsAITitle: model.showAITitles, showsAISummary: model.showAISummaries
             )
         }
         displayCache = cache
         resultIDs = resolved.map(\.id)
         rows = displays
-        groups = LibraryListContent.groups(for: displays, sortOrder: model.librarySortOrder, isSearchResult: true)
+        groups = LibraryDateGroups.ungrouped(displays, id: "results")
         selection.formIntersection(resultIDs)
         model.fillSearchSnippets(for: displays.map(\.id))
     }

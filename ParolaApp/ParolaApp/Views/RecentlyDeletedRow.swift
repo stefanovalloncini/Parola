@@ -39,7 +39,6 @@ struct RecentlyDeletedRow: View {
                 display: display,
                 detail: .excerpt(display.excerpt),
                 isSelected: isSelected,
-                showsTimeOnly: false,
                 help: helpText,
                 drawsHover: false,
                 accessory: { countdown },

@@ -47,23 +47,12 @@ struct CustomizationPane: View {
                 SettingsSection("Palette") { CustomThemeEditor() }
             }
 
-            SettingsSection("Text and density") {
+            SettingsSection("Text") {
                 SettingRow("Monospaced timestamps",
                            description: "Use a fixed-width font for timestamps in the transcript.",
                            isFirst: true) {
                     Toggle("", isOn: $model.monospacedTimestamps).labelsHidden()
                         .axLeaf("Customization.Toggle.MonospacedTimestamps")
-                }
-                SettingRow("List density",
-                           description: "Row spacing in the library list.") {
-                    Picker("", selection: $model.sidebarDensity) {
-                        Text("Comfortable").tag("comfortable")
-                        Text("Compact").tag("compact")
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 160, alignment: .trailing)
-                    .axLeaf("Customization.Picker.SidebarDensity")
                 }
             }
             ResetPaneButton(scope: .customization)

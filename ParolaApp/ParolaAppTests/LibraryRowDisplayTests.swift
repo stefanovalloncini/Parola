@@ -85,6 +85,47 @@ struct LibraryRowDisplayTests {
         #expect(buffer(of: otherAfter.tooltip) == buffer(of: otherBefore.tooltip))
     }
 
+    private func spoken(in language: String, seconds: Double? = nil) -> LibraryEntry {
+        let manifest = ParolaDocument.Manifest(
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            originalAudioName: "Chiamata con il fornitore.m4a",
+            modelName: "m",
+            language: language,
+            durationSeconds: seconds
+        )
+        return LibraryEntry(id: "c", bundleURL: URL(fileURLWithPath: "/tmp/c.parola"), manifest: manifest)
+    }
+
+    @Test("a row names its language only when the library mostly speaks another")
+    func languageOnlyWhenItDiffers() {
+        let italian = spoken(in: "it")
+        #expect(LibraryRowDisplay(entry: italian, usualLanguage: "EN").language == LanguageDisplay.name(for: "it"))
+        #expect(LibraryRowDisplay(entry: italian, usualLanguage: "IT").language == nil)
+        #expect(LibraryRowDisplay(entry: spoken(in: "unknown"), usualLanguage: "EN").language == nil)
+    }
+
+    @Test("a row states its length in words")
+    func lengthInWords() {
+        #expect(LibraryRowDisplay(entry: spoken(in: "en", seconds: 4320)).duration == "1 h 12 min")
+        #expect(LibraryRowDisplay(entry: spoken(in: "en")).duration == nil)
+    }
+
+    @Test("the cache rebuilds a row whose time or usual language changed, and reuses it otherwise")
+    func cacheFollowsTheTimeAndTheLanguage() {
+        var cache = LibraryRowDisplayCache()
+        let subject = spoken(in: "it")
+
+        let first = cache.display(for: subject, when: "9:05", usualLanguage: "EN")
+        #expect(first.language == LanguageDisplay.name(for: "it"))
+        let again = cache.display(for: subject, when: "9:05", usualLanguage: "EN")
+        #expect(buffer(of: again.tooltip) == buffer(of: first.tooltip))
+
+        let lateNight = cache.display(for: subject, when: "Yesterday 9:05", usualLanguage: "EN")
+        #expect(lateNight.when == "Yesterday 9:05")
+        #expect(buffer(of: lateNight.tooltip) != buffer(of: first.tooltip))
+        #expect(cache.display(for: subject, when: "Yesterday 9:05", usualLanguage: "IT").language == nil)
+    }
+
     @Test("flipping the AI toggles rebuilds the row the toggles change")
     func aiTogglesRebuildTheRow() {
         var cache = LibraryRowDisplayCache()

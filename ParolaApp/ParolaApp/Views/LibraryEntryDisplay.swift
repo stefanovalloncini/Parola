@@ -87,15 +87,16 @@ enum LibraryEntryDisplay {
     }
 }
 
-/// The strings a library row draws that are costly and never age, formatted once per entry snapshot.
+/// The strings a library row draws, formatted once per entry snapshot and kept while they still read true.
 struct LibraryRowDisplay: Identifiable, Equatable {
     let entry: LibraryEntry
     let title: String
-    let timeOfDay: String
-    let shortDate: String
-    let durationLabel: String?
-    let modelLabel: String?
-    let languageLabel: String?
+    let when: String
+    let duration: String?
+    /// Named only when it isn't the library's usual language.
+    let language: String?
+    /// The usual language as passed in — what the cache compares against.
+    let usualLanguage: String?
     let tooltip: String
     /// The opening of the transcript, read from the search index. nil until the index has the entry.
     /// Replaced by the entry's AI summary when `showsAISummary` is set.
@@ -117,11 +118,9 @@ struct LibraryRowDisplay: Identifiable, Equatable {
             && lhs.entry.bundleURL == rhs.entry.bundleURL
             && lhs.entry.manifest == rhs.entry.manifest
             && lhs.title == rhs.title
-            && lhs.timeOfDay == rhs.timeOfDay
-            && lhs.shortDate == rhs.shortDate
-            && lhs.durationLabel == rhs.durationLabel
-            && lhs.modelLabel == rhs.modelLabel
-            && lhs.languageLabel == rhs.languageLabel
+            && lhs.when == rhs.when
+            && lhs.duration == rhs.duration
+            && lhs.language == rhs.language
             && lhs.tooltip == rhs.tooltip
             && lhs.excerpt == rhs.excerpt
             && lhs.rawExcerpt == rhs.rawExcerpt
@@ -130,30 +129,30 @@ struct LibraryRowDisplay: Identifiable, Equatable {
             && lhs.sourceKind == rhs.sourceKind
     }
 
-    /// `date` is what the row states; `dateLabel` names it where the bare day would read as the creation.
+    /// A nil `when` states the creation day with no header over the row. `usualLanguage` is the library's, as a code.
     /// `showsAITitle`/`showsAISummary` swap in the entry's generated title and summary when it has one.
     init(
         entry: LibraryEntry,
         excerpt: String? = nil,
-        date: Date? = nil,
-        dateLabel: String? = nil,
+        when: String? = nil,
+        usualLanguage: String? = nil,
         showsAITitle: Bool = false,
         showsAISummary: Bool = false
     ) {
         let title = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showsAITitle)
-        let stated = date ?? entry.createdAt
         self.entry = entry
         self.title = title
+        self.when = when ?? LibraryRowFormat.when(entry.createdAt, under: nil)
+        duration = LibraryRowFormat.duration(entry.durationSeconds)
+        self.usualLanguage = usualLanguage
+        language = LanguageDisplay.code(for: entry.language) == usualLanguage
+            ? nil
+            : LanguageDisplay.name(for: entry.language)
         self.excerpt = showsAISummary ? (entry.shortSummary ?? excerpt) : excerpt
         self.rawExcerpt = excerpt
         self.showsAITitle = showsAITitle
         self.showsAISummary = showsAISummary
         sourceKind = EntrySourceKind(entry: entry)
-        timeOfDay = dateLabel ?? AppFormat.timeOfDay(stated)
-        shortDate = dateLabel ?? AppFormat.dayAndMonth(stated)
-        durationLabel = entry.durationSeconds.flatMap { $0 > 0 ? Timecode.format($0) : nil }
-        modelLabel = LibraryEntryDisplay.modelName(raw: entry.modelName)
-        languageLabel = LanguageDisplay.name(for: entry.language)
 
         var parts = [title, AppFormat.longDateAndTime(entry.createdAt)]
         if !entry.labels.isEmpty {
@@ -182,16 +181,19 @@ struct LibraryRowDisplayCache {
         displays.removeAll(keepingCapacity: true)
     }
 
-    /// `date` and `dateLabel` are left out of the hit test because every caller derives them from the manifest.
+    /// The time is part of the hit test: the same entry reads differently under another header or on another day.
     mutating func display(
         for entry: LibraryEntry,
         excerpt: String? = nil,
-        date: Date? = nil,
-        dateLabel: String? = nil,
+        when: String? = nil,
+        usualLanguage: String? = nil,
         showsAITitle: Bool = false,
         showsAISummary: Bool = false
     ) -> LibraryRowDisplay {
+        let when = when ?? LibraryRowFormat.when(entry.createdAt, under: nil)
         if let cached = displays[entry.id],
+           cached.when == when,
+           cached.usualLanguage == usualLanguage,
            cached.rawExcerpt == excerpt,
            cached.showsAITitle == showsAITitle,
            cached.showsAISummary == showsAISummary,
@@ -199,7 +201,7 @@ struct LibraryRowDisplayCache {
             return cached
         }
         let display = LibraryRowDisplay(
-            entry: entry, excerpt: excerpt, date: date, dateLabel: dateLabel,
+            entry: entry, excerpt: excerpt, when: when, usualLanguage: usualLanguage,
             showsAITitle: showsAITitle, showsAISummary: showsAISummary
         )
         displays[entry.id] = display

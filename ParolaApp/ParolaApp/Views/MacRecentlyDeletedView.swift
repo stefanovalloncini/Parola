@@ -277,12 +277,13 @@ struct MacRecentlyDeletedView: View {
     private func recomputeRows() {
         var cache = displayCache
         cache.prune(keeping: model.deletedEntries.lazy.map(\.id))
+        let usualLanguage = model.usualLanguage
         rows = model.deletedEntries.map { entry in
             cache.display(
                 for: entry,
                 excerpt: RecentlyDeletedRow.previewText(previews[entry.id]),
-                date: entry.deletedAt,
-                dateLabel: RecentlyDeletedCopy.deletedOn(entry.deletedAt),
+                when: RecentlyDeletedCopy.deletedOn(entry.deletedAt),
+                usualLanguage: usualLanguage,
                 showsAITitle: model.showAITitles
             )
         }

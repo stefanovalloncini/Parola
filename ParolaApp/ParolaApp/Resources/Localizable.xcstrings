@@ -385,6 +385,28 @@
         }
       }
     },
+    "%lld h": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld h"
+          }
+        }
+      }
+    },
+    "%lld h %lld min": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld h %lld min"
+          }
+        }
+      }
+    },
     "%lld hours left": {
       "extractionState": "manual",
       "localizations": {
@@ -508,6 +530,17 @@
         }
       }
     },
+    "%lld min": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld min"
+          }
+        }
+      }
+    },
     "%lld ms": {
       "extractionState": "manual",
       "localizations": {
@@ -557,6 +590,17 @@
         }
       }
     },
+    "%lld s": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld s"
+          }
+        }
+      }
+    },
     "%lld segments": {
       "extractionState": "manual",
       "localizations": {
@@ -571,10 +615,40 @@
     "%lld transcripts": {
       "extractionState": "manual",
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld transcript"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld transcripts"
+                }
+              }
+            }
+          }
+        },
         "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld trascrizioni"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld trascrizione"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld trascrizioni"
+                }
+              }
+            }
           }
         }
       }
@@ -3382,16 +3456,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Schema di colori usato dall'export HTML."
-          }
-        }
-      }
-    },
-    "Comfortable": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Comoda"
           }
         }
       }
@@ -7252,17 +7316,6 @@
         }
       }
     },
-    "List density": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Densità elenco"
-          }
-        }
-      }
-    },
     "Listening": {
       "comment": "A placeholder text displayed when the user is not speaking.",
       "extractionState": "manual",
@@ -10305,6 +10358,28 @@
         }
       }
     },
+    "Previous 30 Days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 giorni precedenti"
+          }
+        }
+      }
+    },
+    "Previous 7 Days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 giorni precedenti"
+          }
+        }
+      }
+    },
     "Previous match": {
       "extractionState": "manual",
       "localizations": {
@@ -11435,17 +11510,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le anteprime delle righe usano il riassunto generato, quando esiste."
-          }
-        }
-      }
-    },
-    "Row spacing in the library list.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spaziatura delle righe nell'elenco della libreria."
           }
         }
       }
@@ -13615,17 +13679,6 @@
         }
       }
     },
-    "Text and density": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Testo e densità"
-          }
-        }
-      }
-    },
     "That URL isn't on a host yt-dlp can fetch.": {
       "extractionState": "manual",
       "localizations": {
@@ -14414,6 +14467,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Oggi"
+          }
+        }
+      }
+    },
+    "Today %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oggi %@"
           }
         }
       }
@@ -16012,6 +16076,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ieri"
+          }
+        }
+      }
+    },
+    "Yesterday %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ieri %@"
           }
         }
       }

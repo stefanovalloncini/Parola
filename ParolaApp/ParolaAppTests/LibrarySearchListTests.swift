@@ -223,7 +223,7 @@ struct LibrarySearchListTests {
     @Test("Select All counts entries, not the day headers the table also highlights")
     func selectAllCountsEntries() {
         let displays = entries(7).map { LibraryRowDisplay(entry: $0) }
-        let groups = LibraryDateGroups.groups(for: displays, sortOrder: .newest)
+        let groups = LibraryDateGroups.groups(for: displays, sortOrder: .newest, now: Self.baseDate)
         let highlighted = Set(groups.map(\.id)).union(displays.map(\.id))
         #expect(groups.count > 1)
         #expect(LibraryRowList.entries(in: highlighted, groups: groups) == Set(displays.map(\.id)))
@@ -261,7 +261,7 @@ struct LibrarySearchListTests {
         #expect(before != after)
 
         func row(_ display: LibraryRowDisplay) -> LibraryListRow {
-            LibraryListRow(row: display, detail: .excerpt, isSelected: false, showsTime: true, rename: { _ in })
+            LibraryListRow(row: display, detail: .excerpt, isSelected: false, rename: { _ in })
         }
         #expect(row(before) != row(after))
         #expect(row(before) == row(LibraryRowDisplay(entry: entry)))
