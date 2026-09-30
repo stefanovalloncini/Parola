@@ -2191,7 +2191,7 @@ final class AppModel {
     }
 
     func deleteModel(_ name: String) {
-        guard !modelsBeingDeleted.contains(name) else { return }
+        guard !isDeletingModel(name) else { return }
         modelsBeingDeleted.insert(name)
         let store = self.store
         Task { [weak self] in

@@ -81,14 +81,23 @@ extension AppModel {
         }
     }
 
+    func earlierCopies(of variantID: String) -> [SupersededCopy] {
+        supersededCopies.filter { $0.variantID == variantID }
+    }
+
     /// Deleting the model itself removes its earlier copies too.
     func isReclaiming(_ copy: SupersededCopy) -> Bool {
         modelsBeingDeleted.contains(copy.id) || modelsBeingDeleted.contains(copy.variantID)
     }
 
+    /// Clearing an earlier copy touches the model's folders too, so the model reads as busy meanwhile.
+    func isDeletingModel(_ name: String) -> Bool {
+        modelsBeingDeleted.contains(name) || earlierCopies(of: name).contains { modelsBeingDeleted.contains($0.id) }
+    }
+
     @discardableResult
     func reclaimSupersededCopy(_ variantID: String, in store: ModelStore = .shared) -> Task<Void, Never>? {
-        let copies = supersededCopies.filter { $0.variantID == variantID }
+        let copies = earlierCopies(of: variantID)
         guard let first = copies.first, !copies.contains(where: isReclaiming) else { return nil }
         let keys = Set(copies.map(\.id))
         modelsBeingDeleted.formUnion(keys)
