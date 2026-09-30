@@ -81,14 +81,14 @@ struct LibraryPageHeader: View {
             Divider()
             Toggle("Group by Date", isOn: $model.libraryGroupsByDate)
                 .disabled(!model.librarySortOrder.isChronological)
-                .axLeaf("Library.MenuItem.GroupByDate")
+                .axLeaf("MenuItem.GroupByDate")
         } label: {
             Label("Sort", systemImage: "arrow.up.arrow.down")
         }
         .labelStyle(.titleAndIcon)
         .libraryHeaderMenu()
         .help("Sort")
-        .axLeaf("Library.Menu.Sort")
+        .axLeaf("Menu.Sort")
     }
 
     /// Drawn in SwiftUI, not handed to AppKit like the text menus: AppKit would drop the glyph's spoken name.
@@ -102,11 +102,11 @@ struct LibraryPageHeader: View {
             Button { model.openStatistics() } label: {
                 Label("Statistics", systemImage: "chart.bar")
             }
-            .axLeaf("Library.MenuItem.Statistics")
+            .axLeaf("MenuItem.Statistics")
             Button { model.showingPeopleSheet = true } label: {
                 Label("Manage People…", systemImage: "person.2")
             }
-            .axLeaf("Library.MenuItem.ManagePeople")
+            .axLeaf("MenuItem.ManagePeople")
         } label: {
             Image(systemName: filtersInside ? "ellipsis.circle.fill" : "ellipsis.circle")
         }
@@ -118,6 +118,6 @@ struct LibraryPageHeader: View {
         .fixedSize()
         .help("More")
         .accessibilityLabel("More")
-        .axLeaf("Library.Menu.More")
+        .axLeaf("Menu.More")
     }
 }

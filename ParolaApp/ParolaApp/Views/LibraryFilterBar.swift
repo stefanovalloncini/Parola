@@ -85,45 +85,45 @@ struct LibraryFilterBar: View {
     private var labelsMenu: some View {
         Menu {
             Button("All Labels") { labelFilter = nil }
-                .axLeaf("Library.MenuItem.AllLabels")
+                .axLeaf("MenuItem.AllLabels")
             Divider()
             ForEach(labelOptions, id: \.self) { label in
                 Toggle(isOn: choosing(label, in: $labelFilter)) { Text(verbatim: label) }
-                    .axLeaf("Library.MenuItem.Label.\(label)")
+                    .axLeaf("MenuItem.Label.\(label)")
             }
         } label: {
             LibraryHeaderMenuLabel(title: Self.labelsTitle(labelFilter), isActive: labelFilter != nil)
         }
         .libraryHeaderMenu()
-        .axLeaf("Library.Menu.Labels")
+        .axLeaf("Menu.Labels")
     }
 
     private var peopleMenu: some View {
         Menu {
             Button("All People") { personFilter = nil }
-                .axLeaf("Library.MenuItem.AllPeople")
+                .axLeaf("MenuItem.AllPeople")
             if !peopleOptions.isEmpty {
                 Divider()
                 ForEach(peopleOptions) { person in
                     Toggle(isOn: choosing(person.id, in: $personFilter)) { Text(verbatim: person.name) }
-                        .axLeaf("Library.MenuItem.Person.\(person.name)")
+                        .axLeaf("MenuItem.Person.\(person.name)")
                 }
             }
         } label: {
             LibraryHeaderMenuLabel(title: Self.peopleTitle(selectedPerson?.name), isActive: personFilter != nil)
         }
         .libraryHeaderMenu()
-        .axLeaf("Library.Menu.People")
+        .axLeaf("Menu.People")
     }
 
     private var languageMenu: some View {
         Menu {
             Button("All Languages") { languageFilter = nil }
-                .axLeaf("Library.MenuItem.AllLanguages")
+                .axLeaf("MenuItem.AllLanguages")
             Divider()
             ForEach(languageOptions, id: \.self) { code in
                 Toggle(isOn: choosing(code, in: $languageFilter)) { Text(verbatim: languageName(code)) }
-                    .axLeaf("Library.MenuItem.Language.\(code)")
+                    .axLeaf("MenuItem.Language.\(code)")
             }
         } label: {
             LibraryHeaderMenuLabel(
@@ -132,7 +132,7 @@ struct LibraryFilterBar: View {
             )
         }
         .libraryHeaderMenu()
-        .axLeaf("Library.Menu.Language")
+        .axLeaf("Menu.Language")
     }
 
     private var dateMenu: some View {
@@ -141,14 +141,14 @@ struct LibraryFilterBar: View {
                 Toggle(isOn: Binding(get: { dateRangeFilter == option }, set: { if $0 { dateRangeFilter = option } })) {
                     Text(option.label)
                 }
-                .axLeaf("Library.MenuItem.Date.\(option.rawValue)")
+                .axLeaf("MenuItem.Date.\(option.rawValue)")
             }
         } label: {
             Text(dateRangeFilter.label)
                 .foregroundStyle(dateRangeFilter == .all ? DS.Color.primaryText : DS.Color.accentInk)
         }
         .libraryHeaderMenu()
-        .axLeaf("Library.Menu.Date")
+        .axLeaf("Menu.Date")
     }
 
     /// A checkmark on the one value the list is narrowed to; picking it again clears the filter.
