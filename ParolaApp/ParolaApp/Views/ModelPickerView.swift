@@ -3,22 +3,21 @@ import ParolaCore
 
 struct ModelPickerView: View {
     @Environment(AppModel.self) private var model
-    let shell: PillPickerShell
     let leaf: String?
 
     @State private var searchText = ""
     @State private var installedOnly = false
 
     var body: some View {
-        PillPickerButton(icon: "cpu", caption: String(localized: "Model"), value: currentLabel, shell: shell, popoverWidth: 400, leaf: leaf) {
-            ModelPickerPopover(searchText: $searchText, installedOnly: $installedOnly, offersDownloads: shell == .segment)
+        PillPickerButton(icon: "cpu", caption: String(localized: "Model"), value: currentLabel, popoverWidth: 400, leaf: leaf) {
+            ModelPickerPopover(searchText: $searchText, installedOnly: $installedOnly, offersDownloads: false)
         }
-        .help(shell == .segment ? "Active model. Models are downloaded on demand." : "Default model. Installed models only.")
+        .help("Default model. Installed models only.")
     }
 
     private var currentLabel: String {
         if let variant = ModelCatalog.variant(id: model.selectedModel) {
-            return shell == .standalone ? variant.displayName : Self.shortLabel(for: variant.displayName)
+            return variant.displayName
         }
         let installed = model.availableModels.first(where: { $0.name == model.selectedModel })?.label
         return Self.capped(installed ?? model.selectedModel)
@@ -36,7 +35,7 @@ struct ModelPickerView: View {
         return capped(replacements[displayName] ?? displayName)
     }
 
-    /// The catalog's own names all fit; an uncurated model id would widen the capsule past what the toolbar can spare the search field.
+    /// The catalog's own names all fit; an uncurated model id would push the intake strip's other controls aside.
     static let labelCharacterCap = 24
 
     static func capped(_ label: String) -> String {

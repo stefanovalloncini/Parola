@@ -1,6 +1,6 @@
 import Foundation
 
-/// The one language table shared by every picker (toolbar, Transcription Defaults,
+/// The one language table shared by every picker (intake, Transcription Defaults,
 /// dictation workflows) so the offered languages can't drift between surfaces.
 enum SupportedLanguages {
     static let codes: [String] = [

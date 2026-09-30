@@ -48,6 +48,13 @@ final class AppModel {
             case .systemAudio: return .systemAudio
             }
         }
+        /// System-audio takes are what the meetings feature gates.
+        var feature: ParolaFeature {
+            switch self {
+            case .microphone: return .micRecording
+            case .systemAudio: return .meetings
+            }
+        }
         /// What the meter under a take is listening to.
         var meterLabel: String {
             switch self {
@@ -608,7 +615,7 @@ final class AppModel {
     var assumedLanguageNotice: String? {
         guard let detection = transcript?.languageDetection, detection.isAssumed else { return nil }
         let name = LanguageDisplay.name(for: detection.code) ?? detection.code.uppercased()
-        return String(localized: "Parola couldn't detect the language and assumed \(name). Set it in the toolbar and transcribe again.")
+        return String(localized: "Parola couldn't detect the language and assumed \(name). Pick the language in the inspector to transcribe it again.")
     }
 
     var diarizeMismatchWarning: String? {
@@ -3040,7 +3047,7 @@ final class AppModel {
 
     func startRecording(source: RecordSource) {
         introduction.defer()
-        let needed: ParolaFeature = source == .microphone ? .micRecording : .meetings
+        let needed = source.feature
         guard features.isEnabled(needed) else {
             forgetTakeRequest()
             phase = .failed(message: ParolaError.featureDisabled(needed).description)
@@ -3117,6 +3124,11 @@ final class AppModel {
         if recordingCountdown != nil { return true }
         if case .recording = phase { return true }
         return false
+    }
+
+    /// What Record and File ▸ New Recording ask before they offer a take from `source`.
+    func canStartTake(_ source: RecordSource) -> Bool {
+        features.isEnabled(source.feature) && !recordingActive && !quitPending
     }
 
     /// Whether `take` still owns the recording state; a start or a stream that outlived its take leaves the next one alone.

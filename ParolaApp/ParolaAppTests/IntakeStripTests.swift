@@ -58,6 +58,35 @@ struct IntakeStripTests {
         #expect(IntakeSummary.text(for: model).hasSuffix(" · Speakers"))
     }
 
+    @Test("the popover explains an English-only model, on Auto and with a language it can't transcribe")
+    func languageNotice() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("intakenotice"))
+        model.selectedModel = "openai_whisper-large-v3_turbo"
+        model.selectedLanguage = "it"
+        #expect(IntakeSummary.languageNotice(for: model) == nil)
+
+        model.selectedModel = "nvidia_parakeet-tdt-0.6b-v2"
+        model.selectedLanguage = nil
+        #expect(IntakeSummary.languageNotice(for: model) != nil)
+        #expect(IntakeSummary.languageNotice(for: model) == model.englishOnlyAutoNotice)
+
+        model.selectedLanguage = "it"
+        #expect(IntakeSummary.languageNotice(for: model) != nil)
+        #expect(IntakeSummary.languageNotice(for: model) == model.languageMismatchWarning)
+    }
+
+    @Test("the popover shows the language notice, so it reaches more than Settings")
+    func popoverShowsTheLanguageNotice() throws {
+        let path = #filePath.replacingOccurrences(
+            of: "ParolaAppTests/IntakeStripTests.swift",
+            with: "ParolaApp/Views/Library/IntakeStrip.swift"
+        )
+        let source = try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        #expect(source.contains(
+            #"if let notice = IntakeSummary.languageNotice(for: model) { Label(notice, systemImage: "exclamationmark.triangle.fill")"#
+        ))
+    }
+
     @Test("the prompt offers links only when the build can fetch them")
     func prompt() {
         #expect(IntakeStrip.prompt(linksEnabled: true) == "Drop audio or video, or paste a link")

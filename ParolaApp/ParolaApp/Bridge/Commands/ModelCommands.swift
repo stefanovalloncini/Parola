@@ -6,7 +6,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "selectModel",
                 area: .model,
-                summary: "Selects the active transcription model, with the same side effects as the toolbar picker.",
+                summary: "Selects the active transcription model, with the same side effects as the model picker.",
                 kind: .mutating,
                 args: [
                     .init(name: "name", kind: .string(), required: true, summary: "Model name (e.g. openai_whisper-tiny)"),

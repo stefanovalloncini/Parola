@@ -1,33 +1,5 @@
 import SwiftUI
 
-/// One segment of the toolbar's intake capsule: no shell of its own, just a hover fill inside the shared one.
-struct IntakeSegment<Label: View>: View {
-    let action: () -> Void
-    @ViewBuilder var label: Label
-
-    @State private var hovering = false
-    @Environment(\.isEnabled) private var isEnabled
-
-    var body: some View {
-        Button(action: action) {
-            label
-                .padding(.horizontal, DS.Spacing.regular)
-                .frame(height: ToolbarCapsule.height)
-                .background(hovering ? DS.Palette.subtleFill : Color.clear)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .opacity(isEnabled ? 1 : DS.Opacity.disabled)
-        .onHover { hovering = isEnabled && $0 }
-    }
-}
-
-/// A segment borrows the toolbar capsule's chrome; a standalone pill wears its own so it can sit in a settings row.
-enum PillPickerShell {
-    case segment
-    case standalone
-}
-
 /// Written by hand rather than with `@Entry`: the macro warns about storing a closure it cannot compare.
 private struct DismissPillPopoverKey: EnvironmentKey {
     static let defaultValue: @MainActor @Sendable () -> Void = {}
@@ -45,7 +17,6 @@ struct PillPickerButton<MenuContent: View>: View {
     let icon: String
     let caption: String
     let value: String
-    var shell: PillPickerShell = .segment
     let popoverWidth: CGFloat
     var leaf: String? = nil
     @ViewBuilder var menuContent: () -> MenuContent
@@ -66,31 +37,21 @@ struct PillPickerButton<MenuContent: View>: View {
             .axLeaf(leaf ?? "Pill.Button.\(caption)")
     }
 
-    @ViewBuilder
     private var control: some View {
-        switch shell {
-        case .segment:
-            IntakeSegment {
-                isPresented = true
-            } label: {
-                label
-            }
-        case .standalone:
-            Button {
-                isPresented = true
-            } label: {
-                label
-                    .padding(.leading, DS.Spacing.regular)
-                    .padding(.trailing, DS.Spacing.small + DS.Spacing.hair)
-                    .frame(height: 28)
-                    .background(Capsule(style: .continuous).fill(hovering ? DS.Palette.pillFillHover : DS.Palette.pillFill))
-                    .overlay(Capsule(style: .continuous).strokeBorder(DS.Color.separator.opacity(0.6), lineWidth: 0.5))
-                    .contentShape(Capsule(style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .opacity(isEnabled ? 1 : DS.Opacity.disabled)
-            .onHover { hovering = isEnabled && $0 }
+        Button {
+            isPresented = true
+        } label: {
+            label
+                .padding(.leading, DS.Spacing.regular)
+                .padding(.trailing, DS.Spacing.small + DS.Spacing.hair)
+                .frame(height: 28)
+                .background(Capsule(style: .continuous).fill(hovering ? DS.Palette.pillFillHover : DS.Palette.pillFill))
+                .overlay(Capsule(style: .continuous).strokeBorder(DS.Color.separator.opacity(0.6), lineWidth: 0.5))
+                .contentShape(Capsule(style: .continuous))
         }
+        .buttonStyle(.plain)
+        .opacity(isEnabled ? 1 : DS.Opacity.disabled)
+        .onHover { hovering = isEnabled && $0 }
     }
 
     private var label: some View {

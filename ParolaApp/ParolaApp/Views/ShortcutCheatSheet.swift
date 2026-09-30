@@ -32,6 +32,8 @@ struct ShortcutCatalog {
 
     private static let allSections: [Section] = [
         Section(title: "Capture", entries: [
+            Entry(label: "New Recording",          keys: "⌘ N", requires: .micRecording),
+            Entry(label: "New System Audio Recording", keys: "⌘ ⌥ N", requires: .meetings),
             Entry(label: "Toggle Live Captions",   keys: "⌘ ⇧ L", requires: .liveCaptions),
             Entry(label: "Enter Presenter Mode",   keys: "⌘ ⇧ P", requires: .liveCaptions),
             Entry(label: "Show Scratchpad",        keys: "⌘ ⇧ K", requires: .dictation),

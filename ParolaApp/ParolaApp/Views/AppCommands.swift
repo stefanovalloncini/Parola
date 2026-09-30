@@ -39,6 +39,18 @@ struct FileCommands: View {
     let model: AppModel
 
     var body: some View {
+        if model.features.isEnabled(.micRecording) {
+            Button("New Recording") { model.startRecording(source: .microphone) }
+                .keyboardShortcut("n")
+                .disabled(!model.canStartTake(.microphone) || model.introduction.isPresented)
+                .axLeaf("Menu.File.NewRecording")
+        }
+        if model.features.isEnabled(.meetings) {
+            Button("New System Audio Recording") { model.startRecording(source: .systemAudio) }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+                .disabled(!model.canStartTake(.systemAudio) || model.introduction.isPresented)
+                .axLeaf("Menu.File.NewSystemAudioRecording")
+        }
         Button("Open…") { model.presentOpenPanel() }
             .keyboardShortcut("o")
             .disabled(model.introduction.isPresented)

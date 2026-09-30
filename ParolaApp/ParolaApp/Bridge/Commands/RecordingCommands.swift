@@ -34,7 +34,7 @@ extension ParolaAutomationServer {
                 handler: { args, ctx in
                     let source = (try args.optionalString("source")) ?? "microphone"
                     let recordSource: AppModel.RecordSource = (source == "systemAudio") ? .systemAudio : .microphone
-                    try ctx.require(recordSource == .microphone ? .micRecording : .meetings)
+                    try ctx.require(recordSource.feature)
                     let categoryRaw = (try args.optionalString("category")) ?? ""
                     let category = EntryCategory(rawValue: categoryRaw) ?? .transcription
                     let targets = try args.optionalStringArray("targetBundleIDs") ?? []

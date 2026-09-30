@@ -109,6 +109,11 @@ enum IntakeSummary {
             englishOnly: model.selectedModelCapabilities.supportedLanguages.isEnglishOnly
         )
     }
+
+    /// At most one applies: the English-only note needs Auto, the mismatch warning a picked language.
+    static func languageNotice(for model: AppModel) -> String? {
+        model.englishOnlyAutoNotice ?? model.languageMismatchWarning
+    }
 }
 
 /// "Whisper Turbo · Auto ›": opens the popover that sets up the next run.
@@ -161,7 +166,6 @@ struct IntakeSettingsPopover: View {
                         icon: "cpu",
                         caption: String(localized: "Model"),
                         value: IntakeSummary.modelLabel(for: model),
-                        shell: .standalone,
                         popoverWidth: 400,
                         leaf: "Intake.Button.Model"
                     ) {
@@ -171,7 +175,7 @@ struct IntakeSettingsPopover: View {
                 GridRow {
                     Text("Language")
                         .foregroundStyle(DS.Color.secondaryText)
-                    LanguagePickerView(shell: .standalone, leaf: "Intake.Button.Language")
+                    LanguagePickerView(leaf: "Intake.Button.Language")
                         .disabled(model.selectedModelCapabilities.supportedLanguages.isEnglishOnly)
                 }
             }
@@ -205,7 +209,7 @@ struct IntakeSettingsPopover: View {
                 .help("How many speakers to expect. Auto lets the diarizer decide.")
                 .axLeaf("Intake.Menu.ExpectedSpeakers")
             }
-            if let notice = model.englishOnlyAutoNotice {
+            if let notice = IntakeSummary.languageNotice(for: model) {
                 Label(notice, systemImage: "exclamationmark.triangle.fill")
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.warningText)

@@ -3,11 +3,10 @@ import ParolaCore
 
 struct LanguagePickerView: View {
     @Environment(AppModel.self) private var model
-    var shell: PillPickerShell = .segment
     var leaf: String? = nil
 
     var body: some View {
-        PillPickerButton(icon: "globe", caption: String(localized: "Language"), value: currentLabel, shell: shell, popoverWidth: 300, leaf: leaf) {
+        PillPickerButton(icon: "globe", caption: String(localized: "Language"), value: currentLabel, popoverWidth: 300, leaf: leaf) {
             LanguagePickerPopover()
         }
     }
@@ -60,7 +59,7 @@ struct LanguagePickerPopover: View {
         .padding(.horizontal, DS.Spacing.snug)
     }
 
-    /// A pick the model can't honour still goes through (the toolbar warns), but the row says so first.
+    /// A pick the model can't honour still goes through (the intake popover warns), but the row says so first.
     static func supportNote(for code: String, scope: ParolaCore.SupportedLanguages, modelName: String) -> String? {
         scope.allows(code) ? nil : String(localized: "Not supported by \(modelName)")
     }

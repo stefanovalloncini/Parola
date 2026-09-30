@@ -1373,17 +1373,6 @@
         }
       }
     },
-    "Active model. Models are downloaded on demand.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modello attivo. I modelli vengono scaricati su richiesta."
-          }
-        }
-      }
-    },
     "Activity": {
       "extractionState": "manual",
       "localizations": {
@@ -1999,6 +1988,17 @@
         }
       }
     },
+    "Applies to every new transcription and to dictation. The model picker on the Library page edits this same setting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vale per ogni nuova trascrizione e per la dettatura. Il selettore del modello nella pagina Libreria modifica questa stessa impostazione."
+          }
+        }
+      }
+    },
     "Apply translation to every new transcription unless overridden.": {
       "extractionState": "manual",
       "localizations": {
@@ -2518,6 +2518,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Export batch"
+          }
+        }
+      }
+    },
+    "Batch Transcribe…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi in batch…"
           }
         }
       }
@@ -4177,6 +4188,17 @@
         }
       }
     },
+    "Default model. Installed models only.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modello predefinito. Solo i modelli installati."
+          }
+        }
+      }
+    },
     "Default prompt": {
       "extractionState": "manual",
       "localizations": {
@@ -4549,17 +4571,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diagnostica"
-          }
-        }
-      }
-    },
-    "Diarize": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Diarizza"
           }
         }
       }
@@ -8429,6 +8440,28 @@
         }
       }
     },
+    "New Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuova registrazione"
+          }
+        }
+      }
+    },
+    "New System Audio Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuova registrazione audio di sistema"
+          }
+        }
+      }
+    },
     "New files dropped into a watched folder are transcribed automatically, including ones added while Parola was closed. Files already there when you add the folder are ignored.": {
       "extractionState": "manual",
       "localizations": {
@@ -9868,13 +9901,13 @@
         }
       }
     },
-    "Parola couldn't detect the language and assumed %@. Set it in the toolbar and transcribe again.": {
+    "Parola couldn't detect the language and assumed %@. Pick the language in the inspector to transcribe it again.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parola non è riuscita a rilevare la lingua e ha ipotizzato %@. Impostala nella toolbar e trascrivi di nuovo."
+            "value": "Parola non è riuscita a rilevare la lingua e ha ipotizzato %@. Scegli la lingua nell'inspector per trascrivere di nuovo."
           }
         }
       }
@@ -10908,6 +10941,17 @@
         }
       }
     },
+    "Record %@ Meeting": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra riunione %@"
+          }
+        }
+      }
+    },
     "Record Meeting": {
       "extractionState": "manual",
       "localizations": {
@@ -10974,6 +11018,17 @@
         }
       }
     },
+    "Record from the microphone": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra dal microfono"
+          }
+        }
+      }
+    },
     "Record from the microphone or system audio.": {
       "extractionState": "manual",
       "localizations": {
@@ -10992,6 +11047,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra le riunioni"
+          }
+        }
+      }
+    },
+    "Record system audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra l'audio di sistema"
           }
         }
       }
@@ -11052,6 +11118,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La registrazione dell'audio delle riunioni e cosa fa Parola quando parte un'app di riunioni."
+          }
+        }
+      }
+    },
+    "Recording options": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opzioni di registrazione"
           }
         }
       }
@@ -11974,17 +12051,6 @@
         }
       }
     },
-    "Search library": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cerca nella libreria"
-          }
-        }
-      }
-    },
     "Search looks in titles and transcript text": {
       "extractionState": "manual",
       "localizations": {
@@ -12091,17 +12157,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cerca speaker…"
-          }
-        }
-      }
-    },
-    "Searching for “%@”": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ricerca di “%@”"
           }
         }
       }
@@ -13660,6 +13715,17 @@
         }
       }
     },
+    "System Audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio di sistema"
+          }
+        }
+      }
+    },
     "System Audio Recording": {
       "extractionState": "manual",
       "localizations": {
@@ -13810,6 +13876,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questo URL non proviene da una sorgente supportata da yt-dlp."
+          }
+        }
+      }
+    },
+    "The Library page shows these same settings; a change in either place persists.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La pagina Libreria mostra queste stesse impostazioni; una modifica in uno dei due punti viene mantenuta."
           }
         }
       }
@@ -14744,6 +14821,17 @@
         }
       }
     },
+    "Transcribe Link…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi link…"
+          }
+        }
+      }
+    },
     "Transcribe Now": {
       "extractionState": "manual",
       "localizations": {
@@ -15037,17 +15125,6 @@
         }
       }
     },
-    "Transcription options": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Opzioni di trascrizione"
-          }
-        }
-      }
-    },
     "Transcription settings": {
       "extractionState": "manual",
       "localizations": {
@@ -15166,17 +15243,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Traduci in inglese di default"
-          }
-        }
-      }
-    },
-    "Translate to English instead of transcribing in the source language.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Traduce in inglese invece di trascrivere nella lingua originale."
           }
         }
       }
@@ -16255,17 +16321,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Capitoli YouTube"
-          }
-        }
-      }
-    },
-    "YouTube URL…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "URL YouTube…"
           }
         }
       }

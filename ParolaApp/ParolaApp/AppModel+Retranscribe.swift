@@ -23,7 +23,7 @@ extension AppModel {
         return transcript.modelName.isEmpty && transcript.segments.isEmpty
     }
 
-    /// Transcribes the loaded entry's audio for the first time, with the model and language the toolbar shows.
+    /// Transcribes the loaded entry's audio for the first time, with the selected model and language.
     func transcribeLoadedEntry() {
         retranscribeCurrentEntry(model: selectedModel, language: selectedLanguage)
     }

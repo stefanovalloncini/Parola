@@ -9,13 +9,13 @@ struct TranscriptionDefaultsPane: View {
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 SettingRow("Default model",
-                           description: "Applies to every new transcription and to dictation. The toolbar model picker edits this same setting.",
+                           description: "Applies to every new transcription and to dictation. The model picker on the Library page edits this same setting.",
                            isFirst: true) {
-                    ModelPickerView(shell: .standalone, leaf: "TranscriptionDefaults.Picker.Model")
+                    ModelPickerView(leaf: "TranscriptionDefaults.Picker.Model")
                 }
                 SettingRow("Default language",
                            description: "Auto detects the language from the audio with Whisper models. Pick one when the audio language is known.") {
-                    LanguagePickerView(shell: .standalone, leaf: "TranscriptionDefaults.Picker.Language")
+                    LanguagePickerView(leaf: "TranscriptionDefaults.Picker.Language")
                         .disabled(model.selectedModelCapabilities.supportedLanguages.isEnglishOnly)
                 }
                 SettingRow("Word timestamps",
@@ -50,7 +50,7 @@ struct TranscriptionDefaultsPane: View {
                     .padding(.top, DS.Spacing.hair)
                     .axLeaf("TranscriptionDefaults.Label.DiarizeWarning")
             }
-            SettingHelper(text: "The main-window toolbar shows these same settings; a change in either place persists.")
+            SettingHelper(text: "The Library page shows these same settings; a change in either place persists.")
 
             SettingsSection("Playback") {
                 SettingRow("Pause when app is hidden",

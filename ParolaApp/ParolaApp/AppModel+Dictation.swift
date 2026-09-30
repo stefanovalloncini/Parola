@@ -289,7 +289,7 @@ extension AppModel {
         }
     }
 
-    /// Non-blocking advisories for the Dictation pane: dictation follows the toolbar's
+    /// Non-blocking advisories for the Dictation pane: dictation follows the selected
     /// model, and some choices degrade it (English-only, no streaming, not installed).
     nonisolated static func dictationModelWarnings(
         model: String,

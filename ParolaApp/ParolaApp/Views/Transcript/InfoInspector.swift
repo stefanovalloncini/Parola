@@ -190,7 +190,7 @@ struct InfoInspector: View {
         return code.isEmpty ? nil : code
     }
 
-    /// The model a language pick runs: the entry's own, or the toolbar's when that one is gone.
+    /// The model a language pick runs: the entry's own, or the selected one when that one is gone.
     private func runModel(variants: [ModelVariant]) -> String {
         let current = model.transcript?.modelName ?? ""
         return variants.contains { $0.id == current } ? current : model.selectedModel

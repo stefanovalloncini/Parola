@@ -79,14 +79,14 @@ struct AssumedLanguageNoticeTests {
         )
     }
 
-    @Test("an assumed language names it and points at the toolbar")
+    @Test("an assumed language names it and points at the inspector")
     func assumedLanguageNotices() {
         let model = makeModel()
         model.transcript = transcript(.assumed("it"))
         let notice = model.assumedLanguageNotice
         #expect(notice != nil)
         #expect(notice?.contains("Italian") == true)
-        #expect(notice?.contains("toolbar") == true)
+        #expect(notice?.contains("inspector") == true)
     }
 
     @Test("a detected language says nothing")
