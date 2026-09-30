@@ -58,8 +58,8 @@ extension AppModel {
             let freeBytes = await check.value
             guard let self, Self.diskSpaceVerdict(freeBytes: freeBytes) == .refuse,
                   let countdown, countdownTask == countdown else { return }
-            cancelRecordingCountdown()
             let message = Self.diskSpaceRefusalMessage()
+            failCountIn(message)
             phase = .failed(message: message)
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
         }

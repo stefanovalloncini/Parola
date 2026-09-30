@@ -151,8 +151,9 @@ struct RecordingSession: Equatable, Sendable {
         state = .done(entryID: entryID)
     }
 
-    mutating func fail(_ message: String) {
+    mutating func fail(_ message: String, at date: Date = Date()) {
         if case .done = state { return }
+        if isCapturing { endedElapsed = elapsed(at: date) }
         state = .failed(message: message)
     }
 }

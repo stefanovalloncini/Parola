@@ -137,10 +137,7 @@ extension TranscriberMockSuites {
                 model.recordingCountInSeconds = 0
 
                 model.startRecording(source: .microphone)
-                let recording = await waitUntil {
-                    if case .recording = model.phase { return true }
-                    return false
-                }
+                let recording = await waitUntil { model.takeInProgress }
                 #expect(recording)
 
                 model.stopRecordingAndTranscribe()

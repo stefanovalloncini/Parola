@@ -72,9 +72,13 @@ final class LevelTrace {
         guard date != sampledAt else { return history.samples }
         sampledAt = date
         // Read even at rest, so the first bar after the silence is not the peak from before it.
-        let peak = meter.takePeak()
-        if !LevelMeterSchedule.isResting(lastSound: meter.lastSound, now: now) { history.append(peak) }
+        note(meter.takePeak(), lastSound: meter.lastSound, now: now)
         return history.samples
+    }
+
+    /// A peak someone else read off the meter, kept like a frame's: nothing while the capture rests.
+    func note(_ peak: Float, lastSound: ContinuousClock.Instant?, now: ContinuousClock.Instant = .now) {
+        if !LevelMeterSchedule.isResting(lastSound: lastSound, now: now) { history.append(peak) }
     }
 }
 
@@ -90,7 +94,7 @@ struct WaveformHistory: View {
     /// A ready window of levels. When it is there the view draws it as-is instead of reading a meter.
     private let envelope: [Float]?
 
-    /// A history its owner keeps, so the bars outlive this view; without one the view keeps its own.
+    /// A history its owner keeps and fills, so the bars outlive this view; without one the view samples the meter itself.
     private let heldTrace: LevelTrace?
     @State private var ownTrace: LevelTrace
 
@@ -150,7 +154,7 @@ struct WaveformHistory: View {
             } else if let meter {
                 // Sampling on a steady display clock keeps the scroll even while buffers arrive in bursts.
                 TimelineView(LevelMeterSchedule(meter: meter)) { timeline in
-                    bars(trace.samples(at: timeline.date, reading: meter))
+                    bars(heldTrace?.history.samples ?? ownTrace.samples(at: timeline.date, reading: meter))
                 }
             } else {
                 bars(trace.history.samples)

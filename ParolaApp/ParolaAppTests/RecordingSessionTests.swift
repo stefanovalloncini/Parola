@@ -117,4 +117,28 @@ struct RecordingSessionTests {
         #expect(take.isOver)
         #expect(take.elapsed(at: t0.addingTimeInterval(1)) >= 0)
     }
+
+    @Test("a failure stops the clock where the take was, paused or not, and never restarts a stopped one")
+    func failureFreezesTheClock() {
+        var recording = session()
+        _ = recording.markCapturing(at: t0)
+        recording.fail("The microphone stopped.", at: t0.addingTimeInterval(7))
+        #expect(recording.elapsed(at: t0.addingTimeInterval(60)) == 7)
+
+        var paused = session()
+        _ = paused.markCapturing(at: t0)
+        _ = paused.pause(at: t0.addingTimeInterval(4))
+        paused.fail("The disk is full.", at: t0.addingTimeInterval(30))
+        #expect(paused.elapsed(at: t0.addingTimeInterval(60)) == 4)
+
+        var finished = session()
+        _ = finished.markCapturing(at: t0)
+        _ = finished.finish(at: t0.addingTimeInterval(9))
+        finished.fail("The transcription failed.", at: t0.addingTimeInterval(50))
+        #expect(finished.elapsed(at: t0.addingTimeInterval(60)) == 9)
+
+        var arming = session()
+        arming.fail("Nothing was recorded.", at: t0.addingTimeInterval(3))
+        #expect(arming.elapsed(at: t0.addingTimeInterval(60)) == 0)
+    }
 }
