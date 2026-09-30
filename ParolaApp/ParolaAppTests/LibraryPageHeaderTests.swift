@@ -121,6 +121,7 @@ struct LibraryPageHeaderTests {
     private static let english = Locale(identifier: "en_US")
     private static let italian = Locale(identifier: "it_IT")
 
+    @MainActor
     private struct HostedHeader {
         let host: NSHostingView<AnyView>
         let window: NSWindow
