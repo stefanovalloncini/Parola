@@ -765,23 +765,26 @@ struct AppModelLibraryTests {
         ]
         for (name, act) in mutations {
             let model = makeModel()
+            model.browseCategory(.meeting)
 
             act(model)
 
             #expect(await waitUntil { model.exportNotice != nil }, "\(name)")
             #expect(model.phase == .idle, "\(name)")
+            #expect(model.libraryFilter == .meeting, "\(name)")
             #expect(model.isBrowsingLibrary, "\(name)")
         }
     }
 
-    @Test("a failed pin on the Library page leaves the list on screen")
+    @Test("a failed pin on a category list leaves that list on screen")
     func failedPinKeepsTheListOnScreen() async {
         let model = makeModel()
-        model.route = .transcript
+        model.browseCategory(.meeting)
 
         model.togglePinned(for: "missing-entry")
 
         #expect(await waitUntil { model.exportNotice != nil })
+        #expect(model.libraryFilter == .meeting)
         #expect(model.isBrowsingLibrary)
         #expect(model.phase == .idle)
     }

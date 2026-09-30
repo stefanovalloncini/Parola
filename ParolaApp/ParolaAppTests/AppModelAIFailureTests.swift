@@ -200,7 +200,7 @@ struct AppModelAIFailureTests {
         #expect(model.phase == .ready)
     }
 
-    @Test("dismissing an error with no transcript returns to the launcher")
+    @Test("dismissing an error with no transcript returns to the library")
     func dismissWithoutTranscriptGoesIdle() {
         let model = makeModel()
         model.transcript = nil
