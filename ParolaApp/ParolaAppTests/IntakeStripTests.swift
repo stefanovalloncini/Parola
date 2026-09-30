@@ -21,6 +21,15 @@ struct IntakeStripTests {
         #expect(IntakeSummary.languageLabel(selected: "it", englishOnly: false) == SupportedLanguages.displayName(for: "it"))
     }
 
+    @Test("under the hero Auto is spelled out; a picked language reads the same either way")
+    func heroLanguageLabel() throws {
+        #expect(IntakeSummary.languageLabel(selected: nil, englishOnly: false, spellsOutAuto: true) == "Auto-detect")
+        #expect(IntakeSummary.languageLabel(selected: "it", englishOnly: false, spellsOutAuto: true) == SupportedLanguages.displayName(for: "it"))
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        #expect(IntakeSummary.languageLabel(selected: nil, englishOnly: false, spellsOutAuto: true, bundle: italian) == "Automatica")
+    }
+
     @Test("the button reads model · language, then each option that changes the transcript")
     func summary() {
         #expect(IntakeSummary.text(model: "Whisper Turbo", language: "Auto", translates: false, identifiesSpeakers: false)

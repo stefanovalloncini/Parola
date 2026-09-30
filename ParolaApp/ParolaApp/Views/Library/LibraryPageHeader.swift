@@ -82,7 +82,9 @@ struct LibraryPageHeader: View {
         if showsListControls {
             sortMenu
         }
-        moreMenu(folded: folded)
+        if showsFilters {
+            moreMenu(folded: folded)
+        }
     }
 
     private var sortMenu: some View {
@@ -112,7 +114,7 @@ struct LibraryPageHeader: View {
         let filtersInside = folded && filters.isFiltering
         let inside = filters.presented(as: folded ? .submenus : .language)
         return Menu {
-            if showsFilters, folded || inside.showsLanguage {
+            if folded || inside.showsLanguage {
                 inside
                 Divider()
             }

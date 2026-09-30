@@ -31,16 +31,16 @@ struct EmptyLibraryHero: View {
             if let source {
                 recordButton(source)
                 recordCaption(source)
-                    .padding(.top, DS.Spacing.regular)
+                    .padding(.top, 14)
                 if Self.offersSourceChoice(features: model.features) {
                     sourcePicker
-                        .padding(.top, DS.Spacing.medium)
+                        .padding(.top, 18)
                 }
             }
             IntakeSettingsButton(style: .quiet, leaf: "Settings")
-                .padding(.top, source == nil ? 0 : DS.Spacing.small)
+                .padding(.top, source == nil ? 0 : 10)
             waysIn(offersRecording: source != nil)
-                .padding(.top, DS.Spacing.large)
+                .padding(.top, 22)
         }
         .axBranch("Hero")
     }
@@ -113,7 +113,7 @@ struct EmptyLibraryHero: View {
 
     private var separator: some View {
         Text(verbatim: "·")
-            .foregroundStyle(DS.Color.secondaryText)
+            .foregroundStyle(DS.Color.secondaryText.opacity(0.6))
             .accessibilityHidden(true)
     }
 }

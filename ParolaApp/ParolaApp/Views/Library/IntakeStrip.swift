@@ -48,11 +48,11 @@ enum IntakeSummary {
         return ModelPickerView.capped(installedLabel ?? id)
     }
 
-    /// Auto on an English-only model runs as English, so the button says what the run will do.
-    static func languageLabel(selected: String?, englishOnly: Bool, bundle: Bundle = .main) -> String {
+    /// Auto on an English-only model runs as English, so the button says what the run will do; the hero has room to spell Auto out.
+    static func languageLabel(selected: String?, englishOnly: Bool, spellsOutAuto: Bool = false, bundle: Bundle = .main) -> String {
         if let selected { return SupportedLanguages.displayName(for: selected) }
         if englishOnly { return SupportedLanguages.displayName(for: "en") }
-        return String(localized: "Auto", bundle: bundle)
+        return spellsOutAuto ? String(localized: "Auto-detect", bundle: bundle) : String(localized: "Auto", bundle: bundle)
     }
 
     /// Anything that changes what the transcript says is named here, since the popover is the only other place it shows.
@@ -83,10 +83,10 @@ enum IntakeSummary {
     }
 
     /// Translate is named only while the chosen model can translate: otherwise the run stays in its own language.
-    static func parts(for model: AppModel) -> [String] {
+    static func parts(for model: AppModel, spellsOutAuto: Bool = false) -> [String] {
         parts(
             model: modelLabel(for: model),
-            language: languageLabel(for: model),
+            language: languageLabel(for: model, spellsOutAuto: spellsOutAuto),
             translates: model.translate && model.selectedModelCapabilities.supportsTranslate,
             identifiesSpeakers: model.diarize
         )
@@ -103,10 +103,11 @@ enum IntakeSummary {
         )
     }
 
-    static func languageLabel(for model: AppModel) -> String {
+    static func languageLabel(for model: AppModel, spellsOutAuto: Bool = false) -> String {
         languageLabel(
             selected: model.selectedLanguage,
-            englishOnly: model.selectedModelCapabilities.supportedLanguages.isEnglishOnly
+            englishOnly: model.selectedModelCapabilities.supportedLanguages.isEnglishOnly,
+            spellsOutAuto: spellsOutAuto
         )
     }
 
@@ -130,7 +131,7 @@ struct IntakeSettingsButton: View {
     @State private var isPresented = false
 
     var body: some View {
-        let parts = IntakeSummary.parts(for: model)
+        let parts = IntakeSummary.parts(for: model, spellsOutAuto: style == .quiet)
         Button {
             isPresented = true
         } label: {

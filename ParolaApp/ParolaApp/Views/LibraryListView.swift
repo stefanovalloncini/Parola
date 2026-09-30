@@ -421,8 +421,8 @@ private struct LibraryBrowseList: View, Equatable {
                 VStack(spacing: 0) {
                     pageTop(showsIntake: !showsHero)
                         .padding(.horizontal, DS.Spacing.large)
-                        .padding(.top, DS.Spacing.regular)
-                        .padding(.bottom, DS.Spacing.small)
+                        .padding(.top, DS.Spacing.medium)
+                        .padding(.bottom, DS.Spacing.tight)
                     emptyContent
                 }
             }

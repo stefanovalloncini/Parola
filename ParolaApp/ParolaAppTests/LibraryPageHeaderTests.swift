@@ -137,6 +137,7 @@ struct LibraryPageHeaderTests {
         selection: Set<LibraryEntry.ID> = [],
         filtering: Bool = true,
         dimensions: Bool = true,
+        showsListControls: Bool = true,
         locale: Locale = english,
         subtitle: String = LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60)
     ) -> HostedHeader {
@@ -155,7 +156,7 @@ struct LibraryPageHeaderTests {
                 languageOptions: dimensions ? ["en", "it"] : [],
                 peopleOptions: dimensions ? [giulia] : []
             ),
-            showsListControls: true,
+            showsListControls: showsListControls,
             selection: selection,
             pendingBulkDelete: .constant(false)
         )
@@ -277,6 +278,19 @@ struct LibraryPageHeaderTests {
         let hosted = hostedHeader(windowWidth: MainWindowLayout.minimumWidth, filtering: false)
         defer { hosted.close() }
         #expect(chipTitles(in: hosted) == ["Labels", "People", "Any time", "Sort", "More"])
+    }
+
+    @Test("an empty page with nothing filtered shows no chips, not even More")
+    func emptyPageHasNoChips() {
+        let empty = hostedHeader(windowWidth: 1180, filtering: false, showsListControls: false)
+        let filtered = hostedHeader(windowWidth: 1180, showsListControls: false)
+        defer {
+            empty.close()
+            filtered.close()
+        }
+        #expect(chipTitles(in: empty).isEmpty)
+        let italianName = LanguageDisplay.name(for: "it") ?? "IT"
+        #expect(chipTitles(in: filtered) == ["Quarterly planning", "Giulia Rossi", italianName, "Last 30 days", "More"], "a filter on stays so it can be cleared")
     }
 
     @Test("with every filter on, the header's controls stay inside the page", arguments: [920.0, 1000, 1040, 1180, 1440])
