@@ -23,7 +23,7 @@ enum StaleWindowKeys {
 
     static func pruneInBackground() {
         guard let domain = Bundle.main.bundleIdentifier else { return }
-        Task.detached(priority: .utility) {
+        DispatchQueue.global(qos: .utility).async {
             let removed = prune(domain: domain)
             guard removed > 0 else { return }
             ParolaLog.info(.appLifecycle, "stale window frames removed", [.count: .int(removed)])
