@@ -25,8 +25,15 @@ enum LibraryDateRangeFilter: String, CaseIterable, Identifiable {
     }
 }
 
-/// The Labels, People, Language and date pull-downs: header menus on a wide window, submenus of More on a narrow one.
+/// The Labels, People, Language and date pull-downs: chips in the header, submenus of More once they fold.
 struct LibraryFilterBar: View {
+    enum Presentation {
+        /// A chip names its dimension at rest and only the value it keeps once it filters.
+        case chips
+        /// A submenu of More keeps the dimension's name in front of the value.
+        case submenus
+    }
+
     @Environment(AppModel.self) private var model
     @Binding var labelFilter: String?
     @Binding var languageFilter: String?
@@ -35,6 +42,7 @@ struct LibraryFilterBar: View {
     let labelOptions: [String]
     let languageOptions: [String]
     let peopleOptions: [Person]
+    var presentation: Presentation = .chips
 
     /// A category with no speakers (Dictations) must not make an active person filter disappear.
     static func showsPersonFilter(peopleOptions: [Person], personFilter: UUID?) -> Bool {
@@ -48,12 +56,14 @@ struct LibraryFilterBar: View {
         value.count <= valueCharacterCap ? value : String(value.prefix(valueCharacterCap - 1)) + "…"
     }
 
-    static func isCut(_ value: String) -> Bool {
-        value.count > valueCharacterCap
-    }
-
     var isFiltering: Bool {
         labelFilter != nil || languageFilter != nil || dateRangeFilter != .all || personFilter != nil
+    }
+
+    func presented(as presentation: Presentation) -> LibraryFilterBar {
+        var copy = self
+        copy.presentation = presentation
+        return copy
     }
 
     var body: some View {
@@ -81,10 +91,10 @@ struct LibraryFilterBar: View {
                     .axLeaf("MenuItem.Label.\(label)")
             }
         } label: {
-            LibraryHeaderMenuLabel(rest: Text("Labels"), active: labelFilter.map { Text("Labels: \(Self.capped($0))") })
+            title(Text("Labels"), value: labelFilter) { Text("Labels: \($0)") }
         }
-        .libraryHeaderMenu()
-        .modifier(FullValue(text: labelFilter.flatMap { Self.isCut($0) ? Text("Labels: \($0)") : nil }))
+        .libraryHeaderChip(isActive: labelFilter != nil)
+        .modifier(FilterValue(name: Text("Labels"), value: labelFilter.map { Text("Labels: \($0)") }))
         .axLeaf("Menu.Labels")
     }
 
@@ -100,15 +110,16 @@ struct LibraryFilterBar: View {
                 }
             }
         } label: {
-            LibraryHeaderMenuLabel(rest: Text("People"), active: selectedName.map { Text("People: \(Self.capped($0))") })
+            title(Text("People"), value: selectedName) { Text("People: \($0)") }
         }
-        .libraryHeaderMenu()
-        .modifier(FullValue(text: selectedName.flatMap { Self.isCut($0) ? Text("People: \($0)") : nil }))
+        .libraryHeaderChip(isActive: personFilter != nil)
+        .modifier(FilterValue(name: Text("People"), value: selectedName.map { Text("People: \($0)") }))
         .axLeaf("Menu.People")
     }
 
     private var languageMenu: some View {
-        Menu {
+        let name = languageFilter.map(languageName)
+        return Menu {
             Button("All Languages") { languageFilter = nil }
                 .axLeaf("MenuItem.AllLanguages")
             Divider()
@@ -117,11 +128,10 @@ struct LibraryFilterBar: View {
                     .axLeaf("MenuItem.Language.\(code)")
             }
         } label: {
-            let name = languageFilter.map(languageName)
-            LibraryHeaderMenuLabel(rest: Text("Language"), active: name.map { Text("Language: \(Self.capped($0))") })
+            title(Text("Language"), value: name) { Text("Language: \($0)") }
         }
-        .libraryHeaderMenu()
-        .modifier(FullValue(text: languageFilter.map(languageName).flatMap { Self.isCut($0) ? Text("Language: \($0)") : nil }))
+        .libraryHeaderChip(isActive: languageFilter != nil)
+        .modifier(FilterValue(name: Text("Language"), value: name.map { Text("Language: \($0)") }))
         .axLeaf("Menu.Language")
     }
 
@@ -135,10 +145,19 @@ struct LibraryFilterBar: View {
             }
         } label: {
             Text(dateRangeFilter.label)
-                .foregroundStyle(dateRangeFilter == .all ? DS.Color.primaryText : DS.Color.accentInk)
         }
-        .libraryHeaderMenu()
+        .libraryHeaderChip(isActive: dateRangeFilter != .all)
         .axLeaf("Menu.Date")
+    }
+
+    /// The dimension at rest; once it filters, the value on a chip and the dimension with its value in a submenu.
+    private func title(_ name: Text, value: String?, prefixed: (String) -> Text) -> Text {
+        guard let value else { return name }
+        let shown = Self.capped(value)
+        switch presentation {
+        case .chips: return Text(verbatim: shown)
+        case .submenus: return prefixed(shown)
+        }
     }
 
     /// A checkmark on the one value the list is narrowed to; picking it again clears the filter.
@@ -157,38 +176,26 @@ struct LibraryFilterBar: View {
     }
 }
 
-/// What a header menu reads: the menu's name at rest, what it keeps once it filters, in the accent's ink.
-private struct LibraryHeaderMenuLabel: View {
-    let rest: Text
-    let active: Text?
-
-    var body: some View {
-        if let active {
-            active.foregroundStyle(DS.Color.accentInk)
-        } else {
-            rest.foregroundStyle(DS.Color.primaryText)
-        }
-    }
-}
-
-/// A value cut short in the menu keeps all of itself in the tooltip and in what VoiceOver reads.
-private struct FullValue: ViewModifier {
-    let text: Text?
+/// The chip shows only the value; the tooltip and VoiceOver get the dimension's name in front of all of it.
+private struct FilterValue: ViewModifier {
+    let name: Text
+    let value: Text?
 
     func body(content: Content) -> some View {
-        if let text {
-            content.help(text).accessibilityLabel(text)
-        } else {
-            content
-        }
+        content
+            .help(value ?? Text(verbatim: ""))
+            .accessibilityLabel(value ?? name)
     }
 }
 
 extension View {
-    /// Plain text and a chevron, sized to their words: inside More the same menus render as submenus and ignore it.
-    func libraryHeaderMenu() -> some View {
+    /// A small bordered capsule, neutral until it narrows the list; inside More the same menus render as submenus and ignore it.
+    func libraryHeaderChip(isActive: Bool = false) -> some View {
         menuStyle(.button)
-            .buttonStyle(.borderless)
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .controlSize(.small)
+            .tint(isActive ? DS.Color.accent : nil)
             .fixedSize()
     }
 }

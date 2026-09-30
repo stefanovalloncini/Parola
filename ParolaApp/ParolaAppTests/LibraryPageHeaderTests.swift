@@ -58,9 +58,7 @@ struct LibraryPageHeaderTests {
         #expect(LibraryFilterBar.capped(long).hasPrefix("Quarterly planning"))
         #expect(LibraryFilterBar.capped(long).hasSuffix("…"))
         #expect(LibraryFilterBar.capped(long).count == LibraryFilterBar.valueCharacterCap)
-        #expect(LibraryFilterBar.isCut(long))
         #expect(LibraryFilterBar.capped("Work") == "Work")
-        #expect(!LibraryFilterBar.isCut("Work"))
     }
 
     private let giulia = UUID()
@@ -116,6 +114,16 @@ struct LibraryPageHeaderTests {
     private static let english = Locale(identifier: "en_US")
     private static let italian = Locale(identifier: "it_IT")
 
+    private struct HostedHeader {
+        let host: NSHostingView<AnyView>
+        let window: NSWindow
+
+        func close() {
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+    }
+
     /// The header as the page hosts it at one window width: every filter on, with a label of an everyday length.
     private func hostedHeader(
         windowWidth: CGFloat,
@@ -123,7 +131,7 @@ struct LibraryPageHeaderTests {
         filtering: Bool = true,
         locale: Locale = english,
         subtitle: String = LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60)
-    ) -> NSHostingView<AnyView> {
+    ) -> HostedHeader {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("pageheader"))
         let giulia = Person(name: "Giulia Rossi")
         let header = LibraryPageHeader(
@@ -151,78 +159,126 @@ struct LibraryPageHeaderTests {
                 .environment(\.locale, locale)
                 .frame(width: pageWidth)
         ))
-        host.frame = NSRect(x: 0, y: 0, width: pageWidth, height: 120)
+        // In a window, so the chips' accessibility frames can be brought back to the header's own coordinates.
+        let window = NSWindow(
+            contentRect: NSRect(x: -12_000, y: -12_000, width: pageWidth, height: 120),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = host
+        window.orderFront(nil)
         // The fold reads widths measured on the first pass, so the header is laid out a second time.
         host.layoutSubtreeIfNeeded()
         RunLoop.current.run(until: Date().addingTimeInterval(0.05))
         host.layoutSubtreeIfNeeded()
-        return host
+        return HostedHeader(host: host, window: window)
     }
 
-    private func popUps(in view: NSView) -> [NSPopUpButton] {
-        view.subviews.flatMap { sub -> [NSPopUpButton] in
-            (sub as? NSPopUpButton).map { [$0] } ?? popUps(in: sub)
+    /// The chips are drawn by SwiftUI, not AppKit; its accessibility nodes give each one's words and where they sit.
+    private func chipLabels(in hosted: HostedHeader) -> [(text: String, frame: CGRect)] {
+        func read(_ key: String, of node: NSObject) -> Any? {
+            node.responds(to: NSSelectorFromString(key)) ? node.value(forKey: key) : nil
         }
-    }
-
-    /// The text menus are AppKit pop-ups; More, drawn in SwiftUI, sits a gap after the last of them.
-    private func spillsPastTheRight(_ host: NSView) -> [String] {
-        let moreRoom = DS.Spacing.small + GlyphButtonStyle.defaultSide
-        return popUps(in: host).compactMap { button in
-            let frame = button.convert(button.bounds, to: host)
-            return frame.maxX + moreRoom > host.bounds.width + 0.5 ? "\(button.title) ends at \(frame.maxX)" : nil
+        var found: [(text: String, frame: CGRect)] = []
+        func walk(_ node: NSObject) {
+            for child in read("accessibilityChildren", of: node) as? [NSObject] ?? [] {
+                let words = (read("accessibilityValue", of: child) as? String) ?? (read("accessibilityLabel", of: child) as? String)
+                if let words, !words.isEmpty, let screen = (read("accessibilityFrame", of: child) as? NSValue)?.rectValue {
+                    found.append((words, hosted.host.convert(hosted.window.convertFromScreen(screen), from: nil)))
+                }
+                walk(child)
+            }
         }
+        walk(hosted.host)
+        return found.sorted { $0.frame.minX < $1.frame.minX }
     }
 
-    @Test("an idle menu reads its name; an active one names what it keeps")
+    private func chipTitles(in hosted: HostedHeader) -> [String] {
+        chipLabels(in: hosted).map(\.text)
+    }
+
+    /// Every chip and every view AppKit keeps for one, against the page's right edge.
+    private func spillsPastTheRight(_ hosted: HostedHeader) -> [String] {
+        let edge = hosted.host.bounds.width + 0.5
+        let labels = chipLabels(in: hosted).filter { $0.frame.maxX > edge }.map { "\($0.text) ends at \($0.frame.maxX)" }
+        let views = hosted.host.subviews
+            .filter { String(describing: type(of: $0)) != "KeyViewProxy" && $0.frame.maxX > edge }
+            .map { "\(type(of: $0)) ends at \($0.frame.maxX)" }
+        return labels + views
+    }
+
+    @Test("an idle chip names what it narrows; an active one shows only the value it keeps")
     func menuTitles() {
         let idle = hostedHeader(windowWidth: 1440, filtering: false)
         let active = hostedHeader(windowWidth: 1440)
+        defer {
+            idle.close()
+            active.close()
+        }
         let italianName = LanguageDisplay.name(for: "it") ?? "IT"
 
-        #expect(popUps(in: idle).map(\.title) == ["Labels", "People", "Language", "Any time", "Sort"])
-        #expect(popUps(in: active).map(\.title) == [
-            "Labels: Quarterly planning", "People: Giulia Rossi", "Language: \(italianName)", "Last 30 days", "Sort",
-        ])
+        #expect(chipTitles(in: idle) == ["Labels", "People", "Language", "Any time", "Sort", "More"])
+        #expect(chipTitles(in: active) == ["Quarterly planning", "Giulia Rossi", italianName, "Last 30 days", "Sort", "More"])
     }
 
-    @Test("the menus read in Italian")
+    @Test("the chips read in Italian")
     func italianMenuTitles() {
+        let idle = hostedHeader(windowWidth: 1440, filtering: false, locale: Self.italian)
         let active = hostedHeader(windowWidth: 1440, locale: Self.italian)
+        defer {
+            idle.close()
+            active.close()
+        }
         let italianName = LanguageDisplay.name(for: "it") ?? "IT"
 
-        #expect(popUps(in: active).map(\.title) == [
-            "Etichette: Quarterly planning", "Persone: Giulia Rossi", "Lingua: \(italianName)", "Ultimi 30 giorni", "Ordina",
-        ])
+        #expect(chipTitles(in: idle) == ["Etichette", "Persone", "Lingua", "Sempre", "Ordina", "Altro"])
+        #expect(chipTitles(in: active) == ["Quarterly planning", "Giulia Rossi", italianName, "Ultimi 30 giorni", "Ordina", "Altro"])
     }
 
-    @Test("at 920 points the filters wait in More; at 1440 each has its own menu")
+    @Test("at 920 points the filters wait in More; at 1440 each has its own chip")
     func foldedMenus() {
-        #expect(popUps(in: hostedHeader(windowWidth: MainWindowLayout.minimumWidth)).map(\.title) == ["Sort"])
-        #expect(popUps(in: hostedHeader(windowWidth: 1440)).count == 5)
+        let narrow = hostedHeader(windowWidth: MainWindowLayout.minimumWidth)
+        let wide = hostedHeader(windowWidth: 1440)
+        defer {
+            narrow.close()
+            wide.close()
+        }
+        #expect(chipTitles(in: narrow) == ["Sort", "More"])
+        #expect(chipTitles(in: wide).count == 6)
     }
 
     @Test("with every filter on, the header's controls stay inside the page", arguments: [920.0, 1000, 1040, 1180, 1440])
     func controlsStayInside(windowWidth: Double) {
-        let host = hostedHeader(windowWidth: CGFloat(windowWidth))
-        #expect(spillsPastTheRight(host).isEmpty, "\(spillsPastTheRight(host))")
+        let hosted = hostedHeader(windowWidth: CGFloat(windowWidth))
+        defer { hosted.close() }
+        let spilled = spillsPastTheRight(hosted)
+        #expect(spilled.isEmpty, "\(spilled)")
     }
 
     @Test("with every filter on and several rows selected, Export and Delete still fit", arguments: [920.0, 1000, 1180, 1440])
     func selectionFits(windowWidth: Double) {
-        let host = hostedHeader(windowWidth: CGFloat(windowWidth), selection: ["a", "b", "c"])
-        #expect(spillsPastTheRight(host).isEmpty, "\(spillsPastTheRight(host))")
+        let hosted = hostedHeader(windowWidth: CGFloat(windowWidth), selection: ["a", "b", "c"])
+        defer { hosted.close() }
+        let spilled = spillsPastTheRight(hosted)
+        #expect(spilled.isEmpty, "\(spilled)")
     }
 
-    @Test("the Italian menus stay inside the page too", arguments: [1000.0, 1040, 1180])
+    @Test("the Italian chips stay inside the page too", arguments: [1000.0, 1040, 1180])
     func italianStaysInside(windowWidth: Double) throws {
         let subtitle = LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60, bundle: try italianBundle())
-        let host = hostedHeader(windowWidth: CGFloat(windowWidth), locale: Self.italian, subtitle: subtitle)
-        #expect(spillsPastTheRight(host).isEmpty, "\(spillsPastTheRight(host))")
+        let hosted = hostedHeader(windowWidth: CGFloat(windowWidth), locale: Self.italian, subtitle: subtitle)
+        defer { hosted.close() }
+        let spilled = spillsPastTheRight(hosted)
+        #expect(spilled.isEmpty, "\(spilled)")
     }
 
-    @Test("with every filter on and rows selected, 1180 points is too narrow to keep the menus out")
+    @Test("with every filter on and rows selected, 1180 points is too narrow to keep the chips out")
     func selectionFoldsAtTheDefaultSize() {
-        #expect(popUps(in: hostedHeader(windowWidth: 1180, selection: ["a", "b", "c"])).map(\.title) == ["Sort"])
+        let hosted = hostedHeader(windowWidth: 1180, selection: ["a", "b", "c"])
+        defer { hosted.close() }
+        let titles = chipTitles(in: hosted)
+        #expect(titles.suffix(2) == ["Sort", "More"], "\(titles)")
+        #expect(!titles.contains("Quarterly planning"), "\(titles)")
     }
 }

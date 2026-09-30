@@ -73,6 +73,7 @@ struct LibraryPageHeader: View {
             Spacer(minLength: DS.Spacing.regular)
             controls(folded: folded)
         }
+        .frame(minHeight: 22)
     }
 
     @ViewBuilder
@@ -105,17 +106,17 @@ struct LibraryPageHeader: View {
             Label("Sort", systemImage: "arrow.up.arrow.down")
         }
         .labelStyle(.titleAndIcon)
-        .libraryHeaderMenu()
+        .libraryHeaderChip()
         .help("Sort")
         .axLeaf("Menu.Sort")
     }
 
-    /// Drawn in SwiftUI rather than as an AppKit pop-up, which ignores the ink the glyph takes while filters wait inside.
+    /// Takes the chip's tint while filters wait inside it.
     private func moreMenu(foldedFilters: Bool) -> some View {
         let filtersInside = foldedFilters && filters.isFiltering
         return Menu {
             if foldedFilters {
-                filters
+                filters.presented(as: .submenus)
                 Divider()
             }
             Button { model.openStatistics() } label: {
@@ -127,14 +128,12 @@ struct LibraryPageHeader: View {
             }
             .axLeaf("MenuItem.ManagePeople")
         } label: {
-            Image(systemName: filtersInside ? "ellipsis.circle.fill" : "ellipsis.circle")
+            // Set in a line of text, so the chip is as tall as the others.
+            Text(Image(systemName: "ellipsis"))
         }
         .labelStyle(.titleAndIcon)
-        .menuStyle(.button)
-        .buttonStyle(GlyphButtonStyle(tinted: filtersInside))
-        .tint(DS.Color.accentInk)
         .menuIndicator(.hidden)
-        .fixedSize()
+        .libraryHeaderChip(isActive: filtersInside)
         .help("More")
         .accessibilityLabel("More")
         .accessibilityValue(filtersInside ? Text("Filters on") : Text(verbatim: ""))
