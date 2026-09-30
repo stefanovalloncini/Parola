@@ -134,6 +134,52 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("getState.recording carries the take's progress, stage and partial text while its run is on")
+        func bridgeReportsTheTakesRun() async throws {
+            let audio = try makeTakeWAV("take-bridge", seconds: 10)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(
+                    segments: [(0, 1, "bridged")], partials: ["half a sentence"], progressSeconds: [5], gate: gate
+                )
+                let model = makeModel("take-bridge")
+                let server = try ParolaAutomationServer(model: model)
+                recordAndStop(model, audio: audio, seconds: 10)
+                let streamed = await waitUntil {
+                    model.takePartialText == "half a sentence" && model.takeTranscribeStage == .transcribing
+                        && self.progress(model) != nil
+                }
+                #expect(streamed)
+                let fraction = try #require(progress(model))
+
+                let running = try #require(recordingFields(server.snapshotState()))
+                #expect(running["state"] == .string("transcribing"))
+                #expect(running["progress"] == .double(fraction))
+                #expect(running["stage"] == .string("transcribing"))
+                #expect(running["hasPartialText"] == .bool(true))
+                #expect(phaseName(server.snapshotState()) == .string("idle"))
+
+                model.stopTranscribingTake()
+                let stopped = try #require(recordingFields(server.snapshotState()))
+                #expect(stopped["stage"] == .null)
+                #expect(stopped["hasPartialText"] == .bool(false))
+                let done = await waitUntil { self.isDone(model) }
+                #expect(done)
+                withExtendedLifetime(server) {}
+            }
+        }
+
+        private func recordingFields(_ state: AutomationValue) -> [String: AutomationValue]? {
+            guard case .object(let fields) = state, case .object(let take)? = fields["recording"] else { return nil }
+            return take
+        }
+
+        private func phaseName(_ state: AutomationValue) -> AutomationValue? {
+            guard case .object(let fields) = state else { return nil }
+            return fields["phase"]
+        }
+
         @Test("a batch job that starts while a take transcribes on its Stage leaves the Stage on the take")
         func batchLeavesTheTakeOnTheStage() async throws {
             let audio = try makeTakeWAV("take-batch", seconds: 3)

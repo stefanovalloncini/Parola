@@ -49,7 +49,7 @@ extension ParolaAutomationServer {
                         observed: { ["state": .string(takeStateName(ctx.model))] },
                         predicate: { takeStateName(ctx.model) == target },
                         successFields: {
-                            ["recording": ParolaAutomationServer.recordingState(ctx.model.recording, now: Date())]
+                            ["recording": ParolaAutomationServer.recordingState(of: ctx.model, now: Date())]
                         }
                     )
                 }

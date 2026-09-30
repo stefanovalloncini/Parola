@@ -475,7 +475,7 @@ final class ParolaAutomationServer {
             "phase": .string(Self.phaseName(for: model)),
             "phaseDetail": Self.phaseDetail(for: model),
             "recordingStartedAt": model.recordingStartedAt.map { .double($0.timeIntervalSince1970) } ?? .null,
-            "recording": Self.recordingState(model.recording, now: Date()),
+            "recording": Self.recordingState(of: model, now: Date()),
             "route": .string(model.route.rawValue),
             "settingsPane": .string(model.settingsPane),
             "libraryFilter": .string(model.libraryFilter?.rawValue ?? ""),
@@ -627,8 +627,9 @@ final class ParolaAutomationServer {
     }
 
     /// The take the surfaces show, from its count-in until the next take; null when there is none.
-    static func recordingState(_ take: RecordingSession?, now: Date) -> AutomationValue {
-        guard let take else { return .null }
+    static func recordingState(of model: AppModel, now: Date) -> AutomationValue {
+        guard let take = model.recording else { return .null }
+        let run = TranscribeProgress(takeOf: model)
         return .object([
             "state": .string(recordingStateName(take.state)),
             "elapsed": .double(take.elapsed(at: now)),
@@ -640,6 +641,9 @@ final class ParolaAutomationServer {
             "source": .string(take.source.rawValue),
             "isStreaming": .bool(take.isStreaming),
             "device": take.device.map { .string($0) } ?? .null,
+            "progress": run.fraction.map { .double($0) } ?? .null,
+            "stage": run.stage.map { .string(Self.stageName($0)) } ?? .null,
+            "hasPartialText": .bool(run.hasPartialText),
         ])
     }
 
@@ -696,6 +700,19 @@ struct TranscribeProgress {
         self.fraction = fraction
         self.stage = stage
         self.hasPartialText = hasPartialText
+    }
+
+    /// A take's own run: its session's fraction, and the stage and words its Stage shows.
+    @MainActor
+    init(takeOf model: AppModel) {
+        var fraction: Double?
+        if case .transcribing(let progress)? = model.recording?.state { fraction = progress }
+        let shown = ContentRoutes.stageTranscription(for: model) != nil
+        self.init(
+            fraction: fraction,
+            stage: shown ? model.takeTranscribeStage : nil,
+            hasPartialText: shown && !model.takePartialText.isEmpty
+        )
     }
 
     @MainActor

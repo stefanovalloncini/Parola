@@ -116,17 +116,22 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 The five introduction commands and `getState.introduction` all reply `{visible, step, steps, engine, engineChoices}`.
 
 `getState.recording` is the take the window shows, from its count-in until the next take starts, or `null` when there is none:
-`{state, elapsed, startedAt, paused, markers, title, category, source, isStreaming, device}`. `state` is one of `arming` /
-`recording` / `paused` / `finishing` / `transcribing` / `done` / `failed`; `elapsed` and `markers` are seconds of the take;
-`startedAt` is seconds since 1970, `null` until the first audio; `device` names the input a mic take listens on.
+`{state, elapsed, startedAt, paused, markers, title, category, source, isStreaming, device, progress, stage, hasPartialText}`.
+`state` is one of `arming` / `recording` / `paused` / `finishing` / `transcribing` / `done` / `failed`; `elapsed` and
+`markers` are seconds of the take; `startedAt` is seconds since 1970, `null` until the first audio; `device` names the
+input a mic take listens on. While a file take transcribes, `progress` is its 0–1 fraction (`null` until the engine
+reports one), and `stage` and `hasPartialText` mirror `phaseDetail`'s for its run; otherwise they read `null` and `false`.
 `phase` reads `recording` whenever that take is arming, recording or paused. Neither its capture nor its transcription
-moves the phase: a file take transcribing shows on its Stage as `recording.state` `transcribing`, a failure as `failed`
-(and, when another page shows, as an `exportNotice`), while `phase` stays on whatever the rest of the window shows. A
-take stopped with its Stage up lands there and ends `ready` with its transcript loaded. One stopped while another page
-shows, or after the main window closed, lands in the library with a toast and loads no transcript, so
-`waitForPhase ready` and `getTranscript` need the Stage up when the take stops (`setRoute recording`). While a take
-runs, entries open as usual, and a file, link or batch handed over waits for the take (a link replies `parked: true`);
-`retranscribeEntry` is `PRECONDITION` until it ends.
+moves the phase: a failure shows on its Stage as `recording.state` `failed` (and, when another page shows, as an
+`exportNotice`), while `phase` stays on whatever the rest of the window shows, `ready` with an older transcript
+included. Where a take lands is decided when its run ends, not at Stop: with its own Stage up it lands there and loads
+its transcript; with another page, a newer take's Stage or no main window, it goes to the library with a toast and
+loads nothing. To read a take back, keep its Stage up (`setRoute recording`), wait with `waitForRecordingState done`
+(the transcript is loaded before the save marks the take done), then `getTranscript`. While a take captures, entries
+open as usual, a file, link or batch handed over waits for it (a link replies `parked: true`), and `retranscribeEntry`
+is `PRECONDITION`. While its run transcribes, links, drops and batches still wait behind it, but `transcribeFile` and
+`retranscribeEntry` stop the run and save the take "(not transcribed)" with a notice, and `downloadModel` is
+`PRECONDITION` whatever `phase` reads.
 
 `getState.burn` is the subtitle burn running beside the phase, `{state, progress, output}` with `state` one of
 `running` / `finished` / `failed` (a failed one adds `message`), or `null` when there is none.
