@@ -10,7 +10,7 @@ struct ModelsSettingsPane: View {
     @State private var pendingDeletion: PendingDeletion?
 
     private struct PendingDeletion: Identifiable {
-        enum Kind { case model, earlierDownload }
+        enum Kind { case model, modelAndEarlierDownload, earlierDownload }
 
         let id: String
         let displayName: String
@@ -63,27 +63,37 @@ struct ModelsSettingsPane: View {
         ) { item in
             Button("Delete from Disk", role: .destructive) {
                 switch item.kind {
-                case .model: model.deleteModel(item.id)
+                case .model, .modelAndEarlierDownload: model.deleteModel(item.id)
                 case .earlierDownload: model.reclaimSupersededCopy(item.id)
                 }
                 pendingDeletion = nil
             }
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
         } message: { item in
-            if item.kind == .earlierDownload {
-                Text(verbatim: earlierDownloadWarning(bytes: item.sizeBytes ?? 0))
-            } else if let bytes = item.sizeBytes {
-                Text("This will remove \(AppFormat.byteSize(bytes)) from disk. You can re-download it later.")
-            } else {
-                Text("This will remove the model from disk. You can re-download it later.")
-            }
+            Text(verbatim: confirmationMessage(for: item))
         }
     }
 
-    private func earlierDownloadWarning(bytes: Int64) -> String {
-        let warning = String(localized: "This will remove \(AppFormat.byteSize(bytes)) from disk. Parola doesn't use this copy.")
-        guard model.modelStoreIsRelocated else { return warning }
-        return warning + String(localized: " Another app that uses this folder may still need it.")
+    private func confirmationMessage(for item: PendingDeletion) -> String {
+        let size = AppFormat.byteSize(item.sizeBytes ?? 0)
+        switch item.kind {
+        case .model:
+            guard item.sizeBytes != nil else {
+                return String(localized: "This will remove the model from disk. You can re-download it later.")
+            }
+            return String(localized: "This will remove \(size) from disk. You can re-download it later.")
+        case .modelAndEarlierDownload:
+            return withSharedFolderNote(String(
+                localized: "This will remove \(size) from disk, including an earlier download. You can re-download the model later."
+            ))
+        case .earlierDownload:
+            return withSharedFolderNote(String(localized: "This will remove \(size) from disk. Parola doesn't use this copy."))
+        }
+    }
+
+    private func withSharedFolderNote(_ message: String) -> String {
+        guard model.modelStoreIsRelocated else { return message }
+        return message + String(localized: " Another app that uses this folder may still need it.")
     }
 
     private var confirmationTitle: String {
@@ -278,10 +288,13 @@ struct ModelsSettingsPane: View {
                             isDeleting: model.isDeletingModel(variant.id),
                             onActivate: { model.activateModel(variant.id) },
                             onRequestDelete: (isActive || variant.engineID == .appleSpeech) ? nil : {
+                                let earlier = model.earlierCopies(of: variant.id)
+                                let modelBytes = model.modelSizes[variant.id] ?? Int64(variant.sizeBytes)
                                 pendingDeletion = PendingDeletion(
                                     id: variant.id,
                                     displayName: variant.displayName,
-                                    sizeBytes: model.modelSizes[variant.id] ?? Int64(variant.sizeBytes)
+                                    sizeBytes: earlier.reduce(modelBytes) { $0 + $1.bytes },
+                                    kind: earlier.isEmpty ? .model : .modelAndEarlierDownload
                                 )
                             }
                         )

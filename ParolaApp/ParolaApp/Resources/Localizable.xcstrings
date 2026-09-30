@@ -14628,6 +14628,17 @@
         }
       }
     },
+    "This will remove %@ from disk, including an earlier download. You can re-download the model later.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verrà rimosso %@ dal disco, compreso un download precedente. Potrai riscaricare il modello più tardi."
+          }
+        }
+      }
+    },
     "This will remove %@ from disk. Parola doesn't use this copy.": {
       "extractionState": "manual",
       "localizations": {

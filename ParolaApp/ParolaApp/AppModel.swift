@@ -2197,7 +2197,7 @@ final class AppModel {
         Task { [weak self] in
             let failure: (any Error)?
             do {
-                // Delete also frees the model's earlier downloads, so nothing of it stays on disk.
+                // Delete frees everything the model owns, earlier downloads included; the dialog counts them.
                 try await AppModel.offMainIO {
                     try AppModel.removeModelCopies(name, using: store)
                 }
