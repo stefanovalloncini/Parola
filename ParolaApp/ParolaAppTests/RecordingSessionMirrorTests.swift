@@ -4,7 +4,40 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
-// Waits are bound before they are expected: a closure inside #expect can share its symbol with a later closure.
+/// A capture the test drives: it comes up and hands back its file when let go, and meters only what the test records.
+private actor StubCapture: LiveAudioSource {
+    nonisolated let levelMeter = LevelMeter()
+    private let file: URL
+    private var holdsStart: Bool
+    private var holdsPrepare: Bool
+    private var held: CheckedContinuation<Void, Never>?
+
+    init(file: URL, holdsStart: Bool = false, holdsPrepare: Bool = false) {
+        self.file = file
+        self.holdsStart = holdsStart
+        self.holdsPrepare = holdsPrepare
+    }
+
+    func start() async throws {
+        if holdsStart { await withCheckedContinuation { held = $0 } }
+    }
+
+    func prepare() async throws -> URL {
+        if holdsPrepare { await withCheckedContinuation { held = $0 } }
+        return file
+    }
+
+    func letGo() {
+        holdsStart = false
+        holdsPrepare = false
+        held?.resume()
+        held = nil
+    }
+
+    func cancel() async {}
+}
+
+// Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
 extension TranscriberMockSuites {
     @MainActor
     @Suite("Recording session mirror", .serialized)
@@ -33,6 +66,12 @@ extension TranscriberMockSuites {
             model.useStreaming = true
             model.selectedModel = "openai_whisper-tiny"
             model.startRecording(source: .microphone)
+        }
+
+        private func startStubTake(_ model: AppModel, _ capture: StubCapture, source: AppModel.RecordSource = .microphone) {
+            model.useStreaming = false
+            model.takeCaptureOverride = { _ in capture }
+            model.startRecording(source: source)
         }
 
         @Test("a file take arms, then records from its first buffer, then finishes on Stop")
@@ -120,6 +159,226 @@ extension TranscriberMockSuites {
                 let settled = await waitUntil { !model.recordingActive }
                 #expect(settled)
             }
+        }
+
+        @Test("a capture that comes up but never meters runs its watches at once and starts its clock from then after two seconds")
+        func unheardCaptureFallsBack() async throws {
+            let audio = try makeTakeWAV("mirror-unheard", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeModel()
+            model.silenceRule = AppModel.SilenceRule(microphone: 60, macAudioBeforeSound: 0.5, macAudioAfterSound: 60)
+            startStubTake(model, StubCapture(file: audio), source: .systemAudio)
+            let up = await waitUntil { model.liveSource != nil }
+            #expect(up)
+            let cameUp = Date()
+            #expect(model.recording?.isArming == true)
+            #expect(model.takeInProgress, "a capture that is up holds audio a quit would lose")
+            #expect(model.silenceWatchTask != nil)
+
+            let warned = await waitUntil { model.recordingIsSilent }
+            #expect(warned, "Mac audio that has heard nothing yet warns early")
+            let started = await waitUntil { model.recording?.state == .recording }
+            #expect(started)
+            let startedAt = try #require(model.recording?.startedAt)
+            #expect(abs(startedAt.timeIntervalSince(cameUp)) < 0.25)
+            #expect(model.takeInProgress)
+            model.cancelCurrentWork()
+        }
+
+        @Test("a capture that meters starts its clock at its first reading, not when it came up")
+        func clockStartsAtTheFirstReading() async throws {
+            let audio = try makeTakeWAV("mirror-heard", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeModel()
+            let capture = StubCapture(file: audio)
+            startStubTake(model, capture)
+            let up = await waitUntil { model.liveSource != nil }
+            #expect(up)
+            try await Task.sleep(for: .milliseconds(300))
+
+            let heardAt = Date()
+            capture.levelMeter.record(0.4)
+
+            let started = await waitUntil { model.recording?.state == .recording }
+            #expect(started)
+            let startedAt = try #require(model.recording?.startedAt)
+            #expect(abs(startedAt.timeIntervalSince(heardAt)) < 0.05)
+            model.cancelCurrentWork()
+        }
+
+        @Test("a buffer metered just before Stop counts: the take is kept and its clock starts at that reading")
+        func stopRightAfterTheFirstReading() async throws {
+            let audio = try makeTakeWAV("mirror-first-reading", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "just in time")]
+                ))
+                let model = makeModel()
+                let capture = StubCapture(file: audio)
+                startStubTake(model, capture)
+                let up = await waitUntil { model.liveSource != nil }
+                #expect(up)
+                try await Task.sleep(for: .milliseconds(300))
+
+                let heardAt = Date()
+                capture.levelMeter.record(0.4)
+                model.stopRecordingAndTranscribe()
+
+                #expect(model.recording?.state == .finishing)
+                let startedAt = try #require(model.recording?.startedAt)
+                #expect(abs(startedAt.timeIntervalSince(heardAt)) < 0.05)
+                let entryID = try #require(await landedEntryID(model))
+                let saved = await model.library.list().map(\.id)
+                #expect(saved == [entryID])
+            }
+        }
+
+        @Test("a Stop after the capture came up but before it metered anything keeps a file that holds audio")
+        func unheardTakeWithAudioIsKept() async throws {
+            let audio = try makeTakeWAV("mirror-unheard-audio", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "kept anyway")]
+                ))
+                let model = makeModel()
+                startStubTake(model, StubCapture(file: audio))
+                let up = await waitUntil { model.liveSource != nil }
+                #expect(up)
+                let cameUp = Date()
+
+                model.stopRecordingAndTranscribe()
+
+                #expect(model.recording?.state == .finishing)
+                let startedAt = try #require(model.recording?.startedAt)
+                #expect(abs(startedAt.timeIntervalSince(cameUp)) < 0.25, "counted from when the capture came up")
+                let entryID = try #require(await landedEntryID(model))
+                let saved = await model.library.list().map(\.id)
+                #expect(saved == [entryID])
+            }
+        }
+
+        @Test("a Stop after the capture came up but before it metered anything records nothing when the file is empty, and deletes it")
+        func unheardEmptyTakeIsDropped() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "an empty take is never transcribed")
+                ))
+                let model = makeModel()
+                try FileManager.default.createDirectory(at: model.inflightRecordingsURL, withIntermediateDirectories: true)
+                let empty = try makeTakeWAV("mirror-unheard-empty", seconds: 0, in: model.inflightRecordingsURL, prefix: "parola-mic")
+                startStubTake(model, StubCapture(file: empty))
+                let up = await waitUntil { model.liveSource != nil }
+                #expect(up)
+
+                model.stopRecordingAndTranscribe()
+
+                let message = AppModel.nothingRecordedMessage()
+                let ended = await waitUntil { model.recording?.state == .failed(message: message) }
+                #expect(ended)
+                #expect(model.phase == .failed(message: message))
+                #expect(!FileManager.default.fileExists(atPath: empty.path), "an empty take's file goes")
+                await settle()
+                let saved = await model.library.list()
+                #expect(saved.isEmpty)
+            }
+        }
+
+        @Test("a Stop before the capture came up records nothing, and the capture that comes up later is dropped")
+        func stopBeforeTheCaptureCameUp() async throws {
+            let audio = try makeTakeWAV("mirror-not-up", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeModel()
+            let capture = StubCapture(file: audio, holdsStart: true)
+            startStubTake(model, capture)
+            let starting = await waitUntil {
+                model.takeArming == .startingCapture && model.phase == .recording(source: .microphone)
+            }
+            #expect(starting)
+            #expect(model.liveSource == nil)
+
+            model.stopRecordingAndTranscribe()
+
+            let message = AppModel.nothingRecordedMessage()
+            #expect(model.recording?.state == .failed(message: message))
+            #expect(model.phase == .failed(message: message))
+            await capture.letGo()
+            let settled = await waitUntil { !model.recordingActive }
+            #expect(settled)
+            #expect(model.liveSource == nil, "the late capture is dropped")
+        }
+
+        @Test("a take whose file comes back after the next take started leaves that take's levels running")
+        func lateFileSparesTheNextTake() async throws {
+            let firstFile = try makeTakeWAV("mirror-late-first", seconds: 1)
+            let secondFile = try makeTakeWAV("mirror-late-second", seconds: 1)
+            defer {
+                try? FileManager.default.removeItem(at: firstFile)
+                try? FileManager.default.removeItem(at: secondFile)
+            }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "the first take is not the point")
+                ))
+                let model = makeModel()
+                let first = StubCapture(file: firstFile, holdsPrepare: true)
+                startStubTake(model, first)
+                let firstUp = await waitUntil { model.liveSource != nil }
+                #expect(firstUp)
+                model.stopRecordingAndTranscribe()
+                model.cancelCurrentWork()
+
+                let second = StubCapture(file: secondFile)
+                startStubTake(model, second)
+                let secondUp = await waitUntil { model.liveSource != nil }
+                #expect(secondUp)
+                await first.letGo()
+                let firstDone = await waitUntil { !model.hasPendingTakeWork }
+                #expect(firstDone)
+
+                #expect(model.recordingLevelMeter === second.levelMeter, "the first take's late clear left the second take's meter")
+                second.levelMeter.record(0.4)
+                let started = await waitUntil { model.recording?.state == .recording }
+                #expect(started, "the second take's sampler still runs")
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("Stop and Save on a quit keeps a capture that came up but metered nothing when its file holds audio")
+        func quitKeepsAnUnheardTakeWithAudio() async throws {
+            let audio = try makeTakeWAV("mirror-quit-unheard", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeModel()
+            startStubTake(model, StubCapture(file: audio))
+            let up = await waitUntil { model.liveSource != nil }
+            #expect(up)
+            #expect(model.takeInProgress, "the quit asks, since the capture is up")
+
+            let quits = await model.resolveQuitDuringTake(.stopAndSave)
+
+            #expect(quits)
+            let saved = await model.library.list()
+            #expect(saved.count == 1)
+            #expect(saved.first?.title.hasSuffix("(not transcribed)") == true)
+        }
+
+        @Test("Stop and Save on a quit drops a capture that came up but metered nothing when its file is empty")
+        func quitDropsAnUnheardEmptyTake() async throws {
+            let model = makeModel()
+            try FileManager.default.createDirectory(at: model.inflightRecordingsURL, withIntermediateDirectories: true)
+            let empty = try makeTakeWAV("mirror-quit-empty", seconds: 0, in: model.inflightRecordingsURL, prefix: "parola-mic")
+            startStubTake(model, StubCapture(file: empty))
+            let up = await waitUntil { model.liveSource != nil }
+            #expect(up)
+
+            let quits = await model.resolveQuitDuringTake(.stopAndSave)
+
+            #expect(quits)
+            #expect(!FileManager.default.fileExists(atPath: empty.path))
+            let saved = await model.library.list()
+            #expect(saved.isEmpty)
+            #expect(model.recording == nil)
         }
 
         @Test("a count-in is the take's first arming, and it hands the same take to the capture")

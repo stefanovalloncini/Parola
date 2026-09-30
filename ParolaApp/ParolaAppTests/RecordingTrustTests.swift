@@ -380,7 +380,7 @@ extension TranscriberMockSuites {
                 model.useStreaming = false
                 model.pendingRecordingCategory = .meeting
                 model.startRecording(source: .microphone)
-                await waitUntil { model.takeInProgress }
+                await waitUntil { model.liveSource != nil }
                 model.stopRecordingAndTranscribe()
                 await waitUntil { if case .transcribing = model.phase { return true }; return false }
 
@@ -440,7 +440,7 @@ extension TranscriberMockSuites {
                 model.meetingCaptureAppOnly = true
 
                 model.startMeetingRecording(appName: "Microsoft Teams")
-                await waitUntil { model.takeInProgress }
+                await waitUntil { model.liveSource != nil }
                 let teams: Set<String> = ["com.microsoft.teams", "com.microsoft.teams2"]
                 #expect(model.activeTake?.category == .meeting)
                 #expect(model.activeTake?.captureTargets == teams)
