@@ -1,7 +1,19 @@
+import AppKit
 import Foundation
 import ParolaCore
 
 extension AppModel {
+
+    /// A take's Stop and Cancel are in the main window: it comes forward, or `open` makes a new one after it closed.
+    func showMainWindow(orOpen open: () -> Void) {
+        NSApp.activate(ignoringOtherApps: true)
+        guard let mainWindow else {
+            open()
+            return
+        }
+        if mainWindow.isMiniaturized { mainWindow.deminiaturize(nil) }
+        mainWindow.makeKeyAndOrderFront(nil)
+    }
 
     /// Hands the scene's `openWindow` to the model, the one thing that can put a window on screen.
     func bindOpenEntryWindow(_ action: @escaping (LibraryEntry.ID) -> Void) {

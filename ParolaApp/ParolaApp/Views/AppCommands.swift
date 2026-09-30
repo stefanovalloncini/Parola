@@ -37,16 +37,17 @@ struct HelpCommands: View {
 
 struct FileCommands: View {
     let model: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         if model.features.isEnabled(.micRecording) {
-            Button("New Recording") { model.startRecording(source: .microphone) }
+            Button("New Recording") { record(.microphone) }
                 .keyboardShortcut("n")
                 .disabled(!model.canStartTake(.microphone) || model.introduction.isPresented)
                 .axLeaf("Menu.File.NewRecording")
         }
         if model.features.isEnabled(.meetings) {
-            Button("New System Audio Recording") { model.startRecording(source: .systemAudio) }
+            Button("New System Audio Recording") { record(.systemAudio) }
                 .keyboardShortcut("n", modifiers: [.command, .option])
                 .disabled(!model.canStartTake(.systemAudio) || model.introduction.isPresented)
                 .axLeaf("Menu.File.NewSystemAudioRecording")
@@ -70,6 +71,12 @@ struct FileCommands: View {
         Button("Save As Parola Document…") { model.saveProjectDocument() }
             .keyboardShortcut("s")
             .disabled(!model.hasTranscript)
+    }
+
+    /// From a viewer, Settings or with no window open, the take's Stop still has to be on screen.
+    private func record(_ source: AppModel.RecordSource) {
+        model.showMainWindow { openWindow(id: MainWindowScene.id) }
+        model.startRecording(source: source)
     }
 }
 

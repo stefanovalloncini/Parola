@@ -1396,6 +1396,8 @@ final class AppModel {
 
     // MARK: - Transcript windows
 
+    /// The window the library and a take's controls live in; nil once it closed.
+    @ObservationIgnored weak var mainWindow: NSWindow?
     @ObservationIgnored let entryWindows = EntryWindowRegistry()
     @ObservationIgnored var openEntryWindowAction: ((LibraryEntry.ID) -> Void)?
     var keyViewerEntryIDs: Set<LibraryEntry.ID> = []

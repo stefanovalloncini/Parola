@@ -89,7 +89,7 @@ struct ParolaApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: MainWindowScene.id) {
             ContentView()
                 .id(model.themeRevision)
                 .demoPlayback()

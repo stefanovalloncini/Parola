@@ -22,6 +22,7 @@ struct ContentView: View {
             }
         }
         .animation(.smooth(duration: 0.35), value: model.introduction.isPresented)
+        .background(MainWindowReporter(model: model))
         .onReceive(NotificationCenter.default.publisher(for: .parolaStartRecording)) { _ in
             model.startRecording(source: .microphone)
         }
