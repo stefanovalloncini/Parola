@@ -205,22 +205,44 @@ extension TranscriberMockSuites {
             #expect(model.isBrowsingLibrary)
         }
 
-        @Test("stopping a run short hands back the phase its job painted", arguments: [false, true])
-        func stoppingHandsThePhaseBack(clears: Bool) async {
+        enum StopRun: CaseIterable {
+            case cancelBatch
+            case clear
+            case cancelJob
+        }
+
+        @Test("stopping a run short hands back the phase its job painted", arguments: StopRun.allCases)
+        func stoppingHandsThePhaseBack(stop: StopRun) async {
             let model = makeModel()
             let job = Self.job("running")
             model.batchJobs = [job]
             await model.handleBatchEvent(.started(jobID: job.id))
 
-            if clears {
-                model.clearBatch()
-            } else {
-                model.cancelAllInFlightBatchJobs()
+            switch stop {
+            case .cancelBatch: model.cancelAllInFlightBatchJobs()
+            case .clear: model.clearBatch()
+            case .cancelJob: model.cancelBatchJob(job.id)
             }
 
             #expect(model.phase == .idle)
             model.goHome()
             #expect(model.isBrowsingLibrary)
+        }
+
+        @Test("cancelling the running job while a take records leaves the take's pane")
+        func cancellingAJobKeepsTheTake() {
+            let model = makeModel()
+            let running = Self.job("running", .transcribing)
+            model.batchJobs = [running]
+            model.installTestTake(source: .microphone)
+            let phase = model.phase
+            let route = model.route
+
+            model.cancelBatchJob(running.id)
+
+            #expect(model.batchJobs.first?.status == .cancelled)
+            #expect(model.phase == phase)
+            #expect(model.route == route)
         }
 
         @Test("a job that finishes while an entry is open leaves the entry on screen")

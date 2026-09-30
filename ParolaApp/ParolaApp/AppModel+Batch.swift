@@ -323,7 +323,6 @@ extension AppModel {
         case .transcribing:
             stopBatchRun()
             mutateBatchJob(id) { $0.status = .cancelled }
-            phase = .ready
             let remaining = batchJobs.filter { $0.status == .pending }
             if !remaining.isEmpty {
                 resumeBatch(pendingJobs: remaining)
