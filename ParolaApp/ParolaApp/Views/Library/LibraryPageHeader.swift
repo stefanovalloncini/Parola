@@ -14,8 +14,9 @@ struct LibraryPageHeader: View {
         rowWidth > 0 && unfoldedRowWidth > rowWidth
     }
 
-    static func subtitle(count: Int, totalSeconds: Double, bundle: Bundle = .main) -> String {
-        guard count > 0 else { return String(localized: "No transcripts yet", bundle: bundle) }
+    /// Counts the rows on screen; when the filters left none, the empty state under the header says so instead.
+    static func subtitle(count: Int, totalSeconds: Double, filteredOut: Bool = false, bundle: Bundle = .main) -> String {
+        guard count > 0 else { return filteredOut ? "" : String(localized: "No transcripts yet", bundle: bundle) }
         return LibraryRowFormat.subtitle(count: count, totalSeconds: totalSeconds, bundle: bundle)
     }
 

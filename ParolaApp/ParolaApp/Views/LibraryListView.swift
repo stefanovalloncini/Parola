@@ -68,23 +68,25 @@ enum LibraryListContent {
         var bytes: Int64 = 0
     }
 
-    /// The header speaks for the page, not for what its filters leave: a category, else a person's own page, else the library.
-    static func pageTotals(
-        of entries: [LibraryEntry],
-        category: EntryCategory?,
-        person: UUID?,
-        sizes: [String: Int64]
-    ) -> PageTotals {
-        let pagePerson = category == nil ? person : nil
+    /// The header counts what the filters leave on screen, so its numbers always match the rows under it.
+    static func totals(of shown: [LibraryEntry], sizes: [String: Int64]) -> PageTotals {
         var totals = PageTotals()
-        for entry in entries {
-            if let category, entry.category != category { continue }
-            if let pagePerson, !entry.assigns(personID: pagePerson) { continue }
+        for entry in shown {
             totals.count += 1
             totals.seconds += entry.durationSeconds ?? 0
             totals.bytes += sizes[entry.id] ?? 0
         }
         return totals
+    }
+
+    /// What the page holds before its filters: a category, else a person's own page, else the library.
+    static func pageCount(of entries: [LibraryEntry], category: EntryCategory?, person: UUID?) -> Int {
+        let pagePerson = category == nil ? person : nil
+        return entries.count { entry in
+            if let category, entry.category != category { return false }
+            if let pagePerson, !entry.assigns(personID: pagePerson) { return false }
+            return true
+        }
     }
 
     /// A browse list sits under the results only when clearing the query would show it: not over a transcript.
@@ -336,7 +338,8 @@ private struct LibraryBrowseList: View, Equatable {
     @State private var dateRangeFilter: LibraryDateRangeFilter = .all
     @State private var entries: [LibraryRowDisplay] = []
     @State private var rowItems: [LibraryListItem] = []
-    @State private var pageTotals = LibraryListContent.PageTotals()
+    @State private var shownTotals = LibraryListContent.PageTotals()
+    @State private var pageCount = 0
     /// Set with `entries`, from the same library and filters, so no pass judges new filters against rows not yet rebuilt.
     @State private var emptyKind = LibraryEmptyState.Kind.none
     @State private var showsHero = false
@@ -384,9 +387,8 @@ private struct LibraryBrowseList: View, Equatable {
         displayCache = cache
         entries = displays
         rowItems = LibraryListItem.items(for: headers.groups(for: displays))
-        pageTotals = LibraryListContent.pageTotals(
-            of: model.libraryEntries, category: category, person: filters.person, sizes: model.libraryBundleSizes
-        )
+        shownTotals = LibraryListContent.totals(of: computed, sizes: model.libraryBundleSizes)
+        pageCount = LibraryListContent.pageCount(of: model.libraryEntries, category: category, person: filters.person)
         emptyKind = LibraryEmptyState.kind(
             entryCount: LibraryEmptyState.entryCount(in: model.libraryEntries, category: category),
             visibleCount: displays.count,
@@ -487,9 +489,11 @@ private struct LibraryBrowseList: View, Equatable {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             LibraryPageHeader(
                 title: LibraryPageHeader.title(category: category, personName: selectedPerson?.name),
-                subtitle: LibraryPageHeader.subtitle(count: pageTotals.count, totalSeconds: pageTotals.seconds),
-                subtitleHelp: pageTotals.bytes > 0
-                    ? String(localized: "Total size: \(AppFormat.byteSize(pageTotals.bytes))") : nil,
+                subtitle: LibraryPageHeader.subtitle(
+                    count: shownTotals.count, totalSeconds: shownTotals.seconds, filteredOut: emptyKind == .noMatches
+                ),
+                subtitleHelp: shownTotals.bytes > 0
+                    ? String(localized: "Total size: \(AppFormat.byteSize(shownTotals.bytes))") : nil,
                 filters: LibraryFilterBar(
                     labelFilter: $labelFilter,
                     languageFilter: $languageFilter,
@@ -499,7 +503,7 @@ private struct LibraryBrowseList: View, Equatable {
                     languageOptions: model.knownLanguages(in: category),
                     peopleOptions: model.knownPeople(in: category)
                 ),
-                showsListControls: pageTotals.count > 0,
+                showsListControls: pageCount > 0,
                 selection: selection,
                 pendingBulkDelete: $pendingBulkDelete
             )

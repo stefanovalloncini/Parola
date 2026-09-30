@@ -36,6 +36,7 @@ struct LibraryPageHeaderTests {
         #expect(LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60) == "14 transcripts · 7 h 25 min")
         #expect(LibraryPageHeader.subtitle(count: 1, totalSeconds: 0) == "1 transcript")
         #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0) == "No transcripts yet")
+        #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0, filteredOut: true) == "", "No Matches below says it")
     }
 
     @Test("the subtitle reads naturally in Italian")
@@ -77,24 +78,37 @@ struct LibraryPageHeaderTests {
         return LibraryEntry(id: id, bundleURL: URL(fileURLWithPath: "/tmp/LibraryPageHeaderTests/\(id).parola"), manifest: manifest)
     }
 
-    @Test("the subtitle counts the page before any filter narrows it")
-    func pageTotalsIgnoreTheFilters() {
+    @Test("the subtitle counts the transcripts the filters leave on screen")
+    func subtitleCountsShownRows() {
+        let entries = [
+            entry("a", seconds: 60, labels: ["Work"]),
+            entry("b", category: .meeting, seconds: 1800, person: giulia),
+            entry("c", category: .meeting, seconds: 3540, person: giulia),
+            entry("d", category: .meeting, seconds: 600),
+            entry("e", seconds: 30, person: giulia),
+        ]
+        let sizes: [String: Int64] = ["a": 1_000, "b": 20_000, "c": 5_000, "d": 7_000]
+        let shown = LibraryListContent.rows(
+            from: entries, category: .meeting, labelFilter: nil, languageFilter: nil, dateRange: .all, personFilter: giulia
+        )
+
+        let totals = LibraryListContent.totals(of: shown, sizes: sizes)
+        #expect(totals == .init(count: 2, seconds: 5340, bytes: 25_000))
+        #expect(LibraryPageHeader.subtitle(count: totals.count, totalSeconds: totals.seconds) == "2 transcripts · 1 h 29 min")
+    }
+
+    @Test("the chips stay while the page holds something before its filters, a person's own page included")
+    func pageCountIgnoresTheFilters() {
         let entries = [
             entry("a", seconds: 60, labels: ["Work"]),
             entry("b", category: .meeting, seconds: 1800, person: giulia),
             entry("c", category: .meeting, seconds: 600),
             entry("d", seconds: 30, person: giulia),
         ]
-        let sizes: [String: Int64] = ["a": 1_000, "b": 20_000, "c": 5_000]
-
-        let library = LibraryListContent.pageTotals(of: entries, category: nil, person: nil, sizes: sizes)
-        #expect(library == .init(count: 4, seconds: 2490, bytes: 26_000))
-
-        let meetings = LibraryListContent.pageTotals(of: entries, category: .meeting, person: giulia, sizes: sizes)
-        #expect(meetings == .init(count: 2, seconds: 2400, bytes: 25_000), "the People menu narrows the Meetings page; it doesn't make it a new one")
-
-        let person = LibraryListContent.pageTotals(of: entries, category: nil, person: giulia, sizes: sizes)
-        #expect(person == .init(count: 2, seconds: 1830, bytes: 20_000), "with no category, the person is the page")
+        #expect(LibraryListContent.pageCount(of: entries, category: nil, person: nil) == 4)
+        #expect(LibraryListContent.pageCount(of: entries, category: .meeting, person: giulia) == 2, "the People chip narrows the Meetings page; it doesn't make it a new one")
+        #expect(LibraryListContent.pageCount(of: entries, category: nil, person: giulia) == 2, "with no category, the person is the page")
+        #expect(LibraryListContent.pageCount(of: entries, category: .dictation, person: nil) == 0)
     }
 
     // MARK: - Layout
