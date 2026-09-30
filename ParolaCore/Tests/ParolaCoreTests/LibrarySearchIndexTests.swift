@@ -1135,17 +1135,17 @@ final class LibrarySearchIndexTests {
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         let first = Task { await index.flush() }
-        let withLockWait = await eventually { log.withLock { $0.written.count } > 0 }
-        #expect(withLockWait)
+        let logHasWrites = await eventually { log.withLock { $0.written.count } > 0 }
+        #expect(logHasWrites)
 
         await index.index(id: "e2", title: "Two", text: "retro feedback", createdAt: Date())
         let second = Task { await index.flush() }
-        let indexWait = await eventually { await index.snapshotGeneration >= 2 }
-        #expect(indexWait)
+        let generationAtLeastTwo = await eventually { await index.snapshotGeneration >= 2 }
+        #expect(generationAtLeastTwo)
         await index.index(id: "e3", title: "Three", text: "alpha review", createdAt: Date())
         let third = Task { await index.flush() }
-        let indexWait2 = await eventually { await index.snapshotGeneration >= 3 }
-        #expect(indexWait2)
+        let generationAtLeastThree = await eventually { await index.snapshotGeneration >= 3 }
+        #expect(generationAtLeastThree)
 
         gate.signal()
         await first.value

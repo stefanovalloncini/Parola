@@ -229,40 +229,40 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.pushRamp(seconds: 10)
-        let scriptWait = await eventually { await script.callCount == 1 }
-        #expect(scriptWait)
+        let scriptCalledOnce = await eventually { await script.callCount == 1 }
+        #expect(scriptCalledOnce)
         let call1 = try #require(await script.calls.first)
         #expect(call1.sampleCount == 10 * sampleRate)
         #expect(call1.clip == [0])
 
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
         let batch1 = try #require(recorder.batches.first)
         #expect(batch1.segments.map(\.text) == ["a"])
         #expect(batch1.segments.map(\.start) == [0])
         #expect(batch1.segments.map(\.end) == [4])
 
-        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
-        #expect(loopWait)
+        let windowOffsetAt2Seconds = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
+        #expect(windowOffsetAt2Seconds)
         #expect(await loop.windowSampleCount() == 8 * sampleRate)
 
         capture.push(seconds: 6, value: 0.5)
-        let scriptWait2 = await eventually { await script.callCount == 2 }
-        #expect(scriptWait2)
+        let scriptCalledTwice = await eventually { await script.callCount == 2 }
+        #expect(scriptCalledTwice)
         let call2 = try #require(await script.calls.last)
         #expect(call2.sampleCount == 14 * sampleRate)
         #expect(call2.clip == [2])
         #expect(call2.firstSample == Float(2 * sampleRate) / Float(10 * sampleRate))
 
-        let countWait2 = await eventually { recorder.batches.count == 2 }
-        #expect(countWait2)
+        let twoBatchesRecorded = await eventually { recorder.batches.count == 2 }
+        #expect(twoBatchesRecorded)
         let batch2 = try #require(recorder.batches.last)
         #expect(batch2.segments.map(\.text) == ["d"])
         #expect(batch2.segments.map(\.start) == [4])
         #expect(batch2.segments.map(\.end) == [8])
 
-        let loopWait2 = await eventually { await loop.windowStartOffsetSamples() == 6 * sampleRate }
-        #expect(loopWait2)
+        let windowOffsetAt6Seconds = await eventually { await loop.windowStartOffsetSamples() == 6 * sampleRate }
+        #expect(windowOffsetAt6Seconds)
         #expect(await loop.windowSampleCount() == 10 * sampleRate)
 
         #expect(recorder.partials.contains("b c"))
@@ -286,17 +286,17 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.pushRamp(seconds: 10)
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
         let batch1 = try #require(recorder.batches.first)
         #expect(batch1.windowStartSeconds == 0)
         #expect(batch1.audioWindow.count == Int(4.5 * Double(sampleRate)))
 
         capture.push(seconds: 6, value: 0.5)
-        let scriptWait = await eventually { await script.callCount == 2 }
-        #expect(scriptWait)
-        let countWait2 = await eventually { recorder.batches.count == 2 }
-        #expect(countWait2)
+        let scriptCalledTwice = await eventually { await script.callCount == 2 }
+        #expect(scriptCalledTwice)
+        let twoBatchesRecorded = await eventually { recorder.batches.count == 2 }
+        #expect(twoBatchesRecorded)
         let batch2 = try #require(recorder.batches.last)
         #expect(batch2.windowStartSeconds == 3.5)
         #expect(batch2.audioWindow.count == 5 * sampleRate)
@@ -320,21 +320,21 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.push(seconds: 10, value: 0.5)
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
         #expect(recorder.batches.first?.segments.map(\.text) == ["a"])
 
         capture.push(seconds: 6, value: 0.5)
-        let scriptWait = await eventually { await script.callCount == 2 }
-        #expect(scriptWait)
-        let countWait2 = await eventually { recorder.batches.count == 2 }
-        #expect(countWait2)
+        let scriptCalledTwice = await eventually { await script.callCount == 2 }
+        #expect(scriptCalledTwice)
+        let twoBatchesRecorded = await eventually { recorder.batches.count == 2 }
+        #expect(twoBatchesRecorded)
         let batch = try #require(recorder.batches.last)
         #expect(batch.segments.map(\.text) == ["d", "e"], "the segment behind the watermark is the only one dropped")
         #expect(batch.segments.map(\.end) == [8, 12])
 
-        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 10 * sampleRate }
-        #expect(loopWait)
+        let windowOffsetAt10Seconds = await eventually { await loop.windowStartOffsetSamples() == 10 * sampleRate }
+        #expect(windowOffsetAt10Seconds)
 
         await loop.stop()
         _ = await runTask.value
@@ -354,15 +354,15 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.pushRamp(seconds: 10)
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
         #expect(recorder.batches.first?.segments.map(\.text) == ["a"])
-        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
-        #expect(loopWait)
+        let windowOffsetAt2SecondsAfterRamp = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
+        #expect(windowOffsetAt2SecondsAfterRamp)
 
         capture.push(seconds: 2, value: 0.5)
-        let scriptWait = await eventually { await script.callCount == 2 }
-        #expect(scriptWait)
+        let scriptCalledTwice = await eventually { await script.callCount == 2 }
+        #expect(scriptCalledTwice)
 
         await loop.stop()
         _ = await runTask.value
@@ -390,17 +390,17 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.push(seconds: 5, value: 0.5)
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
-        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 3 * sampleRate }
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
+        let windowOffsetAt3Seconds = await eventually { await loop.windowStartOffsetSamples() == 3 * sampleRate }
         #expect(
-            loopWait,
+            windowOffsetAt3Seconds,
             "the watermark stops at the 5 s actually decoded, so the purge keeps the speech"
         )
 
         capture.push(seconds: 5, value: 0.5)
-        let scriptWait = await eventually { await script.callCount == 2 }
-        #expect(scriptWait)
+        let scriptCalledTwice = await eventually { await script.callCount == 2 }
+        #expect(scriptCalledTwice)
         let call2 = try #require(await script.calls.last)
         #expect(call2.sampleCount == 7 * sampleRate)
         #expect(call2.clip == [2], "the decode starts inside the window, not past everything it holds")
@@ -426,12 +426,12 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.push(seconds: 10, value: 0.5)
-        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 1 * sampleRate }
-        #expect(loopWait)
+        let windowOffsetAt1Second = await eventually { await loop.windowStartOffsetSamples() == 1 * sampleRate }
+        #expect(windowOffsetAt1Second)
 
         capture.push(seconds: 2, value: 0.5)
-        let scriptWait = await eventually { await script.callCount == 2 }
-        #expect(scriptWait)
+        let scriptCalledTwice = await eventually { await script.callCount == 2 }
+        #expect(scriptCalledTwice)
         let call2 = try #require(await script.calls.last)
         #expect(call2.sampleCount == 11 * sampleRate)
         #expect(call2.clip == [2], "3 s in, where the retained segment starts")
@@ -451,16 +451,16 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.push(seconds: 10, value: 0.5)
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
-        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
-        #expect(loopWait)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
+        let windowOffsetAt2SecondsSecondBatch = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
+        #expect(windowOffsetAt2SecondsSecondBatch)
 
         capture.push(seconds: 4, value: 0.5)
-        let scriptWait = await eventually { await script.callCount == 2 }
-        #expect(scriptWait)
-        let countWait2 = await eventually { recorder.batches.count == 2 }
-        #expect(countWait2)
+        let scriptCalledTwice = await eventually { await script.callCount == 2 }
+        #expect(scriptCalledTwice)
+        let twoBatchesRecorded = await eventually { recorder.batches.count == 2 }
+        #expect(twoBatchesRecorded)
 
         await loop.stop()
         _ = await runTask.value
@@ -485,8 +485,8 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.pushRamp(seconds: 10)
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
         let batch = try #require(recorder.batches.first)
         #expect(batch.segments.map(\.text) == ["late", "early"])
         #expect(batch.windowStartSeconds == 0)
@@ -525,8 +525,8 @@ struct StreamingRealtimeLoopTests {
         #expect(recorder.partials.contains("Waiting for speech..."))
 
         capture.pushBuffers(count: 20, secondsEach: 0.1, value: 0.5)
-        let scriptWait = await eventually { await script.callCount >= 1 }
-        #expect(scriptWait)
+        let scriptCalledAtLeastOnce = await eventually { await script.callCount >= 1 }
+        #expect(scriptCalledAtLeastOnce)
 
         await loop.stop()
         _ = await runTask.value
@@ -540,13 +540,13 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.pushBuffers(count: 70, secondsEach: 1, value: 0)
-        let loopWait = await eventually { await loop.windowStartOffsetSamples() == 10 * sampleRate }
-        #expect(loopWait)
+        let windowOffsetAt10SecondsLate = await eventually { await loop.windowStartOffsetSamples() == 10 * sampleRate }
+        #expect(windowOffsetAt10SecondsLate)
         #expect(await loop.windowSampleCount() == 60 * sampleRate)
 
         capture.pushBuffers(count: 10, secondsEach: 1, value: 0)
-        let loopWait2 = await eventually { await loop.windowStartOffsetSamples() == 20 * sampleRate }
-        #expect(loopWait2)
+        let windowOffsetAt20Seconds = await eventually { await loop.windowStartOffsetSamples() == 20 * sampleRate }
+        #expect(windowOffsetAt20Seconds)
         #expect(await loop.windowSampleCount() == 60 * sampleRate)
         #expect(await script.callCount == 0)
 
@@ -562,14 +562,14 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.push(seconds: 3, value: 0.5)
-        let scriptWait = await eventually { await script.callCount == 1 }
-        #expect(scriptWait)
+        let scriptCalledOnce = await eventually { await script.callCount == 1 }
+        #expect(scriptCalledOnce)
         let call1 = try #require(await script.calls.first)
         #expect(call1.sampleCount == 3 * sampleRate)
 
         capture.push(seconds: 3, value: 0.5)
-        let scriptWait2 = await eventually { await script.callCount == 2 }
-        #expect(scriptWait2)
+        let scriptCalledTwice = await eventually { await script.callCount == 2 }
+        #expect(scriptCalledTwice)
         let call2 = try #require(await script.calls.last)
         #expect(call2.sampleCount == 4 * sampleRate)
         #expect(await loop.windowStartOffsetSamples() == 2 * sampleRate)
@@ -589,8 +589,8 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.pushRamp(seconds: 10)
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
 
         await loop.stop()
         let outcome = await runTask.value
@@ -619,10 +619,10 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.push(seconds: 3, value: 0.5)
-        let scriptWait = await eventually { await script.callCount == 1 }
-        #expect(scriptWait)
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
+        let scriptCalledOnce = await eventually { await script.callCount == 1 }
+        #expect(scriptCalledOnce)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
 
         capture.push(seconds: 0.5, value: 0.5)
         await loop.stop()
@@ -649,10 +649,10 @@ struct StreamingRealtimeLoopTests {
         // would leave undecoded speech in the tail and the flush would rightly decode it.
         capture.pushBuffers(count: 1, secondsEach: 0.1, value: 0)
         capture.push(seconds: 3, value: 0.5)
-        let scriptWait = await eventually { await script.callCount == 1 }
-        #expect(scriptWait)
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
+        let scriptCalledOnce = await eventually { await script.callCount == 1 }
+        #expect(scriptCalledOnce)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
 
         capture.pushBuffers(count: 20, secondsEach: 0.1, value: 0)
         await loop.stop()
@@ -674,10 +674,10 @@ struct StreamingRealtimeLoopTests {
         #expect(installedWait)
 
         capture.push(seconds: 3, value: 0.5)
-        let scriptWait = await eventually { await script.callCount == 1 }
-        #expect(scriptWait)
-        let countWait = await eventually { recorder.batches.count == 1 }
-        #expect(countWait)
+        let scriptCalledOnce = await eventually { await script.callCount == 1 }
+        #expect(scriptCalledOnce)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
 
         capture.push(seconds: 0.5, value: 0.5)
         runTask.cancel()
@@ -758,8 +758,8 @@ struct StreamingRealtimeLoopTests {
         let prompt = PermissionPrompt()
         let (loop, capture, script, _) = makeLoop(responses: [], requestPermission: { await prompt.ask() })
         let runTask = Task { await loop.run() }
-        let promptWait = await eventually { await prompt.isShowing }
-        #expect(promptWait)
+        let promptIsShowing = await eventually { await prompt.isShowing }
+        #expect(promptIsShowing)
 
         await loop.stop()
         await prompt.answer(true)
@@ -784,12 +784,12 @@ struct StreamingRealtimeLoopTests {
             if case .stopped = outcome { stopped = true } else { stopped = false }
             ended.withLock { $0 = stopped }
         }
-        let promptWait = await eventually { await prompt.isShowing }
-        #expect(promptWait)
+        let promptIsShowing = await eventually { await prompt.isShowing }
+        #expect(promptIsShowing)
 
         await loop.stop()
-        let withLockWait = await eventually { ended.withLock { $0 } != nil }
-        #expect(withLockWait, "an unanswered prompt must not park the stop")
+        let promptEnded = await eventually { ended.withLock { $0 } != nil }
+        #expect(promptEnded, "an unanswered prompt must not park the stop")
         #expect(ended.withLock { $0 } == true)
 
         await prompt.answer(true)

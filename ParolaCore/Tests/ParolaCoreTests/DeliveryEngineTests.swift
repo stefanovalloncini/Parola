@@ -443,8 +443,8 @@ final class DeliveryEngineTests {
 
         await gate.arm()
         let cancelling = Task { await engine.cancel(entryID: "entry-1") }
-        let gateWait = await poll { await gate.isHolding }
-        #expect(gateWait)
+        let gateIsHolding = await poll { await gate.isHolding }
+        #expect(gateIsHolding)
         clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
         await retry?.value
         await gate.release()
@@ -521,8 +521,8 @@ final class DeliveryEngineTests {
 
         let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: TestClock())
 
-        let engineWait = await poll { await engine.pending().isEmpty }
-        #expect(engineWait, "the stored delivery should have run")
+        let enginePendingCleared = await poll { await engine.pending().isEmpty }
+        #expect(enginePendingCleared, "the stored delivery should have run")
         #expect(await recorder.recorded().map(\.entryID) == ["entry-1"])
         #expect(store.loadQueue().isEmpty)
     }
@@ -581,8 +581,8 @@ final class DeliveryEngineTests {
         ])
         let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
 
-        let engineWait = await poll { await engine.pending().isEmpty }
-        #expect(engineWait)
+        let enginePendingCleared = await poll { await engine.pending().isEmpty }
+        #expect(enginePendingCleared)
         #expect(await engine.recentLog().last?.event == .dropped)
     }
 
@@ -616,8 +616,8 @@ final class DeliveryEngineTests {
             payload: { try await payloads.build($0) }
         )
 
-        let engineWait = await poll { await engine.pending().first { $0.entryID == "entry-1" }?.unreachableChecks == 1 }
-        #expect(engineWait)
+        let entryOneUnreachableOnce = await poll { await engine.pending().first { $0.entryID == "entry-1" }?.unreachableChecks == 1 }
+        #expect(entryOneUnreachableOnce)
 
         let pending = await engine.pending()
         #expect(pending.first { $0.entryID == "entry-2" }?.unreachableChecks == 1, "the other due delivery moved with it")
@@ -638,8 +638,8 @@ final class DeliveryEngineTests {
 
         let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
 
-        let recorderWait = await poll { await recorder.recorded().count == 1 }
-        #expect(recorderWait)
+        let recorderGotOne = await poll { await recorder.recorded().count == 1 }
+        #expect(recorderGotOne)
         let sleeperCountWait = await poll { clock.sleeperCount == 2 }
         #expect(sleeperCountWait, "the other two wait their turn")
         #expect(await recorder.recorded().map(\.entryID) == ["entry-1"])
@@ -690,8 +690,8 @@ final class DeliveryEngineTests {
         await recorder.setReachable(true, for: destination.id)
         await engine.retryNow(destinationID: destination.id)
 
-        let recorderWait = await poll { await recorder.recorded().count == 1 }
-        #expect(recorderWait)
+        let recorderGotOne = await poll { await recorder.recorded().count == 1 }
+        #expect(recorderGotOne)
         let sleeperCountWait = await poll { clock.sleeperCount == 1 }
         #expect(sleeperCountWait, "the second waits its turn")
         let second = await engine.timerTask(for: "entry-2", destinationID: destination.id)
@@ -720,8 +720,8 @@ final class DeliveryEngineTests {
 
         await engine.retryNow(destinationID: destination.id)
 
-        let recorderWait = await poll { await recorder.recorded().count == 1 }
-        #expect(recorderWait)
+        let recorderGotOne = await poll { await recorder.recorded().count == 1 }
+        #expect(recorderGotOne)
         #expect(await recorder.recorded().map(\.entryID) == ["was-away"])
         let left = try #require(await engine.pending().first)
         #expect(left.entryID == "write-failed")

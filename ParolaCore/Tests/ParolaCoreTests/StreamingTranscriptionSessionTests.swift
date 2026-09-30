@@ -143,8 +143,8 @@ struct StreamingTakeEndingTests {
         let session = StreamingTranscriptionSession()
         let loader = SuspendingLoader()
         let starting = Task { try await session.loadingModel { await loader.load() } }
-        let loaderWait = await eventually { await loader.isLoading }
-        #expect(loaderWait)
+        let loaderIsLoading = await eventually { await loader.isLoading }
+        #expect(loaderIsLoading)
 
         await session.stop()
         await loader.finish()
@@ -157,8 +157,8 @@ struct StreamingTakeEndingTests {
         let session = StreamingTranscriptionSession()
         let loader = SuspendingLoader()
         let starting = Task { try await session.loadingModel { await loader.load() } }
-        let loaderWait = await eventually { await loader.isLoading }
-        #expect(loaderWait)
+        let loaderIsLoading = await eventually { await loader.isLoading }
+        #expect(loaderIsLoading)
 
         await session.cancel()
         await loader.finish()
@@ -172,8 +172,8 @@ struct StreamingTakeEndingTests {
         await session.stop()
         let loader = SuspendingLoader()
         let starting = Task { try await session.loadingModel { await loader.load() } }
-        let loaderWait = await eventually { await loader.isLoading }
-        #expect(loaderWait)
+        let loaderIsLoading = await eventually { await loader.isLoading }
+        #expect(loaderIsLoading)
 
         await loader.finish()
 

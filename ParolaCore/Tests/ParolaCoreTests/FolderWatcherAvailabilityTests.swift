@@ -49,8 +49,8 @@ struct FolderWatcherAvailabilityTests {
 
         let renamed = parent.appendingPathComponent("Recordings")
         try FileManager.default.moveItem(at: folder, to: renamed)
-        let watcherWait = await waitUntil { await watcher.state == .lost }
-        #expect(watcherWait)
+        let watcherLostAccess = await waitUntil { await watcher.state == .lost }
+        #expect(watcherLostAccess)
         #expect(states.all == [.lost])
         let saved = try #require(await watcher.baseline())
         #expect(saved.entries.map(\.path) == ["kept.m4a"])
@@ -80,8 +80,8 @@ struct FolderWatcherAvailabilityTests {
         await watcher.start()
         try FileManager.default.removeItem(at: folder)
 
-        let watcherWait = await waitUntil { await watcher.state == .lost }
-        #expect(watcherWait)
+        let watcherLostAccess = await waitUntil { await watcher.state == .lost }
+        #expect(watcherLostAccess)
         #expect(states.all == [.lost])
         await watcher.stop()
         #expect(await watcher.state == .idle)

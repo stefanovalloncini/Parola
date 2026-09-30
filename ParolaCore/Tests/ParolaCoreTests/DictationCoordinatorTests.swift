@@ -726,8 +726,8 @@ struct DictationCoordinatorTests {
 
         await coord.handle(.press)
         let first = Task { await coord.stopListening() }
-        let recorderWait = await eventually { await recorder.waiting == 1 }
-        #expect(recorderWait)
+        let recorderIsWaitingOnce = await eventually { await recorder.waiting == 1 }
+        #expect(recorderIsWaitingOnce)
         let giveUp = Task { await coord.giveUpOnTranscription(after: .milliseconds(300)) }
 
         await recorder.releaseNext()
@@ -736,8 +736,8 @@ struct DictationCoordinatorTests {
 
         await coord.handle(.press)
         let second = Task { await coord.stopListening() }
-        let recorderWait2 = await eventually { await recorder.waiting == 1 }
-        #expect(recorderWait2)
+        let recorderIsWaitingOnceAgain = await eventually { await recorder.waiting == 1 }
+        #expect(recorderIsWaitingOnceAgain)
         #expect(await giveUp.value == false, "the timer fires while the second final runs and must leave it alone")
         await #expect(coord.state == .transcribing)
 
@@ -755,8 +755,8 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         let finish = Task { await coord.stopListening() }
-        let recorderWait = await eventually { await recorder.waiting == 1 }
-        #expect(recorderWait)
+        let recorderIsWaitingOnce = await eventually { await recorder.waiting == 1 }
+        #expect(recorderIsWaitingOnce)
 
         #expect(await coord.giveUpOnTranscription(after: .milliseconds(20)))
         await #expect(coord.state == .idle)
