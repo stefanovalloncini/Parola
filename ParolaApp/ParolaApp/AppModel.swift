@@ -229,6 +229,7 @@ final class AppModel {
 
     /// How long a take whose capture is up waits for a metered buffer before its clock starts from the capture anyway.
     nonisolated static let firstBufferWait: Duration = .seconds(2)
+    nonisolated static let takeSampleInterval: Duration = .milliseconds(100)
     /// The route the running take took; the recording pane reads it.
     var liveTakeIsStreaming: Bool { recording?.isStreaming ?? false }
     /// When the take in progress began capturing; the pane, the toolbar and the Dock all count from it.
@@ -3482,12 +3483,20 @@ final class AppModel {
     private func startTakeSampler(meter: LevelMeter, take: TakeContext) {
         stopTakeSampler()
         takeSampler = Task { @MainActor [weak self] in
+            var tick = ContinuousClock.now
             while !Task.isCancelled {
                 guard let self else { return }
                 self.sampleTake(meter, take: take)
-                try? await Task.sleep(for: .milliseconds(100))
+                tick = Self.nextSampleTick(after: tick, now: .now)
+                try? await Task.sleep(until: tick, clock: .continuous)
             }
         }
+    }
+
+    /// Ten a second on average, whatever a tick costs; a stall longer than a second is skipped rather than replayed.
+    nonisolated static func nextSampleTick(after tick: ContinuousClock.Instant, now: ContinuousClock.Instant) -> ContinuousClock.Instant {
+        let next = tick + takeSampleInterval
+        return next < now - .seconds(1) ? now : next
     }
 
     private func stopTakeSampler() {

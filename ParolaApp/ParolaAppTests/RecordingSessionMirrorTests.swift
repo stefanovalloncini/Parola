@@ -74,6 +74,11 @@ extension TranscriberMockSuites {
             model.startRecording(source: source)
         }
 
+        private func seconds(since start: ContinuousClock.Instant) -> Double {
+            let elapsed = start.duration(to: .now).components
+            return Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
+        }
+
         @Test("a file take arms, then records from its first buffer, then finishes on Stop")
         func fileTakeStages() async throws {
             let fixture = try makeTakeWAV("mirror-stages")
@@ -96,16 +101,24 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("the take's levels fill at ten a second from one sampler")
-        func oneSampler() async throws {
-            let fixture = try makeTakeWAV("mirror-levels", seconds: 2)
+        @Test("the take's levels fill at ten a second")
+        func levelsFillAtTenASecond() async throws {
+            let fixture = try makeTakeWAV("mirror-levels", seconds: 3)
             defer { try? FileManager.default.removeItem(at: fixture) }
             try await withMocksCleared(.audioSource) {
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
                 let model = makeModel()
                 model.startRecording(source: .microphone)
-                let filled = await waitUntil { (model.takeLevels?.sampleCount ?? 0) >= 10 }
-                #expect(filled)
+                let recording = await waitUntil { model.recording?.state == .recording }
+                #expect(recording)
+
+                let before = model.takeLevels?.sampleCount ?? 0
+                let from = ContinuousClock.now
+                try await Task.sleep(for: .seconds(1))
+                let after = model.takeLevels?.sampleCount ?? 0
+                let rate = Double(after - before) / seconds(since: from)
+
+                #expect(rate >= 7 && rate <= 13, "about ten levels a second, not \(rate)")
                 model.cancelCurrentWork()
             }
         }
