@@ -2094,21 +2094,12 @@ final class AppModel {
     // MARK: - Model list
 
     var modelSizes: [String: Int64] = [:]
+    var supersededCopies: [SupersededCopy] = []
+    @ObservationIgnored var supersededCopiesTask: Task<Void, Never>?
     var modelsBeingDeleted: Set<String> = []
     /// Last model download/delete failure, surfaced as a banner in the Models pane —
     /// the shared phase error renders in the main window, invisible behind Settings.
     var modelActionError: String?
-
-    /// Count and bytes of models with an actual disk footprint, measured when available.
-    /// Apple Speech reports installed but owns no files, so it's excluded. Both the
-    /// Models pane and About read this — the two stats must never disagree.
-    var modelsOnDiskSummary: (count: Int, bytes: Int64) {
-        let onDisk = availableModels.filter { $0.isInstalled && $0.installedURL != nil }
-        let bytes = onDisk.reduce(Int64(0)) { total, info in
-            total + (modelSizes[info.name] ?? info.approximateSizeBytes.map(Int64.init) ?? 0)
-        }
-        return (onDisk.count, bytes)
-    }
 
     @ObservationIgnored private var modelScanTask: Task<Void, Never>?
 
@@ -2149,6 +2140,7 @@ final class AppModel {
             selectedModel = corrected
         }
         refreshModelSizes()
+        refreshSupersededCopies()
     }
 
     /// The model `downloadModel` is fetching, or nil — a scan mid-download must not correct it away as if uninstalled.
@@ -2205,8 +2197,7 @@ final class AppModel {
         Task { [weak self] in
             let failure: (any Error)?
             do {
-                // One row per model here and no leftovers list, so Delete frees every copy —
-                // the CLI splits the two into `models rm` and `models rm --leftovers`.
+                // Delete also frees the model's earlier downloads, so nothing of it stays on disk.
                 try await AppModel.offMainIO {
                     try AppModel.removeModelCopies(name, using: store)
                 }

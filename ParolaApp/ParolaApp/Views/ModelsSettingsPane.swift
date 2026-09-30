@@ -10,9 +10,12 @@ struct ModelsSettingsPane: View {
     @State private var pendingDeletion: PendingDeletion?
 
     private struct PendingDeletion: Identifiable {
+        enum Kind { case model, earlierDownload }
+
         let id: String
         let displayName: String
         let sizeBytes: Int64?
+        var kind: Kind = .model
     }
 
     enum InstallFilter: String, CaseIterable, Identifiable {
@@ -59,17 +62,28 @@ struct ModelsSettingsPane: View {
             presenting: pendingDeletion
         ) { item in
             Button("Delete from Disk", role: .destructive) {
-                model.deleteModel(item.id)
+                switch item.kind {
+                case .model: model.deleteModel(item.id)
+                case .earlierDownload: model.reclaimSupersededCopy(item.id)
+                }
                 pendingDeletion = nil
             }
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
         } message: { item in
-            if let bytes = item.sizeBytes {
+            if item.kind == .earlierDownload {
+                Text(verbatim: earlierDownloadWarning(bytes: item.sizeBytes ?? 0))
+            } else if let bytes = item.sizeBytes {
                 Text("This will remove \(AppFormat.byteSize(bytes)) from disk. You can re-download it later.")
             } else {
                 Text("This will remove the model from disk. You can re-download it later.")
             }
         }
+    }
+
+    private func earlierDownloadWarning(bytes: Int64) -> String {
+        let warning = String(localized: "This will remove \(AppFormat.byteSize(bytes)) from disk. Parola doesn't use this copy.")
+        guard model.modelStoreIsRelocated else { return warning }
+        return warning + String(localized: " Another app that uses this folder may still need it.")
     }
 
     private var confirmationTitle: String {
@@ -101,11 +115,7 @@ struct ModelsSettingsPane: View {
         let summary = model.modelsOnDiskSummary
         if summary.bytes > 0 {
             Divider()
-            UsageRow(
-                icon: "cpu",
-                label: "Models on disk:",
-                value: "\(summary.count) installed · \(AppFormat.byteSize(summary.bytes))"
-            )
+            UsageRow(icon: "cpu", label: "Models on disk:", value: summary.usageText)
         }
     }
 
@@ -184,6 +194,9 @@ struct ModelsSettingsPane: View {
                 if !sections.installed.isEmpty || installFilter == .installed {
                     downloadedSection(sections.installed)
                 }
+                if !sections.earlier.isEmpty {
+                    earlierDownloadsSection(sections.earlier)
+                }
                 if !sections.orphans.isEmpty {
                     orphansSection(sections.orphans)
                 }
@@ -192,6 +205,27 @@ struct ModelsSettingsPane: View {
                 }
                 if !sections.categories.isEmpty {
                     categoriesSection(sections.categories)
+                }
+            }
+        }
+    }
+
+    private func earlierDownloadsSection(_ copies: [SupersededCopy]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Earlier downloads", count: copies.count)
+            Text("Newer versions of these models replaced them, and Parola no longer uses them.")
+                .font(DS.Font.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
+            LazyVStack(spacing: 8) {
+                ForEach(copies) { copy in
+                    EarlierDownloadRow(copy: copy, isDeleting: model.isReclaiming(copy)) {
+                        pendingDeletion = PendingDeletion(
+                            id: copy.variantID,
+                            displayName: copy.displayName,
+                            sizeBytes: copy.bytes,
+                            kind: .earlierDownload
+                        )
+                    }
                 }
             }
         }
@@ -301,9 +335,10 @@ struct ModelsSettingsPane: View {
         var recommended: [ModelVariant] = []
         var categories: [ModelsCategory] = []
         var orphans: [ModelInfo] = []
+        var earlier: [SupersededCopy] = []
 
         var isEmpty: Bool {
-            installed.isEmpty && recommended.isEmpty && categories.isEmpty && orphans.isEmpty
+            installed.isEmpty && recommended.isEmpty && categories.isEmpty && orphans.isEmpty && earlier.isEmpty
         }
     }
 
@@ -322,6 +357,10 @@ struct ModelsSettingsPane: View {
                 guard info.isInstalled, !selectableNames.contains(info.name) else { return false }
                 guard let needle else { return true }
                 return info.name.lowercased().contains(needle)
+            }
+            sections.earlier = model.supersededCopies.filter { copy in
+                guard let needle else { return true }
+                return copy.displayName.lowercased().contains(needle)
             }
         }
         if installFilter != .installed {

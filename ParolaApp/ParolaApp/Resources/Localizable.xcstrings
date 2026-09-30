@@ -12,6 +12,17 @@
         }
       }
     },
+    " Another app that uses this folder may still need it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " Un'altra app che usa questa cartella potrebbe averne ancora bisogno."
+          }
+        }
+      }
+    },
     "%1$@ is folded into %2$@, and the transcripts that named them take the new name. That rewrite can't be undone.": {
       "extractionState": "manual",
       "localizations": {
@@ -74,6 +85,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ non supporta %@. La dettatura in quella lingua non funzionerà."
+          }
+        }
+      }
+    },
+    "%@ in earlier downloads": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ in download precedenti"
           }
         }
       }
@@ -5027,6 +5049,28 @@
         }
       }
     },
+    "Earlier download · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download precedente · %@"
+          }
+        }
+      }
+    },
+    "Earlier downloads": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download precedenti"
+          }
+        }
+      }
+    },
     "Edit": {
       "extractionState": "manual",
       "localizations": {
@@ -8502,6 +8546,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le nuove trascrizioni dividono l'audio per speaker, così puoi dare un nome a ciascuno."
+          }
+        }
+      }
+    },
+    "Newer versions of these models replaced them, and Parola no longer uses them.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versioni più recenti di questi modelli li hanno sostituiti e Parola non li usa più."
           }
         }
       }
@@ -14547,6 +14602,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questo video non ha sottotitoli. Puoi trascriverlo."
+          }
+        }
+      }
+    },
+    "This will remove %@ from disk. Parola doesn't use this copy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa operazione rimuove %@ dal disco. Parola non usa questa copia."
           }
         }
       }
