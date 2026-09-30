@@ -173,8 +173,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
                     requestPermission: { await AudioProcessor.requestRecordPermission() },
                     startCapture: { ingest in
                         try processor.startRecordingLive(inputDeviceID: inputDeviceID) { buffer in
-                            ingest(buffer)
-                            persister?.append(buffer)
+                            if ingest(buffer) {
+                                persister?.append(buffer)
+                            }
                             // Runs on the tap thread, serialized with processBuffer's appends, so this purge can't race them.
                             processor.purgeAudioSamples(keepingLast: 0)
                         }
@@ -259,7 +260,6 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         return stream
     }
 
-    /// Pauses or resumes the running take; a no-op before capture has launched.
     public func setPaused(_ paused: Bool) async {
         loop?.setPaused(paused)
         persister?.setPaused(paused)

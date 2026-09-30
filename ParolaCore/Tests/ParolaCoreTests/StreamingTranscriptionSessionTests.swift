@@ -43,6 +43,7 @@ private final class TakeHarness: Sendable {
     private struct State {
         var ingest: (@Sendable ([Float]) -> Void)?
         var decodes = 0
+        var lastDecodeSampleCount = 0
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -51,12 +52,16 @@ private final class TakeHarness: Sendable {
         state.withLock { $0.ingest = ingest }
     }
 
-    func recordDecode() {
-        state.withLock { $0.decodes += 1 }
+    func recordDecode(sampleCount: Int) {
+        state.withLock {
+            $0.decodes += 1
+            $0.lastDecodeSampleCount = sampleCount
+        }
     }
 
     var installed: Bool { state.withLock { $0.ingest != nil } }
     var decodes: Int { state.withLock { $0.decodes } }
+    var lastDecodeSampleCount: Int { state.withLock { $0.lastDecodeSampleCount } }
 
     func push(_ samples: [Float]) {
         let ingest = state.withLock { $0.ingest }
@@ -90,13 +95,14 @@ private func launchTake(
                 requestPermission: { true },
                 startCapture: { ingest in
                     harness.install { buffer in
-                        ingest(buffer)
-                        persister.append(buffer)
+                        if ingest(buffer) {
+                            persister.append(buffer)
+                        }
                     }
                 },
                 stopCapture: {},
-                transcribe: { _, _, _ in
-                    harness.recordDecode()
+                transcribe: { samples, _, _ in
+                    harness.recordDecode(sampleCount: samples.count)
                     return TranscriptionResult(
                         text: " last words",
                         segments: [TranscriptionSegment(start: 0, end: 0.5, text: " last words")],
@@ -295,13 +301,18 @@ struct StreamingTakeEndingTests {
         harness.push([Float](repeating: 0.5, count: 16_000))
         await session.setPaused(false)
         harness.push([Float](repeating: 0.5, count: 16_000))
+        await session.setPaused(true)
+        harness.push([Float](repeating: 0.5, count: 16_000))
+        await session.setPaused(false)
+        harness.push([Float](repeating: 0.5, count: 16_000))
         let audio = persister.url
         defer { try? FileManager.default.removeItem(at: audio) }
 
         await session.stop()
 
         for await _ in events {}
-        #expect(try AVAudioFile(forReading: audio).length == 32_000)
+        #expect(try AVAudioFile(forReading: audio).length == 48_000)
+        #expect(harness.lastDecodeSampleCount == 48_000)
     }
 }
 

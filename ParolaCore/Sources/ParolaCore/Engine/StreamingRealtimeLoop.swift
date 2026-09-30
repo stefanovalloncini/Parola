@@ -23,7 +23,8 @@ actor StreamingRealtimeLoop {
 
     struct Dependencies: Sendable {
         var requestPermission: @Sendable () async -> Bool
-        var startCapture: @Sendable (@escaping @Sendable ([Float]) -> Void) throws -> Void
+        /// The callback's Bool reports whether it took the buffer, so a caller can gate another consumer on the same decision.
+        var startCapture: @Sendable (@escaping @Sendable ([Float]) -> Bool) throws -> Void
         var stopCapture: @Sendable () -> Void
         var transcribe: @Sendable ([Float], DecodingOptions, @escaping TranscriptionCallback) async throws -> TranscriptionResult
         var tick: @Sendable () async throws -> Void
@@ -95,7 +96,7 @@ actor StreamingRealtimeLoop {
         guard !stopRequested else { return .stopped }
         let startedAt = ContinuousClock.now
         do {
-            try deps.startCapture { [weak self] buffer in self?.ingest(buffer) }
+            try deps.startCapture { [weak self] buffer in self?.ingest(buffer) ?? false }
         } catch {
             ParolaLog.error(.streaming, "streaming capture failed to start", [.error: .error(error)])
             stopCapture()
@@ -208,8 +209,8 @@ actor StreamingRealtimeLoop {
         paused.withLock { $0 = value }
     }
 
-    nonisolated private func ingest(_ buffer: [Float]) {
-        guard !buffer.isEmpty, !paused.withLock({ $0 }) else { return }
+    nonisolated private func ingest(_ buffer: [Float]) -> Bool {
+        guard !buffer.isEmpty, !paused.withLock({ $0 }) else { return false }
         let avgEnergy = AudioProcessor.calculateEnergy(of: buffer).avg
         levelMeter.record(AudioLevel.normalised(rms: avgEnergy))
         let rel = inbox.withLock { box -> Float in
@@ -223,6 +224,7 @@ actor StreamingRealtimeLoop {
             return rel
         }
         onEnergy(rel)
+        return true
     }
 
     private func iterate() async throws {

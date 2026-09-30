@@ -9,13 +9,13 @@ private let sampleRate = 16_000
 private final class FakeCapture: Sendable {
     // A named struct, not a tuple: a tuple element is lowered at the lock's opaque abstraction, so every `withLock` adds a reabstraction-thunk pair to the callback.
     private struct State {
-        var callback: (@Sendable ([Float]) -> Void)?
+        var callback: (@Sendable ([Float]) -> Bool)?
         var stops = 0
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
 
-    func install(_ callback: @escaping @Sendable ([Float]) -> Void) {
+    func install(_ callback: @escaping @Sendable ([Float]) -> Bool) {
         state.withLock { $0.callback = callback }
     }
 
@@ -29,7 +29,7 @@ private final class FakeCapture: Sendable {
 
     func push(_ samples: [Float]) {
         let callback = state.withLock { $0.callback }
-        callback?(samples)
+        _ = callback?(samples)
     }
 
     func push(seconds: Double, value: Float) {
@@ -205,7 +205,10 @@ struct StreamingRealtimeLoopTests {
     func pollingDoesNotNestTheCallback() {
         let capture = FakeCapture()
         let depths = OSAllocatedUnfairLock<[Int]>(initialState: [])
-        capture.install { _ in depths.withLock { $0.append(Thread.callStackSymbols.count) } }
+        capture.install { _ in
+            depths.withLock { $0.append(Thread.callStackSymbols.count) }
+            return true
+        }
         capture.push([])
         for _ in 0..<200 { _ = capture.installed }
         capture.push([])

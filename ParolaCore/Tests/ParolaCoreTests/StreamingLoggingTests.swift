@@ -11,13 +11,13 @@ private struct StreamingLogFailure: Error {}
 private final class FakeStreamingCapture: Sendable {
     // A named struct, not a tuple: a tuple element is lowered at the lock's opaque abstraction, so every `withLock` adds a reabstraction-thunk pair to the callback.
     private struct State {
-        var callback: (@Sendable ([Float]) -> Void)?
+        var callback: (@Sendable ([Float]) -> Bool)?
         var installed = false
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
 
-    func install(_ callback: @escaping @Sendable ([Float]) -> Void) {
+    func install(_ callback: @escaping @Sendable ([Float]) -> Bool) {
         state.withLock { $0 = State(callback: callback, installed: true) }
     }
 
@@ -25,7 +25,7 @@ private final class FakeStreamingCapture: Sendable {
 
     func push(seconds: Double, value: Float) {
         let callback = state.withLock { $0.callback }
-        callback?([Float](repeating: value, count: Int(seconds * Double(streamingSampleRate))))
+        _ = callback?([Float](repeating: value, count: Int(seconds * Double(streamingSampleRate))))
     }
 }
 
@@ -188,7 +188,10 @@ struct StreamingLoggingTests {
     func pollingDoesNotNestTheCallback() {
         let capture = FakeStreamingCapture()
         let depths = OSAllocatedUnfairLock<[Int]>(initialState: [])
-        capture.install { _ in depths.withLock { $0.append(Thread.callStackSymbols.count) } }
+        capture.install { _ in
+            depths.withLock { $0.append(Thread.callStackSymbols.count) }
+            return true
+        }
         capture.push(seconds: 0, value: 0)
         for _ in 0..<200 { _ = capture.installed }
         capture.push(seconds: 0, value: 0)
