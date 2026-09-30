@@ -113,8 +113,8 @@ struct AICallSiteTests {
             pick(openAI(), for: .prompts, on: model)
 
             model.extractActionItems()
-            let isEmptyWait = await waitUntil { !model.actionItems.isEmpty }
-            #expect(isEmptyWait)
+            let hasActionItems = await waitUntil { !model.actionItems.isEmpty }
+            #expect(hasActionItems)
             #expect(model.actionItems.map(\.task) == ["from openai"])
         }
     }
@@ -139,8 +139,8 @@ struct AICallSiteTests {
             pick(ollama(), for: .summary, on: model)
 
             model.summariseTranscript()
-            let transcriptWait = await waitUntil { model.transcript?.summary != nil }
-            #expect(transcriptWait)
+            let hasSummary = await waitUntil { model.transcript?.summary != nil }
+            #expect(hasSummary)
             #expect(model.transcript?.summary?.text == "from ollama")
             #expect(model.transcript?.summary?.provider == "Ollama · llama3.2:3b")
         }
@@ -152,8 +152,8 @@ struct AICallSiteTests {
             let model = makeModel()
 
             model.summariseTranscript()
-            let transcriptWait = await waitUntil { model.transcript?.summary != nil }
-            #expect(transcriptWait)
+            let hasSummary = await waitUntil { model.transcript?.summary != nil }
+            #expect(hasSummary)
             #expect(model.transcript?.summary?.provider == Summary.onDeviceProvider)
         }
     }
@@ -252,8 +252,8 @@ struct AICallSiteTests {
             _ = try await first.ask("di cosa si parla?")
 
             #expect(await digests.count == 1)
-            let transcriptWait = await waitUntil { model.transcript?.summary?.text == "the digest" }
-            #expect(transcriptWait)
+            let summaryIsTheDigest = await waitUntil { model.transcript?.summary?.text == "the digest" }
+            #expect(summaryIsTheDigest)
             #expect(model.smartChapters.map(\.title) == ["Start"])
             let stored = try await model.library.load(entry.id).document.transcript
             #expect(stored.summary?.text == "the digest")
@@ -285,8 +285,8 @@ struct AICallSiteTests {
             let session = try await model.makeChatSession(transcript: long, history: [], entryID: entry.id)
             _ = try await session.ask("di cosa si parla?")
 
-            let transcriptWait = await waitUntil { model.transcript?.summary?.text == "the digest" }
-            #expect(transcriptWait)
+            let summaryIsTheDigest = await waitUntil { model.transcript?.summary?.text == "the digest" }
+            #expect(summaryIsTheDigest)
             #expect(model.transcript?.chapters?.map(\.title) == ["Generated"])
             let stored = try await model.library.load(entry.id).document.transcript
             #expect(stored.summary?.text == "the digest")
@@ -315,8 +315,8 @@ struct AICallSiteTests {
             let session = try await model.makeChatSession(transcript: long, history: [], entryID: entry.id)
             _ = try await session.ask("di cosa si parla?")
 
-            let transcriptWait = await waitUntil { model.transcript?.summary != nil }
-            #expect(transcriptWait)
+            let hasSummary = await waitUntil { model.transcript?.summary != nil }
+            #expect(hasSummary)
             #expect(model.transcript?.summary?.text == "from ollama")
             #expect(model.transcript?.summary?.provider == model.languageModelLabel(for: .chat))
             #expect(await MockLanguageModelStore.shared.lastPrompt(for: .openAI) == nil)

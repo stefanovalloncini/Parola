@@ -110,8 +110,8 @@ extension TranscriberMockSuites {
 
                 let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { after.watchedLaneIsIdle }
                 #expect(watchedLaneIsIdleWait)
-                let afterWait = await waitUntil(timeoutMs: 10_000) { await after.library.list().count == 2 }
-                #expect(afterWait)
+                let afterLibraryHasTwo = await waitUntil(timeoutMs: 10_000) { await after.library.list().count == 2 }
+                #expect(afterLibraryHasTwo)
                 #expect(!FileManager.default.fileExists(atPath: after.watchedArrivalsFileURL.path))
             }
         }
@@ -143,8 +143,8 @@ extension TranscriberMockSuites {
                 #expect(after.watchedArrivals.map(\.url) == files)
                 let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { after.watchedLaneIsIdle }
                 #expect(watchedLaneIsIdleWait)
-                let afterWait = await waitUntil(timeoutMs: 10_000) { await after.library.list().count == 3 }
-                #expect(afterWait)
+                let afterLibraryHasThree = await waitUntil(timeoutMs: 10_000) { await after.library.list().count == 3 }
+                #expect(afterLibraryHasThree)
             }
         }
 
@@ -223,8 +223,8 @@ extension TranscriberMockSuites {
                     }
                     _ = try await openOwnEntry(before, in: folder)
                     arrive(before, [file])
-                    let firstWait = await waitUntil(timeoutMs: 10_000) { before.watchedArrivals.first?.isLanding == true }
-                    #expect(firstWait)
+                    let firstArrivalIsLanding = await waitUntil(timeoutMs: 10_000) { before.watchedArrivals.first?.isLanding == true }
+                    #expect(firstArrivalIsLanding)
                     #expect(try savedQueue(before) == [file])
                 }
 
@@ -293,8 +293,8 @@ extension TranscriberMockSuites {
                 }
                 let file = try makeWAV("Saving", in: folder)
                 arrive(model, [file])
-                let firstWait = await waitUntil(timeoutMs: 10_000) { model.watchedArrivals.first?.isLanding == true }
-                #expect(firstWait)
+                let firstArrivalIsLanding = await waitUntil(timeoutMs: 10_000) { model.watchedArrivals.first?.isLanding == true }
+                #expect(firstArrivalIsLanding)
 
                 arrive(model, [file])
                 await settle()
@@ -523,8 +523,8 @@ extension TranscriberMockSuites {
                 await gate.open()
                 let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle && model.fileTranscribeTask == nil }
                 #expect(watchedLaneIsIdleWait)
-                let libraryWait = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 3 }
-                #expect(libraryWait)
+                let libraryHasThree = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 3 }
+                #expect(libraryHasThree)
                 #expect(model.transcript?.segments.first?.text == "kept")
                 #expect(model.sourceFileURL == opened)
             }
@@ -559,8 +559,8 @@ extension TranscriberMockSuites {
                 let arrived = try makeWAV("Arrived", in: folder)
                 let opened = try makeWAV("Opened", in: folder, seconds: 0.6)
                 arrive(model, [arrived])
-                let callsWait = await waitUntil(timeoutMs: 10_000) { await calls.count == 1 }
-                #expect(callsWait)
+                let oneCallMade = await waitUntil(timeoutMs: 10_000) { await calls.count == 1 }
+                #expect(oneCallMade)
 
                 model.transcribe(fileURL: opened)
                 let sourceFileURLWait = await waitUntil(timeoutMs: 10_000) { model.sourceFileURL == opened }
@@ -599,8 +599,8 @@ extension TranscriberMockSuites {
 
                 model.fileTranscribeTask = nil
 
-                let mapWait = await waitUntil(timeoutMs: 20_000) { model.watchedArrivals.map(\.url) == [onShare] }
-                #expect(mapWait)
+                let watchedArrivalsMatchOnShare = await waitUntil(timeoutMs: 20_000) { model.watchedArrivals.map(\.url) == [onShare] }
+                #expect(watchedArrivalsMatchOnShare)
                 #expect(model.watchedLaneTask == nil)
                 #expect(model.unreachableArrivalIDs == Set(model.watchedArrivals.map(\.id)))
                 #expect(await model.library.list().map(LibraryEntryDisplay.title(for:)).contains("On the disk"))
@@ -638,8 +638,8 @@ extension TranscriberMockSuites {
 
             arrive(model, [file])
 
-            let isEmptyWait = await waitUntil(timeoutMs: 5_000) { !model.unreachableArrivalIDs.isEmpty }
-            #expect(isEmptyWait)
+            let hasUnreachableArrivals = await waitUntil(timeoutMs: 5_000) { !model.unreachableArrivalIDs.isEmpty }
+            #expect(hasUnreachableArrivals)
             #expect(model.watchedArrivals.map(\.url) == [file])
             #expect(model.watchedLaneTask == nil)
             #expect(model.fileTranscribeTask == nil)

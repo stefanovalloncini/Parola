@@ -95,8 +95,8 @@ struct EntryWindowSessionTests {
 
         a.scrub(to: 1.5)
         a.searchQuery = "alpha"
-        let countWait = await waitUntil { a.matches.count == 2 }
-        #expect(countWait)
+        let matchesReachedTwo = await waitUntil { a.matches.count == 2 }
+        #expect(matchesReachedTwo)
 
         #expect(a.currentTime == 1.5)
         #expect(b.currentTime == 0)
@@ -227,8 +227,8 @@ struct EntryWindowSessionTests {
         let session = await EntryWindowTestSupport.openSession(model, entry)
         session.scrub(to: 1.2)
         session.searchQuery = "beta"
-        let countWait = await waitUntil { session.matches.count == 1 }
-        #expect(countWait)
+        let sessionMatchesReachedOne = await waitUntil { session.matches.count == 1 }
+        #expect(sessionMatchesReachedOne)
 
         try await EntryWindowTestSupport.store(model).setFavoriteSegments([1], for: entry.id)
         await EntryWindowTestSupport.syncLibrary(model)
@@ -250,8 +250,8 @@ struct EntryWindowSessionTests {
         )
         let session = await EntryWindowTestSupport.openSession(model, entry)
         session.searchQuery = "beta"
-        let countWait = await waitUntil { session.matches.count == 2 }
-        #expect(countWait)
+        let sessionMatchesReachedTwo = await waitUntil { session.matches.count == 2 }
+        #expect(sessionMatchesReachedTwo)
         session.goToNextMatch()
         #expect(session.currentMatchIndex == 1)
 
@@ -275,8 +275,8 @@ struct EntryWindowSessionTests {
         )
         let session = await EntryWindowTestSupport.openSession(model, entry)
         session.searchQuery = "alpha"
-        let countWait = await waitUntil { session.matches.count == 2 }
-        #expect(countWait)
+        let sessionMatchesReachedTwo = await waitUntil { session.matches.count == 2 }
+        #expect(sessionMatchesReachedTwo)
         session.goToNextMatch()
         #expect(session.currentMatchIndex == 1)
         #expect(session.currentSegmentID == 2)
@@ -287,8 +287,8 @@ struct EntryWindowSessionTests {
             return transcript.findMatches(query)
         }
         session.searchQuery = "alp"
-        let gateWait = await waitUntil { await gate.isHolding }
-        #expect(gateWait)
+        let gateIsHolding = await waitUntil { await gate.isHolding }
+        #expect(gateIsHolding)
 
         session.reload()
         await session.loadTask?.value
@@ -343,8 +343,8 @@ struct EntryWindowSessionTests {
         let session = await EntryWindowTestSupport.openSession(model, entry)
 
         session.searchQuery = "al"
-        let countWait = await waitUntil { session.matches.count == 3 }
-        #expect(countWait)
+        let sessionMatchesReachedThree = await waitUntil { session.matches.count == 3 }
+        #expect(sessionMatchesReachedThree)
 
         #expect(session.currentSegmentID == 0)
 

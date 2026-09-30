@@ -117,8 +117,8 @@ extension TranscriberMockSuites {
                 await gate.open()
                 let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
                 #expect(retranscribeRequestWait)
-                let transcriptWait = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" }
-                #expect(transcriptWait)
+                let firstSegmentIsTheNewTake = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" }
+                #expect(firstSegmentIsTheNewTake)
             }
         }
 
@@ -145,8 +145,8 @@ extension TranscriberMockSuites {
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "en")
 
-                let transcriptWait = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" }
-                #expect(transcriptWait)
+                let firstSegmentIsTheNewTake = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" }
+                #expect(firstSegmentIsTheNewTake)
                 #expect(model.transcript?.sourceURL == page)
                 let stored = try await model.library.load(entry.id).document.transcript
                 #expect(stored.segments.first?.text == "the new take")
@@ -214,8 +214,8 @@ extension TranscriberMockSuites {
                 #expect(model.isSummarising)
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: "it")
-                let transcriptWait = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" }
-                #expect(transcriptWait)
+                let firstSegmentIsTheNewTake = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" }
+                #expect(firstSegmentIsTheNewTake)
                 #expect(!model.isSummarising)
                 releaser.finish()
                 await settle()
@@ -243,8 +243,8 @@ extension TranscriberMockSuites {
 
                 model.retranscribeCurrentEntry(model: Self.appleSpeech, language: nil)
 
-                let playsWait = await waitUntil(timeoutMs: 10_000) { counter.plays == 1 }
-                #expect(playsWait)
+                let playedOnce = await waitUntil(timeoutMs: 10_000) { counter.plays == 1 }
+                #expect(playedOnce)
                 let retranscribeRequestWait = await waitUntil(timeoutMs: 10_000) { model.retranscribeRequest == nil }
                 #expect(retranscribeRequestWait)
                 #expect(counter.plays == 1)

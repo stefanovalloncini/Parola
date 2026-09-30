@@ -102,8 +102,8 @@ struct FavoriteSegmentsTests {
         let pasteboard = NSPasteboard(name: NSPasteboard.Name("favorites-test-\(UUID())"))
         model.copyTranscriptToPasteboard(withTimestamps: false, favoritesOnly: true, pasteboard: pasteboard)
 
-        let stringWait = await waitUntil { pasteboard.string(forType: .string) == "second" }
-        #expect(stringWait)
+        let pastedSecond = await waitUntil { pasteboard.string(forType: .string) == "second" }
+        #expect(pastedSecond)
     }
 
     @Test("visibleSegments applies the favorites-only filter")

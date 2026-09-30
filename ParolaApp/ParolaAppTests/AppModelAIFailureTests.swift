@@ -115,8 +115,8 @@ struct AppModelAIFailureTests {
 
         model.extractSmartChapters()
 
-        let mapWait = await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening", "Fresh close"] }
-        #expect(mapWait)
+        let chapterTitlesBothFresh = await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening", "Fresh close"] }
+        #expect(chapterTitlesBothFresh)
         #expect(model.transcript?.summary?.chapters.map(\.title) == ["Fresh opening", "Fresh close"])
         }
     }
@@ -146,8 +146,8 @@ struct AppModelAIFailureTests {
 
             model.extractSmartChapters()
 
-            let mapWait = await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening"] }
-            #expect(mapWait)
+            let chapterTitleFresh = await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening"] }
+            #expect(chapterTitleFresh)
             #expect(model.transcript?.chapters?.map(\.title) == ["Fresh opening"])
             #expect(model.transcript?.summary == nil)
         }

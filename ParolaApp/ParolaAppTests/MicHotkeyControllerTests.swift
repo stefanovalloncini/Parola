@@ -54,8 +54,8 @@ struct MicHotkeyControllerTests {
         controller.monitorFactory = { _, _ in queue.next() }
 
         controller.applyConfiguration(enabled: true, keyCode: 96, modifiers: [])
-        let controllerWait = await spin { (controller.monitor as? GatedMonitor) === fake1 }
-        #expect(controllerWait)
+        let monitorIsFake1 = await spin { (controller.monitor as? GatedMonitor) === fake1 }
+        #expect(monitorIsFake1)
         let fake1Wait = await spin { await fake1.started == 1 }
         #expect(fake1Wait)
 

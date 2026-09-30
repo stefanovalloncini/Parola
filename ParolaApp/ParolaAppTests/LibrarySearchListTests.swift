@@ -99,8 +99,8 @@ struct LibrarySearchListTests {
 
         let ids = hosted.model.libraryEntries.map(\.id)
         search([ids[3], ids[1], ids[2]], in: hosted.model)
-        let tablesWait = await settled(hosted) { tables(hosted).count == 2 }
-        #expect(tablesWait)
+        let twoTables = await settled(hosted) { tables(hosted).count == 2 }
+        #expect(twoTables)
         #expect(tables(hosted).first === browse)
         #expect(browse.numberOfRows == rows)
         search(Array(ids.prefix(12)), in: hosted.model)
@@ -108,8 +108,8 @@ struct LibrarySearchListTests {
         #expect(browse.numberOfRows == rows)
 
         search(nil, in: hosted.model)
-        let tablesWait2 = await settled(hosted) { tables(hosted).count == 1 }
-        #expect(tablesWait2)
+        let oneTable = await settled(hosted) { tables(hosted).count == 1 }
+        #expect(oneTable)
         #expect(tables(hosted).first === browse)
         #expect(browse.numberOfRows == rows)
         #expect(browse.visibleRect.origin == scrolled)
@@ -122,8 +122,8 @@ struct LibrarySearchListTests {
         let ids = hosted.model.libraryEntries.map(\.id)
         search(ids, in: hosted.model)
         let firstPage = LibrarySearchResults.pageSize
-        let tablesWait = await settled(hosted) { tables(hosted).last?.numberOfRows == firstPage }
-        #expect(tablesWait)
+        let lastTableShowsFirstPage = await settled(hosted) { tables(hosted).last?.numberOfRows == firstPage }
+        #expect(lastTableShowsFirstPage)
         let results = try #require(tables(hosted).last)
 
         results.scrollRowToVisible(results.numberOfRows - 1)
@@ -136,8 +136,8 @@ struct LibrarySearchListTests {
 
         hosted.model.searchQuery = "tak"
         hosted.model.searchRanking = ids.reversed()
-        let tablesWait2 = await settled(hosted) { tables(hosted).last?.numberOfRows == firstPage }
-        #expect(tablesWait2)
+        let lastTableShowsFirstPageAfterNewQuery = await settled(hosted) { tables(hosted).last?.numberOfRows == firstPage }
+        #expect(lastTableShowsFirstPageAfterNewQuery)
     }
 
     @Test("a new query opens its results at the top, so it neither lands mid-list nor fetches a second page at once")
@@ -174,11 +174,11 @@ struct LibrarySearchListTests {
 
         let ids = hosted.model.libraryEntries.map(\.id)
         search(Array(ids.prefix(3)), in: hosted.model)
-        let responderWait = await settled(hosted) {
+        let focusLeftTheBrowseRow = await settled(hosted) {
             let responder = window.firstResponder
             return responder is NSTableView && responder !== browse
         }
-        #expect(responderWait)
+        #expect(focusLeftTheBrowseRow)
 
         window.makeFirstResponder(nil)
         for _ in 0..<4 {
@@ -233,8 +233,8 @@ struct LibrarySearchListTests {
         defer { close(hosted) }
         let ids = hosted.model.libraryEntries.map(\.id)
         search(ids, in: hosted.model)
-        let tablesWait = await settled(hosted) { tables(hosted).last?.numberOfRows == LibrarySearchResults.pageSize }
-        #expect(tablesWait)
+        let lastTableShowsFirstPage = await settled(hosted) { tables(hosted).last?.numberOfRows == LibrarySearchResults.pageSize }
+        #expect(lastTableShowsFirstPage)
         let results = try #require(tables(hosted).last)
         hosted.window.makeFirstResponder(results)
         _ = await settled(hosted)

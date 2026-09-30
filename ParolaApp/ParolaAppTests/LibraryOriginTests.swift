@@ -218,8 +218,8 @@ struct LibraryOriginTests {
 
         model.returnToOrigin()
 
-        let transcriptWait = await waitUntil { model.transcript == nil }
-        #expect(transcriptWait)
+        let transcriptCleared = await waitUntil { model.transcript == nil }
+        #expect(transcriptCleared)
         #expect(model.libraryFilter == nil, "no origin means goHome, not the last entry's category")
         #expect(model.isBrowsingLibrary)
     }
@@ -328,8 +328,8 @@ struct LibraryOriginTests {
 
         model.browseAll()
 
-        let transcriptWait = await waitUntil { model.transcript == nil }
-        #expect(transcriptWait)
+        let transcriptCleared = await waitUntil { model.transcript == nil }
+        #expect(transcriptCleared)
         #expect(model.isBrowsingLibrary)
         #expect(model.transcriptOrigin == nil)
     }
@@ -470,8 +470,8 @@ struct LibraryOriginTests {
         let result = try await command.handler(try command.validate(AutomationArgs()), context)
         withExtendedLifetime(server) {}
 
-        let transcriptWait = await waitUntil { model.transcript == nil }
-        #expect(transcriptWait)
+        let transcriptCleared = await waitUntil { model.transcript == nil }
+        #expect(transcriptCleared)
         #expect(model.libraryFilter == .meeting)
         guard case .object(let fields) = result else {
             Issue.record("goBack should answer with an object")

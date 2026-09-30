@@ -159,7 +159,7 @@ struct SegmentNoteEditTests {
         #expect(segmentNotesByIDWait)
 
         model.deleteSegment(id: 0)
-        let isEmptyWait = await waitUntil { model.segmentNotesByID.isEmpty }
-        #expect(isEmptyWait)
+        let segmentNotesCleared = await waitUntil { model.segmentNotesByID.isEmpty }
+        #expect(segmentNotesCleared)
     }
 }

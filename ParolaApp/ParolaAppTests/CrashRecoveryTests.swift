@@ -396,8 +396,8 @@ extension TranscriberMockSuites {
             model.acceptPendingRecovery()
             model.openStatistics()
 
-            let transcriptWait = await waitUntil { model.transcript?.segments == segments }
-            #expect(transcriptWait)
+            let segmentsRestored = await waitUntil { model.transcript?.segments == segments }
+            #expect(segmentsRestored)
             #expect(model.route == .statistics)
         }
 
@@ -500,8 +500,8 @@ extension TranscriberMockSuites {
 
             let model = makeModel(libraryURL: lib)
             #expect(model.pendingRecovery?.id == newer.id)
-            let mapWait = await waitUntil { model.recoveryCheckpointFiles.map(\.lastPathComponent) == ["\(newer.id.uuidString).json"] }
-            #expect(mapWait)
+            let onlyNewerCheckpointRemains = await waitUntil { model.recoveryCheckpointFiles.map(\.lastPathComponent) == ["\(newer.id.uuidString).json"] }
+            #expect(onlyNewerCheckpointRemains)
             #expect(await model.library.list().count == 1, "the older take is kept, not dropped")
 
             model.declinePendingRecovery()
