@@ -155,6 +155,7 @@ struct DuplicateImportTests {
         let audio = try makeAudio("RIFFbackfill")
         defer { try? FileManager.default.removeItem(at: audio) }
         let entry = try await seed.add(transcript: makeTranscript(), audioSource: audio)
+        await seed.flush()
         try ParolaDocument.updateManifest(at: entry.bundleURL) { $0.sourceDigest = nil }
         try? FileManager.default.removeItem(at: library.appendingPathComponent(".search-index", isDirectory: true))
 
