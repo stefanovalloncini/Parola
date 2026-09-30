@@ -761,5 +761,44 @@ extension TranscriberMockSuites {
                 await waitUntil { !model.hasPendingTakeWork }
             }
         }
+
+        @Test("an older take's run that ends while a newer take counts in lands in the library and leaves the Stage to the newer take")
+        func olderTakeLandsBehindANewerStage() async throws {
+            let older = try tempWAV("older-take")
+            let fixture = try tempWAV("newer-take-mic")
+            defer {
+                try? FileManager.default.removeItem(at: older)
+                try? FileManager.default.removeItem(at: fixture)
+            }
+            try await withMocksCleared([.transcriber, .audioSource]) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "the older take")], gate: gate)
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let model = makeRecordingModel("take-landing-older")
+                model.selectedModel = "openai_whisper-tiny"
+                recordAndStop(model, audio: older, seconds: 2)
+                let transcribing = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                #expect(transcribing)
+                model.recordingCountInSeconds = 3
+                model.startRecording(source: .microphone)
+                let newer = try #require(model.recording?.takeID)
+
+                await gate.open()
+
+                let announced = await waitUntil { model.arrivalNotice?.origin == .take }
+                #expect(announced, "the older take lands in the library with a toast")
+                let saved = try #require(await landedEntry(model))
+                #expect(saved.title.hasPrefix("Recording "))
+                #expect(model.route == .recording)
+                #expect(model.recording?.takeID == newer)
+                #expect(model.transcript == nil, "the older take never loads over the newer take's Stage")
+                let recording = await waitUntil(timeoutMs: 10_000) {
+                    model.recording?.takeID == newer && model.recording?.isCapturing == true
+                }
+                #expect(recording)
+                #expect(model.route == .recording, "the newer take records on its Stage")
+                model.cancelCurrentWork()
+            }
+        }
     }
 }

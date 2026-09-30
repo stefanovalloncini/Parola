@@ -3334,6 +3334,11 @@ final class AppModel {
         route == .recording && mainWindowPresence != .closed
     }
 
+    /// The Stage is up with this take on it; a newer take's Stage is not this one's.
+    func stageShows(_ takeID: Int) -> Bool {
+        stageIsVisible && recording?.takeID == takeID
+    }
+
     /// A take's failure shows on its Stage, and in a notice when the Stage isn't on screen; with no take to hold it, the page's banner says it.
     private func reportTakeFailure(_ message: String, take takeID: Int?, retry: RecordingSession.Failure? = nil) {
         guard let takeID else {
@@ -4017,7 +4022,7 @@ final class AppModel {
         }
         let title = given.title(for: takeCategory)
         // Watched on its Stage, the take opens as the transcript; from any other page it goes to the library with a toast.
-        let inPlace = take == nil || stageIsVisible
+        let inPlace = take.map { stageShows($0.id) } ?? true
         if inPlace {
             let landing = Self.landingSignposter.beginInterval("install")
             clearDerivedArtifacts()
@@ -4300,7 +4305,7 @@ final class AppModel {
                 resolveRecordingOutcome(.success(processed.text))
                 return
             }
-            guard take == nil || stageIsVisible else {
+            guard take.map({ stageShows($0) }) ?? true else {
                 saveTake(
                     processed, audio: url, title: title, source: source, category: category, landingAs: .backgroundTake,
                     recovery: recovery, take: take, annotations: annotations
