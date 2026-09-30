@@ -4278,7 +4278,9 @@ final class AppModel {
         liveRecordingAudioURL = nil
         takeRunCounter &+= 1
         let run = takeRunCounter
-        takeRun = run
+        // Stopped before it began, the run only saves: a newer take's run keeps Stop Transcribing, its title and its Stage.
+        let startsStopped = Task.isCancelled
+        if !startsStopped { takeRun = run }
         defer {
             if takeRun == run { takeRun = nil }
             endTakeTranscription(run)
@@ -4287,10 +4289,10 @@ final class AppModel {
         let recovery = beginFileTranscribeRecovery(sourceURL: url, title: named, source: source, category: category)
         // Held by the run itself, so a Cancel's cleanup leaves it for the save that follows.
         recoveryHeldByTake.insert(recovery)
-        recordedTake = RecordedTake(file: url, title: named)
+        if !startsStopped { recordedTake = RecordedTake(file: url, title: named) }
         // A take's run reports to its session and its Stage; one with no session is a run like a file's.
         if let take {
-            beginTakeTranscription(TakeTranscription(run: run, takeID: take, file: url))
+            if !startsStopped { beginTakeTranscription(TakeTranscription(run: run, takeID: take, file: url)) }
         } else {
             phase = .transcribing(file: url)
         }

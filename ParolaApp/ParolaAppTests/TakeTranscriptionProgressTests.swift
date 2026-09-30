@@ -233,6 +233,42 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("an older take's run that starts already stopped only saves, and the take on the Stage keeps its run")
+        func lateStoppedRunLeavesTheStageAlone() async throws {
+            let audio = try makeTakeWAV("take-late-current", seconds: 2)
+            let older = try makeTakeWAV("take-late-older")
+            defer {
+                try? FileManager.default.removeItem(at: audio)
+                try? FileManager.default.removeItem(at: older)
+            }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "held")], gate: gate)
+                let model = makeModel("take-late-stopped")
+                recordAndStop(model, audio: audio, seconds: 2)
+                let transcribing = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                #expect(transcribing)
+                let current = try #require(model.takeRun)
+                let olderTake = try #require(model.recording?.takeID) - 1
+
+                let late = Task { @MainActor in
+                    await model.transcribeRecordedTake(url: older, title: "Older take", source: .microphone, take: olderTake)
+                }
+                late.cancel()
+                await late.value
+
+                #expect(ContentRoutes.stageTranscription(for: model)?.file == audio, "the take on the Stage keeps its run")
+                #expect(model.takeRun == current, "Stop Transcribing still reaches the take on the Stage")
+                #expect(model.recordedTake?.file == audio, "its pane keeps its title and Stop Transcribing")
+                let kept = try #require(await landedEntry(model))
+                #expect(kept.title.hasPrefix("Older take"))
+                model.stopTranscribingTake()
+                let stopped = await waitUntil { await model.library.list().count == 2 }
+                #expect(stopped)
+                await waitUntil { !model.hasPendingTakeWork }
+            }
+        }
+
         @Test("new work stops a take's transcription, takes its pane down at once and keeps the take untranscribed")
         func newWorkTakesThePaneDown() async throws {
             let audio = try makeTakeWAV("take-new-work", seconds: 3)
