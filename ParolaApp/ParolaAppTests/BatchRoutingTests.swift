@@ -220,6 +220,67 @@ extension TranscriberMockSuites {
             #expect(model.transcript?.segments.first?.text == "the entry the user opened")
         }
 
+        @Test("a job that finishes while the queue shows leaves the loaded entry alone")
+        func finishedJobLeavesTheLoadedEntry() async throws {
+            let model = makeModel()
+            let entry = try await seedEntry(in: model, text: "the entry the user loaded")
+            let opened = await open(entry, in: model)
+            #expect(opened)
+            let source = try tempWAV("batch-routing-queue")
+            defer { try? FileManager.default.removeItem(at: source) }
+            let job = BatchJob(url: source)
+            model.batchJobs = [job]
+            model.selectedBatchJobID = job.id
+            model.openQueue()
+
+            await model.handleBatchEvent(.started(jobID: job.id))
+            await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.transcript("the batch job")))
+            let landed = await waitUntil { model.batchJobs.first?.entryID != nil }
+            #expect(landed)
+            await model.handleBatchEvent(.finished)
+
+            #expect(model.selectedEntryID == entry.id)
+            #expect(model.transcript?.segments.first?.text == "the entry the user loaded")
+        }
+
+        @Test("clicking a job row marks it and leaves what is loaded alone")
+        func selectingAJobLeavesTheLoadedEntry() async throws {
+            let model = makeModel()
+            let entry = try await seedEntry(in: model, text: "the entry the user loaded")
+            let opened = await open(entry, in: model)
+            #expect(opened)
+            let done = BatchJob(
+                url: URL(fileURLWithPath: "/tmp/BatchRoutingTests/done.m4a"), status: .done,
+                transcript: Self.transcript("the finished job")
+            )
+            model.batchJobs = [done]
+            model.route = .batch
+
+            model.selectBatchJob(done.id)
+
+            #expect(model.selectedBatchJobID == done.id)
+            #expect(model.selectedEntryID == entry.id)
+            #expect(model.transcript?.segments.first?.text == "the entry the user loaded")
+            #expect(model.route == .batch)
+        }
+
+        @Test("opening a finished job shows its transcript on the Library route")
+        func openingAJobShowsIt() async throws {
+            let model = makeModel()
+            let entry = try await seedEntry(in: model, text: "the job's entry")
+            let done = BatchJob(url: URL(fileURLWithPath: "/tmp/BatchRoutingTests/saved.m4a"), status: .done, entryID: entry.id)
+            model.batchJobs = [done]
+            model.openQueue()
+
+            let opening = model.openBatchJobTranscript(done.id)
+            let transcript = try await opening?.value
+
+            #expect(transcript?.segments.first?.text == "the job's entry")
+            #expect(model.route == .transcript)
+            #expect(model.selectedEntryID == entry.id)
+            #expect(model.selectedBatchJobID == done.id)
+        }
+
         @Test("a job that finishes over the Library page leaves the list up")
         func finishedJobLeavesTheLibrary() async throws {
             let model = makeModel()

@@ -583,15 +583,10 @@ extension AppModel {
         return .bulk(exported: entries.count - failures.count, of: entries.count, failures: failures, folder: folder)
     }
 
-    /// Opens an entry into the main pane, whatever else is running: a take keeps recording on its own page.
-    func loadEntry(_ id: LibraryEntry.ID) {
-        startOpeningEntry(id)
-    }
-
-    /// For a list that shows the transcript beside itself, like the batch: the page, the phase and the origin stay as they are.
+    /// Opens an entry into the main pane, whatever else is running (a take keeps recording on its own page); returns the open for a caller that waits on it.
     @discardableResult
-    func openEntryInPlace(_ id: LibraryEntry.ID) -> Task<Transcript, any Error> {
-        startOpeningEntry(id, inPlace: true)
+    func loadEntry(_ id: LibraryEntry.ID) -> Task<Transcript, any Error> {
+        startOpeningEntry(id)
     }
 
     /// `loadEntry` for a caller that needs what it opened; a later open makes this one throw `CancellationError`.
@@ -601,9 +596,8 @@ extension AppModel {
     }
 
     @discardableResult
-    private func startOpeningEntry(_ id: LibraryEntry.ID, inPlace: Bool = false) -> Task<Transcript, any Error> {
-        // The batch's in-place open leaves the phase exactly as it is; only a full navigation clears a stale failure.
-        if !inPlace { leaveFailedPhase() }
+    private func startOpeningEntry(_ id: LibraryEntry.ID) -> Task<Transcript, any Error> {
+        leaveFailedPhase()
         introduction.defer()
         loadEntryGeneration &+= 1
         let generation = loadEntryGeneration
@@ -632,13 +626,11 @@ extension AppModel {
                 } else {
                     tearDownPlayer()
                 }
-                if !inPlace {
-                    phase = .ready
-                    // Opened from the extra, a link or the duplicate sheet it would load behind a page; a page opened during the load is the later word.
-                    if route == pageAtStart { route = .transcript }
-                    libraryOrigin = origin
-                    libraryOriginEntryID = id
-                }
+                phase = .ready
+                // Opened from the extra, a link or the duplicate sheet it would load behind a page; a page opened during the load is the later word.
+                if route == pageAtStart { route = .transcript }
+                libraryOrigin = origin
+                libraryOriginEntryID = id
                 if let hit, !hit.isEmpty { revealInTranscript(hit, at: hitPosition) }
                 let opened = transcript ?? loaded.document.transcript
                 let openedAt = Date()
@@ -649,11 +641,7 @@ extension AppModel {
                 return opened
             } catch {
                 guard generation == loadEntryGeneration else { throw error }
-                if inPlace {
-                    nonFatalWarning = error.localizedDescription
-                } else {
-                    phase = .failed(message: error.localizedDescription)
-                }
+                phase = .failed(message: error.localizedDescription)
                 throw error
             }
         }

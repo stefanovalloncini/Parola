@@ -299,8 +299,6 @@ struct AppModelBatchTests {
         model.findReplaceRules = [FindReplaceRule(find: "acme", replace: "Acme")]
         let job = Self.makeJob("clip", status: .transcribing)
         model.batchJobs = [job]
-        model.selectedBatchJobID = job.id
-        model.route = .batch
 
         let raw = Transcript(
             segments: [
@@ -311,6 +309,7 @@ struct AppModelBatchTests {
             modelName: "stub"
         )
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: raw))
+        model.openBatchJobTranscript(job.id)
 
         #expect(model.transcript?.segments.map(\.text) == ["perché Acme spende un po'"])
         #expect(model.batchJobs[0].transcript?.segments.map(\.text) == ["perché Acme spende un po'"])
@@ -463,8 +462,6 @@ struct AppModelBatchTests {
         try Data("fake".utf8).write(to: source)
         let job = BatchJob(url: source, status: .transcribing)
         model.batchJobs = [job]
-        model.selectedBatchJobID = job.id
-        model.route = .batch
         let (release, releaser) = AsyncStream<Void>.makeStream()
         model.summariseOperation = { _, _ in
             for await _ in release { break }
@@ -472,6 +469,7 @@ struct AppModelBatchTests {
         }
 
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+        model.openBatchJobTranscript(job.id)
         #expect(model.selectedEntryID == nil)
         model.summariseTranscript()
         #expect(model.isSummarising)
@@ -521,7 +519,7 @@ struct AppModelBatchTests {
         let entryID = try #require(await Self.waitForEntryID(of: job.id, in: model))
         model.route = .batch
 
-        model.selectBatchJob(job.id)
+        model.openBatchJobTranscript(job.id)
         let landed = await Self.waitUntil { model.selectedEntryID == entryID && model.transcript != nil }
         #expect(landed)
         model.editSegment(id: 0, newText: "corrected")
@@ -529,12 +527,12 @@ struct AppModelBatchTests {
 
         let stored = try await model.library.load(entryID)
         #expect(stored.document.transcript.segments.first?.text == "corrected")
-        #expect(model.phase == .idle)
-        #expect(model.route == .batch)
+        #expect(model.phase == .ready)
+        #expect(model.route == .transcript)
     }
 
-    @Test("an entry still loading for the last job clicked doesn't land over the next one")
-    func pendingOpenYieldsToTheNextSelection() async throws {
+    @Test("an entry still loading for the last job opened doesn't land over the next one")
+    func pendingOpenYieldsToTheNextOpen() async throws {
         let scratch = try Self.makeScratchDirectory()
         defer { try? FileManager.default.removeItem(at: scratch) }
         let model = makeModel()
@@ -543,20 +541,24 @@ struct AppModelBatchTests {
         let source = scratch.appendingPathComponent("saved.wav")
         try Data("fake".utf8).write(to: source)
         let saved = BatchJob(url: source, status: .transcribing)
-        let waiting = Self.makeJob("waiting")
-        model.batchJobs = [saved, waiting]
+        let unsaved = BatchJob(url: Self.makeURL("unsaved"), status: .done, transcript: Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the unsaved job")],
+            language: "en",
+            modelName: "stub"
+        ))
+        model.batchJobs = [saved, unsaved]
         await model.handleBatchEvent(.completed(jobID: saved.id, transcript: Self.makeTranscript()))
         _ = try #require(await Self.waitForEntryID(of: saved.id, in: model))
         model.selectedBatchJobID = nil
         model.transcript = nil
 
-        let opening = try #require(model.selectBatchJob(saved.id))
-        model.selectBatchJob(waiting.id)
+        let opening = try #require(model.openBatchJobTranscript(saved.id))
+        model.openBatchJobTranscript(unsaved.id)
 
         await #expect(throws: CancellationError.self) { _ = try await opening.value }
-        #expect(model.selectedBatchJobID == waiting.id)
+        #expect(model.selectedBatchJobID == unsaved.id)
         #expect(model.selectedEntryID == nil)
-        #expect(model.transcript == nil)
+        #expect(model.transcript?.segments.first?.text == "the unsaved job")
     }
 
     @Test("the bridge's selectBatchJob returns once the job's entry is on screen")
@@ -577,8 +579,9 @@ struct AppModelBatchTests {
         model.batchJobs = [job, other]
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
         let entryID = try #require(await Self.waitForEntryID(of: job.id, in: model))
-        model.selectBatchJob(other.id)
+        model.openBatchJobTranscript(other.id)
         #expect(model.transcript?.segments.first?.text == "the other job")
+        model.openQueue()
         let server = try ParolaAutomationServer(model: model)
         let context = AutomationContext(model: model, server: server)
         let command = try #require(server.batchCommands().first { $0.name == "selectBatchJob" })
@@ -589,9 +592,10 @@ struct AppModelBatchTests {
 
         #expect(model.selectedEntryID == entryID)
         #expect(model.transcript?.segments.first?.text == "hi")
+        #expect(model.route == .transcript)
     }
 
-    @Test("an edit made while the selected job's add is in flight lands in the entry it becomes")
+    @Test("an edit made while the opened job's add is in flight lands in the entry it becomes")
     func batchJobEditBeforeTheEntryLands() async throws {
         let scratch = try Self.makeScratchDirectory()
         defer { try? FileManager.default.removeItem(at: scratch) }
@@ -601,10 +605,9 @@ struct AppModelBatchTests {
         try Data("fake".utf8).write(to: source)
         let job = BatchJob(url: source, status: .transcribing)
         model.batchJobs = [job]
-        model.selectedBatchJobID = job.id
-        model.route = .batch
 
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+        model.openBatchJobTranscript(job.id)
         #expect(model.selectedEntryID == nil)
         model.editSegment(id: 0, newText: "fixed early")
 
@@ -627,12 +630,11 @@ struct AppModelBatchTests {
         let job = BatchJob(url: source, status: .transcribing)
         let other = BatchJob(url: Self.makeURL("other"), status: .done, transcript: Self.makeTranscript())
         model.batchJobs = [job, other]
-        model.selectedBatchJobID = job.id
-        model.route = .batch
 
         await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+        model.openBatchJobTranscript(job.id)
         model.editSegment(id: 0, newText: "kept")
-        model.selectBatchJob(other.id)
+        model.openBatchJobTranscript(other.id)
 
         let entryID = try #require(await Self.waitForEntryID(of: job.id, in: model))
         #expect(model.selectedEntryID == nil)
@@ -848,18 +850,14 @@ struct AppModelBatchTests {
         #expect(model.phase == .ready)
     }
 
-    @Test("a batch job whose entry hasn't landed shows its own copy without a library selection")
-    func selectBatchJobClearsSelectedEntry() async {
+    @Test("a batch job whose entry hasn't landed opens its own copy without a library selection")
+    func openingAnUnsavedJobClearsSelectedEntry() async {
         let model = makeModel()
         model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav")])
         let jobID = model.batchJobs[0].id
         await model.handleBatchEvent(.started(jobID: jobID))
         let t = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
         await model.handleBatchEvent(.completed(jobID: jobID, transcript: t))
-
-        model.selectedEntryID = "stale-entry"
-        model.selectBatchJob(jobID)
-        #expect(model.selectedEntryID == nil)
 
         model.selectedEntryID = "stale-entry"
         model.openBatchJobTranscript(jobID)
@@ -878,17 +876,13 @@ struct AppModelBatchTests {
         #expect(model.smartChapters.isEmpty)
     }
 
-    @Test("selecting a batch job clears artifacts derived from the previous transcript")
-    func selectBatchJobClearsDerivedArtifacts() async {
+    @Test("opening a batch job clears artifacts derived from the previous transcript")
+    func openingAJobClearsDerivedArtifacts() async {
         let model = makeModel()
         model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav")])
         let jobID = model.batchJobs[0].id
         await model.handleBatchEvent(.started(jobID: jobID))
         await model.handleBatchEvent(.completed(jobID: jobID, transcript: Self.makeTranscript()))
-
-        Self.installStaleArtifacts(on: model)
-        model.selectBatchJob(jobID)
-        Self.expectArtifactsCleared(on: model)
 
         Self.installStaleArtifacts(on: model)
         model.openBatchJobTranscript(jobID)

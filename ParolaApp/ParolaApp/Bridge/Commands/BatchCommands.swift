@@ -173,7 +173,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "selectBatchJob",
                 area: .batch,
-                summary: "Selects a batch job by UUID.",
+                summary: "Selects a batch job by UUID and opens its transcript, as the job's Open button does.",
                 kind: .mutating,
                 args: [
                     .init(name: "id", kind: .string(), required: true, summary: "Batch job UUID"),
@@ -184,7 +184,7 @@ extension ParolaAutomationServer {
                         throw AutomationError.invalidArgs(field: "id", reason: "not a valid UUID")
                     }
                     // A job saved to the library opens its entry, and the caller reads the transcript next.
-                    _ = try? await ctx.model.selectBatchJob(id)?.value
+                    _ = try? await ctx.model.openBatchJobTranscript(id)?.value
                     return .object(["selected": .string(idStr)])
                 }
             ),

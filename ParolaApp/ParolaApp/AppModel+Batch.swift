@@ -70,10 +70,6 @@ extension AppModel {
                 $0.transcript = processed
                 $0.segmentCount = processed.segments.count
             }
-            // The transcript route shows what the user opened; a finished job never replaces it.
-            if id == selectedBatchJobID, route != .transcript {
-                showUnsavedBatchJob(id, processed)
-            }
             if let job = batchJobs.first(where: { $0.id == id }) {
                 land(.batchJob(job, transcript: processed))
             }
@@ -355,21 +351,9 @@ extension AppModel {
         change(&batchJobs[idx])
     }
 
-    /// Opens the job's entry in place, or its own copy while the add is in flight; returns the entry's load.
-    @discardableResult
-    func selectBatchJob(_ id: BatchJob.ID) -> Task<Transcript, any Error>? {
-        // An open the last click started must not land over this one.
-        loadEntryGeneration &+= 1
+    /// Marks the job's row; its transcript opens only through `openBatchJobTranscript`, where the user sees it.
+    func selectBatchJob(_ id: BatchJob.ID) {
         selectedBatchJobID = id
-        guard let job = batchJobs.first(where: { $0.id == id }) else { return nil }
-        if let entryID = job.entryID {
-            guard selectedEntryID != entryID else { return nil }
-            return openEntryInPlace(entryID)
-        }
-        if let t = job.transcript {
-            showUnsavedBatchJobReplacingSelection(job, t)
-        }
-        return nil
     }
 
     private func showUnsavedBatchJobReplacingSelection(_ job: BatchJob, _ transcript: Transcript) {
@@ -425,17 +409,21 @@ extension AppModel {
         }
     }
 
-    func openBatchJobTranscript(_ id: BatchJob.ID) {
-        guard let job = batchJobs.first(where: { $0.id == id }) else { return }
+    /// Shows a finished job on the transcript route: its entry, or its own copy while the add is in flight; returns the entry's load.
+    @discardableResult
+    func openBatchJobTranscript(_ id: BatchJob.ID) -> Task<Transcript, any Error>? {
+        guard let job = batchJobs.first(where: { $0.id == id }) else { return nil }
         if let entryID = job.entryID {
             selectedBatchJobID = id
-            loadEntry(entryID)
-        } else if let t = job.transcript {
+            return loadEntry(entryID)
+        }
+        if let t = job.transcript {
             selectedBatchJobID = id
             showUnsavedBatchJobReplacingSelection(job, t)
             phase = .ready
             route = .transcript
         }
+        return nil
     }
 
     func reorderPendingBatchJobs(from source: IndexSet, to destination: Int) {
