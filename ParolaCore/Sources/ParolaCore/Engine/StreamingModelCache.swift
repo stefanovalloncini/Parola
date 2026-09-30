@@ -42,27 +42,26 @@ actor StreamingModelCache {
         }
 
         let loader = loader
-        let task = Task { try await loader(modelName, store) }
-        inFlight[modelName] = task
         let myEpoch = evictionEpoch
-        // Bookkeeping is detached from the borrower: a cancelled borrow returns early while
-        // the load runs on, and this is what lands the finished kit in the cache.
-        // Task {}, not detached: the log scope has to follow this bookkeeping.
-        Task { [weak self] in
-            let kit: SharedWhisperKit?
+        // Books its own result before any borrower resumes; Task {}, not detached, so the log scope follows the load.
+        let task = Task { [weak self] in
+            let kit: SharedWhisperKit
             do {
-                kit = try await task.value
+                kit = try await loader(modelName, store)
             } catch {
-                kit = nil
                 if !isCancellation(error) {
                     ParolaLog.error(
                         .streaming, "model load failed",
                         [.model: .safe(ModelToken(modelName)), .error: .error(error)]
                     )
                 }
+                await self?.finishLoad(modelName, epoch: myEpoch, kit: nil)
+                throw error
             }
             await self?.finishLoad(modelName, epoch: myEpoch, kit: kit)
+            return kit
         }
+        inFlight[modelName] = task
         return try await Self.awaitCancellable(task)
     }
 
