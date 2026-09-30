@@ -91,7 +91,7 @@ struct PersonFilterTests {
     }
 
     @Test("a filter that hides every row reads as the filters' doing")
-    func filtersHideEverything() async {
+    func filterThatHidesEveryRow() async {
         let model = await makeModel()
         func emptyKind(_ filters: LibraryListContent.ActiveFilters, category: EntryCategory?) -> LibraryEmptyState.Kind {
             let visible = LibraryListContent.rows(

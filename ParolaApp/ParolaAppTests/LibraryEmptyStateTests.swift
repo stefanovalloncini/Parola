@@ -79,6 +79,15 @@ struct LibraryEmptyStateTests {
         #expect(LibraryEmptyState.entryCount(in: library, category: .meeting) == 2)
         #expect(LibraryEmptyState.entryCount(in: library, category: .dictation) == 0)
     }
+
+    @Test("the hero is the Library page's alone: a category or a person over an empty library keeps its own state")
+    func heroOnlyOnTheLibraryPage() {
+        #expect(LibraryEmptyState.showsHero(.emptyLibrary, category: nil, person: nil))
+        #expect(!LibraryEmptyState.showsHero(.emptyLibrary, category: nil, person: UUID()))
+        #expect(!LibraryEmptyState.showsHero(.emptyLibrary, category: .meeting, person: nil))
+        #expect(!LibraryEmptyState.showsHero(.noMatches, category: nil, person: nil))
+        #expect(!LibraryEmptyState.showsHero(.none, category: nil, person: nil))
+    }
 }
 
 @MainActor

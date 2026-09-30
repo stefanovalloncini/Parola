@@ -30,6 +30,11 @@ enum LibraryEmptyState {
         guard let category else { return entries.count }
         return entries.count(where: { $0.category == category })
     }
+
+    /// The hero belongs to the Library page itself; a category or a person over an empty library keeps its own empty state.
+    static func showsHero(_ kind: Kind, category: EntryCategory?, person: UUID?) -> Bool {
+        kind == .emptyLibrary && category == nil && person == nil
+    }
 }
 
 enum LibraryListContent {
@@ -332,8 +337,9 @@ private struct LibraryBrowseList: View, Equatable {
     @State private var entries: [LibraryRowDisplay] = []
     @State private var rowGroups: [LibraryDateGroups.Group] = []
     @State private var pageTotals = LibraryListContent.PageTotals()
-    /// Set with `entries`, so the empty state never judges fresh library contents against rows not yet rebuilt.
-    @State private var unfilteredCount = 0
+    /// Set with `entries`, from the same library and filters, so no pass judges new filters against rows not yet rebuilt.
+    @State private var emptyKind = LibraryEmptyState.Kind.none
+    @State private var showsHero = false
     @State private var displayCache = LibraryRowDisplayCache()
     @State private var animatesRows = false
 
@@ -341,10 +347,6 @@ private struct LibraryBrowseList: View, Equatable {
         LibraryListContent.ActiveFilters(
             label: labelFilter, language: languageFilter, dateRange: dateRangeFilter, person: model.personFilter
         )
-    }
-
-    private var emptyKind: LibraryEmptyState.Kind {
-        LibraryEmptyState.kind(entryCount: unfilteredCount, visibleCount: entries.count, filtersActive: !activeFilters.isEmpty)
     }
 
     /// Narrows the category on screen; unlike a sidebar or bridge pick it never navigates.
@@ -385,16 +387,19 @@ private struct LibraryBrowseList: View, Equatable {
         pageTotals = LibraryListContent.pageTotals(
             of: model.libraryEntries, category: category, person: filters.person, sizes: model.libraryBundleSizes
         )
-        unfilteredCount = LibraryEmptyState.entryCount(in: model.libraryEntries, category: category)
+        emptyKind = LibraryEmptyState.kind(
+            entryCount: LibraryEmptyState.entryCount(in: model.libraryEntries, category: category),
+            visibleCount: displays.count,
+            filtersActive: !filters.isEmpty
+        )
+        showsHero = LibraryEmptyState.showsHero(emptyKind, category: category, person: filters.person)
         return displays
     }
 
     var body: some View {
-        let kind = emptyKind
-        let showsHero = kind == .emptyLibrary && category == nil
         VStack(spacing: 0) {
             pageTop(showsIntake: !showsHero)
-            switch kind {
+            switch emptyKind {
             case .none:
                 LibraryRowList(
                     groups: rowGroups,
@@ -412,10 +417,12 @@ private struct LibraryBrowseList: View, Equatable {
             case .noMatches:
                 noMatchesState
             case .emptyLibrary:
-                if let category {
+                if showsHero {
+                    heroState
+                } else if let category {
                     emptyState(of: category)
                 } else {
-                    heroState
+                    noMatchesState
                 }
             }
         }
@@ -526,7 +533,7 @@ private struct LibraryBrowseList: View, Equatable {
         .axBranch("Empty")
     }
 
-    /// The page has rows; the filters are what emptied it. Offering "Record" here would be a lie.
+    /// The filters (a person's page counts) are what emptied it. Offering "Record" here would be a lie.
     private var noMatchesState: some View {
         EmptyStateView(
             systemImage: "line.3.horizontal.decrease.circle",
