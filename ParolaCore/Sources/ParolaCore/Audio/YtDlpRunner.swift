@@ -210,8 +210,9 @@ enum YtDlpRunner {
         /// Returns once the deadline passes with no line pushing it out, or `.cancelled` when the run is.
         func expiry() async -> Ending {
             while !Task.isCancelled {
-                let (deadline, ending) = state.withLock { ($0.deadline, $0.expiry) }
+                // The clock before the deadline: a line seen in between can only move the deadline past `now`.
                 let now = elapsed.now()
+                let (deadline, ending) = state.withLock { ($0.deadline, $0.expiry) }
                 if now >= ceiling, case .progress(let limits) = watch {
                     return .wallClock(seconds: Self.wholeSeconds(limits.ceiling))
                 }

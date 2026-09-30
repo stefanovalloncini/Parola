@@ -168,6 +168,7 @@ struct YouTubeProcessTests {
 
         for step in 1...4 {
             await seen.wait(until: { $0.count >= step }, "progress line \(step)")
+            await clock.waitForSleeper()
             clock.advance(by: .seconds(2))
             steps.open(step)
         }
@@ -201,9 +202,11 @@ struct YouTubeProcessTests {
 
         for step in 1...5 {
             await seen.wait(until: { $0.count >= step }, "progress line \(step)")
+            await clock.waitForSleeper()
             clock.advance(by: .seconds(2))
             steps.open(step)
         }
+        await clock.waitForSleeper()
         clock.advance(by: .seconds(3))
 
         let failure = await linkFailure { _ = try await run.value("the quiet download to be ended") }
@@ -280,6 +283,7 @@ struct YouTubeProcessTests {
         }
 
         await seen.wait(until: { $0.count >= 3 && $0.contains(.processing) }, "the metadata, progress and processing lines")
+        await clock.waitForSleeper()
         clock.advance(by: .seconds(4))
         steps.open(1)
         let output = try await run.value("the download to finish after post-processing")
@@ -306,6 +310,7 @@ struct YouTubeProcessTests {
         }
 
         await seen.wait(until: { $0.count >= 2 && $0.contains(.processing) }, "the progress and processing lines")
+        await clock.waitForSleeper()
         clock.advance(by: .seconds(3))
 
         let failure = await linkFailure { _ = try await run.value("the overrunning post-processing to be ended") }
@@ -354,6 +359,7 @@ struct YouTubeProcessTests {
         }
         let pid = await childPID(in: childPid)
         await seen.wait(until: { !$0.isEmpty }, "the progress line")
+        await clock.waitForSleeper()
         clock.advance(by: .seconds(1))
 
         let failure = await linkFailure { _ = try await run.value("the stalled group to be ended") }
