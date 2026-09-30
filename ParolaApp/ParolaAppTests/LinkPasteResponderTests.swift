@@ -21,6 +21,12 @@ private final class CountingProvider: NSObject, NSPasteboardItemDataProvider {
     }
 }
 
+/// A window that reports itself key, since the test host never makes one key.
+private final class KeyStubWindow: NSWindow {
+    var reportsKey = true
+    override var isKeyWindow: Bool { reportsKey }
+}
+
 @MainActor
 @Suite("Link paste in the main window")
 struct LinkPasteResponderTests {
@@ -246,6 +252,46 @@ struct LinkPasteResponderTests {
             #expect(!model.recordingActive)
             #expect(offers(model))
         }
+    }
+
+    @Test("the Paste item asks the window it sits in: key, no sheet over it, and only for Paste")
+    func validatesThroughItsWindow() async throws {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("LinkPasteResponderTests-\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+        pasteboard.setString("https://youtu.be/abc123", forType: .string)
+        let model = makeModel(pasteboard: pasteboard)
+        let window = KeyStubWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        let controller = NSWindowController(window: window)
+        window.contentViewController = NSHostingController(rootView: Color.clear.background(LinkPasteInstaller(model: model)))
+        window.contentView?.layoutSubtreeIfNeeded()
+        defer { withExtendedLifetime(controller) { window.close() } }
+        let responder = try #require(window.nextResponder as? LinkPasteResponder)
+        let pasteItem = NSMenuItem(title: "Paste", action: paste, keyEquivalent: "v")
+        let copyItem = NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+
+        #expect(responder.validateUserInterfaceItem(pasteItem))
+        #expect(!responder.validateUserInterfaceItem(copyItem))
+
+        window.reportsKey = false
+        #expect(!responder.validateUserInterfaceItem(pasteItem), "another window has the keyboard")
+        window.reportsKey = true
+
+        let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: true)
+        window.beginSheet(sheet, completionHandler: nil)
+        let sheetUp = await waitUntil { window.attachedSheet != nil }
+        #expect(sheetUp)
+        #expect(!responder.validateUserInterfaceItem(pasteItem), "a sheet is over the window")
+        window.endSheet(sheet)
+        let sheetGone = await waitUntil { window.attachedSheet == nil }
+        #expect(sheetGone)
+        #expect(responder.validateUserInterfaceItem(pasteItem))
     }
 
     @Test("the link paste leaves the window's chain with the content that put it there")
