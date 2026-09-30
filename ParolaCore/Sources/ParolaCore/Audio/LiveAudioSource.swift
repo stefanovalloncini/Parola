@@ -15,7 +15,7 @@ public protocol LiveAudioSource: AudioSource {
     /// an in-flight take for crash recovery. `nil` for sources that don't record to disk.
     func inFlightURL() async -> URL?
     /// Pausing stops new audio landing in the file without ending the capture; a paused
-    /// stretch is simply absent when it resumes.
+    /// stretch is absent when it resumes.
     func setPaused(_ paused: Bool) async
 }
 
