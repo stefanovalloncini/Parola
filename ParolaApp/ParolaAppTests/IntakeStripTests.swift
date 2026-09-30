@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 @MainActor
 @Suite("Intake strip")
@@ -20,9 +21,39 @@ struct IntakeStripTests {
         #expect(IntakeSummary.languageLabel(selected: "it", englishOnly: false) == SupportedLanguages.displayName(for: "it"))
     }
 
-    @Test("the button reads model · language")
+    @Test("the button reads model · language, then each option that changes the transcript")
     func summary() {
-        #expect(IntakeSummary.text(model: "Whisper Turbo", language: "Auto") == "Whisper Turbo · Auto")
+        #expect(IntakeSummary.text(model: "Whisper Turbo", language: "Auto", translates: false, identifiesSpeakers: false)
+            == "Whisper Turbo · Auto")
+        #expect(IntakeSummary.text(model: "Whisper Turbo", language: "Auto", translates: true, identifiesSpeakers: false)
+            == "Whisper Turbo · Auto · Translate")
+        #expect(IntakeSummary.text(model: "Whisper Turbo", language: "Italian", translates: false, identifiesSpeakers: true)
+            == "Whisper Turbo · Italian · Speakers")
+        #expect(IntakeSummary.text(model: "Whisper Turbo", language: "Auto", translates: true, identifiesSpeakers: true)
+            == "Whisper Turbo · Auto · Translate · Speakers")
+    }
+
+    @Test("the options read in Italian with the words the rest of the app uses")
+    func italianSummary() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        #expect(
+            IntakeSummary.text(model: "Whisper Turbo", language: "Auto", translates: true, identifiesSpeakers: true, bundle: italian)
+                == "Whisper Turbo · Auto · Traduci · Persone"
+        )
+    }
+
+    @Test("Translate shows only while the chosen model can translate")
+    func translateFollowsTheModel() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("intakesummary"))
+        model.selectedModel = "openai_whisper-large-v3_turbo"
+        model.translate = true
+        model.diarize = true
+        #expect(IntakeSummary.text(for: model) == "Whisper Turbo · Auto · Translate · Speakers")
+
+        model.selectedModel = "nvidia_parakeet-tdt-0.6b-v2"
+        #expect(!IntakeSummary.text(for: model).contains("Translate"), "Parakeet can't translate, so the run won't")
+        #expect(IntakeSummary.text(for: model).hasSuffix(" · Speakers"))
     }
 
     @Test("the prompt offers links only when the build can fetch them")

@@ -55,8 +55,44 @@ enum IntakeSummary {
         return String(localized: "Auto", bundle: bundle)
     }
 
-    static func text(model: String, language: String) -> String {
-        "\(model) · \(language)"
+    /// Anything that changes what the transcript says is named here, since the popover is the only other place it shows.
+    static func parts(
+        model: String,
+        language: String,
+        translates: Bool,
+        identifiesSpeakers: Bool,
+        bundle: Bundle = .main
+    ) -> [String] {
+        var parts = [model, language]
+        if translates { parts.append(String(localized: "Translate", bundle: bundle)) }
+        if identifiesSpeakers { parts.append(String(localized: "Speakers", bundle: bundle)) }
+        return parts
+    }
+
+    static func text(
+        model: String,
+        language: String,
+        translates: Bool,
+        identifiesSpeakers: Bool,
+        bundle: Bundle = .main
+    ) -> String {
+        parts(
+            model: model, language: language, translates: translates, identifiesSpeakers: identifiesSpeakers, bundle: bundle
+        ).joined(separator: " · ")
+    }
+
+    /// Translate is named only while the chosen model can translate: otherwise the run stays in its own language.
+    static func parts(for model: AppModel) -> [String] {
+        parts(
+            model: modelLabel(for: model),
+            language: languageLabel(for: model),
+            translates: model.translate && model.selectedModelCapabilities.supportsTranslate,
+            identifiesSpeakers: model.diarize
+        )
+    }
+
+    static func text(for model: AppModel) -> String {
+        parts(for: model).joined(separator: " · ")
     }
 
     static func modelLabel(for model: AppModel) -> String {
@@ -80,13 +116,12 @@ private struct IntakeSettingsButton: View {
     @State private var isPresented = false
 
     var body: some View {
-        let modelLabel = IntakeSummary.modelLabel(for: model)
-        let languageLabel = IntakeSummary.languageLabel(for: model)
+        let parts = IntakeSummary.parts(for: model)
         Button {
             isPresented = true
         } label: {
             HStack(spacing: 3) {
-                Text(verbatim: IntakeSummary.text(model: modelLabel, language: languageLabel))
+                Text(verbatim: parts.joined(separator: " · "))
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .semibold))
                     .accessibilityHidden(true)
@@ -103,7 +138,7 @@ private struct IntakeSettingsButton: View {
         }
         .help("Transcription settings")
         .accessibilityLabel(Text("Transcription settings"))
-        .accessibilityValue(Text(verbatim: "\(modelLabel), \(languageLabel)"))
+        .accessibilityValue(Text(verbatim: parts.joined(separator: ", ")))
         .axLeaf("Intake.Button.Settings")
     }
 }
