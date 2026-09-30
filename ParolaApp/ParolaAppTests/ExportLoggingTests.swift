@@ -143,12 +143,48 @@ struct ExportLoggingTests {
 
     // The bulk library export runs an NSOpenPanel modally, so its catch is pinned in source.
     private func appSource(_ name: String) throws -> String {
-        let path = #filePath.replacingOccurrences(
-            of: "ParolaAppTests/ExportLoggingTests.swift",
-            with: "ParolaApp/\(name).swift"
-        )
-        let source = try String(contentsOfFile: path, encoding: .utf8)
+        try flattened(appDirectory.appendingPathComponent("\(name).swift"))
+    }
+
+    private var appDirectory: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("ParolaApp", isDirectory: true)
+    }
+
+    private func flattened(_ file: URL) throws -> String {
+        let source = try String(contentsOf: file, encoding: .utf8)
         return source.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    private func appModelSources() throws -> [String: String] {
+        let files = (FileManager.default.enumerator(at: appDirectory, includingPropertiesForKeys: nil)?.allObjects ?? [])
+            .compactMap { $0 as? URL }
+            .filter { $0.lastPathComponent.hasPrefix("AppModel") && $0.pathExtension == "swift" }
+        return try Dictionary(uniqueKeysWithValues: files.map {
+            ($0.deletingPathExtension().lastPathComponent, try flattened($0))
+        })
+    }
+
+    private func logCalls(in source: String) -> [String] {
+        source.components(separatedBy: "ParolaLog.").dropFirst().map { chunk in
+            var depth = 0
+            var call = ""
+            for character in chunk {
+                call.append(character)
+                if character == "(" { depth += 1 }
+                if character == ")" {
+                    depth -= 1
+                    if depth == 0 { break }
+                }
+            }
+            return call
+        }
+    }
+
+    private func logsAnExport(_ call: String) -> Bool {
+        call.split(separator: "(", maxSplits: 1).last?.trimmingCharacters(in: .whitespaces).hasPrefix(".export,") == true
     }
 
     @Test("the bulk library export logs the format and the entry, never the title")
@@ -161,28 +197,15 @@ struct ExportLoggingTests {
 
     @Test("no export site hands an error's localized description to the log")
     func exportSitesNeverLogLocalizedDescriptions() throws {
-        var total = 0
-        let files = [
-            "AppModel", "AppModel+Export", "AppModel+Library", "AppModel+AutoExport", "AppModel+Landing",
-            "AppModel+WatchedArrivals",
-        ]
-        for name in files {
-            let source = try appSource(name)
-            for chunk in source.components(separatedBy: "ParolaLog.").dropFirst() {
-                total += 1
-                var depth = 0
-                var call = ""
-                for character in chunk {
-                    call.append(character)
-                    if character == "(" { depth += 1 }
-                    if character == ")" {
-                        depth -= 1
-                        if depth == 0 { break }
-                    }
-                }
+        let sources = try appModelSources()
+        for (name, source) in sources {
+            for call in logCalls(in: source) {
                 #expect(call.contains("localizedDescription") == false, "\(name) logs a localized description")
             }
         }
-        #expect(total == 17)
+        for name in ["AppModel", "AppModel+Export", "AppModel+Library"] {
+            let exportCalls = logCalls(in: sources[name] ?? "").filter(logsAnExport)
+            #expect(exportCalls.count >= 1, "\(name) no longer logs a failed export")
+        }
     }
 }
