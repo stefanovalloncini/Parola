@@ -17,50 +17,66 @@ struct DictationInsertionLoggingTests {
         sink.records.first { $0.category == .appPermissions && $0.message.rendered == message }
     }
 
+    // The general pasteboard is shared with every other test and process on the Mac.
+    private func makePasteboard() -> NSPasteboard {
+        NSPasteboard(name: NSPasteboard.Name("insertion-logging-test-\(UUID().uuidString)"))
+    }
+
     @Test("a paste blocked by accessibility is a notice, and the text stays out of it")
     func blockedPasteIsNoticed() async throws {
+        let pasteboard = makePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        let pasteboardName = pasteboard.name
         try await withSink { sink in
-            try await withPasteboardRestored {
-                let inserter = ClipboardPasteInserter(trustCheck: { false })
-                await #expect(throws: TextInsertionError.self) {
-                    try await inserter.insert("dictated text")
-                }
-                let record = try #require(
-                    permissionRecord(sink, message: "text insertion blocked: accessibility not granted")
-                )
-                #expect(record.level == .notice)
-                #expect(record.fields.isEmpty)
-                #expect(record.formattedLine.contains("dictated text") == false)
+            let inserter = ClipboardPasteInserter(trustCheck: { false }, pasteboardName: pasteboardName)
+            var thrown: Error?
+            do {
+                try await inserter.insert("dictated text")
+            } catch {
+                thrown = error
             }
+            #expect(thrown is TextInsertionError)
+            let record = try #require(
+                permissionRecord(sink, message: "text insertion blocked: accessibility not granted")
+            )
+            #expect(record.level == .notice)
+            #expect(record.fields.isEmpty)
+            #expect(record.formattedLine.contains("dictated text") == false)
         }
     }
 
     @Test("blocked keystrokes are noticed on their own path")
     func blockedKeystrokesAreNoticed() async throws {
+        let pasteboard = makePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        let pasteboardName = pasteboard.name
         try await withSink { sink in
-            try await withPasteboardRestored {
-                let inserter = KeystrokeTextInserter(trustCheck: { false })
-                await #expect(throws: TextInsertionError.self) {
-                    try await inserter.insert("typed text")
-                }
-                let record = try #require(
-                    permissionRecord(sink, message: "keystroke insertion blocked: accessibility not granted")
-                )
-                #expect(record.level == .notice)
-                #expect(record.fields.isEmpty)
-                #expect(record.formattedLine.contains("typed text") == false)
+            let inserter = KeystrokeTextInserter(trustCheck: { false }, pasteboardName: pasteboardName)
+            var thrown: Error?
+            do {
+                try await inserter.insert("typed text")
+            } catch {
+                thrown = error
             }
+            #expect(thrown is TextInsertionError)
+            let record = try #require(
+                permissionRecord(sink, message: "keystroke insertion blocked: accessibility not granted")
+            )
+            #expect(record.level == .notice)
+            #expect(record.fields.isEmpty)
+            #expect(record.formattedLine.contains("typed text") == false)
         }
     }
 
     @Test("a granted insertion logs nothing")
     func grantedInsertionIsSilent() async throws {
+        let pasteboard = makePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        let pasteboardName = pasteboard.name
         try await withSink { sink in
-            try await withPasteboardRestored {
-                let inserter = KeystrokeTextInserter(trustCheck: { true })
-                try await inserter.insert("")
-                #expect(sink.records.filter { $0.category == .appPermissions }.isEmpty)
-            }
+            let inserter = KeystrokeTextInserter(trustCheck: { true }, pasteboardName: pasteboardName)
+            try await inserter.insert("")
+            #expect(sink.records.filter { $0.category == .appPermissions }.isEmpty)
         }
     }
 }

@@ -1,8 +1,7 @@
 import AppKit
 import Foundation
 
-/// Hands the user's clipboard back after a test that had to use `NSPasteboard.general` — the paste
-/// inserters read it by name and cannot be pointed at a private board.
+/// Hands the user's clipboard back after a test of a product path that only copies to `NSPasteboard.general`.
 func withPasteboardRestored(
     isolation: isolated (any Actor)? = #isolation,
     _ body: () async throws -> Void
