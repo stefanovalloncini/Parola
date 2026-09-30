@@ -4,7 +4,7 @@ import ParolaTestSupport
 
 @Suite("No #expect/#require closure inside a wrapper closure")
 struct MacroArgumentClosureGuardTests {
-    /// The T38 recording (W3) lane still owns these files; remove an entry once it binds that file's waits.
+    /// Files another lane still edits that hold a closure inside #expect/#require within a wrapper closure; drop each once it's fixed.
     static let pendingRecordingLaneSweep: Set<String> = [
         "AppModelRecordingOptionsTests.swift",
         "RecordingSafetyTests.swift",
