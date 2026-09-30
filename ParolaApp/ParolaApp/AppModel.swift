@@ -3447,7 +3447,7 @@ final class AppModel {
         runRecordingAutoStop()
     }
 
-    /// Counts down what is left of the take's limit on the model's clock, then stops the take.
+    /// Sleeps what is left of the take's limit on the model's clock, then stops the take; the time run is measured on the continuous clock.
     private func runRecordingAutoStop() {
         guard var budget = recordingAutoStop, budget.runningSince == nil else { return }
         budget.runningSince = .now
@@ -4392,7 +4392,7 @@ final class AppModel {
         }
     }
 
-    /// Marks this moment, whose sentence becomes a favourite once the take has words; nil when nothing is capturing or the last mark is under a second old.
+    /// Marks this moment, whose sentence becomes a favorite once the take has words; nil when nothing is capturing or the last mark is under a second old.
     @discardableResult
     func addTakeMarker() -> TimeInterval? {
         guard let take = controlledTake else { return nil }

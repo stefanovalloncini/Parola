@@ -30,7 +30,7 @@ struct RunLanding {
     var category: EntryCategory = .transcription
     var title: String?
     var titleSource: TitleSource?
-    /// A take's markers, kept in its entry so every transcript it gets favourites their sentences.
+    /// A take's markers, kept in its entry so every transcript it gets makes their sentences favorites.
     var takeMarkers: [TimeInterval] = []
     var sourceDigest: String?
     var consumesAudio = false
@@ -216,7 +216,7 @@ extension AppModel {
         return saving
     }
 
-    /// Favorites, notes, the speaker map and the card metadata all name segments and labels the re-run replaced; a take's markers pick favourites anew.
+    /// Favorites, notes, the speaker map and the card metadata all name segments and labels the re-run replaced; a take's markers pick favorites anew.
     private func replaceEntry(_ entryID: LibraryEntry.ID, with landing: RunLanding) -> Task<LibraryEntry, any Error> {
         aiJobs.cancelAll(for: entryID)
         let transcript = landing.transcript

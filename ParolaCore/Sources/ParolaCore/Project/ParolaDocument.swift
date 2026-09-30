@@ -45,7 +45,7 @@ public struct ParolaDocument: Sendable {
         /// Which person each speaker label in this transcript stands for, keyed by the label the
         /// segments carry now.
         public var speakerAssignments: [String: UUID]
-        /// Moments marked while the take recorded, kept so every transcript it gets favourites them again.
+        /// Moments marked while the take recorded, kept so every transcript it gets makes them favorites again.
         public var takeMarkers: [TimeInterval]?
 
         public init(

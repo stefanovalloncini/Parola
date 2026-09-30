@@ -1071,8 +1071,8 @@ public actor LibraryStore {
         try updateFavorites(for: id) { $0 = ids }
     }
 
-    /// The favourites become the segments the entry's take markers pick, or none when it has no markers:
-    /// what a new transcript does to favourites that named the old segments.
+    /// The favorites become the segments the entry's take markers pick, or none when it has no markers:
+    /// what a new transcript does to favorites that named the old segments.
     @discardableResult
     public func replaceFavoritesWithTakeMarkers(in segments: [TranscriptSegment], for id: LibraryEntry.ID) throws -> LibraryEntry {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
