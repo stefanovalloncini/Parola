@@ -68,9 +68,12 @@ struct LibraryPageHeader: View {
         .frame(minHeight: 22)
     }
 
+    private var showsFilters: Bool {
+        showsListControls || filters.isFiltering
+    }
+
     @ViewBuilder
     private func controls(folded: Bool) -> some View {
-        let showsFilters = showsListControls || filters.isFiltering
         LibraryBulkActions(selection: selection, pendingBulkDelete: $pendingBulkDelete)
         if showsFilters, !folded {
             filters
@@ -78,7 +81,7 @@ struct LibraryPageHeader: View {
         if showsListControls {
             sortMenu
         }
-        moreMenu(foldedFilters: showsFilters && folded)
+        moreMenu(folded: folded)
     }
 
     private var sortMenu: some View {
@@ -103,12 +106,13 @@ struct LibraryPageHeader: View {
         .axLeaf("Menu.Sort")
     }
 
-    /// Takes the chip's tint while filters wait inside it.
-    private func moreMenu(foldedFilters: Bool) -> some View {
-        let filtersInside = foldedFilters && filters.isFiltering
+    /// Holds Language, and every filter once they fold; takes the chip's tint while filters wait inside it.
+    private func moreMenu(folded: Bool) -> some View {
+        let filtersInside = folded && filters.isFiltering
+        let inside = filters.presented(as: folded ? .submenus : .language)
         return Menu {
-            if foldedFilters {
-                filters.presented(as: .submenus)
+            if showsFilters, folded || inside.showsLanguage {
+                inside
                 Divider()
             }
             Button { model.openStatistics() } label: {

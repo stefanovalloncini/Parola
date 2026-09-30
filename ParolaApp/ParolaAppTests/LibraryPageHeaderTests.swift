@@ -211,8 +211,18 @@ struct LibraryPageHeaderTests {
         }
         let italianName = LanguageDisplay.name(for: "it") ?? "IT"
 
-        #expect(chipTitles(in: idle) == ["Labels", "People", "Language", "Any time", "Sort", "More"])
+        #expect(chipTitles(in: idle) == ["Labels", "People", "Any time", "Sort", "More"], "Language waits in More")
         #expect(chipTitles(in: active) == ["Quarterly planning", "Giulia Rossi", italianName, "Last 30 days", "Sort", "More"])
+    }
+
+    @Test("Language is a chip only while it filters; More holds it once the page has two languages")
+    func languagePlaces() {
+        #expect(!LibraryFilterBar.showsLanguage(in: .chips, optionCount: 3, filtering: false))
+        #expect(LibraryFilterBar.showsLanguage(in: .chips, optionCount: 3, filtering: true))
+        #expect(LibraryFilterBar.showsLanguage(in: .language, optionCount: 2, filtering: false))
+        #expect(!LibraryFilterBar.showsLanguage(in: .language, optionCount: 1, filtering: false))
+        #expect(LibraryFilterBar.showsLanguage(in: .language, optionCount: 1, filtering: true), "a filter on stays so it can be cleared")
+        #expect(LibraryFilterBar.showsLanguage(in: .submenus, optionCount: 2, filtering: false))
     }
 
     @Test("the chips read in Italian")
@@ -225,7 +235,7 @@ struct LibraryPageHeaderTests {
         }
         let italianName = LanguageDisplay.name(for: "it") ?? "IT"
 
-        #expect(chipTitles(in: idle) == ["Etichette", "Persone", "Lingua", "Sempre", "Ordina", "Altro"])
+        #expect(chipTitles(in: idle) == ["Etichette", "Persone", "Sempre", "Ordina", "Altro"])
         #expect(chipTitles(in: active) == ["Quarterly planning", "Giulia Rossi", italianName, "Ultimi 30 giorni", "Ordina", "Altro"])
     }
 
@@ -248,6 +258,13 @@ struct LibraryPageHeaderTests {
         #expect(chipTitles(in: hosted) == ["Any time", "Sort", "More"])
     }
 
+    @Test("at 920 points every everyday chip and More sit beside the subtitle")
+    func everydayChipsAtTheSmallestWindow() {
+        let hosted = hostedHeader(windowWidth: MainWindowLayout.minimumWidth, filtering: false)
+        defer { hosted.close() }
+        #expect(chipTitles(in: hosted) == ["Labels", "People", "Any time", "Sort", "More"])
+    }
+
     @Test("with every filter on, the header's controls stay inside the page", arguments: [920.0, 1000, 1040, 1180, 1440])
     func controlsStayInside(windowWidth: Double) {
         let hosted = hostedHeader(windowWidth: CGFloat(windowWidth))
@@ -264,7 +281,7 @@ struct LibraryPageHeaderTests {
         #expect(spilled.isEmpty, "\(spilled)")
     }
 
-    @Test("the Italian chips stay inside the page too", arguments: [1000.0, 1040, 1180])
+    @Test("the Italian chips stay inside the page too", arguments: [920.0, 1000, 1040, 1180])
     func italianStaysInside(windowWidth: Double) throws {
         let subtitle = LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60, bundle: try italianBundle())
         let hosted = hostedHeader(windowWidth: CGFloat(windowWidth), locale: Self.italian, subtitle: subtitle)

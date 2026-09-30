@@ -32,6 +32,8 @@ struct LibraryFilterBar: View {
         case chips
         /// A submenu of More keeps the dimension's name in front of the value.
         case submenus
+        /// Language alone, the submenu More keeps for it while the chips are out.
+        case language
     }
 
     @Environment(AppModel.self) private var model
@@ -60,6 +62,18 @@ struct LibraryFilterBar: View {
         labelFilter != nil || languageFilter != nil || dateRangeFilter != .all || personFilter != nil
     }
 
+    /// A chip only while it filters; in More once the page holds two languages, or one is already picked.
+    static func showsLanguage(in presentation: Presentation, optionCount: Int, filtering: Bool) -> Bool {
+        switch presentation {
+        case .chips: return filtering
+        case .submenus, .language: return optionCount >= 2 || filtering
+        }
+    }
+
+    var showsLanguage: Bool {
+        Self.showsLanguage(in: presentation, optionCount: languageOptions.count, filtering: languageFilter != nil)
+    }
+
     func presented(as presentation: Presentation) -> LibraryFilterBar {
         var copy = self
         copy.presentation = presentation
@@ -68,16 +82,20 @@ struct LibraryFilterBar: View {
 
     var body: some View {
         Group {
-            if !labelOptions.isEmpty || labelFilter != nil {
-                labelsMenu
+            if presentation != .language {
+                if !labelOptions.isEmpty || labelFilter != nil {
+                    labelsMenu
+                }
+                if Self.showsPersonFilter(peopleOptions: peopleOptions, personFilter: personFilter) {
+                    peopleMenu
+                }
             }
-            if Self.showsPersonFilter(peopleOptions: peopleOptions, personFilter: personFilter) {
-                peopleMenu
-            }
-            if languageOptions.count >= 2 || languageFilter != nil {
+            if showsLanguage {
                 languageMenu
             }
-            dateMenu
+            if presentation != .language {
+                dateMenu
+            }
         }
     }
 
@@ -132,7 +150,7 @@ struct LibraryFilterBar: View {
         }
         .libraryHeaderChip(isActive: languageFilter != nil)
         .modifier(FilterValue(name: Text("Language"), value: name.map { Text("Language: \($0)") }))
-        .axLeaf("Menu.Language")
+        .axLeaf(presentation == .chips ? "Menu.ActiveLanguage" : "Menu.Language")
     }
 
     private var dateMenu: some View {
@@ -156,7 +174,7 @@ struct LibraryFilterBar: View {
         let shown = Self.capped(value)
         switch presentation {
         case .chips: return Text(verbatim: shown)
-        case .submenus: return prefixed(shown)
+        case .submenus, .language: return prefixed(shown)
         }
     }
 
