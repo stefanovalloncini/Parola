@@ -8,63 +8,92 @@ enum LibraryListFocus: Hashable {
     case results
 }
 
-/// The rows of one library page, with their menu, drag and open gesture. Browsing and search results each own one.
-struct LibraryRowList: View {
-    enum Detail: Equatable {
-        case excerpt
-        case match(showsTimestamp: Bool)
+/// One row of a library list: a date group's title, or an entry under it.
+enum LibraryListItem: Identifiable, Equatable {
+    case header(id: String, title: String)
+    case entry(LibraryRowDisplay)
+
+    var id: String {
+        switch self {
+        // A file name can't hold a slash, so no entry id takes this form.
+        case .header(let id, _): return "header/\(id)"
+        case .entry(let row): return row.id
+        }
     }
 
+    /// Titles and entries in one run, so a title scrolls away with the rows under it; an untitled group adds none.
+    static func items(for groups: [LibraryDateGroups.Group]) -> [LibraryListItem] {
+        var items: [LibraryListItem] = []
+        items.reserveCapacity(groups.reduce(0) { $0 + $1.rows.count + 1 })
+        for group in groups {
+            if let title = group.title {
+                items.append(.header(id: group.id, title: title))
+            }
+            items.append(contentsOf: group.rows.lazy.map(LibraryListItem.entry))
+        }
+        return items
+    }
+
+    /// Select All also takes the title rows, which are tagged with ids of their own; only entries are kept.
+    static func entries(in proposed: Set<LibraryEntry.ID>, items: [LibraryListItem]) -> Set<LibraryEntry.ID> {
+        proposed.intersection(items.lazy.compactMap { item -> LibraryEntry.ID? in
+            if case .entry(let row) = item { return row.id }
+            return nil
+        })
+    }
+}
+
+/// The rows of one library page, with their menu, drag and open gesture. Browsing and search results each own one.
+struct LibraryRowList: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let groups: [LibraryDateGroups.Group]
+    let items: [LibraryListItem]
     @Binding var selection: Set<LibraryEntry.ID>
-    let detail: Detail
+    let detail: LibraryListRow.Detail
     let animatesRows: Bool
     let rename: (LibraryEntry) -> Void
     let focus: FocusState<LibraryListFocus?>.Binding
     let focusKey: LibraryListFocus
     var rowAppeared: ((LibraryEntry.ID) -> Void)?
 
-    /// Select All also takes the section rows, which are tagged with their groups' ids; only entries are kept.
-    static func entries(in proposed: Set<LibraryEntry.ID>, groups: [LibraryDateGroups.Group]) -> Set<LibraryEntry.ID> {
-        proposed.intersection(groups.lazy.flatMap(\.rows).map(\.id))
-    }
+    /// List(.inset) indents its rows by 16 pt of its own; this lands a title on the 24 pt gutter.
+    private static let titleInsets = EdgeInsets(top: 0, leading: DS.Spacing.small, bottom: 0, trailing: DS.Spacing.small)
 
     private var rowSelection: Binding<Set<LibraryEntry.ID>> {
         Binding(
             get: { selection },
-            set: { selection = Self.entries(in: $0, groups: groups) }
+            set: { selection = LibraryListItem.entries(in: $0, items: items) }
         )
     }
 
     var body: some View {
         List(selection: rowSelection) {
-            ForEach(groups) { group in
-                Section {
-                    ForEach(group.rows) { row in
-                        LibraryListRow(
-                            row: row,
-                            detail: detail,
-                            isSelected: selection.contains(row.id),
-                            rename: rename
-                        )
-                        .equatable()
-                        .onAppear { rowAppeared?(row.id) }
-                        // Out here: set in the Equatable row's own body, the list never applied them.
-                        .listRowInsets(EdgeInsets())
+            ForEach(items) { item in
+                switch item {
+                case .header(_, let title):
+                    LibraryGroupHeader(title: title)
+                        .listRowInsets(Self.titleInsets)
                         .listRowSeparator(.hidden)
-                    }
-                } header: {
-                    groupHeader(group)
+                        .selectionDisabled()
+                case .entry(let row):
+                    LibraryListRow(
+                        row: row,
+                        detail: detail,
+                        isSelected: selection.contains(row.id),
+                        rename: rename
+                    )
+                    .equatable()
+                    .onAppear { rowAppeared?(row.id) }
+                    // Out here: set in the Equatable row's own body, the list never applied them.
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
                 }
-                .listSectionSeparator(.hidden)
             }
         }
         .listStyle(.inset)
         .tint(DS.Color.accentFill)
         .focused(focus, equals: focusKey)
-        .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: groups.flatMap { $0.rows.map(\.id) })
+        .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: items.map(\.id))
         // Empty on purpose: each row keeps its own context menu, and the list takes only double-click and Return.
         .contextMenu(forSelectionType: LibraryEntry.ID.self) { _ in
         } primaryAction: { ids in
@@ -72,35 +101,39 @@ struct LibraryRowList: View {
         }
     }
 
-    /// The primary action doesn't carry the event's modifiers, so Option is read as it runs.
+    /// The primary action doesn't carry the event's modifiers, so Option is read as it runs; a title row opens nothing.
     private func openFromList(_ ids: Set<LibraryEntry.ID>) {
-        guard let request = LibraryListContent.openRequest(for: ids, modifiers: NSEvent.modifierFlags) else { return }
+        let entries = LibraryListItem.entries(in: ids, items: items)
+        guard let request = LibraryListContent.openRequest(for: entries, modifiers: NSEvent.modifierFlags) else { return }
         model.openEntryFromLibrary(request.id, inNewWindow: request.inNewWindow)
     }
+}
 
-    @ViewBuilder
-    private func groupHeader(_ group: LibraryDateGroups.Group) -> some View {
-        if let title = group.title {
-            Text(verbatim: title)
-                .font(DS.Font.body.weight(.semibold))
-                .foregroundStyle(DS.Color.secondaryText)
-                .textCase(nil)
-                .listRowInsets(EdgeInsets(
-                    top: DS.Spacing.regular,
-                    leading: DS.Spacing.small,
-                    bottom: DS.Spacing.tight,
-                    trailing: DS.Spacing.small
-                ))
-                .accessibilityAddTraits(.isHeader)
-        }
+/// A date group's title as a row of its own, on the gutter the rows' badges start on.
+struct LibraryGroupHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(verbatim: title)
+            .font(DS.Font.body.weight(.semibold))
+            .foregroundStyle(DS.Color.secondaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, DS.Spacing.regular)
+            .padding(.bottom, DS.Spacing.tight)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
 /// One row with its menu. Equatable, so a click re-renders the rows whose selection moved, not all of them.
 struct LibraryListRow: View, Equatable {
+    enum Detail: Equatable {
+        case excerpt
+        case match(showsTimestamp: Bool)
+    }
+
     @Environment(AppModel.self) private var model
     let row: LibraryRowDisplay
-    let detail: LibraryRowList.Detail
+    let detail: Detail
     let isSelected: Bool
     let rename: (LibraryEntry) -> Void
 

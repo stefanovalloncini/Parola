@@ -335,7 +335,7 @@ private struct LibraryBrowseList: View, Equatable {
     @State private var languageFilter: String?
     @State private var dateRangeFilter: LibraryDateRangeFilter = .all
     @State private var entries: [LibraryRowDisplay] = []
-    @State private var rowGroups: [LibraryDateGroups.Group] = []
+    @State private var rowItems: [LibraryListItem] = []
     @State private var pageTotals = LibraryListContent.PageTotals()
     /// Set with `entries`, from the same library and filters, so no pass judges new filters against rows not yet rebuilt.
     @State private var emptyKind = LibraryEmptyState.Kind.none
@@ -383,7 +383,7 @@ private struct LibraryBrowseList: View, Equatable {
         }
         displayCache = cache
         entries = displays
-        rowGroups = headers.groups(for: displays)
+        rowItems = LibraryListItem.items(for: headers.groups(for: displays))
         pageTotals = LibraryListContent.pageTotals(
             of: model.libraryEntries, category: category, person: filters.person, sizes: model.libraryBundleSizes
         )
@@ -402,7 +402,7 @@ private struct LibraryBrowseList: View, Equatable {
             switch emptyKind {
             case .none:
                 LibraryRowList(
-                    groups: rowGroups,
+                    items: rowItems,
                     selection: $selection,
                     detail: .excerpt,
                     animatesRows: animatesRows,

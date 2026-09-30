@@ -18,7 +18,7 @@ struct LibrarySearchResults: View {
     @State private var renameDraft: String = ""
     @State private var resultIDs: [LibraryEntry.ID] = []
     @State private var rows: [LibraryRowDisplay] = []
-    @State private var groups: [LibraryDateGroups.Group] = []
+    @State private var items: [LibraryListItem] = []
     @State private var shownCount = LibrarySearchResults.pageSize
     @State private var shownQuery = ""
     @State private var displayCache = LibraryRowDisplayCache()
@@ -43,7 +43,7 @@ struct LibrarySearchResults: View {
         displayCache = cache
         resultIDs = resolved.map(\.id)
         rows = displays
-        groups = LibraryDateGroups.ungrouped(displays, id: "results")
+        items = LibraryListItem.items(for: LibraryDateGroups.ungrouped(displays, id: "results"))
         selection.formIntersection(resultIDs)
         model.fillSearchSnippets(for: displays.map(\.id))
     }
@@ -84,7 +84,7 @@ struct LibrarySearchResults: View {
                 emptyState
             } else {
                 LibraryRowList(
-                    groups: groups,
+                    items: items,
                     selection: selectionBinding,
                     // Read over every result, not the realised rows, so the column doesn't jump as pages land.
                     detail: .match(showsTimestamp: LibraryListContent.showsTimestampSlot(

@@ -119,8 +119,7 @@ struct LibrarySearchListTests {
         defer { close(hosted) }
         let ids = hosted.model.libraryEntries.map(\.id)
         search(ids, in: hosted.model)
-        // One unheadered section row above the results.
-        let firstPage = LibrarySearchResults.pageSize + 1
+        let firstPage = LibrarySearchResults.pageSize
         #expect(await settled(hosted) { tables(hosted).last?.numberOfRows == firstPage })
         let results = try #require(tables(hosted).last)
 
@@ -131,6 +130,9 @@ struct LibrarySearchListTests {
         _ = await settled(hosted)
         #expect(results.numberOfRows == firstPage + LibrarySearchResults.pageSize, "the same query re-ranked keeps its pages")
 
+        // Back at the top first: a query keeps the list's scroll, and rows near the end would fetch a page of their own.
+        results.scrollRowToVisible(0)
+        _ = await settled(hosted)
         hosted.model.searchQuery = "tak"
         hosted.model.searchRanking = ids.reversed()
         #expect(await settled(hosted) { tables(hosted).last?.numberOfRows == firstPage })
@@ -204,7 +206,7 @@ struct LibrarySearchListTests {
         defer { close(hosted) }
         let ids = hosted.model.libraryEntries.map(\.id)
         search(ids, in: hosted.model)
-        #expect(await settled(hosted) { tables(hosted).last?.numberOfRows == LibrarySearchResults.pageSize + 1 })
+        #expect(await settled(hosted) { tables(hosted).last?.numberOfRows == LibrarySearchResults.pageSize })
         let results = try #require(tables(hosted).last)
         hosted.window.makeFirstResponder(results)
         _ = await settled(hosted)
@@ -216,17 +218,17 @@ struct LibrarySearchListTests {
             results.scrollRowToVisible(results.numberOfRows - 1)
             _ = await settled(hosted)
         }
-        #expect(results.numberOfRows == ids.count + 1)
+        #expect(results.numberOfRows == ids.count)
         #expect(results.selectedRowIndexes.contains(results.numberOfRows - 1))
     }
 
-    @Test("Select All counts entries, not the day headers the table also highlights")
+    @Test("Select All counts entries, not the date titles the table also highlights")
     func selectAllCountsEntries() {
         let displays = entries(7).map { LibraryRowDisplay(entry: $0) }
-        let groups = LibraryDateGroups.groups(for: displays, sortOrder: .newest, now: Self.baseDate)
-        let highlighted = Set(groups.map(\.id)).union(displays.map(\.id))
-        #expect(groups.count > 1)
-        #expect(LibraryRowList.entries(in: highlighted, groups: groups) == Set(displays.map(\.id)))
+        let items = LibraryListItem.items(for: LibraryDateGroups.groups(for: displays, sortOrder: .newest, now: Self.baseDate))
+        let highlighted = Set(items.map(\.id))
+        #expect(highlighted.count > displays.count, "the titles are rows with ids of their own")
+        #expect(LibraryListItem.entries(in: highlighted, items: items) == Set(displays.map(\.id)))
     }
 
     @Test("only a selection of every realised row, with more results waiting, stands for all of them")
