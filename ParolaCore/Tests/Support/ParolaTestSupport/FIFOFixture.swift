@@ -24,13 +24,14 @@ public enum FIFOFixture {
         }
     }
 
-    /// Opened read-write, then unlinked, the writer kept a second: an `open()` that found the path just before the
-    /// unlink still meets a writer, so a parked or later one goes through or fails, never outliving the test.
+    private static let closeQueue = DispatchQueue(label: "app.parola.tests.fifo-release")
+
+    /// Opened read-write, unlinked, then closed a second later, so an `open()` that resolved the path just before the unlink still meets a writer.
     public static func release(_ url: URL) {
         let descriptor = open(url.path, O_RDWR | O_NONBLOCK)
         unlink(url.path)
         guard descriptor >= 0 else { return }
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1) { close(descriptor) }
+        closeQueue.asyncAfter(deadline: .now() + 1) { close(descriptor) }
     }
 
     /// Runs `body` under the shared gate and releases the FIFO the moment it returns or throws —
