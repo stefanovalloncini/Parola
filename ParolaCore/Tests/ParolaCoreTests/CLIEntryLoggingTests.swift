@@ -37,14 +37,14 @@ struct CLIEntryLoggingTests {
         "the mic-source gate refuses record before it logs its entry",
         .enabled(if: parolaBinaryURL != nil)
     )
-    func recordGateRefusesBeforeLogging() throws {
-        try withTemporaryHome { home, environment in
+    func recordGateRefusesBeforeLogging() async throws {
+        try await withTemporaryHome { home, environment in
             let plist = home.appendingPathComponent("gate.plist")
             try (["enabledFeatures": ["meetings", "batch"]] as NSDictionary).write(to: plist)
             var overrides = environment
             overrides["PAROLA_MANAGED_PLIST"] = plist.path
             // `--seconds` bounds the take: without it a regressed gate records until Ctrl-C.
-            let run = try runParola(
+            let run = try await runParola(
                 ["record", "--seconds", "0.2"],
                 environment: overrides,
                 currentDirectory: home,

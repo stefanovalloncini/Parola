@@ -89,11 +89,11 @@ struct CLIDuplicateProcessTests {
         let before = snapshotFiles(in: library)
         #expect(!before.isEmpty)
 
-        let transcribe = try runParola(
+        let transcribe = try await runParola(
             ["transcribe", audio.path, "--library", library.path, "--skip-duplicates"], timeout: 60
         )
-        let stats = try runParola(["library", "stats", "--library", library.path], timeout: 60)
-        let verify = try runParola(["library", "verify", "--library", library.path], timeout: 60)
+        let stats = try await runParola(["library", "stats", "--library", library.path], timeout: 60)
+        let verify = try await runParola(["library", "verify", "--library", library.path], timeout: 60)
 
         #expect(transcribe.stderr.contains("Already in the library as Kickoff call"))
         #expect(stats.stdout.contains("Transcripts: 2"))
@@ -110,7 +110,7 @@ struct CLIDuplicateProcessTests {
         let audio = try makeWAV(in: scratch, named: "kickoff.wav")
         _ = try await seed(library, audio: audio)
 
-        let run = try runParola([
+        let run = try await runParola([
             "transcribe", audio.path, "--library", library.path, "--skip-duplicates",
         ], timeout: 60)
 

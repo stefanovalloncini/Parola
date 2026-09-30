@@ -167,7 +167,7 @@ struct CLIStatsProcessTests {
         let library = scratch.appendingPathComponent("library", isDirectory: true)
         try await seed(library)
 
-        let run = try runParola(["library", "stats", "--library", library.path], timeout: 60)
+        let run = try await runParola(["library", "stats", "--library", library.path], timeout: 60)
 
         #expect(run.status == 0)
         #expect(run.stdout.contains("Transcripts: 2"))
@@ -186,7 +186,7 @@ struct CLIStatsProcessTests {
         let library = scratch.appendingPathComponent("library", isDirectory: true)
         let seeded = try await seed(library)
 
-        let run = try runParola(["library", "stats", "--library", library.path, "--json"], timeout: 60)
+        let run = try await runParola(["library", "stats", "--library", library.path, "--json"], timeout: 60)
 
         #expect(run.status == 0)
         let payload = try #require(
@@ -219,11 +219,11 @@ struct CLIStatsProcessTests {
     }
 
     @Test("an empty library reports nothing rather than zeroes")
-    func statsOnAnEmptyLibrary() throws {
+    func statsOnAnEmptyLibrary() async throws {
         let scratch = try makeScratch()
         defer { try? FileManager.default.removeItem(at: scratch) }
 
-        let run = try runParola([
+        let run = try await runParola([
             "library", "stats", "--library", scratch.appendingPathComponent("library").path,
         ], timeout: 60)
 

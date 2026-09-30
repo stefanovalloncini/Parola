@@ -4,24 +4,24 @@ import Testing
 
 @Suite("CLI process gating", .serialized, .enabled(if: parolaBinaryURL != nil))
 struct CLIProcessGateTests {
-    private func runParola(_ arguments: [String], plist: String) throws -> (output: String, status: Int32) {
-        let run = try ParolaCoreTests.runParola(arguments, environment: ["PAROLA_MANAGED_PLIST": plist])
+    private func runParola(_ arguments: [String], plist: String) async throws -> (output: String, status: Int32) {
+        let run = try await ParolaCoreTests.runParola(arguments, environment: ["PAROLA_MANAGED_PLIST": plist])
         return (run.output, run.status)
     }
 
     /// The managed dict travels as a plist file: cfprefsd refuses to relay defaults
     /// writes from dev-built processes, so a defaults suite can't cross to the child.
-    private func withManagedPlist(_ dict: [String: Any], body: (String) throws -> Void) throws {
+    private func withManagedPlist(_ dict: [String: Any], body: (String) async throws -> Void) async throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-cli-gate-\(UUID().uuidString).plist")
         try (dict as NSDictionary).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
-        try body(url.path)
+        try await body(url.path)
     }
 
-    @Test func gatedHelpHidesRecordAndMCP() throws {
-        try withManagedPlist(["enabledFeatures": ["batch"]]) { plist in
-            let result = try runParola(["--help"], plist: plist)
+    @Test func gatedHelpHidesRecordAndMCP() async throws {
+        try await withManagedPlist(["enabledFeatures": ["batch"]]) { plist in
+            let result = try await runParola(["--help"], plist: plist)
             let subcommands = result.output.range(of: "SUBCOMMANDS:").map { String(result.output[$0.lowerBound...]) } ?? ""
             #expect(subcommands.contains("transcribe"))
             #expect(!subcommands.contains("record "))
@@ -29,16 +29,16 @@ struct CLIProcessGateTests {
         }
     }
 
-    @Test func gatedYouTubeTranscribeRefusesBeforeDownloading() throws {
-        try withManagedPlist(["enabledFeatures": ["batch"]]) { plist in
-            let result = try runParola(["transcribe", "https://youtu.be/x123"], plist: plist)
+    @Test func gatedYouTubeTranscribeRefusesBeforeDownloading() async throws {
+        try await withManagedPlist(["enabledFeatures": ["batch"]]) { plist in
+            let result = try await runParola(["transcribe", "https://youtu.be/x123"], plist: plist)
             #expect(result.status != 0)
             #expect(result.output.contains("disabled in this deployment"))
             #expect(!result.output.contains("Downloading"))
         }
     }
 
-    @Test func gatedBatchRefusesBeforeTranscribing() throws {
+    @Test func gatedBatchRefusesBeforeTranscribing() async throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-cli-gate-batch-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
@@ -50,8 +50,8 @@ struct CLIProcessGateTests {
         let output = scratch.appendingPathComponent("out", isDirectory: true)
         let library = scratch.appendingPathComponent("library", isDirectory: true)
 
-        try withManagedPlist(["enabledFeatures": ["youtube"]]) { plist in
-            let result = try runParola(
+        try await withManagedPlist(["enabledFeatures": ["youtube"]]) { plist in
+            let result = try await runParola(
                 ["transcribe", first.path, second.path, "--output-dir", output.path, "--library", library.path],
                 plist: plist
             )
@@ -62,9 +62,9 @@ struct CLIProcessGateTests {
         }
     }
 
-    @Test func ungatedHelpKeepsEverything() throws {
-        try withManagedPlist([:]) { plist in
-            let result = try runParola(["--help"], plist: plist)
+    @Test func ungatedHelpKeepsEverything() async throws {
+        try await withManagedPlist([:]) { plist in
+            let result = try await runParola(["--help"], plist: plist)
             #expect(result.output.contains("record"))
             #expect(result.output.contains("mcp"))
         }

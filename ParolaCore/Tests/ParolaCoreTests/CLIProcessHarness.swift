@@ -33,15 +33,16 @@ struct ParolaRun {
 }
 
 /// Spawns the real binary. The two streams land in files rather than pipes so a chatty child can
-/// never fill a pipe buffer while the test is draining the other one. The wait is bounded: a child
-/// that stops exiting on its own (a regressed `record` gate listens on the mic until Ctrl-C) has to
-/// fail the test, not wedge `swift test`.
+/// never fill a pipe buffer while the test is draining the other one. The wait holds no thread and is
+/// bounded: a child that stops exiting on its own (a regressed `record` gate listens on the mic until
+/// Ctrl-C) has to fail the test, not wedge `swift test`.
 func runParola(
     _ arguments: [String],
     environment overrides: [String: String] = [:],
     currentDirectory: URL? = nil,
-    timeout: TimeInterval = 120
-) throws -> ParolaRun {
+    timeout: TimeInterval = 120,
+    sourceLocation: SourceLocation = #_sourceLocation
+) async throws -> ParolaRun {
     let binary = try #require(parolaBinaryURL)
     let scratch = FileManager.default.temporaryDirectory
         .appendingPathComponent("parola-run-\(UUID().uuidString)", isDirectory: true)
@@ -64,35 +65,29 @@ func runParola(
     process.environment = environment
     process.standardOutput = try FileHandle(forWritingTo: outURL)
     process.standardError = try FileHandle(forWritingTo: errURL)
+    let exited = TestSignal()
+    process.terminationHandler = { _ in exited.fire() }
     try process.run()
-    if !waitForExit(process, within: timeout) {
-        Issue.record("`parola \(arguments.joined(separator: " "))` did not exit within \(Int(timeout))s")
+    let command = "`parola \(arguments.joined(separator: " "))`"
+    if await !exited.wait("\(command) to exit", timeout: .seconds(timeout), sourceLocation: sourceLocation) {
         process.terminate()
-        if !waitForExit(process, within: 5) {
+        if await !exited.wait("\(command) to exit after SIGTERM", timeout: .seconds(5), sourceLocation: sourceLocation) {
             kill(process.processIdentifier, SIGKILL)
-            _ = waitForExit(process, within: 5)
+            await exited.wait("\(command) to exit after SIGKILL", timeout: .seconds(5), sourceLocation: sourceLocation)
         }
     }
 
     return ParolaRun(
         stdout: (try? String(contentsOf: outURL, encoding: .utf8)) ?? "",
         stderr: (try? String(contentsOf: errURL, encoding: .utf8)) ?? "",
-        status: process.isRunning ? -1 : process.terminationStatus
+        status: exited.fired ? process.terminationStatus : -1
     )
-}
-
-private func waitForExit(_ process: Process, within seconds: TimeInterval) -> Bool {
-    let deadline = Date().addingTimeInterval(seconds)
-    while process.isRunning, Date() < deadline {
-        Thread.sleep(forTimeInterval: 0.02)
-    }
-    return !process.isRunning
 }
 
 /// `HOME` alone does not move `~/Library/Caches`: `NSHomeDirectory()` reads the password database.
 /// `CFFIXED_USER_HOME` is the override CoreFoundation honors, so the child writes into the temp
 /// home and never touches the real caches directory.
-func withTemporaryHome(_ body: (URL, [String: String]) throws -> Void) throws {
+func withTemporaryHome(_ body: (URL, [String: String]) async throws -> Void) async throws {
     let home = FileManager.default.temporaryDirectory
         .appendingPathComponent("parola-home-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
@@ -100,7 +95,7 @@ func withTemporaryHome(_ body: (URL, [String: String]) throws -> Void) throws {
 
     let managed = home.appendingPathComponent("managed.plist")
     try ([:] as NSDictionary).write(to: managed)
-    try body(home, [
+    try await body(home, [
         "HOME": home.path,
         "CFFIXED_USER_HOME": home.path,
         "PAROLA_MANAGED_PLIST": managed.path,

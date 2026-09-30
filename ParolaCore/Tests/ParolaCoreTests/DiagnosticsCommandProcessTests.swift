@@ -5,9 +5,9 @@ import Testing
 struct DiagnosticsCommandProcessTests {
     private static let header = "Parola Diagnostics —"
 
-    @Test func printsOnlyTheReportPath() throws {
-        try withTemporaryHome { home, environment in
-            let run = try runParola(["diagnostics"], environment: environment, currentDirectory: home)
+    @Test func printsOnlyTheReportPath() async throws {
+        try await withTemporaryHome { home, environment in
+            let run = try await runParola(["diagnostics"], environment: environment, currentDirectory: home)
             #expect(run.status == 0)
 
             let lines = run.stdout.split(separator: "\n", omittingEmptySubsequences: false)
@@ -25,19 +25,19 @@ struct DiagnosticsCommandProcessTests {
         }
     }
 
-    @Test func doesNotInstallItsOwnSink() throws {
-        try withTemporaryHome { home, environment in
+    @Test func doesNotInstallItsOwnSink() async throws {
+        try await withTemporaryHome { home, environment in
             var overrides = environment
             overrides["PAROLA_DIAGNOSTICS"] = "1"
-            let run = try runParola(["diagnostics"], environment: overrides, currentDirectory: home)
+            let run = try await runParola(["diagnostics"], environment: overrides, currentDirectory: home)
             #expect(run.status == 0)
             #expect(diagnosticsFiles(in: home).isEmpty)
         }
     }
 
-    @Test func stdoutPrintsTheReportAndWritesNoFile() throws {
-        try withTemporaryHome { home, environment in
-            let run = try runParola(["diagnostics", "--stdout"], environment: environment, currentDirectory: home)
+    @Test func stdoutPrintsTheReportAndWritesNoFile() async throws {
+        try await withTemporaryHome { home, environment in
+            let run = try await runParola(["diagnostics", "--stdout"], environment: environment, currentDirectory: home)
             #expect(run.status == 0)
             #expect(run.stdout.hasPrefix(Self.header))
 
@@ -46,8 +46,8 @@ struct DiagnosticsCommandProcessTests {
         }
     }
 
-    @Test func clearDeletesTheRecordedDiagnostics() throws {
-        try withTemporaryHome { home, environment in
+    @Test func clearDeletesTheRecordedDiagnostics() async throws {
+        try await withTemporaryHome { home, environment in
             let directory = diagnosticsDirectory(in: home)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let seeded = directory.appendingPathComponent("parola-\(Self.deadProcessID())-1000.jsonl")
@@ -56,7 +56,7 @@ struct DiagnosticsCommandProcessTests {
                 .appending("\n")
                 .write(to: seeded, atomically: true, encoding: .utf8)
 
-            let run = try runParola(
+            let run = try await runParola(
                 ["diagnostics", "--stdout", "--clear"],
                 environment: environment,
                 currentDirectory: home
@@ -68,15 +68,15 @@ struct DiagnosticsCommandProcessTests {
         }
     }
 
-    @Test func clearSparesAFileALiveProcessIsWriting() throws {
-        try withTemporaryHome { home, environment in
+    @Test func clearSparesAFileALiveProcessIsWriting() async throws {
+        try await withTemporaryHome { home, environment in
             let directory = diagnosticsDirectory(in: home)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let live = directory.appendingPathComponent("parola-\(getpid())-1000.jsonl")
             let dead = directory.appendingPathComponent("parola-\(Self.deadProcessID())-1000.jsonl")
             for file in [live, dead] { try "\n".write(to: file, atomically: true, encoding: .utf8) }
 
-            let run = try runParola(
+            let run = try await runParola(
                 ["diagnostics", "--stdout", "--clear"],
                 environment: environment,
                 currentDirectory: home
