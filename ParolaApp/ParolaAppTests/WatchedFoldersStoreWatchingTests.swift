@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import os
 @testable import Parola
 import ParolaCore
 import ParolaTestSupport
@@ -238,8 +239,8 @@ struct WatchedFoldersStoreWatchingTests {
         defer { try? FileManager.default.removeItem(at: scratch) }
         let image = DiskImage(image: scratch.appendingPathComponent("card.dmg"), mountPoint: scratch.appendingPathComponent("Card"))
         try await image.create()
-        try await image.attach()
         do {
+            try await image.attach()
             try await ejectAndMountAgain(image)
         } catch {
             await image.detach()
@@ -451,8 +452,9 @@ private struct DiskImage {
         try await run(["attach", image.path, "-mountpoint", mountPoint.path, "-nobrowse"])
     }
 
+    /// Runs even when the test was cancelled, so a failed or cancelled test never leaves the image mounted.
     func detach() async {
-        try? await run(["detach", mountPoint.path, "-force"])
+        await Task { try? await run(["detach", mountPoint.path, "-force"]) }.value
     }
 
     private struct Failed: Error {
@@ -466,7 +468,11 @@ private struct DiskImage {
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         let (exited, exit) = AsyncStream<Void>.makeStream()
-        process.terminationHandler = { _ in exit.finish() }
+        let hasExited = OSAllocatedUnfairLock(initialState: false)
+        process.terminationHandler = { _ in
+            hasExited.withLock { $0 = true }
+            exit.finish()
+        }
         try process.run()
         let exitedInTime = await awaitGuarded("hdiutil \(arguments[0])", timeout: .seconds(60)) {
             for await _ in exited {}
@@ -474,6 +480,12 @@ private struct DiskImage {
         } ?? false
         guard exitedInTime else {
             process.terminate()
+            // A task of its own, so even a cancelled caller waits for hdiutil to go before its cleanup detaches.
+            _ = await Task {
+                await pollUntil("hdiutil \(arguments[0]) to exit after SIGTERM", timeout: .seconds(5)) {
+                    hasExited.withLock { $0 }
+                }
+            }.value
             throw Failed(status: -1)
         }
         guard process.terminationStatus == 0 else { throw Failed(status: process.terminationStatus) }
