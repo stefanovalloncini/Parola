@@ -1,12 +1,13 @@
 import Darwin
 import Foundation
 
-/// The unit-test host's own defaults suite and library, named after its process.
+/// The unit-test host's own defaults suite, library and models folder, named after its process.
 struct TestHostSandbox: Sendable {
     static let namePrefix = "parola-test-host-"
 
     let defaultsSuite: String
     let library: URL
+    let models: URL
 
     /// Prepared once per process: preparing again would clear the suite the running host reads.
     static let current = prepare(
@@ -27,8 +28,11 @@ struct TestHostSandbox: Sendable {
         let root = temporary.appending(path: name, directoryHint: .isDirectory)
         try? FileManager.default.removeItem(at: root)
         let library = root.appending(path: "Library", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
-        return TestHostSandbox(defaultsSuite: name, library: library)
+        let models = root.appending(path: "Models", directoryHint: .isDirectory)
+        for folder in [library, models] {
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        return TestHostSandbox(defaultsSuite: name, library: library, models: models)
     }
 
     /// Two hosts can run at once, so only what a finished host left behind goes.

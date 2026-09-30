@@ -81,14 +81,14 @@ struct AppBootstrap: @unchecked Sendable {
         )
     }
 
-    /// Every test builds its own AppModel; the host's only has to stay off the user's settings, library and keychain.
+    /// Every test builds its own AppModel; the host's only has to stay off the user's settings, library, models and keychain.
     static func testHost(environment: [String: String]) -> AppBootstrap? {
         guard TestHostSandbox.isTestHost(environment) else { return nil }
         let sandbox = TestHostSandbox.current
-        // No models override: recording tests still take their default model from what is installed.
         return AppBootstrap(
             mode: .test,
             library: sandbox.library,
+            models: sandbox.models,
             defaultsSuite: sandbox.defaultsSuite,
             sideEffects: [],
             filePicker: TestFilePicker(),

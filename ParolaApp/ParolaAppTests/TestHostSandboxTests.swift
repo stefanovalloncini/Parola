@@ -7,7 +7,7 @@ import ParolaCore
 @Suite("The unit-test host runs in a sandbox")
 struct TestHostSandboxTests {
 
-    @Test("the host's defaults, library and keys are its own, never the user's")
+    @Test("the host's defaults, library, models and keys are its own, never the user's")
     func hostIsSandboxed() throws {
         let host = try #require(AppDelegate.launchModel)
         let settingsStore = try #require(ManagedConfiguration.userSettingsStore)
@@ -21,6 +21,9 @@ struct TestHostSandboxTests {
         let library = host.library.libraryURL.standardizedFileURL.path
         #expect(library != LibraryStore.defaultLibraryURL.standardizedFileURL.path)
         #expect(library == TestHostSandbox.current.library.standardizedFileURL.path)
+        let models = ModelStore.shared.directory.standardizedFileURL.path
+        #expect(models != ModelStore.defaultDirectory.standardizedFileURL.path)
+        #expect(models == TestHostSandbox.current.models.standardizedFileURL.path)
         #expect(host.apiKeyStore is InMemoryAPIKeyStore)
     }
 

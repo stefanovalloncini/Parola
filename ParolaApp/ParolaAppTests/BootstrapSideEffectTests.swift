@@ -48,7 +48,7 @@ struct BootstrapSideEffectTests {
         #expect(bootstrap == nil)
     }
 
-    @Test("the unit-test host boots in test mode on its own suite, library and key store, with no side effects")
+    @Test("the unit-test host boots in test mode on its own suite, library, models and key store, with no side effects")
     func testHostGetsItsOwnSandbox() throws {
         let environment = ["XCTestConfigurationFilePath": ""]
         let bootstrap = try #require(AppBootstrap.test(from: ["Parola"], environment: environment))
@@ -60,8 +60,9 @@ struct BootstrapSideEffectTests {
         #expect(bootstrap.defaultsSuite == sandbox.defaultsSuite)
         #expect(sandbox.defaultsSuite.hasPrefix(TestHostSandbox.namePrefix))
         #expect(bootstrap.library == sandbox.library)
-        #expect(bootstrap.models == nil)
+        #expect(bootstrap.models == sandbox.models)
         #expect(sandbox.library.standardizedFileURL.path.hasPrefix(temporary))
+        #expect(sandbox.models.standardizedFileURL.path.hasPrefix(temporary))
         #expect(bootstrap.apiKeyStore is InMemoryAPIKeyStore)
     }
 
