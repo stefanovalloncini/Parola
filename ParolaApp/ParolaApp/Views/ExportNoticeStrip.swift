@@ -94,8 +94,8 @@ struct ExportNoticeStrip: View {
         switch handler {
         case .openEntry: "Open"
         case .transcribeEntry: "Transcribe"
-        case .retryTake: "Retry"
-        case .showTake: "Show"
+        case .retryTake, .retrySavedTake: "Retry"
+        case .showTake, .showSavedTake: "Show"
         }
     }
 }

@@ -120,6 +120,17 @@ extension AppModel {
         case .showTake(let takeID):
             guard recording?.takeID == takeID else { return }
             showStage()
+        case .retrySavedTake(let failure):
+            guard !takeIsRunning else {
+                noteRunWaitsForTake()
+                return
+            }
+            retryTake(failure)
+        case .showSavedTake(let failure):
+            Task { [weak self] in
+                guard let entry = try? await failure.save?.value else { return }
+                self?.openEntryFromLibrary(entry.id, inNewWindow: false)
+            }
         }
     }
 

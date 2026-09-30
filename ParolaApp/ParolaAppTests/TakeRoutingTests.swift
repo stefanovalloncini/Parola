@@ -800,5 +800,60 @@ extension TranscriberMockSuites {
                 model.cancelCurrentWork()
             }
         }
+
+        @Test("an older take that fails while a newer take counts in says so, and its Retry and Show act on what it saved")
+        func olderTakeFailsBehindANewerStage() async throws {
+            let older = try tempWAV("older-failing-take")
+            let fixture = try tempWAV("newer-take-mic-2")
+            defer {
+                try? FileManager.default.removeItem(at: older)
+                try? FileManager.default.removeItem(at: fixture)
+            }
+            try await withMocksCleared([.transcriber, .audioSource]) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine boom"), gate: gate
+                ))
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let model = makeRecordingModel("take-landing-older-fails")
+                model.selectedModel = "openai_whisper-tiny"
+                recordAndStop(model, audio: older, seconds: 2)
+                let transcribing = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                #expect(transcribing)
+                model.recordingCountInSeconds = 3
+                model.startRecording(source: .microphone)
+                let newer = try #require(model.recording?.takeID)
+
+                await gate.open()
+
+                let notice = try #require(await waitForNotice(model))
+                #expect(notice.tone == .failure)
+                #expect(notice.message.hasSuffix("The audio was saved to your library."))
+                #expect(notice.actions.map(\.title) == ["Retry", "Show"])
+                #expect(model.route == .recording)
+                #expect(model.recording?.takeID == newer)
+                let saved = try #require(await landedEntry(model))
+                #expect(saved.title.hasSuffix("(transcription failed)"))
+                model.cancelRecordingCountdown()
+                #expect(model.recording == nil)
+                #expect(model.exportNotice?.id == notice.id, "the notice outlives the newer take's session")
+
+                let show = try #require(notice.actions.last)
+                model.performNoticeAction(show)
+                let shown = await waitUntil { model.selectedEntryID == saved.id }
+                #expect(shown)
+
+                await installMockTranscriber(segments: [(0, 1, "second time lucky")])
+                await model.unloadTranscriptionSession()
+                let retry = try #require(notice.actions.first)
+                model.performNoticeAction(retry)
+                let retried = await waitUntil { model.selectedEntryID == saved.id && model.transcript?.text == "second time lucky" }
+                #expect(retried)
+                await model.awaitLandingSteps()
+                let entries = await model.library.list()
+                #expect(entries.count == 1, "Retry fills in the entry the failure saved")
+                #expect(entries.first?.title.hasSuffix("(transcription failed)") == false)
+            }
+        }
     }
 }

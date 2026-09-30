@@ -3346,6 +3346,10 @@ final class AppModel {
             if let retry { armTakeRetry(retry) }
             return
         }
+        guard recording?.takeID == takeID else {
+            reportReplacedTakeFailure(message, retry: retry)
+            return
+        }
         var failed = false
         updateSession(of: takeID) { session in
             session.fail(message)
@@ -3353,11 +3357,22 @@ final class AppModel {
             session.failure = retry
             failed = true
         }
-        guard failed, !stageIsVisible else { return }
+        guard failed, !stageShows(takeID) else { return }
         var actions = [ExportNotice.Action(title: String(localized: "Show"), handler: .showTake(takeID))]
         if retry != nil {
             actions.insert(ExportNotice.Action(title: String(localized: "Retry"), handler: .retryTake(takeID)), at: 0)
         }
+        exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure, actions: actions)
+    }
+
+    /// A take whose session a newer take has taken over has no Stage to fail on, so its notice carries what its failure saved.
+    private func reportReplacedTakeFailure(_ message: String, retry: RecordingSession.Failure?) {
+        let actions = retry.map {
+            [
+                ExportNotice.Action(title: String(localized: "Retry"), handler: .retrySavedTake($0)),
+                ExportNotice.Action(title: String(localized: "Show"), handler: .showSavedTake($0)),
+            ]
+        } ?? []
         exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure, actions: actions)
     }
 
@@ -4897,7 +4912,7 @@ final class AppModel {
     }
 
     /// Re-runs a failed take's transcription in the entry its failure saved, so no twin appears; from its working file when that save never landed.
-    private func retryTake(_ failure: RecordingSession.Failure) {
+    func retryTake(_ failure: RecordingSession.Failure) {
         let url = failure.audioURL
         Task { [weak self] in
             if let entry = try? await failure.save?.value, let self, (try? await self.openEntry(entry.id)) != nil {
