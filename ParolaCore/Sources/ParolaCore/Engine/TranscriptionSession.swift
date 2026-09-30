@@ -25,6 +25,7 @@ public actor TranscriptionSession {
     private var lastRunID = 0
     private var transcribeWaiters: [CheckedContinuation<Void, Never>] = []
     private var diarizeStep: DiarizeStep?
+    private var readabilityProbe: ReadabilityProbe = { FileAudioSource(url: $0).synchronousDuration() }
 
     /// How long the readability probe waits before the file counts as out of reach.
     private let fileReadDeadline: Duration
@@ -33,6 +34,7 @@ public actor TranscriptionSession {
     private let abandonGrace: Duration
 
     typealias DiarizeStep = @Sendable (Transcript, URL, Int?) async throws -> Transcript
+    typealias ReadabilityProbe = @Sendable (URL) -> Double?
 
     public init(
         modelStore: ModelStore = .shared,
@@ -117,10 +119,8 @@ public actor TranscriptionSession {
         // engine that would park in the same uninterruptible open() with the transcribe slot held.
         // The gate itself can run its full deadline, so a cancel during it arms the same abandon
         // the engine call uses rather than leaving the next run queued behind a stopped one.
-        let probe = await withTaskCancellationHandler {
-            await BoundedFileRead.run(deadline: fileReadDeadline) {
-                FileAudioSource(url: audioURL).synchronousDuration()
-            }
+        let probe = await withTaskCancellationHandler { [readabilityProbe] in
+            await BoundedFileRead.run(deadline: fileReadDeadline) { readabilityProbe(audioURL) }
         } onCancel: {
             Task { await self.abandonIfCancelledRunStalls(runID) }
         }
@@ -214,6 +214,13 @@ public actor TranscriptionSession {
     func useDiarization(_ step: @escaping DiarizeStep) {
         diarizeStep = step
     }
+
+    /// Stands in for the header read that proves a file opens. Internal, like `useDiarization`.
+    func useReadabilityProbe(_ probe: @escaping ReadabilityProbe) {
+        readabilityProbe = probe
+    }
+
+    var queuedRunCount: Int { transcribeWaiters.count }
 
     private func diarize(
         transcript: Transcript,

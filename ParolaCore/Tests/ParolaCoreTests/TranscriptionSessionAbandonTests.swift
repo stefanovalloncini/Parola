@@ -2,36 +2,6 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-// @unchecked is safe: the only state is `opened`/`waiters`, guarded by the lock.
-private final class AbandonGate: @unchecked Sendable {
-    private let lock = NSLock()
-    private var opened = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    func open() {
-        lock.lock()
-        opened = true
-        let due = waiters
-        waiters = []
-        lock.unlock()
-        for waiter in due { waiter.resume() }
-    }
-
-    /// Deliberately not cancellation-aware: it stands in for an engine parked in a blocking read.
-    func wait() async {
-        await withCheckedContinuation { continuation in
-            lock.lock()
-            if opened {
-                lock.unlock()
-                continuation.resume()
-            } else {
-                waiters.append(continuation)
-                lock.unlock()
-            }
-        }
-    }
-}
-
 // @unchecked is safe: the only state is `count`, guarded by the lock.
 private final class Counter: @unchecked Sendable {
     private let lock = NSLock()
@@ -58,13 +28,11 @@ struct TranscriptionSessionAbandonTests {
         static let engineID = EngineID.whisperKit
         static let capabilities = EngineCapabilities.whisperKitDefaults
 
-        private let gate: AbandonGate
-        private let entered: Counter
+        private let gate: UninterruptibleGate
         private var loaded: String?
 
-        fileprivate init(gate: AbandonGate, entered: Counter) {
+        init(gate: UninterruptibleGate) {
             self.gate = gate
-            self.entered = entered
         }
 
         func load(model: String) async throws { loaded = model }
@@ -74,7 +42,6 @@ struct TranscriptionSessionAbandonTests {
         func transcribe(
             url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers
         ) async throws -> Transcript {
-            entered.increment()
             await gate.wait()
             throw CancellationError()
         }
@@ -112,11 +79,10 @@ struct TranscriptionSessionAbandonTests {
         let audioURL = dir.appendingPathComponent("input.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)
 
-        let gate = AbandonGate()
+        let gate = UninterruptibleGate()
         defer { gate.open() }
-        let entered = Counter()
         let handedOut = Counter()
-        let stalling = StallingTranscriber(gate: gate, entered: entered)
+        let stalling = StallingTranscriber(gate: gate)
         let quick = QuickTranscriber()
 
         let registry = EngineRegistry()
@@ -138,16 +104,14 @@ struct TranscriptionSessionAbandonTests {
         let stalled = Task {
             try await session.transcribe(source: FileAudioSource(url: audioURL), options: options)
         }
-        while entered.value == 0 { try await Task.sleep(for: .milliseconds(10)) }
+        await gate.arrivals.wait(atLeast: 1, "the first run to park in the engine")
         stalled.cancel()
 
-        let started = ContinuousClock.now
-        let transcript = try await session.transcribe(
-            source: FileAudioSource(url: audioURL), options: options
-        )
-        let elapsed = started.duration(to: .now)
-        #expect(transcript.segments.first?.text == "second run")
-        #expect(elapsed < .seconds(5), "the next run waited \(elapsed) on the abandoned one")
+        let next = GuardedTask {
+            try await session.transcribe(source: FileAudioSource(url: audioURL), options: options)
+        }
+        let transcript = try await next.value("the next run to take the slot from the abandoned one")
+        #expect(transcript?.segments.first?.text == "second run")
         #expect(handedOut.value == 2, "the abandoned run's transcriber must not be reused")
     }
 }

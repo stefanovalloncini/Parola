@@ -2,67 +2,18 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-private final class Gate: @unchecked Sendable {
-    private let lock = NSLock()
-    private var opened = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    func open() {
-        lock.lock()
-        opened = true
-        let due = waiters
-        waiters = []
-        lock.unlock()
-        for waiter in due { waiter.resume() }
-    }
-
-    func wait() async {
-        await withCheckedContinuation { continuation in
-            lock.lock()
-            if opened {
-                lock.unlock()
-                continuation.resume()
-            } else {
-                waiters.append(continuation)
-                lock.unlock()
-            }
-        }
-    }
-}
-
-private final class LockedBox<Value>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var stored: Value
-
-    init(_ initial: Value) { stored = initial }
-
-    var value: Value {
-        lock.lock()
-        defer { lock.unlock() }
-        return stored
-    }
-
-    func set(_ newValue: Value) {
-        lock.lock()
-        stored = newValue
-        lock.unlock()
-    }
-}
-
 @Suite("Transcription session slot serialization")
 struct TranscriptionSessionSlotTests {
     actor SlotStubTranscriber: Transcriber {
         static let engineID = EngineID.whisperKit
         static let capabilities = EngineCapabilities.whisperKitDefaults
 
-        private let firstLoadGate: Gate?
-        private let transcribeGate: Gate?
-        fileprivate let firstLoadEntered = LockedBox(false)
-        fileprivate let transcribeEntered = LockedBox(false)
+        private let firstLoadGate: UninterruptibleGate?
+        private let transcribeGate: UninterruptibleGate?
         private var loaded: String?
         private var loadCalls = 0
 
-        fileprivate init(firstLoadGate: Gate? = nil, transcribeGate: Gate? = nil) {
+        init(firstLoadGate: UninterruptibleGate? = nil, transcribeGate: UninterruptibleGate? = nil) {
             self.firstLoadGate = firstLoadGate
             self.transcribeGate = transcribeGate
         }
@@ -70,7 +21,6 @@ struct TranscriptionSessionSlotTests {
         func load(model: String) async throws {
             loadCalls += 1
             if loadCalls == 1, let firstLoadGate {
-                firstLoadEntered.set(true)
                 await firstLoadGate.wait()
             }
             loaded = model
@@ -80,7 +30,6 @@ struct TranscriptionSessionSlotTests {
         func loadedModelName() async -> String? { loaded }
 
         func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
-            transcribeEntered.set(true)
             if let transcribeGate {
                 await transcribeGate.wait()
             }
@@ -128,29 +77,30 @@ struct TranscriptionSessionSlotTests {
 
     @Test("a prewarm overlapping a transcribe leaves no idle timers armed while the run is in flight")
     func prewarmDoesNotArmTimersMidRun() async throws {
-        let loadGate = Gate()
-        let transcribeGate = Gate()
+        let loadGate = UninterruptibleGate()
+        let transcribeGate = UninterruptibleGate()
+        defer {
+            loadGate.open()
+            transcribeGate.open()
+        }
         let stub = SlotStubTranscriber(firstLoadGate: loadGate, transcribeGate: transcribeGate)
         let clock = TestClock()
         let (session, audioURL) = try await makeSession(clock: clock, transcriber: stub)
 
-        let prewarmTask = Task { await session.prewarm(modelName: "openai_whisper-tiny") }
-        let prewarmLoading = await poll { stub.firstLoadEntered.value }
-        #expect(prewarmLoading, "prewarm should reach the gated model load")
+        let prewarm = GuardedTask { await session.prewarm(modelName: "openai_whisper-tiny") }
+        await loadGate.arrivals.wait(atLeast: 1, "the prewarm to reach the gated model load")
 
-        let transcribeTask = Task {
+        let run = GuardedTask {
             try await session.transcribe(
                 source: FileAudioSource(url: audioURL),
                 options: TranscriptionOptions(model: "openai_whisper-tiny")
             )
         }
-        try? await Task.sleep(for: .milliseconds(100))
+        await pollUntil("the transcribe to queue behind the prewarm") { await session.queuedRunCount == 1 }
 
         loadGate.open()
-        await prewarmTask.value
-
-        let runStarted = await poll { stub.transcribeEntered.value }
-        #expect(runStarted, "the transcribe should reach the engine after prewarm completes")
+        _ = try await prewarm.value("the prewarm to finish once its load is let through")
+        await transcribeGate.arrivals.wait(atLeast: 1, "the transcribe to reach the engine after the prewarm")
 
         let timersQuiescent = await poll(budget: .seconds(2)) {
             guard clock.sleeperCount == 0 else { return false }
@@ -163,47 +113,34 @@ struct TranscriptionSessionSlotTests {
         )
 
         transcribeGate.open()
-        _ = try await transcribeTask.value
+        _ = try await run.value("the transcribe to finish once the engine is let through")
     }
 
     @Test("cancelling a transcribe queued behind a running one returns promptly")
     func cancellingQueuedTranscribeReturnsPromptly() async throws {
-        let transcribeGate = Gate()
+        let transcribeGate = UninterruptibleGate()
+        defer { transcribeGate.open() }
         let stub = SlotStubTranscriber(transcribeGate: transcribeGate)
         let clock = TestClock()
         let (session, audioURL) = try await makeSession(clock: clock, transcriber: stub)
         let options = TranscriptionOptions(model: "openai_whisper-tiny")
 
-        let runningTask = Task {
+        let running = GuardedTask {
             try await session.transcribe(source: FileAudioSource(url: audioURL), options: options)
         }
-        let runStarted = await poll { stub.transcribeEntered.value }
-        #expect(runStarted, "the first transcribe should reach the gated engine call")
+        await transcribeGate.arrivals.wait(atLeast: 1, "the first transcribe to reach the gated engine call")
 
-        let queuedOutcome = LockedBox<Result<Transcript, any Error>?>(nil)
-        let queuedTask = Task {
-            do {
-                let transcript = try await session.transcribe(
-                    source: FileAudioSource(url: audioURL),
-                    options: options
-                )
-                queuedOutcome.set(.success(transcript))
-            } catch {
-                queuedOutcome.set(.failure(error))
-            }
+        let queued = GuardedTask {
+            try await session.transcribe(source: FileAudioSource(url: audioURL), options: options)
         }
-        try? await Task.sleep(for: .milliseconds(100))
+        await pollUntil("the second transcribe to queue behind the running one") { await session.queuedRunCount == 1 }
 
-        queuedTask.cancel()
-        let returned = await poll(budget: .seconds(2)) { queuedOutcome.value != nil }
-        #expect(returned, "a cancelled queued transcribe must not stay suspended behind the running one")
-        if case .failure(let error)? = queuedOutcome.value {
-            #expect(error is CancellationError, "expected CancellationError, got \(error)")
-        } else if returned {
-            Issue.record("cancelled queued transcribe unexpectedly succeeded")
+        queued.cancel()
+        await #expect(throws: CancellationError.self) {
+            _ = try await queued.value("the cancelled transcribe to return while the running one holds the slot")
         }
 
         transcribeGate.open()
-        _ = try await runningTask.value
+        _ = try await running.value("the running transcribe to finish once the engine is let through")
     }
 }

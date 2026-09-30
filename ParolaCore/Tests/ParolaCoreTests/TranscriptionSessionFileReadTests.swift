@@ -98,28 +98,25 @@ struct TranscriptionSessionFileReadTests {
         let options = TranscriptionOptions(model: "openai_whisper-tiny")
 
         await FIFOFixture.holding(wedged) {
+            let run = GuardedTask {
+                try await session.transcribe(source: FileAudioSource(url: wedged), options: options)
+            }
             do {
-                _ = try await session.transcribe(source: FileAudioSource(url: wedged), options: options)
-                Issue.record("a run on a file that never opens should fail")
-            } catch let error as ParolaError {
-                guard case .fileReadTimedOut(let name) = error else {
-                    Issue.record("expected fileReadTimedOut, got \(error)")
-                    return
+                if try await run.value("the run on a file that never opens to give up") != nil {
+                    Issue.record("a run on a file that never opens should fail")
                 }
+            } catch ParolaError.fileReadTimedOut(let name) {
                 #expect(name == "wedged.wav")
             } catch {
                 Issue.record("expected fileReadTimedOut, got \(error)")
-                return
             }
         }
 
-        let started = ContinuousClock.now
-        let transcript = try await session.transcribe(
-            source: FileAudioSource(url: readable), options: options
-        )
-        let elapsed = started.duration(to: .now)
-        #expect(transcript.segments.count == 1)
-        #expect(elapsed < .seconds(5), "the next run waited \(elapsed) behind the wedged one")
+        let next = GuardedTask {
+            try await session.transcribe(source: FileAudioSource(url: readable), options: options)
+        }
+        let transcript = try await next.value("the next run to start once the wedged one gave up")
+        #expect(transcript?.segments.count == 1)
     }
 
     @Test("cancelling inside the gate hands the slot over without waiting out the deadline")
@@ -130,30 +127,35 @@ struct TranscriptionSessionFileReadTests {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         let wedged = dir.appendingPathComponent("wedged.wav")
-        #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
+        try Data("RIFFstub".utf8).write(to: wedged)
         let readable = dir.appendingPathComponent("readable.wav")
         try Data("RIFFstub".utf8).write(to: readable)
 
         let session = try await makeSession(
-            in: dir, fileReadDeadline: .seconds(60), abandonGrace: .milliseconds(200)
+            in: dir, fileReadDeadline: .seconds(3600), abandonGrace: .milliseconds(200)
         )
+        let inGate = TestSignal()
+        let unpark = DispatchSemaphore(value: 0)
+        defer { unpark.signal() }
+        await session.useReadabilityProbe { url in
+            guard url.lastPathComponent == "wedged.wav" else { return FileAudioSource(url: url).synchronousDuration() }
+            inGate.fire()
+            unpark.wait()
+            return nil
+        }
         let options = TranscriptionOptions(model: "openai_whisper-tiny")
 
-        try await FIFOFixture.holding(wedged) {
-            let cancelled = Task {
-                try await session.transcribe(source: FileAudioSource(url: wedged), options: options)
-            }
-            try await Task.sleep(for: .milliseconds(300))
-            cancelled.cancel()
+        let cancelled = Task {
+            try await session.transcribe(source: FileAudioSource(url: wedged), options: options)
         }
+        await inGate.wait("the run to park inside the readability gate")
+        cancelled.cancel()
 
-        let started = ContinuousClock.now
-        let transcript = try await session.transcribe(
-            source: FileAudioSource(url: readable), options: options
-        )
-        let elapsed = started.duration(to: .now)
-        #expect(transcript.segments.count == 1)
-        #expect(elapsed < .seconds(10), "the next run waited \(elapsed) on a cancelled gate")
+        let next = GuardedTask {
+            try await session.transcribe(source: FileAudioSource(url: readable), options: options)
+        }
+        let transcript = try await next.value("the next run to take the slot while the cancelled one is parked")
+        #expect(transcript?.segments.count == 1)
     }
 
     @Test("a file that stops reading after the gate skips the energy pass instead of parking")
@@ -167,16 +169,15 @@ struct TranscriptionSessionFileReadTests {
         try Data("RIFFstub".utf8).write(to: audioURL)
 
         let session = try await makeSession(in: dir, transcriber: SwapsTheFileForAFifo())
-        var elapsed = Duration.zero
         let transcript = try await FIFOFixture.holding(audioURL) {
-            let started = ContinuousClock.now
-            defer { elapsed = started.duration(to: .now) }
-            return try await session.transcribe(
-                source: FileAudioSource(url: audioURL),
-                options: TranscriptionOptions(model: "openai_whisper-tiny")
-            )
+            let run = GuardedTask {
+                try await session.transcribe(
+                    source: FileAudioSource(url: audioURL),
+                    options: TranscriptionOptions(model: "openai_whisper-tiny")
+                )
+            }
+            return try await run.value("the run to finish while its file no longer reads")
         }
-        #expect(transcript.segments.count == 1)
-        #expect(elapsed < .seconds(10), "the run took \(elapsed); the energy probe was not bounded")
+        #expect(transcript?.segments.count == 1)
     }
 }
