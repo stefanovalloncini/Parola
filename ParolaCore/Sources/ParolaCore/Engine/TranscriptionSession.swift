@@ -121,7 +121,7 @@ public actor TranscriptionSession {
             [.model: .safe(ModelToken(modelName))]
         )
 
-        if !modelStore.isInstalled(modelName) {
+        if await needsDownload(modelName, engineID: engineID) {
             _ = try await modelStore.download(
                 variant: modelName, progress: downloadProgress, registry: registry
             )
@@ -483,9 +483,15 @@ public actor TranscriptionSession {
     }
 
     /// The model a `transcribe` with these options would run, and whether it has to be fetched first.
-    public func modelPlan(for options: TranscriptionOptions) -> (model: String, needsDownload: Bool) {
+    public func modelPlan(for options: TranscriptionOptions) async -> (model: String, needsDownload: Bool) {
         let model = options.model ?? defaultModelName(for: options)
-        return (model, !modelStore.isInstalled(model))
+        let engineID = ModelCatalog.variant(id: model)?.engineID ?? .whisperKit
+        return (model, await needsDownload(model, engineID: engineID))
+    }
+
+    private func needsDownload(_ modelName: String, engineID: EngineID) async -> Bool {
+        guard !modelStore.isInstalled(modelName) else { return false }
+        return await !registry.servesMock(for: engineID)
     }
 
     private func scheduleIdleUnload() {

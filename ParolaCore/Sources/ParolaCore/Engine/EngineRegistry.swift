@@ -18,9 +18,15 @@ public actor EngineRegistry {
 
     private var entries: [EngineID: Entry] = [:]
     private let clock: any Clock<Duration>
+    private let mocks: MockTranscriberRegistry
 
     public init(clock: any Clock<Duration> = ContinuousClock()) {
+        self.init(clock: clock, mocks: .shared)
+    }
+
+    init(clock: any Clock<Duration> = ContinuousClock(), mocks: MockTranscriberRegistry) {
         self.clock = clock
+        self.mocks = mocks
     }
 
     public func register(
@@ -42,8 +48,13 @@ public actor EngineRegistry {
         entries.removeAll()
     }
 
+    /// True when an installed mock answers for the engine, so its models never need to be on disk.
+    public func servesMock(for engineID: EngineID) async -> Bool {
+        await mocks.resolve(for: engineID) != nil
+    }
+
     public func transcriber(for engineID: EngineID, store: ModelStore) async throws -> any Transcriber {
-        if let mock = await MockTranscriberRegistry.shared.resolve(for: engineID) {
+        if let mock = await mocks.resolve(for: engineID) {
             return MockTranscriber.make(response: mock, clock: clock)
         }
         guard let entry = entries[engineID] else {
