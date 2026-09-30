@@ -84,6 +84,7 @@ struct LinkPasteInstaller: NSViewRepresentable {
     private final class InstallingView: NSView {
         /// AppKit doesn't retain a next responder, so the view holds the one it puts in the chain.
         private let responder: LinkPasteResponder
+        private var keyObserver: (any NSObjectProtocol)?
 
         init(responder: LinkPasteResponder) {
             self.responder = responder
@@ -93,14 +94,36 @@ struct LinkPasteInstaller: NSViewRepresentable {
         @available(*, unavailable)
         required init?(coder: NSCoder) { fatalError("not used") }
 
+        isolated deinit {
+            if let keyObserver { NotificationCenter.default.removeObserver(keyObserver) }
+        }
+
         override func viewWillMove(toWindow newWindow: NSWindow?) {
             super.viewWillMove(toWindow: newWindow)
-            if let window, window !== newWindow { responder.detach(from: window) }
+            guard let window, window !== newWindow else { return }
+            stopWatching()
+            responder.detach(from: window)
         }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if let window { responder.attach(to: window) }
+            guard let window else { return }
+            responder.attach(to: window)
+            stopWatching()
+            // Whatever sets the window's next responder drops this one; becoming key puts it back before ⌘V needs it.
+            keyObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main
+            ) { [weak self, weak window] _ in
+                MainActor.assumeIsolated {
+                    guard let self, let window else { return }
+                    self.responder.attach(to: window)
+                }
+            }
+        }
+
+        private func stopWatching() {
+            if let keyObserver { NotificationCenter.default.removeObserver(keyObserver) }
+            keyObserver = nil
         }
     }
 }

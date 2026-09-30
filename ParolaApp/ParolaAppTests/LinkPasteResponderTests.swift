@@ -26,6 +26,16 @@ private final class CountingProvider: NSObject, NSPasteboardItemDataProvider {
 struct LinkPasteResponderTests {
     private let paste = #selector(NSText.paste(_:))
 
+    private func chain(from window: NSWindow) -> [NSResponder] {
+        var responders: [NSResponder] = []
+        var responder = window.nextResponder
+        while let current = responder {
+            responders.append(current)
+            responder = current.nextResponder
+        }
+        return responders
+    }
+
     private func withPasteboard(_ body: (NSPasteboard) throws -> Void) rethrows {
         let pasteboard = NSPasteboard(name: NSPasteboard.Name("LinkPasteResponderTests-\(UUID().uuidString)"))
         defer { pasteboard.releaseGlobally() }
@@ -186,6 +196,40 @@ struct LinkPasteResponderTests {
             #expect(fieldFocused)
             #expect(pasteTarget(in: window) is NSText)
         }
+    }
+
+    @Test("the app's own main window, the one its window group opens, carries the link paste")
+    func appMainWindowCarriesIt() async throws {
+        let opened = await waitUntil { AppDelegate.launchModel?.mainWindow != nil }
+        #expect(opened)
+        let window = try #require(AppDelegate.launchModel?.mainWindow)
+        let spliced = await waitUntil { chain(from: window).contains { $0 is LinkPasteResponder } }
+        #expect(spliced, "\(chain(from: window).map { String(describing: type(of: $0)) })")
+    }
+
+    @Test("becoming key puts the link paste back after something else takes the window's next responder")
+    func repairsOnBecomingKey() async throws {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("LinkPasteResponderTests-\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        let model = makeModel(pasteboard: pasteboard)
+        let (window, controller) = hostWindow(Color.clear.background(LinkPasteInstaller(model: model)))
+        defer { withExtendedLifetime(controller) { window.close() } }
+        let responder = try #require(window.nextResponder as? LinkPasteResponder)
+
+        window.nextResponder = controller
+        #expect(!chain(from: window).contains(responder))
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+        let repaired = await waitUntil { window.nextResponder === responder }
+        #expect(repaired)
+        #expect(responder.nextResponder === controller)
+
+        let replacement = NSWindowController(window: window)
+        defer { withExtendedLifetime(replacement) {} }
+        #expect(window.nextResponder === replacement, "a new window controller takes the slot")
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+        let repairedAgain = await waitUntil { window.nextResponder === responder }
+        #expect(repairedAgain)
+        #expect(responder.nextResponder === replacement)
     }
 
     @Test("the link paste leaves the window's chain with the content that put it there")
