@@ -14078,6 +14078,17 @@
         }
       }
     },
+    "The recording ended without a transcript.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La registrazione è terminata senza una trascrizione."
+          }
+        }
+      }
+    },
     "The recording stays in your library.": {
       "extractionState": "manual",
       "localizations": {

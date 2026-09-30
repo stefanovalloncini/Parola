@@ -3819,7 +3819,7 @@ final class AppModel {
             updateSession(of: take?.id) { $0.finish(at: Date()) }
             trackTakeWork { [weak self] in
                 await self?.finishStreamingTake(s, take: take)
-                self?.resolveRecordingOutcome(.failure(IntentActionError.failed("The recording ended without a transcript.")))
+                self?.resolveRecordingOutcome(.failure(IntentActionError.failed(Self.streamEndedWithoutTranscriptMessage())))
             }
             return
         }
@@ -3890,7 +3890,7 @@ final class AppModel {
         await consumer?.value
         if streamingConsumer == consumer { streamingConsumer = nil }
         // A no-op when .finished already ended the take; it covers a stream that ends without one.
-        updateSession(of: take?.id) { if $0.isRunning { $0.land(entryID: nil) } }
+        updateSession(of: take?.id) { if $0.isRunning { $0.fail(Self.streamEndedWithoutTranscriptMessage()) } }
         endLiveTake(take)
     }
 
@@ -3954,6 +3954,10 @@ final class AppModel {
             return String(localized: "Nothing was recorded — the model was still loading.", bundle: bundle)
         }
         return String(localized: "Nothing was recorded.", bundle: bundle)
+    }
+
+    nonisolated static func streamEndedWithoutTranscriptMessage(bundle: Bundle = .main) -> String {
+        String(localized: "The recording ended without a transcript.", bundle: bundle)
     }
 
     /// Transcribes a finished take from its working file, retiring the checkpoint it replaces; a failure or a stop still saves it.
