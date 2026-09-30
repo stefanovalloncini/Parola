@@ -163,19 +163,41 @@ public final class ModelStore: Sendable {
     }
 
     /// Directories an earlier release installed a variant into, whether or not they still exist.
-    private func supersededURLs(for source: ModelDownloadSource) -> [URL] {
-        source.supersededInstallDirectories.map {
-            modelsDirectory
-                .appendingPathComponent("models", isDirectory: true)
-                .appendingPathComponent($0, isDirectory: true)
-        }
+    /// Any that overlaps a folder in use is dropped, since an engine update can rename its folder.
+    private func supersededURLs(
+        for source: ModelDownloadSource,
+        among catalog: [ModelVariant] = ModelCatalog.all
+    ) -> [URL] {
+        let liveURLs = catalog.map { installedURL(for: $0.downloadSource) }
+            + [installedURL(for: source)]
+            + serviceOwnedDirectories
+        let livePaths = liveURLs.map(Self.comparablePath)
+        return source.supersededInstallDirectories
+            .map {
+                modelsDirectory
+                    .appendingPathComponent("models", isDirectory: true)
+                    .appendingPathComponent($0, isDirectory: true)
+            }
+            .filter { url in
+                let path = Self.comparablePath(url)
+                return !livePaths.contains { $0 == path || $0.hasPrefix(path + "/") || path.hasPrefix($0 + "/") }
+            }
+    }
+
+    /// Lowercased because the default APFS volume ignores case, so two spellings can name one folder.
+    private static func comparablePath(_ url: URL) -> String {
+        url.standardizedFileURL.path.lowercased()
     }
 
     /// Leftover weights from a variant that has since moved to another folder, so a caller can
     /// show what an upgrade orphaned. Only directories that still hold weights are listed.
     public func supersededInstalls() -> [SupersededInstall] {
-        ModelCatalog.all.flatMap { variant in
-            supersededURLs(for: variant.downloadSource)
+        supersededInstalls(among: ModelCatalog.all)
+    }
+
+    func supersededInstalls(among catalog: [ModelVariant]) -> [SupersededInstall] {
+        catalog.flatMap { variant in
+            supersededURLs(for: variant.downloadSource, among: catalog)
                 .filter { url in
                     guard let entries = try? FileManager.default.contentsOfDirectory(
                         at: url, includingPropertiesForKeys: [.isDirectoryKey]
@@ -664,7 +686,12 @@ public final class ModelStore: Sendable {
     /// Removes the directories an earlier release installed a variant into, leaving the current
     /// install in place.
     public func deleteLeftovers(variant: String) throws {
-        let superseded = ModelCatalog.variant(id: variant).map { supersededURLs(for: $0.downloadSource) } ?? []
+        try deleteLeftovers(variant: variant, among: ModelCatalog.all)
+    }
+
+    func deleteLeftovers(variant: String, among catalog: [ModelVariant]) throws {
+        let superseded = catalog.first { $0.id == variant }
+            .map { supersededURLs(for: $0.downloadSource, among: catalog) } ?? []
         try remove(superseded, describedBy: variant)
     }
 

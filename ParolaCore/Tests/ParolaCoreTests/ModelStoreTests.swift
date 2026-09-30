@@ -409,6 +409,72 @@ struct ModelStoreTests {
         #expect(FileManager.default.fileExists(atPath: current.path))
     }
 
+    @Test("every earlier-download folder the catalog names is offered, and none of them is a live install")
+    func supersededFoldersAreDisjointFromLiveInstalls() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let models = tmp.appendingPathComponent("models", isDirectory: true)
+        let supersededDirectories = ModelCatalog.all.flatMap(\.downloadSource.supersededInstallDirectories)
+        let liveURLs = ModelCatalog.all.map { store.installedURL(for: $0.id) }
+        for folder in supersededDirectories.map({ models.appendingPathComponent($0, isDirectory: true) }) + liveURLs {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data("w".utf8).write(to: folder.appendingPathComponent("weights.bin"))
+        }
+
+        let offered = Set(store.supersededInstalls().map(\.url.standardizedFileURL.path))
+        #expect(!supersededDirectories.isEmpty)
+        #expect(offered.count == supersededDirectories.count)
+        #expect(offered.isDisjoint(with: liveURLs.map(\.standardizedFileURL.path)))
+    }
+
+    @Test(
+        "a folder that is, holds or sits inside a live install is never offered as an earlier download",
+        arguments: [
+            "FluidInference/synthetic-coreml",
+            "fluidinference/Synthetic-CoreML",
+            "FluidInference",
+            "FluidInference/synthetic-coreml/Encoder.mlmodelc",
+        ]
+    )
+    func supersededFolderOverlappingTheLiveOneIsNotOffered(superseded: String) throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let synthetic = ModelVariant(
+            id: "synthetic-parakeet",
+            displayName: "Synthetic Parakeet",
+            tagline: "",
+            engineID: .parakeet,
+            sizeBytes: 1,
+            downloadSource: ModelDownloadSource(
+                huggingFaceRepo: "FluidInference/synthetic-coreml",
+                subpath: "",
+                installDirectory: "FluidInference/synthetic-coreml",
+                supersededInstallDirectories: [superseded]
+            ),
+            category: .fastest,
+            speedTier: .fastest,
+            qualityTier: .good
+        )
+        let store = ModelStore(modelsDirectory: tmp)
+        let live = store.installedURL(for: synthetic.downloadSource)
+        let encoder = live.appendingPathComponent("Encoder.mlmodelc", isDirectory: true)
+        try FileManager.default.createDirectory(at: encoder, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: encoder.appendingPathComponent("weights.bin"))
+
+        #expect(store.supersededInstalls(among: [synthetic]).isEmpty)
+        #expect(throws: ParolaError.self) {
+            try store.deleteLeftovers(variant: synthetic.id, among: [synthetic])
+        }
+        #expect(FileManager.default.fileExists(atPath: encoder.appendingPathComponent("weights.bin").path))
+    }
+
     @Test("a checkpoint whose config disagrees with the catalog reads as needing a download")
     func mismatchedCheckpointIsNotInstalled() throws {
         let tmp = FileManager.default.temporaryDirectory
