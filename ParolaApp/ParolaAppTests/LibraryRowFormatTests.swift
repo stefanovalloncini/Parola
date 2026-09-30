@@ -74,6 +74,17 @@ struct LibraryRowFormatTests {
             .hasPrefix("Yesterday"))
     }
 
+    @Test("a short time drops the leading zero a 24-hour region's hour field would add")
+    func shortTimesHaveNoLeadingZero() {
+        let englishInItaly = Locale(identifier: "en_US@rg=itzzzz")
+        let morning = date(2026, 9, 30, 9, 31)
+        #expect(LibraryRowFormat.when(morning, under: .today, now: now, calendar: calendar, locale: englishInItaly) == "9:31")
+        #expect(LibraryRowFormat.when(morning, under: nil, now: now, calendar: calendar, locale: englishInItaly) == "Today 9:31")
+        let yesterday = date(2026, 9, 29, 9, 31)
+        #expect(LibraryRowFormat.when(yesterday, under: .yesterday, now: now, calendar: calendar, locale: englishInItaly) == "9:31")
+        #expect(LibraryRowFormat.when(yesterday, under: nil, now: now, calendar: calendar, locale: englishInItaly) == "Yesterday 9:31")
+    }
+
     @Test("under a month header a row gives its day, and the year only when it isn't this one")
     func whenUnderMonths() {
         let august = date(2026, 8, 20)

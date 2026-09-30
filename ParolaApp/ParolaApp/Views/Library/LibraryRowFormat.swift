@@ -32,7 +32,7 @@ enum LibraryRowFormat {
         let resolved = bucket ?? edges.bucket(for: date)
         switch resolved {
         case .today, .yesterday:
-            let time = date.formatted(style(.dateTime.hour().minute(), calendar: calendar, locale: locale))
+            let time = date.formatted(style(Date.FormatStyle(date: .omitted, time: .shortened), calendar: calendar, locale: locale))
             guard bucket == nil else { return time }
             return resolved == .today
                 ? String(localized: "Today \(time)", locale: locale)
