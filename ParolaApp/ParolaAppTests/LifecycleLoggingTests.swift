@@ -53,7 +53,8 @@ struct LifecycleLoggingTests {
                 features: []
             )
 
-            let record = try #require(sink.records.first { $0.category == .appLifecycle })
+            let lifecycleRecord = sink.records.first { $0.category == .appLifecycle }
+            let record = try #require(lifecycleRecord)
             #expect(record.message.rendered == "side effects none, features none")
             withExtendedLifetime(model) {}
         }

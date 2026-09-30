@@ -68,7 +68,8 @@ struct PermissionLoggingTests {
 
             permissions.refresh()
             permissions.refresh()
-            #expect(sink.records.filter { $0.category == .appPermissions }.isEmpty)
+            let permissionRecords = sink.records.filter { $0.category == .appPermissions }
+            #expect(permissionRecords.isEmpty)
 
             trusted.value = true
             microphone.value = .denied

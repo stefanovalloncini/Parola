@@ -168,8 +168,10 @@ extension TranscriberMockSuites {
 
                 #expect(Array(phases.names.prefix(2)) == ["idle", "fetchingLink"], "\(phases.names)")
                 #expect(phases.names.last == "ready")
-                #expect(phases.names.filter { $0 == "fetchingLink" }.count == 1)
-                #expect(phases.names.dropFirst(2).first.map { ["loadingModel", "downloadingModel", "transcribing"].contains($0) } == true)
+                let fetchingLinkCount = phases.names.filter { $0 == "fetchingLink" }.count
+                #expect(fetchingLinkCount == 1)
+                let thirdPhaseIsLoading = phases.names.dropFirst(2).first.map { ["loadingModel", "downloadingModel", "transcribing"].contains($0) }
+                #expect(thirdPhaseIsLoading == true)
                 #expect(model.sourceFileURL == fixture)
                 #expect(model.transcript?.sourceURL == Self.page)
                 #expect(entry.manifest.source == .web)
@@ -381,7 +383,8 @@ extension TranscriberMockSuites {
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: Self.words)
                 let fetcher = ScriptedLinkFetcher(fixture: fixture, owned: true)
                 let model = makeModel(fetcher: fetcher)
-                let srt = try #require(model.exportPresets.first { $0.spec.format == .srt })
+                let srtPreset = model.exportPresets.first { $0.spec.format == .srt }
+                let srt = try #require(srtPreset)
                 model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [srt.id])]
                 let libraryURL = model.library.libraryURL
                 try FileManager.default.removeItem(at: libraryURL)
@@ -533,7 +536,8 @@ extension TranscriberMockSuites {
             try await withMocksCleared([.transcriber]) {
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: Self.words)
                 let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture))
-                let srt = try #require(model.exportPresets.first { $0.spec.format == .srt })
+                let srtPreset = model.exportPresets.first { $0.spec.format == .srt }
+                let srt = try #require(srtPreset)
                 model.autoExportRules = [AutoExportRule(sourceExtensions: [], presetIDs: [srt.id])]
                 let chosen = try makeExportFolder()
                 defer { try? FileManager.default.removeItem(at: chosen) }

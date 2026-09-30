@@ -165,7 +165,8 @@ struct StatisticsViewTests {
         try withIsolatedDefaults { defaults in
             let model = makeModel(defaults, entries: [])
             let server = try ParolaAutomationServer(model: model)
-            let command = try #require(server.settingsCommands().first { $0.name == "setRoute" })
+            let setRouteCommand = server.settingsCommands().first { $0.name == "setRoute" }
+            let command = try #require(setRouteCommand)
             withExtendedLifetime(server) {}
 
             guard case .string(let options) = command.args.first(where: { $0.name == "route" })?.kind else {

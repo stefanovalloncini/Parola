@@ -76,7 +76,8 @@ struct DictationInsertionLoggingTests {
         try await withSink { sink in
             let inserter = KeystrokeTextInserter(trustCheck: { true }, pasteboardName: pasteboardName)
             try await inserter.insert("")
-            #expect(sink.records.filter { $0.category == .appPermissions }.isEmpty)
+            let permissionRecords = sink.records.filter { $0.category == .appPermissions }
+            #expect(permissionRecords.isEmpty)
         }
     }
 }

@@ -127,7 +127,8 @@ extension TranscriberMockSuites {
                 #expect(watchedLaneIsIdleWait)
                 await model.awaitLandingSteps()
                 let entries = await model.library.list()
-                let landed = try #require(entries.first { $0.id != own.id })
+                let landedEntry = entries.first { $0.id != own.id }
+                let landed = try #require(landedEntry)
                 #expect(model.player === player)
                 #expect(model.isPlaying)
                 #expect(model.currentTimeSeconds == 12.5)
@@ -225,7 +226,8 @@ extension TranscriberMockSuites {
                 let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle }
                 #expect(watchedLaneIsIdleWait)
                 await model.awaitLandingSteps()
-                let landed = try #require(await model.library.list().first { $0.id != own.id })
+                let landedEntry = await model.library.list().first { $0.id != own.id }
+                let landed = try #require(landedEntry)
                 #expect(model.selectedEntryID == own.id)
                 #expect(model.transcript?.segments.first?.text == "my own notes")
                 #expect(model.player === player)
@@ -284,15 +286,16 @@ extension TranscriberMockSuites {
 
                 let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle }
                 #expect(watchedLaneIsIdleWait)
-                let libraryWait = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 5 }
-                #expect(libraryWait)
+                let libraryHasFive = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 5 }
+                #expect(libraryHasFive)
                 await model.awaitLandingSteps()
                 await model.awaitCardMetadataQueue()
-                let rigWait = await waitUntil(timeoutMs: 10_000) { await rig.recorder.recorded().count == 5 }
-                #expect(rigWait)
+                let rigRecordedFive = await waitUntil(timeoutMs: 10_000) { await rig.recorder.recorded().count == 5 }
+                #expect(rigRecordedFive)
                 let sidecars = try FileManager.default.contentsOfDirectory(atPath: rig.folder.path)
                     .filter { $0.hasSuffix(".txt") }
-                #expect(Set(sidecars) == Set(files.map { $0.deletingPathExtension().lastPathComponent + ".txt" }))
+                let expectedSidecars = Set(files.map { $0.deletingPathExtension().lastPathComponent + ".txt" })
+                #expect(Set(sidecars) == expectedSidecars)
                 #expect(await rig.tally.cards == 5)
                 #expect(model.batchJobs.isEmpty)
                 #expect(model.route == .transcript)
@@ -352,8 +355,8 @@ extension TranscriberMockSuites {
 
                 let watchedLaneIsIdleWait = await waitUntil(timeoutMs: 20_000) { model.watchedLaneIsIdle && model.fileTranscribeTask == nil }
                 #expect(watchedLaneIsIdleWait)
-                let libraryWait = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 3 }
-                #expect(libraryWait)
+                let libraryHasThree = await waitUntil(timeoutMs: 10_000) { await model.library.list().count == 3 }
+                #expect(libraryHasThree)
                 let titles = Set(await model.library.list().filter { $0.id != own.id }.map(LibraryEntryDisplay.title(for:)))
                 #expect(titles == ["Arrived", "Opened"])
             }
