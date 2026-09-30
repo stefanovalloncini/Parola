@@ -110,7 +110,8 @@ struct EntryDurationTests {
         let short = try await seedEntry(in: model, mediaSeconds: 1, transcriptDuration: 1, text: "short take")
 
         #expect(await openEntry(long.id, in: model))
-        #expect(await waitUntil { model.transcript?.durationSeconds != nil })
+        let transcriptWait = await waitUntil { model.transcript?.durationSeconds != nil }
+        #expect(transcriptWait)
 
         #expect(await openEntry(short.id, in: model))
         let settled = await waitUntil { abs((model.transcript?.durationSeconds ?? 0) - 1) < 0.05 }
@@ -124,7 +125,8 @@ struct EntryDurationTests {
         let short = try await seedEntry(in: model, mediaSeconds: 1, transcriptDuration: 1, text: "short take")
 
         #expect(await openEntry(long.id, in: model))
-        #expect(await waitUntil { model.transcript?.durationSeconds != nil })
+        let transcriptWait = await waitUntil { model.transcript?.durationSeconds != nil }
+        #expect(transcriptWait)
         #expect(await openEntry(short.id, in: model))
         #expect(await openEntry(long.id, in: model))
         #expect(await openEntry(short.id, in: model))
@@ -172,7 +174,8 @@ struct EntryDurationTests {
         await model.library.dropCaches()
 
         #expect(await openEntry(entry.id, in: model))
-        #expect(await waitUntil { abs((model.libraryEntry(id: entry.id)?.durationSeconds ?? 0) - 1) < 0.05 })
+        let absWait = await waitUntil { abs((model.libraryEntry(id: entry.id)?.durationSeconds ?? 0) - 1) < 0.05 }
+        #expect(absWait)
         let listed = await model.library.list().first { $0.id == entry.id }
         await model.refreshLibraryAndWait()
 
@@ -190,7 +193,8 @@ struct EntryDurationTests {
         await model.refreshLibraryAndWait()
 
         #expect(await openEntry(entry.id, in: model))
-        #expect(await waitUntil { abs((model.transcript?.durationSeconds ?? 0) - 1) < 0.02 })
+        let absWait = await waitUntil { abs((model.transcript?.durationSeconds ?? 0) - 1) < 0.02 }
+        #expect(absWait)
         await settle()
 
         #expect(try manifest(of: entry).durationSeconds == 1.03)

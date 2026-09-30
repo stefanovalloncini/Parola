@@ -102,7 +102,8 @@ struct FavoriteSegmentsTests {
         let pasteboard = NSPasteboard(name: NSPasteboard.Name("favorites-test-\(UUID())"))
         model.copyTranscriptToPasteboard(withTimestamps: false, favoritesOnly: true, pasteboard: pasteboard)
 
-        #expect(await waitUntil { pasteboard.string(forType: .string) == "second" })
+        let stringWait = await waitUntil { pasteboard.string(forType: .string) == "second" }
+        #expect(stringWait)
     }
 
     @Test("visibleSegments applies the favorites-only filter")
@@ -161,8 +162,10 @@ struct FavoriteSegmentsTests {
 
         // The filter drops inside setSegmentFavorite, which is the single write path both the star
         // and the bridge go through, so it lands on the write's own hop rather than synchronously.
-        #expect(await waitUntil { !model.favoritesOnly })
-        #expect(await waitUntil { !model.isSegmentFavorite(1) })
+        let favoritesOnlyWait = await waitUntil { !model.favoritesOnly }
+        #expect(favoritesOnlyWait)
+        let isSegmentFavoriteWait = await waitUntil { !model.isSegmentFavorite(1) }
+        #expect(isSegmentFavoriteWait)
     }
 
     @Test("splitting a favorited segment keeps the favorite on the first half")

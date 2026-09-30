@@ -48,7 +48,8 @@ struct FileHandlerCoalescingTests {
         model.phase = .loadingModel(name: "openai_whisper-tiny")
         partials.send("before the cancel")
         stage(.preparingAudio)
-        #expect(await waitUntil { model.phase == .transcribing(file: file) && !model.filePartialText.isEmpty })
+        let phaseWait = await waitUntil { model.phase == .transcribing(file: file) && !model.filePartialText.isEmpty }
+        #expect(phaseWait)
 
         model.cancelCurrentWork()
         #expect(model.filePartialText.isEmpty)

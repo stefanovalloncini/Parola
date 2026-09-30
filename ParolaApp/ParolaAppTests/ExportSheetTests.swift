@@ -107,7 +107,8 @@ struct ExportSheetTests {
 
         model.copyExportToPasteboard(pasteboard: pasteboard)
 
-        #expect(await waitUntil { pasteboard.string(forType: .string) == Self.copiedText })
+        let stringWait = await waitUntil { pasteboard.string(forType: .string) == Self.copiedText }
+        #expect(stringWait)
     }
 
     @Test("copying a Word export puts its text on the pasteboard")
@@ -120,7 +121,8 @@ struct ExportSheetTests {
 
         model.copyExportToPasteboard(pasteboard: pasteboard)
 
-        #expect(await waitUntil { pasteboard.string(forType: .string) == Self.copiedText })
+        let stringWait = await waitUntil { pasteboard.string(forType: .string) == Self.copiedText }
+        #expect(stringWait)
         if case .failed(let message) = model.phase {
             Issue.record("the copy failed: \(message)")
         }

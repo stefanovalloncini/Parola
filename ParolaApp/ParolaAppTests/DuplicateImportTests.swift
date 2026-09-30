@@ -127,7 +127,8 @@ extension TranscriberMockSuites {
             model.openExistingDuplicate(remembering: false)
 
             #expect(model.duplicateImport == nil)
-            #expect(await waitUntil { model.selectedEntryID == existing.id })
+            let selectedEntryIDWait = await waitUntil { model.selectedEntryID == existing.id }
+            #expect(selectedEntryIDWait)
             #expect(model.fileTranscribeTask == nil)
         }
 
@@ -292,8 +293,10 @@ extension TranscriberMockSuites {
                 model.fileTranscribeTask = nil
             }
 
-            #expect(await waitUntil { model.batchDuplicateNotice == "1 already in your library" })
-            #expect(await waitUntil { model.watchedLaneIsIdle })
+            let batchDuplicateNoticeWait = await waitUntil { model.batchDuplicateNotice == "1 already in your library" }
+            #expect(batchDuplicateNoticeWait)
+            let watchedLaneIsIdleWait = await waitUntil { model.watchedLaneIsIdle }
+            #expect(watchedLaneIsIdleWait)
             #expect(model.duplicateImport == nil)
             #expect(model.selectedEntryID == selection)
             #expect(model.route == route)
@@ -316,7 +319,8 @@ extension TranscriberMockSuites {
                 model.handleWatchedArrival(wav)
 
                 #expect(model.duplicateImport == nil)
-                #expect(await waitUntil { model.fileTranscribeTask != nil })
+                let fileTranscribeTaskWait = await waitUntil { model.fileTranscribeTask != nil }
+                #expect(fileTranscribeTaskWait)
                 #expect(model.sourceFileURL == wav)
                 #expect(model.batchDuplicatesSkipped == 0)
                 model.cancelCurrentWork()
@@ -336,7 +340,8 @@ extension TranscriberMockSuites {
                 model.handleWatchedArrival(wav)
 
                 #expect(model.duplicateImport == nil)
-                #expect(await waitUntil { model.fileTranscribeTask != nil })
+                let fileTranscribeTaskWait = await waitUntil { model.fileTranscribeTask != nil }
+                #expect(fileTranscribeTaskWait)
                 #expect(model.batchDuplicatesSkipped == 0)
                 model.cancelCurrentWork()
             }

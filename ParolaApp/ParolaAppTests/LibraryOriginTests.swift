@@ -126,7 +126,8 @@ struct LibraryOriginTests {
         model.loadEntry(entry.id)
 
         #expect(model.phase == .idle, "the stale failure must not survive the click that starts the open")
-        #expect(await waitUntil { model.selectedEntryID == entry.id && model.transcript != nil })
+        let selectedEntryIDWait = await waitUntil { model.selectedEntryID == entry.id && model.transcript != nil }
+        #expect(selectedEntryIDWait)
     }
 
     @Test("opening from search records the query and keeps the results")
@@ -217,7 +218,8 @@ struct LibraryOriginTests {
 
         model.returnToOrigin()
 
-        #expect(await waitUntil { model.transcript == nil })
+        let transcriptWait = await waitUntil { model.transcript == nil }
+        #expect(transcriptWait)
         #expect(model.libraryFilter == nil, "no origin means goHome, not the last entry's category")
         #expect(model.isBrowsingLibrary)
     }
@@ -326,7 +328,8 @@ struct LibraryOriginTests {
 
         model.browseAll()
 
-        #expect(await waitUntil { model.transcript == nil })
+        let transcriptWait = await waitUntil { model.transcript == nil }
+        #expect(transcriptWait)
         #expect(model.isBrowsingLibrary)
         #expect(model.transcriptOrigin == nil)
     }
@@ -467,7 +470,8 @@ struct LibraryOriginTests {
         let result = try await command.handler(try command.validate(AutomationArgs()), context)
         withExtendedLifetime(server) {}
 
-        #expect(await waitUntil { model.transcript == nil })
+        let transcriptWait = await waitUntil { model.transcript == nil }
+        #expect(transcriptWait)
         #expect(model.libraryFilter == .meeting)
         guard case .object(let fields) = result else {
             Issue.record("goBack should answer with an object")
