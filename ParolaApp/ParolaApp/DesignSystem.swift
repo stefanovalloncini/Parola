@@ -334,18 +334,6 @@ extension View {
             )
     }
 
-    func pillStyle(bordered: Bool = true) -> some View {
-        padding(.horizontal, DS.Spacing.regular)
-            .padding(.vertical, DS.Spacing.small)
-            .background(Capsule(style: .continuous).fill(DS.Palette.pillFill))
-            .overlay(
-                Capsule(style: .continuous)
-                    .strokeBorder(DS.Palette.divider, lineWidth: bordered ? 1 : 0)
-            )
-            .clipShape(Capsule(style: .continuous))
-            .contentShape(Capsule(style: .continuous))
-    }
-
     /// Secondary chrome (inspector, media bar). A material, not a token fill, so it keeps the hue of
     /// the window materials it abuts instead of reading as a detached neutral slab.
     func chromeSurface() -> some View {
