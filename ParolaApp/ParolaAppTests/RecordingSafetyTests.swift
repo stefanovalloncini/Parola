@@ -110,7 +110,8 @@ extension TranscriberMockSuites {
                 #expect(after.first?.title.hasSuffix("(transcription failed)") == false)
                 await model.awaitLandingSteps()
                 let exported = try FileManager.default.contentsOfDirectory(atPath: exports.path)
-                #expect(exported.contains { $0.hasSuffix(".txt") }, "auto-export runs, as it would have for the take")
+                let exportedText = exported.contains { $0.hasSuffix(".txt") }
+                #expect(exportedText, "auto-export runs, as it would have for the take")
             }
         }
 

@@ -351,8 +351,13 @@ extension TranscriberMockSuites {
                     "a stop intent has to wait for the take instead of reporting nothing recording"
                 )
 
-                await #expect(throws: IntentActionError.cancelled) {
+                do {
                     _ = try await model.awaitRecordingOutcome()
+                    Issue.record("expected IntentActionError.cancelled")
+                } catch let error as IntentActionError {
+                    #expect(error == .cancelled)
+                } catch {
+                    Issue.record("unexpected \(error)")
                 }
             }
         }
@@ -420,7 +425,8 @@ extension TranscriberMockSuites {
             let fixture = try makeSilentWAV()
             try await withMocksCleared(.audioSource) {
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-                let apple = try #require(ModelCatalog.all.first { $0.engineID == .appleSpeech })
+                let appleSpeech = ModelCatalog.all.first { $0.engineID == .appleSpeech }
+                let apple = try #require(appleSpeech)
                 let model = makeRecordingModel()
                 model.useStreaming = true
                 model.selectedModel = apple.id

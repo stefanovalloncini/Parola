@@ -775,7 +775,8 @@ extension TranscriberMockSuites {
                 #expect(!title.contains("parola-trust"))
 
                 await waitUntil { model.sourceFileURL != wav && model.selectedEntryID != nil }
-                let entry = try #require(model.selectedEntryID.flatMap { model.libraryEntry(id: $0) })
+                let selectedLibraryEntry = model.selectedEntryID.flatMap { model.libraryEntry(id: $0) }
+                let entry = try #require(selectedLibraryEntry)
                 #expect(model.recordedTakeTitle(playing: model.sourceFileURL) == nil, "playback moved into the entry")
                 #expect(AppModel.transcriptDisplayTitle(
                     sourceFileURL: model.sourceFileURL, entry: entry, showsAITitle: model.showAITitles, fallback: "Untitled"
@@ -1480,7 +1481,8 @@ extension TranscriberMockSuites {
                 let quit = QuitReply()
                 let reply = AppDelegate.terminateReply(for: model, ask: { .stopAndSave }) { quit.value = $0 }
                 #expect(reply == .terminateLater)
-                #expect(AppDelegate.terminateReply(for: model, ask: { .discard }) { _ in } == .terminateCancel)
+                let discardReply = AppDelegate.terminateReply(for: model, ask: { .discard }) { _ in }
+                #expect(discardReply == .terminateCancel)
 
                 await waitUntil { quit.value != nil }
                 #expect(quit.value == true)
