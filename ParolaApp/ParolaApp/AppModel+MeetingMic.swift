@@ -9,7 +9,6 @@ struct MicTrack {
     var file: URL?
     /// Seconds into the take's own audio where the microphone's first sample sits, once it has been heard.
     var offset: TimeInterval?
-    var unavailable = false
     var stalled = false
     var lastMicReading: ContinuousClock.Instant?
     var lastMacReading: ContinuousClock.Instant?
@@ -62,6 +61,8 @@ extension AppModel {
             micTrackUnavailable(take.id)
             return
         }
+        // The permission prompt can outlast the take: a late Allow must not switch the microphone on.
+        guard micTrack?.takeID == take.id, takeIsCurrent(take) else { return }
         do {
             try await capture.start()
         } catch {
@@ -95,7 +96,6 @@ extension AppModel {
 
     private func micTrackUnavailable(_ takeID: Int) {
         guard micTrack?.takeID == takeID else { return }
-        micTrack?.unavailable = true
         takeMicTrackState = .unavailable
         noteMicTrackMissing(takeID, stopped: false)
     }
