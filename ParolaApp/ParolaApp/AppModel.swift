@@ -270,8 +270,14 @@ final class AppModel {
     }
     /// The take transcribing or just transcribed. Matched by file, so a stale one names nothing.
     private(set) var recordedTake: RecordedTake?
-    /// A take that landed on its own Stage, for the toast that says where it went.
-    var takeSavedNotice: TakeSavedNotice?
+    /// A take that landed on its own Stage, for the toast that says where it went; it goes on its own unless the pointer holds it.
+    var takeSavedNotice: TakeSavedNotice? {
+        didSet { if takeSavedNotice != oldValue { restartTakeSavedExpiry() } }
+    }
+    /// Test seam: how long the saved-take toast stays once nothing holds it.
+    @ObservationIgnored var takeSavedLifetime: Duration = TakeSavedNotice.lifetime
+    @ObservationIgnored private var takeSavedExpiry: Task<Void, Never>?
+    @ObservationIgnored private var takeSavedHeld = false
     /// True while a quit waits for takes to reach the library; the window says so.
     private(set) var savingTakesBeforeQuit = false
     /// A quit already winding the takes down; the app delegate answers any other quit with a no.
@@ -3322,6 +3328,7 @@ final class AppModel {
 
     private func beginSession(_ session: RecordingSession) {
         takeLevels = TakeLevelHistory()
+        takeSavedNotice = nil
         recording = session
     }
 
@@ -5014,7 +5021,28 @@ final class AppModel {
         takeSavedNotice = nil
     }
 
-    /// The saved take's Summarize: its summary pane, with a summary on the way unless it has one already.
+    /// The pointer over the saved-take toast holds it; when it leaves, the toast's time starts again.
+    func holdTakeSaved(_ held: Bool) {
+        guard takeSavedHeld != held else { return }
+        takeSavedHeld = held
+        restartTakeSavedExpiry()
+    }
+
+    /// The model keeps the toast's time, so a window closed and opened again doesn't bring a stale toast back.
+    private func restartTakeSavedExpiry() {
+        takeSavedExpiry?.cancel()
+        takeSavedExpiry = nil
+        guard let notice = takeSavedNotice, !takeSavedHeld else { return }
+        let lifetime = takeSavedLifetime
+        let clock = clock
+        takeSavedExpiry = Task { [weak self] in
+            try? await Task.sleep(for: lifetime, clock: clock)
+            guard !Task.isCancelled, let self, self.takeSavedNotice == notice else { return }
+            self.takeSavedNotice = nil
+        }
+    }
+
+    /// The saved take's Summarize: its transcript page in summary mode, with a summary on the way unless it has one already.
     func summarizeSavedTake(_ entryID: LibraryEntry.ID) {
         dismissTakeSaved()
         Task { [weak self] in
@@ -5022,6 +5050,7 @@ final class AppModel {
             if selectedEntryID != entryID {
                 guard (try? await openEntry(entryID)) != nil else { return }
             }
+            route = .transcript
             setTranscriptPaneMode(.summary)
             guard transcript?.summary == nil, !isSummarising else { return }
             summariseTranscript()

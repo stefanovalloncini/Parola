@@ -257,11 +257,11 @@ struct StageStateTests {
     }
 
     @MainActor
-    @Test("the saved toast names the place the take went, and goes after three seconds")
+    @Test("the saved toast names the place the take went, and stays five seconds")
     func toast() {
         #expect(TakeSavedToast.message(category: .meeting) == "Saved to Meetings")
         #expect(TakeSavedToast.message(category: .transcription) == "Saved to Transcriptions")
-        #expect(TakeSavedToast.dismissAfter == .seconds(3))
+        #expect(TakeSavedNotice.lifetime == .seconds(5))
     }
 
     @MainActor
@@ -461,11 +461,13 @@ extension TranscriberMockSuites {
             model.transcript = words
             model.summariseOperation = { _, _ in Summary(text: "the gist") }
             model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+            model.route = .statistics
 
             model.summarizeSavedTake(entry.id)
 
             let summarized = await waitUntil { model.transcript?.summary?.text == "the gist" }
             #expect(summarized)
+            #expect(model.route == .transcript, "the summary is written where it can be seen")
             #expect(model.transcriptPaneMode == .summary)
             #expect(model.takeSavedNotice == nil)
         }
@@ -604,6 +606,43 @@ extension TranscriberMockSuites {
             await capture.letGo()
             let over = await waitUntil { model.recording?.isOver == true }
             #expect(over)
+        }
+
+        @Test("the saved toast goes on its own after its time, whether or not a window shows it")
+        func savedToastExpires() async {
+            let model = makeModel("stage-saved-expiry")
+            model.takeSavedLifetime = .milliseconds(50)
+
+            model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+
+            let gone = await waitUntil { model.takeSavedNotice == nil }
+            #expect(gone)
+        }
+
+        @Test("the pointer resting on the saved toast holds it, and leaving starts its time again")
+        func savedToastHoldsUnderThePointer() async {
+            let model = makeModel("stage-saved-hover")
+            model.takeSavedLifetime = .milliseconds(100)
+            model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+
+            model.holdTakeSaved(true)
+            await settle(for: .milliseconds(400))
+            #expect(model.takeSavedNotice != nil)
+
+            model.holdTakeSaved(false)
+            let gone = await waitUntil { model.takeSavedNotice == nil }
+            #expect(gone)
+        }
+
+        @Test("a new take takes the saved toast down, so it never sits on that take's Stage")
+        func newTakeClearsTheSavedToast() {
+            let model = makeModel("stage-saved-new-take")
+            model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+
+            model.installTestTake(source: .microphone)
+
+            #expect(model.takeSavedNotice == nil)
+            model.endTestTake()
         }
 
         @Test("the Stage's Cancel ends a count-in with no word")

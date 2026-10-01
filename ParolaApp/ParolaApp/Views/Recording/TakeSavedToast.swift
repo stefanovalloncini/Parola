@@ -6,14 +6,15 @@ struct TakeSavedNotice: Equatable, Identifiable {
     let id = UUID()
     let entryID: LibraryEntry.ID
     let category: EntryCategory
+
+    /// Long enough to reach for Summarize or Copy; the pointer resting on the toast holds it longer.
+    static let lifetime: Duration = .seconds(5)
 }
 
 /// "Saved to Meetings" under the transcript a take just became, with Summarize and Copy; it goes after a few seconds.
 struct TakeSavedToast: View {
     @Environment(AppModel.self) private var model
     let notice: TakeSavedNotice
-
-    static let dismissAfter: Duration = .seconds(3)
 
     var body: some View {
         HStack(alignment: .center, spacing: DS.Spacing.regular) {
@@ -60,11 +61,8 @@ struct TakeSavedToast: View {
                 .strokeBorder(DS.Palette.success.opacity(0.35), lineWidth: 1)
         )
         .padding(DS.Spacing.regular)
-        .task(id: notice) {
-            try? await Task.sleep(for: Self.dismissAfter)
-            guard !Task.isCancelled, model.takeSavedNotice == notice else { return }
-            model.dismissTakeSaved()
-        }
+        .onHover { model.holdTakeSaved($0) }
+        .onDisappear { model.holdTakeSaved(false) }
         .axBranch("TakeSavedToast")
     }
 
