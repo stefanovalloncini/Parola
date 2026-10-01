@@ -5,6 +5,12 @@ struct ContentToolbar: ToolbarContent {
     @Environment(AppModel.self) private var model
 
     var body: some ToolbarContent {
+        if let take = TakeTitleBar.take(on: model) {
+            ToolbarItem(placement: .principal) {
+                TakeTitleBar(take: take)
+            }
+            .sharedBackgroundVisibility(.hidden)
+        }
         ToolbarSpacer(.flexible)
         if RecordControl.primarySource(features: model.features) != nil {
             // Its own item with no shared glass behind it, so the red capsule isn't set inside a second pill.
