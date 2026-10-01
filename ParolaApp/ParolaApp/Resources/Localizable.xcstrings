@@ -12390,6 +12390,39 @@
         }
       }
     },
+    "Saved to Dictations": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvata in Dettature"
+          }
+        }
+      }
+    },
+    "Saved to Meetings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvata in Riunioni"
+          }
+        }
+      }
+    },
+    "Saved to Transcriptions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvata in Trascrizioni"
+          }
+        }
+      }
+    },
     "Saved without a transcript.": {
       "extractionState": "manual",
       "localizations": {

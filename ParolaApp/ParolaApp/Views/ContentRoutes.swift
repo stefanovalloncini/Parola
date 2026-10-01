@@ -37,6 +37,10 @@ struct ContentRoutes: View {
                     ArrivalToast(notice: notice)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+                if let saved = model.takeSavedNotice {
+                    TakeSavedToast(notice: saved)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
     }

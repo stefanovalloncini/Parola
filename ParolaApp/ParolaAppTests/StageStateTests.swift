@@ -143,6 +143,14 @@ struct StageStateTests {
         #expect(ErrorBanner.showsTakeInFinder(take))
     }
 
+    @MainActor
+    @Test("the saved toast names the place the take went, and goes after three seconds")
+    func toast() {
+        #expect(TakeSavedToast.message(category: .meeting) == "Saved to Meetings")
+        #expect(TakeSavedToast.message(category: .transcription) == "Saved to Transcriptions")
+        #expect(TakeSavedToast.dismissAfter == .seconds(3))
+    }
+
     @Test("the time slot names the model a live take waits on, with its download")
     func preparingLine() {
         #expect(StageTimeSlot.preparingText(name: "openai_whisper-large-v3_turbo", download: 0.42) == "Preparing Whisper Turbo · 42%")
@@ -269,6 +277,59 @@ extension TranscriberMockSuites {
                 #expect(model.recording == nil)
                 #expect(model.route != .recording)
             }
+        }
+
+        @Test("a take that lands on its Stage says where it went, and Copy puts its words on the pasteboard")
+        func landingSaysWhereItWent() async throws {
+            let audio = try makeTakeWAV("stage-saved", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the words of the take")])
+                let model = makeModel("stage-saved")
+                model.pendingRecordingCategory = .meeting
+
+                recordAndStop(model, audio: audio, seconds: 1)
+
+                let toasted = await waitUntil { model.takeSavedNotice != nil }
+                #expect(toasted)
+                let landed = await landedEntry(model)
+                let entry = try #require(landed)
+                let notice = try #require(model.takeSavedNotice)
+                #expect(notice.entryID == entry.id)
+                #expect(notice.category == .meeting)
+                #expect(model.recording?.state == .done(entryID: entry.id))
+                #expect(model.route == .transcript, "the take landed on its transcript")
+
+                let pasteboard = NSPasteboard(name: NSPasteboard.Name("stage-saved-\(UUID())"))
+                await model.copySavedTake(entry.id, to: pasteboard)
+                #expect(pasteboard.string(forType: .string) == "the words of the take")
+                #expect(model.takeSavedNotice == nil, "Copy takes the toast down")
+            }
+        }
+
+        @Test("the saved toast offers Summarize only while a summary can be written, and Summarize shows one")
+        func savedTakeSummarize() async throws {
+            let model = makeModel("stage-saved-summary")
+            model.aiUnavailableReason = "Apple Intelligence is turned off."
+            #expect(!TakeSavedToast.offersSummary(model))
+            model.aiUnavailableReason = nil
+            #expect(TakeSavedToast.offersSummary(model))
+
+            let words = Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "a take worth a summary")], language: "en", modelName: "stub"
+            )
+            let entry = try await model.library.add(transcript: words, audioSource: nil, category: .meeting)
+            model.selectedEntryID = entry.id
+            model.transcript = words
+            model.summariseOperation = { _, _ in Summary(text: "the gist") }
+            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+
+            model.summarizeSavedTake(entry.id)
+
+            let summarized = await waitUntil { model.transcript?.summary?.text == "the gist" }
+            #expect(summarized)
+            #expect(model.transcriptPaneMode == .summary)
+            #expect(model.takeSavedNotice == nil)
         }
 
         @Test("the Stage's Cancel ends a count-in with no word")

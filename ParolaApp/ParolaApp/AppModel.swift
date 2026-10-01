@@ -270,6 +270,8 @@ final class AppModel {
     }
     /// The take transcribing or just transcribed. Matched by file, so a stale one names nothing.
     private(set) var recordedTake: RecordedTake?
+    /// A take that landed on its own Stage, for the toast that says where it went.
+    var takeSavedNotice: TakeSavedNotice?
     /// True while a quit waits for takes to reach the library; the window says so.
     private(set) var savingTakesBeforeQuit = false
     /// A quit already winding the takes down; the app delegate answers any other quit with a no.
@@ -4601,6 +4603,9 @@ final class AppModel {
                 }
             }
             self?.updateSession(of: take) { $0.land(entryID: entry?.id) }
+            if kind == .recording, take != nil, let entry {
+                self?.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: category)
+            }
             var entryAudio: URL?
             if let entry, audio != nil { entryAudio = try? await library.load(entry.id).document.audioURL }
             guard let self, let entry else { return }
@@ -4979,6 +4984,34 @@ final class AppModel {
     func dismissTakeFailure() {
         guard let session = recording, case .failed = session.state else { return }
         endSession(of: session.takeID)
+    }
+
+    func dismissTakeSaved() {
+        takeSavedNotice = nil
+    }
+
+    /// The saved take's Summarize: its summary pane, with a summary on the way unless it has one already.
+    func summarizeSavedTake(_ entryID: LibraryEntry.ID) {
+        dismissTakeSaved()
+        Task { [weak self] in
+            guard let self else { return }
+            if selectedEntryID != entryID {
+                guard (try? await openEntry(entryID)) != nil else { return }
+            }
+            setTranscriptPaneMode(.summary)
+            guard transcript?.summary == nil, !isSummarising else { return }
+            summariseTranscript()
+        }
+    }
+
+    /// The saved take's Copy: its transcript as plain text, read from the library if the user has moved on.
+    func copySavedTake(_ entryID: LibraryEntry.ID, to pasteboard: NSPasteboard = .general) async {
+        dismissTakeSaved()
+        var text = selectedEntryID == entryID ? transcript?.text : nil
+        if text == nil { text = try? await library.load(entryID).document.transcript.text }
+        guard let text else { return }
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
     }
 
     /// Show in Finder on a failed take's Stage: the audio its failure saved.
