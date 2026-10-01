@@ -32,6 +32,17 @@ struct ListCellModelTests {
         return !HostedAccessibility.elements(in: hosted.host).isEmpty
     }
 
+    /// Whether the button opens its popover can't be read back from a hosted view, so the wiring is pinned in the source.
+    @Test("the intake settings button is disabled with no model, so its popover can't trap")
+    func settingsButtonDisabledWithNoModel() throws {
+        let path = #filePath.replacingOccurrences(
+            of: "ParolaAppTests/ListCellModelTests.swift",
+            with: "ParolaApp/Views/Library/IntakeStrip.swift"
+        )
+        let source = try String(contentsOfFile: path, encoding: .utf8)
+        #expect(source.contains(".disabled(model == nil)"))
+    }
+
     @Test("an entry row, a search row and a trashed row draw with no model")
     func rows() {
         #expect(renders(LibraryListRow(row: display, detail: .excerpt, isSelected: false, rename: { _ in })))

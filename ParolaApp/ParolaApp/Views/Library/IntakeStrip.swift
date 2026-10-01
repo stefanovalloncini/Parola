@@ -150,6 +150,7 @@ struct IntakeSettingsButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(model == nil)
         .fixedSize()
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             IntakeSettingsPopover()
