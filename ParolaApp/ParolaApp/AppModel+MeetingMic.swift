@@ -84,9 +84,9 @@ enum FoldStep: CaseIterable, Sendable {
 
 extension AppModel {
 
-    /// A meeting take records your microphone beside the Mac audio, when the setting asks for it.
+    /// A meeting take records your microphone beside the Mac audio, when the setting asks for it; so does one switched to Note since its Record asked for a meeting.
     func startMicTrack(for take: TakeContext, pairedWith macFile: URL?) {
-        guard take.source == .systemAudio, take.category == .meeting, meetingRecordsMicrophone else { return }
+        guard take.source == .systemAudio, take.category == .meeting || take.askedForMeeting, meetingRecordsMicrophone else { return }
         micTrack = MicTrack(takeID: take.id)
         takeMicTrackState = .starting
         let levels = TakeLevelHistory()

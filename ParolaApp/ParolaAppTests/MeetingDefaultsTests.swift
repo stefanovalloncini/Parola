@@ -253,6 +253,94 @@ extension TranscriberMockSuites {
     }
 
     @MainActor
+    @Suite("Count-in category takes", .serialized)
+    struct CountInCategoryTakeTests {
+        @Test("Note picked during a Mac-audio count-in sticks: the take files as a note and still records your microphone")
+        func countInNoteSticks() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 0.3, "Welcome.")])
+                let model = makeRecordingModel("count-in-note")
+                model.useStreaming = false
+                model.selectedModel = "openai_whisper-tiny"
+                let macFile = try makeTakeWAV("count-in-note-mac")
+                let micFile = try makeTakeWAV("count-in-note-mic")
+                defer {
+                    try? FileManager.default.removeItem(at: macFile)
+                    try? FileManager.default.removeItem(at: micFile)
+                }
+                let mac = MeteredCapture(file: macFile)
+                model.takeCaptureOverride = { _ in mac }
+                model.micTrackCaptureOverride = { MeteredCapture(file: micFile) }
+                model.recordingCountInSeconds = 1
+
+                model.startRecording(source: .systemAudio)
+                let countIn = try #require(model.recording)
+                #expect(countIn.isCountingIn)
+                #expect(countIn.category == .meeting)
+                TakeCategoryPicker.choose(.transcription, for: countIn.takeID, model: model)
+                #expect(model.recording?.category == .transcription, "the click sticks")
+                #expect(model.recording?.title.hasPrefix("Recording ") == true)
+
+                let micUp = await waitUntil(timeoutMs: 10_000) { model.takeMicTrackState == .recording }
+                #expect(micUp, "the meeting's microphone records though the take is now a note")
+                #expect(model.activeTake?.category == .transcription)
+                #expect(model.recording?.category == .transcription)
+                #expect(model.recording?.title.hasPrefix("Recording ") == true)
+                mac.levelMeter.record(0.4)
+                let recording = await waitUntil { model.recording?.state == .recording }
+                #expect(recording)
+
+                model.stopRecordingAndTranscribe()
+                let entry = try #require(await landedEntry(model, timeoutMs: 15_000))
+                #expect(entry.category == .transcription)
+                #expect(entry.title.hasPrefix("Recording "))
+            }
+        }
+
+        @Test("Meeting picked during a microphone count-in sticks, and the take files as a meeting")
+        func countInMeetingSticks() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeRecordingModel("count-in-meeting")
+                model.useStreaming = false
+                let audio = try makeTakeWAV("count-in-meeting")
+                defer { try? FileManager.default.removeItem(at: audio) }
+                model.takeCaptureOverride = { _ in StubSource(url: audio) }
+                model.recordingCountInSeconds = 1
+
+                model.startRecording(source: .microphone)
+                let countIn = try #require(model.recording)
+                TakeCategoryPicker.choose(.meeting, for: countIn.takeID, model: model)
+                #expect(model.recording?.category == .meeting)
+                #expect(model.recording?.title.hasPrefix("Meeting ") == true)
+
+                let handedOver = await waitUntil(timeoutMs: 10_000) { model.activeTake != nil }
+                #expect(handedOver)
+                #expect(model.activeTake?.category == .meeting)
+                #expect(model.recording?.category == .meeting)
+                #expect(model.takeMicTrackState == nil, "a microphone take has no second track")
+                model.cancelCurrentWork()
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+            }
+        }
+
+        @Test("a cancelled count-in lets its choice go, so the next take files by its source")
+        func cancelledCountInForgetsItsChoice() {
+            let model = makeRecordingModel("count-in-cancel")
+            model.recordingCountInSeconds = 60
+            model.startRecording(source: .systemAudio)
+            let takeID = model.recording?.takeID ?? -1
+            TakeCategoryPicker.choose(.transcription, for: takeID, model: model)
+            #expect(model.pendingRecordingCategory == .transcription)
+
+            model.cancelArmingTake()
+
+            #expect(model.recording == nil)
+            #expect(model.pendingRecordingCategory == nil)
+        }
+    }
+
+    @MainActor
     @Suite("Stage device menu takes", .serialized)
     struct StageDeviceMenuTakeTests {
         @Test("the device menu picks the microphone while the take counts in, and the take opens that one; once it starts, it only shows it")
