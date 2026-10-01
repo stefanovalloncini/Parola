@@ -2457,6 +2457,17 @@
         }
       }
     },
+    "Back to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna a %@"
+          }
+        }
+      }
+    },
     "Back to Dictations": {
       "extractionState": "manual",
       "localizations": {

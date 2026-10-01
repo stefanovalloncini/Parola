@@ -79,10 +79,12 @@ struct LibraryOriginTests {
         #expect(LibraryOrigin.capture(from: page()) == .all)
     }
 
-    @Test("a person's list is recorded as the whole library, whether or not the sidebar lists them")
+    @Test("a person's page is recorded as that person, whether or not the sidebar lists them")
     func personList() {
-        #expect(LibraryOrigin.capture(from: page(person: UUID())) == .all)
-        #expect(LibraryOrigin.capture(from: page(listShowing: false, person: UUID())) == .all)
+        let giulia = UUID()
+        #expect(LibraryOrigin.capture(from: page(person: giulia)) == .person(giulia))
+        #expect(LibraryOrigin.capture(from: page(listShowing: false, person: giulia)) == .person(giulia))
+        #expect(LibraryOrigin.capture(from: page(filter: .meeting, person: giulia)) == .category(.meeting), "a person narrowing a category leaves the category the place")
     }
 
     @Test("an entry opened with no list on screen has no origin")
@@ -99,6 +101,7 @@ struct LibraryOriginTests {
         #expect(LibraryOrigin.all.bridgeName == "all")
         #expect(LibraryOrigin.category(.meeting).bridgeName == EntryCategory.meeting.rawValue)
         #expect(LibraryOrigin.search.bridgeName == "search")
+        #expect(LibraryOrigin.person(UUID()).bridgeName == "person")
     }
 
     // MARK: - Opening an entry
@@ -269,6 +272,35 @@ struct LibraryOriginTests {
         #expect(model.libraryFilter == nil)
         #expect(model.isBrowsingLibrary)
         #expect(sidebar(model) == .library)
+    }
+
+    @Test("back from an entry opened on a person's page shows that person's page, and the link names them")
+    func backToAPerson() async throws {
+        let model = makeModel()
+        await model.addPerson(named: "Giulia Rossi")
+        let giulia = try #require(model.person(named: "Giulia Rossi"))
+        let entry = try await seedEntry(in: model, text: "call with Giulia")
+        model.browsePerson(giulia.id)
+        #expect(await openEntry(entry.id, in: model))
+
+        #expect(model.transcriptOrigin == .person(giulia.id))
+        let name = TranscriptBackCopy.name(for: .person(giulia.id), personName: model.person(id: giulia.id)?.name)
+        #expect(name == "Giulia Rossi")
+        #expect(TranscriptBackCopy.help(for: .person(giulia.id), personName: "Giulia Rossi") == "Back to Giulia Rossi")
+
+        #expect(await goBack(in: model))
+
+        #expect(model.personFilter == giulia.id)
+        #expect(model.libraryFilter == nil)
+        #expect(model.isBrowsingLibrary)
+        #expect(sidebar(model) == nil, "Giulia has no sidebar row here; her page is still the one on screen")
+        #expect(SidebarSelection.place(of: model.sidebarPage) == .person(giulia.id))
+    }
+
+    @Test("a person who left the directory sends the link back to the Library's words")
+    func personWithoutAName() {
+        #expect(TranscriptBackCopy.name(for: .person(UUID()), personName: nil) == "Library")
+        #expect(TranscriptBackCopy.help(for: .person(UUID()), personName: nil) == "Back to Library")
     }
 
     @Test("back with no origin falls back to the Library page")
@@ -462,6 +494,7 @@ struct LibraryOriginTests {
         #expect(TranscriptBackCopy.help(for: .category(.meeting), bundle: italian) == "Torna alle riunioni")
         #expect(TranscriptBackCopy.help(for: .search, bundle: italian) == "Torna ai risultati")
         #expect(TranscriptBackCopy.help(for: .all, bundle: italian) == "Torna alla libreria")
+        #expect(TranscriptBackCopy.help(for: .person(UUID()), personName: "Giulia Rossi", bundle: italian) == "Torna a Giulia Rossi")
     }
 
     @Test("the link back to the whole library reads as the sidebar row does")

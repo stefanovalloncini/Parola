@@ -30,6 +30,8 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 enum LibraryOrigin: Equatable {
     case all
     case category(EntryCategory)
+    /// A person's own page: the whole library narrowed to them.
+    case person(UUID)
     case search
 
     /// Read off the user's place rather than the lit row, so a search wins over the category filter underneath it.
@@ -39,16 +41,15 @@ enum LibraryOrigin: Equatable {
         switch SidebarSelection.place(of: page) {
         case .library?: return page.listShowing ? .all : nil
         case .category(let category)?: return .category(category)
-        // The back link reads "Library" for a person's list too; personFilter itself isn't part of the origin.
-        case .person?: return .all
+        case .person(let id)?: return .person(id)
         case .activity?, .recentlyDeleted?, nil: return nil
         }
     }
 
-    /// The source key, not a `LocalizedStringKey`, so the back link can both show the name and say "Back to <name>".
+    /// The source key, so the back link can show it and say "Back to <name>"; a person's page goes by the person's name instead.
     var name: String {
         switch self {
-        case .all: return "Library"
+        case .all, .person: return "Library"
         case .category(let category): return libraryCategoryName(category)
         case .search: return "Results"
         }
@@ -58,6 +59,7 @@ enum LibraryOrigin: Equatable {
         switch self {
         case .all: return "all"
         case .category(let category): return category.rawValue
+        case .person: return "person"
         case .search: return "search"
         }
     }
@@ -704,6 +706,9 @@ extension AppModel {
             libraryFilter = category
         case .all:
             libraryFilter = nil
+        case .person(let id):
+            libraryFilter = nil
+            personFilter = id
         case .search:
             break
         case nil:
