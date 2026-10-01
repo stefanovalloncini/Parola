@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
@@ -52,6 +54,25 @@ struct IntakeStripTests {
         )
         #expect(String(localized: "Translate", bundle: italian) == "Traduci")
         #expect(String(localized: "Speakers", bundle: italian) == "Persone")
+    }
+
+    @Test("the speaker-count picker says what it counts, in words of its own in Italian")
+    func speakerCountPicker() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("intake-speakers"))
+        model.diarize = true
+        let cases = [
+            (locale: Locale(identifier: "en_US"), title: "Number of speakers", shared: "Speakers"),
+            (locale: Locale(identifier: "it_IT"), title: "Numero di speaker", shared: "Persone"),
+        ]
+        for language in cases {
+            let hosted = HostedWindow(
+                IntakeSettingsPopover().environment(model).environment(\.locale, language.locale), width: 320, height: 420
+            )
+            let words = HostedAccessibility.words(in: hosted.host)
+            hosted.close()
+            #expect(words.contains(language.title), "\(words)")
+            #expect(!words.contains(language.shared), "\(words)")
+        }
     }
 
     @Test("Translate shows only while the chosen model can translate")

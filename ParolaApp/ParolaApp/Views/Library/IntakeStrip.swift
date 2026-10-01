@@ -208,7 +208,7 @@ struct IntakeSettingsPopover: View {
                 leaf: "Intake.Toggle.IdentifySpeakers"
             )
             if model.diarize {
-                Picker("Speakers", selection: $model.expectedSpeakersRaw) {
+                Picker("Number of speakers", selection: $model.expectedSpeakersRaw) {
                     Text("Auto").tag(0)
                     ForEach(2...8, id: \.self) { count in
                         Text(verbatim: "\(count)").tag(count)
