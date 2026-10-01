@@ -25,6 +25,13 @@ enum MicTrackState: Equatable {
     case unavailable
 }
 
+/// How a microphone track's finish came back, when it did.
+enum MicTrackFinish: Sendable {
+    case finished(URL)
+    case cutShort(URL)
+    case failed(String)
+}
+
 /// A stopped microphone track's file, where it starts in the take, and whether it stopped before the take did.
 struct StoppedMicTrack {
     let file: URL
@@ -100,7 +107,7 @@ extension AppModel {
         takeMicTrackState = .recording
         liveCompanionAudioURL = file
         liveCompanionStartOffset = nil
-        if recording?.isPaused == true { queueCapturePause(true, on: capture) }
+        if recording?.isPaused == true { queueMicTrackPause(true, on: capture) }
         writeRecordingCheckpoint()
     }
 
@@ -181,13 +188,25 @@ extension AppModel {
     /// Stops the microphone track and hands back what it recorded; a write that failed partway still keeps what landed.
     func finishMicTrack(_ track: MicTrack?) async -> StoppedMicTrack? {
         guard let track, let capture = track.capture else { return nil }
-        do {
-            return StoppedMicTrack(file: try await capture.prepare(), offset: track.offset ?? 0, stoppedEarly: track.stoppedEarly)
-        } catch let cut as CaptureInterrupted {
-            return StoppedMicTrack(file: cut.url, offset: track.offset ?? 0, stoppedEarly: true)
-        } catch {
-            ParolaLog.error(.audioRecording, "a meeting's microphone track could not be finished", [.error: .error(error)])
-            return nil
+        let finish = await AsyncTimeout.run(micTrackFinishLimit, clock: clock) { () -> MicTrackFinish in
+            do {
+                return .finished(try await capture.prepare())
+            } catch let cut as CaptureInterrupted {
+                return .cutShort(cut.url)
+            } catch {
+                return .failed(String(describing: error))
+            }
+        }
+        switch finish {
+        case .finished(let file)?:
+            return StoppedMicTrack(file: file, offset: track.offset ?? 0, stoppedEarly: track.stoppedEarly)
+        case .cutShort(let file)?:
+            return StoppedMicTrack(file: file, offset: track.offset ?? 0, stoppedEarly: true)
+        case .failed?, nil:
+            // A wedged device or a failed finish still leaves on disk what the mic wrote until then.
+            ParolaLog.error(.audioRecording, "a meeting's microphone track did not finish; keeping what it wrote")
+            guard let file = track.file, FileManager.default.fileExists(atPath: file.path) else { return nil }
+            return StoppedMicTrack(file: file, offset: track.offset ?? 0, stoppedEarly: true)
         }
     }
 
@@ -200,7 +219,9 @@ extension AppModel {
     /// Cancel and Discard end the microphone track as they end the take: its file goes with the take's.
     func dropMicTrack(_ track: MicTrack?) async {
         if let file = track?.file { forgetLiveCompanion(file) }
-        await track?.capture?.cancel()
+        if let capture = track?.capture {
+            _ = await AsyncTimeout.run(micTrackFinishLimit, clock: clock) { await capture.cancel() }
+        }
         if let file = track?.file { releaseMicFile(file) }
     }
 

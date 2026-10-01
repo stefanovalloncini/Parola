@@ -260,6 +260,9 @@ final class AppModel {
     @ObservationIgnored var micTrackNoticeTake: Int?
     /// Sampler ticks in which the Mac audio moved on and the microphone didn't, before its track counts as stopped.
     @ObservationIgnored var micTrackStallTicks = 30
+    /// How long Stop, a quit or a Discard waits on the mic before going on with what it wrote.
+    @ObservationIgnored var micTrackFinishLimit: Duration = .seconds(5)
+    @ObservationIgnored private var micTrackPauseWrites: Task<Void, Never>?
     /// A meeting's mix files while a fold or a run still reads them.
     @ObservationIgnored var meetingScratchInUse: Set<URL> = []
     /// Mic tracks a fold couldn't add, by their take's file, until the take's entry can hold a record of them.
@@ -4823,20 +4826,19 @@ final class AppModel {
     private func setCapturePaused(_ paused: Bool) {
         let capture = liveSource as? any LiveAudioSource
         let stream = streamingSession
-        let mic = micTrack?.capture
         let earlier = takePauseWrites
         takePauseWrites = Task {
             await earlier?.value
             await capture?.setPaused(paused)
-            await mic?.setPaused(paused)
             await stream?.setPaused(paused)
         }
+        if let mic = micTrack?.capture { queueMicTrackPause(paused, on: mic) }
     }
 
-    /// A capture that comes up while the take is paused joins it paused, in turn with the changes already on their way.
-    func queueCapturePause(_ paused: Bool, on capture: any LiveAudioSource) {
-        let earlier = takePauseWrites
-        takePauseWrites = Task {
+    /// The mic keeps a queue of its own, so a wedged input device can't hold up the Mac audio's pause or resume.
+    func queueMicTrackPause(_ paused: Bool, on capture: any LiveAudioSource) {
+        let earlier = micTrackPauseWrites
+        micTrackPauseWrites = Task {
             await earlier?.value
             await capture.setPaused(paused)
         }

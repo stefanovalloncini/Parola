@@ -5,6 +5,13 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
+/// What a wedged input device never returns from.
+private enum Wedge: Hashable {
+    case prepare
+    case pause
+    case cancel
+}
+
 /// A capture the test drives: it comes up when let, meters only what the test records, and keeps every pause, prepare and cancel.
 private actor ScriptedTrack: LiveAudioSource {
     nonisolated let levelMeter = LevelMeter()
@@ -15,6 +22,8 @@ private actor ScriptedTrack: LiveAudioSource {
     private var startGate: CheckedContinuation<Void, Never>?
     private var holdsInFlightRead: Bool
     private var heldRead: CheckedContinuation<Void, Never>?
+    private var wedges: Set<Wedge>
+    private var wedged: [CheckedContinuation<Void, Never>] = []
     private(set) var pauseCalls: [Bool] = []
     private(set) var cancelled = false
     private(set) var prepared = false
@@ -22,13 +31,25 @@ private actor ScriptedTrack: LiveAudioSource {
 
     init(
         file: URL, startFailure: (any Error)? = nil, prepareFailure: (any Error)? = nil, holdsStart: Bool = false,
-        holdsInFlightRead: Bool = false
+        holdsInFlightRead: Bool = false, wedges: Set<Wedge> = []
     ) {
         self.file = file
         self.startFailure = startFailure
         self.prepareFailure = prepareFailure
         self.holdsStart = holdsStart
         self.holdsInFlightRead = holdsInFlightRead
+        self.wedges = wedges
+    }
+
+    private func hang(_ wedge: Wedge) async {
+        guard wedges.contains(wedge) else { return }
+        await withCheckedContinuation { wedged.append($0) }
+    }
+
+    func unwedge() {
+        wedges = []
+        for waiter in wedged { waiter.resume() }
+        wedged.removeAll()
     }
 
     func start() async throws {
@@ -44,13 +65,21 @@ private actor ScriptedTrack: LiveAudioSource {
     }
 
     func prepare() async throws -> URL {
+        await hang(.prepare)
         prepared = true
         if let prepareFailure { throw prepareFailure }
         return file
     }
 
-    func cancel() async { cancelled = true }
-    func setPaused(_ paused: Bool) async { pauseCalls.append(paused) }
+    func cancel() async {
+        await hang(.cancel)
+        cancelled = true
+    }
+
+    func setPaused(_ paused: Bool) async {
+        await hang(.pause)
+        pauseCalls.append(paused)
+    }
     func inFlightURL() async -> URL? {
         if holdsInFlightRead { await withCheckedContinuation { heldRead = $0 } }
         return file
@@ -395,6 +424,74 @@ extension TranscriberMockSuites {
                 #expect(await mic.started == false)
                 #expect(model.recording?.state == .recording)
                 model.cancelCurrentWork()
+            }
+        }
+
+        // MARK: - A wedged input device
+
+        @Test("a mic that won't finish holds Stop back only so long, and what it wrote is still folded in")
+        func wedgedFinishDoesNotHoldStop() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let model = makeModel()
+                model.micTrackFinishLimit = .milliseconds(300)
+                let files = try meetingFiles(model)
+                let mic = ScriptedTrack(file: files.mic, wedges: [.prepare])
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: mic)
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+
+                model.stopRecordingAndTranscribe()
+
+                let entry = try #require(await landedEntry(model))
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                #expect(try channels(of: audio) == 2)
+                await mic.unwedge()
+            }
+        }
+
+        @Test("a mic that won't pause can't hold up the Mac audio's pause or resume")
+        func wedgedPauseDoesNotHoldTheMac() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                let mac = ScriptedTrack(file: files.mac)
+                let mic = ScriptedTrack(file: files.mic, wedges: [.pause])
+                try await startMeeting(model, mac: mac, mic: mic)
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+
+                #expect(model.pauseTake())
+                #expect(model.resumeTake())
+
+                let told = await waitUntil { await mac.pauseCalls == [true, false] }
+                #expect(told)
+                await mic.unwedge()
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("Discard doesn't wait for a mic that won't stop, and its file still goes")
+        func wedgedCancelDoesNotHoldDiscard() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeModel()
+                model.micTrackFinishLimit = .milliseconds(300)
+                let files = try meetingFiles(model)
+                let mic = ScriptedTrack(file: files.mic, wedges: [.cancel])
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: mic)
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                var discarded = false
+
+                Task { @MainActor in
+                    await model.discardTake()
+                    discarded = true
+                }
+
+                let done = await waitUntil { discarded }
+                #expect(done)
+                #expect(!exists(files.mic))
+                await mic.unwedge()
             }
         }
 
