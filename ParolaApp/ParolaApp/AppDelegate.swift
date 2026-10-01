@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let provider = ServicesProvider()
     private var dictationSubscription: DictationSubscription?
     private var settingsResetSubscription: (any NSObjectProtocol)?
+    private var startRecordingSubscription: (any NSObjectProtocol)?
     private let menuBar = MenuBarController()
     private let dockBadge = DockBadge()
     private let playbackKeys = PlaybackKeyMonitor()
@@ -44,6 +45,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.model?.reloadSettings() }
             }
+        }
+        if let startRecordingSubscription { NotificationCenter.default.removeObserver(startRecordingSubscription) }
+        startRecordingSubscription = Self.observeStartRecording(for: model)
+    }
+
+    /// The Start Recording intent's signal, heard by the app rather than a window, so a take starts with none open.
+    static func observeStartRecording(for model: AppModel, on center: NotificationCenter = .default) -> any NSObjectProtocol {
+        center.addObserver(forName: .parolaStartRecording, object: nil, queue: .main) { [weak model] _ in
+            MainActor.assumeIsolated { model?.startRecording(source: .microphone) }
         }
     }
 
