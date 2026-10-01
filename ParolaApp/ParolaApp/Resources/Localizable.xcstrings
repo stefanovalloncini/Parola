@@ -13116,17 +13116,6 @@
         }
       }
     },
-    "Show in Finder": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostra nel Finder"
-          }
-        }
-      }
-    },
     "Show info": {
       "extractionState": "manual",
       "localizations": {
@@ -14951,6 +14940,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questa registrazione è nella libreria, ma non è ancora stata trascritta."
+          }
+        }
+      }
+    },
+    "This recording was deleted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa registrazione è stata eliminata."
+          }
+        }
+      }
+    },
+    "This recording was deleted. Restore it from Recently Deleted to try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa registrazione è stata eliminata. Ripristinala da Eliminati di recente per riprovare."
           }
         }
       }

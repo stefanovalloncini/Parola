@@ -5068,21 +5068,44 @@ final class AppModel {
         await copyTranscriptAsPlainText(copied, to: pasteboard)
     }
 
-    /// Show in Finder on a failed take's Stage: the audio its failure saved.
+    /// What Reveal in Finder on a failed take points at, or why it can't.
+    enum TakeReveal: Equatable {
+        case reveal(URL)
+        case deleted(restorable: Bool)
+    }
+
+    /// Reveal in Finder on a failed take's Stage: the entry its failure saved, selected as a library row selects it.
     func revealFailedTake() {
         guard let failure = recording?.failure else { return }
         Task { [weak self] in
-            guard let url = await self?.savedAudio(of: failure) else { return }
-            NSWorkspace.shared.activateFileViewerSelecting([url])
+            guard let self else { return }
+            switch await self.takeReveal(for: failure) {
+            case .reveal(let url):
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            case .deleted(let restorable):
+                self.exportNotice = Self.deletedTakeNotice(restorable: restorable)
+            case nil:
+                break
+            }
         }
     }
 
-    /// Where a failed take's audio is now: its entry's copy once the save lands, else the working file it was saved from.
-    func savedAudio(of failure: RecordingSession.Failure) async -> URL? {
-        if let entry = try? await failure.save?.value, let audio = try? await library.load(entry.id).document.audioURL {
-            return audio
+    /// The entry's bundle while it is in the library; a deleted one is said to be deleted, and an unsaved take shows its working file.
+    func takeReveal(for failure: RecordingSession.Failure) async -> TakeReveal? {
+        if let entry = try? await failure.save?.value {
+            if let live = await library.list().first(where: { $0.id == entry.id }) { return .reveal(live.bundleURL) }
+            let restorable = await library.listDeleted().contains { $0.id == entry.id }
+            return .deleted(restorable: restorable)
         }
-        return FileManager.default.fileExists(atPath: failure.audioURL.path) ? failure.audioURL : nil
+        return FileManager.default.fileExists(atPath: failure.audioURL.path) ? .reveal(failure.audioURL) : nil
+    }
+
+    /// In the words a Retry on a deleted take uses, so the two never disagree.
+    static func deletedTakeNotice(restorable: Bool) -> ExportNotice {
+        let message = restorable
+            ? String(localized: "This recording was deleted. Restore it from Recently Deleted to try again.")
+            : String(localized: "This recording was deleted.")
+        return ExportNotice(message: message, failures: [], folder: nil, tone: .info)
     }
 
     /// Re-runs a failed take's transcription in the entry its failure saved, so no twin appears; from its working file when that save never landed.

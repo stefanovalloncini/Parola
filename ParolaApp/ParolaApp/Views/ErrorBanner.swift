@@ -3,7 +3,7 @@ import SwiftUI
 /// A card the route keeps behind: a failed run shouldn't cost the user the library.
 struct ErrorBanner: View {
     let message: String
-    /// A failed take on its Stage: Retry, Show in Finder and Dismiss act on the take, and nothing a file or link run left behind shows.
+    /// A failed take on its Stage: Retry, Reveal in Finder and Dismiss act on the take, and nothing a file or link run left behind shows.
     var take: RecordingSession?
     // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
     @Environment(AppModel.self) private var model: AppModel?
@@ -48,15 +48,10 @@ struct ErrorBanner: View {
                             .disabled(offer == .updating)
                             .axLeaf("Error.Button.Retry")
                     }
-                    if take == nil, model?.failedFileURL != nil {
-                        Button("Reveal in Finder") { model?.revealFailedFile() }
+                    if revealsInFinder {
+                        Button("Reveal in Finder") { reveal() }
                             .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                             .axLeaf("Error.Button.RevealInFinder")
-                    }
-                    if let take, Self.showsTakeInFinder(take) {
-                        Button("Show in Finder") { model?.revealFailedTake() }
-                            .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                            .axLeaf("Error.Button.ShowInFinder")
                     }
                     Button("Dismiss") { dismiss() }
                         .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
@@ -126,9 +121,18 @@ struct ErrorBanner: View {
         .axLeaf("Error.Button.UpdateYtDlp")
     }
 
-    /// A failed take's audio is in the library once its failure saved it, and Finder can point at it.
-    nonisolated static func showsTakeInFinder(_ take: RecordingSession) -> Bool {
+    /// A failed take is in the library once its failure saved it, and Finder can point at its entry.
+    nonisolated static func revealsTakeInFinder(_ take: RecordingSession) -> Bool {
         take.failure?.save != nil
+    }
+
+    private var revealsInFinder: Bool {
+        guard let take else { return model?.failedFileURL != nil }
+        return Self.revealsTakeInFinder(take)
+    }
+
+    private func reveal() {
+        if take == nil { model?.revealFailedFile() } else { model?.revealFailedTake() }
     }
 
     private var title: LocalizedStringKey {

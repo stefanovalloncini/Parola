@@ -191,7 +191,7 @@ struct StageStateTests {
     }
 
     @MainActor
-    @Test("a failed take offers Show in Finder once its failure saved the audio, and its band greys")
+    @Test("a failed take offers Reveal in Finder once its failure saved the audio, and its band greys")
     func failedTakeLook() {
         var take = RecordingSession(
             takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture
@@ -199,13 +199,13 @@ struct StageStateTests {
         #expect(!StageBand.greys(take.state))
         take.fail("Nothing was recorded.")
         #expect(StageBand.greys(take.state))
-        #expect(!ErrorBanner.showsTakeInFinder(take), "nothing was recorded, so there is nothing to show")
+        #expect(!ErrorBanner.revealsTakeInFinder(take), "nothing was recorded, so there is nothing to reveal")
         take.failure = RecordingSession.Failure(
             audioURL: URL(fileURLWithPath: "/tmp/parola-stage-failed.wav"),
             save: Task<LibraryEntry, any Error> { throw CancellationError() },
             recovery: nil, title: "R", category: .transcription, source: .microphone, annotations: AppModel.TakeAnnotations()
         )
-        #expect(ErrorBanner.showsTakeInFinder(take))
+        #expect(ErrorBanner.revealsTakeInFinder(take))
     }
 
     @MainActor
@@ -248,6 +248,27 @@ struct StageStateTests {
         #expect(abs(clockIs.midY - clockWas.midY) < 1, "the clock stays put")
         #expect(abs(bandIs.midY - bandWas.midY) < 1, "the band stays put")
         #expect(bannerIs.minY > bandIs.maxY || bannerIs.maxY < bandIs.minY, "the banner sits clear of the band")
+    }
+
+    @MainActor
+    @Test("a failed take's banner reveals its entry under the one Reveal in Finder the app uses")
+    func failedBannerRevealsInFinder() throws {
+        let model = makeRecordingModel("stage-failed-reveal")
+        var failed = liveTake()
+        failed.fail("The model stopped answering.")
+        failed.failure = RecordingSession.Failure(
+            audioURL: URL(fileURLWithPath: "/tmp/parola-stage-reveal.wav"),
+            save: Task<LibraryEntry, any Error> { throw CancellationError() },
+            recovery: nil, title: "R", category: .transcription, source: .microphone, annotations: AppModel.TakeAnnotations()
+        )
+
+        let hosted = stage(failed, model: model)
+
+        let reveal = hosted.elements.first { $0.identifier?.hasSuffix("Error.Button.RevealInFinder") == true }
+        let button = try #require(reveal)
+        #expect(button.words.contains("Reveal in Finder"))
+        let showWords = hosted.elements.filter { $0.words.contains("Show in Finder") }
+        #expect(showWords.isEmpty)
     }
 
     @MainActor
@@ -309,7 +330,9 @@ struct StageStateTests {
         #expect(String(localized: "Finishing the recording", bundle: it) == "Chiusura della registrazione in corso")
         #expect(String(localized: "Cancel Recording", bundle: it) == "Annulla registrazione")
         #expect(String(localized: "Transcript appears here as it comes in", bundle: it) == "La trascrizione appare qui man mano che arriva")
-        #expect(String(localized: "Show in Finder", bundle: it) == "Mostra nel Finder")
+        #expect(String(localized: "Reveal in Finder", bundle: it) == "Mostra nel Finder")
+        #expect(String(localized: "This recording was deleted. Restore it from Recently Deleted to try again.", bundle: it)
+            == "Questa registrazione è stata eliminata. Ripristinala da Eliminati di recente per riprovare.")
         #expect(String(localized: "The recording stopped", bundle: it) == "La registrazione si è interrotta")
     }
 
@@ -402,7 +425,7 @@ extension TranscriberMockSuites {
             #expect(saved?.title.hasSuffix("(interrupted)") == true)
         }
 
-        @Test("a take whose transcription fails keeps its Stage, with Retry and Show in Finder on the audio it saved")
+        @Test("a take whose transcription fails keeps its Stage, with Retry and Reveal in Finder on the entry it saved")
         func failedTakeKeepsItsStage() async throws {
             let audio = try makeTakeWAV("stage-failed", seconds: 1)
             defer { try? FileManager.default.removeItem(at: audio) }
@@ -425,16 +448,21 @@ extension TranscriberMockSuites {
                 #expect(ContentRoutes.stageShows(take, model: model), "the Stage stays with the failed take")
                 #expect(message?.hasSuffix("The audio was saved to your library.") == true)
                 #expect(take.failure != nil, "Retry has what it needs")
-                #expect(ErrorBanner.showsTakeInFinder(take))
+                #expect(ErrorBanner.revealsTakeInFinder(take))
                 let failure = try #require(take.failure)
-                let shown = await model.savedAudio(of: failure)
                 let landed = await landedEntry(model)
                 let entry = try #require(landed)
                 #expect(entry.title.hasSuffix("(transcription failed)"))
-                let inLibrary = shown?.path.hasPrefix(model.library.libraryURL.path) ?? false
-                let exists = shown.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
-                #expect(inLibrary, "Finder shows the entry's copy, not the working file")
-                #expect(exists)
+                let reveal = await model.takeReveal(for: failure)
+                #expect(reveal == .reveal(entry.bundleURL), "Finder selects the entry, as a library row does")
+
+                try await model.library.delete(entry.id)
+                let deleted = await model.takeReveal(for: failure)
+                #expect(deleted == .deleted(restorable: true))
+                let restorable = AppModel.deletedTakeNotice(restorable: true).message
+                let purged = AppModel.deletedTakeNotice(restorable: false).message
+                #expect(restorable == "This recording was deleted. Restore it from Recently Deleted to try again.")
+                #expect(purged == "This recording was deleted.")
 
                 model.dismissTakeFailure()
                 #expect(model.recording == nil)
