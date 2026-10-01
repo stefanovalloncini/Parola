@@ -432,7 +432,7 @@ extension AppModel {
         await labelSides(ofEntry: entryID)
         settleMicTrackRecord(record, entryID: entryID)
         refreshLibrary()
-        if added, notifies, !loaded.document.transcript.segments.isEmpty { noteMicTrackAdded(to: loaded.entry) }
+        if added, notifies, loaded.entry.deletedAt == nil, !loaded.document.transcript.segments.isEmpty { noteMicTrackAdded(to: loaded.entry) }
         return true
     }
 

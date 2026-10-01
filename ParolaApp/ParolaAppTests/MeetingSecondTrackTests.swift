@@ -1271,7 +1271,7 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("a waiting mic whose entry was purged goes at the next launch, with its record; one in Recently Deleted is still folded in")
+        @Test("a waiting mic whose entry was purged goes at the next launch, with its record; one in Recently Deleted is still folded in, quietly")
         func purgedEntryLetsItsMicGo() async throws {
             let library = makeTempLibraryURL("second-track-purged")
             let files = try crashedMeeting(in: library, age: 3_600)
@@ -1283,6 +1283,9 @@ extension TranscriberMockSuites {
             let recorded = await waitUntil { model.micTrackRecords[entry.id] != nil }
             #expect(recorded)
 
+            _ = try await model.library.mutateTranscript(for: entry.id) { transcript in
+                transcript.segments = [TranscriptSegment(id: 0, start: 0, end: 1, text: "Welcome, everyone.")]
+            }
             try await model.library.delete(entry.id)
             try repairMic(files.mic)
             model.recoveryOwner = nil
@@ -1293,6 +1296,7 @@ extension TranscriberMockSuites {
             let deletedAudio = try #require(deleted.document.audioURL)
             #expect(try channels(of: deletedAudio) == 2, "Recently Deleted keeps the whole meeting")
             #expect(!exists(files.mic))
+            #expect(second.exportNotice == nil, "no Transcribe Again for a transcript in Recently Deleted")
 
             let purgedLibrary = makeTempLibraryURL("second-track-purged-gone")
             let gone = try crashedMeeting(in: purgedLibrary, age: 3_600)
