@@ -4864,6 +4864,13 @@ final class AppModel {
         await withinQuitLimit { [weak self] in await self?.waitForTakeWork() }
     }
 
+    /// A test reset's wait: every take's save lands, or `limit` passes, before the library is wiped.
+    func settleTakeWork(within limit: Duration) async {
+        _ = await AsyncTimeout.run(limit, clock: clock) { @MainActor [weak self] in
+            while let work = self?.takeWork.values.first { await work.value }
+        }
+    }
+
     private func waitForTakeWork() async {
         takeTask?.cancel()
         guard !takeWork.isEmpty else { return }

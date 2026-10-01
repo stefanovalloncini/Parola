@@ -890,6 +890,32 @@ extension TranscriberMockSuites {
             model.cancelCurrentWork()
         }
 
+        @Test("resetTestState waits for a let-go take's save, so the library it wipes stays empty")
+        func resetWaitsForALetGoTake() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel("stage-live-reset")
+                let server = try ParolaAutomationServer(model: model)
+                let context = AutomationContext(model: model, server: server)
+                let lifecycle = Dictionary(uniqueKeysWithValues: server.lifecycleCommands().map { ($0.name, $0) })
+                let reset = try #require(lifecycle["resetTestState"])
+                let arguments = try reset.validate(AutomationArgs([:]))
+                let recording = await startLiveTake(model)
+                #expect(recording)
+                model.beforeLandingSave = { try await Task.sleep(for: .milliseconds(300)) }
+                model.stopRecordingAndTranscribe()
+
+                _ = try await reset.handler(arguments, context)
+
+                #expect(!model.hasPendingTakeWork, "the reset wiped the library with the take still saving")
+                let quiet = await waitUntil(timeoutMs: 10_000) { !model.hasPendingTakeWork }
+                #expect(quiet)
+                let entries = await model.library.list()
+                #expect(entries.isEmpty, "the take's save landed in the wiped library")
+                withExtendedLifetime(server) {}
+            }
+        }
+
         @Test("a live take let go with nothing in it says so rather than staying on transcribing")
         func emptyLetGoTakeSettles() async throws {
             try await withMocksCleared([.audioSource, .streaming]) {

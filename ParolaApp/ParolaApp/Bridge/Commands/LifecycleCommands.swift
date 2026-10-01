@@ -27,7 +27,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "resetTestState",
                 area: .test,
-                summary: "Wipes in-memory and on-disk state. Test-mode only.",
+                summary: "Wipes in-memory and on-disk state, once a take still saving lands (5 s at most). Test-mode only.",
                 kind: .mutating,
                 handler: { _, ctx in
                     guard ctx.model.mode == .test else {
@@ -36,6 +36,7 @@ extension ParolaAutomationServer {
                     let model = ctx.model
                     model.cancelAllTasks()
                     await ctx.server.releaseHeldStreamingStart()
+                    await model.settleTakeWork(within: .seconds(5))
                     model.dismissTakeSaved()
                     model.forgetTakeSession()
                     model.abortDictation()
