@@ -231,6 +231,14 @@ struct StageStateTests {
         #expect(text.hasSuffix(shown))
     }
 
+    @Test("the cut never splits a character built from several scalars, like a thumbs-up with a skin tone")
+    func takeTextKeepsWholeCharacters() {
+        let text = "x" + String(repeating: "👍🏽", count: 400)
+        let shown = StageTakeText.shown(text)
+        #expect(!shown.isEmpty)
+        #expect(text.hasSuffix(shown))
+    }
+
     @Test("a three-hour take's text costs a partial no more than the stretch it shows")
     func takeTextCostsItsTail() {
         let hours = String(repeating: "perché è già città, ", count: 7_500)
