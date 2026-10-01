@@ -23,4 +23,7 @@ extension DS.Motion {
     static let sidebarCollapse = SwiftUI.Animation.spring(duration: 0.35, bounce: 0)
     static let transcriptFollow = SwiftUI.Animation.easeOut(duration: 0.3)
     static let controlsMorph = SwiftUI.Animation.spring(duration: 0.45, bounce: 0.15)
+    static let takeLanding = SwiftUI.Animation.smooth(duration: 0.45)
+    /// Reduce Motion's stand-in for anything that would travel or morph.
+    static let crossfade = SwiftUI.Animation.easeInOut(duration: 0.25)
 }

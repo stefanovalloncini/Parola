@@ -140,6 +140,7 @@ struct TranscriptPane: View {
 
             transcriptBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .stageLandingDestination(.text)
 
             // In the column's flow, not over it: a toast on top of the media bar would cover the
             // transport for as long as it is up.
@@ -158,6 +159,7 @@ struct TranscriptPane: View {
             if model.player != nil {
                 Divider()
                 MediaBar()
+                    .stageLandingDestination(.band)
             }
         }
         .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: model.visibleDeliveryNotice)

@@ -74,6 +74,7 @@ struct MediaBar: View {
     private var readout: some View {
         HStack(spacing: DS.Spacing.small) {
             PlaybackTimeLabel(scrubbingTo: scrubbingTo)
+                .stageLandingDestination(.time)
             speedMenu
         }
     }

@@ -45,16 +45,19 @@ struct StagePage: View {
             Spacer(minLength: DS.Spacing.small)
             VStack(spacing: DS.Spacing.small) {
                 StageTimeSlot(take: take, isOnScreen: isOnScreen)
+                    .stageLanding(.time, from: take)
                 StageFacts(take: take, isOnScreen: isOnScreen)
             }
             Spacer(minLength: DS.Spacing.large)
                 .frame(maxHeight: 44)
             stageBand
                 .frame(height: StageBand.height)
+                .stageLanding(.band, from: take)
             Spacer(minLength: DS.Spacing.large)
                 .frame(maxHeight: 44)
             stageText
                 .frame(minHeight: StageLiveText.minHeight, maxHeight: StageLiveText.height)
+                .stageLanding(.text, from: take)
                 // Ahead of the spacers: a short window gives up spacing first, then lines, never the bar's clearance.
                 .layoutPriority(1)
             Spacer(minLength: 0)
@@ -228,6 +231,9 @@ struct StageClock: View {
         let seconds = Int(take.elapsed(at: date))
         return Text(verbatim: Self.text(seconds: seconds))
             .font(font)
+            // Shrinks with its frame as a landing carries it into the media bar's duration.
+            .lineLimit(1)
+            .minimumScaleFactor(0.1)
             .contentTransition(rolls && !reduceMotion ? .numericText() : .identity)
             .animation(rolls && !reduceMotion ? .snappy(duration: 0.3) : nil, value: seconds)
             .accessibilityLabel("Recording time")

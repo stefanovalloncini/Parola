@@ -4,6 +4,8 @@ import ParolaCore
 struct ContentRoutes: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var landing
+    @State private var shownRouteID: RouteID?
 
     var body: some View {
         routedContent
@@ -21,8 +23,9 @@ struct ContentRoutes: View {
                 .id(model.route)
                 .transition(.opacity)
         }
-        // No crossfade into the Stage: it plays its own entrance, and the page it replaces must be gone before the sidebar folds.
-        .animation(reduceMotion || routeID == .stage ? nil : DS.Motion.route, value: routeID)
+        .animation(Self.routeAnimation(from: shownRouteID, to: routeID, reduceMotion: reduceMotion), value: routeID)
+        .onChange(of: routeID, initial: true) { _, shown in shownRouteID = shown }
+        .environment(\.stageLanding, landing)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 if let notice = model.exportNotice {
@@ -82,6 +85,12 @@ struct ContentRoutes: View {
     }
 
     private var routeID: RouteID { Self.routeID(for: model) }
+
+    /// Leaving the Stage takes the landing's time, a crossfade under Reduce Motion; nothing fades into it, so the page it replaces is gone before the sidebar folds.
+    static func routeAnimation(from shown: RouteID?, to next: RouteID, reduceMotion: Bool) -> Animation? {
+        if shown == .stage, next != .stage { return reduceMotion ? DS.Motion.crossfade : DS.Motion.takeLanding }
+        return reduceMotion || next == .stage ? nil : DS.Motion.route
+    }
 
     /// Coarse on purpose: one case per library filter keeps the list's identity across a category switch.
     static func routeID(for model: AppModel) -> RouteID {

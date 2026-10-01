@@ -146,6 +146,44 @@ struct StageStateTests {
         #expect(StageControls.layoutChange(reduceMotion: false) == DS.Motion.controlsMorph)
     }
 
+    @Test("the Stage hands its pieces on only while its take winds down, and nothing travels under Reduce Motion")
+    func landingOffers() {
+        #expect(!StageLanding.stageOffers(.arming(.countIn(remaining: 3))))
+        #expect(!StageLanding.stageOffers(.recording))
+        #expect(!StageLanding.stageOffers(.paused(since: Date())))
+        #expect(!StageLanding.stageOffers(.failed(message: "The microphone stopped.")))
+        #expect(StageLanding.stageOffers(.finishing))
+        #expect(StageLanding.stageOffers(.transcribing(progress: 0.5)))
+        #expect(StageLanding.stageOffers(.done(entryID: nil)))
+        #expect(StageLanding.carries(eligible: true, reduceMotion: false))
+        #expect(!StageLanding.carries(eligible: true, reduceMotion: true))
+        #expect(!StageLanding.carries(eligible: false, reduceMotion: false))
+    }
+
+    @Test("each piece links across only while both sides carry it, the band, the time and the words each to their own place")
+    func landingPieces() {
+        for piece in [StageLanding.Piece.band, .time, .text] {
+            #expect(StageLanding.id(piece, on: .stage, carries: true) == StageLanding.id(piece, on: .transcript, carries: true))
+            #expect(StageLanding.id(piece, on: .stage, carries: false) != StageLanding.id(piece, on: .transcript, carries: false))
+            #expect(StageLanding.id(piece, on: .stage, carries: true) != StageLanding.id(piece, on: .transcript, carries: false))
+        }
+        #expect(StageLanding.id(.band, on: .stage, carries: true) != StageLanding.id(.text, on: .transcript, carries: true))
+        #expect(StageLanding.properties(.text) == .position, "the transcript is never laid out again mid-flight")
+        #expect(StageLanding.anchor(.text) == .topLeading, "the words travel by their first line")
+        #expect(StageLanding.properties(.band) == .frame)
+        #expect(StageLanding.properties(.time) == .frame)
+    }
+
+    @MainActor
+    @Test("leaving the Stage takes the landing's time, a crossfade under Reduce Motion, and nothing fades into the Stage")
+    func landingRouteAnimation() {
+        #expect(ContentRoutes.routeAnimation(from: .stage, to: .phase, reduceMotion: false) == DS.Motion.takeLanding)
+        #expect(ContentRoutes.routeAnimation(from: .stage, to: .phase, reduceMotion: true) == DS.Motion.crossfade)
+        #expect(ContentRoutes.routeAnimation(from: .library, to: .stage, reduceMotion: false) == nil)
+        #expect(ContentRoutes.routeAnimation(from: .library, to: .statistics, reduceMotion: false) == DS.Motion.route)
+        #expect(ContentRoutes.routeAnimation(from: .library, to: .statistics, reduceMotion: true) == nil)
+    }
+
     @Test("Esc cancels a take that is still starting, except while the title field has the keyboard")
     func escapeLeavesTheTitleAlone() {
         #expect(StageControls.cancelShortcut(titleFocused: false) == .cancelAction)
@@ -522,6 +560,36 @@ extension TranscriberMockSuites {
                 let saved = try #require(await landedEntry(model))
                 #expect(saved.title.hasSuffix("(not transcribed)"))
                 await gate.open()
+            }
+        }
+
+        @Test("the transcript a take lands as takes the Stage's pieces through its save, and lets go once a new take starts")
+        func landingTranscriptIsTheTake() async throws {
+            let audio = try makeTakeWAV("stage-landing-gate", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "landed words")])
+                let model = makeModel("stage-landing-gate")
+                let before = StageLanding.transcriptIsTheTake(model)
+                #expect(!before)
+
+                recordAndStop(model, audio: audio, seconds: 1)
+
+                let onScreen = await waitUntil { model.route == .transcript && model.transcript != nil }
+                #expect(onScreen)
+                let atLanding = StageLanding.transcriptIsTheTake(model)
+                #expect(atLanding)
+                let landed = await landedEntry(model)
+                let entry = try #require(landed)
+                let moved = await waitUntil { model.recording?.state == .done(entryID: entry.id) && model.sourceFileURL != audio }
+                #expect(moved, "the save moved playback onto the entry's own audio")
+                let afterSave = StageLanding.transcriptIsTheTake(model)
+                #expect(afterSave, "a landing still in flight keeps its pieces when the save lands")
+
+                model.installTestTake(source: .microphone)
+                let newTake = StageLanding.transcriptIsTheTake(model)
+                #expect(!newTake)
+                model.endTestTake()
             }
         }
 
