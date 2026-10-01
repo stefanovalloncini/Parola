@@ -3385,6 +3385,14 @@ final class AppModel {
         forgetTakeRequest()
     }
 
+    /// Picks the microphone a take still counting in will open, as the Microphone setting; false once the take may have opened one.
+    @discardableResult
+    func chooseTakeInput(_ uid: String) -> Bool {
+        guard recording?.isCountingIn == true else { return false }
+        inputDeviceUID = uid
+        return true
+    }
+
     /// A count-in refused before its take began ends there, with the reason; its failed Stage keeps the id, so the next take gets its own.
     func failCountIn(_ message: String) {
         if recordingCountdown != nil {

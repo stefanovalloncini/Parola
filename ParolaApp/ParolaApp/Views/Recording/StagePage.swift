@@ -368,7 +368,7 @@ struct StageTranscribingStatus: View {
     }
 }
 
-/// The input a take listens on. A take keeps its input to the end, so the menu lists the Mac's inputs without switching.
+/// The input a take listens on. A take keeps its input to the end, so once it is past its count-in the menu lists the Mac's inputs without switching.
 struct StageDeviceMenu: View {
     let take: RecordingSession
     @Environment(AppModel.self) private var model
@@ -378,21 +378,21 @@ struct StageDeviceMenu: View {
         Group {
             if take.source == .microphone {
                 Menu {
-                    Picker("Input device", selection: .constant(checkedUID)) {
+                    Picker("Input device", selection: Binding(get: { checkedUID }, set: { model.chooseTakeInput($0) })) {
                         ForEach(devices) { device in
                             Text(verbatim: device.name).tag(device.uid)
                         }
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
-                    .disabled(true)
+                    .disabled(!take.isCountingIn)
                 } label: {
                     label(name: deviceName, opensMenu: true)
                 }
                 .menuStyle(.button)
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
-                .help("Stop the recording to change the microphone")
+                .help(take.isCountingIn ? Text("Choose the microphone for this recording") : Text("Stop the recording to change the microphone"))
                 .accessibilityLabel("Input device")
                 .accessibilityValue(Text(verbatim: deviceName))
                 .axLeaf("Stage.Menu.Device")
@@ -419,8 +419,9 @@ struct StageDeviceMenu: View {
         .contentShape(Rectangle())
     }
 
+    /// Before the take names its input, the one it will open.
     private var deviceName: String {
-        take.device ?? String(localized: "Microphone")
+        take.device ?? devices.first { $0.uid == checkedUID }?.name ?? String(localized: "Microphone")
     }
 
     private var checkedUID: String {

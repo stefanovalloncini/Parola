@@ -80,6 +80,12 @@ struct RecordingSession: Equatable, Sendable {
         return false
     }
 
+    /// Counting in: the take hasn't named or opened its input yet.
+    var isCountingIn: Bool {
+        if case .arming(.countIn) = state { return true }
+        return false
+    }
+
     var isPaused: Bool {
         if case .paused = state { return true }
         return false

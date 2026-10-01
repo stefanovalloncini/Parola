@@ -3281,6 +3281,17 @@
         }
       }
     },
+    "Choose the microphone for this recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli il microfono per questa registrazione"
+          }
+        }
+      }
+    },
     "Choose which formats to write next to each transcribed file.": {
       "extractionState": "manual",
       "localizations": {

@@ -158,6 +158,69 @@ struct MeetingDefaultsTests {
         #expect(StageFacts.silenceWarning(source: .systemAudio, micTrack: nil, bundle: english) == mac)
         #expect(StageFacts.silenceWarning(source: .microphone, micTrack: nil, bundle: english) == "No voice detected — check your microphone.")
     }
+
+    // MARK: - The device menu before a take
+
+    @Test("only a take still counting in can change its microphone; from its start on, it may have opened one")
+    func countInChoosesTheInput() {
+        var take = RecordingSession(
+            takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .countIn(remaining: 3)
+        )
+        #expect(take.isCountingIn)
+        _ = take.arm(.startingCapture)
+        #expect(!take.isCountingIn)
+        _ = take.arm(.preparingModel(name: "openai_whisper-tiny", download: nil))
+        #expect(!take.isCountingIn)
+        _ = take.markCapturing(at: Date())
+        #expect(!take.isCountingIn)
+        _ = take.pause(at: Date())
+        #expect(!take.isCountingIn)
+    }
+
+    @Test("the device menu's words have their Italian")
+    func deviceMenuItalian() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let it = try #require(Bundle(path: path))
+        #expect(String(localized: "Choose the microphone for this recording", bundle: it) == "Scegli il microfono per questa registrazione")
+    }
+}
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("Stage device menu takes", .serialized)
+    struct StageDeviceMenuTakeTests {
+        @Test("the device menu picks the microphone while the take counts in, and the take opens that one; once it starts, it only shows it")
+        func countInPicksTheMicrophone() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeRecordingModel("device-count-in")
+                model.useStreaming = false
+                let audio = try makeTakeWAV("device-count-in")
+                defer { try? FileManager.default.removeItem(at: audio) }
+                var openedOn: [String?] = []
+                model.takeCaptureOverride = { _ in
+                    openedOn.append(model.preferredInputDeviceUID)
+                    return StubSource(url: audio)
+                }
+                model.inputDeviceUID = "built-in"
+                model.recordingCountInSeconds = 1
+
+                model.startRecording(source: .microphone)
+                #expect(model.recording?.isCountingIn == true)
+                #expect(model.chooseTakeInput("usb"))
+                #expect(model.inputDeviceUID == "usb", "written where the Microphone setting writes it")
+
+                let opened = await waitUntil(timeoutMs: 10_000) { !openedOn.isEmpty }
+                #expect(opened)
+                #expect(openedOn == ["usb"])
+                #expect(!model.chooseTakeInput("built-in"))
+                #expect(model.inputDeviceUID == "usb", "a take past its count-in keeps the input it opened")
+
+                model.cancelCurrentWork()
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+            }
+        }
+    }
 }
 
 /// A capture whose meter reads whatever the test records into it.
