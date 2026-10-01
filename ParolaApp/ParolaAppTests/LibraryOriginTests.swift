@@ -370,7 +370,7 @@ struct LibraryOriginTests {
         #expect(model.canReturnToOrigin)
     }
 
-    // MARK: - Where the link shows    // MARK: - Where the link shows
+    // MARK: - Where the link shows
 
     @Test("the back link needs a transcript standing on its own")
     func linkVisibility() async throws {
