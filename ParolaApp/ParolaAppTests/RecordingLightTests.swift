@@ -160,14 +160,15 @@ struct RecordingLightSurfaceTests {
         return HostedWindow(face, width: 400, height: 80)
     }
 
-    private func pill(_ model: AppModel) -> HostedWindow {
-        HostedWindow(RecordingPillView(model: model, onShowParola: {}, onStop: {}, onSize: { _ in }), width: 400, height: 80)
+    private func pill(_ model: AppModel, onScreen: Bool) -> HostedWindow {
+        let face = RecordingPillFace(model: model, isOnScreen: onScreen, onShowParola: {}, onStop: {}, onSize: { _ in })
+        return HostedWindow(face, width: 400, height: 80)
     }
 
     /// The Stage's, the capsule's and the pill's lights that pulse for the model's take as it stands.
     private func pulsing(_ model: AppModel, onScreen: Bool = true) throws -> [Int] {
         let take = try #require(model.recording)
-        let surfaces = [stage(take, model, onScreen: onScreen), capsule(take, onScreen: onScreen), pill(model)]
+        let surfaces = [stage(take, model, onScreen: onScreen), capsule(take, onScreen: onScreen), pill(model, onScreen: onScreen)]
         defer { surfaces.forEach { $0.close() } }
         return surfaces.map(pulsingLights(in:))
     }
@@ -189,7 +190,7 @@ struct RecordingLightSurfaceTests {
         let finishing = try pulsing(model)
 
         #expect(recording == [1, 1, 1])
-        #expect(covered == [0, 0, 1], "the main window's lights rest while it is out of sight; the pill floats on its own")
+        #expect(covered == [0, 0, 0], "every light rests while its window is out of sight")
         #expect(model.recording?.state == .finishing)
         #expect(paused == [0, 0, 0])
         #expect(finishing == [0, 0, 0])

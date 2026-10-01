@@ -134,9 +134,25 @@ final class RecordingPill {
     }
 }
 
-/// The pill's face: the take's light and clock, which a click answers with Parola, three bars of level, and a solid red Stop.
+/// The pill as its panel shows it; the face rests while the panel is hidden, as it is while Parola is in front.
 struct RecordingPillView: View {
     let model: AppModel
+    let onShowParola: () -> Void
+    let onStop: () -> Void
+    let onSize: (CGSize) -> Void
+    @State private var isOnScreen = true
+
+    var body: some View {
+        RecordingPillFace(model: model, isOnScreen: isOnScreen, onShowParola: onShowParola, onStop: onStop, onSize: onSize)
+            .background(WindowShownReader { isOnScreen = $0 })
+    }
+}
+
+/// The pill's face: the take's light and clock, which a click answers with Parola, three bars of level, and a solid red Stop.
+struct RecordingPillFace: View {
+    let model: AppModel
+    /// Off while the panel is hidden, so the clock, the light and the meter stop drawing.
+    let isOnScreen: Bool
     let onShowParola: () -> Void
     let onStop: () -> Void
     let onSize: (CGSize) -> Void
@@ -145,7 +161,7 @@ struct RecordingPillView: View {
 
     var body: some View {
         if let take = model.recording {
-            if take.state == .recording, let origin = take.clockOrigin {
+            if isOnScreen, take.state == .recording, let origin = take.clockOrigin {
                 TimelineView(.periodic(from: origin, by: 1)) { context in
                     face(take, at: context.date)
                 }
@@ -161,7 +177,7 @@ struct RecordingPillView: View {
                 HStack(spacing: DS.Spacing.small) {
                     RecDot(
                         color: TakeRemote.lamp(for: take).tint.color,
-                        pulsesFrom: take.state == .recording ? take.clockOrigin : nil
+                        pulsesFrom: isOnScreen && take.state == .recording ? take.clockOrigin : nil
                     )
                     Text(verbatim: RecordingStatusItem.clock(for: take, now: now))
                         .font(DS.Font.takeTimerCompact)
@@ -174,7 +190,7 @@ struct RecordingPillView: View {
             .accessibilityLabel(Text(verbatim: TakeRemote.spokenStatus(for: take, at: now)))
             .accessibilityHint("Show Parola")
             .axLeaf("Button.ShowParola")
-            PillMeter(model: model, paused: take.isPaused)
+            PillMeter(model: model, paused: take.isPaused, isOnScreen: isOnScreen)
             Button(action: onStop) {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 10, weight: .bold))
@@ -203,16 +219,19 @@ struct RecordingPillView: View {
 private struct PillMeter: View {
     let model: AppModel
     let paused: Bool
+    let isOnScreen: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     nonisolated static let barCount = 3
     nonisolated static let height: CGFloat = 16
 
+    private var follows: Bool { isOnScreen && !paused }
+
     var body: some View {
         if reduceMotion {
-            TimelineView(.animation(minimumInterval: 0.25, paused: paused)) { _ in bars }
+            TimelineView(.animation(minimumInterval: 0.25, paused: !follows)) { _ in bars }
         } else {
-            let _ = paused ? 0 : model.takeLevelTick
+            let _ = follows ? model.takeLevelTick : 0
             bars
         }
     }
