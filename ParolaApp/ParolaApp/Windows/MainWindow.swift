@@ -25,7 +25,16 @@ extension View {
     }
 }
 
-/// Keeps `AppModel.mainWindow` on the window this content sits in, and lets go of it as that window closes.
+/// The main window's title: the app's name, or "Recording — Parola" while a take runs, for the Window menu, Mission Control and VoiceOver.
+enum MainWindowTitle {
+    nonisolated static let resting = "Parola"
+
+    nonisolated static func title(takeRunning: Bool, bundle: Bundle = .main) -> String {
+        takeRunning ? String(localized: "Recording — Parola", bundle: bundle) : resting
+    }
+}
+
+/// Keeps `AppModel.mainWindow` on the window this content sits in, and lets go of it as that window closes; the title follows the take.
 struct MainWindowReporter: NSViewRepresentable {
     let model: AppModel
 
@@ -38,6 +47,7 @@ struct MainWindowReporter: NSViewRepresentable {
     private final class ReportingView: NSView {
         private weak var model: AppModel?
         private var observer: (any NSObjectProtocol)?
+        private var followsTake = false
 
         init(model: AppModel) {
             self.model = model
@@ -64,6 +74,31 @@ struct MainWindowReporter: NSViewRepresentable {
                     if let model, model.mainWindow === window { model.mainWindow = nil }
                 }
             }
+            followTake()
+        }
+
+        /// One observation at a time, however often the view joins a window.
+        private func followTake() {
+            guard !followsTake, let model else {
+                nameWindow()
+                return
+            }
+            followsTake = true
+            withObservationTracking {
+                _ = model.takeIsRunning
+                nameWindow()
+            } onChange: { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.followsTake = false
+                    self?.followTake()
+                }
+            }
+        }
+
+        private func nameWindow() {
+            guard let model, let window else { return }
+            let title = MainWindowTitle.title(takeRunning: model.takeIsRunning)
+            if window.title != title { window.title = title }
         }
     }
 }

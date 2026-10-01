@@ -11527,6 +11527,17 @@
         }
       }
     },
+    "Recording — Parola": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione — Parola"
+          }
+        }
+      }
+    },
     "Recording, %@": {
       "extractionState": "manual",
       "localizations": {

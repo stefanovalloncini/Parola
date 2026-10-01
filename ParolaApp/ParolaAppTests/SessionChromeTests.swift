@@ -242,3 +242,68 @@ struct SidebarRecordingRowTests {
         #expect(gone)
     }
 }
+
+@MainActor
+private func reportedWindow(_ model: AppModel) -> NSWindow {
+    let window = NSWindow(
+        contentRect: NSRect(x: -12_000, y: -12_000, width: 240, height: 120),
+        styleMask: [.titled, .closable],
+        backing: .buffered,
+        defer: true
+    )
+    window.isReleasedWhenClosed = false
+    window.title = MainWindowTitle.resting
+    window.contentView = NSHostingView(rootView: Color.clear.background(MainWindowReporter(model: model)))
+    window.contentView?.layoutSubtreeIfNeeded()
+    return window
+}
+
+@MainActor
+@Suite("Main window title", .serialized)
+struct MainWindowTitleTests {
+    @Test("the window reads Recording while a take runs, and Parola again once it ends")
+    func titleFollowsTheTake() async throws {
+        let audio = try tempWAV("window-title")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("window-title")
+        let window = reportedWindow(model)
+        defer { window.close() }
+        #expect(window.title == "Parola")
+
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        let named = await waitUntil { window.title == "Recording — Parola" }
+        #expect(named)
+        #expect(model.pauseTake())
+        await settle()
+        #expect(window.title == "Recording — Parola", "a paused take still runs")
+
+        model.endTestTake()
+        let rested = await waitUntil { window.title == "Parola" }
+        #expect(rested)
+    }
+
+    @Test("a window opened during a take is named for it at once")
+    func windowOpenedMidTake() throws {
+        let audio = try tempWAV("window-title-reopen")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("window-title-reopen")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        defer { model.endTestTake() }
+
+        let window = reportedWindow(model)
+        defer { window.close() }
+
+        #expect(window.title == "Recording — Parola")
+    }
+
+    @Test("the take's title trips no window filter: not the Mini Player's, not Settings', in either language")
+    func titleTripsNoFilter() throws {
+        let it = try italianBundle()
+        for title in [MainWindowTitle.title(takeRunning: true), MainWindowTitle.title(takeRunning: true, bundle: it)] {
+            #expect(!title.contains("Mini"))
+            #expect(!SettingsWindowClassifier.isSettings(identifier: nil, title: title, isMainWindow: false, isTitled: true))
+        }
+        #expect(MainWindowTitle.title(takeRunning: true, bundle: it) == "Registrazione — Parola")
+        #expect(MainWindowTitle.title(takeRunning: false, bundle: it) == "Parola")
+    }
+}
