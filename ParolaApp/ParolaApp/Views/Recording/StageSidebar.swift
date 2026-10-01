@@ -40,7 +40,10 @@ final class MainSidebar {
     /// The split view's own changes, from its toolbar toggle or a drag; one made while a take holds the sidebar is the user's to keep.
     func userSet(_ newValue: NavigationSplitViewVisibility) {
         guard newValue != visibility else { return }
-        if visibilityBeforeTake != nil { movedDuringTake = true }
+        if visibilityBeforeTake != nil {
+            movedDuringTake = true
+            defaults.removeObject(forKey: Self.foldedByTakeKey)
+        }
         visibility = newValue
     }
 

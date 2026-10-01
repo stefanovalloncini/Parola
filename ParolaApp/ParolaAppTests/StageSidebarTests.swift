@@ -93,6 +93,21 @@ struct StageSidebarTests {
         #expect(relaunched.visibility == .detailOnly)
     }
 
+    @Test("a sidebar the user moves during the take is theirs: a crash after it leaves it as they left it")
+    func userMoveDropsTheMark() {
+        let defaults = temporaryDefaults()
+        let before = MainSidebar(defaults: defaults)
+        before.hold(true, animation: nil)
+        before.userSet(.all)
+        before.userSet(.detailOnly)
+        #expect(!defaults.bool(forKey: MainSidebar.foldedByTakeKey))
+
+        let relaunched = MainSidebar(defaults: defaults)
+        relaunched.userSet(.detailOnly)
+        relaunched.hold(false, animation: nil)
+        #expect(relaunched.visibility == .detailOnly)
+    }
+
     @Test("a take that ends clears its mark")
     func releaseClearsTheMark() {
         let defaults = temporaryDefaults()
