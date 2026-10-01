@@ -88,6 +88,22 @@ struct StageStateTests {
         #expect(StageFacts.transcribingLine(stage: .preparingAudio, progress: 0.1) == "Transcribing… · 10%")
     }
 
+    @Test("the facts line says how long the run has left once it can tell")
+    func transcribingTimeLeft() {
+        #expect(StageFacts.transcribingLine(stage: .transcribing, progress: 0.42, remaining: 725) == "Transcribing… · 42% · 12 min left")
+        #expect(StageFacts.transcribingLine(stage: .transcribing, progress: 0.9, remaining: 38) == "Transcribing… · 90% · 38 s left")
+        #expect(StageFacts.transcribingLine(stage: .transcribing, progress: 0.42, remaining: 2 * 3600 + 5 * 60) == "Transcribing… · 42% · 2 h 5 min left")
+        #expect(StageFacts.transcribingLine(stage: .transcribing, progress: 0.42, remaining: nil) == "Transcribing… · 42%")
+        #expect(StageFacts.transcribingLine(stage: .transcribing, progress: 1, remaining: 0) == "Transcribing… · 100%")
+        #expect(StageFacts.transcribingLine(stage: nil, progress: nil, remaining: 60) == "Transcribing…", "no countdown without a percentage")
+    }
+
+    @Test("a stopped take's quiet line promises words as they come only from an engine that sends them")
+    func takeQuietLine() {
+        #expect(StageTakeText.quietLine(streamsPartials: true) == "Transcript appears here as it comes in")
+        #expect(StageTakeText.quietLine(streamsPartials: false) == "Transcript appears when it's done")
+    }
+
     @MainActor
     @Test("the overview squeezes the whole take into the width and sweeps as far as the run has read")
     func overviewLayout() {

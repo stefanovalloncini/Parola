@@ -71,9 +71,14 @@ struct StageTakeText: View {
         StageTeleprompter(
             settled: Self.shown(model.takePartialText),
             partial: "",
-            quietLine: "Transcript appears here as it comes in",
+            quietLine: Self.quietLine(streamsPartials: model.activeEngineStreamsPartials),
             isOnScreen: isOnScreen
         )
+    }
+
+    /// An engine that sends no words until it is done, like Parakeet, never promises them sooner.
+    nonisolated static func quietLine(streamsPartials: Bool) -> LocalizedStringKey {
+        streamsPartials ? "Transcript appears here as it comes in" : "Transcript appears when it's done"
     }
 
     /// The run hands back everything it has read so far; an hour of it must not be laid out on every partial.

@@ -300,12 +300,18 @@ struct StageFacts: View {
             : String(localized: "Transcript after you stop", bundle: bundle)
     }
 
-    /// "Transcribing… · 42%" as the run reads the take; "Preparing audio…" while the engine has nothing to count yet.
-    nonisolated static func transcribingLine(stage: TranscribeStage?, progress: Double?, bundle: Bundle = .main) -> String {
+    /// "Transcribing… · 42% · 12 min left" as the run reads the take; "Preparing audio…" while the engine has nothing to count yet.
+    nonisolated static func transcribingLine(
+        stage: TranscribeStage?, progress: Double?, remaining: TimeInterval? = nil, bundle: Bundle = .main
+    ) -> String {
         if progress == nil, stage == .preparingAudio { return String(localized: "Preparing audio…", bundle: bundle) }
-        let line = String(localized: "Transcribing…", bundle: bundle)
+        var line = String(localized: "Transcribing…", bundle: bundle)
         guard let progress else { return line }
-        return line + " · " + AppFormat.percent(progress)
+        line += " · " + AppFormat.percent(progress)
+        if let words = LibraryRowFormat.duration(remaining, bundle: bundle) {
+            line += " · " + String(localized: "\(words) left", bundle: bundle)
+        }
+        return line
     }
 
     private var status: some View {
@@ -322,7 +328,7 @@ struct StageFacts: View {
                 statusWord("REC", color: DS.Color.secondaryText)
             case .transcribing(let progress):
                 RecDot(color: DS.Color.accent)
-                StageTranscribingStatus(progress: progress)
+                StageTranscribingStatus(progress: progress, ticks: isOnScreen)
             default:
                 RecDot(pulsesFrom: isOnScreen && take.state == .recording ? take.clockOrigin : nil)
                 statusWord("REC", color: DS.Color.dangerText)
@@ -354,13 +360,38 @@ struct StageFacts: View {
     }
 }
 
-/// Its own view, so the engine's stage changes redraw this line alone.
+/// Its own view, so the engine's stage changes and the countdown redraw this line alone.
 struct StageTranscribingStatus: View {
     let progress: Double?
+    /// Off while the Stage is out of sight, so the countdown stops ticking.
+    let ticks: Bool
     @Environment(AppModel.self) private var model
+    @State private var eta = ETACalculator()
+    @State private var finish: Date?
 
     var body: some View {
-        Text(verbatim: StageFacts.transcribingLine(stage: model.takeTranscribeStage, progress: progress))
+        Group {
+            if ticks, let finish {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    line(remaining: finish.timeIntervalSince(context.date))
+                }
+            } else {
+                line(remaining: finish?.timeIntervalSinceNow)
+            }
+        }
+        .onChange(of: progress, initial: true) { _, value in
+            guard let value else {
+                eta.reset()
+                finish = nil
+                return
+            }
+            eta.observe(progress: value)
+            finish = eta.projectedFinish()
+        }
+    }
+
+    private func line(remaining: TimeInterval?) -> some View {
+        Text(verbatim: StageFacts.transcribingLine(stage: model.takeTranscribeStage, progress: progress, remaining: remaining))
             .monospacedDigit()
     }
 }

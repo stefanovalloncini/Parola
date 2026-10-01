@@ -15695,6 +15695,17 @@
         }
       }
     },
+    "Transcript appears when it's done": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione appare quando è pronta"
+          }
+        }
+      }
+    },
     "Transcript appears when you stop": {
       "extractionState": "manual",
       "localizations": {
