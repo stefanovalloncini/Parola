@@ -79,7 +79,7 @@ struct StageControls: View {
         }
         .task(id: holdsPill) {
             guard holdsPill else { return }
-            try? await Task.sleep(for: Self.pillHold)
+            try? await Task.sleep(for: Self.pillHold, clock: model.clock)
             holdsPill = false
         }
         .alert("Discard this recording?", isPresented: confirmingDiscard, presenting: discarding) { takeID in

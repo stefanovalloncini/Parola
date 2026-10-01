@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import os
 import SwiftUI
 import Testing
 @testable import Parola
@@ -60,6 +61,21 @@ private actor HeldLandingSession: StreamingTranscriber {
         released = true
         waiter?.resume()
         waiter = nil
+    }
+}
+
+/// Stands still: each sleep waits until the test opens its gate, and notes how long it asked for.
+private struct HeldClock: Clock {
+    typealias Instant = ContinuousClock.Instant
+    let gate = FetchGate()
+    let asked = OSAllocatedUnfairLock<[Duration]>(initialState: [])
+    let now = ContinuousClock.now
+    var minimumResolution: Duration { .zero }
+
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+        asked.withLock { $0.append(now.duration(to: deadline)) }
+        await gate.wait()
+        try Task.checkCancellation()
     }
 }
 
@@ -555,9 +571,10 @@ struct StageStateTests {
     }
 
     @MainActor
-    @Test("a take that passes through finishing in a moment still shows its Finishing pill a while before Stop Transcribing")
+    @Test("a take that passes through finishing in a moment holds its Finishing pill on the model's clock, then shows Stop Transcribing")
     func pillHoldsOnScreen() async throws {
-        let model = makeRecordingModel("stage-pill-hold")
+        let clock = HeldClock()
+        let model = makeRecordingModel("stage-pill-hold", clock: clock)
         func controls(_ take: RecordingSession) -> some View {
             StageControls(take: take).environment(model)
         }
@@ -582,10 +599,13 @@ struct StageStateTests {
         await settle(for: .milliseconds(50))
         _ = take.transcribing(progress: nil)
         host.rootView = controls(take)
+        let holding = await waitUntil { clock.asked.withLock { $0 }.contains(StageControls.pillHold) }
+        #expect(holding)
         await settle(for: .milliseconds(50))
 
         #expect(shows("Stage.Label.Finishing"))
         #expect(!shows("Stage.Button.StopTranscribing"))
+        await clock.gate.open()
         let replaced = await waitUntil(timeoutMs: 3_000) { shows("Stage.Button.StopTranscribing") }
         #expect(replaced)
     }
