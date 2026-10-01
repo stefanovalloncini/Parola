@@ -53,7 +53,7 @@ struct StageControls: View {
     }
 
     static func layoutChange(reduceMotion: Bool) -> Animation {
-        reduceMotion ? .easeInOut(duration: 0.2) : DS.Motion.controlsMorph
+        reduceMotion ? DS.Motion.crossfade : DS.Motion.controlsMorph
     }
 
     /// A file take can pass through finishing in a moment; its pill stays this long, so the bar's fold plays out before Stop Transcribing takes its place.

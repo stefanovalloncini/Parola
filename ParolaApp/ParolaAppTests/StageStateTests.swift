@@ -142,7 +142,7 @@ struct StageStateTests {
         let controls: [StageControls.Control] = [.pause, .mark, .stop, .cancel, .discard, .finishing, .stopTranscribing]
         let shapes = controls.map { StageControls.glassShape($0, reduceMotion: true) }
         #expect(shapes == Array(repeating: nil, count: controls.count))
-        #expect(StageControls.layoutChange(reduceMotion: true) == .easeInOut(duration: 0.2))
+        #expect(StageControls.layoutChange(reduceMotion: true) == DS.Motion.crossfade)
         #expect(StageControls.layoutChange(reduceMotion: false) == DS.Motion.controlsMorph)
     }
 
@@ -172,6 +172,25 @@ struct StageStateTests {
         #expect(StageLanding.anchor(.text) == .topLeading, "the words travel by their first line")
         #expect(StageLanding.properties(.band) == .frame)
         #expect(StageLanding.properties(.time) == .frame)
+    }
+
+    @MainActor
+    @Test("under Reduce Motion the Stage only crossfades: a still dot, the band four times a second, no morph, nothing carried over")
+    func reduceMotionOnlyCrossfades() {
+        #expect(StagePage.entrance(reduceMotion: true) == DS.Motion.crossfade)
+        #expect(StagePage.entranceScale(entered: false, reduceMotion: true) == 1)
+        #expect(StagePage.controlsLift(entered: false, reduceMotion: true) == 0)
+        #expect(StagePage.entranceScale(entered: false, reduceMotion: false) < 1, "with motion the page grows into place")
+        #expect(StagePage.controlsLift(entered: false, reduceMotion: false) > 0)
+        #expect(RecDot.opacity(sincePulseStart: 12.5, reduceMotion: true) == 1)
+        #expect(RecDot.opacity(sincePulseStart: 12.5, reduceMotion: false) < 0.5)
+        #expect(RecDot.opacity(sincePulseStart: nil, reduceMotion: false) == 1)
+        #expect(StageBand.cadence(reduceMotion: true) == .steps(every: 0.25))
+        #expect(StageControls.layoutChange(reduceMotion: true) == DS.Motion.crossfade)
+        let shapes = [StageControls.Control.stop, .finishing].map { StageControls.glassShape($0, reduceMotion: true) }
+        #expect(shapes == [nil, nil])
+        #expect(!StageLanding.carries(eligible: true, reduceMotion: true))
+        #expect(ContentRoutes.routeAnimation(from: .stage, to: .phase, reduceMotion: true) == DS.Motion.crossfade)
     }
 
     @MainActor

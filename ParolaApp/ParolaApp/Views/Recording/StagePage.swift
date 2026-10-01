@@ -65,12 +65,12 @@ struct StagePage: View {
                 .frame(height: StageControls.reservedHeight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .scaleEffect(entered || reduceMotion ? 1 : 0.97)
+        .scaleEffect(Self.entranceScale(entered: entered, reduceMotion: reduceMotion))
         .opacity(entered ? 1 : 0)
         .overlay(alignment: .bottom) {
             StageControls(take: take)
                 .padding(.bottom, StageControls.bottomInset)
-                .offset(y: entered || reduceMotion ? 0 : 18)
+                .offset(y: Self.controlsLift(entered: entered, reduceMotion: reduceMotion))
                 .opacity(entered ? 1 : 0)
         }
         .background(WindowShownReader { isOnScreen = $0 })
@@ -120,6 +120,19 @@ struct StagePage: View {
         }
     }
 
+    /// The page grows a touch into place as its controls rise; under Reduce Motion both only fade in.
+    nonisolated static func entranceScale(entered: Bool, reduceMotion: Bool) -> CGFloat {
+        entered || reduceMotion ? 1 : 0.97
+    }
+
+    nonisolated static func controlsLift(entered: Bool, reduceMotion: Bool) -> CGFloat {
+        entered || reduceMotion ? 0 : 18
+    }
+
+    static func entrance(reduceMotion: Bool) -> Animation {
+        reduceMotion ? DS.Motion.crossfade : DS.Motion.takeEntry
+    }
+
     /// Only a take that just began plays the entrance; coming back from another page mid-take shows the Stage as it is.
     private func enter() {
         guard take.elapsed(at: Date()) < 1.5 else {
@@ -128,7 +141,7 @@ struct StagePage: View {
         }
         // The same hop the sidebar fold waits for, so the two start in one frame and read as one motion.
         Task { @MainActor in
-            withAnimation(reduceMotion ? .easeOut(duration: 0.25) : DS.Motion.takeEntry) {
+            withAnimation(Self.entrance(reduceMotion: reduceMotion)) {
                 entered = true
             }
         }
@@ -264,10 +277,16 @@ struct RecDot: View {
             Circle()
                 .fill(color)
                 .frame(width: side, height: side)
-                .opacity(pulsesFrom.map { reduceMotion ? 1 : Self.pulse(at: context.date.timeIntervalSince($0)) } ?? 1)
+                .opacity(Self.opacity(sincePulseStart: pulsesFrom.map { context.date.timeIntervalSince($0) }, reduceMotion: reduceMotion))
         }
         .frame(width: side, height: side)
         .accessibilityHidden(true)
+    }
+
+    /// Still at full strength under Reduce Motion, or with nothing to pulse from.
+    nonisolated static func opacity(sincePulseStart elapsed: TimeInterval?, reduceMotion: Bool) -> Double {
+        guard let elapsed, !reduceMotion else { return 1 }
+        return pulse(at: elapsed)
     }
 
     nonisolated static func pulse(at elapsed: TimeInterval) -> Double {
