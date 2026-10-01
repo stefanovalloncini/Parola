@@ -85,6 +85,21 @@ struct LinkPasteResponderTests {
         }
     }
 
+    @Test("⌘V stays on while a batch job runs, as New ▸ Transcribe Link… does")
+    func offeredDuringABatchJob() {
+        withPasteboard { pasteboard in
+            pasteboard.setString("https://youtu.be/abc123", forType: .string)
+            let model = makeModel(pasteboard: pasteboard)
+            let file = URL(fileURLWithPath: "/tmp/LinkPasteResponderTests-batch.m4a")
+            model.batchPhaseFile = file
+            model.phase = .transcribing(file: file)
+
+            #expect(model.batchOwnsPhase)
+            #expect(!ContentToolbar.isBusy(for: model), "the + menu's Transcribe Link… is on")
+            #expect(offers(model))
+        }
+    }
+
     @Test("⌘V isn't offered for an image, an empty clipboard, or a build without links")
     func notOffered() {
         withPasteboard { pasteboard in

@@ -30,7 +30,7 @@ final class LinkPasteResponder: NSResponder, NSUserInterfaceValidations {
               !model.recordingActive else {
             return false
         }
-        switch model.phase {
+        switch model.transcriptRoutePhase {
         case .idle, .ready, .failed: return PastedLink.mayHoldLink(on: model.linkPasteboard)
         default: return false
         }
