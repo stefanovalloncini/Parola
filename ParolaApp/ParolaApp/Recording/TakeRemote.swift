@@ -73,6 +73,7 @@ enum TakeRemote {
             model.cancelArmingTake()
             return true
         }
+        guard canDiscard(take) else { return false }
         let takeID = take.takeID
         askingToDiscard = true
         defer { askingToDiscard = false }

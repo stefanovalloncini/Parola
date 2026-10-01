@@ -401,7 +401,8 @@ struct MainWindowCloseAnswerTests {
         defer { model.endTestTake() }
         var closed = 0
 
-        await MainWindowClose.resolve(.keepRecording, model: model, confirmDiscard: { true }, close: { closed += 1 })
+        let takeID = try #require(model.recording?.takeID)
+        await MainWindowClose.resolve(.keepRecording, about: takeID, model: model, confirmDiscard: { true }, close: { closed += 1 })
 
         #expect(closed == 0)
         #expect(model.recording?.state == .recording)
@@ -417,12 +418,13 @@ struct MainWindowCloseAnswerTests {
         var confirmations = 0
         var closed = 0
 
-        await MainWindowClose.resolve(.discard, model: model, confirmDiscard: { confirmations += 1; return false }, close: { closed += 1 })
+        let takeID = try #require(model.recording?.takeID)
+        await MainWindowClose.resolve(.discard, about: takeID, model: model, confirmDiscard: { confirmations += 1; return false }, close: { closed += 1 })
         #expect(confirmations == 1)
         #expect(closed == 0)
         #expect(model.recording?.state == .recording)
 
-        await MainWindowClose.resolve(.discard, model: model, confirmDiscard: { confirmations += 1; return true }, close: { closed += 1 })
+        await MainWindowClose.resolve(.discard, about: takeID, model: model, confirmDiscard: { confirmations += 1; return true }, close: { closed += 1 })
         #expect(confirmations == 2)
         #expect(closed == 1)
         #expect(model.recording == nil)
@@ -609,13 +611,87 @@ extension TranscriberMockSuites {
                 model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
                 var closedWhileRunning: Bool?
 
-                await MainWindowClose.resolve(.stopAndSave, model: model, confirmDiscard: { false }, close: {
+                let takeID = try #require(model.recording?.takeID)
+                await MainWindowClose.resolve(.stopAndSave, about: takeID, model: model, confirmDiscard: { false }, close: {
                     closedWhileRunning = model.takeIsRunning
                 })
 
                 #expect(closedWhileRunning == false)
                 let landed = await landedEntry(model, timeoutMs: 30_000)
                 #expect(landed != nil)
+            }
+        }
+
+        @Test("a take that stops by itself under the close sheet is saved, not discarded, and nothing more is asked")
+        func takeStopsUnderTheSheet() async throws {
+            let audio = try makeTakeWAV("close-stops-itself", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "kept after all")])
+                let model = makeRecordingModel("close-stops-itself")
+                model.useStreaming = false
+                let window = closableWindow()
+                defer { window.close() }
+                model.mainWindow = window
+                var confirmations = 0
+                MainWindowCloseGuard.install(
+                    on: window, model: model,
+                    ask: { _ in model.stopRecordingAndTranscribe(); return .discard },
+                    confirmDiscard: { _ in confirmations += 1; return true }
+                )
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+
+                window.performClose(nil)
+
+                let closed = await waitUntil { !window.isVisible }
+                #expect(closed)
+                #expect(confirmations == 0, "a take already on its way to the library is not asked about again")
+                let landed = await landedEntry(model, timeoutMs: 30_000)
+                #expect(landed != nil, "the recording that stopped by itself is kept")
+            }
+        }
+
+        @Test("a take started under the close sheet is never stopped or discarded by the answer about the earlier one", arguments: [
+            AppModel.QuitDuringTake.stopAndSave, .discard,
+        ])
+        func newTakeUnderTheSheet(_ answer: AppModel.QuitDuringTake) async throws {
+            let first = try makeTakeWAV("close-first-take", seconds: 1)
+            let second = try makeTakeWAV("close-second-take", seconds: 1)
+            defer {
+                try? FileManager.default.removeItem(at: first)
+                try? FileManager.default.removeItem(at: second)
+            }
+            try await withMocksCleared(.transcriber) {
+                let model = makeRecordingModel("close-new-take")
+                model.useStreaming = false
+                let window = closableWindow()
+                defer { window.close() }
+                model.mainWindow = window
+                var asked = 0
+                var confirmations = 0
+                var newTake: Int?
+                MainWindowCloseGuard.install(
+                    on: window, model: model,
+                    ask: { _ in
+                        asked += 1
+                        model.endTestTake()
+                        model.installTestTake(source: .microphone, liveSource: StubSource(url: second))
+                        newTake = model.recording?.takeID
+                        return answer
+                    },
+                    confirmDiscard: { _ in confirmations += 1; return true }
+                )
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: first), startedAt: Date(timeIntervalSinceNow: -1))
+                defer { model.endTestTake() }
+
+                window.performClose(nil)
+
+                let closed = await waitUntil { !window.isVisible }
+                #expect(closed, "the window closes as answered")
+                #expect(asked == 1, "the new take is not asked about on the way out")
+                #expect(confirmations == 0)
+                let stillRecording = newTake != nil && model.recording?.takeID == newTake && model.recording?.state == .recording
+                #expect(stillRecording, "the new take records on")
             }
         }
 
