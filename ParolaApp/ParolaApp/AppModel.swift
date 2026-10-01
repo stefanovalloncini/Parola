@@ -146,6 +146,8 @@ final class AppModel {
     var dropDragPayload: DroppedFiles.Kind?
     var dropHighlight: DropHalf?
     var dragOverComposer = false
+    /// The chat composer has the keyboard, so ⌘⏎ sends there instead of stopping a take; the composer sets it, so the menu needs no focused value.
+    var chatComposerHasFocus = false
     var phase: Phase = .idle {
         didSet { forgetFailedSource() }
     }

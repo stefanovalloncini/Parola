@@ -109,12 +109,11 @@ struct RecordingMenuState: Equatable {
 /// The take's controls from any page: the calls the Stage, the menu bar item and the pill make.
 struct RecordingCommands: View {
     let model: AppModel
-    @FocusedValue(\.chatComposerFocused) private var composerFocused
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let menu = RecordingMenuState(
-            take: model.recording, showsRecording: model.sidebarShowsRecording, composerFocused: composerFocused == true
+            take: model.recording, showsRecording: model.sidebarShowsRecording, composerFocused: model.chatComposerHasFocus
         )
         Button("Stop Recording") { TakeRemote.stop(model) }
             .keyboardShortcut(menu.stopOwnsCommandReturn ? CommandReturn.shortcut : nil)

@@ -15,20 +15,10 @@ private struct FocusChatComposerKey: FocusedValueKey {
     typealias Value = FocusChatComposerAction
 }
 
-private struct ChatComposerFocusedKey: FocusedValueKey {
-    typealias Value = Bool
-}
-
 extension FocusedValues {
     var focusChatComposer: FocusChatComposerAction? {
         get { self[FocusChatComposerKey.self] }
         set { self[FocusChatComposerKey.self] = newValue }
-    }
-
-    /// Whether the composer has the keyboard, so ⌘⏎ sends rather than stopping a take.
-    var chatComposerFocused: Bool? {
-        get { self[ChatComposerFocusedKey.self] }
-        set { self[ChatComposerFocusedKey.self] = newValue }
     }
 }
 
@@ -62,7 +52,8 @@ struct ChatPane: View {
         .onAppear { isSearching = isSearchingPersisted }
         .onChange(of: isSearching) { _, value in isSearchingPersisted = value }
         .focusedSceneValue(\.focusChatComposer, FocusChatComposerAction { composerFocused = true })
-        .focusedSceneValue(\.chatComposerFocused, composerFocused)
+        .onChange(of: composerFocused) { _, focused in noteComposerFocus(focused) }
+        .onDisappear { noteComposerFocus(false) }
         .axBranch("Chat")
     }
 
@@ -271,6 +262,10 @@ struct ChatPane: View {
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.bottom, DS.Spacing.medium)
         .padding(.top, DS.Spacing.small)
+    }
+
+    private func noteComposerFocus(_ focused: Bool) {
+        if model.chatComposerHasFocus != focused { model.chatComposerHasFocus = focused }
     }
 
     private var isSendDisabled: Bool {
