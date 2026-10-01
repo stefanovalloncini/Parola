@@ -227,12 +227,13 @@ extension AppModel {
         ))
     }
 
-    /// A mic track whose take is in the library now waits in a record of its own, which the next launch folds into that entry.
-    func keepMicTrack(_ mic: StoppedMicTrack, forEntry entryID: LibraryEntry.ID) async {
+    /// A mic track whose take is in the library now waits in a record of its own, which the next launch folds into that entry; false when the record didn't reach the disk.
+    @discardableResult
+    func keepMicTrack(_ mic: StoppedMicTrack, forEntry entryID: LibraryEntry.ID) async -> Bool {
         recoveryGeneration += 1
         let generation = recoveryGeneration
         recoveryFileIDs[generation] = UUID()
-        writeRecoveryFile(generation: generation, RecoveryCheckpoint(
+        let write = writeRecoveryFile(generation: generation, RecoveryCheckpoint(
             kind: .micTrack,
             startedAt: Date(),
             modelName: "",
@@ -241,8 +242,9 @@ extension AppModel {
             companionStopped: mic.stoppedEarly,
             entryID: entryID
         ))
-        await pendingRecoveryWrite?.value
+        let landed = await write?.value ?? false
         micTrackRecords[entryID] = MicTrackRecord(generation: generation, mic: mic)
+        return landed
     }
 
     /// Rewrites a live checkpoint from what it last said, and waits until the new one is on disk.
@@ -287,8 +289,10 @@ extension AppModel {
         recordingRecoveryStartedAt = nil
     }
 
-    private func writeRecoveryFile(generation: Int, _ checkpoint: RecoveryCheckpoint) {
-        guard let id = recoveryFileIDs[generation] else { return }
+    /// The write's task answers whether the checkpoint reached the disk.
+    @discardableResult
+    private func writeRecoveryFile(generation: Int, _ checkpoint: RecoveryCheckpoint) -> Task<Bool, Never>? {
+        guard let id = recoveryFileIDs[generation] else { return nil }
         var checkpoint = checkpoint
         checkpoint.id = id
         checkpoint.owner = recoveryOwner?.id
@@ -296,7 +300,7 @@ extension AppModel {
         let url = recoveryFileURL(for: id)
         let directory = recoveryDirectoryURL
         let earlier = pendingRecoveryWrite
-        pendingRecoveryWrite = Task { [weak self, checkpoint] in
+        let write = Task { [weak self, checkpoint] () -> Bool in
             // In the order they were made: an earlier checkpoint landing last would drop what a later one added.
             await earlier?.value
             let data: Data
@@ -304,21 +308,29 @@ extension AppModel {
                 data = try await AppModel.offMainIO { try JSONEncoder().encode(checkpoint) }
             } catch {
                 ParolaLog.error(.appRecovery, "recovery checkpoint could not be encoded", [.error: .error(error)])
-                return
+                return false
             }
             // Re-check after the encode: the run may have ended meanwhile, and a late
             // write would resurrect a stale recovery prompt on the next launch.
-            guard let self, self.recoveryFileIDs[generation] == id else { return }
+            guard let self, self.recoveryFileIDs[generation] == id else { return false }
             // Queued in the same main-actor step as the check above, so an endRecovery
             // that lands after it still drains this write before deleting the file.
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let failure = await withCheckedContinuation { (continuation: CheckedContinuation<(any Error)?, Never>) in
                 recoveryFileQueue.async {
-                    try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                    try? data.write(to: url, options: .atomic)
-                    continuation.resume()
+                    do {
+                        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                        try data.write(to: url, options: .atomic)
+                        continuation.resume(returning: nil)
+                    } catch {
+                        continuation.resume(returning: error)
+                    }
                 }
             }
+            if let failure { ParolaLog.error(.appRecovery, "recovery checkpoint could not be written", [.error: .error(failure)]) }
+            return failure == nil
         }
+        pendingRecoveryWrite = Task { _ = await write.value }
+        return write
     }
 
     // MARK: - Recording watch
@@ -511,8 +523,7 @@ extension AppModel {
                 Task { [weak self] in
                     guard let self else { return }
                     if let entry = await self.entryHolding(url) {
-                        await self.keepMicTrack(of: checkpoint, forEntry: entry.id)
-                        self.removeRecoveryFile(of: checkpoint)
+                        if await self.keepMicTrack(of: checkpoint, forEntry: entry.id) { self.removeRecoveryFile(of: checkpoint) }
                         await self.openRecoveredEntry(entry)
                         return
                     }
@@ -583,7 +594,7 @@ extension AppModel {
             Task { [weak self] in
                 guard let self else { return }
                 guard await !self.libraryHolds(url) else {
-                    if let entry = await self.entryHolding(url) { await self.keepMicTrack(of: checkpoint, forEntry: entry.id) }
+                    if let entry = await self.entryHolding(url), await !self.keepMicTrack(of: checkpoint, forEntry: entry.id) { return }
                     return alreadySaved()
                 }
                 let generation = self.adoptRecovery(checkpoint)
@@ -605,7 +616,7 @@ extension AppModel {
                 let audioURL = await Self.probedRecordingURL(checkpoint.audioURL)
                 guard let self else { return }
                 if let audioURL, await self.libraryHolds(audioURL) {
-                    if let entry = await self.entryHolding(audioURL) { await self.keepMicTrack(of: checkpoint, forEntry: entry.id) }
+                    if let entry = await self.entryHolding(audioURL), await !self.keepMicTrack(of: checkpoint, forEntry: entry.id) { return }
                     return alreadySaved()
                 }
                 let generation = self.adoptRecovery(checkpoint)
@@ -645,8 +656,7 @@ extension AppModel {
             let audioURL = await Self.probedRecordingURL(checkpoint.audioURL)
             guard let self else { return }
             if let audioURL, let entry = await self.entryHolding(audioURL) {
-                await self.keepMicTrack(of: checkpoint, forEntry: entry.id)
-                self.removeRecoveryFile(of: checkpoint)
+                if await self.keepMicTrack(of: checkpoint, forEntry: entry.id) { self.removeRecoveryFile(of: checkpoint) }
                 await self.openRecoveredEntry(entry)
                 return
             }
@@ -809,6 +819,8 @@ extension AppModel {
                 _ = try? await AppModel.offMainIO(qos: .utility) { WAVHeaderRepair.makeReadable(file) }
                 let digest = await SourceDigest.digest(of: file)
                 if let digest, await library.hasEntry(digest: digest) {
+                    // A crash after the take reached its entry, before its mic was settled: the copy stays until a record names the mic.
+                    if let mic, await self?.giveMicToSavedTake(mic, take: file, digest: digest) == false { continue }
                     if (try? FileManager.default.removeItem(at: file)) != nil { deleted += 1 }
                     continue
                 }
@@ -837,8 +849,10 @@ extension AppModel {
                         source: AppModel.inflightTakeSource(file)
                     )
                     recovered += 1
-                    if let waitingMic { await self?.keepMicTrack(waitingMic, forEntry: entry.id) }
-                    if self?.inflightFileInUse(file) != true { try? FileManager.default.removeItem(at: file) }
+                    var micKept = true
+                    if let waitingMic { micKept = await self?.keepMicTrack(waitingMic, forEntry: entry.id) ?? false }
+                    // Until the mic's record is on disk, the take's copy stays to pair with it, so the next launch can try again.
+                    if micKept, self?.inflightFileInUse(file) != true { try? FileManager.default.removeItem(at: file) }
                     if let mic, waitingMic == nil, self?.inflightFileInUse(mic) != true {
                         try? FileManager.default.removeItem(at: mic)
                         try? FileManager.default.removeItem(at: MicTrackNote.url(for: mic))

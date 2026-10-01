@@ -4734,10 +4734,14 @@ final class AppModel {
         if let audio { takeFilesBeingSaved[audio, default: 0] += 1 }
         trackTakeWork { [weak self, library] in
             let entry = try? await saving.value
-            // Before the take's checkpoint goes: it is what names a mic track a fold couldn't add.
-            if let entry, let audio, let self, let mic = self.pendingMicTracks.removeValue(forKey: audio) {
-                await self.keepMicTrack(mic, forEntry: entry.id)
+            // Before the take's checkpoint goes; a record that doesn't land leaves that checkpoint and the take's copy naming the mic.
+            var heldForMic: [String] = []
+            if let entry, let audio, let self, let mic = self.pendingMicTracks.removeValue(forKey: audio),
+               await !self.keepMicTrack(mic, forEntry: entry.id) {
+                heldForMic = [audio, mic.file].map { $0.resolvingSymlinksInPath().path }
+                self.recoveryReferencedFiles.formUnion(heldForMic)
             }
+            let micKept = heldForMic.isEmpty
             if let audio, let self {
                 let left = (self.takeFilesBeingSaved[audio] ?? 1) - 1
                 self.takeFilesBeingSaved[audio] = left > 0 ? left : nil
@@ -4745,7 +4749,7 @@ final class AppModel {
             // At once: the entry holds the take now, and a quit may not wait for the rest.
             if let recovery {
                 self?.recoveryHeldByTake.remove(recovery)
-                if entry != nil {
+                if entry != nil, micKept {
                     self?.endRecovery(recovery)
                 } else {
                     self?.keepForNextLaunch(recovery)
@@ -4759,6 +4763,7 @@ final class AppModel {
             if let entry, audio != nil { entryAudio = try? await library.load(entry.id).document.audioURL }
             guard let self, let entry else { return }
             onSaved?(entry)
+            self.recoveryReferencedFiles.formUnion(heldForMic)
             self.assignMePerson(in: entry.id, transcript: transcript)
             if let audio {
                 if let entryAudio, self.sourceFileURL == audio, self.selectedEntryID == entry.id {

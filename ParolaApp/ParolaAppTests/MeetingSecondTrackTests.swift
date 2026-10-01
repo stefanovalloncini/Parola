@@ -980,6 +980,116 @@ extension TranscriberMockSuites {
             try await expectLaterFold(library: library, entry: entry.id, mic: files.mic)
         }
 
+        /// A folder that refuses new files and removals, as a full or failing disk does, until it is handed back.
+        private func refuseWrites(in folder: URL) throws {
+            try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        }
+
+        private func allowWrites(in folder: URL) throws {
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        }
+
+        @Test("a mic record that can't be written at the save leaves the take's checkpoint and its copy, so the next launch gives the mic to the entry")
+        func unwrittenRecordAtStopKeepsTheTake() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let library = makeTempLibraryURL("second-track-record-refused")
+                let model = makeModel(libraryURL: library)
+                let files = try meetingFiles(model)
+                try corrupt(files.mic)
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")], gate: gate)
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                model.stopRecordingAndTranscribe()
+                let running = await waitUntil { model.takeRun != nil }
+                #expect(running)
+                await model.pendingRecoveryWrite?.value
+                let recovery = model.recoveryDirectoryURL
+                try refuseWrites(in: recovery)
+                defer { try? allowWrites(in: recovery) }
+
+                await gate.open()
+
+                let entry = try #require(await landedEntry(model))
+                let settled = await waitUntil { !model.hasPendingTakeWork }
+                #expect(settled)
+                try allowWrites(in: recovery)
+                #expect(exists(files.mac), "the take's copy stays, named by its checkpoint")
+                #expect(exists(files.mic))
+                let namesTheMic = try checkpointsOnDisk(library).contains { $0.kind == .fileTranscription && $0.companionAudioURL == files.mic }
+                #expect(namesTheMic)
+
+                model.recoveryOwner = nil
+                try repairMic(files.mic)
+                for file in [files.mac, files.mic] { try age(file, by: 49 * 3_600) }
+                let relaunched = makeModel(libraryURL: library)
+                relaunched.declinePendingRecovery()
+                let folded = await waitUntil {
+                    guard let audio = try? await relaunched.library.load(entry.id).document.audioURL else { return false }
+                    return (try? channels(of: audio)) == 2
+                }
+                #expect(folded, "the next launch folds the mic into the entry its take was saved as")
+                #expect(await relaunched.library.list().count == 1)
+                let released = await waitUntil { !exists(files.mic) && ((try? micRecords(library).isEmpty) ?? false) }
+                #expect(released)
+            }
+        }
+
+        @Test("a mic record the sweep can't write keeps the take's copy beside the mic, so a later launch gives the mic to the entry")
+        func unwrittenSweepRecordKeepsThePair() async throws {
+            let library = makeTempLibraryURL("second-track-sweep-record-refused")
+            let files = try crashedMeeting(in: library, age: 3_600)
+            try corrupt(files.mic)
+            try age(files.mic, by: 3_600)
+            let recovery = library.appendingPathComponent("recovery", isDirectory: true)
+            try FileManager.default.createDirectory(at: recovery.appendingPathComponent("owners", isDirectory: true), withIntermediateDirectories: true)
+            try refuseWrites(in: recovery)
+            defer { try? allowWrites(in: recovery) }
+            let model = makeModel(libraryURL: library)
+
+            await model.inflightSweep?.value
+
+            let entry = try #require(await landedEntry(model))
+            try allowWrites(in: recovery)
+            #expect(exists(files.mac), "the take's copy stays to pair with the mic")
+            #expect(exists(files.mic))
+            #expect(try micRecords(library).isEmpty)
+
+            model.recoveryOwner = nil
+            try repairMic(files.mic)
+            for file in [files.mac, files.mic] { try age(file, by: 49 * 3_600) }
+            let relaunched = makeModel(libraryURL: library)
+            await relaunched.inflightSweep?.value
+            let audio = try #require(try await relaunched.library.load(entry.id).document.audioURL)
+            #expect(try channels(of: audio) == 2)
+            #expect(await relaunched.library.list().count == 1)
+            #expect(!exists(files.mic))
+            #expect(!exists(files.mac))
+            #expect(try micRecords(library).isEmpty)
+        }
+
+        @Test("a crash between the sweep's import and its mic record still gives the mic to that entry at the next launch")
+        func crashAfterTheSweepsImportKeepsTheMic() async throws {
+            let library = makeTempLibraryURL("second-track-sweep-crash")
+            let files = try crashedMeeting(in: library, age: 3_600)
+            let imported = try await LibraryStore(libraryURL: library, extraIndexer: nil).add(
+                transcript: AppModel.untranscribedTranscript(of: files.mac, language: nil), audioSource: files.mac,
+                category: .meeting, title: "Meeting (recovered)", source: .systemAudio
+            )
+            for file in [files.mac, files.mic] { try age(file, by: 3_600) }
+            let model = makeModel(libraryURL: library)
+
+            await model.inflightSweep?.value
+
+            let audio = try #require(try await model.library.load(imported.id).document.audioURL)
+            #expect(try channels(of: audio) == 2)
+            #expect(await model.library.list().count == 1)
+            #expect(!exists(files.mic))
+            #expect(!exists(files.mac))
+            #expect(try micRecords(library).isEmpty)
+        }
+
         @Test("a crashed meeting whose take already reached the library gets its mic folded into that entry, with no twin")
         func micJoinsTheEntryAlreadySaved() async throws {
             let library = makeTempLibraryURL("second-track-entry-holds")

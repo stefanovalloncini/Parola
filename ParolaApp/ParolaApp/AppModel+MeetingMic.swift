@@ -305,12 +305,33 @@ extension AppModel {
         }
     }
 
-    /// A checkpoint's mic track whose take is in the library already waits for that entry, and gets a first try at once.
-    func keepMicTrack(of checkpoint: RecoveryCheckpoint, forEntry entryID: LibraryEntry.ID) async {
-        guard let mic = checkpoint.micTrack, FileManager.default.fileExists(atPath: mic.file.path) else { return }
-        await keepMicTrack(mic, forEntry: entryID)
-        guard let record = micTrackRecords[entryID] else { return }
-        await foldWaitingMicTrack(record, intoEntry: entryID)
+    /// A checkpoint's mic track whose take is in the library already waits for that entry, and gets a first try at once; false while the checkpoint is all that names it.
+    @discardableResult
+    func keepMicTrack(of checkpoint: RecoveryCheckpoint, forEntry entryID: LibraryEntry.ID) async -> Bool {
+        guard let mic = checkpoint.micTrack, FileManager.default.fileExists(atPath: mic.file.path) else { return true }
+        let recorded = await keepMicTrack(mic, forEntry: entryID)
+        guard let record = micTrackRecords[entryID] else { return recorded }
+        return await foldWaitingMicTrack(record, intoEntry: entryID) || recorded
+    }
+
+    /// A mic left beside a take copy the library already holds goes to that entry; false while the copy must stay to pair with it.
+    func giveMicToSavedTake(_ mic: URL, take: URL, digest: String) async -> Bool {
+        if await Self.isStereoFile(take) {
+            releaseMicFile(mic)
+            return true
+        }
+        guard let entry = await savedEntry(digest: digest) else { return true }
+        let note = MicTrackNote.read(for: mic)
+        let waiting = StoppedMicTrack(file: mic, offset: note?.offset ?? 0, stoppedEarly: note?.stoppedEarly ?? false)
+        guard await keepMicTrack(waiting, forEntry: entry.id) else { return false }
+        if let record = micTrackRecords[entry.id] { await foldWaitingMicTrack(record, intoEntry: entry.id) }
+        return true
+    }
+
+    /// The entry made from these bytes, in the library or in Recently Deleted.
+    private func savedEntry(digest: String) async -> LibraryEntry? {
+        if let entry = await library.findEntry(digest: digest) { return entry }
+        return await library.listDeleted().first { $0.manifest.sourceDigest == digest }
     }
 
     /// The records a launch found are folded in one after another; those that still can't wait for the next launch.
