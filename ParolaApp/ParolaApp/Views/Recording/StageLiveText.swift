@@ -33,6 +33,7 @@ enum LiveParagraphs {
 struct StageLiveText: View {
     /// Off while the Stage is out of sight, so the caret stops blinking.
     let isOnScreen: Bool
+    var isLive = true
     @Environment(AppModel.self) private var model
 
     static let visibleLines = 4
@@ -47,6 +48,7 @@ struct StageLiveText: View {
             settled: Self.settledText(model.liveSegments),
             partial: model.livePartialText,
             quietLine: "Your transcript appears here as you speak",
+            isLive: isLive,
             isOnScreen: isOnScreen
         )
     }
@@ -76,6 +78,7 @@ struct StageTakeText: View {
             settled: Self.shown(model.takePartialText),
             partial: "",
             quietLine: Self.quietLine(streamsPartials: model.activeEngineStreamsPartials),
+            isLive: model.takeTranscription != nil,
             isOnScreen: isOnScreen
         )
     }
@@ -110,20 +113,34 @@ struct StageTeleprompter: View {
     let settled: String
     let partial: String
     let quietLine: LocalizedStringKey
+    /// While words may still come. After that the last ones stay, so a Stage leaving as its take lands never flashes the quiet line.
+    var isLive = true
     let isOnScreen: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @State private var lastWords: Words?
 
     private static let fade: CGFloat = 40
 
+    struct Words: Equatable {
+        let settled: String
+        let partial: String
+        var isEmpty: Bool { settled.isEmpty && partial.isEmpty }
+    }
+
+    /// The words on screen: the ones coming in, or once nothing more can come, the last that did; nil leaves room for the quiet line or nothing.
+    nonisolated static func shown(_ now: Words, last: Words?, isLive: Bool) -> Words? {
+        if !now.isEmpty { return now }
+        return isLive ? nil : last
+    }
+
     var body: some View {
+        let now = Words(settled: settled, partial: partial)
         Group {
-            if settled.isEmpty, partial.isEmpty {
-                LiveQuietLine(text: quietLine)
-            } else {
+            if let words = Self.shown(now, last: lastWords, isLive: isLive) {
                 LiveTail(
-                    settled: settled,
-                    partial: partial,
+                    settled: words.settled,
+                    partial: words.partial,
                     font: DS.Font.liveTranscriptStage,
                     lineSpacing: StageLiveText.lineSpacing,
                     blinks: isOnScreen
@@ -132,12 +149,17 @@ struct StageTeleprompter: View {
                 .frame(maxWidth: StageLiveText.width)
                 // Both bounds, or a frame with only a maximum grows to the text's full height and nothing gets clipped.
                 .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .bottom)
-                .animation(reduceMotion ? nil : DS.Motion.transcriptFollow, value: settled.count + partial.count)
+                .animation(reduceMotion ? nil : DS.Motion.transcriptFollow, value: words.settled.count + words.partial.count)
                 .clipped()
                 .mask { topFade }
+            } else if isLive {
+                LiveQuietLine(text: quietLine)
             }
         }
         .padding(.horizontal, DS.Spacing.large)
+        .onChange(of: now, initial: true) { _, words in
+            if !words.isEmpty { lastWords = words }
+        }
     }
 
     @ViewBuilder

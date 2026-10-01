@@ -177,6 +177,46 @@ struct StageStateTests {
         #expect(StageLanding.stageLeaves <= 0.2)
     }
 
+    @Test("a Stage whose run lets go keeps its last words, and only a live one shows the quiet line")
+    func teleprompterKeepsItsLastWords() {
+        let last = StageTeleprompter.Words(settled: "the last words", partial: "")
+        let none = StageTeleprompter.Words(settled: "", partial: "")
+        let coming = StageTeleprompter.Words(settled: "more", partial: "words")
+        #expect(StageTeleprompter.shown(none, last: last, isLive: false) == last)
+        #expect(StageTeleprompter.shown(none, last: last, isLive: true) == nil)
+        #expect(StageTeleprompter.shown(none, last: nil, isLive: false) == nil)
+        #expect(StageTeleprompter.shown(coming, last: last, isLive: false) == coming)
+    }
+
+    @MainActor
+    @Test("a Stage leaving as its take lands keeps showing its last words instead of the quiet line")
+    func leavingStageKeepsItsWords() async {
+        func prompter(_ words: String, isLive: Bool) -> some View {
+            StageTeleprompter(
+                settled: words, partial: "", quietLine: "Transcript appears here as it comes in", isLive: isLive, isOnScreen: true
+            )
+        }
+        let host = NSHostingView(rootView: prompter("the last words of the take", isLive: true))
+        let window = NSWindow(
+            contentRect: NSRect(x: -12_000, y: -12_000, width: 800, height: 200), styleMask: [.borderless], backing: .buffered, defer: false
+        )
+        window.contentView = host
+        window.orderFront(nil)
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+        await settle(for: .milliseconds(150))
+
+        host.rootView = prompter("", isLive: false)
+        await settle(for: .milliseconds(150))
+
+        let words = HostedAccessibility.words(in: host)
+        let kept = words.contains { $0.contains("the last words of the take") }
+        #expect(kept)
+        #expect(!words.contains("Transcript appears here as it comes in"))
+    }
+
     @MainActor
     @Test("under Reduce Motion the Stage only crossfades: a still dot, the band four times a second, no morph, nothing carried over")
     func reduceMotionOnlyCrossfades() {
