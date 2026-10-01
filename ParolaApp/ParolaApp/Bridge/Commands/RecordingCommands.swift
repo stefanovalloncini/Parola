@@ -21,8 +21,7 @@ extension ParolaAutomationServer {
                         name: "category",
                         kind: .string(),
                         required: false,
-                        summary: "EntryCategory rawValue for the resulting library entry",
-                        defaultValue: .string(EntryCategory.transcription.rawValue)
+                        summary: "EntryCategory rawValue for the resulting library entry; without one, systemAudio files as meeting, microphone as transcription"
                     ),
                     .init(
                         name: "targetBundleIDs",
@@ -35,8 +34,7 @@ extension ParolaAutomationServer {
                     let source = (try args.optionalString("source")) ?? "microphone"
                     let recordSource: AppModel.RecordSource = (source == "systemAudio") ? .systemAudio : .microphone
                     try ctx.require(recordSource.feature)
-                    let categoryRaw = (try args.optionalString("category")) ?? ""
-                    let category = EntryCategory(rawValue: categoryRaw) ?? .transcription
+                    let category = try args.optionalString("category").flatMap(EntryCategory.init(rawValue:))
                     let targets = try args.optionalStringArray("targetBundleIDs") ?? []
                     ctx.model.pendingRecordingCategory = category
                     if !targets.isEmpty { ctx.model.pendingCaptureBundleIDs = Set(targets) }
@@ -44,7 +42,7 @@ extension ParolaAutomationServer {
                     return .object([
                         "started": .bool(true),
                         "source": .string(source),
-                        "category": .string(category.rawValue),
+                        "category": .string((category ?? AppModel.defaultCategory(for: recordSource)).rawValue),
                     ])
                 }
             ),

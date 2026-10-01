@@ -1464,7 +1464,8 @@ final class AppModel {
     var meetingCaptureAppOnly: Bool = false { didSet { defaults.set(meetingCaptureAppOnly, forKey: "meetingCaptureAppOnly") } }
     /// A meeting take records your microphone too, as a second track beside the Mac audio.
     var meetingRecordsMicrophone: Bool = true { didSet { defaults.set(meetingRecordsMicrophone, forKey: "meetingRecordsMicrophone") } }
-    @ObservationIgnored var pendingRecordingCategory: EntryCategory = .transcription
+    /// The category the next take's Record asked for; nil files it by its source, through `defaultCategory(for:)`.
+    @ObservationIgnored var pendingRecordingCategory: EntryCategory?
     /// Where the take in flight is listening, for the manifest a persist writes after the phase has moved on.
     @ObservationIgnored var pendingRecordingSource: EntrySource = .microphone
     @ObservationIgnored var pendingCaptureBundleIDs: Set<String>?
@@ -1898,7 +1899,7 @@ final class AppModel {
         }
         if let mic = detachMicTrack(of: nil) { Task { await dropMicTrack(mic) } }
         if exitsMedia { Task { await mediaSession.exitRecording() } }
-        pendingRecordingCategory = .transcription
+        pendingRecordingCategory = nil
     }
 
     /// A live take already finishing keeps its stream and its checkpoint; the rest of the teardown no longer sees it as the active take.
@@ -3335,8 +3336,13 @@ final class AppModel {
 
     /// A meeting's category and app targets belong to the request that set them, not to whatever take comes next.
     private func forgetTakeRequest() {
-        pendingRecordingCategory = .transcription
+        pendingRecordingCategory = nil
         pendingCaptureBundleIDs = nil
+    }
+
+    /// The category a take from `source` starts in: the one its Record asked for, or its source's own.
+    private func requestedCategory(for source: RecordSource) -> EntryCategory {
+        pendingRecordingCategory ?? Self.defaultCategory(for: source)
     }
 
     /// The count-in is the take's first arming, under the id the take will get.
@@ -3345,11 +3351,12 @@ final class AppModel {
         countdownTask?.cancel()
         let takeID = takeCounter &+ 1
         let stamp = Date()
+        let category = requestedCategory(for: source)
         beginSession(RecordingSession(
             takeID: takeID,
             source: source,
-            category: pendingRecordingCategory,
-            title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: stamp),
+            category: category,
+            title: Self.liveRecordingTitle(category: category, endedAt: stamp),
             isStreaming: false,
             arming: .countIn(remaining: seconds),
             titleDate: stamp
@@ -3420,7 +3427,7 @@ final class AppModel {
     /// Test seam: a take already capturing since `startedAt`; with no source it is a live take whose events the test sends.
     func installTestTake(source: RecordSource, liveSource: AudioSource? = nil, startedAt: Date = Date()) {
         takeCounter &+= 1
-        var take = TakeContext(id: takeCounter, source: source, category: pendingRecordingCategory, captureTargets: [])
+        var take = TakeContext(id: takeCounter, source: source, category: requestedCategory(for: source), captureTargets: [])
         take.captureRequested = true
         forgetTakeRequest()
         activeTake = take
@@ -3568,7 +3575,7 @@ final class AppModel {
         let take = TakeContext(
             id: takeCounter,
             source: source,
-            category: pendingRecordingCategory,
+            category: requestedCategory(for: source),
             captureTargets: pendingCaptureBundleIDs ?? []
         )
         forgetTakeRequest()
@@ -4109,7 +4116,7 @@ final class AppModel {
         teardownStreaming(take)
         let audioURL = await session?.recordingAudioURL()
         var message = reason
-        let takeCategory = take?.category ?? pendingRecordingCategory
+        let takeCategory = take?.category ?? pendingRecordingCategory ?? .transcription
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let takeTitle = given.title(for: takeCategory)
         let savedPartial = !confirmed.isEmpty || audioURL != nil
@@ -4160,7 +4167,7 @@ final class AppModel {
         let arming = takeArming
         let given = kept ?? annotations(of: take?.id)
         if take.map(takeIsCurrent) ?? true { stopRecordingWatch() }
-        let takeCategory = take?.category ?? pendingRecordingCategory
+        let takeCategory = take?.category ?? pendingRecordingCategory ?? .transcription
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let cutShort = await session?.audioWasCutShort() ?? false
         let processed = await postProcessDetached(transcript)
@@ -4281,7 +4288,7 @@ final class AppModel {
         finishSession(of: take)
         stopRecordingWatch()
         stopSilenceWatch()
-        let category = take?.category ?? pendingRecordingCategory
+        let category = take?.category ?? pendingRecordingCategory ?? .transcription
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let recovery = recoveryGeneration(of: take)
         // Held until the take's run replaces it, so a Cancel while the take finishes can't delete it mid-fold.
@@ -5044,7 +5051,7 @@ final class AppModel {
         finishSession(of: take)
         stopRecordingWatch()
         stopSilenceWatch()
-        let category = take?.category ?? pendingRecordingCategory
+        let category = take?.category ?? pendingRecordingCategory ?? .transcription
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let recovery = recoveryGeneration(of: take)
         if let recovery { recoveryHeldByTake.insert(recovery) }

@@ -104,7 +104,7 @@ struct BridgeStateDetailTests {
         #expect(take["startedAt"] == .double(startedAt.timeIntervalSince1970))
         #expect(take["paused"] == .bool(false))
         #expect(take["markers"] == .array([]))
-        #expect(take["category"] == .string("transcription"))
+        #expect(take["category"] == .string("meeting"))
         #expect(take["source"] == .string("systemAudio"))
         #expect(take["isStreaming"] == .bool(false))
         #expect(take["device"] == .null)
@@ -112,7 +112,7 @@ struct BridgeStateDetailTests {
             Issue.record("the take's title and elapsed time should be a string and a number")
             return
         }
-        #expect(title.hasPrefix("Recording "))
+        #expect(title.hasPrefix("Meeting "))
         #expect(elapsed >= 12 && elapsed < 15)
     }
 

@@ -4,6 +4,14 @@ import ParolaCore
 
 extension AppModel {
 
+    /// What a take files as when its Record names no category: Mac audio is a meeting, the microphone a note.
+    nonisolated static func defaultCategory(for source: RecordSource) -> EntryCategory {
+        switch source {
+        case .microphone: .transcription
+        case .systemAudio: .meeting
+        }
+    }
+
     func startMeetingRecording() {
         guard let app = meetingDetectedApp else {
             meetingDetectedApp = nil

@@ -64,12 +64,12 @@ extension TranscriberMockSuites {
                 model.startMeetingRecording()
 
                 #expect(model.activeTake?.category == .meeting)
-                #expect(model.pendingRecordingCategory == .transcription, "the take carries its category; the request slot is spent")
+                #expect(model.pendingRecordingCategory == nil, "the take carries its category; the request slot is spent")
                 #expect(model.meetingDetectedApp == nil)
 
                 model.cancelCurrentWork()
                 await waitUntil { model.activeTake == nil }
-                #expect(model.pendingRecordingCategory == .transcription)
+                #expect(model.pendingRecordingCategory == nil)
             }
         }
 

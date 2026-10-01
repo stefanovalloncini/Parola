@@ -461,7 +461,7 @@ extension TranscriberMockSuites {
 
                 model.startMeetingRecording(appName: "Zoom")
                 #expect(model.activeTake?.captureTargets == teams, "a refused request never reaches the running take")
-                #expect(model.pendingRecordingCategory == .transcription)
+                #expect(model.pendingRecordingCategory == nil)
                 #expect(model.pendingCaptureBundleIDs == nil)
 
                 model.stopRecordingAndTranscribe()
@@ -1589,7 +1589,7 @@ extension TranscriberMockSuites {
             await settle()
             #expect(model.activeTake == nil)
             #expect(!model.recordingActive)
-            #expect(model.pendingRecordingCategory == .transcription, "the refused request's category is spent")
+            #expect(model.pendingRecordingCategory == nil, "the refused request's category is spent")
         }
 
         @Test("a count-in running when a quit begins never becomes a take")
