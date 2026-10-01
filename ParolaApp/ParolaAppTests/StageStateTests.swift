@@ -583,6 +583,19 @@ extension TranscriberMockSuites {
             return await waitUntil(timeoutMs: 30_000) { model.recording?.state == .recording }
         }
 
+        /// What the user gave the take before Stop: a title of their own, the Meeting category and one marker.
+        private func annotate(_ model: AppModel) -> TimeInterval? {
+            model.renameTake("Board review")
+            model.setTakeCategory(.meeting)
+            return model.addTakeMarker()
+        }
+
+        private func expectAnnotated(_ entry: LibraryEntry, sourceLocation: SourceLocation = #_sourceLocation) {
+            #expect(entry.title == "Board review", sourceLocation: sourceLocation)
+            #expect(entry.category == .meeting, sourceLocation: sourceLocation)
+            #expect(entry.manifest.takeMarkers?.count == 1, sourceLocation: sourceLocation)
+        }
+
         private func cancel(_ path: FinishingCancel, _ model: AppModel, server: ParolaAutomationServer) async throws {
             switch path {
             case .cancel:
@@ -604,6 +617,8 @@ extension TranscriberMockSuites {
                 let server = try ParolaAutomationServer(model: model)
                 let recording = await startLiveTake(model)
                 #expect(recording)
+                let mark = annotate(model)
+                #expect(mark != nil)
                 model.stopRecordingAndTranscribe()
                 #expect(model.recording?.state == .finishing)
 
@@ -616,6 +631,7 @@ extension TranscriberMockSuites {
                 let entry = try #require(landed)
                 let document = try await model.library.load(entry.id).document
                 #expect(document.transcript.text == "the live words")
+                expectAnnotated(entry)
                 let settled = await waitUntil { model.recording?.state == .done(entryID: entry.id) }
                 #expect(settled)
                 withExtendedLifetime(server) {}
@@ -629,6 +645,8 @@ extension TranscriberMockSuites {
                 let model = makeModel("stage-live-cancel-next")
                 let first = await startLiveTake(model)
                 #expect(first)
+                let mark = annotate(model)
+                #expect(mark != nil)
                 model.stopRecordingAndTranscribe()
                 model.cancelCurrentWork()
 
@@ -639,6 +657,7 @@ extension TranscriberMockSuites {
                 let entry = try #require(landed)
                 let document = try await model.library.load(entry.id).document
                 #expect(document.transcript.text == "the live words")
+                expectAnnotated(entry)
                 #expect(model.recording?.takeID == secondTake)
                 #expect(model.recording?.state == .recording, "the first take's landing leaves the second one alone")
                 #expect(model.recordingWatchTask != nil, "the second take keeps its disk and checkpoint watch")
