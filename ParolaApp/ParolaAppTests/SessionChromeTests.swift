@@ -718,6 +718,54 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a count-in asked about, then cancelled under the sheet, leaves its id behind: the take started next is not the one the answer ends", arguments: [
+            AppModel.QuitDuringTake.stopAndSave, .discard,
+        ])
+        func countInCancelledUnderTheSheet(_ answer: AppModel.QuitDuringTake) async throws {
+            let audio = try makeTakeWAV("close-count-in", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeRecordingModel("close-count-in")
+            model.useStreaming = false
+            model.selectedModel = "openai_whisper-tiny"
+            model.takeCaptureOverride = { _ in StubSource(url: audio) }
+            defer { model.cancelCurrentWork() }
+            let window = closableWindow()
+            defer { window.close() }
+            model.mainWindow = window
+            var askedAbout: [Int] = []
+            var confirmations = 0
+            var newTake: Int?
+            MainWindowCloseGuard.install(
+                on: window, model: model,
+                ask: { _, take in
+                    askedAbout.append(take.takeID)
+                    guard askedAbout.count == 1 else { return .keepRecording }
+                    model.cancelRecordingCountdown()
+                    model.recordingCountInSeconds = 0
+                    model.startRecording(source: .microphone)
+                    newTake = model.recording?.takeID
+                    return answer
+                },
+                confirmDiscard: { _ in confirmations += 1; return true }
+            )
+            model.recordingCountInSeconds = 3
+            model.startRecording(source: .microphone)
+            #expect(model.recordingCountdown == 3)
+            let countIn = try #require(model.recording?.takeID)
+
+            window.performClose(nil)
+
+            let askedAgain = await waitUntil { askedAbout.count == 2 }
+            #expect(askedAgain)
+            #expect(askedAbout.first == countIn)
+            #expect(newTake != nil && newTake != countIn, "the new take has an id of its own")
+            #expect(askedAbout.last == newTake)
+            let untouched = model.recording?.takeID == newTake && model.recording?.isRunning == true
+            #expect(untouched, "the answer about the count-in neither stops nor discards the new take")
+            #expect(confirmations == 0)
+            #expect(window.isVisible)
+        }
+
         @Test("Stop and Save closes the window that asked, even while another window is the main one")
         func closesTheWindowThatAsked() async throws {
             let audio = try makeTakeWAV("close-save-other", seconds: 1)

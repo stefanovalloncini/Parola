@@ -3325,7 +3325,9 @@ final class AppModel {
         }
     }
 
+    /// A count-in holds the id its take would get; ending it spends the id, as `failCountIn` does, so no later take answers to it.
     func cancelRecordingCountdown() {
+        if recordingCountdown != nil { takeCounter &+= 1 }
         countdownTask?.cancel()
         countdownTask = nil
         endCountIn()
