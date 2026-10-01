@@ -274,7 +274,11 @@ final class AppModel {
     var takeTitleHasFocus = false
     /// A take that landed on its own Stage, for the toast that says where it went; it goes on its own unless the pointer holds it.
     var takeSavedNotice: TakeSavedNotice? {
-        didSet { if takeSavedNotice != oldValue { restartTakeSavedExpiry() } }
+        didSet {
+            // A pointer that left as the toast's window hid sends no exit, so the hold goes with the toast.
+            if takeSavedNotice == nil { takeSavedHeld = false }
+            if takeSavedNotice != oldValue { restartTakeSavedExpiry() }
+        }
     }
     /// Test seam: how long the saved-take toast stays once nothing holds it.
     @ObservationIgnored var takeSavedLifetime: Duration = TakeSavedNotice.lifetime

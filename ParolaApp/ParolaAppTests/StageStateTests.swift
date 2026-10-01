@@ -833,6 +833,20 @@ extension TranscriberMockSuites {
             #expect(gone)
         }
 
+        @Test("a hold whose pointer exit never came ends with its toast, so the next toast still goes on its own")
+        func savedToastHoldEndsWithIt() async {
+            let model = makeModel("stage-saved-hold-ends")
+            model.takeSavedLifetime = .milliseconds(50)
+            model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+            model.holdTakeSaved(true)
+            model.dismissTakeSaved()
+
+            model.takeSavedNotice = TakeSavedNotice(entryID: "F", category: .transcription)
+
+            let gone = await waitUntil { model.takeSavedNotice == nil }
+            #expect(gone)
+        }
+
         @Test("the pointer resting on the saved toast holds it, and leaving starts its time again")
         func savedToastHoldsUnderThePointer() async {
             let model = makeModel("stage-saved-hover")
