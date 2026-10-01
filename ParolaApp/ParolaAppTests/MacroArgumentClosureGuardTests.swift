@@ -4,13 +4,6 @@ import ParolaTestSupport
 
 @Suite("No #expect/#require closure inside a wrapper closure")
 struct MacroArgumentClosureGuardTests {
-    /// Files another lane still edits that hold a closure inside #expect/#require within a wrapper closure; drop each once it's fixed.
-    static let pendingRecordingLaneSweep: Set<String> = [
-        "AppModelRecordingOptionsTests.swift",
-        "RecordingSafetyTests.swift",
-        "RecordingTrustTests.swift",
-    ]
-
     private var testsDirectory: URL {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     }
@@ -28,7 +21,6 @@ struct MacroArgumentClosureGuardTests {
             if url.lastPathComponent == ownFileName {
                 scannedSelf = true
             }
-            guard !Self.pendingRecordingLaneSweep.contains(url.lastPathComponent) else { continue }
             let source = try String(contentsOf: url, encoding: .utf8)
             for violation in MacroArgumentClosureScanner.violations(in: source) {
                 violations.append("\(url.lastPathComponent):\(violation.line): \(violation.snippet)")
