@@ -46,7 +46,7 @@ final class RecordingStatusItem: NSObject {
 
     /// Pause and Mark need a capture; Stop and Discard… have nothing left once the take finishes.
     nonisolated static func controls(for take: RecordingSession, bundle: Bundle = .main) -> [Control] {
-        let canEnd = take.state != .finishing
+        let canEnd = TakeRemote.canEnd(take)
         let pause = take.isPaused ? String(localized: "Resume", bundle: bundle) : String(localized: "Pause", bundle: bundle)
         return [
             Control(title: String(localized: "Stop Recording", bundle: bundle), isEnabled: canEnd, action: #selector(stop)),

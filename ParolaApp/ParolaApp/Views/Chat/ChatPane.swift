@@ -15,10 +15,20 @@ private struct FocusChatComposerKey: FocusedValueKey {
     typealias Value = FocusChatComposerAction
 }
 
+private struct ChatComposerFocusedKey: FocusedValueKey {
+    typealias Value = Bool
+}
+
 extension FocusedValues {
     var focusChatComposer: FocusChatComposerAction? {
         get { self[FocusChatComposerKey.self] }
         set { self[FocusChatComposerKey.self] = newValue }
+    }
+
+    /// Whether the composer has the keyboard, so ⌘⏎ sends rather than stopping a take.
+    var chatComposerFocused: Bool? {
+        get { self[ChatComposerFocusedKey.self] }
+        set { self[ChatComposerFocusedKey.self] = newValue }
     }
 }
 
@@ -52,6 +62,7 @@ struct ChatPane: View {
         .onAppear { isSearching = isSearchingPersisted }
         .onChange(of: isSearching) { _, value in isSearchingPersisted = value }
         .focusedSceneValue(\.focusChatComposer, FocusChatComposerAction { composerFocused = true })
+        .focusedSceneValue(\.chatComposerFocused, composerFocused)
         .axBranch("Chat")
     }
 
@@ -253,7 +264,7 @@ struct ChatPane: View {
             }
             .buttonStyle(.plain)
             .disabled(isSendDisabled)
-            .keyboardShortcut(.return, modifiers: [.command])
+            .modifier(ChatSendShortcut(composerFocused: composerFocused))
             .help("Send (⌘↩)")
             .axLeaf("Composer.Button.Send")
         }
@@ -433,5 +444,16 @@ struct ChatPane: View {
                 turnError = error.localizedDescription
             }
         }
+    }
+}
+
+/// ⌘⏎ sends, unless a take is running and the keyboard is elsewhere: then the Recording menu's Stop has it.
+private struct ChatSendShortcut: ViewModifier {
+    let composerFocused: Bool
+    @Environment(AppModel.self) private var model
+
+    func body(content: Content) -> some View {
+        let stops = CommandReturn.stops(takeCanStop: TakeRemote.canEnd(model.recording), composerFocused: composerFocused)
+        content.keyboardShortcut(stops ? nil : CommandReturn.shortcut)
     }
 }

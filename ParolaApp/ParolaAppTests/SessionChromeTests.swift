@@ -566,3 +566,91 @@ extension TranscriberMockSuites {
         }
     }
 }
+
+private func appSource(_ name: String) throws -> String {
+    let path = #filePath.replacingOccurrences(of: "ParolaAppTests/SessionChromeTests.swift", with: "ParolaApp/\(name).swift")
+    return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+}
+
+@Suite("Recording menu")
+struct RecordingMenuTests {
+    @Test("⌘⏎ stops a take that can stop from anywhere but the chat composer, where it sends")
+    func commandReturnOwner() {
+        #expect(CommandReturn.stops(takeCanStop: true, composerFocused: false))
+        #expect(!CommandReturn.stops(takeCanStop: true, composerFocused: true))
+        #expect(!CommandReturn.stops(takeCanStop: false, composerFocused: false))
+        #expect(!CommandReturn.stops(takeCanStop: false, composerFocused: true))
+    }
+
+    @Test("every item waits for a take: Stop and Discard… until Stop, Pause and Add Marker while it captures")
+    func itemsFollowTheTake() {
+        let start = Date(timeIntervalSinceReferenceDate: 1_000)
+        let none = RecordingMenuState(take: nil, showsRecording: false, composerFocused: false)
+        #expect(!none.canEnd && !none.canCapture && !none.canShow && !none.stopOwnsCommandReturn)
+
+        var take = RecordingSession(
+            takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .countIn(remaining: 3)
+        )
+        let countIn = RecordingMenuState(take: take, showsRecording: true, composerFocused: false)
+        #expect(countIn.canEnd && !countIn.canCapture && countIn.canShow && countIn.stopOwnsCommandReturn)
+
+        _ = take.markCapturing(at: start)
+        let recording = RecordingMenuState(take: take, showsRecording: true, composerFocused: false)
+        #expect(recording.canEnd && recording.canCapture && !recording.resumes && recording.stopOwnsCommandReturn)
+        let typing = RecordingMenuState(take: take, showsRecording: true, composerFocused: true)
+        #expect(typing.canEnd && !typing.stopOwnsCommandReturn, "the composer keeps ⌘⏎ for Send")
+
+        _ = take.pause(at: start.addingTimeInterval(4))
+        let paused = RecordingMenuState(take: take, showsRecording: true, composerFocused: false)
+        #expect(paused.canEnd && paused.canCapture && paused.resumes)
+
+        _ = take.finish(at: start.addingTimeInterval(9))
+        let finishing = RecordingMenuState(take: take, showsRecording: true, composerFocused: false)
+        #expect(!finishing.canEnd && !finishing.canCapture && !finishing.stopOwnsCommandReturn)
+    }
+
+    @Test("the menu holds ⌘⏎ and ⌘B, and the chat's Send gives ⌘⏎ up by the same rule")
+    func shortcutsAreWired() throws {
+        let commands = try appSource("Views/AppCommands")
+        #expect(commands.contains(#"Button("Stop Recording") { TakeRemote.stop(model) } .keyboardShortcut(menu.stopOwnsCommandReturn ? CommandReturn.shortcut : nil)"#))
+        #expect(commands.contains(#"Button("Add Marker") { TakeRemote.addMarker(model) } .keyboardShortcut("b", modifiers: .command)"#))
+        #expect(try appSource("ParolaApp").contains(#"CommandMenu("Recording") { RecordingCommands(model: model) }"#))
+        let chat = try appSource("Views/Chat/ChatPane")
+        #expect(chat.contains(".focusedSceneValue(\\.chatComposerFocused, composerFocused)"))
+        #expect(chat.contains(".modifier(ChatSendShortcut(composerFocused: composerFocused))"))
+        #expect(chat.contains("content.keyboardShortcut(stops ? nil : CommandReturn.shortcut)"))
+        #expect(!chat.contains(".keyboardShortcut(.return, modifiers: [.command])"))
+    }
+
+    @Test("the Stage's buttons keep no ⌘⏎ or ⌘B of their own: the Recording menu is the one source")
+    func stageLeavesTheShortcutsToTheMenu() throws {
+        let stage = try appSource("Views/Recording/StageControls")
+        #expect(!stage.contains(#".keyboardShortcut("b", modifiers: .command)"#))
+        #expect(!stage.contains(".keyboardShortcut(.return, modifiers: .command)"))
+    }
+}
+
+@MainActor
+@Suite("Recording menu acts on the take", .serialized)
+struct RecordingMenuActionTests {
+    @Test("Pause, Resume and Add Marker in the menu reach the take")
+    func itemsReachTheTake() async throws {
+        let audio = try tempWAV("recording-menu")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("recording-menu")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -5))
+        defer { model.endTestTake() }
+        let hosted = HostedWindow(VStack { RecordingCommands(model: model) }, width: 300, height: 300)
+        defer { hosted.close() }
+        let shown = await waitUntil { shows("Menu.Recording.Pause", in: hosted) }
+        #expect(shown)
+
+        #expect(HostedAccessibility.press(endingWith: "Menu.Recording.Pause", in: hosted.host))
+        #expect(model.recording?.isPaused == true)
+        await settle()
+        #expect(HostedAccessibility.press(endingWith: "Menu.Recording.Pause", in: hosted.host))
+        #expect(model.recording?.state == .recording)
+        #expect(HostedAccessibility.press(endingWith: "Menu.Recording.AddMarker", in: hosted.host))
+        #expect(model.recording?.markers.count == 1)
+    }
+}

@@ -137,6 +137,11 @@ struct ParolaApp: App {
             CommandGroup(after: .textEditing) {
                 EditCommands(model: model)
             }
+            if RecordControl.primarySource(features: model.features) != nil {
+                CommandMenu("Recording") {
+                    RecordingCommands(model: model)
+                }
+            }
             CommandMenu("Playback") {
                 PlaybackCommands(model: model)
             }

@@ -93,7 +93,6 @@ struct StageControls: View {
                 Label("Mark", systemImage: "flag.fill")
             }
             .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: 18))
-            .keyboardShortcut("b", modifiers: .command)
             .disabled(!take.isCapturing)
             .help("Add Marker")
             .accessibilityLabel("Add Marker")
@@ -130,7 +129,6 @@ struct StageControls: View {
             horizontalPadding: DS.Spacing.medium,
             minWidth: Self.stopWidth
         ))
-        .keyboardShortcut(.return, modifiers: .command)
         .help("Stop recording and transcribe.")
         .accessibilityLabel("Stop Recording")
         .axLeaf("Stage.Button.Stop")

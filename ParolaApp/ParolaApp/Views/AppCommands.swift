@@ -80,6 +80,67 @@ struct FileCommands: View {
     }
 }
 
+/// ⌘⏎ stops a take that can still stop, except in the chat composer, where it sends: one key, one owner at a time.
+enum CommandReturn {
+    static let shortcut = KeyboardShortcut(.return, modifiers: .command)
+
+    nonisolated static func stops(takeCanStop: Bool, composerFocused: Bool) -> Bool {
+        takeCanStop && !composerFocused
+    }
+}
+
+/// What the Recording menu offers for the take as it stands.
+struct RecordingMenuState: Equatable {
+    var canEnd: Bool
+    var canCapture: Bool
+    var resumes: Bool
+    var canShow: Bool
+    var stopOwnsCommandReturn: Bool
+
+    init(take: RecordingSession?, showsRecording: Bool, composerFocused: Bool) {
+        canEnd = TakeRemote.canEnd(take)
+        canCapture = take?.isCapturing ?? false
+        resumes = take?.isPaused ?? false
+        canShow = showsRecording
+        stopOwnsCommandReturn = CommandReturn.stops(takeCanStop: canEnd, composerFocused: composerFocused)
+    }
+}
+
+/// The take's controls from any page: the calls the Stage, the menu bar item and the pill make.
+struct RecordingCommands: View {
+    let model: AppModel
+    @FocusedValue(\.chatComposerFocused) private var composerFocused
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        let menu = RecordingMenuState(
+            take: model.recording, showsRecording: model.sidebarShowsRecording, composerFocused: composerFocused == true
+        )
+        Button("Stop Recording") { TakeRemote.stop(model) }
+            .keyboardShortcut(menu.stopOwnsCommandReturn ? CommandReturn.shortcut : nil)
+            .disabled(!menu.canEnd)
+            .axLeaf("Menu.Recording.Stop")
+        Button(menu.resumes ? "Resume" : "Pause") { TakeRemote.togglePause(model) }
+            .disabled(!menu.canCapture)
+            .axLeaf("Menu.Recording.Pause")
+        Button("Add Marker") { TakeRemote.addMarker(model) }
+            .keyboardShortcut("b", modifiers: .command)
+            .disabled(!menu.canCapture)
+            .axLeaf("Menu.Recording.AddMarker")
+        Button("Discard…") {
+            Task { await TakeRemote.discard(model, confirm: TakeRemote.askToDiscard) }
+        }
+        .disabled(!menu.canEnd)
+        .axLeaf("Menu.Recording.Discard")
+        Divider()
+        Button("Show Recording") {
+            TakeRemote.showParola(model) { model.showMainWindow { openWindow(id: MainWindowScene.id) } }
+        }
+        .disabled(!menu.canShow)
+        .axLeaf("Menu.Recording.ShowRecording")
+    }
+}
+
 struct ViewCommands: View {
     @Bindable var model: AppModel
 
