@@ -11324,6 +11324,17 @@
         }
       }
     },
+    "Recording controls": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controlli di registrazione"
+          }
+        }
+      }
+    },
     "Recording from %@": {
       "extractionState": "manual",
       "localizations": {
@@ -12907,6 +12918,17 @@
         }
       }
     },
+    "Show a floating recording pill when Parola is in the background": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra una pillola di registrazione fluttuante quando Parola è in background"
+          }
+        }
+      }
+    },
     "Show all speakers": {
       "extractionState": "manual",
       "localizations": {
@@ -13013,6 +13035,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra anche la fine di ogni segmento."
+          }
+        }
+      }
+    },
+    "Show the recording in the menu bar": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra la registrazione nella barra dei menu"
           }
         }
       }
@@ -14512,6 +14545,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il testo della trascrizione viene inviato al servizio che hai scelto e trattato secondo le condizioni di quel servizio."
+          }
+        }
+      }
+    },
+    "The time and a Stop button float over other apps. Drag the pill wherever you like.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il tempo e il pulsante Ferma restano sopra le altre app. Trascina la pillola dove preferisci."
+          }
+        }
+      }
+    },
+    "The time stays in the menu bar while you record, with the recording's controls in its menu.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il tempo resta nella barra dei menu mentre registri, con i controlli della registrazione nel suo menu."
           }
         }
       }

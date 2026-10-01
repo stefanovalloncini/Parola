@@ -63,6 +63,7 @@ struct SettingsPaneScopeTests {
             "themeIsCustom", "themeCustomPaletteJSON",
             "recordingMaxMinutes", "recordingCountInSeconds",
             "autoMuteWhileRecording", "autoPauseMediaWhileRecording",
+            "showRecordingStatusItem", "showRecordingPill",
             "dictationHudOpacity", "dictationStripSelfCorrections", "dictationPasteDelayMs",
             "dictationContextSelection", "dictationContextClipboard", "dictationContextScreen",
             "micHotkeyEnabled", "micHotkeyKeyCode", "micHotkeyModifiers",

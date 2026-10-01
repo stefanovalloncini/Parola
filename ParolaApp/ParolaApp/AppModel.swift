@@ -447,6 +447,8 @@ final class AppModel {
     var recordingCountInSeconds: Int = 0 { didSet { defaults.set(recordingCountInSeconds, forKey: "recordingCountInSeconds") } }
     var autoMuteWhileRecording: Bool = false { didSet { defaults.set(autoMuteWhileRecording, forKey: "autoMuteWhileRecording") } }
     var autoPauseMediaWhileRecording: Bool = false { didSet { defaults.set(autoPauseMediaWhileRecording, forKey: "autoPauseMediaWhileRecording") } }
+    var showRecordingStatusItem: Bool = true { didSet { defaults.set(showRecordingStatusItem, forKey: "showRecordingStatusItem") } }
+    var showRecordingPill: Bool = true { didSet { defaults.set(showRecordingPill, forKey: "showRecordingPill") } }
     /// The count-in's number, mirrored from the session so the window's overlay redraws only when it moves.
     private(set) var recordingCountdown: Int?
     @ObservationIgnored private(set) var countdownTask: Task<Void, Never>?
@@ -1097,6 +1099,8 @@ final class AppModel {
         self.recordingCountInSeconds = defaults.integer(forKey: "recordingCountInSeconds")
         self.autoMuteWhileRecording = defaults.bool(forKey: "autoMuteWhileRecording")
         self.autoPauseMediaWhileRecording = defaults.bool(forKey: "autoPauseMediaWhileRecording")
+        self.showRecordingStatusItem = readBool("showRecordingStatusItem", default: true)
+        self.showRecordingPill = readBool("showRecordingPill", default: true)
         self.inputDeviceUID = defaults.string(forKey: "inputDeviceUID") ?? ""
         self.selectedModel = defaults.string(forKey: "selectedModel") ?? ModelCatalog.defaultModelID()
         self.selectedLanguageRaw = defaults.string(forKey: "selectedLanguageRaw") ?? ""

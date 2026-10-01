@@ -375,6 +375,7 @@ final class ParolaAutomationServer {
         "translationSideBySide", "remoteAIAcknowledged", "showMostUsedPeople",
         "openEntriesInNewWindow", "playSoundWhenFinished", "appVisibilityMode",
         "duplicateImportPolicy", "libraryGroupsByDate",
+        "showRecordingStatusItem", "showRecordingPill",
     ]
 
     func runScreenshot(requestedFileName: String?) async throws -> AutomationValue {

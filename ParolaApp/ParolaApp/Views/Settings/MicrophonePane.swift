@@ -100,6 +100,24 @@ struct MicrophonePane: View {
                 }
             }
             SettingHelper(text: "Both apply to dictation too. Mute is skipped when the recording source is system audio.")
+
+            if RecordControl.primarySource(features: model.features) != nil {
+                SettingsSection("Recording controls") {
+                    SettingRow("Show the recording in the menu bar",
+                               description: "The time stays in the menu bar while you record, with the recording's controls in its menu.",
+                               isFirst: true) {
+                        Toggle("", isOn: $model.showRecordingStatusItem).labelsHidden()
+                            .accessibilityLabel("Show the recording in the menu bar")
+                            .axLeaf("Microphone.Toggle.ShowRecordingStatusItem")
+                    }
+                    SettingRow("Show a floating recording pill when Parola is in the background",
+                               description: "The time and a Stop button float over other apps. Drag the pill wherever you like.") {
+                        Toggle("", isOn: $model.showRecordingPill).labelsHidden()
+                            .accessibilityLabel("Show a floating recording pill when Parola is in the background")
+                            .axLeaf("Microphone.Toggle.ShowRecordingPill")
+                    }
+                }
+            }
             ResetPaneButton(scope: .microphone)
         }
         .onAppear {
