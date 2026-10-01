@@ -1492,6 +1492,8 @@ final class AppModel {
                 if self.meetingDetectedApp == nil { self.meetingDetectedApp = appName }
             default: break
             }
+        } onQuit: { [weak self] appName in
+            self?.meetingAppQuit(appName)
         }
     }
 

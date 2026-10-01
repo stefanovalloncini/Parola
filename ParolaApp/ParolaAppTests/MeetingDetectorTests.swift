@@ -72,6 +72,51 @@ struct MeetingDetectorTests {
         #expect(recorder.calls.isEmpty)
     }
 
+    final class Running: @unchecked Sendable {
+        var apps: Set<String> = []
+    }
+
+    private func make(clock: Clock, recorder: Recorder, quits: Recorder, running: Running) -> MeetingDetector {
+        let detector = MeetingDetector(
+            onDetected: { name in recorder.calls.append(name) },
+            onQuit: { name in quits.calls.append(name) },
+            clock: { clock.now },
+            runningApps: { running.apps }
+        )
+        detector.isEnabled = true
+        return detector
+    }
+
+    @Test("a meeting app that quits is let go, unless another copy of it still runs")
+    func quitLetsTheAppGo() {
+        let quits = Recorder()
+        let running = Running()
+        let detector = make(clock: Clock(), recorder: Recorder(), quits: quits, running: running)
+        detector.fire(appName: "Microsoft Teams")
+
+        running.apps = ["Microsoft Teams"]
+        detector.quit(appName: "Microsoft Teams")
+        #expect(quits.calls.isEmpty, "the new Teams still runs beside the classic one that quit")
+
+        running.apps = []
+        detector.quit(appName: "Microsoft Teams")
+        #expect(quits.calls == ["Microsoft Teams"])
+    }
+
+    @Test("a meeting app that quits and launches again at once is offered again")
+    func relaunchAfterQuitFires() {
+        let clock = Clock()
+        let recorder = Recorder()
+        let detector = make(clock: clock, recorder: recorder, quits: Recorder(), running: Running())
+
+        detector.fire(appName: "Zoom")
+        detector.quit(appName: "Zoom")
+        clock.advance(by: 1)
+        detector.fire(appName: "Zoom")
+
+        #expect(recorder.calls == ["Zoom", "Zoom"])
+    }
+
     @Test("knownMeetingApps maps the supported bundle IDs")
     func knownAppsMapping() {
         let known = MeetingDetector.knownMeetingApps

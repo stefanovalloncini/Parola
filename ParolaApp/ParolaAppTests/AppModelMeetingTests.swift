@@ -28,6 +28,24 @@ extension TranscriberMockSuites {
             #expect(model.detectedMeetingAppName == "Acme Conference", "what the Record menu and the menu bar offer")
         }
 
+        @Test("a meeting app that quits takes its Record Meeting item off the Record menu and the menu bar")
+        func quitClearsTheDetectedApp() {
+            let model = makeModel()
+            model.meetingDetector.isEnabled = true
+            model.showMenuBarExtra = true
+            model.meetingDetector.fire(appName: "Acme Conference")
+            #expect(RecordControl.detectedMeetingApp(for: model) == "Acme Conference")
+            #expect(MenuBarController.snapshot(for: model).detectedMeetingApp == "Acme Conference")
+
+            model.meetingDetector.quit(appName: "Other Conference")
+            #expect(model.detectedMeetingAppName == "Acme Conference", "another app quitting leaves it")
+
+            model.meetingDetector.quit(appName: "Acme Conference")
+            #expect(model.detectedMeetingAppName == nil)
+            #expect(RecordControl.detectedMeetingApp(for: model) == nil)
+            #expect(MenuBarController.snapshot(for: model).detectedMeetingApp == nil)
+        }
+
         @Test("a second detection while the prompt is up keeps the first app")
         func secondDetectionKeepsFirstPrompt() {
             let model = makeModel()

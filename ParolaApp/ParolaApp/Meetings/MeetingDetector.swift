@@ -25,7 +25,9 @@ final class MeetingDetector {
     }
 
     @ObservationIgnored private let onDetected: @MainActor (String) -> Void
+    @ObservationIgnored private let onQuit: @MainActor (String) -> Void
     @ObservationIgnored private let clock: @MainActor () -> Date
+    @ObservationIgnored private let runningApps: @MainActor () -> Set<String>
     @ObservationIgnored private var lastFiredApp: String?
     @ObservationIgnored private var lastFiredAt: Date?
     @ObservationIgnored private var snoozedApps: Set<String> = []
@@ -40,10 +42,14 @@ final class MeetingDetector {
 
     init(
         onDetected: @escaping @MainActor (String) -> Void,
-        clock: @escaping @MainActor () -> Date = { Date() }
+        onQuit: @escaping @MainActor (String) -> Void = { _ in },
+        clock: @escaping @MainActor () -> Date = { Date() },
+        runningApps: @escaping @MainActor () -> Set<String> = { MeetingDetector.runningMeetingApps() }
     ) {
         self.onDetected = onDetected
+        self.onQuit = onQuit
         self.clock = clock
+        self.runningApps = runningApps
         self.isEnabled = (DefaultsStore.current.object(forKey: Self.defaultsKey) as? Bool) ?? true
         startObserving()
     }
@@ -72,6 +78,16 @@ final class MeetingDetector {
             }
             observerTokens.append(token)
         }
+        let quitToken = center.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let bundleID = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
+            guard let bundleID, let display = MeetingDetector.knownMeetingApps[bundleID] else { return }
+            Task { @MainActor in self?.quit(appName: display) }
+        }
+        observerTokens.append(quitToken)
         for app in NSWorkspace.shared.runningApplications {
             if let bundleID = app.bundleIdentifier,
                let display = MeetingDetector.knownMeetingApps[bundleID] {
@@ -95,5 +111,23 @@ final class MeetingDetector {
     /// Declining the prompt mutes that app until it launches again.
     func snooze(appName: String) {
         snoozedApps.insert(appName)
+    }
+
+    /// A meeting app that quit takes back what it offered, unless another copy of it still runs; launched again, it is offered again.
+    func quit(appName: String) {
+        guard !runningApps().contains(appName) else { return }
+        if lastFiredApp == appName {
+            lastFiredApp = nil
+            lastFiredAt = nil
+        }
+        onQuit(appName)
+    }
+
+    /// The known meeting apps running now, by name.
+    static func runningMeetingApps() -> Set<String> {
+        Set(NSWorkspace.shared.runningApplications.compactMap { app in
+            guard !app.isTerminated, let bundleID = app.bundleIdentifier else { return nil }
+            return knownMeetingApps[bundleID]
+        })
     }
 }
