@@ -177,26 +177,23 @@ extension AppModel {
             return FoldedTake(audio: mac, engineInput: nil)
         }
         let folder = inflightRecordingsURL
-        let staging = folder.appendingPathComponent("\(RecordingScratch.meetingMixPrefix)-\(UUID().uuidString).wav")
         let engineInput = wantsEngineInput ? Self.meetingEngineInputURL() : nil
         let stereo: URL
         do {
-            let start = Date(timeIntervalSinceReferenceDate: 0)
+            let mixed = try await Self.mixMeetingFiles(mac: mac, mic: mic.file, micOffset: mic.offset, in: folder, mono: engineInput)
             stereo = try await Self.offMainIO {
-                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                WAVHeaderRepair.makeReadable(mac)
-                WAVHeaderRepair.makeReadable(mic.file)
-                try MeetingTakeMixer.mix(
-                    mac: mac, mic: mic.file, macStart: start, micStart: start.addingTimeInterval(mic.offset),
-                    into: staging, mono: engineInput
-                )
                 let take = folder.appendingPathComponent("parola-system-\(UUID().uuidString).wav")
-                try FileManager.default.moveItem(at: staging, to: take)
+                do {
+                    try FileManager.default.moveItem(at: mixed, to: take)
+                } catch {
+                    try? FileManager.default.removeItem(at: mixed)
+                    throw error
+                }
                 return take
             }
         } catch {
             ParolaLog.error(.audioRecording, "a meeting's microphone track could not be mixed in", [.error: .error(error)])
-            for file in [staging, engineInput].compactMap({ $0 }) { try? FileManager.default.removeItem(at: file) }
+            if let engineInput { try? FileManager.default.removeItem(at: engineInput) }
             if let take { noteMicTrackMissing(take.id, stopped: false) }
             return FoldedTake(audio: mac, engineInput: nil)
         }
@@ -210,6 +207,40 @@ extension AppModel {
         releaseTakeFile(mac)
         releaseTakeFile(mic.file)
         return FoldedTake(audio: stereo, engineInput: engineInput)
+    }
+
+    /// Mixes a meeting's two files into a stereo file under a scratch name in `folder`, which a sweep never takes for a take.
+    nonisolated static func mixMeetingFiles(mac: URL, mic: URL, micOffset: TimeInterval, in folder: URL, mono: URL?) async throws -> URL {
+        let mixed = folder.appendingPathComponent("\(RecordingScratch.meetingMixPrefix)-\(UUID().uuidString).wav")
+        do {
+            try await offMainIO {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                WAVHeaderRepair.makeReadable(mac)
+                WAVHeaderRepair.makeReadable(mic)
+                let start = Date(timeIntervalSinceReferenceDate: 0)
+                try MeetingTakeMixer.mix(
+                    mac: mac, mic: mic, macStart: start, micStart: start.addingTimeInterval(micOffset), into: mixed, mono: mono
+                )
+            }
+        } catch {
+            for file in [mixed, mono].compactMap({ $0 }) { try? FileManager.default.removeItem(at: file) }
+            throw error
+        }
+        return mixed
+    }
+
+    /// A crashed meeting's microphone track goes back into its take; one that is gone or unreadable leaves the Mac side alone.
+    func mixRecoveredMicTrack(_ checkpoint: RecoveryCheckpoint, mac: URL?) async -> URL? {
+        guard let mac, let companion = checkpoint.companionAudioURL else { return nil }
+        guard let mic = (try? await Self.offMainIO { Self.readableRecordingURL(companion) }) ?? nil else { return nil }
+        do {
+            return try await Self.mixMeetingFiles(
+                mac: mac, mic: mic, micOffset: checkpoint.companionStartOffset ?? 0, in: inflightRecordingsURL, mono: nil
+            )
+        } catch {
+            ParolaLog.error(.appRecovery, "a recovered meeting's microphone track could not be mixed in", [.error: .error(error)])
+            return nil
+        }
     }
 
     nonisolated static func meetingEngineInputURL() -> URL {

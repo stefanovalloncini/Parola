@@ -95,7 +95,10 @@ extension TranscriberMockSuites {
 
         /// A two-second meeting in the take's working folder: the Mac talks in the first second, you in the second.
         private func meetingFiles(_ model: AppModel) throws -> (mac: URL, mic: URL) {
-            let folder = model.inflightRecordingsURL
+            try meetingFiles(in: model.inflightRecordingsURL)
+        }
+
+        private func meetingFiles(in folder: URL) throws -> (mac: URL, mic: URL) {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             let id = UUID().uuidString
             let mac = folder.appendingPathComponent("parola-system-\(id).wav")
@@ -478,6 +481,120 @@ extension TranscriberMockSuites {
                 #expect(speakers == [nil, AppModel.meLabel()])
                 #expect(await model.library.list().count == 1, "Retry fills in the entry the failure saved")
             }
+        }
+
+        // MARK: - After a crash
+
+        private func crashedMeeting(in library: URL, age seconds: TimeInterval = 300) throws -> (mac: URL, mic: URL) {
+            let files = try meetingFiles(in: try inflight(library))
+            for file in [files.mac, files.mic] { try age(file, by: seconds) }
+            return files
+        }
+
+        private func meetingCheckpoint(_ files: (mac: URL, mic: URL)) -> RecoveryCheckpoint {
+            RecoveryCheckpoint(
+                kind: .recording, startedAt: Date(), modelName: "m", audioURL: files.mac, source: .systemAudio, category: .meeting,
+                companionAudioURL: files.mic, companionStartOffset: 0
+            )
+        }
+
+        private func mixLeftovers(_ library: URL) -> [String] {
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: library.appendingPathComponent("inflight").path)) ?? []
+            return names.filter { $0.hasPrefix(RecordingScratch.meetingMixPrefix) }
+        }
+
+        @Test("Restore brings a crashed meeting back with your microphone mixed in, and lets both files go once it is saved")
+        func restoreMixesTheMicBackIn() async throws {
+            let library = makeTempLibraryURL("second-track-restore")
+            let files = try crashedMeeting(in: library)
+            try writeLegacyCheckpoint(meetingCheckpoint(files), library: library)
+            let model = makeModel(libraryURL: library)
+            #expect(model.pendingRecovery?.companionAudioURL == files.mic)
+
+            model.acceptPendingRecovery()
+
+            let entry = try #require(await landedEntry(model))
+            #expect(entry.category == .meeting)
+            let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+            #expect(try channels(of: audio) == 2)
+            let released = await waitUntil { !exists(files.mac) && !exists(files.mic) }
+            #expect(released)
+            let cleared = await waitUntil { model.recoveryCheckpointFiles.isEmpty && mixLeftovers(library).isEmpty }
+            #expect(cleared)
+        }
+
+        @Test("Not Now keeps a crashed meeting in the library with your microphone mixed in")
+        func notNowMixesTheMicBackIn() async throws {
+            let library = makeTempLibraryURL("second-track-not-now")
+            let files = try crashedMeeting(in: library)
+            try writeLegacyCheckpoint(meetingCheckpoint(files), library: library)
+            let model = makeModel(libraryURL: library)
+
+            model.declinePendingRecovery()
+
+            let entry = try #require(await landedEntry(model))
+            #expect(entry.title.hasSuffix("(recovered)"))
+            let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+            #expect(try channels(of: audio) == 2)
+            let released = await waitUntil { !exists(files.mac) && !exists(files.mic) && mixLeftovers(library).isEmpty }
+            #expect(released)
+        }
+
+        @Test("a crashed meeting whose microphone file is gone comes back with the Mac side alone")
+        func restoreWithoutTheMicKeepsTheMacSide() async throws {
+            let library = makeTempLibraryURL("second-track-mic-gone")
+            let files = try crashedMeeting(in: library)
+            try FileManager.default.removeItem(at: files.mic)
+            try writeLegacyCheckpoint(meetingCheckpoint(files), library: library)
+            let model = makeModel(libraryURL: library)
+
+            model.acceptPendingRecovery()
+
+            let entry = try #require(await landedEntry(model))
+            let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+            #expect(try channels(of: audio) == 1)
+        }
+
+        @Test("the sweep brings back a meeting that never reached the library with your microphone mixed in")
+        func sweepMixesAnOrphanedPair() async throws {
+            let library = makeTempLibraryURL("second-track-sweep-pair")
+            let files = try crashedMeeting(in: library, age: 3_600)
+            let orphan = try makeTakeWAV("lone-mic", in: try inflight(library), prefix: RecordingScratch.meetingMicPrefix)
+            try age(orphan, by: 3_600)
+
+            let model = makeModel(libraryURL: library)
+            await model.inflightSweep?.value
+
+            let listed = await model.library.list()
+            #expect(listed.count == 1, "one meeting, and a microphone track is never a take of its own")
+            let entry = try #require(listed.first)
+            let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+            #expect(try channels(of: audio) == 2)
+            #expect(!exists(files.mac) && !exists(files.mic))
+            #expect(mixLeftovers(library).isEmpty)
+            #expect(exists(orphan), "an orphaned track goes only after two days")
+            #expect(AppModel.pairedMeetingMic(for: files.mac, in: [(orphan, Date()), (files.mic, Date())]) == files.mic)
+        }
+
+        @Test("an orphaned meeting whose Mac side recorded nothing still comes back for its microphone")
+        func sweepKeepsAMicWithAnEmptyMacSide() async throws {
+            let library = makeTempLibraryURL("second-track-sweep-empty-mac")
+            let folder = try inflight(library)
+            let id = UUID().uuidString
+            let mac = folder.appendingPathComponent("parola-system-\(id).wav")
+            let mic = folder.appendingPathComponent("\(RecordingScratch.meetingMicPrefix)-\(id).wav")
+            try TestAudio.write(channels: [[]], sampleRate: 16_000, to: mac)
+            try TestAudio.write(channels: [TestAudio.sine(seconds: 1, hz: 220, amplitude: 0.4, sampleRate: 16_000)], sampleRate: 16_000, to: mic)
+            for file in [mac, mic] { try age(file, by: 3_600) }
+
+            let model = makeModel(libraryURL: library)
+            await model.inflightSweep?.value
+
+            let listed = await model.library.list()
+            #expect(listed.count == 1)
+            let entry = try #require(listed.first)
+            let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+            #expect(try channels(of: audio) == 2)
         }
 
         @Test("the microphone notices and the Me label read in Italian")

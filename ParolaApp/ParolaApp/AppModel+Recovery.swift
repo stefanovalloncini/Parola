@@ -531,20 +531,24 @@ extension AppModel {
                 let audioURL = await Self.probedRecordingURL(checkpoint.audioURL)
                 guard let self else { return }
                 if let audioURL, await self.libraryHolds(audioURL) { return alreadySaved() }
-                guard let restored = Self.restoredTranscript(checkpoint, audioURL: audioURL) else {
+                let mixed = await self.mixRecoveredMicTrack(checkpoint, mac: audioURL)
+                guard let restored = Self.restoredTranscript(checkpoint, audioURL: mixed ?? audioURL) else {
                     self.removeRecoveryFile(of: checkpoint)
                     return
                 }
+                let originals = mixed == nil ? [] : [audioURL, checkpoint.companionAudioURL].compactMap { $0 }
                 self.saveTake(
                     restored,
-                    audio: audioURL,
+                    audio: mixed ?? audioURL,
                     title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt, category: checkpoint.category ?? .transcription),
                     source: checkpoint.source ?? .microphone,
                     category: checkpoint.category ?? .transcription,
                     landingAs: .salvagedTake,
-                    recovery: self.adoptRecovery(checkpoint),
-                    onSaved: release
-                )
+                    recovery: self.adoptRecovery(checkpoint)
+                ) { [weak self] entry in
+                    release?(entry)
+                    for file in originals { self?.releaseTakeFile(file) }
+                }
             }
         }
     }
@@ -563,7 +567,9 @@ extension AppModel {
                 await self.openRecoveredEntry(entry)
                 return
             }
-            self.finishRecordingRestore(checkpoint, audioURL: audioURL, pageAtStart: pageAtStart)
+            let mixed = await self.mixRecoveredMicTrack(checkpoint, mac: audioURL)
+            let originals = mixed == nil ? [] : [audioURL, checkpoint.companionAudioURL].compactMap { $0 }
+            self.finishRecordingRestore(checkpoint, audioURL: mixed ?? audioURL, pageAtStart: pageAtStart, mixedFrom: originals)
         }
     }
 
@@ -591,7 +597,7 @@ extension AppModel {
         )
     }
 
-    private func finishRecordingRestore(_ checkpoint: RecoveryCheckpoint, audioURL: URL?, pageAtStart: Route) {
+    private func finishRecordingRestore(_ checkpoint: RecoveryCheckpoint, audioURL: URL?, pageAtStart: Route, mixedFrom originals: [URL] = []) {
         guard let restored = Self.restoredTranscript(checkpoint, audioURL: audioURL) else {
             removeRecoveryFile(of: checkpoint)
             return
@@ -618,7 +624,9 @@ extension AppModel {
             category: checkpoint.category ?? .transcription,
             landingAs: .recording,
             recovery: adoptRecovery(checkpoint)
-        )
+        ) { [weak self] _ in
+            for file in originals { self?.releaseTakeFile(file) }
+        }
     }
 
     nonisolated static func readableRecordingURL(_ url: URL) -> URL? {
@@ -702,7 +710,9 @@ extension AppModel {
                 if self?.inflightFileInUse(file) == true { continue }
                 let bytes = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
                 let isTake = AppModel.isImportableTake(file, modified: modified[file] ?? .distantPast, takesSince: cutoff)
-                guard isTake, bytes > AppModel.emptyTakeBytes else {
+                let mic = isTake ? AppModel.pairedMeetingMic(for: file, in: found) : nil
+                let micBytes = (try? mic?.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                guard isTake, bytes > AppModel.emptyTakeBytes || micBytes > AppModel.emptyTakeBytes else {
                     if (try? FileManager.default.removeItem(at: file)) != nil { deleted += 1 }
                     continue
                 }
@@ -714,21 +724,26 @@ extension AppModel {
                     continue
                 }
                 let startedAt = (try? file.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
+                var mixed: URL?
+                if let mic { mixed = try? await AppModel.mixMeetingFiles(mac: file, mic: mic, micOffset: 0, in: dir, mono: nil) }
                 do {
                     // Copied, not moved: the original goes only once the entry holds the audio.
                     _ = try await library.add(
-                        transcript: AppModel.untranscribedTranscript(of: file, language: nil),
-                        audioSource: file,
+                        transcript: AppModel.untranscribedTranscript(of: mixed ?? file, language: nil),
+                        audioSource: mixed ?? file,
                         category: .transcription,
                         title: AppModel.recoveredRecordingTitle(startedAt: startedAt),
+                        // The Mac file's own digest, even for a mix: a copy of it left behind is then known as saved.
                         sourceDigest: digest,
                         source: AppModel.inflightTakeSource(file)
                     )
                     recovered += 1
                     if self?.inflightFileInUse(file) != true { try? FileManager.default.removeItem(at: file) }
+                    if let mic, self?.inflightFileInUse(mic) != true { try? FileManager.default.removeItem(at: mic) }
                 } catch {
                     ParolaLog.error(.appRecovery, "an orphaned take could not be brought back", [.error: .error(error)])
                 }
+                if let mixed { try? FileManager.default.removeItem(at: mixed) }
             }
             let staging = (try? await AppModel.offMainIO(qos: .utility) { AppModel.staleStagingFolders(in: root, now: Date()) }) ?? []
             for folder in staging where await AppModel.salvageStagingFolder(folder, into: library) {
@@ -800,6 +815,12 @@ extension AppModel {
         }
         try? fm.removeItem(at: folder)
         return true
+    }
+
+    /// The meeting microphone track named for `take`, among the files a sweep found beside it.
+    nonisolated static func pairedMeetingMic(for take: URL, in files: [(url: URL, modified: Date)]) -> URL? {
+        let name = take.lastPathComponent
+        return files.first { RecordingScratch.takeNames(pairedWith: $0.url).contains(name) }?.url
     }
 
     /// A WAV header and next to nothing after it: nothing was recorded.
