@@ -33,7 +33,7 @@ enum SidebarActivity: Equatable {
     var title: String {
         switch self {
         case .inProgress: "In Progress"
-        case .failed: "Failed"
+        case .failed: "Activity.Failed"
         }
     }
 

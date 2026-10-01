@@ -1430,6 +1430,24 @@
         }
       }
     },
+    "Activity.Failed": {
+      "comment": "The sidebar Activity row once only failed jobs remain; a job's own status keeps the plain \"Failed\".",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non riusciti"
+          }
+        }
+      }
+    },
     "Add": {
       "extractionState": "manual",
       "localizations": {

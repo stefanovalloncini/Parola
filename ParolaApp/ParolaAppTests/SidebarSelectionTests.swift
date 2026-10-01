@@ -93,11 +93,12 @@ struct SidebarSelectionTests {
     @Test("the Activity row reads In Progress or Failed, in Italian too")
     func activityTitles() throws {
         #expect(SidebarActivity.inProgress(count: 3).title == "In Progress")
-        #expect(SidebarActivity.failed(count: 2).title == "Failed")
+        #expect(SidebarActivity.failed(count: 2).title == "Activity.Failed")
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let italian = try #require(Bundle(path: path))
         #expect(String(localized: String.LocalizationValue(SidebarActivity.inProgress(count: 3).title), bundle: italian) == "In corso")
-        #expect(String(localized: String.LocalizationValue(SidebarActivity.failed(count: 2).title), bundle: italian) == "Errore")
+        #expect(String(localized: String.LocalizationValue(SidebarActivity.failed(count: 2).title), bundle: italian) == "Non riusciti")
+        #expect(String(localized: String.LocalizationValue(SidebarActivity.failed(count: 2).title)) == "Failed")
     }
 
     @Test("dictations wear the keyboard everywhere the category shows")
