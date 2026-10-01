@@ -62,6 +62,7 @@ enum InspectorMode: String, CaseIterable, Identifiable {
 
 struct TranscriptPane: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.arrivesFromStage) private var arrivesFromStage
     @Environment(AppModel.self) private var model
     @AppStorage(InspectorVisibility.preferenceKey, store: DefaultsStore.current) private var inspectorVisible: Bool = true
     @AppStorage(InspectorVisibility.modeKey, store: DefaultsStore.current) private var inspectorModeRaw: String = InspectorMode.format.rawValue
@@ -140,7 +141,7 @@ struct TranscriptPane: View {
 
             transcriptBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .stageLandingDestination(.text)
+                .arrivesAfterTheStage(model.routeLandsTake && arrivesFromStage)
 
             // In the column's flow, not over it: a toast on top of the media bar would cover the
             // transport for as long as it is up.

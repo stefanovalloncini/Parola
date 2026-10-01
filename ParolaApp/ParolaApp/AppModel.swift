@@ -137,8 +137,11 @@ final class AppModel {
     var route: Route = .transcript {
         didSet {
             if oldValue == .recentlyDeleted { recentlyDeletedSelection = [] }
+            if routeLandsTake { routeLandsTake = false }
         }
     }
+    /// Set as a take's own landing replaces its Stage with its transcript, so the window plays that change as a landing; the next route change clears it.
+    private(set) var routeLandsTake = false
     var settingsPane: String = "general"
     var settingsRoutePreview = false  // test-mode only: renders SettingsView in the main window so the bridge can screenshot panes
     // Published by TranscriptPane so the Toggle Inspector command knows which of the two visibility keys to flip.
@@ -4210,7 +4213,7 @@ final class AppModel {
             selectedEntryID = nil
             self.transcript = processed
             phase = .ready
-            route = .transcript
+            showLandedTake()
             if let audioURL = processed.sourceURL {
                 recordedTake = RecordedTake(file: audioURL, title: given.typedTitle ?? title)
                 sourceFileURL = audioURL
@@ -4558,7 +4561,7 @@ final class AppModel {
             transcript = processed
             adoptLoadedMediaDuration()
             phase = .ready
-            if route == .recording { route = .transcript }
+            if route == .recording { showLandedTake() }
             saveTake(
                 processed, audio: url, title: title, source: source, category: category, landingAs: .recording,
                 recovery: recovery, take: take, annotations: annotations
@@ -4699,6 +4702,12 @@ final class AppModel {
     private func armTakeRetry(_ retry: RecordingSession.Failure) {
         failureKind = .transcription
         failedTakeRetry = retry
+    }
+
+    private func showLandedTake() {
+        let fromStage = route == .recording
+        route = .transcript
+        routeLandsTake = fromStage
     }
 
     /// Stops a take's transcription. The take is saved to the library untranscribed, so the recording survives.

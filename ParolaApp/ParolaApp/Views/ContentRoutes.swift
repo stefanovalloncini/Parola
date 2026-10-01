@@ -26,6 +26,7 @@ struct ContentRoutes: View {
         .animation(Self.routeAnimation(from: shownRouteID, to: routeID, reduceMotion: reduceMotion), value: routeID)
         .onChange(of: routeID, initial: true) { _, shown in shownRouteID = shown }
         .environment(\.stageLanding, landing)
+        .environment(\.arrivesFromStage, shownRouteID == .stage && routeID != .stage)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 if let notice = model.exportNotice {

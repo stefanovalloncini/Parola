@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// What carries over from the Stage into the transcript a take lands as: the band drops into the media bar, the time into the bar's duration, the words into the transcript column.
+/// What carries over from the Stage into the transcript a take lands as: the band drops into the media bar and the time into the bar's duration, while the Stage's words give way to the transcript's.
 enum StageLanding {
     enum Piece: Hashable, Sendable {
-        case band, time, text
+        case band, time
     }
 
     enum Side: Hashable, Sendable {
@@ -15,6 +15,14 @@ enum StageLanding {
         let side: Side?
     }
 
+    /// The Stage's words, facts and controls are gone before the transcript's words begin, so the two never show at once.
+    nonisolated static let stageLeaves: Double = 0.15
+    nonisolated static let wordsWait: Double = 0.15
+    nonisolated static let wordsArrive: Double = 0.25
+
+    static var stageLeaving: Animation { .easeOut(duration: stageLeaves) }
+    static var wordsArriving: Animation { .easeOut(duration: wordsArrive).delay(wordsWait) }
+
     /// The two sides share a piece's id only while it carries over; otherwise each keeps one of its own, so nothing links.
     nonisolated static func id(_ piece: Piece, on side: Side, carries: Bool) -> ID {
         ID(piece: piece, side: carries ? nil : side)
@@ -23,15 +31,6 @@ enum StageLanding {
     /// Under Reduce Motion nothing carries over and the Stage and the transcript only crossfade.
     nonisolated static func carries(eligible: Bool, reduceMotion: Bool) -> Bool {
         eligible && !reduceMotion
-    }
-
-    /// The words move by their first line without resizing, so a long transcript isn't laid out again on every frame of the landing.
-    nonisolated static func properties(_ piece: Piece) -> MatchedGeometryProperties {
-        piece == .text ? .position : .frame
-    }
-
-    nonisolated static func anchor(_ piece: Piece) -> UnitPoint {
-        piece == .text ? .topLeading : .center
     }
 
     /// The Stage offers its pieces only while its take winds down, so a new take's Stage never flies in out of a transcript.
@@ -59,6 +58,8 @@ enum StageLanding {
 extension EnvironmentValues {
     /// Shared by the main window's Stage and transcript page, so a landing take's pieces can carry across the route change.
     @Entry var stageLanding: Namespace.ID?
+    /// The page appears in the very change that takes the window off the Stage.
+    @Entry var arrivesFromStage = false
 }
 
 extension View {
@@ -70,6 +71,16 @@ extension View {
     /// The transcript's place for a piece of the Stage, taken only when the transcript is the take that landed.
     func stageLandingDestination(_ piece: StageLanding.Piece) -> some View {
         modifier(StageLandingMatch(piece: piece, side: .transcript, offered: nil))
+    }
+
+    /// A part of the Stage that carries nothing over, gone fast as its take lands.
+    func leavesFirstOnLanding() -> some View {
+        modifier(LeavesFirstOnLanding())
+    }
+
+    /// The transcript's words, held back as a landing's Stage leaves and brought in after it; `landing` counts only as the page is made.
+    func arrivesAfterTheStage(_ landing: Bool) -> some View {
+        modifier(ArrivesAfterTheStage(waits: landing))
     }
 }
 
@@ -87,12 +98,40 @@ private struct StageLandingMatch: ViewModifier {
             let eligible = offered ?? (model.map { StageLanding.transcriptIsTheTake($0) } == true)
             content.matchedGeometryEffect(
                 id: StageLanding.id(piece, on: side, carries: StageLanding.carries(eligible: eligible, reduceMotion: reduceMotion)),
-                in: namespace,
-                properties: StageLanding.properties(piece),
-                anchor: StageLanding.anchor(piece)
+                in: namespace
             )
         } else {
             content
         }
+    }
+}
+
+/// Reads the model, not the environment: a Stage already on its way out still follows the model, but not new environment values.
+private struct LeavesFirstOnLanding: ViewModifier {
+    @Environment(AppModel.self) private var model: AppModel?
+
+    func body(content: Content) -> some View {
+        let leaves = model?.routeLandsTake == true
+        content
+            .opacity(leaves ? 0 : 1)
+            .animation(StageLanding.stageLeaving, value: leaves)
+    }
+}
+
+/// Latched as state when the page is made: the route that brought it has already moved on by the time it appears.
+private struct ArrivesAfterTheStage: ViewModifier {
+    @State private var waits: Bool
+
+    init(waits: Bool) {
+        _waits = State(initialValue: waits)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(waits ? 0 : 1)
+            .onAppear {
+                guard waits else { return }
+                withAnimation(StageLanding.wordsArriving) { waits = false }
+            }
     }
 }

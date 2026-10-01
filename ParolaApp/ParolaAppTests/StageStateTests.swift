@@ -160,18 +160,21 @@ struct StageStateTests {
         #expect(!StageLanding.carries(eligible: false, reduceMotion: false))
     }
 
-    @Test("each piece links across only while both sides carry it, the band, the time and the words each to their own place")
+    @Test("the band and the time link across only while both sides carry them, each to its own place")
     func landingPieces() {
-        for piece in [StageLanding.Piece.band, .time, .text] {
+        for piece in [StageLanding.Piece.band, .time] {
             #expect(StageLanding.id(piece, on: .stage, carries: true) == StageLanding.id(piece, on: .transcript, carries: true))
             #expect(StageLanding.id(piece, on: .stage, carries: false) != StageLanding.id(piece, on: .transcript, carries: false))
             #expect(StageLanding.id(piece, on: .stage, carries: true) != StageLanding.id(piece, on: .transcript, carries: false))
         }
-        #expect(StageLanding.id(.band, on: .stage, carries: true) != StageLanding.id(.text, on: .transcript, carries: true))
-        #expect(StageLanding.properties(.text) == .position, "the transcript is never laid out again mid-flight")
-        #expect(StageLanding.anchor(.text) == .topLeading, "the words travel by their first line")
-        #expect(StageLanding.properties(.band) == .frame)
-        #expect(StageLanding.properties(.time) == .frame)
+        #expect(StageLanding.id(.band, on: .stage, carries: true) != StageLanding.id(.time, on: .transcript, carries: true))
+    }
+
+    @Test("as a take lands, the Stage's words, facts and controls are gone before the transcript's words begin, all inside the landing")
+    func landingWordsNeverOverlap() {
+        #expect(StageLanding.wordsWait >= StageLanding.stageLeaves)
+        #expect(StageLanding.wordsWait + StageLanding.wordsArrive <= 0.45)
+        #expect(StageLanding.stageLeaves <= 0.2)
     }
 
     @MainActor
@@ -598,12 +601,15 @@ extension TranscriberMockSuites {
                 #expect(onScreen)
                 let atLanding = StageLanding.transcriptIsTheTake(model)
                 #expect(atLanding)
+                #expect(model.routeLandsTake, "the change off the Stage was the take's own landing")
                 let landed = await landedEntry(model)
                 let entry = try #require(landed)
                 let moved = await waitUntil { model.recording?.state == .done(entryID: entry.id) && model.sourceFileURL != audio }
                 #expect(moved, "the save moved playback onto the entry's own audio")
                 let afterSave = StageLanding.transcriptIsTheTake(model)
                 #expect(afterSave, "a landing still in flight keeps its pieces when the save lands")
+                model.route = .statistics
+                #expect(!model.routeLandsTake, "the next route change is no landing")
 
                 model.installTestTake(source: .microphone)
                 let newTake = StageLanding.transcriptIsTheTake(model)
