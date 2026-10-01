@@ -166,10 +166,11 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "goHome",
                 area: .library,
-                summary: "Shows the Library page: clears the category and person filters and any search, and unloads any transcript.",
+                summary: "Shows the Library page: clears the category and person filters and any search, and unloads any transcript, replying once the list is back.",
                 kind: .mutating,
                 handler: { _, ctx in
                     ctx.model.goHome()
+                    await ctx.model.awaitTranscriptClose()
                     return .object(["route": .string(ctx.model.route.rawValue)])
                 }
             ),

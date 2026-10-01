@@ -521,6 +521,22 @@ struct LibraryOriginTests {
         #expect(fields["libraryBrowsingAll"] == .bool(true))
     }
 
+    @Test("goHome replies once the transcript is gone and the whole library is back")
+    func bridgeGoHomeWaitsForTheList() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let entry = try await seedEntry(in: model, text: "quarterly review", category: .meeting)
+        model.browseCategory(.meeting)
+        #expect(await openEntry(entry.id, in: model))
+        let command = try #require(commands["goHome"])
+
+        let result = try await command.handler(try command.validate(AutomationArgs()), context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.transcript == nil, "the reply waited for the transcript to close")
+        #expect(model.isBrowsingWholeLibrary)
+        #expect(result == .object(["route": .string("transcript")]))
+    }
+
     @Test("getState reports the origin a scenario can assert")
     func bridgeStateCarriesTheOrigin() async throws {
         let (model, server, _, _) = try makeRig()
