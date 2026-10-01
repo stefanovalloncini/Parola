@@ -123,13 +123,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     static func presentQuitDuringTakeAlert() -> AppModel.QuitDuringTake {
+        askAboutTake(discardTitle: String(localized: "Discard"))
+    }
+
+    /// The same question for the main window closing; its Discard… asks once more before anything is deleted.
+    static func presentCloseDuringTakeAlert() -> AppModel.QuitDuringTake {
+        askAboutTake(discardTitle: String(localized: "Discard…"))
+    }
+
+    private static func askAboutTake(discardTitle: String) -> AppModel.QuitDuringTake {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.messageText = String(localized: "A recording is in progress")
         alert.informativeText = String(localized: "Stop and Save keeps what you've recorded so far in your library.")
         alert.addButton(withTitle: String(localized: "Stop and Save"))
         alert.addButton(withTitle: String(localized: "Keep Recording")).keyEquivalent = "\u{1b}"
-        alert.addButton(withTitle: String(localized: "Discard")).hasDestructiveAction = true
+        alert.addButton(withTitle: discardTitle).hasDestructiveAction = true
         switch alert.runModal() {
         case .alertFirstButtonReturn: return .stopAndSave
         case .alertThirdButtonReturn: return .discard

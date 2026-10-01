@@ -27,6 +27,12 @@ enum TakeRemote {
         }
     }
 
+    /// From the count-in until Stop there is a take to stop or discard; one finishing is already on its way to the library.
+    nonisolated static func canEnd(_ take: RecordingSession?) -> Bool {
+        guard let take else { return false }
+        return take.isRunning && take.state != .finishing
+    }
+
     /// What VoiceOver reads for the take: what it is doing, then its time in words.
     nonisolated static func spokenStatus(
         for take: RecordingSession, at now: Date, bundle: Bundle = .main, locale: Locale = AppFormat.locale

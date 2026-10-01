@@ -307,3 +307,262 @@ struct MainWindowTitleTests {
         #expect(MainWindowTitle.title(takeRunning: false, bundle: it) == "Parola")
     }
 }
+
+@MainActor
+private final class SwiftUIStandIn: NSObject, NSWindowDelegate {
+    var allowsClose = true
+    var askedToClose = 0
+    var resizes = 0
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        askedToClose += 1
+        return allowsClose
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        resizes += 1
+    }
+}
+
+/// Titled and closable, far off screen, kept after it closes so a test can read it back.
+@MainActor
+private func closableWindow() -> NSWindow {
+    let window = NSWindow(
+        contentRect: NSRect(x: -12_000, y: -12_000, width: 400, height: 300),
+        styleMask: [.titled, .closable, .resizable],
+        backing: .buffered,
+        defer: false
+    )
+    window.isReleasedWhenClosed = false
+    window.orderFront(nil)
+    return window
+}
+
+@Suite("Closing the window during a take")
+struct MainWindowCloseDecisionTests {
+    @Test("closing asks from the count-in until Stop; never without a take, nor once it finishes")
+    func asksWhileTheTakeCanEnd() {
+        let start = Date(timeIntervalSinceReferenceDate: 1_000)
+        #expect(!MainWindowClose.asks(take: nil))
+        var take = RecordingSession(
+            takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .countIn(remaining: 3)
+        )
+        #expect(MainWindowClose.asks(take: take))
+        _ = take.arm(.startingCapture)
+        #expect(MainWindowClose.asks(take: take))
+        _ = take.markCapturing(at: start)
+        #expect(MainWindowClose.asks(take: take))
+        _ = take.pause(at: start.addingTimeInterval(5))
+        #expect(MainWindowClose.asks(take: take))
+        _ = take.resume(at: start.addingTimeInterval(6))
+        _ = take.finish(at: start.addingTimeInterval(9))
+        #expect(!MainWindowClose.asks(take: take))
+        _ = take.transcribing(progress: nil)
+        #expect(!MainWindowClose.asks(take: take))
+        take.fail("boom")
+        #expect(!MainWindowClose.asks(take: take))
+    }
+}
+
+@MainActor
+@Suite("Closing the window during a take, answered", .serialized)
+struct MainWindowCloseAnswerTests {
+    @Test("Keep Recording keeps the window and the take")
+    func keepRecording() async throws {
+        let audio = try tempWAV("close-keep")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("close-keep")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        defer { model.endTestTake() }
+        var closed = 0
+
+        await MainWindowClose.resolve(.keepRecording, model: model, confirmDiscard: { true }, close: { closed += 1 })
+
+        #expect(closed == 0)
+        #expect(model.recording?.state == .recording)
+    }
+
+    @Test("Discard… asks again; a refusal keeps the window and the take, a yes discards and closes")
+    func discardAsksAgain() async throws {
+        let audio = try tempWAV("close-discard")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("close-discard")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        defer { model.endTestTake() }
+        var confirmations = 0
+        var closed = 0
+
+        await MainWindowClose.resolve(.discard, model: model, confirmDiscard: { confirmations += 1; return false }, close: { closed += 1 })
+        #expect(confirmations == 1)
+        #expect(closed == 0)
+        #expect(model.recording?.state == .recording)
+
+        await MainWindowClose.resolve(.discard, model: model, confirmDiscard: { confirmations += 1; return true }, close: { closed += 1 })
+        #expect(confirmations == 2)
+        #expect(closed == 1)
+        #expect(model.recording == nil)
+        let saved = await model.library.list()
+        #expect(saved.isEmpty)
+    }
+
+    @Test("during a take the window asks before it closes, and Keep Recording leaves it open")
+    func windowAsksFirst() throws {
+        let audio = try tempWAV("close-guard")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("close-guard")
+        let window = closableWindow()
+        defer { window.close() }
+        model.mainWindow = window
+        var asked = 0
+        MainWindowCloseGuard.install(on: window, model: model, ask: { asked += 1; return .keepRecording }, confirmDiscard: { false })
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        defer { model.endTestTake() }
+
+        window.performClose(nil)
+
+        #expect(asked == 1)
+        #expect(window.isVisible)
+        #expect(model.recording?.state == .recording)
+    }
+
+    @Test("with a text field focused, ⌘W's close still asks first")
+    func focusedFieldStillAsks() throws {
+        let audio = try tempWAV("close-field")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("close-field")
+        let window = closableWindow()
+        defer { window.close() }
+        let field = NSTextField(frame: NSRect(x: 20, y: 20, width: 200, height: 24))
+        window.contentView?.addSubview(field)
+        model.mainWindow = window
+        var asked = 0
+        MainWindowCloseGuard.install(on: window, model: model, ask: { asked += 1; return .keepRecording }, confirmDiscard: { false })
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        defer { model.endTestTake() }
+        #expect(window.makeFirstResponder(field))
+
+        let responder = try #require(window.firstResponder)
+        #expect(responder.tryToPerform(#selector(NSWindow.performClose(_:)), with: nil))
+
+        #expect(asked == 1)
+        #expect(window.isVisible)
+    }
+
+    @Test("with a sheet up, a close can't get past the sheet: the window stays and the take records on")
+    func sheetKeepsTheWindow() throws {
+        let audio = try tempWAV("close-sheet")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("close-sheet")
+        let window = closableWindow()
+        defer { window.close() }
+        model.mainWindow = window
+        MainWindowCloseGuard.install(on: window, model: model, ask: { .keepRecording }, confirmDiscard: { false })
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        defer { model.endTestTake() }
+        let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
+        window.beginSheet(sheet)
+        defer { window.endSheet(sheet) }
+
+        window.performClose(nil)
+        sheet.performClose(nil)
+
+        #expect(window.isVisible)
+        #expect(model.recording?.state == .recording)
+    }
+
+    @Test("with no take, the close is SwiftUI's own delegate's to answer, and other calls reach it too")
+    func passesThroughWithoutATake() throws {
+        let model = makeRecordingModel("close-pass")
+        let window = closableWindow()
+        defer { window.close() }
+        let swiftUI = SwiftUIStandIn()
+        window.delegate = swiftUI
+        model.mainWindow = window
+        var asked = 0
+        MainWindowCloseGuard.install(on: window, model: model, ask: { asked += 1; return .keepRecording }, confirmDiscard: { false })
+
+        swiftUI.allowsClose = false
+        window.performClose(nil)
+        #expect(swiftUI.askedToClose == 1)
+        #expect(window.isVisible)
+
+        window.setFrame(NSRect(x: -12_000, y: -12_000, width: 500, height: 320), display: false)
+        #expect(swiftUI.resizes == 1)
+
+        swiftUI.allowsClose = true
+        window.performClose(nil)
+        #expect(swiftUI.askedToClose == 2)
+        #expect(!window.isVisible)
+        #expect(asked == 0)
+    }
+
+    @Test("the main window reporter puts the question in front of the window's own delegate, once")
+    func reporterInstallsTheGuard() {
+        let model = makeRecordingModel("close-reporter")
+        let window = reportedWindow(model)
+        defer { window.close() }
+        let installed = window.delegate as? MainWindowCloseGuard
+        #expect(installed != nil)
+        #expect(MainWindowCloseGuard.install(on: window, model: model) === installed)
+    }
+}
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("Closing the window during a take, saved", .serialized)
+    struct MainWindowCloseSaveTests {
+        @Test("Stop and Save stops the take and closes the window only once the take's audio is safe")
+        func stopAndSaveClosesOnceSafe() async throws {
+            let audio = try makeTakeWAV("close-save", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "saved before the window went")])
+                let model = makeRecordingModel("close-save")
+                model.useStreaming = false
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+                var closedWhileRunning: Bool?
+
+                await MainWindowClose.resolve(.stopAndSave, model: model, confirmDiscard: { false }, close: {
+                    closedWhileRunning = model.takeIsRunning
+                })
+
+                #expect(closedWhileRunning == false)
+                let landed = await landedEntry(model, timeoutMs: 30_000)
+                #expect(landed != nil)
+            }
+        }
+
+        @Test("answered from the window, Stop and Save closes it once the take is safe")
+        func windowClosesAfterStopAndSave() async throws {
+            let audio = try makeTakeWAV("close-save-window", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the window waited")])
+                let model = makeRecordingModel("close-save-window")
+                model.useStreaming = false
+                let window = closableWindow()
+                defer { window.close() }
+                model.mainWindow = window
+                MainWindowCloseGuard.install(on: window, model: model, ask: { .stopAndSave }, confirmDiscard: { false })
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+                var runningAtClose: Bool?
+                let closing = NotificationCenter.default.addObserver(
+                    forName: NSWindow.willCloseNotification, object: window, queue: .main
+                ) { _ in
+                    MainActor.assumeIsolated { runningAtClose = model.takeIsRunning }
+                }
+                defer { NotificationCenter.default.removeObserver(closing) }
+
+                window.performClose(nil)
+                let stillOpen = window.isVisible
+                #expect(stillOpen)
+
+                let closed = await waitUntil { !window.isVisible }
+                #expect(closed)
+                #expect(runningAtClose == false)
+                let landed = await landedEntry(model, timeoutMs: 30_000)
+                #expect(landed != nil)
+            }
+        }
+    }
+}

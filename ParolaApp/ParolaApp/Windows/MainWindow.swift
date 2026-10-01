@@ -34,7 +34,7 @@ enum MainWindowTitle {
     }
 }
 
-/// Keeps `AppModel.mainWindow` on the window this content sits in, and lets go of it as that window closes; the title follows the take.
+/// Keeps `AppModel.mainWindow` on the window this content sits in, and lets go of it as that window closes; the title follows the take, and closing it mid-take asks first.
 struct MainWindowReporter: NSViewRepresentable {
     let model: AppModel
 
@@ -67,6 +67,7 @@ struct MainWindowReporter: NSViewRepresentable {
             observer = nil
             guard let window else { return }
             model?.mainWindow = window
+            if let model { MainWindowCloseGuard.install(on: window, model: model) }
             observer = NotificationCenter.default.addObserver(
                 forName: NSWindow.willCloseNotification, object: window, queue: .main
             ) { [weak model, weak window] _ in
