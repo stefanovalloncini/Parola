@@ -1803,8 +1803,7 @@ final class AppModel {
     private func teardownActiveCapture(exitsMedia: Bool = true) {
         let takeRecovery = activeTake?.recovery
         endSession(of: activeTake?.id)
-        // A stopped take still finishing its file lands on its own; it no longer holds up the next take.
-        updateSession(of: recording?.takeID) { if $0.state == .finishing { $0.land(entryID: nil) } }
+        letGoOfFinishingTake()
         if recordingStartInFlight, liveSource == nil {
             stopRequestedDuringStart = true
         } else {
@@ -1828,6 +1827,16 @@ final class AppModel {
         }
         if exitsMedia { Task { await mediaSession.exitRecording() } }
         pendingRecordingCategory = .transcription
+    }
+
+    /// A stopped take still finishing its file goes on alone, freeing Record and the Stage; it lands only with its save, so a cut-short file can still say so.
+    private func letGoOfFinishingTake() {
+        var letGo = false
+        updateSession(of: recording?.takeID) { session in
+            guard session.state == .finishing else { return }
+            letGo = session.transcribing(progress: nil)
+        }
+        if letGo, route == .recording { route = .transcript }
     }
 
     func cancelCurrentWork() {

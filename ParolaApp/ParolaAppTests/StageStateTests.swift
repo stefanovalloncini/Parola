@@ -5,6 +5,31 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
+/// A capture whose file comes back only when the test lets it go, and then cut short.
+private actor HeldCutShortCapture: LiveAudioSource {
+    nonisolated let levelMeter = LevelMeter()
+    private let file: URL
+    private var released = false
+    private var held: CheckedContinuation<Void, Never>?
+
+    init(file: URL) { self.file = file }
+
+    func start() async throws {}
+
+    func prepare() async throws -> URL {
+        if !released { await withCheckedContinuation { held = $0 } }
+        throw CaptureInterrupted(url: file, reason: "the disk is full")
+    }
+
+    func letGo() {
+        released = true
+        held?.resume()
+        held = nil
+    }
+
+    func cancel() async {}
+}
+
 @Suite("Stage states")
 struct StageStateTests {
     @Test("each session state has one Stage look")
@@ -157,6 +182,35 @@ extension TranscriberMockSuites {
                 #expect(saved.title.hasSuffix("(not transcribed)"))
                 await gate.open()
             }
+        }
+
+        @Test("a take cut short after Stop and Cancel still says so, while Record works again at once")
+        func cutShortAfterCancelReports() async throws {
+            let audio = try makeTakeWAV("stage-cut-after-cancel", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeModel("stage-cut-after-cancel")
+            let capture = HeldCutShortCapture(file: audio)
+            model.takeCaptureOverride = { _ in capture }
+            model.startRecording(source: .microphone)
+            let up = await waitUntil { model.liveSource != nil }
+            #expect(up)
+            model.stopRecordingAndTranscribe()
+            #expect(model.recording?.state == .finishing)
+
+            model.cancelCurrentWork()
+
+            #expect(!model.recordingActive, "the stopped take no longer holds up the next one")
+            #expect(model.route != .recording, "Cancel leaves the Stage")
+            #expect(model.recording?.isOver == false, "the take lands only once its save does")
+            await capture.letGo()
+            let message = "Parola couldn't keep writing the recording to disk. The recording up to this point was saved to your library."
+            let reported = await waitUntil { model.recording?.state == .failed(message: message) }
+            #expect(reported)
+            let notice = await waitForNotice(model)
+            #expect(notice?.message == message)
+            #expect(notice?.actions.map(\.title) == ["Retry", "Show"])
+            let saved = await landedEntry(model)
+            #expect(saved?.title.hasSuffix("(interrupted)") == true)
         }
 
         @Test("the Stage's Cancel ends a count-in with no word")
