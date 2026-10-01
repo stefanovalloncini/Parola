@@ -365,6 +365,20 @@ private func closableWindow() -> NSWindow {
 
 @Suite("Closing the window during a take")
 struct MainWindowCloseDecisionTests {
+    @Test("while a take is still starting, the close question doesn't speak of keeping what it recorded, in English or Italian")
+    func startingQuestion() throws {
+        let starting = AppDelegate.closeQuestion(starting: true)
+        #expect(starting.message == "A recording is starting")
+        #expect(starting.detail == "Nothing has been recorded yet.")
+        let recording = AppDelegate.closeQuestion(starting: false)
+        #expect(recording.message == "A recording is in progress")
+        #expect(recording.detail == "Stop and Save keeps what you've recorded so far in your library.")
+        let it = try italianBundle()
+        let italian = AppDelegate.closeQuestion(starting: true, bundle: it)
+        #expect(italian.message == "Una registrazione sta per iniziare")
+        #expect(italian.detail == "Non è ancora stato registrato nulla.")
+    }
+
     @Test("closing asks from the count-in until Stop; never without a take, nor once it finishes")
     func asksWhileTheTakeCanEnd() {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
@@ -442,8 +456,11 @@ struct MainWindowCloseAnswerTests {
         model.mainWindow = window
         var asked = 0
         var askedOn: NSWindow?
+        var askedAbout: Int?
         MainWindowCloseGuard.install(
-            on: window, model: model, ask: { closing in asked += 1; askedOn = closing; return .keepRecording }, confirmDiscard: { _ in false }
+            on: window, model: model,
+            ask: { closing, take in asked += 1; askedOn = closing; askedAbout = take.takeID; return .keepRecording },
+            confirmDiscard: { _ in false }
         )
         model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
         defer { model.endTestTake() }
@@ -453,6 +470,7 @@ struct MainWindowCloseAnswerTests {
         let wasAsked = await waitUntil { asked == 1 }
         #expect(wasAsked)
         #expect(askedOn === window, "the question is a sheet on the window that is closing")
+        #expect(askedAbout == model.recording?.takeID, "the question is about the take running now")
         await settle()
         #expect(window.isVisible)
         #expect(model.recording?.state == .recording)
@@ -468,7 +486,7 @@ struct MainWindowCloseAnswerTests {
         model.mainWindow = window
         var confirmedOn: NSWindow?
         MainWindowCloseGuard.install(
-            on: window, model: model, ask: { _ in .discard }, confirmDiscard: { closing in confirmedOn = closing; return true }
+            on: window, model: model, ask: { _, _ in .discard }, confirmDiscard: { closing in confirmedOn = closing; return true }
         )
         model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
         defer { model.endTestTake() }
@@ -494,7 +512,7 @@ struct MainWindowCloseAnswerTests {
         window.contentView?.addSubview(field)
         model.mainWindow = window
         var asked = 0
-        MainWindowCloseGuard.install(on: window, model: model, ask: { _ in asked += 1; return .keepRecording }, confirmDiscard: { _ in false })
+        MainWindowCloseGuard.install(on: window, model: model, ask: { _, _ in asked += 1; return .keepRecording }, confirmDiscard: { _ in false })
         model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
         defer { model.endTestTake() }
         #expect(window.makeFirstResponder(field))
@@ -516,7 +534,7 @@ struct MainWindowCloseAnswerTests {
         defer { window.close() }
         model.mainWindow = window
         var asked = 0
-        MainWindowCloseGuard.install(on: window, model: model, ask: { _ in asked += 1; return .keepRecording }, confirmDiscard: { _ in false })
+        MainWindowCloseGuard.install(on: window, model: model, ask: { _, _ in asked += 1; return .keepRecording }, confirmDiscard: { _ in false })
         model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
         defer { model.endTestTake() }
         let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
@@ -541,7 +559,7 @@ struct MainWindowCloseAnswerTests {
         window.delegate = swiftUI
         model.mainWindow = window
         var asked = 0
-        MainWindowCloseGuard.install(on: window, model: model, ask: { _ in asked += 1; return .keepRecording }, confirmDiscard: { _ in false })
+        MainWindowCloseGuard.install(on: window, model: model, ask: { _, _ in asked += 1; return .keepRecording }, confirmDiscard: { _ in false })
 
         swiftUI.allowsClose = false
         window.performClose(nil)
@@ -636,7 +654,7 @@ extension TranscriberMockSuites {
                 var confirmations = 0
                 MainWindowCloseGuard.install(
                     on: window, model: model,
-                    ask: { _ in model.stopRecordingAndTranscribe(); return .discard },
+                    ask: { _, _ in model.stopRecordingAndTranscribe(); return .discard },
                     confirmDiscard: { _ in confirmations += 1; return true }
                 )
                 model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
@@ -672,7 +690,7 @@ extension TranscriberMockSuites {
                 var newTake: Int?
                 MainWindowCloseGuard.install(
                     on: window, model: model,
-                    ask: { _ in
+                    ask: { _, _ in
                         asked += 1
                         model.endTestTake()
                         model.installTestTake(source: .microphone, liveSource: StubSource(url: second))
@@ -709,7 +727,7 @@ extension TranscriberMockSuites {
                     asking.close()
                     other.close()
                 }
-                MainWindowCloseGuard.install(on: asking, model: model, ask: { _ in .stopAndSave }, confirmDiscard: { _ in false })
+                MainWindowCloseGuard.install(on: asking, model: model, ask: { _, _ in .stopAndSave }, confirmDiscard: { _ in false })
                 model.mainWindow = other
                 model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
 
@@ -735,7 +753,7 @@ extension TranscriberMockSuites {
                 let window = closableWindow()
                 defer { window.close() }
                 model.mainWindow = window
-                MainWindowCloseGuard.install(on: window, model: model, ask: { _ in .stopAndSave }, confirmDiscard: { _ in false })
+                MainWindowCloseGuard.install(on: window, model: model, ask: { _, _ in .stopAndSave }, confirmDiscard: { _ in false })
                 model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
                 var runningAtClose: Bool?
                 let closing = NotificationCenter.default.addObserver(

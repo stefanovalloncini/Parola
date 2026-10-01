@@ -124,18 +124,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     static func presentQuitDuringTakeAlert() -> AppModel.QuitDuringTake {
         NSApp.activate(ignoringOtherApps: true)
-        return choice(for: takeAlert(discardTitle: String(localized: "Discard")).runModal())
+        return choice(for: takeAlert(closeQuestion(starting: false), discardTitle: String(localized: "Discard")).runModal())
     }
 
     /// The same question as a sheet on the window that is closing; its Discard… asks once more before anything is deleted.
-    static func askAboutClosing(_ window: NSWindow) async -> AppModel.QuitDuringTake {
-        choice(for: await takeAlert(discardTitle: String(localized: "Discard…")).beginSheetModal(for: window))
+    static func askAboutClosing(_ window: NSWindow, take: RecordingSession) async -> AppModel.QuitDuringTake {
+        let alert = takeAlert(closeQuestion(starting: take.isArming), discardTitle: String(localized: "Discard…"))
+        return choice(for: await alert.beginSheetModal(for: window))
     }
 
-    private static func takeAlert(discardTitle: String) -> NSAlert {
+    /// A take still starting has recorded nothing, so the question doesn't speak of keeping what it holds.
+    nonisolated static func closeQuestion(starting: Bool, bundle: Bundle = .main) -> (message: String, detail: String) {
+        guard !starting else {
+            return (String(localized: "A recording is starting", bundle: bundle), String(localized: "Nothing has been recorded yet.", bundle: bundle))
+        }
+        return (
+            String(localized: "A recording is in progress", bundle: bundle),
+            String(localized: "Stop and Save keeps what you've recorded so far in your library.", bundle: bundle)
+        )
+    }
+
+    private static func takeAlert(_ question: (message: String, detail: String), discardTitle: String) -> NSAlert {
         let alert = NSAlert()
-        alert.messageText = String(localized: "A recording is in progress")
-        alert.informativeText = String(localized: "Stop and Save keeps what you've recorded so far in your library.")
+        alert.messageText = question.message
+        alert.informativeText = question.detail
         alert.addButton(withTitle: String(localized: "Stop and Save"))
         alert.addButton(withTitle: String(localized: "Keep Recording")).keyEquivalent = "\u{1b}"
         alert.addButton(withTitle: discardTitle).hasDestructiveAction = true

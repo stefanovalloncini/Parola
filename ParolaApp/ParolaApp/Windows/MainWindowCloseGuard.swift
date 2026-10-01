@@ -41,7 +41,7 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
     private weak var model: AppModel?
     // Read by the Objective-C forwarding below, which AppKit only sends on the main thread.
     nonisolated(unsafe) private weak var forwarded: NSObject?
-    private let ask: @MainActor (NSWindow) async -> AppModel.QuitDuringTake
+    private let ask: @MainActor (NSWindow, RecordingSession) async -> AppModel.QuitDuringTake
     private let confirmDiscard: @MainActor (NSWindow) async -> Bool
     private var closingAsAnswered = false
 
@@ -50,7 +50,7 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
     private init(
         model: AppModel,
         forwarded: NSObject?,
-        ask: @escaping @MainActor (NSWindow) async -> AppModel.QuitDuringTake,
+        ask: @escaping @MainActor (NSWindow, RecordingSession) async -> AppModel.QuitDuringTake,
         confirmDiscard: @escaping @MainActor (NSWindow) async -> Bool
     ) {
         self.model = model
@@ -64,7 +64,7 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
     static func install(
         on window: NSWindow,
         model: AppModel,
-        ask: @escaping @MainActor (NSWindow) async -> AppModel.QuitDuringTake = AppDelegate.askAboutClosing,
+        ask: @escaping @MainActor (NSWindow, RecordingSession) async -> AppModel.QuitDuringTake = AppDelegate.askAboutClosing,
         confirmDiscard: @escaping @MainActor (NSWindow) async -> Bool = TakeRemote.askToDiscard(on:)
     ) -> MainWindowCloseGuard {
         if let installed = window.delegate as? MainWindowCloseGuard {
@@ -87,7 +87,7 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
         let ask = ask
         let confirmDiscard = confirmDiscard
         Task { [weak self] in
-            let choice = await ask(sender)
+            let choice = await ask(sender, take)
             await MainWindowClose.resolve(choice, about: take.takeID, model: model, confirmDiscard: { await confirmDiscard(sender) }) {
                 guard sender.isVisible || sender.isMiniaturized else { return }
                 self?.closeAsAnswered(sender)

@@ -1160,6 +1160,17 @@
         }
       }
     },
+    "A recording is starting": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una registrazione sta per iniziare"
+          }
+        }
+      }
+    },
     "A sample Parola writes to check a destination.": {
       "extractionState": "manual",
       "localizations": {
@@ -9433,6 +9444,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nome della nota"
+          }
+        }
+      }
+    },
+    "Nothing has been recorded yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è ancora stato registrato nulla."
           }
         }
       }
