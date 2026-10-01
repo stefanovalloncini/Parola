@@ -3385,7 +3385,7 @@ final class AppModel {
         forgetTakeRequest()
     }
 
-    /// Picks the microphone a take still counting in will open, as the Microphone setting; false once the take may have opened one.
+    /// Changes the saved microphone, as Settings does, while a take still counting in has yet to open it; false once the take may have opened one.
     @discardableResult
     func chooseTakeInput(_ uid: String) -> Bool {
         guard recording?.isCountingIn == true else { return false }

@@ -3281,13 +3281,13 @@
         }
       }
     },
-    "Choose the microphone for this recording": {
+    "Choose the microphone Parola records from": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scegli il microfono per questa registrazione"
+            "value": "Scegli il microfono che Parola usa per registrare"
           }
         }
       }

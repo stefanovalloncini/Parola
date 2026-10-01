@@ -378,9 +378,9 @@ struct StageDeviceMenu: View {
         Group {
             if take.source == .microphone {
                 Menu {
-                    Picker("Input device", selection: Binding(get: { checkedUID }, set: { model.chooseTakeInput($0) })) {
-                        ForEach(devices) { device in
-                            Text(verbatim: device.name).tag(device.uid)
+                    Picker("Input device", selection: Binding(get: { checkedRow }, set: { if let uid = $0 { model.chooseTakeInput(uid) } })) {
+                        ForEach(Self.rows(devices)) { row in
+                            Text(verbatim: row.name).tag(String?.some(row.id))
                         }
                     }
                     .pickerStyle(.inline)
@@ -392,7 +392,7 @@ struct StageDeviceMenu: View {
                 .menuStyle(.button)
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
-                .help(take.isCountingIn ? Text("Choose the microphone for this recording") : Text("Stop the recording to change the microphone"))
+                .help(Self.help(countingIn: take.isCountingIn))
                 .accessibilityLabel("Input device")
                 .accessibilityValue(Text(verbatim: deviceName))
                 .axLeaf("Stage.Menu.Device")
@@ -404,6 +404,35 @@ struct StageDeviceMenu: View {
             }
         }
         .fixedSize()
+    }
+
+    /// A row of the menu; System Default's id is the empty saved choice.
+    struct Row: Identifiable, Equatable {
+        let id: String
+        let name: String
+    }
+
+    /// System Default first, as Settings and the menu bar list it, then the Mac's inputs.
+    nonisolated static func rows(_ devices: [AudioInputDevice], bundle: Bundle = .main) -> [Row] {
+        [Row(id: "", name: String(localized: "System Default", bundle: bundle))] + devices.map { Row(id: $0.uid, name: $0.name) }
+    }
+
+    /// The row the menu checks: during a count-in the saved microphone, System Default when it is that or is gone; after, the input the take listens on.
+    nonisolated static func checkedRow(countingIn: Bool, takeDevice: String?, savedUID: String, devices: [AudioInputDevice]) -> String? {
+        guard countingIn else {
+            return checkedUID(takeDevice: takeDevice, preferredUID: savedUID.isEmpty ? nil : savedUID, devices: devices)
+        }
+        return devices.contains { $0.uid == savedUID } ? savedUID : ""
+    }
+
+    nonisolated static func help(countingIn: Bool, bundle: Bundle = .main) -> String {
+        countingIn
+            ? String(localized: "Choose the microphone Parola records from", bundle: bundle)
+            : String(localized: "Stop the recording to change the microphone", bundle: bundle)
+    }
+
+    private var checkedRow: String? {
+        Self.checkedRow(countingIn: take.isCountingIn, takeDevice: take.device, savedUID: model.inputDeviceUID, devices: devices)
     }
 
     private func label(name: String, opensMenu: Bool) -> some View {

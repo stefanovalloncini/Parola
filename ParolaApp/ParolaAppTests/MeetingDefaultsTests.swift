@@ -177,11 +177,41 @@ struct MeetingDefaultsTests {
         #expect(!take.isCountingIn)
     }
 
-    @Test("the device menu's words have their Italian")
-    func deviceMenuItalian() throws {
+    private static let builtIn = AudioInputDevice(uid: "built-in", name: "MacBook Pro Microphone", isDefault: true)
+    private static let usb = AudioInputDevice(uid: "usb", name: "USB Mic", isDefault: false)
+
+    @Test("the device menu lists System Default first, as Settings and the menu bar do, then the Mac's inputs")
+    func deviceMenuRows() throws {
+        #expect(StageDeviceMenu.rows([Self.builtIn, Self.usb]) == [
+            StageDeviceMenu.Row(id: "", name: "System Default"),
+            StageDeviceMenu.Row(id: "built-in", name: "MacBook Pro Microphone"),
+            StageDeviceMenu.Row(id: "usb", name: "USB Mic"),
+        ])
+        #expect(StageDeviceMenu.rows([]) == [StageDeviceMenu.Row(id: "", name: "System Default")])
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let it = try #require(Bundle(path: path))
-        #expect(String(localized: "Choose the microphone for this recording", bundle: it) == "Scegli il microfono per questa registrazione")
+        #expect(StageDeviceMenu.rows([], bundle: it).first?.name == "Predefinito di sistema")
+    }
+
+    @Test("during a count-in the menu checks the saved microphone, System Default included; after, the input the take listens on")
+    func deviceMenuChecksTheSavedChoice() {
+        let both = [Self.builtIn, Self.usb]
+        #expect(StageDeviceMenu.checkedRow(countingIn: true, takeDevice: nil, savedUID: "", devices: both) == "")
+        #expect(StageDeviceMenu.checkedRow(countingIn: true, takeDevice: nil, savedUID: "usb", devices: both) == "usb")
+        #expect(StageDeviceMenu.checkedRow(countingIn: true, takeDevice: nil, savedUID: "gone", devices: both) == "", "a saved mic that's gone records on the default")
+        #expect(StageDeviceMenu.checkedRow(countingIn: false, takeDevice: "USB Mic", savedUID: "usb", devices: both) == "usb")
+        #expect(StageDeviceMenu.checkedRow(countingIn: false, takeDevice: nil, savedUID: "", devices: both) == "built-in")
+        #expect(StageDeviceMenu.checkedRow(countingIn: false, takeDevice: "Unplugged Mic", savedUID: "", devices: both) == nil, "no row, not System Default")
+    }
+
+    @Test("the device menu's help says it changes the microphone Parola records from, and how to change it once recording")
+    func deviceMenuHelp() throws {
+        #expect(StageDeviceMenu.help(countingIn: true) == "Choose the microphone Parola records from")
+        #expect(StageDeviceMenu.help(countingIn: false) == "Stop the recording to change the microphone")
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let it = try #require(Bundle(path: path))
+        #expect(StageDeviceMenu.help(countingIn: true, bundle: it) == "Scegli il microfono che Parola usa per registrare")
+        #expect(StageDeviceMenu.help(countingIn: false, bundle: it) == "Ferma la registrazione per cambiare microfono")
     }
 }
 
@@ -250,6 +280,35 @@ extension TranscriberMockSuites {
                 #expect(openedOn == ["usb"])
                 #expect(!model.chooseTakeInput("built-in"))
                 #expect(model.inputDeviceUID == "usb", "a take past its count-in keeps the input it opened")
+
+                model.cancelCurrentWork()
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+            }
+        }
+
+        @Test("System Default in the device menu during a count-in sets the saved microphone back to it, and the take opens the default")
+        func countInPicksSystemDefault() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeRecordingModel("device-count-in-default")
+                model.useStreaming = false
+                let audio = try makeTakeWAV("device-count-in-default")
+                defer { try? FileManager.default.removeItem(at: audio) }
+                var openedOn: [String?] = []
+                model.takeCaptureOverride = { _ in
+                    openedOn.append(model.preferredInputDeviceUID)
+                    return StubSource(url: audio)
+                }
+                model.inputDeviceUID = "usb"
+                model.recordingCountInSeconds = 1
+
+                model.startRecording(source: .microphone)
+                #expect(model.chooseTakeInput(""))
+                #expect(model.inputDeviceUID == "")
+
+                let opened = await waitUntil(timeoutMs: 10_000) { !openedOn.isEmpty }
+                #expect(opened)
+                #expect(openedOn == [nil])
 
                 model.cancelCurrentWork()
                 let released = await waitUntil { !model.recordingActive }
