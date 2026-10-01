@@ -65,6 +65,8 @@ extension AppModel {
         kind: RunLanding.Kind
     ) async {
         var landing: Task<LibraryEntry, any Error>?
+        var engineFile: URL?
+        defer { if let engineFile { try? FileManager.default.removeItem(at: engineFile) } }
         do {
             let loaded = try await library.load(entryID)
             guard let audioURL = loaded.document.audioURL else {
@@ -76,15 +78,18 @@ extension AppModel {
             phase = ModelStore.shared.isInstalled(modelName)
                 ? .loadingModel(name: modelName)
                 : .downloadingModel(name: modelName, progress: 0)
+            let meeting = await isMeetingStereo(audioURL, source: loaded.entry.manifest.source)
+            if meeting { engineFile = await meetingEngineInput(for: audioURL) }
             let result = try await session.transcribe(
-                source: FileAudioSource(url: audioURL),
-                options: options,
+                source: FileAudioSource(url: engineFile ?? audioURL),
+                options: meeting ? meetingOptions(options, stereo: audioURL) : options,
                 downloadProgress: makeDownloadProgressHandler(for: modelName),
                 partialHandler: makeFilePartialHandler(runToken: runToken),
                 progressHandler: makeFileProgressHandler(runToken: runToken),
                 stageHandler: makeFileStageHandler(fileURL: audioURL, runToken: runToken)
             )
             var processed = await postProcessDetached(result)
+            if meeting { processed.sourceURL = audioURL }
             // The engine stamps the bundle file it read; a link's entry keeps pointing at its page.
             if let page = loaded.document.transcript.sourceURL, !page.isFileURL { processed.sourceURL = page }
             // Post-processing is a suspension a cancel can land in, and past this line the old

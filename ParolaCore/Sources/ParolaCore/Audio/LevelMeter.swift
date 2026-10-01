@@ -12,6 +12,7 @@ public final class LevelMeter: Sendable {
         var peak: Float = 0
         var lastSound: ContinuousClock.Instant?
         var firstReadingAt: ContinuousClock.Instant?
+        var lastReadingAt: ContinuousClock.Instant?
     }
 
     private let reading = OSAllocatedUnfairLock(initialState: Reading())
@@ -28,6 +29,7 @@ public final class LevelMeter: Sendable {
             reading.peak = max(reading.peak, clamped)
             if let soundNow { reading.lastSound = soundNow }
             if reading.firstReadingAt == nil { reading.firstReadingAt = now }
+            reading.lastReadingAt = now
         }
     }
 
@@ -53,6 +55,11 @@ public final class LevelMeter: Sendable {
     /// When this meter's first reading came in, silent or not; nil before any did.
     public var firstReadingAt: ContinuousClock.Instant? {
         reading.withLock(\.firstReadingAt)
+    }
+
+    /// When the latest reading came in, silent or not, so a reader can tell a capture that stopped from one gone quiet.
+    public var lastReadingAt: ContinuousClock.Instant? {
+        reading.withLock(\.lastReadingAt)
     }
 
     public func reset() {

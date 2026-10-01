@@ -8107,6 +8107,17 @@
         }
       }
     },
+    "Me": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Io"
+          }
+        }
+      }
+    },
     "Medium": {
       "extractionState": "manual",
       "localizations": {
@@ -17067,6 +17078,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli YouTube"
+          }
+        }
+      }
+    },
+    "Your microphone isn't in this recording. It has the Mac audio only.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il tuo microfono non è in questa registrazione. Contiene solo l'audio del Mac."
+          }
+        }
+      }
+    },
+    "Your microphone stopped. The rest of this recording has the Mac audio only.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il tuo microfono si è fermato. Il resto della registrazione contiene solo l'audio del Mac."
           }
         }
       }

@@ -193,6 +193,20 @@ extension AppModel {
         ))
     }
 
+    /// Points a stopped take's checkpoint at the one file it holds now, written before the files it was made from go.
+    func repointRecordingCheckpoint(_ generation: Int, startedAt: Date, audio: URL, source: EntrySource, category: EntryCategory) async {
+        writeRecoveryFile(generation: generation, RecoveryCheckpoint(
+            kind: .recording,
+            startedAt: startedAt,
+            modelName: selectedModel,
+            language: selectedLanguage,
+            audioURL: audio,
+            source: source,
+            category: category
+        ))
+        await pendingRecoveryWrite?.value
+    }
+
     /// Deletes that run's checkpoint unless a take's run or save still needs it; other runs' checkpoints stay.
     func endRecovery(_ generation: Int) {
         guard !recoveryHeldByTake.contains(generation) else { return }

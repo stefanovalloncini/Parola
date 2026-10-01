@@ -246,6 +246,14 @@ final class AppModel {
     @ObservationIgnored private var captureStart: CaptureStart?
     /// Test seam: when set, stands in for the capture a take records to a file, so a test decides when it comes up and what it meters.
     @ObservationIgnored var takeCaptureOverride: (@MainActor (RecordSource) -> any LiveAudioSource)?
+    /// A meeting take's microphone track, from the moment it is asked for until Stop; nil for every other take.
+    @ObservationIgnored var micTrack: MicTrack?
+    /// Test seam: when set, stands in for a meeting's microphone track; nil from it means this process has no microphone.
+    @ObservationIgnored var micTrackCaptureOverride: (@MainActor () -> (any LiveAudioSource)?)?
+    /// The take that has already said its microphone isn't in the recording.
+    @ObservationIgnored var micTrackNoticeTake: Int?
+    /// Sampler ticks in which the Mac audio moved on and the microphone didn't, before its track counts as stopped.
+    @ObservationIgnored var micTrackStallTicks = 30
 
     private struct CaptureStart {
         let takeID: Int
@@ -1850,6 +1858,8 @@ final class AppModel {
         if let takeRecovery { endRecovery(takeRecovery) }
         endActiveRecovery()
         liveRecordingAudioURL = nil
+        liveCompanionAudioURL = nil
+        liveCompanionStartOffset = nil
         cancelAndTrack(&streamingConsumer)
         if let s = streamingSession {
             streamingSession = nil
@@ -1859,6 +1869,7 @@ final class AppModel {
             liveSource = nil
             Task { await source.cancel() }
         }
+        if let mic = detachMicTrack(of: nil) { Task { await dropMicTrack(mic) } }
         if exitsMedia { Task { await mediaSession.exitRecording() } }
         pendingRecordingCategory = .transcription
     }
@@ -3368,7 +3379,7 @@ final class AppModel {
     }
 
     /// Changes `takeID`'s session only; one a newer take owns by now is left alone.
-    private func updateSession(of takeID: Int?, _ change: (inout RecordingSession) -> Void) {
+    func updateSession(of takeID: Int?, _ change: (inout RecordingSession) -> Void) {
         guard let takeID, var session = recording, session.takeID == takeID else { return }
         change(&session)
         if session != recording { recording = session }
@@ -3511,7 +3522,7 @@ final class AppModel {
     }
 
     /// Whether `take` still owns the recording state; a start or a stream that outlived its take leaves the next one alone.
-    private func takeIsCurrent(_ take: TakeContext) -> Bool {
+    func takeIsCurrent(_ take: TakeContext) -> Bool {
         activeTake?.id == take.id
     }
 
@@ -3622,6 +3633,7 @@ final class AppModel {
                         )
                     }
                     guard await adoptLiveSource(sys, take: take) else { return }
+                    startMicTrack(for: activeTake ?? take, pairedWith: liveRecordingAudioURL)
                 }
                 startRecordingWatch(checkpoints: false)
             } catch {
@@ -3826,6 +3838,7 @@ final class AppModel {
         }
         // Read even while nothing is kept, so a peak from before a pause or a silence never lands after it.
         let peak = meter.takePeak()
+        sampleMicTrack(macMeter: meter, take: take)
         recordingLevelTrace?.note(peak, lastSound: meter.lastSound)
         guard let session = recording, session.takeID == take.id, session.state == .recording else { return }
         takeLevels?.append(peak)
@@ -3833,7 +3846,7 @@ final class AppModel {
     }
 
     /// The wall-clock moment a meter reading came in.
-    private static func date(of instant: ContinuousClock.Instant) -> Date {
+    static func date(of instant: ContinuousClock.Instant) -> Date {
         let ago = instant.duration(to: .now).components
         return Date(timeIntervalSinceNow: -(Double(ago.seconds) + Double(ago.attoseconds) / 1e18))
     }
@@ -4228,6 +4241,7 @@ final class AppModel {
         }
         // Hand off synchronously so a racing auto-stop or second click can't start a duplicate run.
         let take = activeTake
+        let mic = detachMicTrack(of: take?.id)
         let unheard = takeIsUnheard
         liveSource = nil
         activeTake = nil
@@ -4244,23 +4258,31 @@ final class AppModel {
             let title = given.title(for: category)
             do {
                 let url = try await source.prepare()
+                let micFile = await finishMicTrack(mic)
                 clearTakeReadouts(of: take?.id)
                 if unheard, await Self.holdsNoAudio(url) {
+                    releaseStoppedMicTrack(micFile)
                     endUnheardTake(url, recovery: recovery, take: take?.id)
                     return
                 }
+                let folded = await foldMicTrack(micFile, into: url, take: take, recovery: recovery, wantsEngineInput: true)
                 await transcribeRecordedTake(
-                    url: url, title: title, source: takeSource, category: category, replacing: recovery, take: take?.id,
-                    annotations: given
+                    url: folded.audio, engineInput: folded.engineInput, title: title, source: takeSource, category: category,
+                    replacing: recovery, take: take?.id, annotations: given
                 )
             } catch let cut as CaptureInterrupted {
+                let micFile = await finishMicTrack(mic)
                 clearTakeReadouts(of: take?.id)
                 liveRecordingAudioURL = nil
+                let folded = await foldMicTrack(micFile, into: cut.url, take: take, recovery: recovery, wantsEngineInput: false)
                 await keepCutShortTake(
-                    cut, title: title, source: takeSource, category: category, recovery: recovery, take: take?.id,
-                    annotations: given
+                    CaptureInterrupted(url: folded.audio, reason: cut.reason), title: title, source: takeSource,
+                    category: category, recovery: recovery, take: take?.id, annotations: given
                 )
             } catch {
+                // The Mac file stays for the sweep, and the microphone file beside it, named to pair with it.
+                _ = await finishMicTrack(mic)
+                liveCompanionAudioURL = nil
                 clearTakeReadouts(of: take?.id)
                 if let recovery { endRecovery(recovery) }
                 liveRecordingAudioURL = nil
@@ -4420,7 +4442,7 @@ final class AppModel {
 
     /// Transcribes a finished take from its working file, retiring the checkpoint it replaces; a failure or a stop still saves it.
     func transcribeRecordedTake(
-        url: URL, title: String, source: EntrySource, category: EntryCategory = .transcription,
+        url: URL, engineInput: URL? = nil, title: String, source: EntrySource, category: EntryCategory = .transcription,
         replacing previous: Int? = nil, take: Int? = nil, annotations: TakeAnnotations = TakeAnnotations()
     ) async {
         liveRecordingAudioURL = nil
@@ -4429,9 +4451,11 @@ final class AppModel {
         // Stopped before it began, the run only saves: a newer take's run keeps Stop Transcribing, its title and its Stage.
         let startsStopped = Task.isCancelled
         if !startsStopped { takeRun = run }
+        var engineFile = engineInput
         defer {
             if takeRun == run { takeRun = nil }
             endTakeTranscription(run)
+            if let engineFile { try? FileManager.default.removeItem(at: engineFile) }
         }
         let named = annotations.typedTitle ?? title
         let recovery = beginFileTranscribeRecovery(sourceURL: url, title: named, source: source, category: category)
@@ -4452,15 +4476,19 @@ final class AppModel {
         do {
             // A take stopped before its run began, by a quit say, goes straight to its save.
             try Task.checkCancellation()
+            var meeting = engineInput != nil
+            if !meeting { meeting = await isMeetingStereo(url, source: source) }
+            if meeting, engineFile == nil { engineFile = await meetingEngineInput(for: url) }
             let handlers = take.map { makeTakeHandlers(run: run, takeID: $0) } ?? TranscribeHandlers()
             let result = try await session.transcribe(
-                source: FileAudioSource(url: url),
-                options: currentOptions,
+                source: FileAudioSource(url: engineFile ?? url),
+                options: meeting ? meetingOptions(currentOptions, stereo: url) : currentOptions,
                 partialHandler: handlers.onPartial,
                 progressHandler: handlers.onProgress,
                 stageHandler: handlers.onStage
             )
-            let processed = await postProcessDetached(result)
+            var processed = await postProcessDetached(result)
+            if meeting { processed.sourceURL = url }
             // A run stopped after its words were ready keeps them, out of the way of whatever stopped it.
             guard !Task.isCancelled else {
                 saveTake(
@@ -4751,11 +4779,22 @@ final class AppModel {
     private func setCapturePaused(_ paused: Bool) {
         let capture = liveSource as? any LiveAudioSource
         let stream = streamingSession
+        let mic = micTrack?.capture
         let earlier = takePauseWrites
         takePauseWrites = Task {
             await earlier?.value
             await capture?.setPaused(paused)
+            await mic?.setPaused(paused)
             await stream?.setPaused(paused)
+        }
+    }
+
+    /// A capture that comes up while the take is paused joins it paused, in turn with the changes already on their way.
+    func queueCapturePause(_ paused: Bool, on capture: any LiveAudioSource) {
+        let earlier = takePauseWrites
+        takePauseWrites = Task {
+            await earlier?.value
+            await capture.setPaused(paused)
         }
     }
 
@@ -4936,6 +4975,7 @@ final class AppModel {
         }
         guard let source = liveSource else { return }
         let take = activeTake
+        let mic = detachMicTrack(of: take?.id)
         let unheard = takeIsUnheard
         liveSource = nil
         activeTake = nil
@@ -4958,6 +4998,7 @@ final class AppModel {
         } catch {
             prepared = nil
         }
+        let micFile = await finishMicTrack(mic)
         clearTakeReadouts(of: take?.id)
         var heardNothing = false
         if unheard, !cutShort, let url = prepared { heardNothing = await Self.holdsNoAudio(url) }
@@ -4968,13 +5009,15 @@ final class AppModel {
         }
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
         // Without a file the checkpoint stays, so the next launch offers what it points at.
-        guard let url = prepared else { return }
+        guard let prepared else { return }
         guard !heardNothing else {
+            releaseStoppedMicTrack(micFile)
             if let recovery { endRecovery(recovery) }
-            releaseTakeFile(url)
+            releaseTakeFile(prepared)
             return
         }
-        if cutShort { _ = try? await AppModel.offMainIO { WAVHeaderRepair.makeReadable(url) } }
+        if cutShort { _ = try? await AppModel.offMainIO { WAVHeaderRepair.makeReadable(prepared) } }
+        let url = await foldMicTrack(micFile, into: prepared, take: take, recovery: recovery, wantsEngineInput: false).audio
         saveTake(
             Self.untranscribedTranscript(of: url, language: currentOptions.language),
             audio: url,
@@ -4994,11 +5037,13 @@ final class AppModel {
         let streaming = streamingSession
         let capture = liveSource
         let consumer = streamingConsumer
+        let mic = detachMicTrack(of: nil)
         streamingSession = nil
         liveSource = nil
         teardownActiveCapture(exitsMedia: false)
         await streaming?.cancel()
         await capture?.cancel()
+        await dropMicTrack(mic)
         // After the consumer's own exit, so this one is the exit that restores muted or paused media before the reply.
         await consumer?.value
         await mediaSession.exitRecording()

@@ -64,4 +64,19 @@ struct LevelMeterFirstReadingTests {
         meter.reset()
         #expect(meter.firstReadingAt == nil)
     }
+
+    @Test("the meter remembers when its latest reading came in, silent or not, and a reset forgets it")
+    func lastReading() async throws {
+        let meter = LevelMeter()
+        #expect(meter.lastReadingAt == nil)
+        meter.record(0)
+        let first = try #require(meter.lastReadingAt)
+        try await Task.sleep(for: .milliseconds(5))
+        meter.record(0)
+        let latest = try #require(meter.lastReadingAt)
+        #expect(latest > first)
+        #expect(meter.firstReadingAt == first)
+        meter.reset()
+        #expect(meter.lastReadingAt == nil)
+    }
 }

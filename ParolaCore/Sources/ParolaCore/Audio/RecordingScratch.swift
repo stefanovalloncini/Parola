@@ -21,6 +21,8 @@ public enum RecordingScratch {
     public static let previewPrefix = "parola-preview"
     /// A meeting's microphone track: it belongs to its take, so it is never a take of its own.
     public static let meetingMicPrefix = "parola-meetmic"
+    /// A meeting's two tracks while they are mixed into one; a leftover is scratch.
+    public static let meetingMixPrefix = "parola-meetmix"
 
     /// Whether a leftover file is a recorded take, which a sweep brings back, rather than scratch it may delete.
     public static func isTake(_ file: URL) -> Bool {

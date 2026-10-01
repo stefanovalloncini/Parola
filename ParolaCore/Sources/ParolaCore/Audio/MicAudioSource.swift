@@ -15,6 +15,7 @@ public actor MicAudioSource: LiveAudioSource {
     private let engine = AVAudioEngine()
     private let preferredDeviceUID: String?
     private let filePrefix: String
+    private let fileURL: URL?
     private var session: Session?
     private var outputScratch: AVAudioPCMBuffer?
     public nonisolated let levelMeter = LevelMeter()
@@ -28,10 +29,12 @@ public actor MicAudioSource: LiveAudioSource {
         var consumerTask: Task<Void, Never>
     }
 
-    /// `filePrefix` names the file after its purpose, which is how a sweep tells a take from dictation scratch.
-    public init(deviceUID: String? = nil, filePrefix: String = "parola-mic") {
+    /// `filePrefix` names the file after its purpose, which is how a sweep tells a take from dictation scratch;
+    /// `fileURL`, when given, is the file itself, as for a meeting's microphone track named after its take.
+    public init(deviceUID: String? = nil, filePrefix: String = "parola-mic", fileURL: URL? = nil) {
         self.preferredDeviceUID = deviceUID
         self.filePrefix = filePrefix
+        self.fileURL = fileURL
     }
 
     public func inFlightURL() -> URL? { session?.outputURL }
@@ -69,7 +72,10 @@ public actor MicAudioSource: LiveAudioSource {
             throw ParolaError.captureUnavailable("could not create audio converter \(tapFormat) → \(outFormat)")
         }
 
-        let url = RecordingScratch.fileURL(prefix: filePrefix)
+        let url = try fileURL.map { requested in
+            try FileManager.default.createDirectory(at: requested.deletingLastPathComponent(), withIntermediateDirectories: true)
+            return requested
+        } ?? RecordingScratch.fileURL(prefix: filePrefix)
         let file = try AVAudioFile(
             forWriting: url,
             settings: outFormat.settings,
