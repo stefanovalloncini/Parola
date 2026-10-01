@@ -310,11 +310,7 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func openParola() {
-        NSApp.activate(ignoringOtherApps: true)
-        for window in NSApp.windows where window.canBecomeMain && !window.title.contains("Mini") {
-            window.makeKeyAndOrderFront(nil)
-            return
-        }
+        model?.bringMainWindowForward()
     }
 
     @objc private func recordMic() {

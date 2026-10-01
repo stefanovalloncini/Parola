@@ -1528,6 +1528,7 @@ final class AppModel {
     @ObservationIgnored var mainWindowPresenceOverride: MainWindowPresence?
     @ObservationIgnored let entryWindows = EntryWindowRegistry()
     @ObservationIgnored var openEntryWindowAction: ((LibraryEntry.ID) -> Void)?
+    @ObservationIgnored var openMainWindowAction: (() -> Void)?
     var keyViewerEntryIDs: Set<LibraryEntry.ID> = []
     var openEntriesInNewWindow: Bool = false {
         didSet { defaults.set(openEntriesInNewWindow, forKey: "openEntriesInNewWindow") }

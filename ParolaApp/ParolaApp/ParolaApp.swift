@@ -100,6 +100,7 @@ struct ParolaApp: App {
                 .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
                 .preferredColorScheme(model.preferredColorScheme)
                 .bindsEntryWindowOpening(to: model)
+                .bindsMainWindowOpening(to: model)
                 .onAppear {
                     model.liveCaptions = liveCaptions
                     appDelegate.bind(model: model)

@@ -19,8 +19,8 @@ extension AppModel {
     }
 
     /// A take's Stop and Cancel are in the main window: it comes forward, or `open` makes a new one after it closed.
-    func showMainWindow(orOpen open: () -> Void) {
-        NSApp.activate(ignoringOtherApps: true)
+    func showMainWindow(activate: () -> Void = { NSApp.activate(ignoringOtherApps: true) }, orOpen open: () -> Void) {
+        activate()
         guard let mainWindow else {
             open()
             return
@@ -29,9 +29,18 @@ extension AppModel {
         mainWindow.makeKeyAndOrderFront(nil)
     }
 
+    /// The main window from outside any scene, as the menu bar and the recording pill need it: in front, or open again after it closed.
+    func bringMainWindowForward(activate: () -> Void = { NSApp.activate(ignoringOtherApps: true) }) {
+        showMainWindow(activate: activate) { openMainWindowAction?() }
+    }
+
     /// Hands the scene's `openWindow` to the model, the one thing that can put a window on screen.
     func bindOpenEntryWindow(_ action: @escaping (LibraryEntry.ID) -> Void) {
         openEntryWindowAction = action
+    }
+
+    func bindOpenMainWindow(_ action: @escaping () -> Void) {
+        openMainWindowAction = action
     }
 
     /// The one way a transcript window opens; false when the library has no such entry or no scene can open one.

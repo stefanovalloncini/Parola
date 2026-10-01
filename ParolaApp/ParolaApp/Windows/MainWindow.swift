@@ -5,6 +5,26 @@ enum MainWindowScene {
     static let id = "main"
 }
 
+/// Hands the scene's `openWindow` to the model, so AppKit surfaces can open the main window again after it closed.
+private struct OpenMainWindowBinder: ViewModifier {
+    let model: AppModel
+
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content.onAppear {
+            let open = openWindow
+            model.bindOpenMainWindow { open(id: MainWindowScene.id) }
+        }
+    }
+}
+
+extension View {
+    func bindsMainWindowOpening(to model: AppModel) -> some View {
+        modifier(OpenMainWindowBinder(model: model))
+    }
+}
+
 /// Keeps `AppModel.mainWindow` on the window this content sits in, and lets go of it as that window closes.
 struct MainWindowReporter: NSViewRepresentable {
     let model: AppModel

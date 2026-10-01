@@ -35,6 +35,25 @@ struct MainWindowTests {
         #expect(released)
     }
 
+    @Test("from outside any scene, a closed main window opens again through the opener the scene handed over")
+    func closedWindowOpensAgain() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("main-window-reopen"))
+        var opened = 0
+        var activated = 0
+        model.bindOpenMainWindow { opened += 1 }
+
+        model.bringMainWindowForward(activate: { activated += 1 })
+
+        #expect(activated == 1)
+        #expect(opened == 1)
+    }
+
+    @Test("the main scene hands its opener to the model, and the menu bar's Open Parola goes through it")
+    func openerIsBound() throws {
+        #expect(try source("ParolaApp").contains(".bindsMainWindowOpening(to: model)"))
+        #expect(try source("MenuBarController").contains("@objc private func openParola() { model?.bringMainWindowForward() }"))
+    }
+
     @Test("File ▸ New Recording puts the main window in front, or opens it again, before the take starts")
     func newRecordingShowsTheMainWindowFirst() throws {
         let commands = try source("Views/AppCommands")
