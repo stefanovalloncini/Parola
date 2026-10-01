@@ -3321,9 +3321,12 @@ final class AppModel {
         forgetTakeRequest()
     }
 
-    /// A count-in refused before its take began ends there, with the reason.
+    /// A count-in refused before its take began ends there, with the reason; its failed Stage keeps the id, so the next take gets its own.
     func failCountIn(_ message: String) {
-        if recordingCountdown != nil { reportTakeFailure(message, take: recording?.takeID) }
+        if recordingCountdown != nil {
+            reportTakeFailure(message, take: recording?.takeID)
+            takeCounter &+= 1
+        }
         cancelRecordingCountdown()
     }
 

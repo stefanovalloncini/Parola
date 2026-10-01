@@ -778,6 +778,37 @@ extension TranscriberMockSuites {
             model.endTestTake()
         }
 
+        @Test("a count-in hands its Stage to its take without building the page again")
+        func countInKeepsItsStage() async throws {
+            let audio = try makeTakeWAV("stage-count-in-handover", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeModel("stage-count-in-handover")
+            let capture = HeldCutShortCapture(file: audio)
+            model.takeCaptureOverride = { _ in capture }
+            model.recordingCountInSeconds = 1
+            let routes = HostedWindow(ContentRoutes().environment(model))
+            defer { routes.close() }
+            func readers(in view: NSView) -> [NSView] {
+                (view is WindowShownReader.ReaderView ? [view] : []) + view.subviews.flatMap(readers(in:))
+            }
+            model.startRecording(source: .microphone)
+            let counting = await waitUntil { model.recordingCountdown != nil }
+            #expect(counting)
+            await settle(for: .milliseconds(300))
+            let before = readers(in: routes.host)
+
+            let handedOver = await waitUntil(timeoutMs: 10_000) { model.liveSource != nil }
+            #expect(handedOver)
+            await settle(for: .milliseconds(400))
+            let after = readers(in: routes.host)
+
+            #expect(before.count == 1)
+            #expect(after.count == 1)
+            let samePage = before.first.map { page in after.first === page } ?? false
+            #expect(samePage, "the take keeps its count-in's Stage, so its entrance doesn't play twice")
+            model.cancelCurrentWork()
+        }
+
         @Test("the Stage's Cancel ends a count-in with no word")
         func cancelDuringCountIn() {
             let model = makeModel("stage-cancel-count-in")

@@ -207,12 +207,6 @@ struct ContentRoutes: View {
     }
 }
 
-/// One Stage per take session, so a take started over a failed one's Stage folds the sidebar and enters afresh, even under a cancelled count-in's id.
-private struct StageKey: Hashable {
-    let take: Int
-    let began: Date
-}
-
 /// The take's page, read here rather than in `ContentRoutes`, which a title typed or a marker set would otherwise redraw whole.
 private struct StageRoute<Library: View, PhasePage: View>: View {
     @Environment(AppModel.self) private var model
@@ -222,8 +216,9 @@ private struct StageRoute<Library: View, PhasePage: View>: View {
 
     var body: some View {
         if let take = model.recording, ContentRoutes.stageShows(take, model: model) {
+            // One Stage per take: its count-in hands the same page on, and a take started over a failed one gets a new page.
             StagePage(take: take)
-                .id(StageKey(take: take.takeID, began: take.titleDate))
+                .id(take.takeID)
         } else if model.recording?.isTranscribing == true {
             phasePage
         } else {
