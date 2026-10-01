@@ -1008,36 +1008,28 @@ private func allViews(in root: NSView) -> [NSView] {
     [root] + root.subviews.flatMap { allViews(in: $0) }
 }
 
-/// The app's own main menu, as AppKit holds it.
+/// The app's own main menu, read as AppKit holds it: nothing here asks SwiftUI to rebuild it.
 @MainActor
 private enum AppMenu {
-    static func recording() throws -> NSMenu {
-        let title = String(localized: "Recording")
-        let item = NSApp.mainMenu?.items.first { $0.title == title }
-        return try #require(item?.submenu)
-    }
-
-    /// SwiftUI fills its menus only when its delegate is asked, as AppKit asks when the menu opens; a read here asks the same way.
-    static func refreshed(_ title: String) throws -> NSMenuItem {
-        let menu = try recording()
-        menu.delegate?.menuNeedsUpdate?(menu)
-        let localized = String(localized: String.LocalizationValue(title))
-        let item = menu.items.first { $0.title == localized }
-        return try #require(item)
-    }
-
-    /// The item's key equivalent when it is held with ⌘ alone; "" when it holds none.
+    /// What the item holds with ⌘ alone; "" when it holds nothing.
     static func shortcut(of title: String) -> String? {
-        guard let item = try? refreshed(title) else { return nil }
+        let localized = String(localized: String.LocalizationValue(title))
+        guard let item = RecordingMenuRefresher.recordingMenu()?.items.first(where: { $0.title == localized }) else { return nil }
         guard !item.keyEquivalent.isEmpty else { return "" }
         return item.keyEquivalentModifierMask == .command ? item.keyEquivalent : "\(item.keyEquivalentModifierMask.rawValue)+\(item.keyEquivalent)"
     }
 
-    static func commandReturn(in window: NSWindow) throws -> NSEvent {
+    /// What AppKit does as the user opens the menu.
+    static func open() throws {
+        let menu = try #require(RecordingMenuRefresher.recordingMenu())
+        menu.delegate?.menuNeedsUpdate?(menu)
+    }
+
+    static func key(_ character: String, keyCode: UInt16, in window: NSWindow) throws -> NSEvent {
         let event = NSEvent.keyEvent(
             with: .keyDown, location: .zero, modifierFlags: .command, timestamp: ProcessInfo.processInfo.systemUptime,
-            windowNumber: window.windowNumber, context: nil, characters: "\r", charactersIgnoringModifiers: "\r",
-            isARepeat: false, keyCode: 36
+            windowNumber: window.windowNumber, context: nil, characters: character, charactersIgnoringModifiers: character,
+            isARepeat: false, keyCode: keyCode
         )
         return try #require(event)
     }
@@ -1060,6 +1052,7 @@ private struct HostModelState {
 
     func restore(_ host: AppModel) {
         if host.takeIsRunning { host.endTestTake() } else { host.forgetTakeSession() }
+        host.dismissTakeSaved()
         host.chatComposerHasFocus = false
         host.transcript = nil
         host.phase = .idle
@@ -1074,7 +1067,7 @@ private struct HostModelState {
 @MainActor
 private func withChatModel(_ body: @MainActor () async throws -> Void) async throws {
     try await MockLanguageModelStore.shared.withLease {
-        await MockLanguageModelStore.shared.install(provider: nil, response: MockLanguageModelResponse(text: "Yes, Friday."))
+        await MockLanguageModelStore.shared.install(provider: nil, response: MockLanguageModelResponse(text: "Yes, Friday.", delayMs: 3_000))
         do {
             try await body()
             await MockLanguageModelStore.shared.clear()
@@ -1085,9 +1078,25 @@ private func withChatModel(_ body: @MainActor () async throws -> Void) async thr
     }
 }
 
+/// The test host's own app: its real main menu and main window, its status item and pill off for the test.
+@MainActor
+private func withHostApp(_ body: @MainActor (AppModel, NSWindow) async throws -> Void) async throws {
+    let host = try #require(AppDelegate.launchModel)
+    let window = try #require(host.mainWindow)
+    let found = HostModelState(host)
+    host.showRecordingStatusItem = false
+    host.showRecordingPill = false
+    defer { found.restore(host) }
+    // The page a previous test left is drawn over first, so nothing here finds that test's views.
+    await settle(for: .milliseconds(50))
+    try await body(host, window)
+    await waitUntil(timeoutMs: 30_000) { !host.hasPendingTakeWork }
+    for entry in await host.library.list() { try? await host.library.purge(entry.id) }
+}
+
 extension TranscriberMockSuites {
     @MainActor
-    @Suite("⌘⏎ in the app's own menu and main window", .serialized)
+    @Suite("⌘⏎ and ⌘B through the app's own menu and main window", .serialized)
     struct CommandReturnOwnershipTests {
         private func composer(in window: NSWindow) -> NSTextField? {
             let placeholder = String(localized: "Ask about this transcript…")
@@ -1102,74 +1111,114 @@ extension TranscriberMockSuites {
             return true
         }
 
-        @Test("Stop holds ⌘⏎ during a take, gives it to Send while the chat composer has the keyboard, and takes it back after")
-        func commandReturnOwnership() async throws {
-            let host = try #require(AppDelegate.launchModel)
-            let window = try #require(host.mainWindow)
+        /// The chat page of a loaded transcript, with its composer drawn.
+        private func openChat(_ host: AppModel, in window: NSWindow) async throws -> NSTextField {
+            host.transcript = Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "we ship the patch on Friday")],
+                language: "en", modelName: "stub"
+            )
+            host.phase = .ready
+            host.route = .transcript
+            host.setTranscriptPaneMode(.chat)
+            let shown = await waitUntil(timeoutMs: 10_000) { composer(in: window) != nil }
+            #expect(shown)
+            return try #require(composer(in: window))
+        }
+
+        @Test("right after a take starts, ⌘B marks it and ⌘⏎ stops it, with no menu opened")
+        func shortcutsReachANewTake() async throws {
+            let audio = try makeTakeWAV("shortcuts-new-take", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "stopped by its shortcut")])
+                try await withHostApp { host, window in
+                    #expect(AppMenu.shortcut(of: "Stop Recording") == "", "with no take nothing holds ⌘⏎")
+                    host.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+                    await settle(for: .milliseconds(50))
+
+                    NSApp.sendEvent(try AppMenu.key("b", keyCode: 11, in: window))
+                    let marked = host.recording?.markers.count == 1
+                    #expect(marked, "⌘B marks the take")
+                    NSApp.sendEvent(try AppMenu.key("\r", keyCode: 36, in: window))
+                    let stopping = host.recording?.isCapturing == false
+                    #expect(stopping, "⌘⏎ stops the take")
+                    let landed = await landedEntry(host, timeoutMs: 30_000)
+                    #expect(landed != nil)
+                }
+            }
+        }
+
+        @Test("⌘⏎ belongs to Send while the chat composer has the keyboard, and to Stop again once it lets go, with no menu opened")
+        func commandReturnFollowsTheComposer() async throws {
             let audio = try makeTakeWAV("command-return", seconds: 1)
             defer { try? FileManager.default.removeItem(at: audio) }
-            let found = HostModelState(host)
-            host.showRecordingStatusItem = false
-            host.showRecordingPill = false
-            defer { found.restore(host) }
-            let commandReturn = try AppMenu.commandReturn(in: window)
-            let mainMenu = try #require(NSApp.mainMenu)
-
             try await withMocksCleared(.transcriber) {
                 try await withChatModel {
                     await installMockTranscriber(segments: [(0, 1, "stopped from the menu")])
-                    let idleStop = AppMenu.shortcut(of: "Stop Recording")
-                    #expect(idleStop == "", "with no take nothing holds ⌘⏎")
-                    let marker = AppMenu.shortcut(of: "Add Marker")
-                    #expect(marker == "b")
+                    try await withHostApp { host, window in
+                        host.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+                        let field = try await openChat(host, in: window)
 
-                    host.transcript = Transcript(
-                        segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "we ship the patch on Friday")],
-                        language: "en", modelName: "stub"
-                    )
-                    host.phase = .ready
-                    host.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
-                    host.route = .transcript
-                    host.setTranscriptPaneMode(.chat)
-                    let composerShown = await waitUntil(timeoutMs: 10_000) { composer(in: window) != nil }
-                    #expect(composerShown)
-                    let field = try #require(composer(in: window))
-                    let stopHolds = await waitUntil { AppMenu.shortcut(of: "Stop Recording") == "\r" }
-                    #expect(stopHolds, "a take gives ⌘⏎ to Stop while the composer doesn't have the keyboard")
+                        #expect(enter("Is Friday still the date?", into: field, in: window))
+                        let focused = await waitUntil { host.chatComposerHasFocus }
+                        #expect(focused)
+                        await settle(for: .milliseconds(20))
+                        NSApp.sendEvent(try AppMenu.key("\r", keyCode: 36, in: window))
+                        let recordingWhileTyping = host.recording?.state == .recording
+                        #expect(recordingWhileTyping, "⌘⏎ in the composer never stops the take")
+                        // The test host is never active, so it has no key window; this is the turn AppKit gives the key window before the menu.
+                        let sent = window.performKeyEquivalent(with: try AppMenu.key("\r", keyCode: 36, in: window))
+                        #expect(sent, "Send holds ⌘⏎ in the composer")
+                        let cleared = await waitUntil { field.stringValue.isEmpty }
+                        #expect(cleared)
 
-                    #expect(enter("Is Friday still the date?", into: field, in: window))
-                    let focused = await waitUntil { host.chatComposerHasFocus }
-                    #expect(focused)
-                    let stopLetGo = await waitUntil { AppMenu.shortcut(of: "Stop Recording") == "" }
-                    #expect(stopLetGo, "the menu gives ⌘⏎ up while the composer has the keyboard")
-                    let menuTookIt = mainMenu.performKeyEquivalent(with: commandReturn)
-                    #expect(!menuTookIt)
-                    let recordingWhileTyping = host.recording?.state == .recording
-                    #expect(recordingWhileTyping)
-                    let sendTookIt = window.performKeyEquivalent(with: commandReturn)
-                    #expect(sendTookIt, "Send holds ⌘⏎ in the composer")
-                    let sent = await waitUntil { field.stringValue.isEmpty }
-                    #expect(sent)
-                    let recordingAfterSend = host.recording?.state == .recording
-                    #expect(recordingAfterSend)
+                        NSApp.sendEvent(try AppMenu.key("\r", keyCode: 36, in: window))
+                        let sendingTookIt = window.performKeyEquivalent(with: try AppMenu.key("\r", keyCode: 36, in: window))
+                        #expect(!sendingTookIt, "nothing takes ⌘⏎ while the composer is empty and a message is on its way")
+                        let recordingWhileSending = host.recording?.state == .recording
+                        #expect(recordingWhileSending)
 
-                    #expect(enter("and the venue?", into: field, in: window))
-                    #expect(window.makeFirstResponder(nil))
-                    let left = await waitUntil { !host.chatComposerHasFocus }
-                    #expect(left)
-                    let stopBack = await waitUntil { AppMenu.shortcut(of: "Stop Recording") == "\r" }
-                    #expect(stopBack, "leaving the composer gives ⌘⏎ back to Stop")
-                    let sendKeptIt = window.performKeyEquivalent(with: commandReturn)
-                    #expect(!sendKeptIt, "Send lets go of ⌘⏎ once the composer loses the keyboard")
-                    #expect(field.stringValue == "and the venue?")
-                    let stopped = mainMenu.performKeyEquivalent(with: commandReturn)
-                    #expect(stopped)
-                    let stopping = host.recording?.isCapturing == false
-                    #expect(stopping, "⌘⏎ through the app's own menu stops the take")
-                    let landed = await landedEntry(host, timeoutMs: 30_000)
-                    #expect(landed != nil)
-                    await waitUntil { !host.hasPendingTakeWork }
-                    if let landed { try await host.library.purge(landed.id) }
+                        #expect(enter("and the venue?", into: field, in: window))
+                        #expect(window.makeFirstResponder(nil))
+                        let left = await waitUntil { !host.chatComposerHasFocus }
+                        #expect(left)
+                        await settle(for: .milliseconds(20))
+                        let sendLetGo = window.performKeyEquivalent(with: try AppMenu.key("\r", keyCode: 36, in: window))
+                        #expect(!sendLetGo, "Send lets go of ⌘⏎ once the composer loses the keyboard")
+                        NSApp.sendEvent(try AppMenu.key("\r", keyCode: 36, in: window))
+                        let stopping = host.recording?.isCapturing == false
+                        #expect(stopping, "out of the composer, ⌘⏎ stops the take")
+                        #expect(field.stringValue == "and the venue?")
+                        let landed = await landedEntry(host, timeoutMs: 30_000)
+                        #expect(landed != nil)
+                    }
+                }
+            }
+        }
+
+        @Test("a Recording menu opened once during the take still lets ⌘⏎ go to Send when the composer takes the keyboard")
+        func menuOpenedEarlierDoesNotStealSend() async throws {
+            let audio = try makeTakeWAV("command-return-opened", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                try await withChatModel {
+                    try await withHostApp { host, window in
+                        host.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+                        let field = try await openChat(host, in: window)
+                        await settle(for: .milliseconds(20))
+                        try AppMenu.open()
+                        let opened = AppMenu.shortcut(of: "Stop Recording")
+                        #expect(opened == "\r")
+
+                        #expect(enter("Is Friday still the date?", into: field, in: window))
+                        let focused = await waitUntil { host.chatComposerHasFocus }
+                        #expect(focused)
+                        await settle(for: .milliseconds(20))
+                        NSApp.sendEvent(try AppMenu.key("\r", keyCode: 36, in: window))
+
+                        let recording = host.recording?.state == .recording
+                        #expect(recording, "the ⌘⏎ the menu held when it opened is gone once the composer has the keyboard")
+                    }
                 }
             }
         }

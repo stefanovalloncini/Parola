@@ -117,6 +117,7 @@ struct RecordingCommands: View {
         let menu = RecordingMenuState(
             take: model.recording, showsRecording: model.stageHoldsTake, composerFocused: model.chatComposerHasFocus
         )
+        let _ = RecordingMenuRefresher.menuDrew()
         Button("Stop Recording") { TakeRemote.stop(model) }
             .keyboardShortcut(menu.stopOwnsCommandReturn ? CommandReturn.shortcut : nil)
             .disabled(!menu.canEnd)
