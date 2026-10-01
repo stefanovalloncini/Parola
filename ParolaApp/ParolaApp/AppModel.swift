@@ -1645,6 +1645,8 @@ final class AppModel {
     @ObservationIgnored var libraryRefreshTask: Task<Void, Never>?
     /// How many scans `refreshLibrary()` has started, so a test can bound them.
     @ObservationIgnored var libraryRefreshes = 0
+    /// Bumped by every row written in place, so a scan can tell its snapshot is older than the rows.
+    @ObservationIgnored var libraryLocalEdits = 0
     /// False until the first scan lands, so the empty list before it never reads as an empty library.
     var libraryLoaded = false
     @ObservationIgnored var pendingTranscriptSaveTask: Task<Void, Never>?

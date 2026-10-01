@@ -86,15 +86,24 @@ extension AppModel {
         libraryRefreshTask?.cancel()
         libraryRefreshTask = Task { [weak self] in
             guard let self else { return }
-            let active = await library.list()
-            let deleted = await library.listDeleted()
-            // A later refreshLibrary() cancels this one; its snapshot may predate a mutation, so don't let it overwrite the newer result.
-            if Task.isCancelled { return }
-            setDeletedEntries(deleted)
-            refreshBundleSizes(for: active)
-            if setLibraryEntries(sortedLibraryEntries(active)) { refreshSearchResults() }
+            guard let snapshot = await readLibrarySnapshot() else { return }
+            setDeletedEntries(snapshot.deleted)
+            refreshBundleSizes(for: snapshot.active)
+            if setLibraryEntries(sortedLibraryEntries(snapshot.active)) { refreshSearchResults() }
             if !libraryLoaded { libraryLoaded = true }
             refreshLibraryExcerpts()
+        }
+    }
+
+    /// nil once a later refreshLibrary() has cancelled this one: its snapshot may predate a mutation, so it must not overwrite the newer result.
+    private func readLibrarySnapshot() async -> (active: [LibraryEntry], deleted: [LibraryEntry])? {
+        while true {
+            let edits = libraryLocalEdits
+            let active = await library.list()
+            let deleted = await library.listDeleted()
+            if Task.isCancelled { return nil }
+            // A row landed or patched while the store was read is newer than the snapshot: read again instead of putting the snapshot back over it.
+            if edits == libraryLocalEdits { return (active, deleted) }
         }
     }
 
@@ -151,6 +160,7 @@ extension AppModel {
         libraryEntries[index] = LibraryEntry(
             id: current.id, bundleURL: current.bundleURL, manifest: manifest
         )
+        libraryLocalEdits &+= 1
     }
 
     /// One assignment for an entry that just landed: its row patched, or inserted where the sort puts it, with no rescan.
@@ -178,6 +188,7 @@ extension AppModel {
             refreshBundleSizes(for: entries)
             refreshLibraryExcerpts()
         }
+        libraryLocalEdits &+= 1
         refreshSearchResults()
     }
 
