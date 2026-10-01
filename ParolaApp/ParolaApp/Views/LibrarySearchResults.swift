@@ -152,7 +152,7 @@ struct LibrarySearchResults: View {
             // Computed, not stored: the entry set can stay put while a query edit changes how often each one matches.
             subtitle: LibraryListContent.searchTotalsLabel(for: resultIDs, matches: model.searchMatches),
             leading: { EmptyView() },
-            trailing: { LibraryBulkActions(selection: selection, pendingBulkDelete: $pendingBulkDelete) }
+            trailing: { LibraryBulkActions(selection: $selection, pendingBulkDelete: $pendingBulkDelete) }
         )
     }
 

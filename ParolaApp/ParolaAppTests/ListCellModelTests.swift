@@ -57,11 +57,11 @@ struct ListCellModelTests {
             subtitleHelp: nil,
             filters: filters,
             showsListControls: true,
-            selection: ["a", "b"],
+            selection: .constant(["a", "b"]),
             pendingBulkDelete: .constant(false)
         )
         #expect(renders(header))
-        #expect(renders(LibraryBulkActions(selection: ["a", "b"], pendingBulkDelete: .constant(false))))
+        #expect(renders(LibraryBulkActions(selection: .constant(["a", "b"]), pendingBulkDelete: .constant(false))))
         #expect(renders(IntakeStrip()))
         #expect(renders(IntakeSettingsButton()))
         #expect(renders(VStack { LibraryFailureBanner(); ErrorBanner(message: "The file couldn't be decoded.") }))

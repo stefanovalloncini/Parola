@@ -518,7 +518,7 @@ private struct LibraryBrowseList: View, Equatable {
                     peopleOptions: model.knownPeople(in: category)
                 ),
                 showsListControls: pageCount > 0,
-                selection: selection,
+                selection: $selection,
                 pendingBulkDelete: $pendingBulkDelete
             )
             if showsIntake {

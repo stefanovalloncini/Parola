@@ -51,6 +51,8 @@ struct LibraryRowList<Top: View>: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let items: [LibraryListItem]
+    /// Taken once with the items, since a click re-runs the body and the rows animate on their ids alone.
+    private let itemIDs: [String]
     @Binding var selection: Set<LibraryEntry.ID>
     let detail: LibraryListRow.Detail
     let animatesRows: Bool
@@ -60,6 +62,29 @@ struct LibraryRowList<Top: View>: View {
     var rowAppeared: ((LibraryEntry.ID) -> Void)?
     /// The page's own top as the list's first row, so it scrolls away with the rows under it.
     var top: Top?
+
+    init(
+        items: [LibraryListItem],
+        selection: Binding<Set<LibraryEntry.ID>>,
+        detail: LibraryListRow.Detail,
+        animatesRows: Bool,
+        rename: @escaping (LibraryEntry) -> Void,
+        focus: FocusState<LibraryListFocus?>.Binding,
+        focusKey: LibraryListFocus,
+        rowAppeared: ((LibraryEntry.ID) -> Void)? = nil,
+        top: Top? = nil
+    ) {
+        self.items = items
+        itemIDs = items.map(\.id)
+        _selection = selection
+        self.detail = detail
+        self.animatesRows = animatesRows
+        self.rename = rename
+        self.focus = focus
+        self.focusKey = focusKey
+        self.rowAppeared = rowAppeared
+        self.top = top
+    }
 
     /// List(.inset) indents its rows by 16 pt of its own; this lands a title on the 24 pt gutter.
     private static var titleInsets: EdgeInsets {
@@ -107,7 +132,7 @@ struct LibraryRowList<Top: View>: View {
         .listStyle(.inset)
         .tint(DS.Color.accentFill)
         .focused(focus, equals: focusKey)
-        .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: items.map(\.id))
+        .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: itemIDs)
         // Empty on purpose: each row keeps its own context menu, and the list takes only double-click and Return.
         .contextMenu(forSelectionType: LibraryEntry.ID.self) { _ in
         } primaryAction: { ids in
@@ -226,7 +251,7 @@ struct LibraryListRow: View, Equatable {
 struct LibraryBulkActions: View {
     // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
     @Environment(AppModel.self) private var model: AppModel?
-    let selection: Set<LibraryEntry.ID>
+    @Binding var selection: Set<LibraryEntry.ID>
     @Binding var pendingBulkDelete: Bool
 
     /// One click selects a row, and that row's own menu covers it; the pills are for acting on several at once.

@@ -189,7 +189,7 @@ struct LibraryPageHeaderTests {
                 peopleOptions: dimensions ? [giulia] : []
             ),
             showsListControls: showsListControls,
-            selection: selection,
+            selection: .constant(selection),
             pendingBulkDelete: .constant(false)
         )
         let pageWidth = windowWidth - MainWindowLayout.sidebarIdealWidth - 2 * DS.Spacing.large

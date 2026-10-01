@@ -70,13 +70,17 @@ struct LibraryListLayoutTests {
     }
 
     /// Ordered in, far off screen and tall enough that every row is laid out.
-    private func host(_ entries: [LibraryEntry], groupsByDate: Bool = true) async -> Hosted {
+    private func host(
+        _ entries: [LibraryEntry], groupsByDate: Bool = true, headerPass: (@MainActor @Sendable () -> Void)? = nil
+    ) async -> Hosted {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("list-layout"))
         await model.libraryRefreshTask?.value
         model.libraryGroupsByDate = groupsByDate
         model.libraryEntries = entries
         model.route = .transcript
-        let host = NSHostingView(rootView: AnyView(ContentRoutes().environment(model)))
+        let host = NSHostingView(rootView: AnyView(
+            ContentRoutes().environment(model).environment(\.libraryHeaderPass, headerPass)
+        ))
         let window = NSWindow(
             contentRect: NSRect(x: -12_000, y: -12_000, width: 940, height: 1_200),
             styleMask: [.borderless],
@@ -248,6 +252,29 @@ struct LibraryListLayoutTests {
         #expect(listed, "rows: \(table(hosted)?.numberOfRows ?? -1)")
     }
 
+    @Test("a row click leaves the header alone; the selection still reaches its bulk actions")
+    func rowClickLeavesTheHeader() async throws {
+        let passes = HeaderPasses()
+        let hosted = await host(entries(6), groupsByDate: false, headerPass: { passes.count += 1 })
+        defer { close(hosted) }
+        let table = try #require(table(hosted))
+        _ = await settled(hosted)
+        let before = passes.count
+        #expect(before > 0, "the header reports its passes")
+
+        table.selectRowIndexes([2], byExtendingSelection: false)
+        _ = await settled(hosted)
+        table.selectRowIndexes([3], byExtendingSelection: false)
+        _ = await settled(hosted)
+        #expect(passes.count == before, "two clicks ran the header \(passes.count - before) more times")
+
+        table.selectRowIndexes([3, 4], byExtendingSelection: false)
+        let bulk = await settled(hosted) {
+            HostedAccessibility.appKitElements(in: hosted.host).contains { $0.words.contains("Export (2)") }
+        }
+        #expect(bulk, "two rows picked bring Export into the header")
+    }
+
     @Test("no row draws a rule under it: not the page's top, not a date title, not an entry")
     func rowsDrawNoRule() async throws {
         let hosted = await host(threeGroups())
@@ -292,4 +319,9 @@ struct LibraryListLayoutTests {
         let untitled = LibraryListItem.items(for: LibraryDateGroups.ungrouped(displays))
         #expect(untitled.map(\.id) == displays.map(\.id))
     }
+}
+
+@MainActor
+private final class HeaderPasses {
+    var count = 0
 }
