@@ -335,6 +335,32 @@ struct LibrarySearchListTests {
         #expect(!LibrarySearchResults.wantsNextPage(appearedAt: page - 1, shown: page, total: page))
     }
 
+    @Test("a search row speaks its snippet, first-match time and match count")
+    func matchRowSpeaksItsHit() {
+        let entry = entries(1)[0]
+        let display = LibraryRowDisplay(entry: entry)
+        let match = LibrarySearchIndex.Match(
+            entryID: entry.id, score: 1, matchCount: 3, snippet: "shipped on Friday",
+            firstHit: LibrarySearchIndex.Match.FirstHit(seconds: 62, segmentIndex: 0, textOffset: 0)
+        )
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("match-row-label"))
+        model.searchMatches = [entry.id: match]
+        let hosted = HostedWindow(
+            LibraryListRow(row: display, detail: .match(showsTimestamp: true), isSelected: false, rename: { _ in })
+                .environment(model)
+                .frame(width: 900)
+        )
+        defer { hosted.close() }
+
+        let label = HostedAccessibility.elements(in: hosted.host)
+            .first { $0.identifier?.hasSuffix("library.row.\(entry.id)") == true }?.label
+        let expected = LibraryRowFormat.spokenLabel(
+            for: display,
+            detail: ["shipped on Friday", "First match at \(Timecode.format(62))", LibraryListContent.matchesLabel(3)]
+        )
+        #expect(label == expected)
+    }
+
     @Test("a row whose notes change is no longer equal to the one on screen, so it redraws with the new count")
     func noteChangeRedrawsTheRow() {
         let entry = entries(1)[0]
