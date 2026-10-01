@@ -474,6 +474,8 @@ struct StageStateTests {
 
     @MainActor
     private func stage(_ take: RecordingSession, model: AppModel) -> (window: CGRect, elements: [HostedAccessibility.Element]) {
+        // The window's route is the Stage's, as it is whenever a Stage is on screen; any other route means the page is on its way out.
+        model.route = .recording
         let hosted = HostedWindow(StagePage(take: take).environment(model), width: 1180, height: 708)
         defer { hosted.close() }
         return (hosted.window.frame, HostedAccessibility.elements(in: hosted.host))
@@ -759,6 +761,7 @@ extension TranscriberMockSuites {
                 #expect(afterSave, "as its entry once the save lands")
                 model.route = .statistics
                 #expect(!model.routeLandsTake, "the next route change is no landing")
+                #expect(StageLanding.stageIsLeaving(model), "a page picked as the take lands keeps its Stage gone")
 
                 model.installTestTake(source: .microphone)
                 let newTake = StageLanding.transcriptIsTheTake(model)
@@ -776,6 +779,7 @@ extension TranscriberMockSuites {
             model.route = .transcript
 
             #expect(!model.routeLandsTake)
+            #expect(StageLanding.stageIsLeaving(model), "its words and controls still go first")
             model.endTestTake()
         }
 

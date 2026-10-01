@@ -41,6 +41,12 @@ enum StageLanding {
         }
     }
 
+    /// A Stage is on its way out for good once the route moves off it, so a page picked mid-landing never brings its words back.
+    @MainActor
+    static func stageIsLeaving(_ model: AppModel) -> Bool {
+        model.route != .recording
+    }
+
     /// The transcript on screen is the window's take: over its working file until its save lands, then as its entry.
     @MainActor
     static func transcriptIsTheTake(_ model: AppModel) -> Bool {
@@ -73,9 +79,9 @@ extension View {
         modifier(StageLandingMatch(piece: piece, side: .transcript, offered: nil))
     }
 
-    /// A part of the Stage that carries nothing over, gone fast as its take lands.
-    func leavesFirstOnLanding() -> some View {
-        modifier(LeavesFirstOnLanding())
+    /// A part of the Stage that carries nothing over, gone fast as the Stage leaves.
+    func leavesFirst() -> some View {
+        modifier(LeavesFirst())
     }
 
     /// The transcript's words, held back as a landing's Stage leaves and brought in after it; `landing` counts only as the page is made.
@@ -107,11 +113,11 @@ private struct StageLandingMatch: ViewModifier {
 }
 
 /// Reads the model, not the environment: a Stage already on its way out still follows the model, but not new environment values.
-private struct LeavesFirstOnLanding: ViewModifier {
+private struct LeavesFirst: ViewModifier {
     @Environment(AppModel.self) private var model: AppModel?
 
     func body(content: Content) -> some View {
-        let leaves = model?.routeLandsTake == true
+        let leaves = model.map { StageLanding.stageIsLeaving($0) } == true
         content
             .opacity(leaves ? 0 : 1)
             .animation(StageLanding.stageLeaving, value: leaves)

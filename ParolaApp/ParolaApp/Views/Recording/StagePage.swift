@@ -47,7 +47,7 @@ struct StagePage: View {
                 StageTimeSlot(take: take, isOnScreen: isOnScreen)
                     .stageLanding(.time, from: take)
                 StageFacts(take: take, isOnScreen: isOnScreen)
-                    .leavesFirstOnLanding()
+                    .leavesFirst()
             }
             Spacer(minLength: DS.Spacing.large)
                 .frame(maxHeight: 44)
@@ -58,7 +58,7 @@ struct StagePage: View {
                 .frame(maxHeight: 44)
             stageText
                 .frame(minHeight: StageLiveText.minHeight, maxHeight: StageLiveText.height)
-                .leavesFirstOnLanding()
+                .leavesFirst()
                 // Ahead of the spacers: a short window gives up spacing first, then lines, never the bar's clearance.
                 .layoutPriority(1)
             Spacer(minLength: 0)
@@ -70,7 +70,7 @@ struct StagePage: View {
         .opacity(Self.entranceOpacity(entered: entered))
         .overlay(alignment: .bottom) {
             StageControls(take: take)
-                .leavesFirstOnLanding()
+                .leavesFirst()
                 .padding(.bottom, StageControls.bottomInset)
                 .offset(y: Self.controlsLift(entered: entered, reduceMotion: reduceMotion))
                 .opacity(Self.entranceOpacity(entered: entered))
