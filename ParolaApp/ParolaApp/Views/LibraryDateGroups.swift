@@ -141,23 +141,20 @@ enum LibraryDateGroups {
     static func groups(
         for rows: [LibraryRowDisplay],
         sortOrder: LibrarySortOrder = .newest,
-        pinsFirst: Bool = true,
         now: Date = Date(),
         calendar: Calendar = .autoupdatingCurrent,
         locale: Locale = AppFormat.locale
     ) -> [Group] {
-        guard sortOrder.isChronological else {
-            return pinsFirst ? pinnedThenRest(rows, locale: locale) : ungrouped(rows)
-        }
+        guard sortOrder.isChronological else { return pinnedThenRest(rows, locale: locale) }
         guard !rows.isEmpty else { return [] }
         var groups: [Group] = []
-        let pinned = pinsFirst ? rows.filter(\.pinned) : []
+        let pinned = rows.filter(\.pinned)
         if !pinned.isEmpty {
             groups.append(pinnedGroup(pinned, locale: locale))
         }
         let edges = Edges(now: now, calendar: calendar)
         var runs: [(bucket: LibraryDateBucket, rows: [LibraryRowDisplay])] = []
-        for row in rows where !(pinsFirst && row.pinned) {
+        for row in rows where !row.pinned {
             let bucket = edges.bucket(for: row.entry.createdAt)
             if runs.last?.bucket == bucket {
                 runs[runs.count - 1].rows.append(row)

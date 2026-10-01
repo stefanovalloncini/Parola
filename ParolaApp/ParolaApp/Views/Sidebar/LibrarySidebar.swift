@@ -1,7 +1,7 @@
 import SwiftUI
 import ParolaCore
 
-/// A native sidebar list: places only, counts as badges, no footer.
+/// A native sidebar list: places only, counts as badges.
 struct LibrarySidebar: View {
     @Environment(AppModel.self) private var model
 

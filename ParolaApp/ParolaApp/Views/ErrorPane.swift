@@ -40,7 +40,6 @@ struct ErrorBanner: View {
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
                     .lineLimit(2)
-                // Capped so the buttons below stay on screen: the batch pane hosting this card doesn't scroll.
                 Text(AppModel.errorDetail(from: message))
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
