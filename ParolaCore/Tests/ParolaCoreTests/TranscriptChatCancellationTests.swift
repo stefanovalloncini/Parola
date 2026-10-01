@@ -2,80 +2,30 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-private final class GatedModelState: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _released = false
-    private var _terminated = false
-    private var _streamClosed = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    func release() {
-        lock.lock()
-        _released = true
-        let due = waiters
-        waiters = []
-        lock.unlock()
-        for waiter in due { waiter.resume() }
-    }
-
-    func waitForRelease() async {
-        await withCheckedContinuation { continuation in
-            lock.lock()
-            if _released {
-                lock.unlock()
-                continuation.resume()
-            } else {
-                waiters.append(continuation)
-                lock.unlock()
-            }
-        }
-    }
-
-    var terminated: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return _terminated
-    }
-
-    func markTerminated() {
-        lock.lock()
-        _terminated = true
-        _streamClosed = true
-        lock.unlock()
-    }
-
-    var streamClosed: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return _streamClosed
-    }
-
-    func markStreamClosed() {
-        lock.lock()
-        _streamClosed = true
-        lock.unlock()
-    }
-}
-
+/// Parks on `gate` until the test opens it; the signals say how far the session's cancellation reached.
 private struct GatedLanguageModel: LanguageModel {
-    let state: GatedModelState
+    let gate = UninterruptibleGate()
+    let terminated = TestSignal()
+    let streamClosed = TestSignal()
 
     func respond(history: [ChatTurn]) async throws -> String {
-        await state.waitForRelease()
+        await gate.wait()
         return "Late answer"
     }
 
     func stream(history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
-        let state = state
-        return AsyncThrowingStream { continuation in
+        AsyncThrowingStream { continuation in
             let task = Task {
                 continuation.yield("Hello")
-                await state.waitForRelease()
+                await gate.wait()
                 continuation.yield(" world")
-                state.markStreamClosed()
+                streamClosed.fire()
                 continuation.finish()
             }
             continuation.onTermination = { reason in
                 if case .cancelled = reason {
-                    state.markTerminated()
+                    terminated.fire()
+                    streamClosed.fire()
                 }
                 task.cancel()
             }
@@ -93,82 +43,45 @@ struct TranscriptChatCancellationTests {
         )
     }
 
-    private func poll(
-        budget: Duration = .seconds(5),
-        until condition: @Sendable () async -> Bool
-    ) async -> Bool {
-        let deadline = ContinuousClock.now + budget
-        while ContinuousClock.now < deadline {
-            if await condition() { return true }
-            try? await Task.sleep(for: .milliseconds(20))
-        }
-        return await condition()
-    }
-
     @Test("cancelling the stream consumer reaches the model and appends nothing to history")
     func streamCancellationPropagates() async throws {
-        let state = GatedModelState()
-        let chat = TranscriptChatSession(
-            transcript: makeTranscript(),
-            model: GatedLanguageModel(state: state)
-        )
+        let model = GatedLanguageModel()
+        let chat = TranscriptChatSession(transcript: makeTranscript(), model: model)
 
-        let firstDelta = LockedProbe()
+        let firstDelta = TestSignal()
         let consumer = Task {
             for try await event in chat.stream("Q") {
-                if case .delta = event { firstDelta.mark() }
+                if case .delta = event { firstDelta.fire() }
             }
         }
-        let deltaArrived = await poll { firstDelta.isMarked }
-        #expect(deltaArrived, "the first delta should reach the consumer")
+        await firstDelta.wait("the first delta to reach the consumer")
 
         consumer.cancel()
-        state.release()
+        model.gate.open()
 
-        let closed = await poll { state.streamClosed }
-        #expect(closed, "the model stream should wind down after cancellation")
-        let modelCancelled = await poll(budget: .seconds(2)) { state.terminated }
-        #expect(modelCancelled, "cancellation must propagate into the model's stream")
+        await model.streamClosed.wait("the model stream to wind down after cancellation")
+        await model.terminated.wait("cancellation to propagate into the model's stream")
 
-        try? await Task.sleep(for: .milliseconds(300))
+        // A later ask runs after the cancelled generation's task, so the history it adds to is final.
+        let answer = try await chat.ask("Follow-up")
+        #expect(answer.text == "Late answer")
         let history = await chat.history
-        #expect(history.isEmpty, "a cancelled generation must not be recorded in history")
+        #expect(history.map(\.text) == ["Follow-up", "Late answer"], "a cancelled generation must not be recorded in history")
     }
 
     @Test("cancelling ask surfaces CancellationError and appends nothing to history")
     func askCancellationPropagates() async throws {
-        let state = GatedModelState()
-        let chat = TranscriptChatSession(
-            transcript: makeTranscript(),
-            model: GatedLanguageModel(state: state)
-        )
+        let model = GatedLanguageModel()
+        let chat = TranscriptChatSession(transcript: makeTranscript(), model: model)
 
         let askTask = Task { try await chat.ask("Q") }
-        try? await Task.sleep(for: .milliseconds(100))
+        await model.gate.arrivals.wait(atLeast: 1, "the ask to reach the model")
         askTask.cancel()
-        try? await Task.sleep(for: .milliseconds(100))
-        state.release()
+        model.gate.open()
 
         let outcome = await askTask.result
         #expect(throws: CancellationError.self) { try outcome.get() }
-        try? await Task.sleep(for: .milliseconds(300))
         let history = await chat.history
         #expect(history.isEmpty, "a cancelled ask must not be recorded in history")
-    }
-}
-
-private final class LockedProbe: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _marked = false
-
-    var isMarked: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return _marked
-    }
-
-    func mark() {
-        lock.lock()
-        _marked = true
-        lock.unlock()
     }
 }
