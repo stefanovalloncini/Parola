@@ -274,23 +274,14 @@ struct TranscriptHeaderBar: View {
     }
 
     private func copyTranscript() {
-        guard let segments = model.transcript?.segments else { return }
-        let labelled = model.transcriptSpeakers.count >= 2
-        guard segments.count > TranscriptDerive.synchronousCap else {
-            writeToPasteboard(TranscriptParagraphs.plainText(segments: segments, includeSpeakerLabels: labelled))
-            return
-        }
+        guard let transcript = model.transcript else { return }
         Task {
-            let text = await Task.detached(priority: .userInitiated) {
-                TranscriptParagraphs.plainText(segments: segments, includeSpeakerLabels: labelled)
-            }.value
-            writeToPasteboard(text)
+            await model.copyTranscriptAsPlainText(transcript)
+            showCopied()
         }
     }
 
-    private func writeToPasteboard(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+    private func showCopied() {
         copied = true
         copiedReset?.cancel()
         copiedReset = Task {

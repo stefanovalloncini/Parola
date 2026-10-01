@@ -181,6 +181,22 @@ extension AppModel {
         picker.show(relativeTo: anchor, of: anchorView, preferredEdge: .minY)
     }
 
+    /// Copy Transcript's text: paragraphs, with speaker names once two or more speak; a long one is built off the main actor.
+    func copyTranscriptAsPlainText(_ transcript: Transcript, to pasteboard: NSPasteboard = .general) async {
+        let segments = transcript.segments
+        let labelled = transcript.uniqueSpeakers.count >= 2
+        let text: String
+        if segments.count > TranscriptDerive.synchronousCap {
+            text = await Task.detached(priority: .userInitiated) {
+                TranscriptParagraphs.plainText(segments: segments, includeSpeakerLabels: labelled)
+            }.value
+        } else {
+            text = TranscriptParagraphs.plainText(segments: segments, includeSpeakerLabels: labelled)
+        }
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
+
     func copyTranscriptToPasteboard(withTimestamps: Bool, favoritesOnly: Bool = false, pasteboard: NSPasteboard) {
         guard let transcript else { return }
         let favorites = favoriteSegmentIDs

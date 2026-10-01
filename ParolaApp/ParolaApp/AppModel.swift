@@ -5004,14 +5004,13 @@ final class AppModel {
         }
     }
 
-    /// The saved take's Copy: its transcript as plain text, read from the library if the user has moved on.
+    /// The saved take's Copy, as Copy Transcript copies it; read from the library if the user has moved on.
     func copySavedTake(_ entryID: LibraryEntry.ID, to pasteboard: NSPasteboard = .general) async {
         dismissTakeSaved()
-        var text = selectedEntryID == entryID ? transcript?.text : nil
-        if text == nil { text = try? await library.load(entryID).document.transcript.text }
-        guard let text else { return }
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        var copied = selectedEntryID == entryID ? transcript : nil
+        if copied == nil { copied = try? await library.load(entryID).document.transcript }
+        guard let copied else { return }
+        await copyTranscriptAsPlainText(copied, to: pasteboard)
     }
 
     /// Show in Finder on a failed take's Stage: the audio its failure saved.

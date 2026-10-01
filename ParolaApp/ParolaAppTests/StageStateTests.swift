@@ -202,6 +202,26 @@ struct StageStateTests {
     }
 
     @MainActor
+    @Test("a transcript past the inline cap is copied with the same paragraphs and speaker names")
+    func longCopyKeepsParagraphs() async {
+        let model = makeRecordingModel("stage-long-copy")
+        let segments = (0..<(TranscriptDerive.synchronousCap + 50)).map { index in
+            TranscriptSegment(
+                id: index, start: Double(index) * 3, end: Double(index) * 3 + 1, text: "Line \(index).",
+                speaker: index.isMultiple(of: 2) ? "Alice" : "Bob"
+            )
+        }
+        let transcript = Transcript(segments: segments, language: "en", modelName: "stub")
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("stage-long-copy-\(UUID())"))
+
+        await model.copyTranscriptAsPlainText(transcript, to: pasteboard)
+
+        let expected = TranscriptParagraphs.plainText(segments: segments, includeSpeakerLabels: true)
+        #expect(pasteboard.string(forType: .string) == expected)
+        #expect(expected.hasPrefix("Alice\nLine 0.\n\nBob\nLine 1."))
+    }
+
+    @MainActor
     @Test("the saved toast names the place the take went, and goes after three seconds")
     func toast() {
         #expect(TakeSavedToast.message(category: .meeting) == "Saved to Meetings")
@@ -356,12 +376,17 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("a take that lands on its Stage says where it went, and Copy puts its words on the pasteboard")
+        @Test("a take that lands on its Stage says where it went, and Copy pastes it as Copy Transcript does")
         func landingSaysWhereItWent() async throws {
             let audio = try makeTakeWAV("stage-saved", seconds: 1)
             defer { try? FileManager.default.removeItem(at: audio) }
             try await withMocksCleared(.transcriber) {
-                await installMockTranscriber(segments: [(0, 1, "the words of the take")])
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(segments: [
+                    TranscriptSegmentSeed(start: 0, end: 1, text: "Hello there.", speaker: "Alice"),
+                    TranscriptSegmentSeed(start: 1.2, end: 2, text: "Still me.", speaker: "Alice"),
+                    TranscriptSegmentSeed(start: 4, end: 5, text: "After a pause.", speaker: "Alice"),
+                    TranscriptSegmentSeed(start: 5.2, end: 6, text: "Bob here.", speaker: "Bob"),
+                ]))
                 let model = makeModel("stage-saved")
                 model.pendingRecordingCategory = .meeting
 
@@ -379,7 +404,8 @@ extension TranscriberMockSuites {
 
                 let pasteboard = NSPasteboard(name: NSPasteboard.Name("stage-saved-\(UUID())"))
                 await model.copySavedTake(entry.id, to: pasteboard)
-                #expect(pasteboard.string(forType: .string) == "the words of the take")
+                let pasted = pasteboard.string(forType: .string)
+                #expect(pasted == "Alice\nHello there. Still me.\n\nAfter a pause.\n\nBob\nBob here.")
                 #expect(model.takeSavedNotice == nil, "Copy takes the toast down")
             }
         }
