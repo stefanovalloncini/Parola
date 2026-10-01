@@ -24,11 +24,25 @@ public final class DiagnosticsBootstrap: Sendable {
 
     /// `periodicFlush` bounds what a hard kill costs: without it only errors, a full buffer and the
     /// exit drain reach the file, so a long-running process would lose its breadcrumbs.
-    public init(
+    public convenience init(
         directory: URL = DiagnosticsBootstrap.defaultDirectory,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         periodicFlush: Bool,
         flushInterval: Duration = .seconds(2)
+    ) {
+        self.init(
+            directory: directory, environment: environment, periodicFlush: periodicFlush,
+            flushInterval: flushInterval, clock: ContinuousClock()
+        )
+    }
+
+    /// Test seam: the periodic flush sleeps on `clock`.
+    init(
+        directory: URL,
+        environment: [String: String],
+        periodicFlush: Bool,
+        flushInterval: Duration,
+        clock: any Clock<Duration>
     ) {
         let sink = FileDiagnosticsSink(
             directory: directory,
@@ -41,7 +55,7 @@ public final class DiagnosticsBootstrap: Sendable {
         flushTask = periodicFlush
             ? Task { [sink] in
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: flushInterval)
+                    try? await clock.sleep(for: flushInterval, tolerance: nil)
                     guard !Task.isCancelled else { return }
                     await sink.flush()
                 }
@@ -50,6 +64,8 @@ public final class DiagnosticsBootstrap: Sendable {
         // Exit is the only hook a CLI has left once its command returns, and it cannot await.
         atexit { ParolaLog.flushSynchronously() }
     }
+
+    var hasPeriodicFlush: Bool { flushTask != nil }
 
     public func stopPeriodicFlush() {
         flushTask?.cancel()

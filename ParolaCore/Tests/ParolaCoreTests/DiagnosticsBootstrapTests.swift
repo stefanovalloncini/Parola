@@ -19,16 +19,6 @@ struct DiagnosticsBootstrapTests {
         return ""
     }
 
-    private func waitForSinkText(in directory: URL, timeout: Duration = .seconds(5)) async throws -> String {
-        let deadline = ContinuousClock.now + timeout
-        while ContinuousClock.now < deadline {
-            let text = try sinkText(in: directory)
-            if !text.isEmpty { return text }
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        return ""
-    }
-
     @Test("PAROLA_LOG_LEVEL sets the file sink's floor, and garbage falls back to info")
     func minimumLevelFromEnvironment() {
         #expect(DiagnosticsBootstrap.minimumLevel(environment: ["PAROLA_LOG_LEVEL": "debug"]) == .debug)
@@ -54,31 +44,35 @@ struct DiagnosticsBootstrapTests {
     func periodicFlushDrainsOnItsOwn() async throws {
         let directory = scratchDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
+        let clock = TestClock()
         let bootstrap = DiagnosticsBootstrap(
             directory: directory,
             environment: [:],
             periodicFlush: true,
-            flushInterval: .milliseconds(20)
+            flushInterval: .seconds(2),
+            clock: clock
         )
         defer {
             bootstrap.stopPeriodicFlush()
             ParolaLog.uninstall()
         }
+        #expect(bootstrap.hasPeriodicFlush)
 
-        let text = try await waitForSinkText(in: directory)
-        #expect(text.contains("diagnostics sink installed"))
+        await clock.waitForSleeper()
+        clock.advance(by: .seconds(2))
+        // The loop sleeps again only once its flush has returned.
+        await clock.waitForSleeper()
+        #expect(try sinkText(in: directory).contains("diagnostics sink installed"))
     }
 
-    @Test("without the periodic flush an info record waits for a drain")
+    @Test("without the periodic flush nothing drains until asked")
     func noPeriodicFlushLeavesTheBufferAlone() async throws {
         let directory = scratchDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let bootstrap = DiagnosticsBootstrap(directory: directory, environment: [:], periodicFlush: false)
-        // The notice is buffered and flush() drains the sink directly; this keeps foreign records out.
+        // flush() drains the sink directly; uninstalling first keeps foreign records out of it.
         ParolaLog.uninstall()
-
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(try sinkText(in: directory).isEmpty)
+        #expect(!bootstrap.hasPeriodicFlush)
 
         await bootstrap.flush()
         #expect(try sinkText(in: directory).contains("diagnostics sink installed"))
