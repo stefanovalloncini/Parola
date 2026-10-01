@@ -1,6 +1,17 @@
 import AVFoundation
 import Foundation
 
+/// The stereo take a meeting's two sides are told apart in, and the label your side takes.
+public struct SpeakerSides: Sendable, Equatable {
+    public var stereo: URL
+    public var meLabel: String
+
+    public init(stereo: URL, meLabel: String) {
+        self.stereo = stereo
+        self.meLabel = meLabel
+    }
+}
+
 /// Tells a meeting's segments apart by side: one clearly louder on your microphone (the right channel) than in
 /// the Mac's audio (the left) is yours, and takes `meLabel`; every other segment keeps the speaker it had.
 public enum SpeakerSideAttribution {

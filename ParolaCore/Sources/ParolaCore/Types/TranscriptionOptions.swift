@@ -29,6 +29,10 @@ public struct TranscriptionOptions: Sendable {
     /// Set false to get the engine's output verbatim.
     public var filtersHallucinations: Bool
 
+    /// A meeting's stereo take: the segments your side carries are labelled before sentences are joined,
+    /// so a join never crosses from one side to the other. The engine still reads the file it is given.
+    public var speakerSides: SpeakerSides?
+
     public init(
         model: String? = nil,
         language: String? = nil,
@@ -38,7 +42,8 @@ public struct TranscriptionOptions: Sendable {
         initialPrompt: String? = nil,
         diarize: Bool = false,
         expectedSpeakers: Int? = nil,
-        filtersHallucinations: Bool = true
+        filtersHallucinations: Bool = true,
+        speakerSides: SpeakerSides? = nil
     ) {
         self.model = model
         self.language = language
@@ -49,6 +54,7 @@ public struct TranscriptionOptions: Sendable {
         self.diarize = diarize
         self.expectedSpeakers = expectedSpeakers
         self.filtersHallucinations = filtersHallucinations
+        self.speakerSides = speakerSides
     }
 
     public static let `default` = TranscriptionOptions()

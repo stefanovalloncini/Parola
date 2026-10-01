@@ -214,13 +214,17 @@ public actor TranscriptionSession {
             readDeadline: fileReadDeadline,
             readClock: fileReadClock
         ) { [options] tidied in
-            guard options.diarize else { return tidied }
-            try Task.checkCancellation()
-            return try await self.diarize(
-                transcript: tidied,
-                audioURL: audioURL,
-                numberOfSpeakers: options.expectedSpeakers
-            )
+            var labelled = tidied
+            if options.diarize {
+                try Task.checkCancellation()
+                labelled = try await self.diarize(
+                    transcript: tidied,
+                    audioURL: audioURL,
+                    numberOfSpeakers: options.expectedSpeakers
+                )
+            }
+            guard let sides = options.speakerSides else { return labelled }
+            return await Self.labellingSides(labelled, sides)
         }
         let engineElapsed = engineStartedAt.duration(to: .now)
         transcript.transcriptionSeconds =
@@ -236,6 +240,21 @@ public actor TranscriptionSession {
             ]
         )
         return transcript
+    }
+
+    /// After the diarizer and before sentences join, so no join carries one side's words into the other's segment.
+    static func labellingSides(_ transcript: Transcript, _ sides: SpeakerSides) async -> Transcript {
+        let segments = transcript.segments
+        let read = await BoundedFileRead.run(deadline: FileReadDeadline.forReading(sides.stereo)) {
+            Result { try SpeakerSideAttribution.label(segments: segments, stereo: sides.stereo, meLabel: sides.meLabel) }
+        }
+        guard case .done(.success(let labelled)) = read else {
+            ParolaLog.notice(.models, "a meeting's two sides could not be read; its segments keep their speakers")
+            return transcript
+        }
+        var sided = transcript
+        sided.segments = labelled
+        return sided
     }
 
     /// Stages speaker labels in place of SpeakerKit. Internal, so the CLI and both apps always

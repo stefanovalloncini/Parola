@@ -1,3 +1,4 @@
+import Clocks
 import Foundation
 import Testing
 import ParolaTestSupport
@@ -91,5 +92,41 @@ struct SpeakerSideAttributionTests {
         let segments = [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello", speaker: "Speaker 3")]
 
         #expect(try SpeakerSideAttribution.label(segments: segments, stereo: mono, meLabel: "Me") == segments)
+    }
+}
+
+@Suite("Transcription session meeting sides")
+struct TranscriptionSessionSidesTests {
+    @Test("a meeting's sides are labelled before sentences join, so your reply never joins the Mac's sentence")
+    func sidesBeforeTheMerge() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("parola-sides-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let loud = TestAudio.sine(seconds: 1, hz: 220, amplitude: 0.5)
+        let quiet = TestAudio.sine(seconds: 1, hz: 440, amplitude: 0.01)
+        let stereo = try TestAudio.write(channels: [loud + quiet, quiet + loud], to: dir.appendingPathComponent("meeting.wav"))
+        let seeds = [
+            TranscriptSegmentSeed(start: 0.0, end: 0.9, text: "so what do you think"),
+            TranscriptSegmentSeed(start: 1.1, end: 1.9, text: "I think we ship it"),
+        ]
+        let registry = EngineRegistry()
+        let response = MockTranscriberResponse(segments: seeds, language: "en", modelName: "mock")
+        await registry.register(
+            engineID: .whisperKit,
+            capabilities: .whisperKitDefaults,
+            factory: { _ in MockTranscriber.make(response: response, clock: ImmediateClock()) }
+        )
+        let store = ModelStore(modelsDirectory: dir)
+        try store.seedInstalledModel("openai_whisper-tiny")
+        let session = TranscriptionSession(modelStore: store, registry: registry)
+
+        let transcript = try await session.transcribe(
+            source: FileAudioSource(url: stereo),
+            options: TranscriptionOptions(model: "openai_whisper-tiny", speakerSides: SpeakerSides(stereo: stereo, meLabel: "Me"))
+        )
+        await session.unloadModel()
+
+        #expect(transcript.segments.map(\.text) == seeds.map(\.text))
+        #expect(transcript.segments.map(\.speaker) == [nil, "Me"])
     }
 }
