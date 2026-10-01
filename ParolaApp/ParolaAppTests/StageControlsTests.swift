@@ -22,6 +22,64 @@ extension TranscriberMockSuites {
             }
         }
 
+        private func playerFile() -> URL {
+            FileManager.default.temporaryDirectory.appendingPathComponent("stage-space-\(UUID().uuidString).m4a")
+        }
+
+        private func pressSpace(_ model: AppModel) -> Bool {
+            PlaybackKeyMonitor.handle(keyCode: 49, modifiers: [], firstResponder: nil, inMainWindow: true, model: model)
+        }
+
+        @Test("Space on a recording take pauses it, and again resumes it")
+        func spacePausesTheTake() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeRecordingModel("stage-space-recording")
+                try await startFixtureTake(model)
+                let paused = pressSpace(model)
+                let pausedState = model.recording?.isPaused == true
+                #expect(paused)
+                #expect(pausedState)
+                let resumed = pressSpace(model)
+                let resumedState = model.recording?.state == .recording
+                #expect(resumed)
+                #expect(resumedState)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("Space during a count-in is the take's, so a transcript's player stays still")
+        func spaceDuringArming() {
+            let model = makeRecordingModel("stage-space-arming")
+            model.recordingCountInSeconds = 3
+            model.installPlayer(for: playerFile())
+            model.startRecording(source: .microphone)
+            #expect(model.route == .recording)
+            #expect(model.recording?.isArming == true)
+
+            #expect(pressSpace(model))
+            #expect(model.player?.rate == 0)
+            model.cancelRecordingCountdown()
+        }
+
+        @Test("Space while a stopped take finishes is the take's, so a transcript's player stays still")
+        func spaceWhileFinishing() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let model = makeRecordingModel("stage-space-finishing")
+                await installMockTranscriber(segments: [(0, 0.3, "kept")])
+                try await startFixtureTake(model)
+                model.installPlayer(for: playerFile())
+                model.stopRecordingAndTranscribe()
+                let finishing = model.recording?.state == .finishing
+                #expect(finishing)
+
+                let used = pressSpace(model)
+                let rate = model.player?.rate
+                #expect(used)
+                #expect(rate == 0)
+                model.cancelCurrentWork()
+            }
+        }
+
         @Test("a confirmed Discard deletes only the take it named")
         func discardNamesItsTake() async throws {
             try await withMocksCleared(.audioSource) {
