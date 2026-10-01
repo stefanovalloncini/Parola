@@ -48,10 +48,11 @@ struct RecentlyDeletedRouteTests {
         defer { page.close() }
         let italian = LanguageDisplay.name(for: "it") ?? "IT"
         // The row rebuilds once its preview loads, so the library changes only after that.
-        _ = await waitUntil {
+        let precondition = await waitUntil {
             let words = HostedAccessibility.words(in: page.host)
             return words.contains(italian) && words.contains("No transcript text.")
         }
+        #expect(precondition, "the row never named Italian before the change")
 
         model.libraryEntries = ["a", "b", "c"].map { entry($0, language: "it") }
         let dropped = await waitUntil { !HostedAccessibility.words(in: page.host).contains(italian) }
