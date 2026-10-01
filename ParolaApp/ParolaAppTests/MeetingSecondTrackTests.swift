@@ -308,6 +308,31 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Stop, then Stop Transcribing, saves the meeting untranscribed with both sides")
+        func stopTranscribingKeepsTheMic() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "never landed")],
+                    gate: MockTranscriberGate()
+                ))
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                model.stopRecordingAndTranscribe()
+                let transcribing = await waitUntil { model.takeRun != nil }
+                #expect(transcribing)
+
+                model.stopTranscribingTake()
+
+                let entry = try #require(await landedEntry(model))
+                #expect(entry.title.hasSuffix("(not transcribed)"))
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                #expect(try channels(of: audio) == 2)
+            }
+        }
+
         @Test("a meeting whose Mac file was cut short still folds your microphone in, and is saved as interrupted")
         func cutShortMacStillFolds() async throws {
             try await withMocksCleared(.audioSource) {
@@ -836,6 +861,30 @@ extension TranscriberMockSuites {
             #expect(written.audioURL == take)
             #expect(written.companionAudioURL == mic)
             #expect(written.companionStartOffset == 0.1)
+            model.endActiveRecovery()
+        }
+
+        @Test("checkpoints land in the order they were written, so a microphone track added just after the take's start stays on disk")
+        func checkpointWritesLandInOrder() async throws {
+            let model = makeModel()
+            model.beginRecordingRecovery()
+            model.liveRecordingAudioURL = URL(fileURLWithPath: "/tmp/parola-system-ordered.wav")
+            model.liveSegments = (0..<60_000).map {
+                TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "a checkpoint that takes a while to encode")
+            }
+            model.writeRecordingCheckpoint()
+            model.liveSegments = []
+            model.liveCompanionAudioURL = URL(fileURLWithPath: "/tmp/parola-meetmic-ordered.wav")
+            model.writeRecordingCheckpoint()
+
+            await model.pendingRecoveryWrite?.value
+            await settle(for: .seconds(2))
+
+            let written = try JSONDecoder().decode(
+                RecoveryCheckpoint.self, from: try Data(contentsOf: try #require(model.activeRecoveryFileURL))
+            )
+            #expect(written.companionAudioURL?.lastPathComponent == "parola-meetmic-ordered.wav")
+            #expect(written.segments.isEmpty)
             model.endActiveRecovery()
         }
 

@@ -247,7 +247,10 @@ extension AppModel {
         checkpoint.owner = recoveryOwner?.id
         let url = recoveryFileURL(for: id)
         let directory = recoveryDirectoryURL
+        let earlier = pendingRecoveryWrite
         pendingRecoveryWrite = Task { [weak self, checkpoint] in
+            // In the order they were made: an earlier checkpoint landing last would drop what a later one added.
+            await earlier?.value
             let data: Data
             do {
                 data = try await AppModel.offMainIO { try JSONEncoder().encode(checkpoint) }
