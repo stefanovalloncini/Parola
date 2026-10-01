@@ -10,6 +10,8 @@ struct MicTrack {
     /// Seconds into the take's own audio where the microphone's first sample sits, once it has been heard.
     var offset: TimeInterval?
     var stalled = false
+    /// Stalled at some point in the take, so its file can't be trusted to drift evenly against the Mac's.
+    var stoppedEarly = false
     var lastMicReading: ContinuousClock.Instant?
     var lastMacReading: ContinuousClock.Instant?
     var quietTicks = 0
@@ -23,10 +25,11 @@ enum MicTrackState: Equatable {
     case unavailable
 }
 
-/// A stopped microphone track's file, and where it starts in the take.
+/// A stopped microphone track's file, where it starts in the take, and whether it stopped before the take did.
 struct StoppedMicTrack {
     let file: URL
     let offset: TimeInterval
+    var stoppedEarly = false
 }
 
 /// A mic track waiting in a record of its own for its entry, and the record's generation.
@@ -141,6 +144,9 @@ extension AppModel {
             }
             if !track.stalled, track.quietTicks >= micTrackStallTicks {
                 track.stalled = true
+                track.stoppedEarly = true
+                micTrack = track
+                writeRecordingCheckpoint()
                 takeMicTrackState = .unavailable
                 noteMicTrackMissing(take.id, stopped: micReading != nil)
             }
@@ -170,9 +176,9 @@ extension AppModel {
     func finishMicTrack(_ track: MicTrack?) async -> StoppedMicTrack? {
         guard let track, let capture = track.capture else { return nil }
         do {
-            return StoppedMicTrack(file: try await capture.prepare(), offset: track.offset ?? 0)
+            return StoppedMicTrack(file: try await capture.prepare(), offset: track.offset ?? 0, stoppedEarly: track.stoppedEarly)
         } catch let cut as CaptureInterrupted {
-            return StoppedMicTrack(file: cut.url, offset: track.offset ?? 0)
+            return StoppedMicTrack(file: cut.url, offset: track.offset ?? 0, stoppedEarly: true)
         } catch {
             ParolaLog.error(.audioRecording, "a meeting's microphone track could not be finished", [.error: .error(error)])
             return nil
@@ -299,12 +305,13 @@ extension AppModel {
             defer { meetingScratchInUse.remove(scratch) }
             let folder = inflightRecordingsURL
             do {
-                try await Self.offMainIO { [offset = record.mic.offset, micFile = record.mic.file] in
+                try await Self.offMainIO { [offset = record.mic.offset, micFile = record.mic.file, stoppedEarly = record.mic.stoppedEarly] in
                     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                     WAVHeaderRepair.makeReadable(micFile)
                     let start = Date(timeIntervalSinceReferenceDate: 0)
                     try MeetingTakeMixer.mix(
-                        mac: audio, mic: micFile, macStart: start, micStart: start.addingTimeInterval(offset), into: scratch, mono: nil
+                        mac: audio, mic: micFile, macStart: start, micStart: start.addingTimeInterval(offset), into: scratch, mono: nil,
+                        micStoppedEarly: stoppedEarly
                     )
                 }
                 try await library.replaceAudio(of: entryID, with: scratch)
@@ -371,13 +378,14 @@ extension AppModel {
             defer { meetingScratchInUse.remove(scratch) }
             let folder = inflightRecordingsURL
             do {
-                try await Self.offMainIO { [offset = mic.offset, micFile = mic.file] in
+                try await Self.offMainIO { [offset = mic.offset, micFile = mic.file, stoppedEarly = mic.stoppedEarly] in
                     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                     WAVHeaderRepair.makeReadable(mac)
                     WAVHeaderRepair.makeReadable(micFile)
                     let start = Date(timeIntervalSinceReferenceDate: 0)
                     try MeetingTakeMixer.mix(
-                        mac: mac, mic: micFile, macStart: start, micStart: start.addingTimeInterval(offset), into: scratch, mono: mono
+                        mac: mac, mic: micFile, macStart: start, micStart: start.addingTimeInterval(offset), into: scratch, mono: mono,
+                        micStoppedEarly: stoppedEarly
                     )
                 }
             } catch {

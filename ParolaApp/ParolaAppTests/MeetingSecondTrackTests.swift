@@ -348,6 +348,54 @@ extension TranscriberMockSuites {
             }
         }
 
+        // MARK: - A mic that stopped
+
+        @Test("a mic that stalled is lined up, never stretched, so a sound at 10 s stays at 10 s; its checkpoint says it stopped")
+        func stalledMicIsNeverStretched() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let library = makeTempLibraryURL("second-track-stalled")
+                let model = makeModel(libraryURL: library)
+                model.micTrackStallTicks = 3
+                let folder = model.inflightRecordingsURL
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let id = UUID().uuidString
+                let mac = folder.appendingPathComponent("parola-system-\(id).wav")
+                let mic = folder.appendingPathComponent("\(RecordingScratch.meetingMicPrefix)-\(id).wav")
+                let rate = 16_000.0
+                try TestAudio.write(channels: [TestAudio.sine(seconds: 20, hz: 440, amplitude: 0.3, sampleRate: rate)], sampleRate: rate, to: mac)
+                var voice = [Float](repeating: 0, count: Int(19.99 * rate))
+                for index in Int(10 * rate)..<Int(10 * rate) + 160 { voice[index] = 0.9 }
+                try TestAudio.write(channels: [voice], sampleRate: rate, to: mic)
+                let macTrack = ScriptedTrack(file: mac)
+                try await startMeeting(model, mac: macTrack, mic: ScriptedTrack(file: mic))
+                let micUp = await waitUntil { model.micTrack?.capture != nil }
+                #expect(micUp)
+
+                let feeding = Task { @MainActor in
+                    for _ in 0..<60 {
+                        macTrack.levelMeter.record(0.3)
+                        try? await Task.sleep(for: .milliseconds(50))
+                    }
+                }
+                let stalled = await waitUntil { model.micTrack?.stoppedEarly == true }
+                feeding.cancel()
+                #expect(stalled)
+                await model.pendingRecoveryWrite?.value
+                let live = try checkpointsOnDisk(library)
+                #expect(live.first?.companionStopped == true, "a crash now still knows not to stretch it")
+
+                model.stopRecordingAndTranscribe()
+
+                let entry = try #require(await landedEntry(model))
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                let sides = try TestAudio.read(audio)
+                let burst = sides.channels[1].firstIndex { $0 > 0.5 }
+                let onset = try #require(burst)
+                #expect(abs(Double(onset) / sides.sampleRate - 10) < 0.001, "lined up as recorded, not stretched by 20/19.99")
+            }
+        }
+
         // MARK: - Room for the fold
 
         @Test("a meeting recording its mic stops while its fold still fits on disk, and a take without one keeps going")

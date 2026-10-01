@@ -6,13 +6,15 @@ import Foundation
 public enum MeetingTakeMixer {
     /// Two files that end within this fraction of each other ran on clocks that drifted, so the microphone is
     /// stretched to end with the Mac audio; further apart, one side was cut short and the two are only lined up.
-    public static let driftTolerance = 0.01
+    public static let driftTolerance = 0.001
 
     static let chunkFrames = 32_768
 
-    /// `macStart` and `micStart` say when each file's first sample was captured, which lines the two up.
-    /// The stereo file is 16-bit; the mono mix, when asked for, is Float32 at the same rate.
-    public static func mix(mac: URL, mic: URL, macStart: Date, micStart: Date, into stereo: URL, mono: URL?) throws {
+    /// `macStart` and `micStart` say when each file's first sample was captured, which lines the two up; a microphone
+    /// that stopped before the take did is never stretched. The stereo file is 16-bit; the mono mix is Float32.
+    public static func mix(
+        mac: URL, mic: URL, macStart: Date, micStart: Date, into stereo: URL, mono: URL?, micStoppedEarly: Bool = false
+    ) throws {
         let macFile = try AVAudioFile(forReading: mac)
         let micFile = try AVAudioFile(forReading: mic)
         let rate = macFile.processingFormat.sampleRate
@@ -22,7 +24,7 @@ public enum MeetingTakeMixer {
             micFrames: Int(micFile.length),
             micRate: micFile.processingFormat.sampleRate,
             offset: micStart.timeIntervalSince(macStart),
-            tolerance: driftTolerance
+            tolerance: micStoppedEarly ? 0 : driftTolerance
         )
         var left = try MonoFileReader(file: macFile)
         var right = StretchedReader(source: try MonoFileReader(file: micFile), plan: plan)

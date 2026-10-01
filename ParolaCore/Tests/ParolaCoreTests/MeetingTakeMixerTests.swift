@@ -93,21 +93,77 @@ struct MeetingTakeMixerTests {
         #expect(abs(mixed.rms(channel: 1, from: 0.05, to: 1.95) - sineRMS(0.1)) < 0.01)
     }
 
-    @Test("a microphone that drifted less than one percent is stretched to end with the Mac audio")
+    /// A mic that holds silence but for one short burst at `burst` seconds, at 16 kHz.
+    private func micWithBurst(at burst: Double, seconds: Double, in dir: URL) throws -> URL {
+        let rate = 16_000.0
+        var samples = [Float](repeating: 0, count: Int(seconds * rate))
+        let first = Int(burst * rate)
+        for index in first..<min(samples.count, first + 160) { samples[index] = 0.9 }
+        return try TestAudio.write(channels: [samples], sampleRate: rate, to: dir.appendingPathComponent("mic.wav"))
+    }
+
+    private func macAudio(seconds: Double, in dir: URL) throws -> URL {
+        try TestAudio.write(
+            channels: [TestAudio.sine(seconds: seconds, hz: 440, amplitude: 0.3, sampleRate: 16_000)], sampleRate: 16_000,
+            to: dir.appendingPathComponent("mac.wav")
+        )
+    }
+
+    /// When the burst starts on your side of the mix.
+    private func burstOnset(in stereo: URL) throws -> Double? {
+        let mixed = try TestAudio.read(stereo)
+        guard let index = mixed.channels[1].firstIndex(where: { $0 > 0.5 }) else { return nil }
+        return Double(index) / mixed.sampleRate
+    }
+
+    @Test("a microphone that drifted less than a tenth of a percent is stretched to end with the Mac audio")
     func smallDriftIsStretched() throws {
         let dir = try folder()
         defer { try? FileManager.default.removeItem(at: dir) }
-        let mac = try TestAudio.write(channels: [tone(2, 0.5, hz: 440)], to: dir.appendingPathComponent("mac.wav"))
-        let mic = try TestAudio.write(channels: [silence(1.918) + tone(0.1, 0.5)], to: dir.appendingPathComponent("mic.wav"))
+        let mac = try macAudio(seconds: 20, in: dir)
+        let mic = try micWithBurst(at: 10, seconds: 19.99, in: dir)
         let stereo = dir.appendingPathComponent("stereo.wav")
         let start = Date()
 
         try MeetingTakeMixer.mix(mac: mac, mic: mic, macStart: start, micStart: start, into: stereo, mono: nil)
 
         let mixed = try TestAudio.read(stereo)
-        #expect(mixed.frameCount == Int(2 * TestAudio.sampleRate), "exactly as long as the Mac audio")
-        #expect(mixed.rms(channel: 1, from: 1.902, to: 1.915) > 0.2, "the microphone's last tenth of a second ends with the take")
-        #expect(mixed.rms(channel: 1, from: 0.1, to: 1.89) < 0.001)
+        #expect(mixed.frameCount == 20 * 16_000, "exactly as long as the Mac audio")
+        let onset = try #require(try burstOnset(in: stereo))
+        #expect(abs(onset - 10.005) < 0.001, "stretched by 20/19.99, so the burst moves 5 ms later")
+    }
+
+    @Test("a microphone half a percent short is lined up, not stretched: that is a mic that stopped, not drift")
+    func halfAPercentIsNotDrift() throws {
+        let dir = try folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let mac = try macAudio(seconds: 20, in: dir)
+        let mic = try micWithBurst(at: 10, seconds: 19.9, in: dir)
+        let stereo = dir.appendingPathComponent("stereo.wav")
+        let start = Date()
+
+        try MeetingTakeMixer.mix(mac: mac, mic: mic, macStart: start, micStart: start, into: stereo, mono: nil)
+
+        let onset = try #require(try burstOnset(in: stereo))
+        #expect(abs(onset - 10) < 0.001)
+    }
+
+    @Test("a microphone that stopped early is never stretched, however little it is short: a sound at 50 s stays at 50 s")
+    func stoppedMicIsNeverStretched() throws {
+        let dir = try folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let mac = try macAudio(seconds: 100, in: dir)
+        let start = Date()
+        for short in [0.6, 0.05] {
+            let mic = try micWithBurst(at: 50, seconds: 100 - short, in: dir)
+            let stereo = dir.appendingPathComponent("stereo-\(short).wav")
+
+            try MeetingTakeMixer.mix(mac: mac, mic: mic, macStart: start, micStart: start, into: stereo, mono: nil, micStoppedEarly: true)
+
+            let onset = try #require(try burstOnset(in: stereo))
+            #expect(abs(onset - 50) < 0.001, "a mic \(short) s short")
+            #expect(try TestAudio.read(stereo).frameCount == 100 * 16_000)
+        }
     }
 
     @Test("a microphone cut short is lined up and padded with silence, never stretched")

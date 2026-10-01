@@ -34,6 +34,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var companionAudioURL: URL?
     /// How far into `audioURL` the microphone track's first sample sits.
     var companionStartOffset: TimeInterval?
+    /// The microphone track stopped before the take did, so the fold never stretches it.
+    var companionStopped: Bool?
     /// The entry a waiting mic track goes into.
     var entryID: String?
 
@@ -51,6 +53,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         owner: String? = nil,
         companionAudioURL: URL? = nil,
         companionStartOffset: TimeInterval? = nil,
+        companionStopped: Bool? = nil,
         entryID: String? = nil,
         id: UUID = UUID()
     ) {
@@ -68,6 +71,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         self.source = source
         self.companionAudioURL = companionAudioURL
         self.companionStartOffset = companionStartOffset
+        self.companionStopped = companionStopped
         self.entryID = entryID
     }
 
@@ -87,6 +91,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         owner = try c.decodeIfPresent(String.self, forKey: .owner)
         companionAudioURL = try c.decodeIfPresent(URL.self, forKey: .companionAudioURL)
         companionStartOffset = try c.decodeIfPresent(TimeInterval.self, forKey: .companionStartOffset)
+        companionStopped = try c.decodeIfPresent(Bool.self, forKey: .companionStopped)
         entryID = try c.decodeIfPresent(String.self, forKey: .entryID)
     }
 
@@ -109,7 +114,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
 
     /// The microphone track it carries, and where that starts in the take.
     var micTrack: StoppedMicTrack? {
-        companionAudioURL.map { StoppedMicTrack(file: $0, offset: companionStartOffset ?? 0) }
+        companionAudioURL.map { StoppedMicTrack(file: $0, offset: companionStartOffset ?? 0, stoppedEarly: companionStopped ?? false) }
     }
 
     /// The same checkpoint once the microphone track is in the take's file, which may have moved to `file`.
@@ -118,6 +123,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         if kind == .recording { folded.audioURL = file } else { folded.sourceURL = file }
         folded.companionAudioURL = nil
         folded.companionStartOffset = nil
+        folded.companionStopped = nil
         return folded
     }
 }
@@ -173,7 +179,8 @@ extension AppModel {
             source: source,
             category: category,
             companionAudioURL: mic?.file,
-            companionStartOffset: mic?.offset
+            companionStartOffset: mic?.offset,
+            companionStopped: mic?.stoppedEarly
         ))
         return generation
     }
@@ -215,7 +222,8 @@ extension AppModel {
             source: activeTake?.source.entrySource ?? pendingRecordingSource,
             category: activeTake?.category,
             companionAudioURL: liveCompanionAudioURL,
-            companionStartOffset: liveCompanionAudioURL == nil ? nil : liveCompanionStartOffset
+            companionStartOffset: liveCompanionAudioURL == nil ? nil : liveCompanionStartOffset,
+            companionStopped: liveCompanionAudioURL == nil ? nil : micTrack?.stoppedEarly
         ))
     }
 
@@ -230,6 +238,7 @@ extension AppModel {
             modelName: "",
             companionAudioURL: mic.file,
             companionStartOffset: mic.offset,
+            companionStopped: mic.stoppedEarly,
             entryID: entryID
         ))
         await pendingRecoveryWrite?.value
