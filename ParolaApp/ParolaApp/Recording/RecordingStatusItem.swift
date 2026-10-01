@@ -16,8 +16,6 @@ final class RecordingStatusItem: NSObject {
         var lamp: TakeRemote.Lamp
         var spoken: String
         var controls: [Control]
-
-        var menuTitles: [String] { controls.map(\.title) }
     }
 
     private weak var model: AppModel?
@@ -25,6 +23,8 @@ final class RecordingStatusItem: NSObject {
     private var item: NSStatusItem?
     private var tick: Task<Void, Never>?
     private(set) var face: Face?
+
+    var isTicking: Bool { tick != nil }
 
     /// Without a status bar the face is kept and nothing reaches the menu bar, as a test wants it.
     init(statusBar: NSStatusBar? = .system) {
@@ -42,10 +42,6 @@ final class RecordingStatusItem: NSObject {
 
     nonisolated static func clock(for take: RecordingSession, now: Date) -> String {
         StageClock.text(seconds: Int(take.elapsed(at: now)))
-    }
-
-    nonisolated static func title(for take: RecordingSession, now: Date) -> String {
-        "● " + clock(for: take, now: now)
     }
 
     /// Pause and Mark need a capture; Stop and Discard… have nothing left once the take finishes.
@@ -85,7 +81,7 @@ final class RecordingStatusItem: NSObject {
         let enabled = model.showRecordingStatusItem
         if enabled, let take = model.recording, take.isRunning {
             show(take, now: Date())
-            startTick()
+            if take.state == .recording { startTick() } else { stopTick() }
         } else {
             hide()
         }
@@ -119,10 +115,12 @@ final class RecordingStatusItem: NSObject {
         self.item = nil
     }
 
-    private static func menu(_ controls: [Control], target: AnyObject?) -> NSMenu {
+    /// The take's controls, then Show Parola on its own.
+    static func menu(_ controls: [Control], target: AnyObject?) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         for control in controls {
+            if control.action == #selector(showParola) { menu.addItem(.separator()) }
             let item = NSMenuItem(title: control.title, action: control.action, keyEquivalent: "")
             item.target = target
             item.isEnabled = control.isEnabled
@@ -131,7 +129,7 @@ final class RecordingStatusItem: NSObject {
         return menu
     }
 
-    /// Reads the take's clock as each of its seconds turns over, as the Dock badge does.
+    /// Reads the take's clock as each of its seconds turns over, as the Dock badge does; a paused clock needs no reading.
     private func startTick() {
         guard tick == nil else { return }
         tick = Task { @MainActor [weak self] in
@@ -148,7 +146,7 @@ final class RecordingStatusItem: NSObject {
     }
 
     private func refresh() -> Double {
-        guard let take = model?.recording, take.isRunning else { return 1 }
+        guard let take = model?.recording, take.state == .recording else { return 1 }
         let now = Date()
         show(take, now: now)
         return DockBadge.secondsToNextTick(for: take, now: now)

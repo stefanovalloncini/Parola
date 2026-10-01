@@ -83,6 +83,10 @@ private func capturingTake(arming: RecordingSession.Arming = .startingCapture) -
     RecordingSession(takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: arming)
 }
 
+private func menuBarTitle(_ take: RecordingSession, at now: Date) -> String {
+    RecordingStatusItem.attributedTitle(clock: RecordingStatusItem.clock(for: take, now: now), lamp: TakeRemote.lamp(for: take)).string
+}
+
 @Suite("Recording status item and pill")
 struct RecordingStatusItemTests {
     @Test("the status item's menu offers the take's controls")
@@ -93,6 +97,17 @@ struct RecordingStatusItemTests {
             == ["Stop Recording", "Pause", "Add Marker", "Discard…", "Show Parola"])
         _ = take.pause(at: .now)
         #expect(RecordingStatusItem.menuTitles(for: take)[1] == "Resume")
+    }
+
+    @Test("in the menu itself, Show Parola stands apart from the take's controls")
+    @MainActor
+    func menuSeparator() {
+        var take = capturingTake()
+        _ = take.markCapturing(at: .now)
+        let menu = RecordingStatusItem.menu(RecordingStatusItem.controls(for: take), target: nil)
+        #expect(menu.items.map { $0.isSeparatorItem ? "—" : $0.title }
+            == ["Stop Recording", "Pause", "Add Marker", "Discard…", "—", "Show Parola"])
+        #expect(!menu.autoenablesItems)
     }
 
     @Test("Pause and Mark wait for a capture; Stop and Discard… have nothing left once the take finishes")
@@ -112,19 +127,19 @@ struct RecordingStatusItemTests {
     func title() {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
         var take = capturingTake()
-        #expect(RecordingStatusItem.title(for: take, now: start) == "● 0:00")
+        #expect(menuBarTitle(take, at: start) == "● 0:00")
         #expect(TakeRemote.lamp(for: take) == .waiting)
 
         _ = take.markCapturing(at: start)
-        #expect(RecordingStatusItem.title(for: take, now: start.addingTimeInterval(754)) == "● 12:34")
+        #expect(menuBarTitle(take, at: start.addingTimeInterval(754)) == "● 12:34")
         #expect(TakeRemote.lamp(for: take) == .recording)
 
         _ = take.pause(at: start.addingTimeInterval(754))
-        #expect(RecordingStatusItem.title(for: take, now: start.addingTimeInterval(800)) == "● 12:34")
+        #expect(menuBarTitle(take, at: start.addingTimeInterval(800)) == "● 12:34")
         #expect(TakeRemote.lamp(for: take) == .paused)
 
         _ = take.resume(at: start.addingTimeInterval(800))
-        #expect(RecordingStatusItem.title(for: take, now: start.addingTimeInterval(3_700)) == "● 1:00:54")
+        #expect(menuBarTitle(take, at: start.addingTimeInterval(3_700)) == "● 1:00:54")
         _ = take.finish(at: start.addingTimeInterval(3_700))
         #expect(TakeRemote.lamp(for: take) == .waiting)
     }
@@ -218,12 +233,17 @@ struct RecordingSurfaceTests {
         let shown = await waitUntil { item.face?.clock.hasPrefix("12:3") == true }
         #expect(shown)
         #expect(item.face?.lamp == .recording)
-        #expect(item.face?.menuTitles == ["Stop Recording", "Pause", "Add Marker", "Discard…", "Show Parola"])
+        #expect(item.face?.controls.map(\.title) == ["Stop Recording", "Pause", "Add Marker", "Discard…", "Show Parola"])
+        #expect(item.isTicking)
 
         #expect(model.pauseTake())
         let paused = await waitUntil { item.face?.lamp == .paused }
         #expect(paused)
-        #expect(item.face?.menuTitles[1] == "Resume")
+        #expect(item.face?.controls[1].title == "Resume")
+        #expect(!item.isTicking)
+        #expect(model.resumeTake())
+        let ticking = await waitUntil { item.isTicking }
+        #expect(ticking)
 
         model.showRecordingStatusItem = false
         let hidden = await waitUntil { item.face == nil }
@@ -377,8 +397,8 @@ struct RecordingSurfaceWiringTests {
         let delegate = try source("AppDelegate")
         #expect(delegate.contains("recordingStatusItem.bind(model)"))
         #expect(delegate.contains("recordingPill.bind(model, appActive: NSApp.isActive)"))
-        #expect(delegate.contains("func applicationDidResignActive(_ notification: Notification) { model?.handleAppResignedActive() recordingPill.appActiveChanged(false) }"))
-        #expect(delegate.contains("func applicationDidBecomeActive(_ notification: Notification) { recordingPill.appActiveChanged(true)"))
+        #expect(delegate.contains("recordingPill.appActiveChanged(false)"))
+        #expect(delegate.contains("recordingPill.appActiveChanged(true)"))
     }
 
     @Test("the menu bar's record actions leave Parola where it is")
@@ -389,9 +409,10 @@ struct RecordingSurfaceWiringTests {
         #expect(!menuBar.contains("openParola() model?.start"))
     }
 
-    @Test("the Microphone pane shows both switches")
+    @Test("the Microphone pane shows both switches wherever a take can be recorded")
     func paneRows() throws {
         let pane = try source("Views/Settings/MicrophonePane")
+        #expect(pane.contains("if RecordControl.primarySource(features: model.features) != nil { SettingsSection(\"Recording controls\") {"))
         #expect(pane.contains("Toggle(\"\", isOn: $model.showRecordingStatusItem)"))
         #expect(pane.contains("Toggle(\"\", isOn: $model.showRecordingPill)"))
     }
