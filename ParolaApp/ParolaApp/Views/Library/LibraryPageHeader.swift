@@ -14,9 +14,11 @@ struct LibraryPageHeader: View {
         rowWidth > 0 && unfoldedRowWidth > rowWidth
     }
 
-    /// Counts the rows on screen; when the filters left none, the empty state under the header says so instead.
-    static func subtitle(count: Int, totalSeconds: Double, filteredOut: Bool = false, bundle: Bundle = .main) -> String {
-        guard count > 0 else { return filteredOut ? "" : String(localized: "No transcripts yet", bundle: bundle) }
+    /// Counts the rows on screen; empty while the first scan is out, or when the filters left none for No Matches to say.
+    static func subtitle(
+        count: Int, totalSeconds: Double, filteredOut: Bool = false, loaded: Bool = true, bundle: Bundle = .main
+    ) -> String {
+        guard count > 0 else { return filteredOut || !loaded ? "" : String(localized: "No transcripts yet", bundle: bundle) }
         return LibraryRowFormat.subtitle(count: count, totalSeconds: totalSeconds, bundle: bundle)
     }
 

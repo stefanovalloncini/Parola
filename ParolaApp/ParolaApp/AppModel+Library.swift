@@ -91,6 +91,7 @@ extension AppModel {
             setDeletedEntries(deleted)
             refreshBundleSizes(for: active)
             if setLibraryEntries(sortedLibraryEntries(active)) { refreshSearchResults() }
+            if !libraryLoaded { libraryLoaded = true }
             refreshLibraryExcerpts()
         }
     }

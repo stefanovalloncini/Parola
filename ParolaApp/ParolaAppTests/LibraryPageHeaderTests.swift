@@ -37,6 +37,7 @@ struct LibraryPageHeaderTests {
         #expect(LibraryPageHeader.subtitle(count: 1, totalSeconds: 0) == "1 transcript")
         #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0) == "No transcripts yet")
         #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0, filteredOut: true) == "", "No Matches below says it")
+        #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0, loaded: false) == "", "the first scan hasn't landed")
     }
 
     @Test("the subtitle reads naturally in Italian")

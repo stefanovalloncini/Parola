@@ -1625,6 +1625,8 @@ final class AppModel {
     @ObservationIgnored var libraryRefreshTask: Task<Void, Never>?
     /// How many scans `refreshLibrary()` has started, so a test can bound them.
     @ObservationIgnored var libraryRefreshes = 0
+    /// False until the first scan lands, so the empty list before it never reads as an empty library.
+    var libraryLoaded = false
     @ObservationIgnored var pendingTranscriptSaveTask: Task<Void, Never>?
     @ObservationIgnored var transcriptCloseTask: Task<Void, Never>?
     @ObservationIgnored var pendingTranscriptSaveGeneration: Int = 0

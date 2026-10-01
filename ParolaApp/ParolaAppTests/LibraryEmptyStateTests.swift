@@ -30,6 +30,14 @@ struct LibraryEmptyStateTests {
         #expect(LibraryEmptyState.kind(entryCount: 0, visibleCount: 0, filtersActive: true) == .emptyLibrary)
     }
 
+    @Test("before the first scan lands nothing reads as empty, filtered or not")
+    func nothingIsEmptyBeforeTheFirstScan() {
+        #expect(LibraryEmptyState.kind(entryCount: 0, visibleCount: 0, filtersActive: false, loaded: false) == .none)
+        #expect(LibraryEmptyState.kind(entryCount: 0, visibleCount: 0, filtersActive: true, loaded: false) == .none)
+        #expect(LibraryEmptyState.kind(entryCount: 12, visibleCount: 0, filtersActive: true, loaded: false) == .none)
+        #expect(LibraryEmptyState.kind(entryCount: 0, visibleCount: 0, filtersActive: false, loaded: true) == .emptyLibrary)
+    }
+
     @Test("Clear Filters is offered only while a filter is on to clear")
     func noMatchesNeedsAFilter() {
         #expect(LibraryEmptyState.kind(entryCount: 12, visibleCount: 0, filtersActive: false) == .none)
@@ -205,6 +213,36 @@ struct EmptyLibraryHeroRenderTests {
         model.libraryEntries = [libraryEntry("first", category: .transcription)]
         let offWithAnEntry = await waitUntil { heroPicker(in: window) == nil }
         #expect(offWithAnEntry, "the first entry puts the list in its place")
+    }
+
+    @Test("until the first scan lands, the Library page shows neither the hero nor No transcripts yet")
+    func noHeroBeforeTheFirstScan() async {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("hero-unloaded"))
+        model.libraryRefreshTask?.cancel()
+        await model.libraryRefreshTask?.value
+        #expect(!model.libraryLoaded, "the cancelled scan stands for one that hasn't come back yet")
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        let controller = NSWindowController(window: window)
+        window.contentViewController = NSHostingController(rootView: ContentView().environment(model))
+        defer { withExtendedLifetime(controller) { window.close() } }
+
+        await settle(for: .milliseconds(400))
+        #expect(heroPicker(in: window) == nil)
+        let words = window.contentView.map { HostedAccessibility.words(in: $0) } ?? []
+        #expect(words.contains("Library"), "the header is up: \(words)")
+        #expect(!words.contains("No transcripts yet"), "\(words)")
+
+        model.refreshLibrary()
+        await model.libraryRefreshTask?.value
+        #expect(model.libraryLoaded)
+        let heroUp = await waitUntil { heroPicker(in: window) != nil }
+        #expect(heroUp, "once the scan finds nothing, the hero shows")
     }
 
     /// The strongly red, opaque pixels a render holds, and the box around them.

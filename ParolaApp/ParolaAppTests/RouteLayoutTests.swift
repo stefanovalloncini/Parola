@@ -18,12 +18,14 @@ struct RouteLayoutTests {
         try body(suite)
     }
 
+    /// Laid out as the first scan left it, which found nothing: these pages are an empty library's, not one still loading.
     private func makeModel(_ defaults: UserDefaults, jobs: Int) -> AppModel {
         let model = AppModel(
             skipBootstrap: true,
             defaults: defaults,
             libraryURL: makeTempLibraryURL("route-layout")
         )
+        model.libraryLoaded = true
         model.batchJobs = (0..<jobs).map {
             BatchJob(url: URL(fileURLWithPath: "/tmp/route-layout/file-\($0).wav"), status: .done)
         }

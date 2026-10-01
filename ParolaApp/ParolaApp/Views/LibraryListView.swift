@@ -19,8 +19,9 @@ enum LibraryEmptyState {
         case noMatches
     }
 
-    /// `entryCount` is what the page holds before any filter; without a filter on, Clear Filters would have nothing to clear.
-    static func kind(entryCount: Int, visibleCount: Int, filtersActive: Bool) -> Kind {
+    /// Nothing is empty before the first scan lands; `entryCount` is the page before any filter, so Clear Filters needs one on.
+    static func kind(entryCount: Int, visibleCount: Int, filtersActive: Bool, loaded: Bool = true) -> Kind {
+        guard loaded else { return .none }
         if entryCount == 0 { return .emptyLibrary }
         return visibleCount == 0 && filtersActive ? .noMatches : .none
     }
@@ -347,6 +348,7 @@ private struct LibraryBrowseList: View, Equatable {
     /// Set with `rowItems`, from the same library and filters, so no pass judges new filters against rows not yet rebuilt.
     @State private var emptyKind = LibraryEmptyState.Kind.none
     @State private var showsHero = false
+    @State private var libraryLoaded = false
     @State private var displayCache = LibraryRowDisplayCache()
     @State private var animatesRows = false
 
@@ -392,10 +394,12 @@ private struct LibraryBrowseList: View, Equatable {
         rowItems = LibraryListItem.items(for: headers.groups(for: displays))
         shownTotals = LibraryListContent.totals(of: computed, sizes: model.libraryBundleSizes)
         pageCount = LibraryListContent.pageCount(of: model.libraryEntries, category: category, person: filters.person)
+        libraryLoaded = model.libraryLoaded
         emptyKind = LibraryEmptyState.kind(
             entryCount: LibraryEmptyState.entryCount(in: model.libraryEntries, category: category),
             visibleCount: displays.count,
-            filtersActive: !filters.isEmpty
+            filtersActive: !filters.isEmpty,
+            loaded: libraryLoaded
         )
         showsHero = LibraryEmptyState.showsHero(emptyKind, category: category, person: filters.person)
         return displays
@@ -444,6 +448,8 @@ private struct LibraryBrowseList: View, Equatable {
         .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryGroupsByDate) { _, _ in recomputeEntries() }
+        // An empty library's first scan lands no entries, so only this says it has looked.
+        .onChange(of: model.libraryLoaded) { _, _ in recomputeEntries() }
         .onChange(of: category) { _, newCategory in
             // Navigation owns personFilter now; this only decides what to keep for label/language/date.
             var kept = LibraryListContent.filters(
@@ -494,7 +500,8 @@ private struct LibraryBrowseList: View, Equatable {
                 subtitle: LibraryPageHeader.subtitle(
                     count: shownTotals.count,
                     totalSeconds: shownTotals.seconds,
-                    filteredOut: LibraryEmptyState.filtersEmptied(emptyKind, pageCount: pageCount)
+                    filteredOut: LibraryEmptyState.filtersEmptied(emptyKind, pageCount: pageCount),
+                    loaded: libraryLoaded
                 ),
                 subtitleHelp: shownTotals.bytes > 0
                     ? String(localized: "Total size: \(AppFormat.byteSize(shownTotals.bytes))") : nil,
