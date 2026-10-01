@@ -27,6 +27,7 @@ struct IntakeStrip: View {
             Button("Open Files…") { model.presentOpenPanel() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .tint(nil)
                 .fixedSize()
                 .axLeaf("Intake.Button.OpenFiles")
             IntakeSettingsButton()
