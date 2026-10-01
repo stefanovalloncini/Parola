@@ -5123,7 +5123,7 @@ final class AppModel {
         return FileManager.default.fileExists(atPath: failure.audioURL.path) ? .reveal(failure.audioURL) : nil
     }
 
-    /// In the words a Retry on a deleted take uses, so the two never disagree.
+    /// Reveal in Finder on a take whose entry was deleted says so, and points to Recently Deleted while the entry is still there.
     static func deletedTakeNotice(restorable: Bool) -> ExportNotice {
         let message = restorable
             ? String(localized: "This recording was deleted. Restore it from Recently Deleted to try again.")
