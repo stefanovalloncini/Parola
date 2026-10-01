@@ -94,7 +94,7 @@ struct LibraryRowList<Top: View>: View {
                     )
                     .equatable()
                     .onAppear { rowAppeared?(row.id) }
-                    // Out here: set in the Equatable row's own body, the list never applied them.
+                    // On the element, not in the row's body: behind `.equatable()` the list doesn't read them.
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)
                 }
