@@ -36,6 +36,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var companionStartOffset: TimeInterval?
     /// The microphone track stopped before the take did, so the fold never stretches it.
     var companionStopped: Bool?
+    /// Mixes of the microphone track that failed.
+    var companionFailedMixes: Int?
     /// The entry a waiting mic track goes into.
     var entryID: String?
 
@@ -54,6 +56,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         companionAudioURL: URL? = nil,
         companionStartOffset: TimeInterval? = nil,
         companionStopped: Bool? = nil,
+        companionFailedMixes: Int? = nil,
         entryID: String? = nil,
         id: UUID = UUID()
     ) {
@@ -72,6 +75,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         self.companionAudioURL = companionAudioURL
         self.companionStartOffset = companionStartOffset
         self.companionStopped = companionStopped
+        self.companionFailedMixes = companionFailedMixes
         self.entryID = entryID
     }
 
@@ -92,6 +96,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         companionAudioURL = try c.decodeIfPresent(URL.self, forKey: .companionAudioURL)
         companionStartOffset = try c.decodeIfPresent(TimeInterval.self, forKey: .companionStartOffset)
         companionStopped = try c.decodeIfPresent(Bool.self, forKey: .companionStopped)
+        companionFailedMixes = try c.decodeIfPresent(Int.self, forKey: .companionFailedMixes)
         entryID = try c.decodeIfPresent(String.self, forKey: .entryID)
     }
 
@@ -114,7 +119,11 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
 
     /// The microphone track it carries, and where that starts in the take.
     var micTrack: StoppedMicTrack? {
-        companionAudioURL.map { StoppedMicTrack(file: $0, offset: companionStartOffset ?? 0, stoppedEarly: companionStopped ?? false) }
+        companionAudioURL.map {
+            StoppedMicTrack(
+                file: $0, offset: companionStartOffset ?? 0, stoppedEarly: companionStopped ?? false, failedMixes: companionFailedMixes ?? 0
+            )
+        }
     }
 
     /// The same checkpoint once the microphone track is in the take's file, which may have moved to `file`.
@@ -124,6 +133,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         folded.companionAudioURL = nil
         folded.companionStartOffset = nil
         folded.companionStopped = nil
+        folded.companionFailedMixes = nil
         return folded
     }
 }
@@ -180,7 +190,8 @@ extension AppModel {
             category: category,
             companionAudioURL: mic?.file,
             companionStartOffset: mic?.offset,
-            companionStopped: mic?.stoppedEarly
+            companionStopped: mic?.stoppedEarly,
+            companionFailedMixes: mic?.failedMixes
         ))
         return generation
     }
@@ -240,6 +251,7 @@ extension AppModel {
             companionAudioURL: mic.file,
             companionStartOffset: mic.offset,
             companionStopped: mic.stoppedEarly,
+            companionFailedMixes: mic.failedMixes,
             entryID: entryID
         ))
         let landed = await write?.value ?? false
@@ -830,12 +842,17 @@ extension AppModel {
                 if let mic, await !AppModel.isStereoFile(file) {
                     let note = MicTrackNote.read(for: mic)
                     let start = StoppedMicTrack(file: mic, offset: note?.offset ?? 0, stoppedEarly: note?.stoppedEarly ?? false)
+                    var tried = false
                     if await self?.hasRoomToFold(mac: file, mic: mic, mono: false) == true {
+                        tried = true
                         mixed = try? await AppModel.mixMeetingFiles(
                             mac: file, mic: mic, micOffset: start.offset, micStoppedEarly: start.stoppedEarly, in: dir, mono: nil
                         )
                     }
-                    if mixed == nil { waitingMic = start }
+                    if mixed == nil {
+                        waitingMic = start
+                        if tried { waitingMic?.failedMixes = 1 }
+                    }
                 }
                 do {
                     // Copied, not moved: the original goes only once the entry holds the audio.

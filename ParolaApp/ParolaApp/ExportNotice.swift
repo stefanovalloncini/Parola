@@ -25,11 +25,13 @@ struct ExportNotice: Equatable, Identifiable {
             /// Opens what a failed take saved, once a newer take has replaced it on the Stage.
             case showSavedTake(RecordingSession.Failure)
             case openRecentlyDeleted
+            /// Reveals a file in the Finder, as a microphone track Parola keeps.
+            case revealFile(URL)
 
             var takeID: Int? {
                 switch self {
                 case .retryTake(let id), .showTake(let id): id
-                case .openEntry, .transcribeEntry, .retrySavedTake, .showSavedTake, .openRecentlyDeleted: nil
+                case .openEntry, .transcribeEntry, .retrySavedTake, .showSavedTake, .openRecentlyDeleted, .revealFile: nil
                 }
             }
         }

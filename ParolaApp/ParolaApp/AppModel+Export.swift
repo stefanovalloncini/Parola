@@ -133,6 +133,8 @@ extension AppModel {
             }
         case .openRecentlyDeleted:
             openRecentlyDeleted()
+        case .revealFile(let file):
+            NSWorkspace.shared.activateFileViewerSelecting([file])
         }
     }
 

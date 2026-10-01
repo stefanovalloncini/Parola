@@ -51,6 +51,8 @@ struct StoppedMicTrack {
     let file: URL
     let offset: TimeInterval
     var stoppedEarly = false
+    /// Mixes of it that failed; a fold that found no room doesn't count.
+    var failedMixes = 0
 }
 
 /// A mic track waiting in a record of its own for its entry, and the record's generation.
@@ -279,13 +281,14 @@ extension AppModel {
             releaseMicFile(mic.file)
             return FoldedTake(audio: mac)
         }
-        switch await foldIntoTakeFile(mic, take: mac, generation: recovery, wantsEngineInput: wantsEngineInput, trimsOverrun: trimsOverrun) {
+        let result = await foldIntoTakeFile(mic, take: mac, generation: recovery, wantsEngineInput: wantsEngineInput, trimsOverrun: trimsOverrun)
+        switch result {
         case .folded(let audio, let engineInput):
             if liveRecordingAudioURL == mac { liveRecordingAudioURL = audio }
             updateSession(of: take?.id) { if $0.audioURL == mac { $0.audioURL = audio } }
             return FoldedTake(audio: audio, engineInput: engineInput)
-        case .failed:
-            pendingMicTracks[mac] = mic
+        case .failed, .noRoom:
+            pendingMicTracks[mac] = Self.counting(mic, result)
             noteMicTrackKept(take?.id)
             return FoldedTake(audio: mac)
         case .stopped:
@@ -313,11 +316,12 @@ extension AppModel {
             releaseMicFile(mic.file)
             return FoldedTake(audio: audio)
         }
-        switch await foldIntoTakeFile(mic, take: audio, generation: generation, wantsEngineInput: wantsEngineInput) {
+        let result = await foldIntoTakeFile(mic, take: audio, generation: generation, wantsEngineInput: wantsEngineInput)
+        switch result {
         case .folded(let folded, let engineInput):
             return FoldedTake(audio: folded, engineInput: engineInput)
-        case .failed:
-            pendingMicTracks[audio] = mic
+        case .failed, .noRoom:
+            pendingMicTracks[audio] = Self.counting(mic, result)
             if notifies { noteMicTrackKept(nil) }
             return FoldedTake(audio: audio)
         case .stopped:
@@ -406,9 +410,16 @@ extension AppModel {
                         micStoppedEarly: stoppedEarly
                     )
                 }
+            } catch {
+                ParolaLog.error(.audioRecording, "a waiting microphone track could not be mixed in", [.error: .error(error)])
+                discardMeetingScratch([scratch])
+                await countFailedMix(of: record, entry: loaded.entry)
+                return false
+            }
+            do {
                 try await library.replaceAudio(of: entryID, with: scratch)
             } catch {
-                ParolaLog.error(.audioRecording, "a waiting microphone track could not be folded in", [.error: .error(error)])
+                ParolaLog.error(.audioRecording, "a waiting microphone track could not take the entry's audio's place", [.error: .error(error)])
                 discardMeetingScratch([scratch])
                 return false
             }
@@ -418,6 +429,26 @@ extension AppModel {
         refreshLibrary()
         if added, notifies, !loaded.document.transcript.segments.isEmpty { noteMicTrackAdded(to: loaded.entry) }
         return true
+    }
+
+    /// Mixes a waiting mic fails before it says so, once; later ones go on quietly.
+    nonisolated static let micTrackFailuresBeforeNotice = 3
+
+    private func countFailedMix(of record: MicTrackRecord, entry: LibraryEntry) async {
+        var mic = record.mic
+        mic.failedMixes += 1
+        if micTrackRecords[entry.id]?.generation == record.generation {
+            micTrackRecords[entry.id] = MicTrackRecord(generation: record.generation, mic: mic)
+        }
+        await rewriteRecoveryCheckpoint(record.generation) { $0.companionFailedMixes = mic.failedMixes }
+        if mic.failedMixes == Self.micTrackFailuresBeforeNotice { noteMicTrackUnfoldable(mic.file, entry: entry) }
+    }
+
+    private nonisolated static func counting(_ mic: StoppedMicTrack, _ result: FoldResult) -> StoppedMicTrack {
+        guard case .failed = result else { return mic }
+        var counted = mic
+        counted.failedMixes += 1
+        return counted
     }
 
     private func settleMicTrackRecord(_ record: MicTrackRecord, entryID: LibraryEntry.ID) {
@@ -453,6 +484,7 @@ extension AppModel {
     private enum FoldResult {
         case folded(audio: URL, engineInput: URL?)
         case failed
+        case noRoom
         case stopped
     }
 
@@ -465,7 +497,7 @@ extension AppModel {
         if await !Self.isStereoFile(mac) {
             guard await hasRoomToFold(mac: mac, mic: mic.file, mono: wantsEngineInput) else {
                 ParolaLog.notice(.audioRecording, "no room on disk to fold a meeting's microphone track in")
-                return .failed
+                return .noRoom
             }
             let scratch = meetingScratchURL()
             let mono = wantsEngineInput ? meetingScratchURL() : nil
@@ -667,6 +699,19 @@ extension AppModel {
 
     nonisolated static func micTrackAddedMessage(title: String, bundle: Bundle = .main) -> String {
         String(localized: "Your microphone's track was added to “\(title)”. Transcribe it again to include your words.", bundle: bundle)
+    }
+
+    /// A waiting mic that keeps failing to mix: said once, with Reveal in Finder for its file; Parola goes on trying.
+    func noteMicTrackUnfoldable(_ mic: URL, entry: LibraryEntry) {
+        guard exportNotice?.actions.isEmpty ?? true else { return }
+        exportNotice = ExportNotice(
+            message: Self.micTrackUnfoldableMessage(title: entry.title), failures: [], folder: nil, tone: .failure,
+            actions: [ExportNotice.Action(title: String(localized: "Reveal in Finder"), handler: .revealFile(mic))]
+        )
+    }
+
+    nonisolated static func micTrackUnfoldableMessage(title: String, bundle: Bundle = .main) -> String {
+        String(localized: "Parola couldn't add your microphone's track to “\(title)”.", bundle: bundle)
     }
 
     nonisolated static func micTrackKeptMessage(bundle: Bundle = .main) -> String {

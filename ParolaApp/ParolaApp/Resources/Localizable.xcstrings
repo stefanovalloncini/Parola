@@ -10207,6 +10207,17 @@
         }
       }
     },
+    "Parola couldn't add your microphone's track to “%@”.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non è riuscita ad aggiungere la traccia del tuo microfono a “%@”."
+          }
+        }
+      }
+    },
     "Parola couldn't detect the language and assumed %@. Pick the language in the inspector to transcribe it again.": {
       "extractionState": "manual",
       "localizations": {

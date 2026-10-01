@@ -97,6 +97,7 @@ struct ExportNoticeStrip: View {
         case .retryTake, .retrySavedTake: "Retry"
         case .showTake, .showSavedTake: "Show"
         case .openRecentlyDeleted: "RecentlyDeleted"
+        case .revealFile: "RevealInFinder"
         }
     }
 }

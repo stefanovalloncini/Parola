@@ -1029,6 +1029,67 @@ extension TranscriberMockSuites {
                 == "La traccia del tuo microfono è stata aggiunta a “Riunione”. Trascrivi di nuovo per includere le tue parole.")
         }
 
+        /// A launch on `library` once its folds of waiting mics are done; it lets go of the library for the next one.
+        private func launch(_ library: URL) async -> AppModel {
+            let model = makeModel(libraryURL: library)
+            await model.micTrackFolds?.value
+            model.recoveryOwner = nil
+            return model
+        }
+
+        @Test("a waiting mic that keeps failing to mix says so once, at the third failed mix, with Reveal in Finder, and is still tried quietly; no room doesn't count")
+        func failingMicSaysSoOnce() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let library = makeTempLibraryURL("second-track-keeps-failing")
+                let model = makeModel(libraryURL: library)
+                let files = try meetingFiles(model)
+                try corrupt(files.mic)
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                model.stopRecordingAndTranscribe()
+                let entry = try #require(await landedEntry(model))
+                let recorded = await waitUntil { model.micTrackRecords[entry.id] != nil }
+                #expect(recorded)
+                #expect(try micRecords(library).first?.companionFailedMixes == 1, "the mix at Stop counts")
+                model.recoveryOwner = nil
+
+                let second = await launch(library)
+                #expect(second.exportNotice == nil)
+                #expect(try micRecords(library).first?.companionFailedMixes == 2)
+
+                let tight = makeModel(libraryURL: library)
+                tight.freeDiskSpaceProvider = { AppModel.meetingFoldMarginBytes + 1_000 }
+                await tight.micTrackFolds?.value
+                tight.recoveryOwner = nil
+                #expect(try micRecords(library).first?.companionFailedMixes == 2, "no room isn't a failed mix")
+
+                let third = await launch(library)
+                let notice = try #require(third.exportNotice)
+                #expect(notice.message == AppModel.micTrackUnfoldableMessage(title: entry.title))
+                let handlers = notice.actions.map(\.handler)
+                #expect(handlers == [.revealFile(files.mic)])
+                #expect(notice.actions.first?.title == String(localized: "Reveal in Finder"))
+
+                let fourth = await launch(library)
+                #expect(fourth.exportNotice == nil, "said once")
+                #expect(exists(files.mic))
+                #expect(try micRecords(library).first?.companionFailedMixes == 4)
+
+                try await expectLaterFold(library: library, entry: entry.id, mic: files.mic)
+            }
+        }
+
+        @Test("the notice for a mic that keeps failing, and its button, read in Italian")
+        func micTrackUnfoldableReadsInItalian() throws {
+            let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+            let italian = try #require(Bundle(path: path))
+            #expect(AppModel.micTrackUnfoldableMessage(title: "Riunione", bundle: italian)
+                == "Parola non è riuscita ad aggiungere la traccia del tuo microfono a “Riunione”.")
+            #expect(String(localized: "Reveal in Finder", bundle: italian) == "Mostra nel Finder")
+        }
+
         @Test("while a take whose fold failed is transcribing, its checkpoint still names your mic")
         func failedFoldRunCarriesTheMic() async throws {
             try await withMocksCleared([.audioSource, .transcriber]) {
