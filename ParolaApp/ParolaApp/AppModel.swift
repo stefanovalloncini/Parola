@@ -232,7 +232,7 @@ final class AppModel {
         }
     }
     /// The main window's sidebar, which a take folds away and gives back as it was.
-    let mainSidebar = MainSidebar()
+    @ObservationIgnored let mainSidebar: MainSidebar
     /// The take's levels at ten a second, for as long as its session lasts; `takeLevelTick` moves with each one.
     @ObservationIgnored private(set) var takeLevels: TakeLevelHistory?
     private(set) var takeLevelTick = 0
@@ -1990,6 +1990,7 @@ final class AppModel {
     init(bootstrap: AppBootstrap) {
         let defaults = bootstrap.defaults
         self.defaults = defaults
+        self.mainSidebar = MainSidebar(defaults: defaults)
         let managed = ManagedConfiguration(storage: defaults)
         self.managedConfiguration = managed
         // A sandbox or a test must never reach the real keychain, so test mode keeps keys in memory.

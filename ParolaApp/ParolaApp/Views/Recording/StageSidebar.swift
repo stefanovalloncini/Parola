@@ -28,6 +28,14 @@ final class MainSidebar {
     private(set) var visibility: NavigationSplitViewVisibility = .automatic
     @ObservationIgnored private var visibilityBeforeTake: NavigationSplitViewVisibility?
     @ObservationIgnored private var movedDuringTake = false
+    @ObservationIgnored private let defaults: UserDefaults
+
+    /// Set while a take keeps a shown sidebar folded. The window saves the fold with its frame, so a launch that finds this unfolds it.
+    nonisolated static let foldedByTakeKey = "sidebarFoldedByTake"
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+    }
 
     /// The split view's own changes, from its toolbar toggle or a drag; one made while a take holds the sidebar is the user's to keep.
     func userSet(_ newValue: NavigationSplitViewVisibility) {
@@ -41,13 +49,19 @@ final class MainSidebar {
             guard visibilityBeforeTake == nil else { return }
             visibilityBeforeTake = visibility
             movedDuringTake = false
-            show(SidebarCollapsePolicy.enter(current: visibility), animation: animation)
+            let folded = SidebarCollapsePolicy.enter(current: visibility)
+            if folded != visibility { defaults.set(true, forKey: Self.foldedByTakeKey) }
+            show(folded, animation: animation)
         } else if let previous = visibilityBeforeTake {
             visibilityBeforeTake = nil
+            defaults.removeObject(forKey: Self.foldedByTakeKey)
             show(
                 SidebarCollapsePolicy.exit(previous: previous, current: visibility, userChangedDuringTake: movedDuringTake),
                 animation: animation
             )
+        } else if defaults.bool(forKey: Self.foldedByTakeKey) {
+            defaults.removeObject(forKey: Self.foldedByTakeKey)
+            show(.all, animation: nil)
         }
     }
 
