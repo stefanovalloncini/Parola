@@ -85,6 +85,17 @@ struct LibraryRowFormatTests {
         #expect(LibraryRowFormat.when(yesterday, under: nil, now: now, calendar: calendar, locale: englishInItaly) == "Yesterday 9:31")
     }
 
+    @Test("a Previous 7 Days row gives its weekday and the short time, with no leading zero")
+    func weekRowsUseTheShortTime() {
+        let morning = date(2026, 9, 25, 9, 33)
+        let englishInItaly = Locale(identifier: "en_US@rg=itzzzz")
+        #expect(LibraryRowFormat.when(morning, under: .previousWeek, now: now, calendar: calendar, locale: englishInItaly) == "Fri 9:33")
+        #expect(LibraryRowFormat.when(morning, under: nil, now: now, calendar: calendar, locale: englishInItaly) == "Fri 9:33")
+        let today = LibraryRowFormat.when(date(2026, 9, 30, 9, 33), under: .today, now: now, calendar: calendar, locale: englishInItaly)
+        #expect(today == "9:33", "the same time a Today row shows")
+        #expect(LibraryRowFormat.when(morning, under: .previousWeek, now: now, calendar: calendar, locale: Locale(identifier: "it_IT")) == "Ven 9:33")
+    }
+
     @Test("under a month header a row gives its day, and the year only when it isn't this one")
     func whenUnderMonths() {
         let august = date(2026, 8, 20)

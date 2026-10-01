@@ -32,13 +32,14 @@ enum LibraryRowFormat {
         let resolved = bucket ?? edges.bucket(for: date)
         switch resolved {
         case .today, .yesterday:
-            let time = date.formatted(style(Date.FormatStyle(date: .omitted, time: .shortened), calendar: calendar, locale: locale))
+            let time = shortTime(date, calendar: calendar, locale: locale)
             guard bucket == nil else { return time }
             return resolved == .today
                 ? String(localized: "Today \(time)", locale: locale)
                 : String(localized: "Yesterday \(time)", locale: locale)
         case .previousWeek:
-            return date.formatted(style(.dateTime.weekday(.abbreviated).hour().minute(), calendar: calendar, locale: locale))
+            let weekday = date.formatted(style(.dateTime.weekday(.abbreviated), calendar: calendar, locale: locale))
+            return "\(weekday) \(shortTime(date, calendar: calendar, locale: locale))"
         case .previousMonth, .month:
             let thisYear = calendar.component(.year, from: date) == calendar.component(.year, from: edges.now)
             let day: Date.FormatStyle = thisYear
@@ -46,6 +47,11 @@ enum LibraryRowFormat {
                 : .dateTime.day().month(.abbreviated).year()
             return date.formatted(style(day, calendar: calendar, locale: locale))
         }
+    }
+
+    /// The locale's own short time, which never pads the hour the way a 24-hour region's hour field does.
+    private static func shortTime(_ date: Date, calendar: Calendar, locale: Locale) -> String {
+        date.formatted(style(Date.FormatStyle(date: .omitted, time: .shortened), calendar: calendar, locale: locale))
     }
 
     /// Italian writes month and weekday names in lower case unless they stand alone, as a header or a row's time does.
