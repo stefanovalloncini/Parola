@@ -16,6 +16,14 @@ struct MicTrack {
     var quietTicks = 0
 }
 
+/// Where a meeting's microphone track stands, for the "You" meter.
+enum MicTrackState: Equatable {
+    case starting
+    case recording
+    /// The microphone never came up, or went quiet while the Mac audio kept coming.
+    case unavailable
+}
+
 /// A stopped microphone track's file, and where it starts in the take.
 struct StoppedMicTrack {
     let file: URL
@@ -34,12 +42,19 @@ extension AppModel {
     func startMicTrack(for take: TakeContext, pairedWith macFile: URL?) {
         guard take.source == .systemAudio, take.category == .meeting, meetingRecordsMicrophone else { return }
         micTrack = MicTrack(takeID: take.id)
+        takeMicTrackState = .starting
+        let levels = TakeLevelHistory()
+        for _ in 0..<(takeLevels?.sampleCount ?? 0) { levels.append(0) }
+        takeMicLevels = levels
         Task { [weak self] in await self?.bringUpMicTrack(take, pairedWith: macFile) }
     }
 
     private func bringUpMicTrack(_ take: TakeContext, pairedWith macFile: URL?) async {
         guard let capture = await makeMicTrackCapture(pairedWith: macFile) else {
-            if micTrack?.takeID == take.id { micTrack = nil }
+            guard micTrack?.takeID == take.id else { return }
+            micTrack = nil
+            takeMicTrackState = nil
+            takeMicLevels = nil
             return
         }
         if capture is MicAudioSource, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
@@ -61,6 +76,7 @@ extension AppModel {
         }
         micTrack?.capture = capture
         micTrack?.file = file
+        takeMicTrackState = .recording
         liveCompanionAudioURL = file
         liveCompanionStartOffset = nil
         if recording?.isPaused == true { queueCapturePause(true, on: capture) }
@@ -80,6 +96,7 @@ extension AppModel {
     private func micTrackUnavailable(_ takeID: Int) {
         guard micTrack?.takeID == takeID else { return }
         micTrack?.unavailable = true
+        takeMicTrackState = .unavailable
         noteMicTrackMissing(takeID, stopped: false)
     }
 
@@ -101,12 +118,14 @@ extension AppModel {
             let macReading = macMeter.lastReadingAt
             if micReading != track.lastMicReading {
                 track.quietTicks = 0
+                if track.stalled { takeMicTrackState = .recording }
                 track.stalled = false
             } else if macReading != track.lastMacReading {
                 track.quietTicks += 1
             }
             if !track.stalled, track.quietTicks >= micTrackStallTicks {
                 track.stalled = true
+                takeMicTrackState = .unavailable
                 noteMicTrackMissing(take.id, stopped: micReading != nil)
             }
             track.lastMicReading = micReading
@@ -127,6 +146,7 @@ extension AppModel {
     func detachMicTrack(of takeID: Int?) -> MicTrack? {
         guard let track = micTrack, takeID == nil || track.takeID == takeID else { return nil }
         micTrack = nil
+        takeMicTrackState = nil
         return track
     }
 

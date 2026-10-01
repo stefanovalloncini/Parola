@@ -13,15 +13,21 @@ private actor ScriptedTrack: LiveAudioSource {
     private let prepareFailure: (any Error)?
     private var holdsStart: Bool
     private var startGate: CheckedContinuation<Void, Never>?
+    private var holdsInFlightRead: Bool
+    private var heldRead: CheckedContinuation<Void, Never>?
     private(set) var pauseCalls: [Bool] = []
     private(set) var cancelled = false
     private(set) var prepared = false
 
-    init(file: URL, startFailure: (any Error)? = nil, prepareFailure: (any Error)? = nil, holdsStart: Bool = false) {
+    init(
+        file: URL, startFailure: (any Error)? = nil, prepareFailure: (any Error)? = nil, holdsStart: Bool = false,
+        holdsInFlightRead: Bool = false
+    ) {
         self.file = file
         self.startFailure = startFailure
         self.prepareFailure = prepareFailure
         self.holdsStart = holdsStart
+        self.holdsInFlightRead = holdsInFlightRead
     }
 
     func start() async throws {
@@ -43,7 +49,16 @@ private actor ScriptedTrack: LiveAudioSource {
 
     func cancel() async { cancelled = true }
     func setPaused(_ paused: Bool) async { pauseCalls.append(paused) }
-    func inFlightURL() async -> URL? { file }
+    func inFlightURL() async -> URL? {
+        if holdsInFlightRead { await withCheckedContinuation { heldRead = $0 } }
+        return file
+    }
+
+    func letInFlightRead() {
+        holdsInFlightRead = false
+        heldRead?.resume()
+        heldRead = nil
+    }
 }
 
 /// The files the engine was handed, and how many channels each had while it read them.
@@ -426,6 +441,7 @@ extension TranscriberMockSuites {
                 #expect(notice?.message == AppModel.micTrackStoppedMessage())
                 #expect(model.recording?.state == .recording)
                 #expect(model.micTrack?.stalled == true)
+                #expect(model.takeMicTrackState == .unavailable)
                 model.cancelCurrentWork()
             }
         }
@@ -480,6 +496,99 @@ extension TranscriberMockSuites {
                 #expect(labelled)
                 #expect(speakers == [nil, AppModel.meLabel()])
                 #expect(await model.library.list().count == 1, "Retry fills in the entry the failure saved")
+            }
+        }
+
+        // MARK: - The You meter
+
+        @Test("a meeting take keeps your microphone's levels beside the Mac audio's, sample for sample")
+        func micLevelsBesideMacLevels() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                let mac = ScriptedTrack(file: files.mac)
+                let mic = ScriptedTrack(file: files.mic, holdsStart: true)
+                try await startMeeting(model, mac: mac, mic: mic)
+                #expect(model.takeMicTrackState == .starting)
+                for _ in 0..<5 {
+                    mac.levelMeter.record(0.2)
+                    try await Task.sleep(for: .milliseconds(60))
+                }
+                let macHeard = await waitUntil { (model.takeLevels?.sampleCount ?? 0) >= 3 }
+                #expect(macHeard)
+
+                await mic.letStart()
+                let up = await waitUntil { model.takeMicTrackState == .recording }
+                #expect(up)
+                for _ in 0..<6 {
+                    mac.levelMeter.record(0.2)
+                    mic.levelMeter.record(0.8)
+                    try await Task.sleep(for: .milliseconds(60))
+                }
+
+                let levels = try #require(model.takeLevels)
+                let micLevels = try #require(model.takeMicLevels)
+                #expect(micLevels.sampleCount == levels.sampleCount, "one series per meter, lined up")
+                let mine = micLevels.recent(micLevels.sampleCount)
+                #expect(mine.first == 0, "flat until your microphone came up")
+                #expect(mine.contains(0.8))
+                #expect(!levels.recent(levels.sampleCount).contains(0.8))
+                model.stopRecordingAndTranscribe()
+                #expect(model.takeMicTrackState == nil)
+            }
+        }
+
+        @Test("a microphone track that starts once the Mac audio is already sampled is padded to line up with it")
+        func lateMicLevelsLineUp() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                let mac = ScriptedTrack(file: files.mac, holdsInFlightRead: true)
+                let mic = ScriptedTrack(file: files.mic)
+                model.useStreaming = false
+                model.takeCaptureOverride = { _ in mac }
+                model.micTrackCaptureOverride = { mic }
+                model.pendingRecordingCategory = .meeting
+                model.startRecording(source: .systemAudio)
+                for _ in 0..<5 {
+                    mac.levelMeter.record(0.2)
+                    try await Task.sleep(for: .milliseconds(60))
+                }
+                let sampled = await waitUntil { (model.takeLevels?.sampleCount ?? 0) >= 2 }
+                #expect(sampled)
+                #expect(model.takeMicLevels == nil)
+
+                await mac.letInFlightRead()
+
+                let up = await waitUntil { model.takeMicTrackState == .recording }
+                #expect(up)
+                let levels = try #require(model.takeLevels)
+                let micLevels = try #require(model.takeMicLevels)
+                #expect(micLevels.sampleCount == levels.sampleCount)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("the You meter's state: unavailable for a refused microphone, gone with the take, and none for a take without one")
+        func micTrackStates() async throws {
+            try await withMocksCleared(.audioSource) {
+                let refusedModel = makeModel()
+                let files = try meetingFiles(refusedModel)
+                let refusedMic = ScriptedTrack(file: files.mic, startFailure: ParolaError.captureUnavailable("microphone not available"))
+                try await startMeeting(refusedModel, mac: ScriptedTrack(file: files.mac), mic: refusedMic)
+                let refused = await waitUntil { refusedModel.takeMicTrackState == .unavailable }
+                #expect(refused)
+                #expect(refusedModel.takeMicLevels != nil, "the meter stays, flat")
+                refusedModel.cancelCurrentWork()
+                #expect(refusedModel.takeMicTrackState == nil)
+                #expect(refusedModel.takeMicLevels == nil)
+
+                let plain = makeModel()
+                let plainFiles = try meetingFiles(plain)
+                try await startMeeting(plain, mac: ScriptedTrack(file: plainFiles.mac), mic: nil, category: .transcription)
+                #expect(plain.takeMicTrackState == nil)
+                #expect(plain.takeMicLevels == nil)
+                plain.cancelCurrentWork()
             }
         }
 

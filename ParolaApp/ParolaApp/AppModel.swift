@@ -238,6 +238,10 @@ final class AppModel {
     @ObservationIgnored let mainSidebar: MainSidebar
     /// The take's levels at ten a second, for as long as its session lasts; `takeLevelTick` moves with each one.
     @ObservationIgnored private(set) var takeLevels: TakeLevelHistory?
+    /// A meeting's microphone levels, sampled with `takeLevels` and as many: the "You" meter beside "Mac audio".
+    @ObservationIgnored var takeMicLevels: TakeLevelHistory?
+    /// Where a meeting's microphone track stands; nil for a take that records none.
+    var takeMicTrackState: MicTrackState?
     private(set) var takeLevelTick = 0
     @ObservationIgnored private var takeSampler: Task<Void, Never>?
     /// The take whose meter, trace and sampler are up, so a late clear from an older take leaves them alone.
@@ -3371,6 +3375,8 @@ final class AppModel {
     private func beginSession(_ session: RecordingSession) {
         takeLevels = TakeLevelHistory()
         takeSavedNotice = nil
+        takeMicLevels = nil
+        if takeMicTrackState != nil { takeMicTrackState = nil }
         recording = session
     }
 
@@ -3379,6 +3385,8 @@ final class AppModel {
         guard let takeID, recording?.takeID == takeID else { return }
         recording = nil
         takeLevels = nil
+        takeMicLevels = nil
+        if takeMicTrackState != nil { takeMicTrackState = nil }
     }
 
     /// Changes `takeID`'s session only; one a newer take owns by now is left alone.
@@ -3841,10 +3849,11 @@ final class AppModel {
         }
         // Read even while nothing is kept, so a peak from before a pause or a silence never lands after it.
         let peak = meter.takePeak()
-        sampleMicTrack(macMeter: meter, take: take)
+        let micPeak = sampleMicTrack(macMeter: meter, take: take)
         recordingLevelTrace?.note(peak, lastSound: meter.lastSound)
         guard let session = recording, session.takeID == take.id, session.state == .recording else { return }
         takeLevels?.append(peak)
+        takeMicLevels?.append(micPeak ?? 0)
         takeLevelTick &+= 1
     }
 
