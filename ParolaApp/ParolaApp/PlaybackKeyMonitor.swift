@@ -5,6 +5,8 @@ enum PlaybackKeyAction: Equatable {
     case skipBack
     case skipForward
     case toggleTakePause
+    /// Space held on the Stage: the press toggled the take once, and its repeats end here.
+    case swallowRepeat
 }
 
 @MainActor
@@ -17,12 +19,17 @@ final class PlaybackKeyMonitor {
         modifiers: NSEvent.ModifierFlags,
         textInputActive: Bool,
         hasPlayer: Bool,
-        stageShowsTake: Bool = false
+        stageShowsTake: Bool = false,
+        isRepeat: Bool = false,
+        focusedControlTakesSpace: Bool = false
     ) -> PlaybackKeyAction? {
         guard !textInputActive else { return nil }
         let relevant = modifiers.intersection([.command, .option, .control, .shift])
-        // A transcript loaded before the take keeps its player; on the Stage, Space belongs to the take.
-        if stageShowsTake, keyCode == 49, relevant.isEmpty { return .toggleTakePause }
+        // A transcript loaded before the take keeps its player; on the Stage, Space belongs to the take or a focused control.
+        if stageShowsTake, keyCode == 49, relevant.isEmpty {
+            guard !focusedControlTakesSpace else { return nil }
+            return isRepeat ? .swallowRepeat : .toggleTakePause
+        }
         guard hasPlayer else { return nil }
         switch (keyCode, relevant) {
         case (49, []): return .togglePlayPause
@@ -36,6 +43,7 @@ final class PlaybackKeyMonitor {
     static func handle(
         keyCode: UInt16,
         modifiers: NSEvent.ModifierFlags,
+        isRepeat: Bool = false,
         firstResponder: NSResponder?,
         inMainWindow: Bool,
         model: AppModel
@@ -45,15 +53,25 @@ final class PlaybackKeyMonitor {
             modifiers: modifiers,
             textInputActive: (firstResponder as? NSTextView)?.isEditable == true,
             hasPlayer: model.player != nil,
-            stageShowsTake: inMainWindow && stageShowsTake(model)
+            stageShowsTake: inMainWindow && stageShowsTake(model),
+            isRepeat: isRepeat,
+            focusedControlTakesSpace: takesSpace(firstResponder)
         ) else { return false }
         switch action {
         case .togglePlayPause: model.togglePlayPause()
         case .skipBack: model.skip(by: -5)
         case .skipForward: model.skip(by: 5)
         case .toggleTakePause: StageControls.togglePause(model)
+        case .swallowRepeat: break
         }
         return true
+    }
+
+    /// A control with keyboard focus that Space presses, as Full Keyboard Access gives one.
+    static func takesSpace(_ responder: NSResponder?) -> Bool {
+        if responder is NSButton || responder is NSSegmentedControl { return true }
+        // SwiftUI's stand-in in the key view loop for whichever of its controls has focus (macOS 26 and 27).
+        return responder.map { String(describing: type(of: $0)) == "KeyViewProxy" } ?? false
     }
 
     /// From Record until the capture winds down, a count-in and finishing included: the Stage owns Space all that time.
@@ -70,6 +88,7 @@ final class PlaybackKeyMonitor {
             let used = Self.handle(
                 keyCode: event.keyCode,
                 modifiers: event.modifierFlags,
+                isRepeat: event.isARepeat,
                 firstResponder: window?.firstResponder,
                 inMainWindow: window != nil && window === model.mainWindow,
                 model: model

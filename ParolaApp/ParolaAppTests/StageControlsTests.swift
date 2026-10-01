@@ -1,8 +1,23 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
 import ParolaTestSupport
+
+/// The Stage's Discard… with keyboard focus, as Full Keyboard Access gives it.
+private struct FocusedDiscard: View {
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        Button {} label: { Label("Discard…", systemImage: "xmark") }
+            .buttonStyle(GlassCapsuleButtonStyle(height: StageControls.buttonHeight))
+            .focusable()
+            .focused($focused)
+            .onAppear { focused = true }
+    }
+}
 
 // Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
 extension TranscriberMockSuites {
@@ -43,6 +58,50 @@ extension TranscriberMockSuites {
                 let resumedState = model.recording?.state == .recording
                 #expect(resumed)
                 #expect(resumedState)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("a held Space pauses the take once; its repeats don't resume it")
+        func heldSpaceTogglesOnce() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeRecordingModel("stage-space-repeat")
+                try await startFixtureTake(model)
+                let pressed = PlaybackKeyMonitor.handle(keyCode: 49, modifiers: [], firstResponder: nil, inMainWindow: true, model: model)
+                let repeated = PlaybackKeyMonitor.handle(
+                    keyCode: 49, modifiers: [], isRepeat: true, firstResponder: nil, inMainWindow: true, model: model
+                )
+                let stillPaused = model.recording?.isPaused == true
+                #expect(pressed)
+                #expect(repeated)
+                #expect(stillPaused)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("with a Stage control focused, Space is the control's: the take records on and the player stays still")
+        func focusedControlKeepsSpace() async throws {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 240, height: 120), styleMask: [.titled], backing: .buffered, defer: false
+            )
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: FocusedDiscard())
+            window.orderFront(nil)
+            defer { window.close() }
+            try await Task.sleep(for: .milliseconds(500))
+            let responder = window.firstResponder
+            #expect(PlaybackKeyMonitor.takesSpace(responder))
+
+            try await withMocksCleared(.audioSource) {
+                let model = makeRecordingModel("stage-space-focused")
+                try await startFixtureTake(model)
+                model.installPlayer(for: playerFile())
+                let used = PlaybackKeyMonitor.handle(keyCode: 49, modifiers: [], firstResponder: responder, inMainWindow: true, model: model)
+                let recording = model.recording?.state == .recording
+                let rate = model.player?.rate
+                #expect(!used)
+                #expect(recording)
+                #expect(rate == 0)
                 model.cancelCurrentWork()
             }
         }

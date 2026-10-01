@@ -1,3 +1,4 @@
+import AppKit
 import Testing
 @testable import Parola
 
@@ -43,6 +44,34 @@ struct PlaybackKeyMonitorTests {
         let noPlayer = PlaybackKeyMonitor.action(keyCode: 49, modifiers: [], textInputActive: false, hasPlayer: false, stageShowsTake: true)
         #expect(overPlayer == .toggleTakePause)
         #expect(noPlayer == .toggleTakePause)
+    }
+
+    @Test("on the Stage a held Space toggles the take once; its repeats are used up and change nothing")
+    func stageSpaceRepeat() {
+        let press = PlaybackKeyMonitor.action(keyCode: 49, modifiers: [], textInputActive: false, hasPlayer: true, stageShowsTake: true, isRepeat: false)
+        let repeated = PlaybackKeyMonitor.action(keyCode: 49, modifiers: [], textInputActive: false, hasPlayer: true, stageShowsTake: true, isRepeat: true)
+        #expect(press == .toggleTakePause)
+        #expect(repeated == .swallowRepeat)
+    }
+
+    @Test("on the Stage, Space on a focused control presses the control, and never reaches the player")
+    func stageSpaceOnAFocusedControl() {
+        let action = PlaybackKeyMonitor.action(
+            keyCode: 49, modifiers: [], textInputActive: false, hasPlayer: true, stageShowsTake: true, focusedControlTakesSpace: true
+        )
+        #expect(action == nil)
+    }
+
+    @Test("buttons and segmented controls take Space; lists, plain views and the window don't")
+    @MainActor
+    func controlsThatTakeSpace() {
+        #expect(PlaybackKeyMonitor.takesSpace(NSButton()))
+        #expect(PlaybackKeyMonitor.takesSpace(NSPopUpButton()))
+        #expect(PlaybackKeyMonitor.takesSpace(NSSegmentedControl()))
+        #expect(!PlaybackKeyMonitor.takesSpace(NSTableView()))
+        #expect(!PlaybackKeyMonitor.takesSpace(NSOutlineView()))
+        #expect(!PlaybackKeyMonitor.takesSpace(NSView()))
+        #expect(!PlaybackKeyMonitor.takesSpace(nil))
     }
 
     @Test("on the Stage, Space typed into the title stays text, and modified Space is not Pause")
