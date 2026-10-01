@@ -13,8 +13,10 @@ struct CompletionSoundTests {
         var plays = 0
     }
 
-    private func makeRig(_ label: String, defaults: UserDefaults = temporaryDefaults()) -> (model: AppModel, sound: SoundCounter) {
+    private func makeRig(_ label: String, defaults: UserDefaults = temporaryDefaults()) async -> (model: AppModel, sound: SoundCounter) {
         let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL(label))
+        // A startup scan still reading when a landing saves would put its empty list back over the landed row.
+        await awaitGuarded("the model's startup library scan") { await model.libraryRefreshTask?.value }
         let counter = SoundCounter()
         model.completionSoundPlayer = { counter.plays += 1 }
         model.playSoundWhenFinished = true
@@ -31,7 +33,7 @@ struct CompletionSoundTests {
 
     @Test("a finished transcription plays the sound once")
     func finishedTranscriptionPlaysOnce() async {
-        let (model, sound) = makeRig("sound-one")
+        let (model, sound) = await makeRig("sound-one")
 
         model.land(RunLanding(kind: .file, transcript: makeTranscript()))
 
@@ -42,7 +44,7 @@ struct CompletionSoundTests {
 
     @Test("a take saved without taking the selection stays silent")
     func inactiveSaveIsSilent() async {
-        let (model, sound) = makeRig("sound-inactive")
+        let (model, sound) = await makeRig("sound-inactive")
 
         model.land(RunLanding(kind: .salvagedTake, transcript: makeTranscript()))
 
@@ -53,7 +55,7 @@ struct CompletionSoundTests {
 
     @Test("with the setting off nothing plays")
     func settingOffIsSilent() async {
-        let (model, sound) = makeRig("sound-off")
+        let (model, sound) = await makeRig("sound-off")
         model.playSoundWhenFinished = false
 
         model.land(RunLanding(kind: .file, transcript: makeTranscript()))
@@ -65,7 +67,7 @@ struct CompletionSoundTests {
 
     @Test("a batch of three plays once, at the end")
     func batchPlaysOnceAtTheEnd() async throws {
-        let (model, sound) = makeRig("sound-batch")
+        let (model, sound) = await makeRig("sound-batch")
         model.batchExportPresetIDs = []
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("CompletionSoundTests-\(UUID().uuidString)", isDirectory: true)
@@ -93,7 +95,7 @@ struct CompletionSoundTests {
 
     @Test("a batch that ends with a failure still rings once for the run")
     func batchRingsWhateverTheOutcomeMix() async throws {
-        let (model, sound) = makeRig("sound-batch-mixed")
+        let (model, sound) = await makeRig("sound-batch-mixed")
         model.batchExportPresetIDs = []
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("CompletionSoundTests-\(UUID().uuidString)", isDirectory: true)
@@ -117,7 +119,7 @@ struct CompletionSoundTests {
 
     @Test("a leftover done job from an earlier batch does not ring for a later one")
     func leftoverDoneJobDoesNotRingTwice() async {
-        let (model, sound) = makeRig("sound-batch-leftover")
+        let (model, sound) = await makeRig("sound-batch-leftover")
         let leftover = BatchJob(url: URL(fileURLWithPath: "/tmp/CompletionSoundTests/old.wav"), status: .done)
         let failed = BatchJob(url: URL(fileURLWithPath: "/tmp/CompletionSoundTests/new.wav"), status: .failed)
         model.batchJobs = [leftover, failed]
@@ -133,7 +135,7 @@ struct CompletionSoundTests {
 
     @Test("a run the user cancelled stays quiet")
     func cancelledRunIsSilent() async {
-        let (model, sound) = makeRig("sound-batch-cancelled")
+        let (model, sound) = await makeRig("sound-batch-cancelled")
         let job = BatchJob(url: URL(fileURLWithPath: "/tmp/CompletionSoundTests/cancel.wav"), status: .transcribing)
         model.batchJobs = [job]
 
@@ -146,7 +148,7 @@ struct CompletionSoundTests {
 
     @Test("importing subtitles is not a transcription and stays quiet")
     func subtitleImportIsSilent() async throws {
-        let (model, sound) = makeRig("sound-subtitles")
+        let (model, sound) = await makeRig("sound-subtitles")
         let srt = FileManager.default.temporaryDirectory
             .appendingPathComponent("completion-sound-\(UUID().uuidString).srt")
         try "1\n00:00:00,000 --> 00:00:01,000\nimported line\n".write(to: srt, atomically: true, encoding: .utf8)
@@ -161,7 +163,7 @@ struct CompletionSoundTests {
 
     @Test("a batch wave that still has pending jobs holds the sound")
     func partialWaveIsSilent() async {
-        let (model, sound) = makeRig("sound-batch-partial")
+        let (model, sound) = await makeRig("sound-batch-partial")
         let done = BatchJob(url: URL(fileURLWithPath: "/tmp/CompletionSoundTests/done.wav"), status: .done)
         let pending = BatchJob(url: URL(fileURLWithPath: "/tmp/CompletionSoundTests/pending.wav"), status: .pending)
         model.batchJobs = [done, pending]
