@@ -4,7 +4,10 @@ import SwiftUI
 struct StageControls: View {
     let take: RecordingSession
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var glass
     @State private var discarding: Int?
+    @State private var holdsPill = false
 
     nonisolated static let buttonHeight: CGFloat = 44
     nonisolated static let bottomInset: CGFloat = 24
@@ -29,14 +32,55 @@ struct StageControls: View {
         }
     }
 
+    enum Control {
+        case pause, mark, stop, cancel, discard, finishing, stopTranscribing
+    }
+
+    /// The glass each control morphs from: whatever ends the take sits in Stop's capsule, so Stop becomes the Finishing pill and then Stop Transcribing.
+    enum GlassShape: Hashable, Sendable {
+        case pause, mark, end, discard
+    }
+
+    /// Under Reduce Motion no glass carries an identity, so nothing morphs and the controls only crossfade.
+    nonisolated static func glassShape(_ control: Control, reduceMotion: Bool) -> GlassShape? {
+        guard !reduceMotion else { return nil }
+        switch control {
+        case .pause: return .pause
+        case .mark: return .mark
+        case .discard: return .discard
+        case .stop, .cancel, .finishing, .stopTranscribing: return .end
+        }
+    }
+
+    static func layoutChange(reduceMotion: Bool) -> Animation {
+        reduceMotion ? .easeInOut(duration: 0.2) : DS.Motion.controlsMorph
+    }
+
+    /// A file take can pass through finishing in a moment; its pill stays this long, so the bar's fold plays out before Stop Transcribing takes its place.
+    nonisolated static let pillHold: Duration = .milliseconds(600)
+
+    nonisolated static func shownLayout(_ layout: Layout, holdingPill: Bool) -> Layout {
+        layout == .stopTranscribing && holdingPill ? .finishing : layout
+    }
+
     var body: some View {
+        let layout = Self.layout(for: take.mode)
+        let shown = Self.shownLayout(layout, holdingPill: holdsPill)
         GlassEffectContainer(spacing: DS.Spacing.small) {
-            switch Self.layout(for: take.mode) {
+            switch shown {
             case .bar: bar
-            case .finishing: finishingPill
-            case .stopTranscribing: stopTranscribingButton
+            case .finishing, .stopTranscribing: windingDown(shown)
             case .none: EmptyView()
             }
+        }
+        .animation(Self.layoutChange(reduceMotion: reduceMotion), value: shown)
+        .onChange(of: layout) { old, new in
+            if old == .bar, new == .finishing || new == .stopTranscribing { holdsPill = true }
+        }
+        .task(id: holdsPill) {
+            guard holdsPill else { return }
+            try? await Task.sleep(for: Self.pillHold)
+            holdsPill = false
         }
         .alert("Discard this recording?", isPresented: confirmingDiscard, presenting: discarding) { takeID in
             // Return keeps the take: only a deliberate click deletes it.
@@ -52,6 +96,16 @@ struct StageControls: View {
         }
     }
 
+    /// One place for both, so the pill turning into Stop Transcribing never cuts the bar's fold short.
+    @ViewBuilder
+    private func windingDown(_ shown: Layout) -> some View {
+        if shown == .finishing {
+            finishingPill
+        } else {
+            stopTranscribingButton
+        }
+    }
+
     /// A word in the controls' place, not a control: there is nothing to press while the take winds down.
     private var finishingPill: some View {
         HStack(spacing: DS.Spacing.small) {
@@ -64,6 +118,7 @@ struct StageControls: View {
         .padding(.horizontal, DS.Spacing.medium)
         .frame(minWidth: Self.stopWidth, minHeight: Self.buttonHeight, maxHeight: Self.buttonHeight)
         .glassEffect(.regular, in: Capsule())
+        .morphs(as: .finishing, in: glass, reduceMotion: reduceMotion)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Finishing the recording")
         .axLeaf("Stage.Label.Finishing")
@@ -82,6 +137,7 @@ struct StageControls: View {
         .help("The recording stays in your library.")
         .accessibilityLabel("Stop Transcribing")
         .axLeaf("Stage.Button.StopTranscribing")
+        .morphs(as: .stopTranscribing, in: glass, reduceMotion: reduceMotion)
     }
 
     private var bar: some View {
@@ -97,6 +153,7 @@ struct StageControls: View {
             .help("Add Marker")
             .accessibilityLabel("Add Marker")
             .axLeaf("Stage.Button.Mark")
+            .morphs(as: .mark, in: glass, reduceMotion: reduceMotion)
             if take.isArming {
                 cancelButton
             } else {
@@ -112,6 +169,7 @@ struct StageControls: View {
             .help("Discard Recording…")
             .accessibilityLabel("Discard Recording…")
             .axLeaf("Stage.Button.Discard")
+            .morphs(as: .discard, in: glass, reduceMotion: reduceMotion)
         }
         .labelStyle(.titleAndIcon)
         .font(DS.Font.bodyStrong)
@@ -132,6 +190,7 @@ struct StageControls: View {
         .help("Stop recording and transcribe.")
         .accessibilityLabel("Stop Recording")
         .axLeaf("Stage.Button.Stop")
+        .morphs(as: .stop, in: glass, reduceMotion: reduceMotion)
     }
 
     /// Nothing is recorded yet, so the take ends on the spot, with no confirmation and no entry.
@@ -146,6 +205,7 @@ struct StageControls: View {
         .help("Cancel the recording before it starts.")
         .accessibilityLabel("Cancel Recording")
         .axLeaf("Stage.Button.Cancel")
+        .morphs(as: .cancel, in: glass, reduceMotion: reduceMotion)
     }
 
     /// Esc cancels a take that is still starting, unless the title field has the keyboard: there it only leaves the field.
@@ -166,6 +226,7 @@ struct StageControls: View {
         .help(spoken)
         .accessibilityLabel(spoken)
         .axLeaf("Stage.Button.Pause")
+        .morphs(as: .pause, in: glass, reduceMotion: reduceMotion)
     }
 
     private var confirmingDiscard: Binding<Bool> {
@@ -187,6 +248,14 @@ struct StageControls: View {
         guard model.recording?.takeID == takeID else { return false }
         await model.discardTake()
         return true
+    }
+}
+
+private extension View {
+    /// Ties the control's glass to its shape in the bar's container; under Reduce Motion the glass fades in and out instead.
+    func morphs(as control: StageControls.Control, in namespace: Namespace.ID, reduceMotion: Bool) -> some View {
+        glassEffectID(StageControls.glassShape(control, reduceMotion: reduceMotion), in: namespace)
+            .glassEffectTransition(reduceMotion ? .materialize : .matchedGeometry)
     }
 }
 

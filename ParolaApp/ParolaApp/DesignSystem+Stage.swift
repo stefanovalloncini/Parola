@@ -22,4 +22,5 @@ extension DS.Motion {
     static let takeEntry = SwiftUI.Animation.spring(duration: 0.35, bounce: 0.12)
     static let sidebarCollapse = SwiftUI.Animation.spring(duration: 0.35, bounce: 0)
     static let transcriptFollow = SwiftUI.Animation.easeOut(duration: 0.3)
+    static let controlsMorph = SwiftUI.Animation.spring(duration: 0.45, bounce: 0.15)
 }

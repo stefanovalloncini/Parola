@@ -112,6 +112,40 @@ struct StageStateTests {
         #expect(StageControls.layout(for: .failed("x")) == .none)
     }
 
+    @Test("whatever ends the take shares Stop's glass, so the bar folds into the Finishing pill and on into Stop Transcribing")
+    func controlsMorphThroughStop() {
+        let stop = StageControls.glassShape(.stop, reduceMotion: false)
+        #expect(stop != nil)
+        #expect(StageControls.glassShape(.cancel, reduceMotion: false) == stop)
+        #expect(StageControls.glassShape(.finishing, reduceMotion: false) == stop)
+        #expect(StageControls.glassShape(.stopTranscribing, reduceMotion: false) == stop)
+        let others = [StageControls.Control.pause, .mark, .discard].map { StageControls.glassShape($0, reduceMotion: false) }
+        #expect(Set(others).count == 3, "each of the other controls keeps a glass of its own")
+        #expect(!others.contains(nil))
+        #expect(!others.contains(stop))
+    }
+
+    @Test("a take that finishes in a moment keeps its Finishing pill up a little while, but nothing over a take that is over")
+    func pillHolds() {
+        #expect(StageControls.shownLayout(.stopTranscribing, holdingPill: true) == .finishing)
+        #expect(StageControls.shownLayout(.stopTranscribing, holdingPill: false) == .stopTranscribing)
+        #expect(StageControls.shownLayout(.finishing, holdingPill: true) == .finishing)
+        #expect(StageControls.shownLayout(.none, holdingPill: true) == .none)
+        #expect(StageControls.shownLayout(.bar, holdingPill: false) == .bar)
+        #expect(StageControls.pillHold >= .milliseconds(450), "long enough for the fold to settle")
+        #expect(StageControls.pillHold <= .seconds(1), "short enough that Stop Transcribing is there when it is wanted")
+    }
+
+    @MainActor
+    @Test("under Reduce Motion no control's glass morphs, and the controls only crossfade")
+    func controlsCrossfadeUnderReduceMotion() {
+        let controls: [StageControls.Control] = [.pause, .mark, .stop, .cancel, .discard, .finishing, .stopTranscribing]
+        let shapes = controls.map { StageControls.glassShape($0, reduceMotion: true) }
+        #expect(shapes == Array(repeating: nil, count: controls.count))
+        #expect(StageControls.layoutChange(reduceMotion: true) == .easeInOut(duration: 0.2))
+        #expect(StageControls.layoutChange(reduceMotion: false) == DS.Motion.controlsMorph)
+    }
+
     @Test("Esc cancels a take that is still starting, except while the title field has the keyboard")
     func escapeLeavesTheTitleAlone() {
         #expect(StageControls.cancelShortcut(titleFocused: false) == .cancelAction)
