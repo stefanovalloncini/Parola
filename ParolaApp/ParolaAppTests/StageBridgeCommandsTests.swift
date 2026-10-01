@@ -146,6 +146,28 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("resetTestState lets go of a held live take's model load and takes the saved toast down")
+        func resetLeavesNothingHeld() async throws {
+            try await withMocksCleared([.streaming, .audioSource]) {
+                let model = makeRecordingModel("stage-bridge-reset")
+                let server = try ParolaAutomationServer(model: model)
+                let context = AutomationContext(model: model, server: server)
+                let mocks = Dictionary(uniqueKeysWithValues: server.mockCommands().map { ($0.name, $0) })
+                let lifecycle = Dictionary(uniqueKeysWithValues: server.lifecycleCommands().map { ($0.name, $0) })
+                let install = try #require(mocks["installMockStreamingTranscriber"])
+                let reset = try #require(lifecycle["resetTestState"])
+                _ = try await install.handler(try install.validate(AutomationArgs(["holdStart": .bool(true)])), context)
+                #expect(server.heldStreamingStart != nil)
+                model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+
+                _ = try await reset.handler(try reset.validate(AutomationArgs([:])), context)
+
+                #expect(server.heldStreamingStart == nil)
+                #expect(model.takeSavedNotice == nil)
+                withExtendedLifetime(server) {}
+            }
+        }
+
         @Test("outside test mode the take controls and the level feed are refused by the test-mode guard")
         func testModeOnly() async throws {
             let fixture = try makeTakeWAV("stage-bridge-normal")

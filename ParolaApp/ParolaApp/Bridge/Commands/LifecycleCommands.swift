@@ -35,6 +35,8 @@ extension ParolaAutomationServer {
                     }
                     let model = ctx.model
                     model.cancelAllTasks()
+                    await ctx.server.releaseHeldStreamingStart()
+                    model.dismissTakeSaved()
                     model.forgetTakeSession()
                     model.abortDictation()
                     await model.unloadTranscriptionSession()
