@@ -62,11 +62,12 @@ struct LibraryRefreshRaceTests {
             }
         }
         // Holding the main actor until the add has landed keeps the scan's continuations queued behind the insert below.
-        let deadline = ContinuousClock.now + .seconds(30)
+        let deadline = ContinuousClock.now + .seconds(10)
         var result: Result<LibraryEntry, any Error>?
-        while result == nil, ContinuousClock.now < deadline { result = saved.withLock { $0 } }
+        while result == nil, !Task.isCancelled, ContinuousClock.now < deadline { result = saved.withLock { $0 } }
         guard let result else {
-            Issue.record("gave up after 30 seconds waiting for the add to land")
+            let reason = Task.isCancelled ? "cancelled" : "gave up after 10 seconds"
+            Issue.record("\(reason) waiting for the add to land")
             return
         }
         let entry = try result.get()

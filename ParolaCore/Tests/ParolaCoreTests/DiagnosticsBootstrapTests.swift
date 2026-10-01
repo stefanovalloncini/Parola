@@ -65,7 +65,7 @@ struct DiagnosticsBootstrapTests {
         #expect(try sinkText(in: directory).contains("diagnostics sink installed"))
     }
 
-    @Test("without the periodic flush nothing drains until asked")
+    @Test("without the periodic flush no flush task runs and flush() drains the notice")
     func noPeriodicFlushLeavesTheBufferAlone() async throws {
         let directory = scratchDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
