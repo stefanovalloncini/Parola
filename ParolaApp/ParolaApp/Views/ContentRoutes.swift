@@ -21,7 +21,8 @@ struct ContentRoutes: View {
                 .id(model.route)
                 .transition(.opacity)
         }
-        .animation(reduceMotion ? nil : DS.Motion.route, value: routeID)
+        // No crossfade into the Stage: it plays its own entrance, and the page it replaces must be gone before the sidebar folds.
+        .animation(reduceMotion || routeID == .stage ? nil : DS.Motion.route, value: routeID)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 if let notice = model.exportNotice {

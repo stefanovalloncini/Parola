@@ -35,7 +35,7 @@ struct ContentView: View {
                 .toolbar { ContentToolbar() }
                 .modifier(HideToolbarTitleIfAvailable())
         }
-        .modifier(TakeSidebarHold())
+        .modifier(TakeSidebarRelease())
         .contentSheets()
         .background { TranslationHostView() }
         .modifier(SplitDropZone())

@@ -147,4 +147,27 @@ struct StageSidebarTests {
         model.mainSidebar.hold(SidebarCollapsePolicy.holds(model.recording), animation: nil)
         #expect(model.mainSidebar.visibility == .automatic)
     }
+
+    @Test("the sidebar folds once the Stage is on screen, not on a timer from the take's start, and returns when the take ends")
+    func foldsOnceTheStageShows() async throws {
+        let model = makeRecordingModel("stage-fold-order")
+        let wav = try tempWAV("fold")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        model.mainSidebar.userSet(.all)
+        model.installTestTake(source: .systemAudio, liveSource: StubSource(url: wav))
+        let window = HostedWindow(Color.clear.modifier(TakeSidebarRelease()).environment(model))
+        defer { window.close() }
+        await settle(for: .milliseconds(600))
+        #expect(model.mainSidebar.visibility == .all)
+
+        let take = try #require(model.recording)
+        let stage = HostedWindow(StagePage(take: take).environment(model))
+        defer { stage.close() }
+        let folded = await waitUntil { model.mainSidebar.visibility == .detailOnly }
+        #expect(folded)
+
+        model.endTestTake()
+        let returned = await waitUntil { model.mainSidebar.visibility == .all }
+        #expect(returned)
+    }
 }

@@ -74,24 +74,28 @@ final class MainSidebar {
     }
 }
 
-/// Hands each change in whether a take holds the sidebar to the model's sidebar, with the collapse spring.
-struct TakeSidebarHold: ViewModifier {
+/// Gives the sidebar back once no take holds it, and at launch undoes a fold a crash left; the Stage folds it on its own appearance.
+struct TakeSidebarRelease: ViewModifier {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Well past the route's 0.2 s crossfade, which a first Stage render can stretch, so the page the Stage replaced is gone before the sidebar moves.
-    static let foldDelay: Duration = .milliseconds(500)
-
     func body(content: Content) -> some View {
         content.onChange(of: SidebarCollapsePolicy.holds(model.recording), initial: true) { _, holds in
+            guard !holds else { return }
+            model.mainSidebar.hold(false, animation: reduceMotion ? nil : DS.Motion.sidebarCollapse)
+        }
+    }
+}
+
+/// Folds the sidebar one hop after the Stage appears: the page the Stage replaced is gone by then, so the split view never collapses over a List being dismantled.
+struct StageSidebarFold: ViewModifier {
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.onAppear {
             let animation = reduceMotion ? nil : DS.Motion.sidebarCollapse
-            guard holds, animation != nil else {
-                model.mainSidebar.hold(holds, animation: animation)
-                return
-            }
-            // A List dismantled mid-collapse has AppKit rebuild its rows on a torn-down graph: "No Observable object of type AppModel found".
             Task { @MainActor in
-                try? await Task.sleep(for: Self.foldDelay)
                 guard SidebarCollapsePolicy.holds(model.recording) else { return }
                 model.mainSidebar.hold(true, animation: animation)
             }

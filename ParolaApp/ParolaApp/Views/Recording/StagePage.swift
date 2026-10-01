@@ -43,6 +43,7 @@ struct StagePage: View {
         .background(WindowShownReader { isOnScreen = $0 })
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityTitle)
+        .modifier(StageSidebarFold())
         .onAppear(perform: enter)
     }
 
