@@ -61,6 +61,67 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "pauseRecording",
+                area: .recording,
+                summary: "Pauses the take that is recording, as the Stage's Pause does. Test-mode only.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    try requireTestMode(ctx)
+                    let paused = ctx.model.pauseTake()
+                    return .object([
+                        "paused": .bool(paused),
+                        "recording": ParolaAutomationServer.recordingState(of: ctx.model, now: Date()),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
+                name: "resumeRecording",
+                area: .recording,
+                summary: "Resumes a paused take. Test-mode only.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    try requireTestMode(ctx)
+                    let resumed = ctx.model.resumeTake()
+                    return .object([
+                        "resumed": .bool(resumed),
+                        "recording": ParolaAutomationServer.recordingState(of: ctx.model, now: Date()),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
+                name: "addRecordingMarker",
+                area: .recording,
+                summary: "Marks this moment of the take, as ⌘B on the Stage does. Test-mode only.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    try requireTestMode(ctx)
+                    let marker = ctx.model.addTakeMarker()
+                    return .object([
+                        "marker": marker.map { .double($0) } ?? .null,
+                        "recording": ParolaAutomationServer.recordingState(of: ctx.model, now: Date()),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
+                name: "discardRecording",
+                area: .recording,
+                summary: "The Stage's confirmed Discard: the take's audio is deleted and nothing is saved. Test-mode only.",
+                kind: .async,
+                handler: { _, ctx in
+                    try requireTestMode(ctx)
+                    let takeID = ctx.model.recording?.takeID
+                    await ctx.model.discardTake()
+                    return .object([
+                        "discarded": .bool(takeID != nil && ctx.model.recording?.takeID != takeID),
+                        "recording": ParolaAutomationServer.recordingState(of: ctx.model, now: Date()),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
                 name: "toggleLiveCaptions",
                 area: .recording,
                 summary: "Toggles live captions; waits up to 1s for the flip.",

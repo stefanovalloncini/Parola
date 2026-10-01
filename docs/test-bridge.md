@@ -63,6 +63,10 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_fetch_youtube_subs` | **url** | Same input, but fetch existing captions instead of running Whisper. Replies `{started, parked}` on the same terms. |
 | `parola_app_start_recording` | source, category | Start mic (default) or systemAudio. Category tags the saved entry. |
 | `parola_app_stop_recording` | — | Stop the active recording and finalize the transcript. |
+| `pauseRecording` | — | Test mode: pause the take that is recording, the way the Stage's Pause does. Replies `{paused, recording}`; `paused` is false when no take is recording. |
+| `resumeRecording` | — | Test mode: resume a paused take. Replies `{resumed, recording}`. |
+| `addRecordingMarker` | — | Test mode: mark this moment of the take, the way ⌘B on the Stage does. Replies `{marker, recording}`; `marker` is the take's time in seconds, or `null` while nothing records or when the last mark is under a second old. |
+| `discardRecording` | — | Test mode: the Stage's confirmed Discard. The take's audio and checkpoint are deleted and nothing is saved; a take still arming ends the way Cancel ends it, and a stopped take is left alone. Replies `{discarded, recording}`. |
 | `parola_app_set_translate` | **on** | Toggle translate-to-English. |
 | `parola_app_set_use_streaming` | **on** | Toggle the live-mic streaming path. |
 | `parola_app_toggle_live_captions` | — | Show or hide the Live Captions overlay. |

@@ -248,7 +248,7 @@ extension ParolaAutomationServer {
 }
 
 @MainActor
-private func requireTestMode(_ ctx: AutomationContext) throws {
+func requireTestMode(_ ctx: AutomationContext) throws {
     guard ctx.model.mode == .test else {
         throw AutomationError.precondition("only available in --test-mode")
     }
