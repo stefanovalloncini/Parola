@@ -31,4 +31,37 @@ struct RecordingScratchTests {
         #expect(FileManager.default.fileExists(atPath: dir.path, isDirectory: &isDirectory))
         #expect(isDirectory.boolValue)
     }
+
+    @Test("a meeting's microphone track is named after its take, beside it, and is never a take of its own")
+    func meetingMicPairsWithItsTake() {
+        let folder = URL(fileURLWithPath: "/tmp/parola-inflight", isDirectory: true)
+        let take = folder.appendingPathComponent("parola-system-1234.wav")
+
+        let mic = RecordingScratch.meetingMicURL(for: take)
+
+        #expect(mic.lastPathComponent == "parola-meetmic-1234.wav")
+        #expect(mic.deletingLastPathComponent().path == folder.path)
+        #expect(RecordingScratch.isMeetingMic(mic))
+        #expect(!RecordingScratch.isTake(mic), "a sweep must never import it as a take")
+        #expect(RecordingScratch.takeNames(pairedWith: mic).contains(take.lastPathComponent))
+        #expect(RecordingScratch.takeNames(pairedWith: take).isEmpty)
+    }
+
+    @Test("a take with no take name, like a fixture, gets a microphone track with a fresh name in the scratch folder")
+    func fixtureTakeGetsAFreshMicName() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scratch-test-\(UUID().uuidString)", isDirectory: true)
+        RecordingScratch.setDirectory(dir)
+        defer {
+            RecordingScratch.setDirectory(nil)
+            try? FileManager.default.removeItem(at: dir)
+        }
+
+        let mic = RecordingScratch.meetingMicURL(for: URL(fileURLWithPath: "/tmp/fixtures/meeting.wav"))
+
+        #expect(mic.deletingLastPathComponent().path == dir.path)
+        #expect(mic.lastPathComponent.hasPrefix("parola-meetmic-"))
+        #expect(RecordingScratch.isMeetingMic(mic))
+        #expect(RecordingScratch.meetingMicURL(for: nil).lastPathComponent != mic.lastPathComponent)
+    }
 }

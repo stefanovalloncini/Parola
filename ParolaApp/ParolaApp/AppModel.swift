@@ -561,6 +561,9 @@ final class AppModel {
     @ObservationIgnored var takeFileHeartbeat: Task<Void, Never>?
     @ObservationIgnored var recordingRecoveryStartedAt: Date?
     @ObservationIgnored var liveRecordingAudioURL: URL?
+    /// A meeting's microphone track while it records beside the take, and how far into the take's audio it starts.
+    @ObservationIgnored var liveCompanionAudioURL: URL?
+    @ObservationIgnored var liveCompanionStartOffset: TimeInterval?
     @ObservationIgnored var recordingWatchTask: Task<Void, Never>?
     @ObservationIgnored var pendingRecoveryWrite: Task<Void, Never>?
     enum FailureKind {

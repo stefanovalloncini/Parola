@@ -28,6 +28,10 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var category: EntryCategory?
     /// The instance that wrote it; nil in a file from a build before owners, which a launch judges by how recently its take was written.
     var owner: String?
+    /// A meeting's microphone track, recorded beside `audioURL` until the take stops and the two become one file.
+    var companionAudioURL: URL?
+    /// How far into `audioURL` the microphone track's first sample sits.
+    var companionStartOffset: TimeInterval?
 
     init(
         kind: Kind,
@@ -41,6 +45,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         source: EntrySource? = nil,
         category: EntryCategory? = nil,
         owner: String? = nil,
+        companionAudioURL: URL? = nil,
+        companionStartOffset: TimeInterval? = nil,
         id: UUID = UUID()
     ) {
         self.id = id
@@ -55,6 +61,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         self.audioURL = audioURL
         self.title = title
         self.source = source
+        self.companionAudioURL = companionAudioURL
+        self.companionStartOffset = companionStartOffset
     }
 
     init(from decoder: any Decoder) throws {
@@ -71,6 +79,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         source = try c.decodeIfPresent(EntrySource.self, forKey: .source)
         category = try c.decodeIfPresent(EntryCategory.self, forKey: .category)
         owner = try c.decodeIfPresent(String.self, forKey: .owner)
+        companionAudioURL = try c.decodeIfPresent(URL.self, forKey: .companionAudioURL)
+        companionStartOffset = try c.decodeIfPresent(TimeInterval.self, forKey: .companionStartOffset)
     }
 
     /// A take by its title, a file by its name; a link by the video's title, or the link itself before the title was known.
@@ -85,9 +95,9 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         kind == .recording || (title != nil && sourceURL?.isFileURL == true)
     }
 
-    /// The files on disk it points at, as resolved paths.
+    /// The files on disk it points at, as resolved paths; the take's own file comes first.
     var referencedPaths: [String] {
-        [sourceURL, audioURL].compactMap { $0?.isFileURL == true ? $0?.resolvingSymlinksInPath().path : nil }
+        [sourceURL, audioURL, companionAudioURL].compactMap { $0?.isFileURL == true ? $0?.resolvingSymlinksInPath().path : nil }
     }
 }
 
@@ -177,7 +187,9 @@ extension AppModel {
             segments: liveSegments,
             audioURL: liveRecordingAudioURL,
             source: activeTake?.source.entrySource ?? pendingRecordingSource,
-            category: activeTake?.category
+            category: activeTake?.category,
+            companionAudioURL: liveCompanionAudioURL,
+            companionStartOffset: liveCompanionAudioURL == nil ? nil : liveCompanionStartOffset
         ))
     }
 
@@ -458,7 +470,8 @@ extension AppModel {
         guard let checkpoint = pendingRecovery else { return }
         answerRecoveryOffer(checkpoint)
         removeRecoveryFile(of: checkpoint)
-        for file in [checkpoint.audioURL, checkpoint.sourceURL].compactMap({ $0 }) where isInflightFile(file) {
+        let files = [checkpoint.audioURL, checkpoint.sourceURL, checkpoint.companionAudioURL].compactMap { $0 }
+        for file in files where isInflightFile(file) {
             try? FileManager.default.removeItem(at: file)
         }
     }
@@ -621,7 +634,7 @@ extension AppModel {
     var inflightFilesInUse: Set<String> {
         var readers = [
             sourceFileURL, failedTakeRetry?.audioURL, recording?.failure?.audioURL, liveRecordingAudioURL,
-            pendingRecovery?.sourceURL, pendingRecovery?.audioURL,
+            liveCompanionAudioURL, pendingRecovery?.sourceURL, pendingRecovery?.audioURL, pendingRecovery?.companionAudioURL,
         ]
         if takeRun != nil { readers.append(recordedTake?.file) }
         let paths = (readers.compactMap { $0 } + takeFilesBeingSaved.keys).map { $0.resolvingSymlinksInPath().path }
@@ -661,8 +674,10 @@ extension AppModel {
     func sweepInflightRecordings() {
         let dir = inflightRecordingsURL
         let root = library.libraryURL
-        let keep = recoveryReferencedFiles.union([pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
-            .compactMap { $0?.resolvingSymlinksInPath().path })
+        let keep = recoveryReferencedFiles.union(
+            [pendingRecovery?.sourceURL, pendingRecovery?.audioURL, pendingRecovery?.companionAudioURL]
+                .compactMap { $0?.resolvingSymlinksInPath().path }
+        )
         let cutoff = takeImportCutoff()
         inflightSweep = Task { [weak self, library] in
             let found = (try? await AppModel.offMainIO(qos: .utility) { AppModel.inflightFiles(in: dir) }) ?? []
@@ -811,16 +826,18 @@ extension AppModel {
         file.lastPathComponent.hasPrefix("parola-system") ? .systemAudio : .microphone
     }
 
-    /// Files not kept for a recovery offer and quiet long enough: a take after ten minutes, which one still writing never is, and other scratch after two days.
+    /// Files not kept for an offer and quiet long enough: a take after ten minutes, which one still writing never is, other scratch after two days, a meeting's mic track never while its take is there.
     nonisolated static func staleInflightFiles(
         in files: [(url: URL, modified: Date)],
         keeping: Set<String>,
         now: Date,
         takesSince cutoff: Date = .distantPast
     ) -> [URL] {
-        files
+        let names = Set(files.map(\.url.lastPathComponent))
+        return files
             .filter { file in
                 guard !keeping.contains(file.url.resolvingSymlinksInPath().path) else { return false }
+                guard !RecordingScratch.takeNames(pairedWith: file.url).contains(where: names.contains) else { return false }
                 let quiet: TimeInterval = isImportableTake(file.url, modified: file.modified, takesSince: cutoff) ? 10 * 60 : 48 * 3600
                 return file.modified < now.addingTimeInterval(-quiet)
             }
