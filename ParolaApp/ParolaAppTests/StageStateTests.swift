@@ -80,6 +80,36 @@ struct StageStateTests {
         #expect(StageControls.layout(for: .failed("x")) == .none)
     }
 
+    @Test("Esc cancels a take that is still starting, except while the title field has the keyboard")
+    func escapeLeavesTheTitleAlone() {
+        #expect(StageControls.cancelShortcut(titleFocused: false) == .cancelAction)
+        #expect(StageControls.cancelShortcut(titleFocused: true) == nil)
+    }
+
+    @MainActor
+    @Test("the take's title field tells the model while it has the keyboard, and when it lets go")
+    func titleFocusReachesTheModel() async throws {
+        let model = makeRecordingModel("stage-title-focus")
+        model.installTestTake(source: .microphone)
+        defer { model.endTestTake() }
+        let take = try #require(model.recording)
+        let hosted = HostedWindow(TakeTitleField(take: take).environment(model), width: 300, height: 60)
+        defer { hosted.close() }
+        func textField(in view: NSView) -> NSTextField? {
+            if let field = view as? NSTextField { return field }
+            return view.subviews.lazy.compactMap(textField(in:)).first
+        }
+        let field = try #require(textField(in: hosted.host))
+
+        hosted.window.makeFirstResponder(field)
+        let focused = await waitUntil { model.takeTitleHasFocus }
+        #expect(focused)
+
+        hosted.window.makeFirstResponder(nil)
+        let released = await waitUntil { !model.takeTitleHasFocus }
+        #expect(released)
+    }
+
     @Test("the facts line counts the run's progress, and says so while the engine prepares the audio")
     func transcribingLine() {
         #expect(StageFacts.transcribingLine(stage: .preparingAudio, progress: nil) == "Preparing audio…")

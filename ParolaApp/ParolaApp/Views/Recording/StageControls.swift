@@ -142,10 +142,15 @@ struct StageControls: View {
             Label("Cancel", systemImage: "xmark")
         }
         .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: DS.Spacing.medium, minWidth: Self.stopWidth))
-        .keyboardShortcut(.cancelAction)
+        .keyboardShortcut(Self.cancelShortcut(titleFocused: model.takeTitleHasFocus))
         .help("Cancel the recording before it starts.")
         .accessibilityLabel("Cancel Recording")
         .axLeaf("Stage.Button.Cancel")
+    }
+
+    /// Esc cancels a take that is still starting, unless the title field has the keyboard: there it only leaves the field.
+    nonisolated static func cancelShortcut(titleFocused: Bool) -> KeyboardShortcut? {
+        titleFocused ? nil : .cancelAction
     }
 
     private var pauseButton: some View {

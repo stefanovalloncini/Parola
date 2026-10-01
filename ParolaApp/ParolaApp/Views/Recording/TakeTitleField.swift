@@ -58,6 +58,10 @@ struct TakeTitleField: View {
         .onSubmit { focused = false }
         .onChange(of: focused) { _, isFocused in
             if !isFocused { draft = nil }
+            if model.takeTitleHasFocus != isFocused { model.takeTitleHasFocus = isFocused }
+        }
+        .onDisappear {
+            if model.takeTitleHasFocus { model.takeTitleHasFocus = false }
         }
         .accessibilityLabel("Title")
         .axLeaf("Stage.TextField.Title")

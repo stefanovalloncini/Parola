@@ -270,6 +270,8 @@ final class AppModel {
     }
     /// The take transcribing or just transcribed. Matched by file, so a stale one names nothing.
     private(set) var recordedTake: RecordedTake?
+    /// The take's title field has the keyboard, so Esc edits the title instead of cancelling a take that is still starting.
+    var takeTitleHasFocus = false
     /// A take that landed on its own Stage, for the toast that says where it went; it goes on its own unless the pointer holds it.
     var takeSavedNotice: TakeSavedNotice? {
         didSet { if takeSavedNotice != oldValue { restartTakeSavedExpiry() } }
