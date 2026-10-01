@@ -225,6 +225,49 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("transcribeNow posts the failure nobody saw as a notice before routing to the transcript")
+        func dropNowPostsTheFailure() async throws {
+            let audio = try makeTakeWAV("unseen-failure-drop")
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "hi")])
+                let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("unseen-failure-drop"))
+                model.useStreaming = false
+                model.selectedModel = Self.pinnedModel
+                model.route = .statistics
+                model.phase = .failed(message: "Couldn't start live captions")
+
+                model.transcribeNow(urls: [audio])
+
+                let notice = try #require(await waitForNotice(model))
+                #expect(notice.message == "Couldn't start live captions")
+                #expect(notice.tone == .failure)
+            }
+        }
+
+        @Test("the gated Add to Queue fallback posts the failure nobody saw as a notice")
+        func addToQueueFallbackPostsTheFailure() async throws {
+            let audio = try makeTakeWAV("unseen-failure-queue-fallback")
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "hi")])
+                let model = AppModel(
+                    skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("unseen-failure-queue-fallback"),
+                    features: Set(ParolaFeature.allCases).subtracting([.batch])
+                )
+                model.useStreaming = false
+                model.selectedModel = Self.pinnedModel
+                model.route = .statistics
+                model.phase = .failed(message: "Couldn't start live captions")
+
+                model.addToQueue(urls: [audio])
+
+                let notice = try #require(await waitForNotice(model))
+                #expect(notice.message == "Couldn't start live captions")
+                #expect(notice.tone == .failure)
+            }
+        }
+
         @Test("transcribeYouTube posts the failure nobody saw as a notice")
         func linkRunPostsTheFailure() async {
             let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("unseen-failure-link"))

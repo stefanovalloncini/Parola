@@ -2502,6 +2502,7 @@ final class AppModel {
         fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil, fetchedLink: FetchedLink? = nil,
         arrival: WatchedArrival? = nil
     ) {
+        leaveFailedPhase()
         leaveFinishedStage()
         // Before the new token: cancelling retires the old run's token; a file opened mid-download keeps its duplicate check.
         cancelTranscriptionRuns(keepingDuplicateCheck: fetchedLink != nil)
@@ -2540,7 +2541,6 @@ final class AppModel {
         fileTranscribeTask = Task { [weak self] in
             guard let self else { return }
             do {
-                leaveFailedPhase()
                 phase = store.isInstalled(selectedModel)
                     ? .loadingModel(name: selectedModel)
                     : .downloadingModel(name: selectedModel, progress: 0)

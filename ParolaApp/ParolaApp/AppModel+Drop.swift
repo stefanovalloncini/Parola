@@ -97,6 +97,7 @@ extension AppModel {
             deferredArrivals.append(contentsOf: files.media)
             return
         }
+        leaveFailedPhase()
         route = .transcript
         guard !transcribeTaskRunning else {
             deferredArrivals.append(contentsOf: files.media)
