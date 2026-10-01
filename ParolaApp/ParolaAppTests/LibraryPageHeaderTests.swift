@@ -328,6 +328,8 @@ struct LibraryPageHeaderTests {
     func controlsStayInside(windowWidth: Double) {
         let hosted = hostedHeader(windowWidth: CGFloat(windowWidth))
         defer { hosted.close() }
+        let titles = chipTitles(in: hosted)
+        #expect(titles.last == "More", "the chips weren't read, so nothing was measured: \(titles)")
         let spilled = spillsPastTheRight(hosted)
         #expect(spilled.isEmpty, "\(spilled)")
     }
@@ -336,6 +338,8 @@ struct LibraryPageHeaderTests {
     func selectionFits(windowWidth: Double) {
         let hosted = hostedHeader(windowWidth: CGFloat(windowWidth), selection: ["a", "b", "c"])
         defer { hosted.close() }
+        let titles = chipTitles(in: hosted)
+        #expect(titles.last == "More", "the chips weren't read, so nothing was measured: \(titles)")
         let spilled = spillsPastTheRight(hosted)
         #expect(spilled.isEmpty, "\(spilled)")
     }
@@ -345,6 +349,8 @@ struct LibraryPageHeaderTests {
         let subtitle = LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60, bundle: try italianBundle())
         let hosted = hostedHeader(windowWidth: CGFloat(windowWidth), locale: Self.italian, subtitle: subtitle)
         defer { hosted.close() }
+        let titles = chipTitles(in: hosted)
+        #expect(titles.last == "Altro", "the chips weren't read, so nothing was measured: \(titles)")
         let spilled = spillsPastTheRight(hosted)
         #expect(spilled.isEmpty, "\(spilled)")
     }
