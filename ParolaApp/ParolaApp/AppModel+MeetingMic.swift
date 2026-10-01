@@ -657,11 +657,11 @@ extension AppModel {
         return (try? await Self.offMainIO { MeetingTakeMixer.isStereo(audio) }) ?? false
     }
 
-    /// The mono mix an engine that hears one channel reads for a meeting's stereo take; nil when there's no room for it or it can't be made.
-    func meetingEngineInput(for stereo: URL) async -> URL? {
+    /// The mono mix an engine that hears one channel reads for a meeting's stereo take; no room throws `MeetingMixUnavailable`, a failed downmix its own error.
+    func meetingEngineInput(for stereo: URL) async throws -> URL {
         guard await hasRoom(for: Self.fileBytes(stereo)) else {
             ParolaLog.notice(.audioRecording, "no room on disk for a meeting's mono mix")
-            return nil
+            throw MeetingMixUnavailable()
         }
         let mono = meetingScratchURL()
         meetingScratchInUse.insert(mono)
@@ -675,7 +675,7 @@ extension AppModel {
         } catch {
             ParolaLog.error(.audioRecording, "a meeting's mono mix could not be made", [.error: .error(error)])
             discardMeetingScratch([mono])
-            return nil
+            throw error
         }
     }
 

@@ -4519,10 +4519,7 @@ final class AppModel {
             try Task.checkCancellation()
             var meeting = engineInput != nil
             if !meeting { meeting = await isMeetingStereo(url, source: source) }
-            if meeting, engineFile == nil, engineNeedsMonoMix() {
-                guard let mono = await meetingEngineInput(for: url) else { throw MeetingMixUnavailable() }
-                engineFile = mono
-            }
+            if meeting, engineFile == nil, engineNeedsMonoMix() { engineFile = try await meetingEngineInput(for: url) }
             let handlers = take.map { makeTakeHandlers(run: run, takeID: $0) } ?? TranscribeHandlers()
             let result = try await session.transcribe(
                 source: FileAudioSource(url: engineFile ?? url),

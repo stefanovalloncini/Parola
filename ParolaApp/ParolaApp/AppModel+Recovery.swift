@@ -832,7 +832,7 @@ extension AppModel {
                 let digest = await SourceDigest.digest(of: file)
                 if let digest, await library.hasEntry(digest: digest) {
                     // A crash after the take reached its entry, before its mic was settled: the copy stays until a record names the mic.
-                    if let mic, await self?.giveMicToSavedTake(mic, take: file, digest: digest) == false { continue }
+                    if let mic, await self?.giveMicToSavedTake(mic, take: file, digest: digest) != true { continue }
                     if (try? FileManager.default.removeItem(at: file)) != nil { deleted += 1 }
                     continue
                 }

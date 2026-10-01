@@ -449,6 +449,33 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a mono mix that fails for a reason other than room says what went wrong, not that the disk is full")
+        func failedDownmixSaysWhy() async throws {
+            try await withMocksCleared(.transcriber) {
+                let library = makeTempLibraryURL("second-track-downmix-fails")
+                let stereo = try TestAudio.stereo(leftAmplitude: 0.3, rightAmplitude: 0.3, seconds: 1)
+                let seeded = try await LibraryStore(libraryURL: library, extraIndexer: nil).add(
+                    transcript: Transcript(
+                        segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Welcome")], language: "en", modelName: "m"
+                    ),
+                    audioSource: stereo, category: .meeting, source: .systemAudio
+                )
+                let model = makeModel(libraryURL: library)
+                await model.awaitModelListRefresh()
+                await installMockTranscriber(segments: [(0, 1, "Welcome")])
+                _ = try await model.openEntry(seeded.id)
+                let folder = try inflight(library)
+                try refuseWrites(in: folder)
+                defer { try? allowWrites(in: folder) }
+
+                model.retranscribeCurrentEntry(model: "nvidia_parakeet-tdt-0.6b-v3", language: nil)
+
+                let failed = await waitUntil { runFailed(model) }
+                #expect(failed)
+                #expect(model.phase != .failed(message: AppModel.meetingMixUnavailableMessage()))
+            }
+        }
+
         @Test("Restore of a meeting mid-transcription with no room for the mono mix Parakeet needs saves the take untranscribed and says so")
         func restoreWithoutRoomForTheMonoFails() async throws {
             try await withMocksCleared(.transcriber) {
