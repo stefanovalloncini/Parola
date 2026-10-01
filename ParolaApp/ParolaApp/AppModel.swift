@@ -5135,12 +5135,16 @@ final class AppModel {
         return FileManager.default.fileExists(atPath: failure.audioURL.path) ? .reveal(failure.audioURL) : nil
     }
 
-    /// Reveal in Finder on a take whose entry was deleted says so, and points to Recently Deleted while the entry is still there.
+    /// Reveal in Finder or Retry on a take whose entry was deleted says so, and leads to Recently Deleted while the entry is still there.
     static func deletedTakeNotice(restorable: Bool) -> ExportNotice {
-        let message = restorable
-            ? String(localized: "This recording was deleted. Restore it from Recently Deleted to try again.")
-            : String(localized: "This recording was deleted.")
-        return ExportNotice(message: message, failures: [], folder: nil, tone: .info)
+        guard restorable else {
+            return ExportNotice(message: String(localized: "This recording was deleted."), failures: [], folder: nil, tone: .info)
+        }
+        return ExportNotice(
+            message: String(localized: "This recording was deleted. Restore it from Recently Deleted to try again."),
+            failures: [], folder: nil, tone: .info,
+            actions: [ExportNotice.Action(title: String(localized: "Show Recently Deleted"), handler: .openRecentlyDeleted)]
+        )
     }
 
     /// Re-runs a failed take's transcription in the entry its failure saved, so no twin appears; from its working file when that save never landed.
@@ -5151,7 +5155,8 @@ final class AppModel {
                 guard await self.library.list().contains(where: { $0.id == entry.id }) else {
                     // The deleted entry keeps the audio; a working file a failed Stage still held goes, or a later sweep would bring the take back.
                     self.releaseTakeFile(url)
-                    self.exportNotice = await self.retryRefusedNotice(entryID: entry.id)
+                    let restorable = await self.library.listDeleted().contains { $0.id == entry.id }
+                    self.exportNotice = Self.deletedTakeNotice(restorable: restorable)
                     return
                 }
                 if (try? await self.openEntry(entry.id)) != nil {
@@ -5167,18 +5172,6 @@ final class AppModel {
                 )
             }
         }
-    }
-
-    /// A Retry whose entry was deleted points to where it can come back from, while it can.
-    private func retryRefusedNotice(entryID: LibraryEntry.ID) async -> ExportNotice {
-        guard await library.listDeleted().contains(where: { $0.id == entryID }) else {
-            return ExportNotice(message: String(localized: "This recording was deleted."), failures: [], folder: nil, tone: .info)
-        }
-        return ExportNotice(
-            message: String(localized: "This recording was deleted. Restore it from Recently Deleted to try again."),
-            failures: [], folder: nil, tone: .info,
-            actions: [ExportNotice.Action(title: String(localized: "Show Recently Deleted"), handler: .openRecentlyDeleted)]
-        )
     }
 
     /// Schedules a debounced (~1 s) persist of the current transcript. Rapid edits coalesce: only the

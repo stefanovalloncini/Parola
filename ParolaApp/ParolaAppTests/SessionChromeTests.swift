@@ -850,6 +850,47 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Reveal in Finder on a failed take whose recording was deleted gives the same notice, with the way to Recently Deleted")
+        func revealAfterTheEntryWasDeleted() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine boom")
+                ))
+                let model = makeRecordingModel("reveal-stage-deleted")
+                model.selectedModel = "openai_whisper-tiny"
+                try FileManager.default.createDirectory(at: model.inflightRecordingsURL, withIntermediateDirectories: true)
+                let working = try makeTakeWAV("reveal", seconds: 1, in: model.inflightRecordingsURL, prefix: "parola-mic")
+                defer { try? FileManager.default.removeItem(at: working) }
+                recordAndStop(model, audio: working, seconds: 2)
+                let failedOnStage = await waitUntil {
+                    if case .failed = model.recording?.state { return true }
+                    return false
+                }
+                #expect(failedOnStage)
+                let saved = try #require(await landedEntry(model))
+                await waitUntil { !model.hasPendingTakeWork }
+                model.deleteEntry(saved.id)
+                let deleted = await waitUntil { await model.library.list().isEmpty }
+                #expect(deleted)
+
+                model.revealFailedTake()
+
+                let told = await waitUntil { model.exportNotice?.message == Self.restoreFirst }
+                #expect(told)
+                let show = try #require(model.exportNotice?.actions.first)
+                #expect(show.title == "Show Recently Deleted")
+                model.performNoticeAction(show)
+                #expect(model.route == .recentlyDeleted)
+            }
+        }
+
+        @Test("the deleted-recording notice leads to Recently Deleted only while the recording is there")
+        func deletedNoticeAction() {
+            let restorable = AppModel.deletedTakeNotice(restorable: true)
+            #expect(restorable.actions.map(\.handler) == [.openRecentlyDeleted])
+            #expect(AppModel.deletedTakeNotice(restorable: false).actions.isEmpty)
+        }
+
         @Test("once the deleted recording is gone from Recently Deleted too, Retry just says it was deleted")
         func retryAfterTheEntryWasPurged() async throws {
             let model = makeRecordingModel("retry-purged")
