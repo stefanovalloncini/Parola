@@ -768,6 +768,38 @@ extension TranscriberMockSuites {
             #expect(over)
         }
 
+        @Test("a sidebar opened while the take transcribes on its Stage stays open through a trip to another page and back")
+        func sidebarOpenedWhileTranscribingStaysOpen() async throws {
+            let audio = try makeTakeWAV("stage-transcribing-sidebar", seconds: 2)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "words")], partials: ["some", "some words"], gate: gate)
+                let model = makeModel("stage-transcribing-sidebar")
+                let routes = HostedWindow(ContentRoutes().modifier(TakeSidebarRelease()).environment(model))
+                defer { routes.close() }
+                recordAndStop(model, audio: audio, seconds: 2)
+                let streamed = await waitUntil { model.takePartialText == "some words" }
+                #expect(streamed)
+                let folded = await waitUntil { model.mainSidebar.visibility == .detailOnly }
+                #expect(folded)
+
+                model.mainSidebar.userSet(.all)
+                model.route = .statistics
+                await settle(for: .milliseconds(300))
+                _ = model.showStage()
+                await settle(for: .milliseconds(400))
+
+                #expect(model.route == .recording)
+                #expect(model.recording?.isTranscribing == true)
+                #expect(model.mainSidebar.visibility == .all, "the Stage folded the sidebar the user opened")
+                model.stopTranscribingTake()
+                await gate.open()
+                let settled = await waitUntil(timeoutMs: 10_000) { !model.hasPendingTakeWork }
+                #expect(settled)
+            }
+        }
+
         @Test("the saved toast goes on its own after its time, whether or not a window shows it")
         func savedToastExpires() async {
             let model = makeModel("stage-saved-expiry")

@@ -14,10 +14,16 @@ enum SidebarCollapsePolicy {
         userChangedDuringTake ? current : previous
     }
 
-    /// While the take runs, and while it transcribes on its Stage; one let go to its save, landed or failed gives the sidebar back.
-    static func holds(_ take: RecordingSession?, stageIsUp: Bool) -> Bool {
+    /// While the take runs, and while it transcribes for its Stage, even with another page up; one let go to its save, landed or failed gives the sidebar back.
+    static func holds(_ take: RecordingSession?, stageShowsIt: Bool) -> Bool {
         guard let take else { return false }
-        return take.isRunning || (take.isTranscribing && stageIsUp)
+        return take.isRunning || (take.isTranscribing && stageShowsIt)
+    }
+
+    @MainActor
+    static func holds(in model: AppModel) -> Bool {
+        guard let take = model.recording else { return false }
+        return holds(take, stageShowsIt: ContentRoutes.stageShows(take, model: model))
     }
 }
 
@@ -80,7 +86,7 @@ struct TakeSidebarRelease: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
-        content.onChange(of: SidebarCollapsePolicy.holds(model.recording, stageIsUp: ContentRoutes.stageIsUp(model)), initial: true) { _, holds in
+        content.onChange(of: SidebarCollapsePolicy.holds(in: model), initial: true) { _, holds in
             guard !holds else { return }
             model.mainSidebar.hold(false, animation: reduceMotion ? nil : DS.Motion.sidebarCollapse)
         }
@@ -96,7 +102,7 @@ struct StageSidebarFold: ViewModifier {
         content.onAppear {
             let animation = reduceMotion ? nil : DS.Motion.sidebarCollapse
             Task { @MainActor in
-                guard SidebarCollapsePolicy.holds(model.recording, stageIsUp: ContentRoutes.stageIsUp(model)) else { return }
+                guard SidebarCollapsePolicy.holds(in: model) else { return }
                 model.mainSidebar.hold(true, animation: animation)
             }
         }
