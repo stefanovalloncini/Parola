@@ -70,8 +70,8 @@ struct RecordingToolbarButton: View {
 
     var body: some View {
         if let startedAt = model.recordingStartedAt {
-            TimelineView(.periodic(from: startedAt, by: 1)) { context in
-                let elapsed = context.date.timeIntervalSince(startedAt)
+            TimelineView(.periodic(from: model.recording?.clockOrigin ?? startedAt, by: 1)) { context in
+                let elapsed = model.recording?.elapsed(at: context.date) ?? context.date.timeIntervalSince(startedAt)
                 Button {
                     model.stopRecordingAndTranscribe()
                 } label: {
