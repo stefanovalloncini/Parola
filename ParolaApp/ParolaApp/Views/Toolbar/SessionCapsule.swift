@@ -6,7 +6,7 @@ struct SessionCapsule: View {
     let take: RecordingSession
     @Environment(AppModel.self) private var model
     @State private var isOnScreen = true
-    @State private var showsMeter = false
+    @State private var showsMeter: Bool?
 
     nonisolated static let height: CGFloat = 36
     nonisolated static let meterMinimumWindowWidth: CGFloat = 1000
@@ -31,7 +31,7 @@ struct SessionCapsule: View {
     var body: some View {
         SessionCapsuleFace(
             take: take,
-            showsMeter: showsMeter,
+            showsMeter: showsMeter ?? Self.showsMeter(windowWidth: model.mainWindow?.frame.width ?? 0),
             isOnScreen: isOnScreen,
             showStage: { model.showStage() },
             stop: { Self.stopOrCancel(model, cancels: $0) }
