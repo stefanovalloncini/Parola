@@ -885,6 +885,44 @@ struct RecordingMenuTests {
     }
 }
 
+/// A menu delegate that, like a SwiftUI that redraws on every refresh, reports a drawing each time it is asked.
+@MainActor
+private final class RedrawingMenuDelegate: NSObject, NSMenuDelegate {
+    let refresher: () -> RecordingMenuRefresher?
+    private(set) var refreshes = 0
+
+    init(refresher: @escaping () -> RecordingMenuRefresher?) {
+        self.refresher = refresher
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        refreshes += 1
+        refresher()?.menuDrew()
+    }
+}
+
+@MainActor
+@Suite("Recording menu refresher")
+struct RecordingMenuRefresherTests {
+    @Test("a drawing made while the refresher asks the menu asks nothing more, so a menu that redraws on every refresh can't loop")
+    func noLoop() async {
+        let menu = NSMenu(title: "Recording")
+        var refresher: RecordingMenuRefresher?
+        let delegate = RedrawingMenuDelegate { refresher }
+        menu.delegate = delegate
+        refresher = RecordingMenuRefresher { menu }
+
+        refresher?.menuDrew()
+        refresher?.menuDrew()
+        let asked = await waitUntil { delegate.refreshes == 1 }
+        #expect(asked, "two drawings in one turn ask the menu once")
+        await settle(for: .milliseconds(100))
+
+        #expect(delegate.refreshes == 1)
+        refresher = nil
+    }
+}
+
 @MainActor
 @Suite("Recording menu acts on the take", .serialized)
 struct RecordingMenuActionTests {
