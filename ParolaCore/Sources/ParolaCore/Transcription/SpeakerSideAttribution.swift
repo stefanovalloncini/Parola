@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 
 /// The stereo take a meeting's two sides are told apart in, and the label your side takes.
-public struct SpeakerSides: Sendable, Equatable {
+public struct SpeakerSides: Sendable {
     public var stereo: URL
     public var meLabel: String
 

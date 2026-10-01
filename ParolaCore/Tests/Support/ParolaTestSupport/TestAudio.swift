@@ -33,9 +33,9 @@ public enum TestAudio {
         try write(channels: [sine(seconds: seconds, hz: hz, amplitude: amplitude, sampleRate: sampleRate)], sampleRate: sampleRate, to: url)
     }
 
-    /// Two sines, left and right, each at its own amplitude, in a temporary file unless `url` names one.
-    public static func stereo(leftAmplitude: Float, rightAmplitude: Float, seconds: Double, at url: URL? = nil) throws -> URL {
-        let target = url ?? FileManager.default.temporaryDirectory.appendingPathComponent("parola-test-stereo-\(UUID().uuidString).wav")
+    /// Two sines, left and right, each at its own amplitude, in a temporary file.
+    public static func stereo(leftAmplitude: Float, rightAmplitude: Float, seconds: Double) throws -> URL {
+        let target = FileManager.default.temporaryDirectory.appendingPathComponent("parola-test-stereo-\(UUID().uuidString).wav")
         return try write(
             channels: [
                 sine(seconds: seconds, hz: 440, amplitude: leftAmplitude),

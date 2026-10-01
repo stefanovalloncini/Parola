@@ -1546,6 +1546,11 @@ extension TranscriberMockSuites {
             let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
             let italian = try #require(Bundle(path: path))
             #expect(String(localized: "Record my microphone in meetings", bundle: italian) == "Registra il mio microfono nelle riunioni")
+            let description = String(
+                localized: "Keeps your voice on a track of its own beside the Mac audio, so the transcript marks what you said as Me.",
+                bundle: italian
+            )
+            #expect(description == "Tiene la tua voce su una traccia a parte, accanto all'audio del Mac, così nella trascrizione quello che dici compare come Io.")
         }
 
         // MARK: - The checkpoint and the sweep
