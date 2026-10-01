@@ -238,14 +238,14 @@ private struct StageDeviceMenu: View {
                     .labelsHidden()
                     .disabled(true)
                 } label: {
-                    label(name: take.device ?? String(localized: "Microphone"), opensMenu: true)
+                    label(name: deviceName, opensMenu: true)
                 }
                 .menuStyle(.button)
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .help("Stop the recording to change the microphone")
                 .accessibilityLabel("Input device")
-                .accessibilityValue(Text(verbatim: take.device ?? String(localized: "Microphone")))
+                .accessibilityValue(Text(verbatim: deviceName))
                 .axLeaf("Stage.Menu.Device")
                 .task {
                     devices = (try? await AppModel.offMainIO { AudioDevices.inputDevices() }) ?? []
@@ -268,6 +268,10 @@ private struct StageDeviceMenu: View {
             }
         }
         .contentShape(Rectangle())
+    }
+
+    private var deviceName: String {
+        take.device ?? String(localized: "Microphone")
     }
 
     private var currentUID: String {
