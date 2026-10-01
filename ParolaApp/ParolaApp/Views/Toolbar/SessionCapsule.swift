@@ -22,13 +22,10 @@ struct SessionCapsule: View {
         windowWidth >= meterMinimumWindowWidth
     }
 
-    /// Acts on what the capsule drew: a Cancel ends a take that has captured nothing, quietly, and leaves one that has since begun recording.
+    /// Acts on what the capsule drew: Stop and Cancel both go the shared way, but a Cancel that finds the take recording by now leaves it.
     static func stopOrCancel(_ model: AppModel, cancels: Bool) {
-        if cancels {
-            model.cancelRecordingBeforeCapture()
-        } else {
-            TakeRemote.stop(model)
-        }
+        guard !cancels || model.recording?.isArming == true else { return }
+        TakeRemote.stop(model)
     }
 
     var body: some View {

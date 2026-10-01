@@ -110,10 +110,10 @@ struct RecordingStatusItemTests {
         #expect(!menu.autoenablesItems)
     }
 
-    @Test("Pause and Mark wait for a capture; Stop and Discard… have nothing left once the take finishes")
+    @Test("Pause, Mark and Discard… wait for a capture; Stop has nothing left once the take finishes")
     func enabledControls() {
         var take = capturingTake(arming: .countIn(remaining: 3))
-        #expect(RecordingStatusItem.controls(for: take).map(\.isEnabled) == [true, false, false, true, true])
+        #expect(RecordingStatusItem.controls(for: take).map(\.isEnabled) == [true, false, false, false, true])
         _ = take.markCapturing(at: .now)
         #expect(RecordingStatusItem.controls(for: take).map(\.isEnabled) == [true, true, true, true, true])
         _ = take.pause(at: .now)

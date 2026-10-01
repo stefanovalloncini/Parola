@@ -27,10 +27,15 @@ enum TakeRemote {
         }
     }
 
-    /// From the count-in until Stop there is a take to stop or discard; one finishing is already on its way to the library.
+    /// From the count-in until Stop there is a take to stop or cancel; one finishing is already on its way to the library.
     nonisolated static func canEnd(_ take: RecordingSession?) -> Bool {
         guard let take else { return false }
         return take.isRunning && take.state != .finishing
+    }
+
+    /// Discard… is for audio already recorded; a take still arming has none, and its Stop already ends it quietly.
+    nonisolated static func canDiscard(_ take: RecordingSession?) -> Bool {
+        take?.isCapturing ?? false
     }
 
     /// What VoiceOver reads for the take: what it is doing, then its time in words.
@@ -46,10 +51,10 @@ enum TakeRemote {
         }
     }
 
-    /// A count-in has nothing to stop yet, so Stop ends it the way the count-in's own Cancel does.
+    /// A take still arming has recorded nothing, so Stop ends it the way the Stage's Cancel does: quietly, with nothing saved.
     static func stop(_ model: AppModel) {
-        if model.recordingCountdown != nil {
-            model.cancelRecordingCountdown()
+        if model.recording?.isArming == true {
+            model.cancelArmingTake()
         } else {
             model.stopRecordingAndTranscribe()
         }
@@ -65,10 +70,15 @@ enum TakeRemote {
 
     private(set) static var askingToDiscard = false
 
-    /// Discard… asks first, one question at a time; a take that ended or changed while it stood stays.
+    /// Discard… asks first, one question at a time; a take that ended or changed while it stood stays. One still arming has nothing to delete, so it ends without the question.
     @discardableResult
     static func discard(_ model: AppModel, confirm: @MainActor () async -> Bool) async -> Bool {
-        guard !askingToDiscard, let takeID = model.recording?.takeID else { return false }
+        guard !askingToDiscard, let take = model.recording else { return false }
+        if take.isArming {
+            model.cancelArmingTake()
+            return true
+        }
+        let takeID = take.takeID
         askingToDiscard = true
         defer { askingToDiscard = false }
         let confirmed = await confirm()

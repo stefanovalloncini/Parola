@@ -698,7 +698,7 @@ struct RecordingMenuTests {
         #expect(!CommandReturn.stops(takeCanStop: false, composerFocused: true))
     }
 
-    @Test("every item waits for a take: Stop and Discard… until Stop, Pause and Add Marker while it captures")
+    @Test("every item waits for a take: Stop until it finishes; Pause, Add Marker and Discard… while it captures")
     func itemsFollowTheTake() {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
         let none = RecordingMenuState(take: nil, showsRecording: false, composerFocused: false)
@@ -709,10 +709,11 @@ struct RecordingMenuTests {
         )
         let countIn = RecordingMenuState(take: take, showsRecording: true, composerFocused: false)
         #expect(countIn.canEnd && !countIn.canCapture && countIn.canShow && countIn.stopOwnsCommandReturn)
+        #expect(!countIn.canDiscard, "nothing is recorded yet, so there is nothing to discard")
 
         _ = take.markCapturing(at: start)
         let recording = RecordingMenuState(take: take, showsRecording: true, composerFocused: false)
-        #expect(recording.canEnd && recording.canCapture && !recording.resumes && recording.stopOwnsCommandReturn)
+        #expect(recording.canEnd && recording.canCapture && recording.canDiscard && !recording.resumes && recording.stopOwnsCommandReturn)
         let typing = RecordingMenuState(take: take, showsRecording: true, composerFocused: true)
         #expect(typing.canEnd && !typing.stopOwnsCommandReturn, "the composer keeps ⌘⏎ for Send")
 
@@ -722,7 +723,7 @@ struct RecordingMenuTests {
 
         _ = take.finish(at: start.addingTimeInterval(9))
         let finishing = RecordingMenuState(take: take, showsRecording: true, composerFocused: false)
-        #expect(!finishing.canEnd && !finishing.canCapture && !finishing.stopOwnsCommandReturn)
+        #expect(!finishing.canEnd && !finishing.canCapture && !finishing.canDiscard && !finishing.stopOwnsCommandReturn)
     }
 
     @Test("the Stage's buttons keep no ⌘⏎ or ⌘B of their own: the Recording menu is the one source")
@@ -1130,6 +1131,91 @@ extension TranscriberMockSuites {
                     if let landed { try await host.library.purge(landed.id) }
                 }
             }
+        }
+    }
+}
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("Ending a take that is still starting, from outside the Stage", .serialized)
+    struct ArmingTakeRemoteTests {
+        private static let pinnedModel = "openai_whisper-tiny"
+
+        /// A take whose capture is up but has heard nothing, so it still arms; its file is too small to hold a recording.
+        private func startArmingTake(_ label: String) async throws -> (AppModel, URL) {
+            let audio = try makeTakeWAV(label, seconds: 0.1, prefix: "parola-test")
+            let model = makeRecordingModel(label)
+            model.useStreaming = false
+            model.selectedModel = Self.pinnedModel
+            model.takeCaptureOverride = { _ in StubSource(url: audio) }
+            model.startRecording(source: .microphone)
+            let captureUp = await waitUntil { model.takeInProgress }
+            #expect(captureUp)
+            return (model, audio)
+        }
+
+        @Test("Stop from the menu bar, the pill, the Recording menu or ⌘⏎ ends a take still starting quietly, as the Stage's Cancel does")
+        func stopWhileStartingCancels() async throws {
+            let (model, audio) = try await startArmingTake("remote-stop-starting")
+            defer { try? FileManager.default.removeItem(at: audio) }
+            defer { model.cancelCurrentWork() }
+            #expect(model.recording?.state == .arming(.startingCapture))
+
+            TakeRemote.stop(model)
+
+            let ended = await waitUntil { model.recording == nil }
+            #expect(ended, "no failed Stage saying nothing was recorded")
+            #expect(model.exportNotice == nil)
+            #expect(model.phase == .idle)
+            let saved = await model.library.list()
+            #expect(saved.isEmpty)
+        }
+
+        @Test("Stop while a live take's model still loads ends it with no word")
+        func stopWhilePreparingCancels() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                let model = makeRecordingModel("remote-stop-preparing")
+                model.selectedModel = Self.pinnedModel
+                let gate = MockTranscriberGate()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    partials: ["hello"], downloadFractions: [0.5], delayMs: 5_000, gate: gate
+                ))
+                model.useStreaming = true
+                model.startRecording(source: .microphone)
+                let preparing = await waitUntil {
+                    if case .arming(.preparingModel) = model.recording?.state { return true }
+                    return false
+                }
+                #expect(preparing)
+
+                TakeRemote.stop(model)
+
+                #expect(model.recording == nil)
+                #expect(model.exportNotice == nil)
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+                await gate.open()
+                await settle()
+                #expect(model.recording == nil)
+                let saved = await model.library.list()
+                #expect(saved.isEmpty)
+            }
+        }
+
+        @Test("Discard… on a take still starting ends it without asking: there is no audio to delete")
+        func discardWhileStartingAsksNothing() async throws {
+            let (model, audio) = try await startArmingTake("remote-discard-starting")
+            defer { try? FileManager.default.removeItem(at: audio) }
+            defer { model.cancelCurrentWork() }
+            var asked = 0
+
+            let ended = await TakeRemote.discard(model) { asked += 1; return true }
+
+            #expect(ended)
+            #expect(asked == 0)
+            let gone = await waitUntil { model.recording == nil }
+            #expect(gone)
+            #expect(model.exportNotice == nil)
         }
     }
 }

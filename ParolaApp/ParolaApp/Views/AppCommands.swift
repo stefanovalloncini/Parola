@@ -93,6 +93,7 @@ enum CommandReturn {
 struct RecordingMenuState: Equatable {
     var canEnd: Bool
     var canCapture: Bool
+    var canDiscard: Bool
     var resumes: Bool
     var canShow: Bool
     var stopOwnsCommandReturn: Bool
@@ -100,6 +101,7 @@ struct RecordingMenuState: Equatable {
     init(take: RecordingSession?, showsRecording: Bool, composerFocused: Bool) {
         canEnd = TakeRemote.canEnd(take)
         canCapture = take?.isCapturing ?? false
+        canDiscard = TakeRemote.canDiscard(take)
         resumes = take?.isPaused ?? false
         canShow = showsRecording
         stopOwnsCommandReturn = CommandReturn.stops(takeCanStop: canEnd, composerFocused: composerFocused)
@@ -129,7 +131,7 @@ struct RecordingCommands: View {
         Button("Discard…") {
             Task { await TakeRemote.discard(model, confirm: TakeRemote.askToDiscard) }
         }
-        .disabled(!menu.canEnd)
+        .disabled(!menu.canDiscard)
         .axLeaf("Menu.Recording.Discard")
         Divider()
         Button("Show Recording") {
