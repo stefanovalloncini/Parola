@@ -27,29 +27,18 @@ struct StageControls: View {
                 .help("Add Marker")
                 .accessibilityLabel("Add Marker")
                 .axLeaf("Stage.Button.Mark")
-                Button {
-                    model.stopRecordingAndTranscribe()
-                } label: {
-                    Label("Stop", systemImage: "stop.fill")
+                if take.isArming {
+                    cancelButton
+                } else {
+                    stopButton
                 }
-                .buttonStyle(GlassCapsuleButtonStyle(
-                    prominence: .tinted(DS.Color.recordingFill),
-                    height: Self.buttonHeight,
-                    horizontalPadding: DS.Spacing.medium,
-                    minWidth: Self.stopWidth
-                ))
-                .keyboardShortcut(.return, modifiers: .command)
-                .disabled(take.state == .finishing)
-                .help("Stop recording and transcribe.")
-                .accessibilityLabel("Stop Recording")
-                .axLeaf("Stage.Button.Stop")
                 Button {
                     discarding = take.takeID
                 } label: {
                     Label("Discard…", systemImage: "xmark")
                 }
                 .buttonStyle(GlassCapsuleButtonStyle(prominence: .secondary, height: Self.buttonHeight, horizontalPadding: 18))
-                .disabled(take.state == .finishing)
+                .disabled(!take.isCapturing)
                 .help("Discard Recording…")
                 .accessibilityLabel("Discard Recording…")
                 .axLeaf("Stage.Button.Discard")
@@ -69,6 +58,39 @@ struct StageControls: View {
         } message: { _ in
             Text("The audio is deleted.")
         }
+    }
+
+    private var stopButton: some View {
+        Button {
+            model.stopRecordingAndTranscribe()
+        } label: {
+            Label("Stop", systemImage: "stop.fill")
+        }
+        .buttonStyle(GlassCapsuleButtonStyle(
+            prominence: .tinted(DS.Color.recordingFill),
+            height: Self.buttonHeight,
+            horizontalPadding: DS.Spacing.medium,
+            minWidth: Self.stopWidth
+        ))
+        .keyboardShortcut(.return, modifiers: .command)
+        .disabled(take.state == .finishing)
+        .help("Stop recording and transcribe.")
+        .accessibilityLabel("Stop Recording")
+        .axLeaf("Stage.Button.Stop")
+    }
+
+    /// Nothing is recorded yet, so the take ends on the spot, with no confirmation and no entry.
+    private var cancelButton: some View {
+        Button {
+            model.cancelArmingTake()
+        } label: {
+            Label("Cancel", systemImage: "xmark")
+        }
+        .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: DS.Spacing.medium, minWidth: Self.stopWidth))
+        .keyboardShortcut(.cancelAction)
+        .help("Cancel the recording before it starts.")
+        .accessibilityLabel("Cancel Recording")
+        .axLeaf("Stage.Button.Cancel")
     }
 
     private var pauseButton: some View {

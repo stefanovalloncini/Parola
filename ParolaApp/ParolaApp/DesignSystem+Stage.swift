@@ -12,6 +12,8 @@ extension DS.Color {
 extension DS.Font {
     static let takeTimerCompact = SwiftUI.Font.system(size: 13, weight: .medium, design: .rounded).monospacedDigit()
     static let takeTimerStage = SwiftUI.Font.system(size: 56, weight: .light, design: .rounded).monospacedDigit()
+    /// A line of words in the clock's slot, while the take has no time to show yet.
+    static let takePreparingStage = SwiftUI.Font.system(size: 28, weight: .light, design: .rounded).monospacedDigit()
     static let liveTranscriptStage = SwiftUI.Font.system(size: 24, design: .serif)
 }
 

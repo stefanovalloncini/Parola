@@ -31,4 +31,77 @@ struct StageStateTests {
         _ = take.markCapturing(at: Date())
         #expect(take.mode == .live)
     }
+
+    @Test("the time slot names the model a live take waits on, with its download")
+    func preparingLine() {
+        #expect(StageTimeSlot.preparingText(name: "openai_whisper-large-v3_turbo", download: 0.42) == "Preparing Whisper Turbo · 42%")
+        #expect(StageTimeSlot.preparingText(name: "openai_whisper-large-v3_turbo", download: nil) == "Preparing Whisper Turbo…")
+    }
+}
+
+// Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("Stage state flows", .serialized)
+    struct StageStateFlowTests {
+        private static let pinnedModel = "openai_whisper-tiny"
+
+        private func makeModel(_ label: String) -> AppModel {
+            let model = makeRecordingModel(label)
+            model.useStreaming = false
+            model.selectedModel = Self.pinnedModel
+            return model
+        }
+
+        /// A live take held while its model "loads", so it stays arming until the gate opens.
+        private func startPreparingTake(_ model: AppModel, gate: MockTranscriberGate) async {
+            MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                partials: ["hello"], downloadFractions: [0.5], delayMs: 5_000, gate: gate
+            ))
+            model.useStreaming = true
+            model.startRecording(source: .microphone)
+            await waitUntil { model.activeTake?.captureRequested == true }
+        }
+
+        @Test("the Stage's Cancel ends a count-in with no word")
+        func cancelDuringCountIn() {
+            let model = makeModel("stage-cancel-count-in")
+            model.recordingCountInSeconds = 60
+            model.startRecording(source: .microphone)
+            #expect(model.recordingCountdown == 60)
+            #expect(model.route == .recording)
+
+            model.cancelArmingTake()
+
+            #expect(model.recording == nil)
+            #expect(model.recordingCountdown == nil)
+            #expect(model.exportNotice == nil)
+            #expect(model.phase == .idle)
+        }
+
+        @Test("the Stage's Cancel ends a take still loading its model with no word")
+        func cancelWhilePreparing() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel("stage-cancel-preparing")
+                let gate = MockTranscriberGate()
+                await startPreparingTake(model, gate: gate)
+                let preparing = await waitUntil { model.recording?.mode == .preparing(Self.pinnedModel, 0.5) }
+                #expect(preparing)
+
+                model.cancelArmingTake()
+
+                #expect(model.recording == nil)
+                #expect(model.exportNotice == nil)
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+                await gate.open()
+                await settle()
+                #expect(model.recording == nil)
+                #expect(model.phase == .idle)
+                let saved = await model.library.list()
+                #expect(saved.isEmpty)
+            }
+        }
+    }
 }

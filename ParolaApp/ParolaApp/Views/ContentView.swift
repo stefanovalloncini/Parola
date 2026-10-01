@@ -37,7 +37,8 @@ struct ContentView: View {
         .background { TranslationHostView() }
         .modifier(SplitDropZone())
         .overlay {
-            if let count = model.recordingCountdown {
+            // The Stage counts in on its own clock; the overlay covers whoever left it during the count.
+            if let count = model.recordingCountdown, model.route != .recording {
                 CountInOverlay(count: count) { model.cancelRecordingCountdown() }
             }
         }

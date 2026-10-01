@@ -44,8 +44,7 @@ struct StagePage: View {
         VStack(spacing: 0) {
             Spacer(minLength: DS.Spacing.small)
             VStack(spacing: DS.Spacing.small) {
-                StageClock(take: take, font: DS.Font.takeTimerStage, rolls: true, ticks: isOnScreen)
-                    .foregroundStyle(DS.Color.primaryText)
+                StageTimeSlot(take: take, isOnScreen: isOnScreen)
                 StageFacts(take: take, isOnScreen: isOnScreen)
             }
             Spacer(minLength: DS.Spacing.large)
@@ -101,6 +100,51 @@ struct StagePage: View {
         withAnimation(reduceMotion ? .easeOut(duration: 0.25) : DS.Motion.takeEntry) {
             entered = true
         }
+    }
+}
+
+/// The Stage's big line: the take's time, the count-in's number, or the model a live take waits on.
+struct StageTimeSlot: View {
+    let take: RecordingSession
+    let isOnScreen: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Group {
+            switch take.mode {
+            case .countIn(let remaining):
+                Text(verbatim: String(remaining))
+                    .font(DS.Font.takeTimerStage)
+                    .contentTransition(reduceMotion ? .identity : .numericText(countsDown: true))
+                    .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: remaining)
+                    .accessibilityLabel("Count-in")
+                    .accessibilityValue(Text(verbatim: String(remaining)))
+            case .preparing(let name, let download):
+                clockSized {
+                    Text(verbatim: Self.preparingText(name: name, download: download))
+                        .font(DS.Font.takePreparingStage)
+                        .lineLimit(1)
+                }
+            default:
+                StageClock(take: take, font: DS.Font.takeTimerStage, rolls: true, ticks: isOnScreen)
+            }
+        }
+        .foregroundStyle(DS.Color.primaryText)
+    }
+
+    /// "Preparing Whisper Turbo · 42 %" while the model downloads, "Preparing Whisper Turbo…" while it loads.
+    nonisolated static func preparingText(name: String, download: Double?, bundle: Bundle = .main) -> String {
+        let model = ModelPickerView.shortLabel(for: AppModel.modelLabel(name))
+        guard let download else { return String(localized: "Preparing \(model)…", bundle: bundle) }
+        return String(localized: "Preparing \(model)", bundle: bundle) + " · " + AppFormat.percent(download)
+    }
+
+    /// The clock's own height, so a line of words in its place moves nothing under it.
+    private func clockSized<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        Text(verbatim: StageClock.text(seconds: 0))
+            .font(DS.Font.takeTimerStage)
+            .hidden()
+            .overlay { content().fixedSize() }
     }
 }
 
@@ -206,7 +250,7 @@ struct StageFacts: View {
         if take.isArming {
             HStack(spacing: DS.Spacing.snug) {
                 RecDot(color: DS.Color.secondaryText)
-                armingLabel
+                Text("Starting…")
             }
         } else {
             HStack(spacing: DS.Spacing.snug) {
@@ -216,21 +260,6 @@ struct StageFacts: View {
                     .tracking(0.6)
                     .foregroundStyle(DS.Color.dangerText)
             }
-        }
-    }
-
-    @ViewBuilder
-    private var armingLabel: some View {
-        if case .arming(.preparingModel(let name, let download)) = take.state {
-            HStack(spacing: 0) {
-                Text("Preparing \(ModelPickerView.shortLabel(for: AppModel.modelLabel(name)))…")
-                if let download {
-                    Text(verbatim: " · " + AppFormat.percent(download))
-                        .monospacedDigit()
-                }
-            }
-        } else {
-            Text("Starting…")
         }
     }
 

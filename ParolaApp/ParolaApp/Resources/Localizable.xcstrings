@@ -2878,6 +2878,17 @@
         }
       }
     },
+    "Cancel Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla registrazione"
+          }
+        }
+      }
+    },
     "Cancel the recording before it starts.": {
       "extractionState": "manual",
       "localizations": {
@@ -10718,6 +10729,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Anteponi a ogni riga l'ora di inizio."
+          }
+        }
+      }
+    },
+    "Preparing %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparazione di %@"
           }
         }
       }

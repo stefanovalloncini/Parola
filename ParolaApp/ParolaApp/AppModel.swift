@@ -4254,6 +4254,15 @@ final class AppModel {
         resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
     }
 
+    /// The Stage's Cancel while a take arms: a count-in or a capture still starting ends without a word.
+    func cancelArmingTake() {
+        if recordingCountdown != nil {
+            cancelRecordingCountdown()
+        } else {
+            cancelRecordingBeforeCapture()
+        }
+    }
+
     /// Cancel on a take that has captured nothing: there is nothing to lose, so it ends without a word.
     func cancelRecordingBeforeCapture() {
         guard takeArming != nil else { return }
