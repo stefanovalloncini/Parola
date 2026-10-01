@@ -160,7 +160,7 @@ struct StageBand: View {
     }
 }
 
-/// The band's bars and flags as of one sample. Equal until the next sample or marker, so the frames that slide it between samples never draw it again.
+/// The band's bars and flags as of one sample. Equal until the next sample, marker or pause, so the frames that slide it between samples never draw it again.
 struct StageTape: View, Equatable {
     let levels: [Float]
     let flags: [Int]
