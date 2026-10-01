@@ -93,6 +93,7 @@ struct LibraryRowDisplay: Identifiable, Equatable {
     let title: String
     let when: String
     let duration: String?
+    let spokenDuration: String?
     /// Named only when it isn't the library's usual language.
     let language: String?
     /// The usual language as passed in — what the cache compares against.
@@ -120,6 +121,7 @@ struct LibraryRowDisplay: Identifiable, Equatable {
             && lhs.title == rhs.title
             && lhs.when == rhs.when
             && lhs.duration == rhs.duration
+            && lhs.spokenDuration == rhs.spokenDuration
             && lhs.language == rhs.language
             && lhs.tooltip == rhs.tooltip
             && lhs.excerpt == rhs.excerpt
@@ -144,6 +146,7 @@ struct LibraryRowDisplay: Identifiable, Equatable {
         self.title = title
         self.when = when ?? LibraryRowFormat.when(entry.createdAt, under: nil)
         duration = LibraryRowFormat.duration(entry.durationSeconds)
+        spokenDuration = LibraryRowFormat.spokenDuration(entry.durationSeconds)
         self.usualLanguage = usualLanguage
         language = LanguageDisplay.code(for: entry.language) == usualLanguage
             ? nil

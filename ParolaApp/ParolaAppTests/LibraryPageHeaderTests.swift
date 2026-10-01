@@ -40,6 +40,18 @@ struct LibraryPageHeaderTests {
         #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0, loaded: false) == "", "the first scan hasn't landed")
     }
 
+    @Test("VoiceOver hears the subtitle's length in words, in Italian too")
+    func spokenSubtitle() throws {
+        let english = Locale(identifier: "en_US")
+        #expect(LibraryPageHeader.spokenSubtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60, locale: english) == "14 transcripts, 7 hours, 25 minutes")
+        #expect(LibraryPageHeader.spokenSubtitle(count: 1, totalSeconds: 0, locale: english) == "1 transcript")
+        #expect(LibraryPageHeader.spokenSubtitle(count: 0, totalSeconds: 0, locale: english) == "No transcripts yet")
+        #expect(LibraryPageHeader.spokenSubtitle(count: 0, totalSeconds: 0, loaded: false, locale: english) == "")
+        let italian = try italianBundle()
+        #expect(LibraryPageHeader.spokenSubtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60, bundle: italian, locale: Self.italian)
+            == "14 trascrizioni, 7 ore e 25 minuti")
+    }
+
     @Test("the subtitle reads naturally in Italian")
     func italianSubtitle() throws {
         let italian = try italianBundle()

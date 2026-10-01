@@ -19,6 +19,15 @@ struct LibraryPageHeader: View {
         rowWidth > 0 && unfoldedRowWidth > rowWidth
     }
 
+    /// The subtitle as VoiceOver reads it, with the length in words.
+    static func spokenSubtitle(
+        count: Int, totalSeconds: Double, filteredOut: Bool = false, loaded: Bool = true,
+        bundle: Bundle = .main, locale: Locale = AppFormat.locale
+    ) -> String {
+        guard count > 0 else { return subtitle(count: count, totalSeconds: totalSeconds, filteredOut: filteredOut, loaded: loaded, bundle: bundle) }
+        return LibraryRowFormat.spokenSubtitle(count: count, totalSeconds: totalSeconds, bundle: bundle, locale: locale)
+    }
+
     /// Counts the rows on screen; empty while the first scan is out, or when the filters left none for No Matches to say.
     static func subtitle(
         count: Int, totalSeconds: Double, filteredOut: Bool = false, loaded: Bool = true, bundle: Bundle = .main
@@ -29,6 +38,7 @@ struct LibraryPageHeader: View {
 
     let title: String
     let subtitle: String
+    var spokenSubtitle: String?
     let subtitleHelp: String?
     let filters: LibraryFilterBar
     /// An empty page has nothing to narrow or order; a filter already on stays so it can be cleared.
@@ -74,6 +84,7 @@ struct LibraryPageHeader: View {
                 .foregroundStyle(DS.Color.secondaryText)
                 .lineLimit(1)
                 .modifier(OptionalHelp(help: subtitleHelp))
+                .accessibilityLabel(Text(verbatim: spokenSubtitle ?? subtitle))
             Spacer(minLength: DS.Spacing.regular)
             controls(folded: folded)
         }

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ParolaCore
 @testable import Parola
 
 @Suite("Library row format")
@@ -113,6 +114,40 @@ struct LibraryRowFormatTests {
         let italian = Locale(identifier: "it_IT")
         #expect(LibraryRowFormat.when(friday, under: .previousWeek, now: now, calendar: calendar, locale: italian)
             == "Ven 16:40")
+    }
+
+    @Test("VoiceOver hears a length in words, to the unit the row shows")
+    func spokenDurations() {
+        let english = Locale(identifier: "en_US")
+        #expect(LibraryRowFormat.spokenDuration(4_320, locale: english) == "1 hour, 12 minutes")
+        #expect(LibraryRowFormat.spokenDuration(38 * 60 + 20, locale: english) == "38 minutes", "the row shows 38 min")
+        #expect(LibraryRowFormat.spokenDuration(3_600, locale: english) == "1 hour")
+        #expect(LibraryRowFormat.spokenDuration(8, locale: english) == "8 seconds")
+        #expect(LibraryRowFormat.spokenDuration(nil, locale: english) == nil)
+        #expect(LibraryRowFormat.spokenDuration(.infinity, locale: english) == nil)
+        let italian = Locale(identifier: "it_IT")
+        #expect(LibraryRowFormat.spokenDuration(4_320, locale: italian) == "1 ora e 12 minuti")
+        #expect(LibraryRowFormat.spokenDuration(8, locale: italian) == "8 secondi")
+    }
+
+    @Test("a row reads as one sentence: title, marks, what it says, when and how long")
+    func spokenRow() throws {
+        let manifest = ParolaDocument.Manifest(
+            createdAt: date(2026, 9, 30, 9, 33),
+            originalAudioName: "standup.m4a",
+            title: "Standup",
+            modelName: "stub",
+            language: "it",
+            labels: ["Work", "Research"],
+            pinned: true,
+            durationSeconds: 4_320
+        )
+        let entry = LibraryEntry(id: "spoken", bundleURL: URL(fileURLWithPath: "/tmp/LibraryRowFormatTests/spoken.parola"), manifest: manifest)
+        let row = LibraryRowDisplay(entry: entry, excerpt: "We agreed to ship on Friday.", when: "9:33", usualLanguage: "EN")
+        let italianName = try #require(row.language)
+        let label = LibraryRowFormat.spokenLabel(for: row, detail: [row.excerpt ?? ""])
+        #expect(label == "Standup, Pinned, Work, Research, \(italianName), We agreed to ship on Friday., 9:33, \(row.spokenDuration ?? "")")
+        #expect(row.spokenDuration == LibraryRowFormat.spokenDuration(4_320))
     }
 
     @Test("the usual language is the most common; a tie goes to the first code alphabetically")

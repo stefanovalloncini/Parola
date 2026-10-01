@@ -305,6 +305,25 @@ struct LibraryListLayoutTests {
         #expect(hosted.model.dateRangeFilter == .month)
     }
 
+    @Test("VoiceOver meets each entry row as one element, read as one sentence, with its actions at hand")
+    func rowsReadAsOneElement() async throws {
+        let shown = entries(3)
+        let hosted = await host(shown, groupsByDate: false)
+        defer { close(hosted) }
+        _ = await settled(hosted)
+        let elements = HostedAccessibility.elements(in: hosted.host)
+        let row = try #require(elements.first { $0.identifier == "library.row.\(shown[0].id)" })
+        let length = try #require(LibraryRowFormat.spokenDuration(shown[0].durationSeconds))
+        #expect(row.label?.hasPrefix("Take 0, ") == true, "\(row.label ?? "")")
+        #expect(row.label?.hasSuffix(", \(length)") == true, "\(row.label ?? "")")
+        #expect(!elements.contains { $0.label == "Take 0" || $0.value == "Take 0" }, "the title is not an element of its own")
+        for action in ["Open", "Open in New Window", "Pin", "Rename…", "Reveal in Finder", "Delete"] {
+            #expect(row.actions.contains(action), "\(row.actions)")
+        }
+        let subtitle = LibraryPageHeader.spokenSubtitle(count: 3, totalSeconds: 180)
+        #expect(elements.contains { $0.words.contains(subtitle) }, "the page's subtitle reads \(subtitle)")
+    }
+
     @Test("no row draws a rule under it: not the page's top, not a date title, not an entry")
     func rowsDrawNoRule() async throws {
         let hosted = await host(threeGroups())

@@ -6057,6 +6057,17 @@
         }
       }
     },
+    "First match at %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima corrispondenza a %@"
+          }
+        }
+      }
+    },
     "Floating pill near the bottom of the screen.": {
       "extractionState": "manual",
       "localizations": {

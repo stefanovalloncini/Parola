@@ -58,6 +58,21 @@ struct RecentlyDeletedRouteTests {
         #expect(dropped, "Italian is the usual language now, so the row stops naming it")
     }
 
+    @Test("a trashed row's length reads in words to VoiceOver")
+    func trashedLengthReadsInWords() async throws {
+        let model = makeModel()
+        await model.libraryRefreshTask?.value
+        var manifest = ParolaDocument.Manifest(originalAudioName: "long.m4a", title: "Long", modelName: "stub", language: "en", durationSeconds: 4_320)
+        manifest.deletedAt = Date()
+        model.setDeletedEntries([LibraryEntry(id: "long", bundleURL: URL(fileURLWithPath: "/tmp/RecentlyDeletedRouteTests/long.parola"), manifest: manifest)])
+        model.openRecentlyDeleted()
+        let page = HostedWindow(ContentRoutes().environment(model))
+        defer { page.close() }
+        let spoken = try #require(LibraryRowFormat.spokenDuration(4_320))
+        let heard = await waitUntil { HostedAccessibility.words(in: page.host).contains(spoken) }
+        #expect(heard, "\(spoken) was never read")
+    }
+
     @Test("the kind filter is a header chip, as the Library page's filters are")
     func kindFilterIsAHeaderChip() {
         let model = makeModel()

@@ -505,6 +505,12 @@ private struct LibraryBrowseList: View, Equatable {
                     filteredOut: LibraryEmptyState.filtersEmptied(emptyKind, pageCount: pageCount),
                     loaded: libraryLoaded
                 ),
+                spokenSubtitle: LibraryPageHeader.spokenSubtitle(
+                    count: shownTotals.count,
+                    totalSeconds: shownTotals.seconds,
+                    filteredOut: LibraryEmptyState.filtersEmptied(emptyKind, pageCount: pageCount),
+                    loaded: libraryLoaded
+                ),
                 subtitleHelp: shownTotals.bytes > 0
                     ? String(localized: "Total size: \(AppFormat.byteSize(shownTotals.bytes))") : nil,
                 filters: LibraryFilterBar(

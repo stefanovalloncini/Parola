@@ -222,6 +222,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                 .foregroundStyle(secondaryStyle)
                 .lineLimit(1)
                 .frame(width: EntryRowMetrics.durationWidth, alignment: .trailing)
+                .accessibilityLabel(Text(verbatim: display.spokenDuration ?? ""))
                 .accessibilityHidden(display.duration == nil)
         }
     }

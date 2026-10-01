@@ -62,6 +62,8 @@ enum HostedAccessibility {
         let value: String?
         /// In screen coordinates.
         let frame: CGRect
+        /// The named actions VoiceOver lists in its Actions rotor.
+        let actions: [String]
 
         var words: [String] { [label, value].compactMap { $0 }.filter { !$0.isEmpty } }
     }
@@ -117,7 +119,8 @@ enum HostedAccessibility {
                     identifier: read("accessibilityIdentifier", of: child) as? String,
                     label: read("accessibilityLabel", of: child) as? String,
                     value: read("accessibilityValue", of: child) as? String,
-                    frame: (read("accessibilityFrame", of: child) as? NSValue)?.rectValue ?? .zero
+                    frame: (read("accessibilityFrame", of: child) as? NSValue)?.rectValue ?? .zero,
+                    actions: (read("accessibilityCustomActions", of: child) as? [NSAccessibilityCustomAction])?.map(\.name) ?? []
                 ))
                 visit(child, depth: depth + 1)
             }

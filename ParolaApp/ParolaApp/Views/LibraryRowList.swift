@@ -184,12 +184,42 @@ struct LibraryListRow: View, Equatable {
     var body: some View {
         let entry = row.entry
         return rowContent
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: LibraryRowFormat.spokenLabel(for: row, detail: spokenDetail)))
+            // The context menu stays on the row for VoiceOver too; these put its everyday items in the Actions rotor.
+            .accessibilityActions {
+                if let model { actions(for: entry, model: model) }
+            }
             .contentShape(Rectangle())
             .draggable(entry.bundleURL)
             .contextMenu {
                 if let model { menu(for: entry, model: model) }
             }
             .accessibilityIdentifier("library.row.\(entry.id)")
+    }
+
+    /// What the row's second line says, and for a search hit, where and how often it matched.
+    private var spokenDetail: [String] {
+        switch detail {
+        case .excerpt:
+            return [row.excerpt ?? ""]
+        case .match:
+            let match = model?.searchMatches[row.id]
+            var parts = [match?.snippet ?? ""]
+            if let timecode = SearchResultRow.timestamp(for: match) { parts.append(String(localized: "First match at \(timecode)")) }
+            if let count = match?.matchCount, count > 0 { parts.append(LibraryListContent.matchesLabel(count)) }
+            return parts
+        }
+    }
+
+    @ViewBuilder
+    private func actions(for entry: LibraryEntry, model: AppModel) -> some View {
+        Button("Open") { model.openEntryFromLibrary(entry.id, inNewWindow: false) }
+        Button("Open in New Window") { model.openEntryWindow(entry.id) }
+        Button(entry.pinned ? "Unpin" : "Pin") { model.togglePinned(for: entry.id) }
+        Button("Rename…") { rename(entry) }
+        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL]) }
+        Button("Delete") { model.deleteEntry(entry.id) }
     }
 
     @ViewBuilder
