@@ -79,7 +79,6 @@ struct LibrarySearchResults: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
             LibraryFailureBanner(insets: EdgeInsets(
                 top: DS.Spacing.regular, leading: DS.Spacing.large, bottom: DS.Spacing.regular, trailing: DS.Spacing.large
             ))

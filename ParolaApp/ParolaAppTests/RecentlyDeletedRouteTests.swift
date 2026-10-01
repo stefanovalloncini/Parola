@@ -58,6 +58,21 @@ struct RecentlyDeletedRouteTests {
         #expect(dropped, "Italian is the usual language now, so the row stops naming it")
     }
 
+    @Test("the kind filter is a header chip, as the Library page's filters are")
+    func kindFilterIsAHeaderChip() {
+        let model = makeModel()
+        let header = HostedWindow(RecentlyDeletedHeader(
+            categoryFilter: .constant(.all),
+            sortOption: .constant(.deletedEarliest),
+            confirmingEmpty: .constant(false),
+            onRestoreSelection: {},
+            onDeleteSelection: {}
+        ).environment(model), width: 900, height: 120)
+        defer { header.close() }
+        let chips = HostedAccessibility.appKitElements(in: header.host).flatMap(\.words)
+        #expect(chips.contains("All Kinds"), "\(chips)")
+    }
+
     private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
         let model = makeModel()
         let server = try ParolaAutomationServer(model: model)

@@ -356,6 +356,22 @@ struct LibraryPageHeaderTests {
         #expect(spilled.isEmpty, "\(spilled)")
     }
 
+    @Test("Export and Delete for a selection are header chips, as tall as the menus beside them")
+    func bulkActionsAreChips() {
+        let hosted = hostedHeader(windowWidth: 1440, selection: ["a", "b", "c"], filtering: false)
+        defer { hosted.close() }
+        let titles = chipTitles(in: hosted)
+        #expect(titles.contains("Export (3)"), "\(titles)")
+
+        let elements = HostedAccessibility.elements(in: hosted.host)
+        let delete = elements.first { $0.identifier?.hasSuffix("Header.Button.BulkDelete") == true }
+        let sort = elements.first { $0.identifier?.hasSuffix("Menu.Sort") == true }
+        let deleteHeight = delete?.frame.height ?? 0
+        let sortHeight = sort?.frame.height ?? 0
+        #expect(sortHeight > 0)
+        #expect(abs(deleteHeight - sortHeight) <= 1, "Delete is \(deleteHeight) pt, Sort \(sortHeight) pt")
+    }
+
     @Test("with every filter on and rows selected, 1180 points is too narrow to keep the chips out")
     func selectionFoldsAtTheDefaultSize() {
         let hosted = hostedHeader(windowWidth: 1180, selection: ["a", "b", "c"])

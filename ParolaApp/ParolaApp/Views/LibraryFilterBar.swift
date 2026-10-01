@@ -217,16 +217,3 @@ extension View {
             .fixedSize()
     }
 }
-
-/// A chip pull-down's label: a glyph and what the list is filtered to.
-struct FilterPillLabel: View {
-    let systemImage: String
-    let label: Text
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: systemImage)
-            label
-        }
-    }
-}

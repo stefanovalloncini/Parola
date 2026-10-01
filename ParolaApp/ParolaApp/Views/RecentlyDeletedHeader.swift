@@ -111,10 +111,7 @@ struct RecentlyDeletedHeader: View {
         } label: {
             FilterPillLabel(systemImage: "square.grid.2x2", label: Text(LocalizedStringKey(categoryFilter.title)))
         }
-        .menuStyle(.button)
-        .buttonStyle(ChipButtonStyle(isSelected: categoryFilter != .all))
-        .menuIndicator(.hidden)
-        .fixedSize()
+        .libraryHeaderChip(isActive: categoryFilter != .all)
         .help("Filter by kind")
         .axLeaf("Filter.Menu.Kind")
     }
@@ -150,5 +147,16 @@ struct RecentlyDeletedHeader: View {
         .disabled(model.deletedEntries.isEmpty)
         .help("Delete every item in Recently Deleted")
         .axLeaf("Toolbar.Button.EmptyTrash")
+    }
+}
+
+/// The kind chip's label: a glyph and what the page is filtered to, both kept when the chip is drawn as a menu.
+private struct FilterPillLabel: View {
+    let systemImage: String
+    let label: Text
+
+    var body: some View {
+        Label { label } icon: { Image(systemName: systemImage) }
+            .labelStyle(.titleAndIcon)
     }
 }

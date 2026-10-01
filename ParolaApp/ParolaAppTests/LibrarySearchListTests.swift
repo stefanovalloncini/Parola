@@ -199,6 +199,27 @@ struct LibrarySearchListTests {
         #expect(rebuilt, "asked again for \(hosted.model.searchSnippetIDs.count) of \(ids.count)")
     }
 
+    @Test("the results' header stays pinned with no rule under it, as the Library page has none")
+    func resultsHeaderHasNoRule() async throws {
+        let hosted = await host(20)
+        defer { close(hosted) }
+        search(Array(hosted.model.libraryEntries.map(\.id).prefix(5)), in: hosted.model)
+        #expect(await settled(hosted) { tables(hosted).count == 2 })
+        let scroll = try #require(tables(hosted).last?.enclosingScrollView)
+        let list = scroll.convert(scroll.bounds, to: hosted.host)
+        let rep = try #require(hosted.host.bitmapImageRepForCachingDisplay(in: hosted.host.bounds))
+        hosted.host.cacheDisplay(in: hosted.host.bounds, to: rep)
+        let scale = CGFloat(rep.pixelsWide) / hosted.host.bounds.width
+        // The band just above the list, where a rule under the header would be drawn.
+        let topEdge = hosted.host.isFlipped ? list.minY : hosted.host.bounds.height - list.maxY
+        let band = Int((topEdge - 3) * scale)..<Int(topEdge * scale)
+        let columns = Array(stride(from: Int(40 * scale), to: Int((hosted.host.bounds.width - 40) * scale), by: 2))
+        let ruled = band.contains { y in
+            columns.count(where: { (rep.colorAt(x: $0, y: y)?.alphaComponent ?? 0) > 0.02 }) > columns.count * 9 / 10
+        }
+        #expect(!ruled, "a rule runs across the page above the results")
+    }
+
     @Test("the keyboard follows the list on screen, and Tab passes over the covered one")
     func keyboardFollowsTheListOnScreen() async throws {
         let hosted = await host(20)

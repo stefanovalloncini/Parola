@@ -60,12 +60,19 @@ enum HostedAccessibility {
         let identifier: String?
         let label: String?
         let value: String?
+        /// In screen coordinates.
+        let frame: CGRect
 
         var words: [String] { [label, value].compactMap { $0 }.filter { !$0.isEmpty } }
     }
 
     static func elements(in root: NSObject) -> [Element] {
         withAssistiveApp { walk(root) }
+    }
+
+    /// Only the controls AppKit draws for SwiftUI, which answer with no assistive app asking: a bordered menu, a picker.
+    static func appKitElements(in root: NSObject) -> [Element] {
+        walk(root)
     }
 
     static func words(in root: NSObject) -> [String] {
@@ -109,7 +116,8 @@ enum HostedAccessibility {
                     object: child,
                     identifier: read("accessibilityIdentifier", of: child) as? String,
                     label: read("accessibilityLabel", of: child) as? String,
-                    value: read("accessibilityValue", of: child) as? String
+                    value: read("accessibilityValue", of: child) as? String,
+                    frame: (read("accessibilityFrame", of: child) as? NSValue)?.rectValue ?? .zero
                 ))
                 visit(child, depth: depth + 1)
             }

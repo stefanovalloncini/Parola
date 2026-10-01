@@ -239,10 +239,7 @@ struct LibraryBulkActions: View {
             } label: {
                 Text("Export (\(selection.count))")
             }
-            .menuStyle(.button)
-            .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-            .menuIndicator(.hidden)
-            .fixedSize()
+            .libraryHeaderChip()
             .axLeaf("Header.Menu.BulkExport")
             Button {
                 pendingBulkDelete = true
@@ -250,7 +247,7 @@ struct LibraryBulkActions: View {
                 Text(verbatim: RecentlyDeletedCopy.deleteSelection(selection.count))
                     .foregroundStyle(DS.Color.dangerText)
             }
-            .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+            .libraryHeaderChip()
             .axLeaf("Header.Button.BulkDelete")
         }
     }
