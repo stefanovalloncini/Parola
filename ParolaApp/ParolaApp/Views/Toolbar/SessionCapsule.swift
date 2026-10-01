@@ -83,7 +83,7 @@ struct SessionCapsuleFace: View {
             .accessibilityAddTraits(.updatesFrequently)
             .axLeaf("Toolbar.Button.SessionTime")
             if showsLevel {
-                SessionMeter()
+                SessionMeter(isOnScreen: isOnScreen)
                     .padding(.trailing, 10)
             }
             Capsule()
@@ -147,6 +147,7 @@ private struct SessionCapsuleButtonStyle: ButtonStyle {
 
 /// The take's last two seconds of level, in the capsule's white, on the Stage band's curve.
 private struct SessionMeter: View {
+    let isOnScreen: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -157,9 +158,9 @@ private struct SessionMeter: View {
 
     var body: some View {
         if reduceMotion {
-            TimelineView(.animation(minimumInterval: 0.25)) { _ in bars }
+            TimelineView(.animation(minimumInterval: 0.25, paused: !isOnScreen)) { _ in bars }
         } else {
-            let _ = model.takeLevelTick
+            let _ = isOnScreen ? model.takeLevelTick : 0
             bars
         }
     }
