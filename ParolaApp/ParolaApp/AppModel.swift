@@ -258,6 +258,10 @@ final class AppModel {
     @ObservationIgnored var micTrackNoticeTake: Int?
     /// Sampler ticks in which the Mac audio moved on and the microphone didn't, before its track counts as stopped.
     @ObservationIgnored var micTrackStallTicks = 30
+    /// A meeting's mix files while a fold or a run still reads them.
+    @ObservationIgnored var meetingScratchInUse: Set<URL> = []
+    /// Test seam: runs after each step of a fold; false stops the fold there, as a crash would.
+    @ObservationIgnored var foldStepHook: (@MainActor (FoldStep) async -> Bool)?
 
     private struct CaptureStart {
         let takeID: Int
@@ -559,6 +563,8 @@ final class AppModel {
     @ObservationIgnored var activeRecoveryGeneration: Int?
     /// Each live generation's checkpoint file, named for its id; a generation missing here has ended.
     @ObservationIgnored var recoveryFileIDs: [Int: UUID] = [:]
+    /// What each live generation's checkpoint last said, so a step can rewrite one field of it.
+    @ObservationIgnored var recoveryCheckpoints: [Int: RecoveryCheckpoint] = [:]
     /// Checkpoints a take's run or save still needs: cleanup leaves them on disk until the entry exists.
     @ObservationIgnored var recoveryHeldByTake: Set<Int> = []
     /// Working files the checkpoints on disk point at, which the sweep leaves for the offer to settle.
@@ -4263,6 +4269,8 @@ final class AppModel {
         let category = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let recovery = recoveryGeneration(of: take)
+        // Held until the take's run replaces it, so a Cancel while the take finishes can't delete it mid-fold.
+        if let recovery { recoveryHeldByTake.insert(recovery) }
         let given = annotations(of: take?.id)
         startTakeTask { [weak self] in
             guard let self else { return }
@@ -4278,6 +4286,7 @@ final class AppModel {
                     return
                 }
                 let folded = await foldMicTrack(micFile, into: url, take: take, recovery: recovery, wantsEngineInput: true)
+                if folded.stopped { return }
                 await transcribeRecordedTake(
                     url: folded.audio, engineInput: folded.engineInput, title: title, source: takeSource, category: category,
                     replacing: recovery, take: take?.id, annotations: given
@@ -4287,6 +4296,7 @@ final class AppModel {
                 clearTakeReadouts(of: take?.id)
                 liveRecordingAudioURL = nil
                 let folded = await foldMicTrack(micFile, into: cut.url, take: take, recovery: recovery, wantsEngineInput: false)
+                if folded.stopped { return }
                 await keepCutShortTake(
                     CaptureInterrupted(url: folded.audio, reason: cut.reason), title: title, source: takeSource,
                     category: category, recovery: recovery, take: take?.id, annotations: given
@@ -4296,7 +4306,10 @@ final class AppModel {
                 _ = await finishMicTrack(mic)
                 liveCompanionAudioURL = nil
                 clearTakeReadouts(of: take?.id)
-                if let recovery { endRecovery(recovery) }
+                if let recovery {
+                    recoveryHeldByTake.remove(recovery)
+                    endRecovery(recovery)
+                }
                 liveRecordingAudioURL = nil
                 let message = Self.transcriptionFailureMessage(for: error)
                 reportTakeFailure(message, take: take?.id)
@@ -4444,7 +4457,10 @@ final class AppModel {
 
     /// A take that came up but never heard a buffer, and whose file holds nothing, ends as if stopped before capture.
     private func endUnheardTake(_ file: URL, recovery: Int?, take: Int?) {
-        if let recovery { endRecovery(recovery) }
+        if let recovery {
+            recoveryHeldByTake.remove(recovery)
+            endRecovery(recovery)
+        }
         liveRecordingAudioURL = nil
         releaseTakeFile(file)
         let message = Self.nothingRecordedMessage()
@@ -4467,7 +4483,7 @@ final class AppModel {
         defer {
             if takeRun == run { takeRun = nil }
             endTakeTranscription(run)
-            if let engineFile { try? FileManager.default.removeItem(at: engineFile) }
+            discardMeetingScratch([engineFile])
         }
         let named = annotations.typedTitle ?? title
         let recovery = beginFileTranscribeRecovery(sourceURL: url, title: named, source: source, category: category)
@@ -4482,6 +4498,7 @@ final class AppModel {
         }
         updateSession(of: take) { $0.transcribing(progress: nil) }
         if let previous {
+            recoveryHeldByTake.remove(previous)
             await pendingRecoveryWrite?.value
             endRecovery(previous)
         }
@@ -4998,6 +5015,7 @@ final class AppModel {
         let category = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let recovery = recoveryGeneration(of: take)
+        if let recovery { recoveryHeldByTake.insert(recovery) }
         let given = annotations(of: take?.id)
         let title = given.title(for: category)
         await mediaSession.exitRecording()
@@ -5025,12 +5043,17 @@ final class AppModel {
         guard let prepared else { return }
         guard !heardNothing else {
             releaseStoppedMicTrack(micFile)
-            if let recovery { endRecovery(recovery) }
+            if let recovery {
+                recoveryHeldByTake.remove(recovery)
+                endRecovery(recovery)
+            }
             releaseTakeFile(prepared)
             return
         }
         if cutShort { _ = try? await AppModel.offMainIO { WAVHeaderRepair.makeReadable(prepared) } }
-        let url = await foldMicTrack(micFile, into: prepared, take: take, recovery: recovery, wantsEngineInput: false).audio
+        let folded = await foldMicTrack(micFile, into: prepared, take: take, recovery: recovery, wantsEngineInput: false)
+        if folded.stopped { return }
+        let url = folded.audio
         saveTake(
             Self.untranscribedTranscript(of: url, language: currentOptions.language),
             audio: url,

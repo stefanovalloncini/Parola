@@ -32,7 +32,17 @@ struct StoppedMicTrack {
 /// What a take's file is once its microphone track is folded in, and the mono mix the engine reads, when one was made.
 struct FoldedTake {
     let audio: URL
-    let engineInput: URL?
+    var engineInput: URL?
+    /// A test seam stopped the fold partway, as a crash would; nothing after it runs.
+    var stopped = false
+}
+
+/// The steps of a fold, after each of which a crash leaves one take file.
+enum FoldStep: CaseIterable, Sendable {
+    case mixed
+    case handedOver
+    case repointed
+    case micReleased
 }
 
 extension AppModel {
@@ -166,67 +176,126 @@ extension AppModel {
     /// A take that ends with nothing to keep lets its microphone file go too.
     func releaseStoppedMicTrack(_ mic: StoppedMicTrack?) {
         guard let mic else { return }
-        if liveCompanionAudioURL == mic.file {
-            liveCompanionAudioURL = nil
-            liveCompanionStartOffset = nil
-        }
-        releaseTakeFile(mic.file)
+        releaseMicFile(mic.file)
     }
 
     /// Cancel and Discard end the microphone track as they end the take: its file goes with the take's.
     func dropMicTrack(_ track: MicTrack?) async {
-        if liveCompanionAudioURL == track?.file {
-            liveCompanionAudioURL = nil
-            liveCompanionStartOffset = nil
-        }
+        if let file = track?.file { forgetLiveCompanion(file) }
         await track?.capture?.cancel()
-        if let file = track?.file { releaseTakeFile(file) }
+        if let file = track?.file { releaseMicFile(file) }
     }
 
-    /// The two tracks become the take's one stereo file, Mac audio left and you right, which takes the Mac file's place before both go.
+    /// Folds the microphone track into the take's own file, or leaves the take as it was when there is nothing to add.
     func foldMicTrack(
         _ mic: StoppedMicTrack?, into mac: URL, take: TakeContext?, recovery: Int?, wantsEngineInput: Bool
     ) async -> FoldedTake {
-        guard let mic else { return FoldedTake(audio: mac, engineInput: nil) }
-        if liveCompanionAudioURL == mic.file {
-            liveCompanionAudioURL = nil
-            liveCompanionStartOffset = nil
-        }
+        guard let mic else { return FoldedTake(audio: mac) }
+        forgetLiveCompanion(mic.file)
         guard await !Self.holdsNoAudio(mic.file) else {
-            releaseTakeFile(mic.file)
-            return FoldedTake(audio: mac, engineInput: nil)
+            if let recovery { await rewriteRecoveryCheckpoint(recovery) { $0 = $0.foldingMicTrack(into: mac) } }
+            releaseMicFile(mic.file)
+            return FoldedTake(audio: mac)
         }
-        let folder = inflightRecordingsURL
-        let engineInput = wantsEngineInput ? Self.meetingEngineInputURL() : nil
-        let stereo: URL
-        do {
-            let mixed = try await Self.mixMeetingFiles(mac: mac, mic: mic.file, micOffset: mic.offset, in: folder, mono: engineInput)
-            stereo = try await Self.offMainIO {
-                let take = folder.appendingPathComponent("parola-system-\(UUID().uuidString).wav")
-                do {
-                    try FileManager.default.moveItem(at: mixed, to: take)
-                } catch {
-                    try? FileManager.default.removeItem(at: mixed)
-                    throw error
-                }
-                return take
-            }
-        } catch {
-            ParolaLog.error(.audioRecording, "a meeting's microphone track could not be mixed in", [.error: .error(error)])
-            if let engineInput { try? FileManager.default.removeItem(at: engineInput) }
+        switch await foldIntoTakeFile(mic, take: mac, generation: recovery, wantsEngineInput: wantsEngineInput) {
+        case .folded(let audio, let engineInput):
+            if liveRecordingAudioURL == mac { liveRecordingAudioURL = audio }
+            updateSession(of: take?.id) { if $0.audioURL == mac { $0.audioURL = audio } }
+            return FoldedTake(audio: audio, engineInput: engineInput)
+        case .failed:
             if let take { noteMicTrackMissing(take.id, stopped: false) }
-            return FoldedTake(audio: mac, engineInput: nil)
+            return FoldedTake(audio: mac)
+        case .stopped:
+            return FoldedTake(audio: mac, stopped: true)
         }
-        if let recovery, let take, let startedAt = take.recoveryStartedAt {
-            await repointRecordingCheckpoint(
-                recovery, startedAt: startedAt, audio: stereo, source: take.source.entrySource, category: take.category
-            )
+    }
+
+    /// A recovered meeting's mic folds into its take file before the take is saved; a take already stereo only lets its mic go.
+    func foldRecoveredMicTrack(_ checkpoint: RecoveryCheckpoint, audio: URL, generation: Int) async -> FoldedTake {
+        if await Self.isStereoFile(audio) {
+            await rewriteRecoveryCheckpoint(generation) { $0 = $0.foldingMicTrack(into: audio) }
+            for mic in Set([checkpoint.companionAudioURL, RecordingScratch.meetingMicURL(for: audio)].compactMap { $0 })
+            where RecordingScratch.isMeetingMic(mic) {
+                releaseMicFile(mic)
+            }
+            return FoldedTake(audio: audio)
         }
-        if liveRecordingAudioURL == mac { liveRecordingAudioURL = stereo }
-        updateSession(of: take?.id) { if $0.audioURL == mac { $0.audioURL = stereo } }
-        releaseTakeFile(mac)
-        releaseTakeFile(mic.file)
-        return FoldedTake(audio: stereo, engineInput: engineInput)
+        guard let companion = checkpoint.companionAudioURL,
+              let readable = (try? await Self.offMainIO { Self.readableRecordingURL(companion) }) ?? nil else {
+            return FoldedTake(audio: audio)
+        }
+        let mic = StoppedMicTrack(file: readable, offset: checkpoint.companionStartOffset ?? 0)
+        switch await foldIntoTakeFile(mic, take: audio, generation: generation, wantsEngineInput: false) {
+        case .folded(let folded, _):
+            return FoldedTake(audio: folded)
+        case .failed:
+            return FoldedTake(audio: audio)
+        case .stopped:
+            return FoldedTake(audio: audio, stopped: true)
+        }
+    }
+
+    private enum FoldResult {
+        case folded(audio: URL, engineInput: URL?)
+        case failed
+        case stopped
+    }
+
+    /// Mix, rename over the take's own file, rewrite the checkpoint, then let the mic go: a crash after any step leaves one take file.
+    private func foldIntoTakeFile(_ mic: StoppedMicTrack, take mac: URL, generation: Int?, wantsEngineInput: Bool) async -> FoldResult {
+        var audio = mac
+        var engineInput: URL?
+        if await !Self.isStereoFile(mac) {
+            let scratch = meetingScratchURL()
+            let mono = wantsEngineInput ? meetingScratchURL() : nil
+            meetingScratchInUse.formUnion([scratch, mono].compactMap { $0 })
+            defer { meetingScratchInUse.remove(scratch) }
+            let folder = inflightRecordingsURL
+            do {
+                try await Self.offMainIO { [offset = mic.offset, micFile = mic.file] in
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    WAVHeaderRepair.makeReadable(mac)
+                    WAVHeaderRepair.makeReadable(micFile)
+                    let start = Date(timeIntervalSinceReferenceDate: 0)
+                    try MeetingTakeMixer.mix(
+                        mac: mac, mic: micFile, macStart: start, micStart: start.addingTimeInterval(offset), into: scratch, mono: mono
+                    )
+                }
+            } catch {
+                ParolaLog.error(.audioRecording, "a meeting's microphone track could not be mixed in", [.error: .error(error)])
+                discardMeetingScratch([scratch, mono])
+                return .failed
+            }
+            guard await foldStepHook?(.mixed) ?? true else { return .stopped }
+            let inPlace = isInflightFile(mac)
+            do {
+                audio = try await Self.offMainIO { try Self.handOver(scratch, to: mac, inPlace: inPlace) }
+            } catch {
+                ParolaLog.error(.audioRecording, "a meeting's mix could not take its take's place", [.error: .error(error)])
+                discardMeetingScratch([scratch, mono])
+                return .failed
+            }
+            engineInput = mono
+            guard await foldStepHook?(.handedOver) ?? true else { return .stopped }
+        }
+        if let generation { await rewriteRecoveryCheckpoint(generation) { $0 = $0.foldingMicTrack(into: audio) } }
+        guard await foldStepHook?(.repointed) ?? true else { return .stopped }
+        releaseMicFile(mic.file)
+        guard await foldStepHook?(.micReleased) ?? true else { return .stopped }
+        return .folded(audio: audio, engineInput: engineInput)
+    }
+
+    /// The mix takes the take file's own name, so there is only ever one take file; one outside the working folder, a fixture, is never overwritten.
+    nonisolated static func handOver(_ scratch: URL, to take: URL, inPlace: Bool) throws -> URL {
+        let target = inPlace
+            ? take
+            : scratch.deletingLastPathComponent().appendingPathComponent("parola-system-\(UUID().uuidString).wav")
+        guard rename(scratch.path, target.path) == 0 else {
+            let failure = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            try? FileManager.default.removeItem(at: scratch)
+            throw failure
+        }
+        return target
     }
 
     /// Mixes a meeting's two files into a stereo file under a scratch name in `folder`, which a sweep never takes for a take.
@@ -249,22 +318,32 @@ extension AppModel {
         return mixed
     }
 
-    /// A crashed meeting's microphone track goes back into its take; one that is gone or unreadable leaves the Mac side alone.
-    func mixRecoveredMicTrack(_ checkpoint: RecoveryCheckpoint, mac: URL?) async -> URL? {
-        guard let mac, let companion = checkpoint.companionAudioURL else { return nil }
-        guard let mic = (try? await Self.offMainIO { Self.readableRecordingURL(companion) }) ?? nil else { return nil }
-        do {
-            return try await Self.mixMeetingFiles(
-                mac: mac, mic: mic, micOffset: checkpoint.companionStartOffset ?? 0, in: inflightRecordingsURL, mono: nil
-            )
-        } catch {
-            ParolaLog.error(.appRecovery, "a recovered meeting's microphone track could not be mixed in", [.error: .error(error)])
-            return nil
+    /// A scratch file for a meeting's mix, in the working folder, where a sweep clears what a crash leaves.
+    func meetingScratchURL() -> URL {
+        inflightRecordingsURL.appendingPathComponent("\(RecordingScratch.meetingMixPrefix)-\(UUID().uuidString).wav")
+    }
+
+    func discardMeetingScratch(_ files: [URL?]) {
+        for file in files.compactMap({ $0 }) {
+            meetingScratchInUse.remove(file)
+            try? FileManager.default.removeItem(at: file)
         }
     }
 
-    nonisolated static func meetingEngineInputURL() -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("parola-meeting-mix-\(UUID().uuidString).wav")
+    /// The live take lets go of a microphone file that is now the fold's to settle.
+    private func forgetLiveCompanion(_ file: URL) {
+        guard liveCompanionAudioURL == file else { return }
+        liveCompanionAudioURL = nil
+        liveCompanionStartOffset = nil
+    }
+
+    func releaseMicFile(_ file: URL) {
+        forgetLiveCompanion(file)
+        releaseTakeFile(file)
+    }
+
+    nonisolated static func isStereoFile(_ url: URL) async -> Bool {
+        (try? await offMainIO { MeetingTakeMixer.isStereo(url) }) ?? false
     }
 
     /// A Mac-audio take with two channels is a meeting with your microphone on the right.
@@ -275,13 +354,18 @@ extension AppModel {
 
     /// The mono mix an engine reads for a meeting's stereo take; nil when one can't be made, and the engine reads the stereo.
     func meetingEngineInput(for stereo: URL) async -> URL? {
-        let mono = Self.meetingEngineInputURL()
+        let mono = meetingScratchURL()
+        meetingScratchInUse.insert(mono)
+        let folder = inflightRecordingsURL
         do {
-            try await Self.offMainIO { try MeetingTakeMixer.downmix(stereo: stereo, into: mono) }
+            try await Self.offMainIO {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                try MeetingTakeMixer.downmix(stereo: stereo, into: mono)
+            }
             return mono
         } catch {
             ParolaLog.error(.audioRecording, "a meeting's mono mix could not be made", [.error: .error(error)])
-            try? FileManager.default.removeItem(at: mono)
+            discardMeetingScratch([mono])
             return nil
         }
     }

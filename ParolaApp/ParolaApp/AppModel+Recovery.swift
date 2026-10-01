@@ -99,6 +99,20 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var referencedPaths: [String] {
         [sourceURL, audioURL, companionAudioURL].compactMap { $0?.isFileURL == true ? $0?.resolvingSymlinksInPath().path : nil }
     }
+
+    /// The take's own file: a recording's audio, or the file a take's transcription reads.
+    var takeFile: URL? {
+        kind == .recording ? audioURL : sourceURL
+    }
+
+    /// The same checkpoint once the microphone track is in the take's file, which may have moved to `file`.
+    func foldingMicTrack(into file: URL) -> RecoveryCheckpoint {
+        var folded = self
+        if kind == .recording { folded.audioURL = file } else { folded.sourceURL = file }
+        folded.companionAudioURL = nil
+        folded.companionStartOffset = nil
+        return folded
+    }
 }
 
 extension AppModel {
@@ -171,6 +185,7 @@ extension AppModel {
     func adoptRecovery(_ checkpoint: RecoveryCheckpoint) -> Int {
         recoveryGeneration += 1
         recoveryFileIDs[recoveryGeneration] = checkpoint.id
+        recoveryCheckpoints[recoveryGeneration] = checkpoint
         return recoveryGeneration
     }
 
@@ -193,17 +208,11 @@ extension AppModel {
         ))
     }
 
-    /// Points a stopped take's checkpoint at the one file it holds now, written before the files it was made from go.
-    func repointRecordingCheckpoint(_ generation: Int, startedAt: Date, audio: URL, source: EntrySource, category: EntryCategory) async {
-        writeRecoveryFile(generation: generation, RecoveryCheckpoint(
-            kind: .recording,
-            startedAt: startedAt,
-            modelName: selectedModel,
-            language: selectedLanguage,
-            audioURL: audio,
-            source: source,
-            category: category
-        ))
+    /// Rewrites a live checkpoint from what it last said, and waits until the new one is on disk.
+    func rewriteRecoveryCheckpoint(_ generation: Int, _ change: (inout RecoveryCheckpoint) -> Void) async {
+        guard var checkpoint = recoveryCheckpoints[generation] else { return }
+        change(&checkpoint)
+        writeRecoveryFile(generation: generation, checkpoint)
         await pendingRecoveryWrite?.value
     }
 
@@ -214,6 +223,7 @@ extension AppModel {
             activeRecoveryGeneration = nil
             recordingRecoveryStartedAt = nil
         }
+        recoveryCheckpoints[generation] = nil
         guard let id = recoveryFileIDs.removeValue(forKey: generation) else { return }
         deleteCheckpointFiles(id)
     }
@@ -245,6 +255,7 @@ extension AppModel {
         var checkpoint = checkpoint
         checkpoint.id = id
         checkpoint.owner = recoveryOwner?.id
+        recoveryCheckpoints[generation] = checkpoint
         let url = recoveryFileURL(for: id)
         let directory = recoveryDirectoryURL
         let earlier = pendingRecoveryWrite
@@ -534,24 +545,27 @@ extension AppModel {
                 let audioURL = await Self.probedRecordingURL(checkpoint.audioURL)
                 guard let self else { return }
                 if let audioURL, await self.libraryHolds(audioURL) { return alreadySaved() }
-                let mixed = await self.mixRecoveredMicTrack(checkpoint, mac: audioURL)
-                guard let restored = Self.restoredTranscript(checkpoint, audioURL: mixed ?? audioURL) else {
-                    self.removeRecoveryFile(of: checkpoint)
+                let generation = self.adoptRecovery(checkpoint)
+                var audio = audioURL
+                if let audioURL {
+                    let folded = await self.foldRecoveredMicTrack(checkpoint, audio: audioURL, generation: generation)
+                    if folded.stopped { return }
+                    audio = folded.audio
+                }
+                guard let restored = Self.restoredTranscript(checkpoint, audioURL: audio) else {
+                    self.endRecovery(generation)
                     return
                 }
-                let originals = mixed == nil ? [] : [audioURL, checkpoint.companionAudioURL].compactMap { $0 }
                 self.saveTake(
                     restored,
-                    audio: mixed ?? audioURL,
+                    audio: audio,
                     title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt, category: checkpoint.category ?? .transcription),
                     source: checkpoint.source ?? .microphone,
                     category: checkpoint.category ?? .transcription,
                     landingAs: .salvagedTake,
-                    recovery: self.adoptRecovery(checkpoint)
-                ) { [weak self] entry in
-                    release?(entry)
-                    for file in originals { self?.releaseTakeFile(file) }
-                }
+                    recovery: generation,
+                    onSaved: release
+                )
             }
         }
     }
@@ -559,7 +573,7 @@ extension AppModel {
     private func restoreRecoveredRecording(_ checkpoint: RecoveryCheckpoint) {
         let pageAtStart = route
         guard checkpoint.audioURL != nil else {
-            finishRecordingRestore(checkpoint, audioURL: nil, pageAtStart: pageAtStart)
+            finishRecordingRestore(checkpoint, audioURL: nil, generation: adoptRecovery(checkpoint), pageAtStart: pageAtStart)
             return
         }
         Task { [weak self] in
@@ -570,9 +584,14 @@ extension AppModel {
                 await self.openRecoveredEntry(entry)
                 return
             }
-            let mixed = await self.mixRecoveredMicTrack(checkpoint, mac: audioURL)
-            let originals = mixed == nil ? [] : [audioURL, checkpoint.companionAudioURL].compactMap { $0 }
-            self.finishRecordingRestore(checkpoint, audioURL: mixed ?? audioURL, pageAtStart: pageAtStart, mixedFrom: originals)
+            let generation = self.adoptRecovery(checkpoint)
+            var audio = audioURL
+            if let audioURL {
+                let folded = await self.foldRecoveredMicTrack(checkpoint, audio: audioURL, generation: generation)
+                if folded.stopped { return }
+                audio = folded.audio
+            }
+            self.finishRecordingRestore(checkpoint, audioURL: audio, generation: generation, pageAtStart: pageAtStart)
         }
     }
 
@@ -600,9 +619,9 @@ extension AppModel {
         )
     }
 
-    private func finishRecordingRestore(_ checkpoint: RecoveryCheckpoint, audioURL: URL?, pageAtStart: Route, mixedFrom originals: [URL] = []) {
+    private func finishRecordingRestore(_ checkpoint: RecoveryCheckpoint, audioURL: URL?, generation: Int, pageAtStart: Route) {
         guard let restored = Self.restoredTranscript(checkpoint, audioURL: audioURL) else {
-            removeRecoveryFile(of: checkpoint)
+            endRecovery(generation)
             return
         }
         clearDerivedArtifacts()
@@ -626,10 +645,8 @@ extension AppModel {
             source: checkpoint.source ?? .microphone,
             category: checkpoint.category ?? .transcription,
             landingAs: .recording,
-            recovery: adoptRecovery(checkpoint)
-        ) { [weak self] _ in
-            for file in originals { self?.releaseTakeFile(file) }
-        }
+            recovery: generation
+        )
     }
 
     nonisolated static func readableRecordingURL(_ url: URL) -> URL? {
@@ -662,7 +679,8 @@ extension AppModel {
             liveCompanionAudioURL, pendingRecovery?.sourceURL, pendingRecovery?.audioURL, pendingRecovery?.companionAudioURL,
         ]
         if takeRun != nil { readers.append(recordedTake?.file) }
-        let paths = (readers.compactMap { $0 } + takeFilesBeingSaved.keys).map { $0.resolvingSymlinksInPath().path }
+        let files = readers.compactMap { $0 } + takeFilesBeingSaved.keys + meetingScratchInUse
+        let paths = files.map { $0.resolvingSymlinksInPath().path }
         return recoveryReferencedFiles.union(paths)
     }
 
@@ -728,7 +746,9 @@ extension AppModel {
                 }
                 let startedAt = (try? file.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
                 var mixed: URL?
-                if let mic { mixed = try? await AppModel.mixMeetingFiles(mac: file, mic: mic, micOffset: 0, in: dir, mono: nil) }
+                if let mic, await !AppModel.isStereoFile(file) {
+                    mixed = try? await AppModel.mixMeetingFiles(mac: file, mic: mic, micOffset: 0, in: dir, mono: nil)
+                }
                 do {
                     // Copied, not moved: the original goes only once the entry holds the audio.
                     _ = try await library.add(
@@ -820,6 +840,11 @@ extension AppModel {
         return true
     }
 
+    /// A meeting's mix in progress, made again by the next fold: one left by a crash is cleared as soon as it is quiet.
+    nonisolated static func isMeetingScratch(_ file: URL) -> Bool {
+        file.pathExtension.lowercased() == "wav" && file.lastPathComponent.hasPrefix(RecordingScratch.meetingMixPrefix + "-")
+    }
+
     /// The meeting microphone track named for `take`, among the files a sweep found beside it.
     nonisolated static func pairedMeetingMic(for take: URL, in files: [(url: URL, modified: Date)]) -> URL? {
         let name = take.lastPathComponent
@@ -864,7 +889,7 @@ extension AppModel {
         file.lastPathComponent.hasPrefix("parola-system") ? .systemAudio : .microphone
     }
 
-    /// Files not kept for an offer and quiet long enough: a take after ten minutes, which one still writing never is, other scratch after two days, a meeting's mic track never while its take is there.
+    /// Files not kept for an offer and quiet long enough: a take or a mix in progress after ten minutes, other scratch after two days, a mic track never beside its take.
     nonisolated static func staleInflightFiles(
         in files: [(url: URL, modified: Date)],
         keeping: Set<String>,
@@ -876,7 +901,8 @@ extension AppModel {
             .filter { file in
                 guard !keeping.contains(file.url.resolvingSymlinksInPath().path) else { return false }
                 guard !RecordingScratch.takeNames(pairedWith: file.url).contains(where: names.contains) else { return false }
-                let quiet: TimeInterval = isImportableTake(file.url, modified: file.modified, takesSince: cutoff) ? 10 * 60 : 48 * 3600
+                let quiet: TimeInterval = isImportableTake(file.url, modified: file.modified, takesSince: cutoff) || isMeetingScratch(file.url)
+                    ? 10 * 60 : 48 * 3600
                 return file.modified < now.addingTimeInterval(-quiet)
             }
             .map(\.url)

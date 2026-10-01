@@ -73,6 +73,25 @@ private actor EngineReads {
     }
 }
 
+/// Holds a step until the test lets it go.
+private actor Gate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private(set) var reached = false
+
+    func wait() async {
+        reached = true
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        for waiter in waiters { waiter.resume() }
+        waiters.removeAll()
+    }
+}
+
 extension TranscriberMockSuites {
     @MainActor
     @Suite("Meeting second track", .serialized)
@@ -614,6 +633,147 @@ extension TranscriberMockSuites {
                 #expect(plain.takeMicTrackState == nil)
                 #expect(plain.takeMicLevels == nil)
                 plain.cancelCurrentWork()
+            }
+        }
+
+        // MARK: - The fold's hand-over
+
+        /// Stops a meeting's fold after `step`, as a crash there would, and hands back the take's files and its library.
+        private func meetingCrashedAfter(_ step: FoldStep) async throws -> (library: URL, files: (mac: URL, mic: URL)) {
+            let library = makeTempLibraryURL("second-track-crash")
+            let model = makeModel(libraryURL: library)
+            let files = try meetingFiles(model)
+            var stoppedAt: FoldStep?
+            model.foldStepHook = { reached in
+                guard reached == step else { return true }
+                stoppedAt = reached
+                return false
+            }
+            try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+            let micUp = await waitForMicTrack(model)
+            guard micUp else { throw FixtureTakeDidNotStart() }
+            model.stopRecordingAndTranscribe()
+            let stopped = await waitUntil { stoppedAt == step }
+            guard stopped else { throw FixtureTakeDidNotStart() }
+            model.recoveryOwner = nil
+            for file in try FileManager.default.contentsOfDirectory(at: model.inflightRecordingsURL, includingPropertiesForKeys: nil) {
+                try age(file, by: 3_600)
+            }
+            return (library, files)
+        }
+
+        private func checkpointsOnDisk(_ library: URL) throws -> [RecoveryCheckpoint] {
+            let folder = library.appendingPathComponent("recovery", isDirectory: true)
+            let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            return try files.filter { $0.pathExtension == "json" }.map {
+                try JSONDecoder().decode(RecoveryCheckpoint.self, from: try Data(contentsOf: $0))
+            }
+        }
+
+        /// The Mac talks in the first second and you in the second: a take folded twice would carry your voice on the left too.
+        private func expectOneFoldedMeeting(_ model: AppModel, files: (mac: URL, mic: URL)) async throws {
+            let entry = try #require(await landedEntry(model))
+            await model.inflightSweep?.value
+            model.sweepInflightRecordings()
+            await model.inflightSweep?.value
+            #expect(await model.library.list().count == 1, "one meeting, never a twin")
+            let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+            let sides = try TestAudio.read(audio)
+            #expect(sides.channels.count == 2)
+            #expect(sides.rms(channel: 0, from: 0.1, to: 0.9) > 0.2, "the Mac side")
+            #expect(sides.rms(channel: 0, from: 1.1, to: 1.9) < 0.01, "your voice is on your side only")
+            #expect(sides.rms(channel: 1, from: 1.1, to: 1.9) > 0.2, "your side")
+            let micGone = await waitUntil { !exists(files.mic) }
+            #expect(micGone)
+        }
+
+        @Test("a crash after any step of the fold leaves one meeting, which the next launch restores with both sides", arguments: FoldStep.allCases)
+        func crashAtAnyFoldStepRestoresOneMeeting(_ step: FoldStep) async throws {
+            try await withMocksCleared(.audioSource) {
+                let crashed = try await meetingCrashedAfter(step)
+
+                let relaunched = makeModel(libraryURL: crashed.library)
+                #expect(relaunched.pendingRecovery?.audioURL == crashed.files.mac, "the checkpoint still names the take's own file")
+                relaunched.acceptPendingRecovery()
+
+                try await expectOneFoldedMeeting(relaunched, files: crashed.files)
+                let cleared = await waitUntil { relaunched.recoveryCheckpointFiles.isEmpty }
+                #expect(cleared)
+            }
+        }
+
+        @Test("a crash once the mix has taken the take's place leaves a meeting that Not Now keeps once, folded once")
+        func notNowAfterAHandOverKeepsOneMeeting() async throws {
+            try await withMocksCleared(.audioSource) {
+                let crashed = try await meetingCrashedAfter(.handedOver)
+                #expect(try channels(of: crashed.files.mac) == 2, "the take's own file is the mix now")
+
+                let relaunched = makeModel(libraryURL: crashed.library)
+                relaunched.declinePendingRecovery()
+
+                try await expectOneFoldedMeeting(relaunched, files: crashed.files)
+            }
+        }
+
+        @Test("a crash after the mix took the take's place, with its checkpoint lost, gives the sweep one meeting to bring back")
+        func sweepAfterAHandOverKeepsOneMeeting() async throws {
+            try await withMocksCleared(.audioSource) {
+                let crashed = try await meetingCrashedAfter(.handedOver)
+                for file in try FileManager.default.contentsOfDirectory(
+                    at: crashed.library.appendingPathComponent("recovery", isDirectory: true), includingPropertiesForKeys: nil
+                ) where file.pathExtension == "json" {
+                    try FileManager.default.removeItem(at: file)
+                }
+                let relaunched = makeModel(libraryURL: crashed.library)
+                #expect(relaunched.pendingRecovery == nil)
+
+                try await expectOneFoldedMeeting(relaunched, files: crashed.files)
+            }
+        }
+
+        @Test("once the mix has the take's place, its checkpoint names that one file and no microphone track")
+        func foldRewritesTheCheckpoint() async throws {
+            try await withMocksCleared(.audioSource) {
+                let crashed = try await meetingCrashedAfter(.micReleased)
+
+                let checkpoints = try checkpointsOnDisk(crashed.library)
+                #expect(checkpoints.count == 1)
+                #expect(checkpoints.first?.audioURL == crashed.files.mac)
+                #expect(checkpoints.first?.companionAudioURL == nil)
+                #expect(!exists(crashed.files.mic))
+            }
+        }
+
+        @Test("Cancel while a meeting folds leaves its checkpoint on disk until the take is saved, with both sides")
+        func cancelDuringTheFoldKeepsTheCheckpoint() async throws {
+            try await withMocksCleared(.audioSource) {
+                let library = makeTempLibraryURL("second-track-cancel-fold")
+                let model = makeModel(libraryURL: library)
+                let files = try meetingFiles(model)
+                let gate = Gate()
+                model.foldStepHook = { step in
+                    if step == .mixed { await gate.wait() }
+                    return true
+                }
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                model.stopRecordingAndTranscribe()
+                let folding = await waitUntil { await gate.reached }
+                #expect(folding)
+
+                model.cancelCurrentWork()
+
+                let held = try checkpointsOnDisk(library)
+                #expect(held.count == 1, "the meeting's checkpoint stays while it folds")
+                #expect(held.first?.companionAudioURL == files.mic)
+                await gate.open()
+                let entry = try #require(await landedEntry(model))
+                #expect(entry.title.hasSuffix("(not transcribed)"))
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                #expect(try channels(of: audio) == 2)
+                let cleared = await waitUntil { model.recoveryCheckpointFiles.isEmpty }
+                #expect(cleared)
             }
         }
 
