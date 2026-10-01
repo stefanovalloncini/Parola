@@ -29,6 +29,22 @@ private func loopPosition(_ light: RecDot.LightView) -> Double? {
     return (now - pulse.beginTime).truncatingRemainder(dividingBy: 1)
 }
 
+/// A click as AppKit delivers one: the press goes to the window at the view's centre, its release already waiting in the queue.
+@MainActor
+private func click(_ view: NSView) {
+    guard let window = view.window else { return }
+    let centre = view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil)
+    func event(_ type: NSEvent.EventType) -> NSEvent? {
+        NSEvent.mouseEvent(
+            with: type, location: centre, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1
+        )
+    }
+    guard let down = event(.leftMouseDown), let up = event(.leftMouseUp) else { return }
+    NSApp.postEvent(up, atStart: false)
+    window.sendEvent(down)
+}
+
 /// How far into its current second the take is right now.
 private func takeSecond(since origin: Date) -> Double {
     Date().timeIntervalSince(origin).truncatingRemainder(dividingBy: 1)
@@ -133,6 +149,26 @@ struct RecordingLightTests {
     }
 
     @MainActor
+    @Test("a light already up follows its window from light to dark and back")
+    func lightFollowsTheAppearance() async throws {
+        let hosted = HostedWindow(RecDot(pulsesFrom: Date()), width: 40, height: 40)
+        defer { hosted.close() }
+        let light = try #require(lights(in: hosted).first)
+        let sRGB = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        func red() -> Double {
+            Double(light.dot.backgroundColor?.converted(to: sRGB, intent: .defaultIntent, options: nil)?.components?.first ?? 0)
+        }
+        let flips: [(NSAppearance.Name, Double)] = [(.aqua, 0.769), (.darkAqua, 0.839), (.aqua, 0.769)]
+        for (name, expected) in flips {
+            hosted.window.appearance = NSAppearance(named: name)
+            let followed = await waitUntil(timeoutMs: 2_000) { abs(red() - expected) < 0.01 }
+            #expect(followed, "\(name.rawValue): red \(red())")
+        }
+        let same = lights(in: hosted).first === light
+        #expect(same, "the light that was up, not one built again")
+    }
+
+    @MainActor
     @Test("under Reduce Motion, or with nothing to pulse from, the light holds still at full strength")
     func stillUnderReduceMotion() {
         let origin = Date(timeIntervalSinceNow: -5)
@@ -194,5 +230,31 @@ struct RecordingLightSurfaceTests {
         #expect(model.recording?.state == .finishing)
         #expect(paused == [0, 0, 0])
         #expect(finishing == [0, 0, 0])
+    }
+
+    @Test("a click on the light reaches the button it sits in, once, on the capsule and on the pill")
+    func clickOnTheLight() async throws {
+        let audio = try tempWAV("light-click")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("light-click")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -30))
+        defer { model.endTestTake() }
+        let take = try #require(model.recording)
+        var stageShown = 0
+        var parolaShown = 0
+        let capsuleFace = SessionCapsuleFace(take: take, showsMeter: false, isOnScreen: true, showStage: { stageShown += 1 }, stop: { _ in })
+        let capsule = HostedWindow(capsuleFace, width: 400, height: 80)
+        defer { capsule.close() }
+        let pillFace = RecordingPillFace(model: model, isOnScreen: true, onShowParola: { parolaShown += 1 }, onStop: {}, onSize: { _ in })
+        let pill = HostedWindow(pillFace, width: 400, height: 80)
+        defer { pill.close() }
+
+        click(try #require(lights(in: capsule).first))
+        await settle(for: .milliseconds(250))
+        click(try #require(lights(in: pill).first))
+        await settle(for: .milliseconds(250))
+
+        #expect(stageShown == 1)
+        #expect(parolaShown == 1)
     }
 }
