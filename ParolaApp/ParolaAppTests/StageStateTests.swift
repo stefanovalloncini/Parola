@@ -217,6 +217,14 @@ struct StageStateTests {
         #expect(!words.contains("Transcript appears here as it comes in"))
     }
 
+    @Test("a covered window, one on another Space or a minimized one stops the Stage drawing; any part in view keeps it going")
+    func coveredWindowStopsDrawing() {
+        #expect(WindowShownReader.shows(isVisible: true, isMiniaturized: false, occlusion: .visible))
+        #expect(!WindowShownReader.shows(isVisible: true, isMiniaturized: false, occlusion: []))
+        #expect(!WindowShownReader.shows(isVisible: true, isMiniaturized: true, occlusion: .visible))
+        #expect(!WindowShownReader.shows(isVisible: false, isMiniaturized: false, occlusion: .visible))
+    }
+
     @MainActor
     @Test("under Reduce Motion the Stage only crossfades: a still dot, the band four times a second, no morph, nothing carried over")
     func reduceMotionOnlyCrossfades() {

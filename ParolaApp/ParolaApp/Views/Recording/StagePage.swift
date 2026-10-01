@@ -497,9 +497,13 @@ struct StageDeviceMenu: View {
     }
 }
 
-/// Whether the window this sits in is on screen: false while it is minimized or hidden with the app.
+/// Whether the window this sits in is on screen: false while it is minimized, hidden with the app, covered, or on another Space.
 struct WindowShownReader: NSViewRepresentable {
     let onChange: (Bool) -> Void
+
+    nonisolated static func shows(isVisible: Bool, isMiniaturized: Bool, occlusion: NSWindow.OcclusionState) -> Bool {
+        isVisible && !isMiniaturized && occlusion.contains(.visible)
+    }
 
     func makeNSView(context: Context) -> ReaderView {
         ReaderView()
@@ -539,7 +543,9 @@ struct WindowShownReader: NSViewRepresentable {
 
         private func report() {
             guard let window else { return }
-            let shown = window.isVisible && !window.isMiniaturized
+            let shown = WindowShownReader.shows(
+                isVisible: window.isVisible, isMiniaturized: window.isMiniaturized, occlusion: window.occlusionState
+            )
             guard shown != reported else { return }
             reported = shown
             onChange?(shown)
