@@ -324,6 +324,22 @@ struct LibraryListLayoutTests {
         #expect(elements.contains { $0.words.contains(subtitle) }, "the page's subtitle reads \(subtitle)")
     }
 
+    @Test("a thousand entries fill the list as rows under their headers")
+    func thousandEntriesOnScreen() async throws {
+        let shown = entries(1_000)
+        let clock = ContinuousClock()
+        let start = clock.now
+        let hosted = await host(shown)
+        defer { close(hosted) }
+        let table = try #require(table(hosted))
+        let onScreen = clock.now - start
+        print("SCALE 1,000 entries hosted: \(table.numberOfRows) table rows ready in \(onScreen)")
+
+        let headers = LibraryDateGroups.Headers(sortOrder: .newest, groupsByDate: true)
+        let items = LibraryListItem.items(for: headers.groups(for: shown.map { LibraryRowDisplay(entry: $0, when: headers.when(for: $0)) }))
+        #expect(table.numberOfRows == items.count + 1, "the page top, then every title and entry")
+    }
+
     @Test("no row draws a rule under it: not the page's top, not a date title, not an entry")
     func rowsDrawNoRule() async throws {
         let hosted = await host(threeGroups())

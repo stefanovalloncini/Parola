@@ -256,4 +256,66 @@ struct LibraryDateGroupsTests {
         #expect(list.when(for: today.entry).hasPrefix("Today"))
         #expect(list.groups(for: [today]).map(\.title) == [nil])
     }
+
+    @Test("a thousand entries reach the list's rows with the pins first, each header once over its own rows, every entry once")
+    func thousandEntriesEndToEnd() throws {
+        let now = at("2026-09-30T10:00")
+        let entries: [LibraryEntry] = (0..<1_000).map { index in
+            let manifest = ParolaDocument.Manifest(
+                createdAt: now.addingTimeInterval(-Double(index) * 3 * 3600),
+                originalAudioName: "take-\(index).m4a",
+                title: "Take \(index)",
+                modelName: "stub",
+                language: index % 10 == 0 ? "it" : "en",
+                labels: index % 3 == 0 ? ["Work"] : [],
+                pinned: index % 97 == 5,
+                durationSeconds: Double(60 + index)
+            )
+            return LibraryEntry(id: String(format: "%04d-scale", index), bundleURL: URL(fileURLWithPath: "/tmp/scale/\(index).parola"), manifest: manifest)
+        }
+        let clock = ContinuousClock()
+        let start = clock.now
+        let rows = LibraryListContent.rows(
+            from: entries, category: nil, labelFilter: nil, languageFilter: nil, dateRange: .all, personFilter: nil
+        )
+        let headers = LibraryDateGroups.Headers(sortOrder: .newest, groupsByDate: true, now: now, calendar: calendar, locale: Self.english)
+        var cache = LibraryRowDisplayCache()
+        let displays = rows.map { cache.display(for: $0, when: headers.when(for: $0), usualLanguage: "EN") }
+        let items = LibraryListItem.items(for: headers.groups(for: displays))
+        let built = clock.now - start
+        let regrouped = LibraryListItem.items(for: headers.groups(for: rows.map {
+            cache.display(for: $0, when: headers.when(for: $0), usualLanguage: "EN")
+        }))
+        let rebuilt = clock.now - start - built
+        print("SCALE 1,000 entries: \(items.count) list rows built in \(built), rebuilt from the cache in \(rebuilt)")
+
+        let pinnedIDs = entries.filter(\.pinned).map(\.id)
+        let unpinnedIDs = entries.filter { !$0.pinned }.map(\.id)
+        var titles: [String] = []
+        var entryIDs: [String] = []
+        var misplaced: [String] = []
+        for item in items {
+            switch item {
+            case .header(_, let title):
+                titles.append(title)
+            case .entry(let row):
+                entryIDs.append(row.id)
+                let bucket = LibraryDateGroups.bucket(for: row.entry.createdAt, now: now, calendar: calendar)
+                let expected = row.pinned ? "Pinned" : LibraryDateGroups.title(for: bucket, now: now, calendar: calendar, locale: Self.english)
+                if titles.last != expected { misplaced.append(row.id) }
+            }
+        }
+        #expect(pinnedIDs.count == 11)
+        #expect(titles.first == "Pinned")
+        #expect(Array(titles.prefix(5)) == ["Pinned", "Today", "Yesterday", "Previous 7 Days", "Previous 30 Days"])
+        #expect(Set(titles).count == titles.count, "a header shows up twice: \(titles)")
+        #expect(Array(entryIDs.prefix(pinnedIDs.count)) == pinnedIDs, "the pins lead, in the library's order")
+        #expect(Array(entryIDs.dropFirst(pinnedIDs.count)) == unpinnedIDs, "the rest keep newest first")
+        #expect(misplaced.isEmpty, "rows under the wrong header: \(misplaced.prefix(5))")
+        #expect(items.count == entries.count + titles.count)
+        #expect(Set(items.map(\.id)).count == items.count, "every row of the list has an id of its own")
+        #expect(regrouped == items, "a rebuild from the cache lands on the same rows")
+        let italian = displays.filter { $0.language != nil }.count
+        #expect(italian == 100, "only the rows in another language than the library's name it")
+    }
 }
