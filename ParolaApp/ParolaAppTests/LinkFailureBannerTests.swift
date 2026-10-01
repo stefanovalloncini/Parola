@@ -198,4 +198,46 @@ extension TranscriberMockSuites {
             #expect(model.canRetryFailedTranscription)
         }
     }
+
+    @MainActor
+    @Suite("A run starting over an unseen failure")
+    struct UnseenFailureBeforeARunTests {
+        private static let pinnedModel = "openai_whisper-tiny"
+        private static let link = "https://www.youtube.com/watch?v=9XUo28kxQt4&t=41s"
+
+        @Test("beginFileTranscription posts the failure nobody saw as a notice")
+        func fileRunPostsTheFailure() async throws {
+            let audio = try makeTakeWAV("unseen-failure-file")
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "hi")])
+                let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("unseen-failure-file"))
+                model.useStreaming = false
+                model.selectedModel = Self.pinnedModel
+                model.route = .statistics
+                model.phase = .failed(message: "Couldn't start live captions")
+
+                model.beginFileTranscription(fileURL: audio, translateOverride: nil)
+
+                let notice = try #require(await waitForNotice(model))
+                #expect(notice.message == "Couldn't start live captions")
+                #expect(notice.tone == .failure)
+            }
+        }
+
+        @Test("transcribeYouTube posts the failure nobody saw as a notice")
+        func linkRunPostsTheFailure() async {
+            let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("unseen-failure-link"))
+            model.linkFetcher = FixtureLinkFetcher(failure: staleRefusal)
+            model.route = .statistics
+            model.phase = .failed(message: "Couldn't open Voice memo 3")
+
+            model.transcribeYouTube(urlString: Self.link)
+
+            #expect(model.exportNotice?.message == "Couldn't open Voice memo 3")
+            #expect(model.exportNotice?.tone == .failure)
+            #expect(model.phase == .fetchingLink(title: nil, progress: nil))
+            await waitUntil { model.phase == .failed(message: staleRefusalMessage) }
+        }
+    }
 }

@@ -2540,6 +2540,7 @@ final class AppModel {
         fileTranscribeTask = Task { [weak self] in
             guard let self else { return }
             do {
+                leaveFailedPhase()
                 phase = store.isInstalled(selectedModel)
                     ? .loadingModel(name: selectedModel)
                     : .downloadingModel(name: selectedModel, progress: 0)
@@ -2944,6 +2945,7 @@ final class AppModel {
         let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, source: .web)
         let fetcher = linkFetcher
         let progress = makeLinkFetchHandler(runToken: runToken)
+        leaveFailedPhase()
         phase = .fetchingLink(title: nil, progress: nil)
         // A cold model load then overlaps the download instead of following it.
         if prewarmsDuringLinkFetch { prewarmSelectedModel() }
