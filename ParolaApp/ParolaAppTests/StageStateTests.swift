@@ -508,6 +508,42 @@ struct StageStateTests {
     }
 
     @MainActor
+    @Test("a take that passes through finishing in a moment still shows its Finishing pill a while before Stop Transcribing")
+    func pillHoldsOnScreen() async throws {
+        let model = makeRecordingModel("stage-pill-hold")
+        func controls(_ take: RecordingSession) -> some View {
+            StageControls(take: take).environment(model)
+        }
+        var take = liveTake()
+        let host = NSHostingView(rootView: controls(take))
+        let window = NSWindow(
+            contentRect: NSRect(x: -12_000, y: -12_000, width: 900, height: 120), styleMask: [.borderless], backing: .buffered, defer: false
+        )
+        window.contentView = host
+        window.orderFront(nil)
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+        await settle(for: .milliseconds(100))
+        func shows(_ id: String) -> Bool {
+            HostedAccessibility.elements(in: host).contains { $0.identifier?.hasSuffix(id) == true }
+        }
+
+        _ = take.finish(at: Date())
+        host.rootView = controls(take)
+        await settle(for: .milliseconds(50))
+        _ = take.transcribing(progress: nil)
+        host.rootView = controls(take)
+        await settle(for: .milliseconds(50))
+
+        #expect(shows("Stage.Label.Finishing"))
+        #expect(!shows("Stage.Button.StopTranscribing"))
+        let replaced = await waitUntil(timeoutMs: 3_000) { shows("Stage.Button.StopTranscribing") }
+        #expect(replaced)
+    }
+
+    @MainActor
     @Test("a failed take's Stage says it stopped, not that it records")
     func failedStageSaysStopped() {
         let model = makeRecordingModel("stage-failed-status")
@@ -657,20 +693,25 @@ extension TranscriberMockSuites {
                 let model = makeModel("stage-landing-gate")
                 let before = StageLanding.transcriptIsTheTake(model)
                 #expect(!before)
+                let save = FetchGate()
+                model.beforeLandingSave = { await save.wait() }
 
                 recordAndStop(model, audio: audio, seconds: 1)
 
                 let onScreen = await waitUntil { model.route == .transcript && model.transcript != nil }
                 #expect(onScreen)
+                let unsaved = model.recording?.isTranscribing == true
+                #expect(unsaved, "the save is still held")
                 let atLanding = StageLanding.transcriptIsTheTake(model)
-                #expect(atLanding)
+                #expect(atLanding, "over its working file before the save lands")
                 #expect(model.routeLandsTake, "the change off the Stage was the take's own landing")
+                await save.open()
                 let landed = await landedEntry(model)
                 let entry = try #require(landed)
                 let moved = await waitUntil { model.recording?.state == .done(entryID: entry.id) && model.sourceFileURL != audio }
                 #expect(moved, "the save moved playback onto the entry's own audio")
                 let afterSave = StageLanding.transcriptIsTheTake(model)
-                #expect(afterSave, "a landing still in flight keeps its pieces when the save lands")
+                #expect(afterSave, "as its entry once the save lands")
                 model.route = .statistics
                 #expect(!model.routeLandsTake, "the next route change is no landing")
 
@@ -691,6 +732,48 @@ extension TranscriberMockSuites {
 
             #expect(!model.routeLandsTake)
             model.endTestTake()
+        }
+
+        @Test("a live take that lands on its Stage carries its band and time into its transcript, over its own audio and then as its entry")
+        func liveTakeLandingCarries() async throws {
+            let audio = try makeTakeWAV("stage-live-landing", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the live words")],
+                    partials: ["the", "the live", "the live words"],
+                    delayMs: 300,
+                    recordedAudio: audio
+                ))
+                let model = makeModel("stage-live-landing")
+                model.useStreaming = true
+                let save = FetchGate()
+                model.beforeLandingSave = { await save.wait() }
+                model.startRecording(source: .microphone)
+                let recording = await waitUntil(timeoutMs: 30_000) { model.recording?.state == .recording }
+                #expect(recording)
+
+                model.stopRecordingAndTranscribe()
+
+                let landed = await waitUntil(timeoutMs: 10_000) {
+                    model.recording?.state == .done(entryID: nil) && model.route == .transcript
+                }
+                #expect(landed)
+                let stageOffers = model.recording.map { StageLanding.stageOffers($0.state) } == true
+                #expect(stageOffers, "the Stage it leaves still offers its pieces")
+                let atLanding = StageLanding.transcriptIsTheTake(model)
+                #expect(atLanding, "over its own audio before the save lands")
+                #expect(model.routeLandsTake)
+                #expect(model.player != nil, "the media bar the band drops into is there")
+                await save.open()
+                let saved = await landedEntry(model, timeoutMs: 10_000)
+                let entry = try #require(saved)
+                let settled = await waitUntil { model.recording?.state == .done(entryID: entry.id) }
+                #expect(settled)
+                let afterSave = StageLanding.transcriptIsTheTake(model)
+                #expect(afterSave, "as its entry once the save lands")
+            }
         }
 
         @Test("a take cut short after Stop and Cancel still says so, while Record works again at once")
