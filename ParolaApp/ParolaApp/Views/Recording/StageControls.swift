@@ -108,7 +108,7 @@ struct StageControls: View {
     }
 }
 
-/// A Liquid Glass capsule of an exact height, clear or tinted; the tinted one carries white labels.
+/// A Liquid Glass capsule of an exact height, clear or filled; the filled one carries white labels.
 struct GlassCapsuleButtonStyle: ButtonStyle {
     enum Prominence {
         case standard
@@ -128,8 +128,9 @@ struct GlassCapsuleButtonStyle: ButtonStyle {
             .padding(.horizontal, horizontalPadding)
             .frame(minWidth: minWidth, minHeight: height, maxHeight: height)
             .foregroundStyle(foreground)
+            .background { fill }
             .contentShape(Capsule())
-            .glassEffect(glass, in: Capsule())
+            .glassEffect(.regular.interactive(), in: Capsule())
             .brightness(configuration.isPressed ? -0.08 : 0)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
@@ -142,10 +143,11 @@ struct GlassCapsuleButtonStyle: ButtonStyle {
         }
     }
 
-    private var glass: Glass {
-        switch prominence {
-        case .standard, .secondary: .regular.interactive()
-        case .tinted(let tint): .regular.tint(tint).interactive()
+    /// Solid rather than a glass tint, which greys out while the window is inactive.
+    @ViewBuilder
+    private var fill: some View {
+        if case .tinted(let tint) = prominence {
+            Capsule().fill(tint)
         }
     }
 }
