@@ -12230,6 +12230,17 @@
         }
       }
     },
+    "STOPPED": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FERMATA"
+          }
+        }
+      }
+    },
     "SUPPORT": {
       "extractionState": "manual",
       "localizations": {

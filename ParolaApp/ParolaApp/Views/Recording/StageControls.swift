@@ -52,19 +52,21 @@ struct StageControls: View {
         }
     }
 
+    /// A word in the controls' place, not a control: there is nothing to press while the take winds down.
     private var finishingPill: some View {
-        Button {} label: {
-            HStack(spacing: DS.Spacing.small) {
-                ProgressView()
-                    .controlSize(.small)
-                Text("Finishing…")
-            }
-            .font(DS.Font.bodyStrong)
+        HStack(spacing: DS.Spacing.small) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Finishing…")
         }
-        .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: DS.Spacing.medium, minWidth: Self.stopWidth))
-        .disabled(true)
+        .font(DS.Font.bodyStrong)
+        .foregroundStyle(DS.Color.secondaryText)
+        .padding(.horizontal, DS.Spacing.medium)
+        .frame(minWidth: Self.stopWidth, minHeight: Self.buttonHeight, maxHeight: Self.buttonHeight)
+        .glassEffect(.regular, in: Capsule())
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Finishing the recording")
-        .axLeaf("Stage.Button.Finishing")
+        .axLeaf("Stage.Label.Finishing")
     }
 
     /// The take's audio is in the library either way; this only stops the words.

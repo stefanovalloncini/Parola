@@ -161,7 +161,7 @@ struct StageTimeSlot: View {
         .foregroundStyle(DS.Color.primaryText)
     }
 
-    /// "Preparing Whisper Turbo · 42 %" while the model downloads, "Preparing Whisper Turbo…" while it loads.
+    /// "Preparing Whisper Turbo · 42%" while the model downloads, "Preparing Whisper Turbo…" while it loads.
     static func preparingText(name: String, download: Double?, bundle: Bundle = .main) -> String {
         let model = ModelPickerView.shortLabel(for: AppModel.modelLabel(name))
         guard let download else { return String(localized: "Preparing \(model)…", bundle: bundle) }
@@ -323,9 +323,12 @@ struct StageFacts: View {
             case .paused:
                 RecDot(color: DS.Palette.warning)
                 statusWord("PAUSED", color: DS.Color.warningText)
-            case .finishing, .failed:
+            case .finishing:
                 RecDot(color: DS.Color.secondaryText)
                 statusWord("REC", color: DS.Color.secondaryText)
+            case .failed:
+                RecDot(color: DS.Color.secondaryText)
+                statusWord("STOPPED", color: DS.Color.secondaryText)
             case .transcribing(let progress):
                 RecDot(color: DS.Color.accent)
                 StageTranscribingStatus(progress: progress, ticks: isOnScreen)

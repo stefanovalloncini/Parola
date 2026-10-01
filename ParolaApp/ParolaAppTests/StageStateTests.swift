@@ -272,6 +272,37 @@ struct StageStateTests {
     }
 
     @MainActor
+    @Test("the Finishing pill reads as words, not as a dimmed button")
+    func finishingPillIsALabel() throws {
+        let model = makeRecordingModel("stage-finishing-label")
+        var take = liveTake()
+        _ = take.finish(at: Date())
+
+        let hosted = stage(take, model: model)
+
+        let pill = hosted.elements.first { $0.identifier?.hasSuffix("Stage.Label.Finishing") == true }
+        let found = try #require(pill)
+        let enabled = found.object.responds(to: NSSelectorFromString("isAccessibilityEnabled"))
+            ? found.object.value(forKey: "accessibilityEnabled") as? Bool : nil
+        #expect(enabled == true, "a disabled control is read as dimmed")
+        #expect(found.words.contains("Finishing the recording"))
+    }
+
+    @MainActor
+    @Test("a failed take's Stage says it stopped, not that it records")
+    func failedStageSaysStopped() {
+        let model = makeRecordingModel("stage-failed-status")
+        var failed = liveTake()
+        failed.fail("The model stopped answering.")
+
+        let hosted = stage(failed, model: model)
+
+        let words = hosted.elements.flatMap(\.words)
+        #expect(words.contains("STOPPED"))
+        #expect(!words.contains("REC"))
+    }
+
+    @MainActor
     @Test("a transcribing take's overview keeps the page's margins")
     func overviewMargins() throws {
         let model = makeRecordingModel("stage-overview-margins")
@@ -334,6 +365,8 @@ struct StageStateTests {
         #expect(String(localized: "This recording was deleted. Restore it from Recently Deleted to try again.", bundle: it)
             == "Questa registrazione è stata eliminata. Ripristinala da Eliminati di recente per riprovare.")
         #expect(String(localized: "The recording stopped", bundle: it) == "La registrazione si è interrotta")
+        #expect(String(localized: "STOPPED", bundle: it) == "FERMATA")
+        #expect(String(localized: "Transcript appears when it's done", bundle: it) == "La trascrizione appare quando è pronta")
     }
 
     @MainActor
