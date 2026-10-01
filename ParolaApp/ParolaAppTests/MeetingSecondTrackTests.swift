@@ -470,8 +470,10 @@ extension TranscriberMockSuites {
 
                 model.retranscribeCurrentEntry(model: "nvidia_parakeet-tdt-0.6b-v3", language: nil)
 
-                let failed = await waitUntil { runFailed(model) }
-                #expect(failed)
+                // The run loads, checks the room and fails its downmix off the main actor, which a loaded host can hold up for seconds.
+                let over = await waitUntil(timeoutMs: 30_000) { model.retranscribeRequest == nil }
+                #expect(over)
+                #expect(runFailed(model))
                 #expect(model.phase != .failed(message: AppModel.meetingMixUnavailableMessage()))
             }
         }
