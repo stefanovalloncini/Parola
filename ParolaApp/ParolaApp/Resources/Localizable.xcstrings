@@ -14912,6 +14912,17 @@
         }
       }
     },
+    "There's no room to prepare this meeting for transcription. Free some disk space and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non c'è spazio per preparare questa riunione alla trascrizione. Libera un po' di spazio su disco e riprova."
+          }
+        }
+      }
+    },
     "These apply to the Transcript menu's copy commands, the library's bulk export and the subtitle warnings. Auto-export writes what each preset says.": {
       "extractionState": "manual",
       "localizations": {

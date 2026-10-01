@@ -67,7 +67,7 @@ extension AppModel {
         var landing: Task<LibraryEntry, any Error>?
         var landed: Transcript?
         var engineFile: URL?
-        defer { if let engineFile { try? FileManager.default.removeItem(at: engineFile) } }
+        defer { discardMeetingScratch([engineFile]) }
         do {
             let loaded = try await library.load(entryID)
             guard let audioURL = loaded.document.audioURL else {
@@ -80,7 +80,10 @@ extension AppModel {
                 ? .loadingModel(name: modelName)
                 : .downloadingModel(name: modelName, progress: 0)
             let meeting = await isMeetingStereo(audioURL, source: loaded.entry.manifest.source)
-            if meeting, engineNeedsMonoMix(model: modelName) { engineFile = await meetingEngineInput(for: audioURL) }
+            if meeting, engineNeedsMonoMix(model: modelName) {
+                guard let mono = await meetingEngineInput(for: audioURL) else { throw MeetingMixUnavailable() }
+                engineFile = mono
+            }
             let result = try await session.transcribe(
                 source: FileAudioSource(url: engineFile ?? audioURL),
                 options: meeting ? meetingOptions(options, stereo: audioURL) : options,

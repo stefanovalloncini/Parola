@@ -69,6 +69,11 @@ struct FoldedTake {
     var stopped = false
 }
 
+/// A meeting's take needs a mono mix for an engine that hears one channel, and there's no room to make it.
+struct MeetingMixUnavailable: LocalizedError {
+    var errorDescription: String? { AppModel.meetingMixUnavailableMessage() }
+}
+
 /// The steps of a fold, after each of which a crash leaves one take file.
 enum FoldStep: CaseIterable, Sendable {
     case mixed
@@ -582,10 +587,12 @@ extension AppModel {
 
     /// What a meeting's fold at Stop will write: the stereo take, and the engine's mono mix when it needs one.
     nonisolated static func foldBytes(mac: URL, mic: URL, mono: Bool) async -> Int64 {
-        let sizes = (try? await offMainIO {
-            [mac, mic].map { Int64((try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }
-        }) ?? []
-        return (sizes.max() ?? 0) * (mono ? 2 : 1)
+        let largest = max(await fileBytes(mac), await fileBytes(mic))
+        return largest * (mono ? 2 : 1)
+    }
+
+    nonisolated static func fileBytes(_ file: URL) async -> Int64 {
+        (try? await offMainIO { Int64((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }) ?? 0
     }
 
     /// The room a meeting recording its mic keeps free for its fold, so the guard stops the take while the fold still fits.
@@ -599,10 +606,14 @@ extension AppModel {
 
     /// Whether the volume holds a fold of these files with a margin still free after it.
     func hasRoomToFold(mac: URL, mic: URL, mono: Bool) async -> Bool {
+        await hasRoom(for: Self.foldBytes(mac: mac, mic: mic, mono: mono))
+    }
+
+    /// Whether the volume holds `bytes` more with the fold's margin still free after them.
+    func hasRoom(for bytes: Int64) async -> Bool {
         let provider = freeDiskSpaceProvider
-        let need = await Self.foldBytes(mac: mac, mic: mic, mono: mono)
         guard let free = await Self.freeDiskSpace(provider) else { return true }
-        return free - need >= Self.meetingFoldMarginBytes
+        return free - bytes >= Self.meetingFoldMarginBytes
     }
 
     /// A scratch file for a meeting's mix, in the working folder, where a sweep clears what a crash leaves.
@@ -640,8 +651,12 @@ extension AppModel {
         return (try? await Self.offMainIO { MeetingTakeMixer.isStereo(audio) }) ?? false
     }
 
-    /// The mono mix an engine reads for a meeting's stereo take; nil when one can't be made, and the engine reads the stereo.
+    /// The mono mix an engine that hears one channel reads for a meeting's stereo take; nil when there's no room for it or it can't be made.
     func meetingEngineInput(for stereo: URL) async -> URL? {
+        guard await hasRoom(for: Self.fileBytes(stereo)) else {
+            ParolaLog.notice(.audioRecording, "no room on disk for a meeting's mono mix")
+            return nil
+        }
         let mono = meetingScratchURL()
         meetingScratchInUse.insert(mono)
         let folder = inflightRecordingsURL
@@ -712,6 +727,10 @@ extension AppModel {
 
     nonisolated static func micTrackUnfoldableMessage(title: String, bundle: Bundle = .main) -> String {
         String(localized: "Parola couldn't add your microphone's track to “\(title)”.", bundle: bundle)
+    }
+
+    nonisolated static func meetingMixUnavailableMessage(bundle: Bundle = .main) -> String {
+        String(localized: "There's no room to prepare this meeting for transcription. Free some disk space and try again.", bundle: bundle)
     }
 
     nonisolated static func micTrackKeptMessage(bundle: Bundle = .main) -> String {

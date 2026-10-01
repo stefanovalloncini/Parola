@@ -379,6 +379,120 @@ extension TranscriberMockSuites {
             }
         }
 
+        /// Whether the model's run failed, as the error card shows it.
+        private func runFailed(_ model: AppModel) -> Bool {
+            if case .failed = model.phase { return true }
+            return false
+        }
+
+        @Test("Transcribe Again on a meeting with no room for the mono mix Parakeet needs fails and says so, never handing the engine the stereo")
+        func retranscribeWithoutRoomForTheMonoFails() async throws {
+            try await withMocksCleared(.transcriber) {
+                let library = makeTempLibraryURL("second-track-no-room-rerun")
+                let stereo = try TestAudio.stereo(leftAmplitude: 0.3, rightAmplitude: 0.3, seconds: 1)
+                let seeded = try await LibraryStore(libraryURL: library, extraIndexer: nil).add(
+                    transcript: Transcript(
+                        segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Welcome")], language: "en", modelName: "m"
+                    ),
+                    audioSource: stereo, category: .meeting, source: .systemAudio
+                )
+                let model = makeModel(libraryURL: library)
+                await model.awaitModelListRefresh()
+                await installMockTranscriber(segments: [(0, 1, "Welcome")])
+                let reads = EngineReads()
+                model.postProcessOperation = { transcript in
+                    await reads.note(transcript.sourceURL)
+                    return transcript
+                }
+                _ = try await model.openEntry(seeded.id)
+                model.freeDiskSpaceProvider = { AppModel.meetingFoldMarginBytes + 1_000 }
+
+                model.retranscribeCurrentEntry(model: "nvidia_parakeet-tdt-0.6b-v3", language: nil)
+
+                let failed = await waitUntil { runFailed(model) }
+                #expect(failed)
+                #expect(model.phase == .failed(message: AppModel.meetingMixUnavailableMessage()))
+                #expect(await reads.files.isEmpty, "the engine never got the stereo")
+                #expect(model.meetingScratchInUse.isEmpty)
+            }
+        }
+
+        @Test("Transcribe Again on a meeting lets Parakeet's mono mix go when the run is done, from the disk and from the files in use")
+        func retranscribeLetsTheMonoGo() async throws {
+            try await withMocksCleared(.transcriber) {
+                let library = makeTempLibraryURL("second-track-rerun-mono")
+                let stereo = try TestAudio.stereo(leftAmplitude: 0.3, rightAmplitude: 0.3, seconds: 1)
+                let seeded = try await LibraryStore(libraryURL: library, extraIndexer: nil).add(
+                    transcript: Transcript(
+                        segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Welcome")], language: "en", modelName: "m"
+                    ),
+                    audioSource: stereo, category: .meeting, source: .systemAudio
+                )
+                let model = makeModel(libraryURL: library)
+                await model.awaitModelListRefresh()
+                await installMockTranscriber(segments: [(0, 1, "Welcome back")])
+                let reads = EngineReads()
+                model.postProcessOperation = { transcript in
+                    await reads.note(transcript.sourceURL)
+                    return transcript
+                }
+                _ = try await model.openEntry(seeded.id)
+
+                model.retranscribeCurrentEntry(model: "nvidia_parakeet-tdt-0.6b-v3", language: nil)
+
+                let done = await waitUntil { model.retranscribeRequest == nil && model.phase == .ready }
+                #expect(done)
+                #expect(await reads.channels == [1])
+                let mono = try #require(await reads.files.first)
+                #expect(!exists(mono))
+                #expect(model.meetingScratchInUse.isEmpty)
+            }
+        }
+
+        @Test("Restore of a meeting mid-transcription with no room for the mono mix Parakeet needs saves the take untranscribed and says so")
+        func restoreWithoutRoomForTheMonoFails() async throws {
+            try await withMocksCleared(.transcriber) {
+                let library = makeTempLibraryURL("second-track-no-room-restore")
+                let take = try inflight(library).appendingPathComponent("parola-system-\(UUID().uuidString).wav")
+                try FileManager.default.copyItem(at: try TestAudio.stereo(leftAmplitude: 0.3, rightAmplitude: 0.3, seconds: 1), to: take)
+                try age(take, by: 300)
+                try writeLegacyCheckpoint(RecoveryCheckpoint(
+                    kind: .fileTranscription, startedAt: Date(), modelName: "m", sourceURL: take, title: "Meeting",
+                    source: .systemAudio, category: .meeting
+                ), library: library)
+                let model = makeModel(libraryURL: library)
+                await model.awaitModelListRefresh()
+                model.selectedModel = "nvidia_parakeet-tdt-0.6b-v3"
+                await installMockTranscriber(segments: [(0, 1, "Welcome")])
+                let reads = EngineReads()
+                model.postProcessOperation = { transcript in
+                    await reads.note(transcript.sourceURL)
+                    return transcript
+                }
+                model.freeDiskSpaceProvider = { AppModel.meetingFoldMarginBytes + 1_000 }
+                #expect(model.pendingRecovery?.sourceURL == take)
+
+                model.acceptPendingRecovery()
+
+                let entry = try #require(await landedEntry(model))
+                let failed = await waitUntil { runFailed(model) }
+                #expect(failed)
+                let message = AppModel.meetingMixUnavailableMessage() + " " + String(localized: "The audio was saved to your library.")
+                #expect(model.phase == .failed(message: message))
+                #expect(await reads.files.isEmpty, "the engine never got the stereo")
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                #expect(try channels(of: audio) == 2)
+            }
+        }
+
+        @Test("the message for a meeting with no room for its mono mix reads in Italian")
+        func meetingMixUnavailableReadsInItalian() throws {
+            let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+            let italian = try #require(Bundle(path: path))
+            #expect(AppModel.meetingMixUnavailableMessage(bundle: italian)
+                == "Non c'è spazio per preparare questa riunione alla trascrizione. Libera un po' di spazio su disco e riprova.")
+        }
+
         // MARK: - The permission prompt
 
         @Test("a late Allow on the mic prompt, after the take has stopped, never switches the mic on")
