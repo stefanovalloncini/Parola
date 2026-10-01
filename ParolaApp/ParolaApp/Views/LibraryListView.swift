@@ -324,9 +324,24 @@ struct LibraryListView: View {
     }
 }
 
+/// Test seam: counts a Library list's row-recompute passes, so a test can tell whether one event rebuilt it twice.
+@MainActor
+final class LibraryRecomputePasses {
+    private(set) var count = 0
+
+    func note() {
+        count += 1
+    }
+}
+
+extension EnvironmentValues {
+    @Entry var libraryRecomputePasses: LibraryRecomputePasses?
+}
+
 /// A category's rows, or all of them, with the filters and the date groups.
 private struct LibraryBrowseList: View, Equatable {
     @Environment(AppModel.self) private var model
+    @Environment(\.libraryRecomputePasses) private var recomputePasses
     let category: EntryCategory?
     let focus: FocusState<LibraryListFocus?>.Binding
 
@@ -379,6 +394,7 @@ private struct LibraryBrowseList: View, Equatable {
     /// Takes filters explicitly so a category switch can recompute with the ones it just dropped, not `@State` it just wrote.
     @discardableResult
     private func recomputeEntries(with filters: LibraryListContent.ActiveFilters) -> [LibraryRowDisplay] {
+        recomputePasses?.note()
         let computed = LibraryListContent.rows(
             from: model.libraryEntries,
             category: category,
@@ -459,8 +475,11 @@ private struct LibraryBrowseList: View, Equatable {
         .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryGroupsByDate) { _, _ in recomputeEntries() }
-        // An empty library's first scan lands no entries, so only this says it has looked.
-        .onChange(of: model.libraryLoaded) { _, _ in recomputeEntries() }
+        // Skips when the version handler above already recomputed for a non-empty first scan, in the same turn.
+        .onChange(of: model.libraryLoaded) { _, _ in
+            guard libraryLoaded != model.libraryLoaded else { return }
+            recomputeEntries()
+        }
         .onChange(of: category) { _, newCategory in
             let newEntries = recomputeEntries(with: keepFiltersThatMatch(in: newCategory))
             selection = selection.intersection(Set(newEntries.map(\.id)))

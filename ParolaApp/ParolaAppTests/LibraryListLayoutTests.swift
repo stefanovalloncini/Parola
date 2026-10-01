@@ -253,6 +253,38 @@ struct LibraryListLayoutTests {
         #expect(listed, "rows: \(table(hosted)?.numberOfRows ?? -1)")
     }
 
+    @Test("a non-empty library's first scan rebuilds the rows once, not twice")
+    func firstScanOfANonEmptyLibraryRebuildsOnce() async {
+        let passes = LibraryRecomputePasses()
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("list-layout-first-scan"))
+        // Cancelled before its first await resumes, so it returns without touching libraryEntries or libraryLoaded.
+        model.libraryRefreshTask?.cancel()
+        await model.libraryRefreshTask?.value
+        model.route = .transcript
+        let host = NSHostingView(rootView: AnyView(
+            ContentRoutes().environment(model).environment(\.libraryRecomputePasses, passes)
+        ))
+        let window = NSWindow(
+            contentRect: NSRect(x: -12_000, y: -12_000, width: 940, height: 1_200),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = host
+        window.orderFront(nil)
+        let hosted = Hosted(model: model, host: host, window: window)
+        defer { close(hosted) }
+        _ = await settled(hosted)
+        let before = passes.count
+        #expect(before > 0, "onAppear reports its own pass")
+
+        model.libraryEntries = entries(1)
+        model.libraryLoaded = true
+
+        _ = await settled(hosted) { (table(hosted)?.numberOfRows ?? 0) > 0 }
+        #expect(passes.count == before + 1, "version and loaded landing together rebuilt \(passes.count - before) times")
+    }
+
     @Test("a row click leaves the header alone; the selection still reaches its bulk actions")
     func rowClickLeavesTheHeader() async throws {
         let passes = LibraryHeaderPasses()
