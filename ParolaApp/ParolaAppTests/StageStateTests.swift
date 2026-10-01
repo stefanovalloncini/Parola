@@ -226,6 +226,19 @@ struct StageStateTests {
     }
 
     @MainActor
+    @Test("each clock character keeps its place counted from the right, so only the digits that change roll, briefly")
+    func clockRollsByPlace() {
+        #expect(StageClock.places("0:59").map(\.place) == [3, 2, 1, 0])
+        #expect(StageClock.places("10:00").map(\.place) == [4, 3, 2, 1, 0])
+        #expect(StageClock.places("1:00:00").map(\.character) == Array("1:00:00"))
+        let units = StageClock.places("9:59").last
+        let grown = StageClock.places("10:00").last
+        #expect(units?.place == 0)
+        #expect(grown?.place == 0, "the seconds keep their place as the clock grows a digit")
+        #expect(StageClock.roll == .easeOut(duration: 0.2))
+    }
+
+    @MainActor
     @Test("under Reduce Motion the Stage only crossfades: a still dot, the band four times a second, no morph, nothing carried over")
     func reduceMotionOnlyCrossfades() {
         #expect(StagePage.entrance(reduceMotion: true) == DS.Motion.crossfade)

@@ -235,6 +235,18 @@ struct StageClock: View {
         AppFormat.elapsed(TimeInterval(seconds))
     }
 
+    static let roll = Animation.easeOut(duration: 0.2)
+    /// A short climb, as `numericText` rolls: the new digit rises into place as the old one rises out.
+    static let rollTransition = AnyTransition.asymmetric(
+        insertion: .offset(y: 18).combined(with: .opacity),
+        removal: .offset(y: -18).combined(with: .opacity)
+    )
+
+    /// Each character with its place counted from the right, so a digit keeps its identity as the clock grows and only the ones that change roll.
+    nonisolated static func places(_ text: String) -> [(place: Int, character: Character)] {
+        text.enumerated().map { (text.count - 1 - $0.offset, $0.element) }
+    }
+
     var body: some View {
         if ticks, take.state == .recording, let origin = take.clockOrigin {
             TimelineView(.periodic(from: origin, by: 1)) { context in
@@ -247,16 +259,26 @@ struct StageClock: View {
 
     private func face(at date: Date) -> some View {
         let seconds = Int(take.elapsed(at: date))
-        return Text(verbatim: Self.text(seconds: seconds))
-            .font(font)
-            // Shrinks with its frame as a landing carries it into the media bar's duration.
-            .lineLimit(1)
-            .minimumScaleFactor(0.1)
-            .contentTransition(rolls && !reduceMotion ? .numericText() : .identity)
-            .animation(rolls && !reduceMotion ? .snappy(duration: 0.3) : nil, value: seconds)
-            .accessibilityLabel("Recording time")
-            .accessibilityValue(AppFormat.spokenDuration(seconds: seconds))
-            .accessibilityAddTraits(.updatesFrequently)
+        let rolling = rolls && !reduceMotion
+        return HStack(spacing: 0) {
+            ForEach(Self.places(Self.text(seconds: seconds)), id: \.place) { place in
+                // Slid and faded rather than numericText, whose blur is drawn on the CPU every frame at many times the cost.
+                ZStack {
+                    Text(verbatim: String(place.character))
+                        .id(place.character)
+                        .transition(rolling ? Self.rollTransition : .identity)
+                }
+                .animation(rolling ? Self.roll : nil, value: place.character)
+            }
+        }
+        .font(font)
+        // Shrinks with its frame as a landing carries it into the media bar's duration.
+        .lineLimit(1)
+        .minimumScaleFactor(0.1)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Recording time")
+        .accessibilityValue(AppFormat.spokenDuration(seconds: seconds))
+        .accessibilityAddTraits(.updatesFrequently)
     }
 }
 
