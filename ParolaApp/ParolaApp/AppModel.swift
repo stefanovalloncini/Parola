@@ -4114,9 +4114,12 @@ final class AppModel {
                     take: take.id,
                     annotations: given
                 )
-            } else if let recovery {
-                recoveryHeldByTake.remove(recovery)
-                endRecovery(recovery)
+            } else {
+                if let recovery {
+                    recoveryHeldByTake.remove(recovery)
+                    endRecovery(recovery)
+                }
+                if recording?.takeID == take.id { reportTakeFailure(Self.nothingRecordedMessage(), take: take.id) }
             }
             return
         }

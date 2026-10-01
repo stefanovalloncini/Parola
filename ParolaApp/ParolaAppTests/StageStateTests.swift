@@ -890,6 +890,31 @@ extension TranscriberMockSuites {
             model.cancelCurrentWork()
         }
 
+        @Test("a live take let go with nothing in it says so rather than staying on transcribing")
+        func emptyLetGoTakeSettles() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["a", "b", "c"], delayMs: 1_500))
+                let model = makeModel("stage-cancel-empty")
+                model.useStreaming = true
+                model.startRecording(source: .microphone)
+                let recording = await waitUntil(timeoutMs: 30_000) { model.recording?.state == .recording }
+                #expect(recording)
+                model.stopRecordingAndTranscribe()
+
+                model.cancelCurrentWork()
+
+                let settled = await waitUntil(timeoutMs: 10_000) { !model.hasPendingTakeWork }
+                #expect(settled)
+                let message = AppModel.nothingRecordedMessage()
+                let failed = await waitUntil { model.recording?.state == .failed(message: message) }
+                #expect(failed)
+                #expect(model.exportNotice?.message == message, "Cancel left the Stage, so a notice says it")
+                let entries = await model.library.list()
+                #expect(entries.isEmpty)
+            }
+        }
+
         @Test("a Cancel while a take's own words are landing leaves it landing, its checkpoint held until the save")
         func cancelDuringTheLanding() async throws {
             try await withMocksCleared([.audioSource, .streaming]) {

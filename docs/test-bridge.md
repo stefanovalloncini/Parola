@@ -127,8 +127,9 @@ The five introduction commands and `getState.introduction` all reply `{visible, 
 `markers` are seconds of the take; `startedAt` is seconds since 1970, `null` until the first audio; `device` names the
 input a mic take listens on. While a file take transcribes, `progress` is its 0–1 fraction (`null` until the engine
 reports one), and `stage` and `hasPartialText` mirror `phaseDetail`'s for its run; otherwise they read `null` and `false`.
-A take cancelled while it finishes reads `transcribing` with `progress` `null` until its save lands, then `done`;
-a cut-short or empty result reads `failed`.
+A take cancelled while it finishes reads `transcribing` with `progress` `null` until its save lands, then `done`. Cut
+short, a file take reads `failed` with Retry and a live take reads `done`; both save under a title ending
+"(interrupted)". A take that recorded nothing reads `failed` with "Nothing was recorded."
 `phase` reads `recording` whenever that take is arming, recording or paused. Neither its capture nor its transcription
 moves the phase: a failure shows on its Stage as `recording.state` `failed` (and, when another page shows, as an
 `exportNotice`), while `phase` stays on whatever the rest of the window shows, `ready` with an older transcript
