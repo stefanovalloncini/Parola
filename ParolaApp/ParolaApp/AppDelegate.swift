@@ -16,6 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var startRecordingSubscription: (any NSObjectProtocol)?
     private let menuBar = MenuBarController()
     private let dockBadge = DockBadge()
+    private let recordingStatusItem = RecordingStatusItem()
+    private let recordingPill = RecordingPill()
     private let playbackKeys = PlaybackKeyMonitor()
 
     func bind(model: AppModel) {
@@ -24,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         provider.model = model
         menuBar.bind(model)
         dockBadge.bind(model)
+        recordingStatusItem.bind(model)
+        recordingPill.bind(model, appActive: NSApp.isActive)
         playbackKeys.bind(model)
         model.activationPolicyApplier = { NSApp.setActivationPolicy($0) }
         model.applyAppVisibilityMode()
@@ -157,9 +161,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidResignActive(_ notification: Notification) {
         model?.handleAppResignedActive()
+        recordingPill.appActiveChanged(false)
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        recordingPill.appActiveChanged(true)
         model?.refreshLibraryIfChangedElsewhere()
     }
 

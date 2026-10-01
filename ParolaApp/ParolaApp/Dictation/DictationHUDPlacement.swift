@@ -33,7 +33,7 @@ enum DictationHUDPlacement {
         switch context.style {
         case .nearField:
             guard let anchor = context.anchor else {
-                origin = NSPoint(x: visible.midX - size.width / 2, y: visible.minY + 100)
+                origin = overlayOrigin(for: size, in: visible)
                 break
             }
             let anchorVisible = anchor.screenVisibleFrame
@@ -45,7 +45,7 @@ enum DictationHUDPlacement {
             let x = min(max(anchor.rect.minX, anchorVisible.minX + 8), anchorVisible.maxX - size.width - 8)
             origin = NSPoint(x: x, y: y)
         case .overlay:
-            origin = NSPoint(x: visible.midX - size.width / 2, y: visible.minY + 100)
+            origin = overlayOrigin(for: size, in: visible)
         case .notch:
             let topY = context.screenFrame.maxY - visible.maxY > 30
                 ? context.screenFrame.maxY - size.height - 4
@@ -55,6 +55,11 @@ enum DictationHUDPlacement {
             origin = NSPoint(x: visible.maxX - size.width - 24, y: visible.minY + 24)
         }
         return NSRect(origin: origin, size: size)
+    }
+
+    /// Bottom centre of the visible screen, 100 pt up: the overlay's spot, and the recording pill's until it is dragged.
+    static func overlayOrigin(for size: NSSize, in visible: NSRect) -> NSPoint {
+        NSPoint(x: visible.midX - size.width / 2, y: visible.minY + 100)
     }
 
     private static func size(for context: Context) -> NSSize {
