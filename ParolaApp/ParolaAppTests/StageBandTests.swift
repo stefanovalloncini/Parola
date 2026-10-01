@@ -18,6 +18,33 @@ struct StageBandTests {
         #expect(StageBand.barX(offset: 10, playheadX: 826) == 771)
     }
 
+    @Test("between samples the bars slide one step left at the samples' pace, then wait for the next")
+    func glide() {
+        #expect(StageBand.step == 5)
+        #expect(StageBand.glide(sinceTick: 0) == 0)
+        #expect(abs(StageBand.glide(sinceTick: 0.025) - 1.25) < 0.0001)
+        #expect(abs(StageBand.glide(sinceTick: 0.05) - 2.5) < 0.0001)
+        #expect(StageBand.glide(sinceTick: 0.1) == StageBand.step)
+        #expect(StageBand.glide(sinceTick: 0.35) == StageBand.step, "a late sample holds the bars a step on, never past it")
+        #expect(StageBand.glide(sinceTick: -0.01) == 0, "a frame dated a moment before its sample")
+    }
+
+    @Test("under Reduce Motion the band redraws four times a second and never slides")
+    func reduceMotionCadence() {
+        #expect(StageBand.cadence(reduceMotion: false) == .glides)
+        #expect(StageBand.cadence(reduceMotion: true) == .steps(every: 0.25))
+    }
+
+    @MainActor
+    @Test("the bars are drawn again when a sample, a marker or a pause comes in, never for a frame that only slides them")
+    func tapeRedrawsPerSample() {
+        let tape = StageTape(levels: [0.1, 0.2], flags: [], newest: 41, paused: false)
+        #expect(tape == StageTape(levels: [0.1, 0.2], flags: [], newest: 41, paused: false))
+        #expect(tape != StageTape(levels: [0.2, 0.3], flags: [], newest: 42, paused: false))
+        #expect(tape != StageTape(levels: [0.1, 0.2], flags: [0], newest: 41, paused: false))
+        #expect(tape != StageTape(levels: [0.1, 0.2], flags: [], newest: 41, paused: true))
+    }
+
     @Test("a marker stands at its moment in the take until it scrolls out of the band")
     func markers() {
         #expect(StageBand.markerOffset(10.0, newestSample: 99) == 0)
@@ -79,5 +106,27 @@ struct StageBandTests {
         await capture.cancel()
         #expect(heard)
         #expect(abs(LevelBars.fraction(for: reading) - 13.0 / 27.0) < 0.03)
+    }
+}
+
+// Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("Stage band takes", .serialized)
+    struct StageBandTakeTests {
+        @Test("each of a take's levels stamps when it came in, the moment the band slides from")
+        func levelsStampTheirTime() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeRecordingModel("stage-band-tick")
+                try await startFixtureTake(model)
+                let firstTick = model.takeLevelTick
+                let firstStamp = model.takeLevelTickAt
+                let moved = await waitUntil { model.takeLevelTick > firstTick }
+                #expect(moved)
+                #expect(model.takeLevelTickAt > firstStamp)
+                #expect(model.takeLevelTickAt <= Date())
+                model.cancelCurrentWork()
+            }
+        }
     }
 }

@@ -244,6 +244,8 @@ final class AppModel {
     /// Where a meeting's microphone track stands; nil for a take that records none.
     var takeMicTrackState: MicTrackState?
     private(set) var takeLevelTick = 0
+    /// When the newest of the take's levels came in; the Stage's band slides from here until the next one.
+    @ObservationIgnored private(set) var takeLevelTickAt = Date.distantPast
     @ObservationIgnored private var takeSampler: Task<Void, Never>?
     /// The take whose meter, trace and sampler are up, so a late clear from an older take leaves them alone.
     @ObservationIgnored private var takeReadoutsOwner: Int?
@@ -3870,6 +3872,7 @@ final class AppModel {
         takeLevels?.append(peak)
         takeMicLevels?.append(micPeak ?? 0)
         takeLevelTick &+= 1
+        takeLevelTickAt = Date()
     }
 
     /// The wall-clock moment a meter reading came in.
