@@ -707,3 +707,88 @@ extension TranscriberMockSuites {
         }
     }
 }
+
+@Suite("Sidebar Recording row, after the take stops")
+struct SidebarRecordingRowStateTests {
+    @Test("VoiceOver hears the time while the take runs, then that it transcribes or failed")
+    func spokenValue() {
+        let start = Date(timeIntervalSinceReferenceDate: 1_000)
+        var take = capturingTake(at: start)
+        let at = start.addingTimeInterval(754)
+        #expect(SidebarRecordingRow.spokenValue(for: take, at: at, locale: english) == "Recording, 12 minutes, 34 seconds")
+        _ = take.finish(at: at)
+        _ = take.transcribing(progress: nil)
+        #expect(SidebarRecordingRow.spokenValue(for: take, at: at, locale: english) == "Transcribing…")
+        take.fail("boom")
+        #expect(SidebarRecordingRow.spokenValue(for: take, at: at, locale: english) == "Failed")
+    }
+}
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("A failed Stage keeps a way back", .serialized)
+    struct FailedStageWayBackTests {
+        @Test("a take that failed on its Stage stays reachable after an older take's notice opens something else")
+        func failedStageStaysReachable() async throws {
+            let older = try tempWAV("way-back-older")
+            let fixture = try tempWAV("way-back-mic")
+            defer {
+                try? FileManager.default.removeItem(at: older)
+                try? FileManager.default.removeItem(at: fixture)
+            }
+            try await withMocksCleared([.transcriber, .audioSource]) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine boom"), gate: gate
+                ))
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let model = makeRecordingModel("way-back")
+                model.selectedModel = "openai_whisper-tiny"
+                recordAndStop(model, audio: older, seconds: 2)
+                let transcribing = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                #expect(transcribing)
+                #expect(model.sidebarShowsRecording, "a take transcribing on its Stage keeps the row")
+                model.recordingCountInSeconds = 3
+                model.startRecording(source: .microphone)
+                await gate.open()
+                let notice = try #require(await waitForNotice(model))
+                let olderEntry = try #require(await landedEntry(model))
+                model.cancelRecordingCountdown()
+
+                model.recordingCountInSeconds = 0
+                model.startRecording(source: .microphone)
+                let capturing = await waitUntil { model.recording?.state == .recording }
+                #expect(capturing)
+                model.stopRecordingAndTranscribe()
+                let failedOnStage = await waitUntil {
+                    if case .failed = model.recording?.state { return true }
+                    return false
+                }
+                #expect(failedOnStage)
+                #expect(model.route == .recording)
+                #expect(model.exportNotice?.id == notice.id, "a take failing on its own Stage posts no notice")
+                let failedTake = try #require(model.recording?.takeID)
+
+                let show = try #require(notice.actions.last)
+                model.performNoticeAction(show)
+                let opened = await waitUntil { model.selectedEntryID == olderEntry.id }
+                #expect(opened)
+                #expect(model.route == .transcript)
+
+                #expect(model.sidebarShowsRecording)
+                let sidebar = HostedWindow(LibrarySidebar().environment(model), width: 240, height: 600)
+                defer { sidebar.close() }
+                let rowShown = await waitUntil { sidebar.row(identifiedBy: "Sidebar.Row.Recording") != nil }
+                #expect(rowShown)
+                let pressed = HostedAccessibility.press(endingWith: "Sidebar.Row.Recording", in: sidebar.host)
+                #expect(pressed)
+                #expect(model.route == .recording)
+                #expect(model.recording?.takeID == failedTake)
+                let stillFailed: Bool
+                if case .failed = model.recording?.state { stillFailed = true } else { stillFailed = false }
+                #expect(stillFailed)
+                await waitUntil { !model.hasPendingTakeWork }
+            }
+        }
+    }
+}

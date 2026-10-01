@@ -1,9 +1,20 @@
 import SwiftUI
 
-/// The take at the top of the sidebar, "● Recording 12:34", which leads back to the Stage and is washed red while the Stage shows.
+/// The take at the top of the sidebar, "● Recording 12:34", which leads back to its Stage, failed or transcribing too, and is washed red while the Stage shows.
 struct SidebarRecordingRow: View {
     let isSelected: Bool
     @Environment(AppModel.self) private var model: AppModel?
+
+    /// What VoiceOver reads after "Recording": the take's state and time while it runs, then how it ended up.
+    nonisolated static func spokenValue(
+        for take: RecordingSession, at now: Date, bundle: Bundle = .main, locale: Locale = AppFormat.locale
+    ) -> String {
+        switch take.state {
+        case .transcribing: String(localized: "Transcribing…", bundle: bundle)
+        case .failed: String(localized: "Failed", bundle: bundle)
+        default: TakeRemote.spokenStatus(for: take, at: now, bundle: bundle, locale: locale)
+        }
+    }
 
     var body: some View {
         if let model, let take = model.recording {
@@ -37,12 +48,10 @@ private struct SidebarRecordingRowFace: View {
                     Text("Recording")
                         .foregroundStyle(DS.Color.primaryText)
                     Spacer(minLength: DS.Spacing.small)
-                    Text(verbatim: StageClock.text(seconds: Int(take.elapsed(at: now))))
-                        .monospacedDigit()
-                        .foregroundStyle(DS.Color.secondaryText)
+                    status(at: now)
                 }
             } icon: {
-                RecDot(color: TakeRemote.lamp(for: take).tint.color)
+                icon
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Self.washInset)
@@ -52,7 +61,34 @@ private struct SidebarRecordingRowFace: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Recording")
-        .accessibilityValue(Text(verbatim: TakeRemote.spokenStatus(for: take, at: now)))
+        .accessibilityValue(Text(verbatim: SidebarRecordingRow.spokenValue(for: take, at: now)))
         .accessibilityAddTraits(isSelected ? [.isSelected, .updatesFrequently] : .updatesFrequently)
+    }
+
+    /// The time while the take runs; once it stops, what became of it.
+    @ViewBuilder
+    private func status(at now: Date) -> some View {
+        switch take.state {
+        case .transcribing:
+            Text("Transcribing…")
+                .foregroundStyle(DS.Color.secondaryText)
+        case .failed:
+            Text("Failed")
+                .foregroundStyle(DS.Color.warningText)
+        default:
+            Text(verbatim: StageClock.text(seconds: Int(take.elapsed(at: now))))
+                .monospacedDigit()
+                .foregroundStyle(DS.Color.secondaryText)
+        }
+    }
+
+    @ViewBuilder
+    private var icon: some View {
+        if case .failed = take.state {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(DS.Palette.warning)
+        } else {
+            RecDot(color: TakeRemote.lamp(for: take).tint.color)
+        }
     }
 }
