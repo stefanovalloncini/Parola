@@ -358,6 +358,14 @@ struct RecordingSurfaceWiringTests {
         #expect(delegate.contains("func applicationDidBecomeActive(_ notification: Notification) { recordingPill.appActiveChanged(true)"))
     }
 
+    @Test("the menu bar's record actions leave Parola where it is")
+    func menuBarRecordActions() throws {
+        let menuBar = try source("MenuBarController")
+        #expect(menuBar.contains("@objc private func recordMic() { model?.startRecording(source: .microphone) }"))
+        #expect(menuBar.contains("@objc private func recordSystem() { model?.startRecording(source: .systemAudio) }"))
+        #expect(!menuBar.contains("openParola() model?.start"))
+    }
+
     @Test("the Microphone pane shows both switches")
     func paneRows() throws {
         let pane = try source("Views/Settings/MicrophonePane")

@@ -313,20 +313,17 @@ final class MenuBarController: NSObject {
         model?.bringMainWindowForward()
     }
 
+    /// Parola stays where it is: a take started here runs behind the menu bar item and the pill.
     @objc private func recordMic() {
-        // Bring the main window up so the count-in overlay (and cancel) can be seen.
-        openParola()
         model?.startRecording(source: .microphone)
     }
 
     @objc private func recordSystem() {
-        openParola()
         model?.startRecording(source: .systemAudio)
     }
 
     @objc private func recordDetectedMeeting(_ sender: NSMenuItem) {
         guard let app = sender.representedObject as? String else { return }
-        openParola()
         model?.startMeetingRecording(appName: app)
     }
 
