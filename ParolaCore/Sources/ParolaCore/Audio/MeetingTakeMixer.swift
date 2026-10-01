@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 
 /// Folds a meeting's two recordings into one take: the Mac's audio on the left, your microphone on the right,
-/// and a mono mix of both for the engine, which hears the meeting as one.
+/// and a mono mix of both for an engine that hears one channel, the two averaged so loud overlapping speech never clips.
 public enum MeetingTakeMixer {
     /// Two files that end within this fraction of each other ran on clocks that drifted, so the microphone is
     /// stretched to end with the Mac audio; further apart, one side was cut short and the two are only lined up.
@@ -58,7 +58,7 @@ public enum MeetingTakeMixer {
             for frame in 0..<frames {
                 var sum: Float = 0
                 for channel in 0..<channels { sum += source[channel][frame] }
-                sink[frame] = clamped(sum)
+                sink[frame] = sum / Float(channels)
             }
             mixed.frameLength = AVAudioFrameCount(frames)
             try target.write(from: mixed)
@@ -235,7 +235,7 @@ struct MixWriter {
         for frame in 0..<frames {
             channels[0][frame] = MeetingTakeMixer.clamped(left[frame])
             channels[1][frame] = MeetingTakeMixer.clamped(right[frame])
-            mixed[frame] = MeetingTakeMixer.clamped(left[frame] + right[frame])
+            mixed[frame] = (MeetingTakeMixer.clamped(left[frame]) + MeetingTakeMixer.clamped(right[frame])) / 2
         }
         stereoBuffer.frameLength = AVAudioFrameCount(frames)
         try stereo.write(from: stereoBuffer)

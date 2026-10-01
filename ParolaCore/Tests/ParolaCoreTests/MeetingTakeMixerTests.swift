@@ -214,8 +214,8 @@ struct MeetingTakeMixerTests {
 
         let mixed = try TestAudio.read(mono)
         #expect(mixed.channels.count == 1)
-        #expect(abs(mixed.rms(channel: 0, from: 0.05, to: 0.95) - sineRMS(0.5)) < 0.01, "the Mac side")
-        #expect(abs(mixed.rms(channel: 0, from: 1.05, to: 1.95) - sineRMS(0.5)) < 0.01, "your side")
+        #expect(abs(mixed.rms(channel: 0, from: 0.05, to: 0.95) - sineRMS(0.25)) < 0.01, "the Mac side, averaged with your silence")
+        #expect(abs(mixed.rms(channel: 0, from: 1.05, to: 1.95) - sineRMS(0.25)) < 0.01, "your side")
 
         let again = dir.appendingPathComponent("again.wav")
         try MeetingTakeMixer.downmix(stereo: stereo, into: again)
@@ -223,6 +223,26 @@ struct MeetingTakeMixerTests {
         #expect(downmixed.frameCount == mixed.frameCount)
         let largest = zip(downmixed.channels[0], mixed.channels[0]).map { abs($0 - $1) }.max() ?? 1
         #expect(largest < 0.001, "the 16-bit stereo file differs from the float mix only by rounding")
+    }
+
+    @Test("loud speech on both sides at once never clips the mono mix")
+    func monoKeepsHeadroom() throws {
+        let dir = try folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let mac = try TestAudio.write(channels: [tone(1, 0.8, hz: 220)], to: dir.appendingPathComponent("mac.wav"))
+        let mic = try TestAudio.write(channels: [tone(1, 0.8, hz: 220)], to: dir.appendingPathComponent("mic.wav"))
+        let stereo = dir.appendingPathComponent("stereo.wav")
+        let mono = dir.appendingPathComponent("mono.wav")
+        let start = Date()
+
+        try MeetingTakeMixer.mix(mac: mac, mic: mic, macStart: start, micStart: start, into: stereo, mono: mono)
+
+        let peak = try TestAudio.read(mono).channels[0].map(abs).max() ?? 0
+        #expect(abs(peak - 0.8) < 0.01, "the two sides averaged, with no sample pinned at full scale")
+        let again = dir.appendingPathComponent("again.wav")
+        try MeetingTakeMixer.downmix(stereo: stereo, into: again)
+        let downmixedPeak = try TestAudio.read(again).channels[0].map(abs).max() ?? 0
+        #expect(downmixedPeak < 0.81)
     }
 
     @Test("a microphone that recorded nothing leaves your side silent and the take as long as the Mac audio")
