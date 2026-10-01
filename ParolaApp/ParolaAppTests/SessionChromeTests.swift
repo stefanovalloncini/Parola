@@ -1292,6 +1292,61 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("the mic hotkey ends a take still loading its model quietly, as every other Stop does")
+        func micHotkeyWhilePreparingCancels() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                let model = makeRecordingModel("hotkey-stop-preparing")
+                model.selectedModel = Self.pinnedModel
+                let gate = MockTranscriberGate()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    partials: ["hello"], downloadFractions: [0.5], delayMs: 5_000, gate: gate
+                ))
+                model.useStreaming = true
+                model.toggleMicRecording()
+                let preparing = await waitUntil {
+                    if case .arming(.preparingModel) = model.recording?.state { return true }
+                    return false
+                }
+                #expect(preparing)
+
+                model.toggleMicRecording()
+
+                #expect(model.recording == nil, "no failed Stage saying nothing was recorded")
+                #expect(model.exportNotice == nil)
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+                await gate.open()
+                await settle()
+                let saved = await model.library.list()
+                #expect(saved.isEmpty)
+            }
+        }
+
+        @Test("a Stop right after the first buffer came in keeps the take, though the take had not been marked recording yet")
+        func stopRightAfterTheFirstBufferKeepsTheTake() async throws {
+            let audio = try makeTakeWAV("stop-first-buffer", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "just in time")])
+                let model = makeRecordingModel("stop-first-buffer")
+                model.useStreaming = false
+                model.selectedModel = Self.pinnedModel
+                let capture = MeteredCapture(file: audio)
+                model.takeCaptureOverride = { _ in capture }
+                model.startRecording(source: .microphone)
+                let up = await waitUntil { model.liveSource != nil }
+                #expect(up)
+                #expect(model.recording?.isArming == true)
+
+                capture.levelMeter.record(0.4)
+                TakeRemote.stop(model)
+
+                #expect(model.recording?.state == .finishing, "the take is kept and stops as any recording take does")
+                let landed = await landedEntry(model, timeoutMs: 30_000)
+                #expect(landed != nil)
+            }
+        }
+
         @Test("Discard… on a take still starting ends it without asking: there is no audio to delete")
         func discardWhileStartingAsksNothing() async throws {
             let (model, audio) = try await startArmingTake("remote-discard-starting")
@@ -1308,6 +1363,18 @@ extension TranscriberMockSuites {
             #expect(model.exportNotice == nil)
         }
     }
+}
+
+/// A capture that is up at once and meters only what the test records; Stop hands back its file.
+private actor MeteredCapture: LiveAudioSource {
+    nonisolated let levelMeter = LevelMeter()
+    private let file: URL
+
+    init(file: URL) { self.file = file }
+
+    func start() async throws {}
+    func prepare() async throws -> URL { file }
+    func cancel() async {}
 }
 
 /// A capture that hands back its file, cut short, only once the test lets it go.

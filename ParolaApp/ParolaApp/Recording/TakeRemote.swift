@@ -51,13 +51,8 @@ enum TakeRemote {
         }
     }
 
-    /// A take still arming has recorded nothing, so Stop ends it the way the Stage's Cancel does: quietly, with nothing saved.
     static func stop(_ model: AppModel) {
-        if model.recording?.isArming == true {
-            model.cancelArmingTake()
-        } else {
-            model.stopRecordingAndTranscribe()
-        }
+        model.stopTake()
     }
 
     static func togglePause(_ model: AppModel) {

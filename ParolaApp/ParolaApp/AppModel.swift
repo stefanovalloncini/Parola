@@ -525,7 +525,7 @@ final class AppModel {
 
     func toggleMicRecording() {
         if let take = recording, take.isRunning {
-            if take.source == .microphone { stopRecordingAndTranscribe() }
+            if take.source == .microphone { stopTake() }
             return
         }
         switch phase {
@@ -4331,6 +4331,16 @@ final class AppModel {
             cancelRecordingCountdown()
         } else {
             cancelRecordingBeforeCapture()
+        }
+    }
+
+    /// Stop from anywhere but the Stage's own buttons: a take that has recorded nothing ends as Cancel ends it; a buffer that just came in counts, so that take is kept.
+    func stopTake() {
+        catchUpFirstBuffer()
+        if recording?.isArming == true {
+            cancelArmingTake()
+        } else {
+            stopRecordingAndTranscribe()
         }
     }
 
