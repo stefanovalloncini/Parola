@@ -18,14 +18,13 @@ private func capturingTake(at start: Date) -> RecordingSession {
 
 /// The pixel halfway down the capsule, 6 pt in from its left end: fill, clear of the dot and the digits.
 @MainActor
-private func capsuleFill(_ take: RecordingSession, dark: Bool) throws -> NSColor {
+private func capsuleFill(_ take: RecordingSession) throws -> NSColor {
     let face = SessionCapsuleFace(take: take, showsMeter: false, isOnScreen: false, showStage: {}, stop: { _ in })
-        .environment(\.controlActiveState, .inactive)
-        .environment(\.colorScheme, dark ? .dark : .light)
+        .environment(\.colorScheme, .light)
     let renderer = ImageRenderer(content: face)
     renderer.scale = 2
     var image: CGImage?
-    let appearance = try #require(NSAppearance(named: dark ? .darkAqua : .aqua))
+    let appearance = try #require(NSAppearance(named: .aqua))
     appearance.performAsCurrentDrawingAppearance { image = renderer.cgImage }
     let rendered = try #require(image)
     #expect(rendered.colorSpace?.name == CGColorSpace.sRGB)
@@ -78,18 +77,16 @@ struct SessionCapsuleTests {
             == "Paused, 12 minutes, 34 seconds")
     }
 
-    @Test("its red is a solid fill, so an inactive window leaves it red in both appearances")
+    @Test("the capsule paints the recording red itself, rather than tinting glass")
     @MainActor
-    func solidRedWhenInactive() throws {
+    func paintsTheRecordingRedItself() throws {
         let take = capturingTake(at: Date(timeIntervalSinceNow: -754))
-        guard case .dynamic(let light, let dark) = DS.Color.recordingFillTheme else {
+        guard case .dynamic(let light, _) = DS.Color.recordingFillTheme else {
             Issue.record("the recording red is not a fixed pair")
             return
         }
-        let lightFill = try capsuleFill(take, dark: false)
-        let darkFill = try capsuleFill(take, dark: true)
-        #expect(matches(lightFill, light), "light fill \(lightFill)")
-        #expect(matches(darkFill, dark), "dark fill \(darkFill)")
+        let fill = try capsuleFill(take)
+        #expect(matches(fill, light), "fill \(fill)")
     }
 
     @Test("the meter goes below a 1000 pt window; the time and Stop stay at every width")
