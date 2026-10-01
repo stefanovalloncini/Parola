@@ -112,21 +112,33 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("outside test mode the take controls are refused")
+        @Test("outside test mode the take controls and the level feed are refused by the test-mode guard")
         func testModeOnly() async throws {
+            let fixture = try makeTakeWAV("stage-bridge-normal")
+            defer { try? FileManager.default.removeItem(at: fixture) }
             let model = AppModel(bootstrap: AppBootstrap(
                 mode: .normal, library: makeTempLibraryURL("stage-bridge-normal"), defaultsOverride: temporaryDefaults(),
                 sideEffects: [], filePicker: TestFilePicker(), clock: ContinuousClock()
             ))
             let server = try ParolaAutomationServer(model: model)
-            for name in ["pauseRecording", "resumeRecording", "addRecordingMarker", "discardRecording"] {
-                var refused = false
+            let context = AutomationContext(model: model, server: server)
+            let commands = Dictionary(uniqueKeysWithValues: (server.recordingCommands() + server.mockCommands()).map { ($0.name, $0) })
+            let calls: [(name: String, args: [String: AutomationValue])] = [
+                ("pauseRecording", [:]),
+                ("resumeRecording", [:]),
+                ("addRecordingMarker", [:]),
+                ("discardRecording", [:]),
+                ("feedTakeLevels", ["fixturePath": .string(fixture.path)]),
+            ]
+            for call in calls {
+                let command = try #require(commands[call.name])
+                var reason: String?
                 do {
-                    _ = try await run(server, model, name)
-                } catch is AutomationError {
-                    refused = true
+                    _ = try await command.handler(try command.validate(AutomationArgs(call.args)), context)
+                } catch AutomationError.precondition(let message) {
+                    reason = message
                 }
-                #expect(refused, "\(name) ran outside test mode")
+                #expect(reason == "only available in --test-mode", "\(call.name) ran outside test mode")
             }
             withExtendedLifetime(server) {}
         }

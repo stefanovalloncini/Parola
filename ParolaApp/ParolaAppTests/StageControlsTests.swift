@@ -169,7 +169,8 @@ extension TranscriberMockSuites {
                 model.stopRecordingAndTranscribe()
 
                 await StageControls.discard(takeID, model: model)
-                let landed = await landedEntry(model)
+                // The landing is not what this checks, and one landed after 5.8 s on a loaded machine.
+                let landed = await landedEntry(model, timeoutMs: 30_000)
                 #expect(landed != nil)
             }
         }
