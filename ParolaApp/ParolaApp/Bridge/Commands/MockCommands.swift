@@ -39,12 +39,31 @@ extension ParolaAutomationServer {
                 args: [
                     .init(name: "response", kind: .object, required: false, summary: "Canned transcript JSON"),
                     .init(name: "failure", kind: .object, required: false, summary: "Canned failure JSON"),
+                    .init(name: "holdStart", kind: .boolean, required: false, summary: "Keep the take loading its model until releaseMockStreamingStart"),
                 ],
                 handler: { args, ctx in
                     try requireTestMode(ctx)
-                    let response = try buildTranscriberResponse(args: args)
+                    var response = try buildTranscriberResponse(args: args)
+                    await ctx.server.releaseHeldStreamingStart()
+                    if try args.optionalBool("holdStart") == true {
+                        let gate = MockTranscriberGate()
+                        response.gate = gate
+                        ctx.server.heldStreamingStart = gate
+                    }
                     MockStreamingTranscriberRegistry.shared.install(response)
                     return .object(["installed": .bool(true)])
+                }
+            ),
+
+            AutomationCommand(
+                name: "releaseMockStreamingStart",
+                area: .test,
+                summary: "Lets a take held by installMockStreamingTranscriber's holdStart finish loading its model. Test-mode only.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    try requireTestMode(ctx)
+                    let released = await ctx.server.releaseHeldStreamingStart()
+                    return .object(["released": .bool(released)])
                 }
             ),
 
@@ -193,6 +212,7 @@ extension ParolaAutomationServer {
                     if scope == "transcriber" || scope == "all" {
                         await MockTranscriberRegistry.shared.clear()
                         MockStreamingTranscriberRegistry.shared.clear()
+                        await ctx.server.releaseHeldStreamingStart()
                         CapturedInsertionStore.shared.clear()
                         // The next run would swap the cached mock out anyway; this frees it now.
                         await ctx.model.unloadTranscriptionSession()
@@ -275,6 +295,17 @@ extension ParolaAutomationServer {
                 }
             ),
         ]
+    }
+}
+
+extension ParolaAutomationServer {
+    /// A held mock live take goes on loading; a new install or a clear never leaves one stuck behind its gate.
+    @discardableResult
+    func releaseHeldStreamingStart() async -> Bool {
+        guard let gate = heldStreamingStart else { return false }
+        heldStreamingStart = nil
+        await gate.open()
+        return true
     }
 }
 

@@ -25,6 +25,8 @@ final class ParolaAutomationServer {
 
     private var commands: [String: AutomationCommand] = [:]
     private var revision: Int = 0
+    /// Test mode: the gate a mock live take's model load waits behind, from `holdStart` until it is released.
+    var heldStreamingStart: MockTranscriberGate?
     private let auditLog: AutomationAuditLog?
     let revisionLog: RevisionLog
 

@@ -112,6 +112,40 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a held mock live take stays loading its model until the bridge lets it go")
+        func heldStreamingStart() async throws {
+            try await withMocksCleared([.streaming, .audioSource]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeRecordingModel("stage-bridge-hold")
+                let server = try ParolaAutomationServer(model: model)
+                let context = AutomationContext(model: model, server: server)
+                let commands = Dictionary(uniqueKeysWithValues: server.mockCommands().map { ($0.name, $0) })
+                let install = try #require(commands["installMockStreamingTranscriber"])
+                let release = try #require(commands["releaseMockStreamingStart"])
+                let response: AutomationValue = .object([
+                    "partials": .array([.string("Quick note")]), "downloadFractions": .array([.double(0.42)]), "delayMs": .int(60_000),
+                ])
+                _ = try await install.handler(
+                    try install.validate(AutomationArgs(["response": response, "holdStart": .bool(true)])), context
+                )
+                model.useStreaming = true
+                model.selectedModel = "openai_whisper-tiny"
+
+                model.startRecording(source: .microphone)
+
+                let preparing = await waitUntil { model.recording?.mode == .preparing("openai_whisper-tiny", 0.42) }
+                #expect(preparing)
+                try await Task.sleep(for: .milliseconds(300))
+                #expect(model.recording?.mode == .preparing("openai_whisper-tiny", 0.42), "the model load stays held")
+                let reply = try await release.handler(try release.validate(AutomationArgs([:])), context)
+                #expect(reply == .object(["released": .bool(true)]))
+                let recording = await waitUntil { model.recording?.state == .recording }
+                #expect(recording)
+                model.cancelCurrentWork()
+                withExtendedLifetime(server) {}
+            }
+        }
+
         @Test("outside test mode the take controls and the level feed are refused by the test-mode guard")
         func testModeOnly() async throws {
             let fixture = try makeTakeWAV("stage-bridge-normal")
@@ -129,6 +163,7 @@ extension TranscriberMockSuites {
                 ("addRecordingMarker", [:]),
                 ("discardRecording", [:]),
                 ("feedTakeLevels", ["fixturePath": .string(fixture.path)]),
+                ("releaseMockStreamingStart", [:]),
             ]
             for call in calls {
                 let command = try #require(commands[call.name])
