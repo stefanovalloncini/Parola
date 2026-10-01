@@ -303,6 +303,24 @@ struct LibraryOriginTests {
         #expect(TranscriptBackCopy.help(for: .person(UUID()), personName: nil) == "Back to Library")
     }
 
+    @Test("back from a person deleted while their entry was open lands on the whole library")
+    func backFromADeletedPerson() async throws {
+        let model = makeModel()
+        await model.addPerson(named: "Giulia Rossi")
+        let giulia = try #require(model.person(named: "Giulia Rossi"))
+        let entry = try await seedEntry(in: model, text: "call with Giulia")
+        model.browsePerson(giulia.id)
+        #expect(await openEntry(entry.id, in: model))
+        #expect(model.transcriptOrigin == .person(giulia.id))
+
+        await model.deletePerson(giulia.id)
+        #expect(await goBack(in: model))
+
+        #expect(model.personFilter == nil, "no chip for a person who is gone")
+        #expect(model.libraryFilter == nil)
+        #expect(model.isBrowsingWholeLibrary)
+    }
+
     @Test("back with no origin falls back to the Library page")
     func backWithoutOrigin() async throws {
         let model = makeModel()

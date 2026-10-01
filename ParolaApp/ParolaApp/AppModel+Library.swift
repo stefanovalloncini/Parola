@@ -708,7 +708,7 @@ extension AppModel {
             libraryFilter = nil
         case .person(let id):
             libraryFilter = nil
-            personFilter = id
+            personFilter = person(id: id) != nil ? id : nil
         case .search:
             break
         case nil:
