@@ -6125,7 +6125,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Completamento della registrazione"
+            "value": "Chiusura della registrazione in corso"
           }
         }
       }
@@ -6147,7 +6147,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Completamento…"
+            "value": "Chiusura in corso…"
           }
         }
       }
@@ -10794,7 +10794,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Preparazione dell’audio…"
+            "value": "Preparazione dell'audio…"
           }
         }
       }
