@@ -123,6 +123,7 @@ struct RecDot: View {
     final class LightView: NSView {
         let dot = CALayer()
         private var origin: Date?
+        private var wakeObserver: (any NSObjectProtocol)?
 
         init() {
             super.init(frame: .zero)
@@ -134,6 +135,10 @@ struct RecDot: View {
 
         @available(*, unavailable)
         required init?(coder: NSCoder) { fatalError("not used") }
+
+        isolated deinit {
+            if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
+        }
 
         override func setFrameSize(_ newSize: NSSize) {
             super.setFrameSize(newSize)
@@ -148,7 +153,19 @@ struct RecDot: View {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            observeWake()
             pulse()
+        }
+
+        // Core Animation's clock stands still while the Mac sleeps and the take's doesn't, so a wake starts the loop again in step.
+        private func observeWake() {
+            let center = NSWorkspace.shared.notificationCenter
+            if let wakeObserver { center.removeObserver(wakeObserver) }
+            wakeObserver = nil
+            guard window != nil else { return }
+            wakeObserver = center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.pulse() }
+            }
         }
 
         func show(_ color: CGColor, pulsingFrom origin: Date) {

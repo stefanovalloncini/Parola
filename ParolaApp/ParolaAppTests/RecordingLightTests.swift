@@ -29,6 +29,11 @@ private func loopPosition(_ light: RecDot.LightView) -> Double? {
     return (now - pulse.beginTime).truncatingRemainder(dividingBy: 1)
 }
 
+/// How far into its current second the take is right now.
+private func takeSecond(since origin: Date) -> Double {
+    Date().timeIntervalSince(origin).truncatingRemainder(dividingBy: 1)
+}
+
 /// The distance between two moments of a one-second loop, either way round.
 private func loopGap(_ a: Double, _ b: Double) -> Double {
     let gap = abs(a - b).truncatingRemainder(dividingBy: 1)
@@ -75,7 +80,7 @@ struct RecordingLightTests {
         defer { first.close() }
         let light = try #require(lights(in: first).first)
         let position = try #require(loopPosition(light))
-        let expected = Date().timeIntervalSince(origin).truncatingRemainder(dividingBy: 1)
+        let expected = takeSecond(since: origin)
         #expect(loopGap(position, expected) < 0.03, "the loop is \(position) s in, the take's second \(expected) s")
 
         await settle(for: .milliseconds(350))
@@ -85,6 +90,27 @@ struct RecordingLightTests {
         let firstBegin = try #require(light.dot.animation(forKey: RecDot.pulseKey)?.beginTime)
         let secondBegin = try #require(rebuilt.dot.animation(forKey: RecDot.pulseKey)?.beginTime)
         #expect(loopGap(firstBegin, secondBegin) < 0.01, "a light built 0.35 s later starts its loop on the same whole seconds")
+    }
+
+    @MainActor
+    @Test("after the Mac wakes, a light whose loop slipped while it slept pulses in step with the take again")
+    func wakeBringsTheLoopBack() async throws {
+        let origin = Date(timeIntervalSinceNow: -12.25)
+        let hosted = HostedWindow(RecDot(pulsesFrom: origin), width: 40, height: 40)
+        defer { hosted.close() }
+        let light = try #require(lights(in: hosted).first)
+        let layerNow = light.dot.convertTime(CACurrentMediaTime(), from: nil)
+        let inStep = RecDot.pulseBegin(origin: origin, now: Date(), layerTime: layerNow)
+        light.dot.add(RecDot.pulseAnimation(beginTime: inStep - 0.5), forKey: RecDot.pulseKey)
+        let slipped = try #require(loopPosition(light))
+        #expect(loopGap(slipped, takeSecond(since: origin)) > 0.4, "half a second out, as after a sleep")
+
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: NSWorkspace.shared)
+
+        let back = await waitUntil(timeoutMs: 2_000) {
+            loopPosition(light).map { loopGap($0, takeSecond(since: origin)) < 0.03 } ?? false
+        }
+        #expect(back)
     }
 
     @MainActor
