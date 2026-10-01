@@ -49,8 +49,55 @@ struct StageStateTests {
         #expect(StageControls.layout(for: .live) == .bar)
         #expect(StageControls.layout(for: .paused) == .bar)
         #expect(StageControls.layout(for: .finishing) == .finishing)
+        #expect(StageControls.layout(for: .transcribing(0.5)) == .stopTranscribing)
         #expect(StageControls.layout(for: .landing) == .none)
         #expect(StageControls.layout(for: .failed("x")) == .none)
+    }
+
+    @Test("the facts line counts the run's progress, and says so while the engine prepares the audio")
+    func transcribingLine() {
+        #expect(StageFacts.transcribingLine(stage: .preparingAudio, progress: nil) == "Preparing audio…")
+        #expect(StageFacts.transcribingLine(stage: nil, progress: nil) == "Transcribing…")
+        #expect(StageFacts.transcribingLine(stage: .transcribing, progress: 0.42) == "Transcribing… · 42%")
+        #expect(StageFacts.transcribingLine(stage: .preparingAudio, progress: 0.1) == "Transcribing… · 10%")
+    }
+
+    @MainActor
+    @Test("the overview squeezes the whole take into the width and sweeps as far as the run has read")
+    func overviewLayout() {
+        let minute = TakeLevelHistory()
+        for _ in 0..<600 { minute.append(0.5) }
+        let squeezed = TakeOverviewLayout(levels: minute, width: 300, progress: 0.5)
+        #expect(squeezed.bars.count == 100)
+        #expect(squeezed.step == 3)
+        #expect(abs(squeezed.secondsPerBar - 0.6) < 0.0001)
+        #expect(abs(squeezed.elapsed - 60) < 0.0001)
+        #expect(squeezed.sweptBars == 50)
+        #expect(abs(squeezed.x(at: 30) - 150) < 0.0001)
+        #expect(squeezed.tickInterval == 10)
+
+        let short = TakeLevelHistory()
+        for _ in 0..<100 { short.append(0.5) }
+        let loose = TakeOverviewLayout(levels: short, width: 300, progress: nil)
+        #expect(loose.bars.count == 100, "ten seconds fill a third of the width, one bar per sample")
+        #expect(abs(loose.secondsPerBar - 0.1) < 0.0001)
+        #expect(abs(loose.elapsed - 10) < 0.0001)
+        #expect(loose.sweptBars == 0)
+        #expect(loose.tickInterval == 2)
+
+        let empty = TakeOverviewLayout(levels: nil, width: 300, progress: 0.5)
+        #expect(empty.bars.isEmpty)
+        #expect(empty.elapsed == 0)
+    }
+
+    @Test("a stopped take's words show from their newest end, never the whole run's text")
+    func takeTextTail() {
+        #expect(StageTakeText.shown("a few words") == "a few words")
+        let hour = String(repeating: "word ", count: 20_000) + "last"
+        let shown = StageTakeText.shown(hour)
+        #expect(shown.count <= StageTakeText.recentCharacters)
+        #expect(shown.hasSuffix("word last"))
+        #expect(shown.hasPrefix("word "), "the cut never starts mid-word")
     }
 
     @Test("the time slot names the model a live take waits on, with its download")
@@ -82,6 +129,34 @@ extension TranscriberMockSuites {
             model.useStreaming = true
             model.startRecording(source: .microphone)
             await waitUntil { model.activeTake?.captureRequested == true }
+        }
+
+        @Test("a stopped take transcribes on its Stage, over the whole take, until Stop Transcribing keeps the audio")
+        func transcribesOnTheStage() async throws {
+            let audio = try makeTakeWAV("stage-transcribing", seconds: 2)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "words")], partials: ["some", "some words"], gate: gate)
+                let model = makeModel("stage-transcribing")
+
+                recordAndStop(model, audio: audio, seconds: 2)
+
+                let streamed = await waitUntil { model.takePartialText == "some words" }
+                #expect(streamed)
+                let take = try #require(model.recording)
+                #expect(take.isTranscribing)
+                #expect(model.route == .recording)
+                #expect(ContentRoutes.stageShows(take, model: model), "the Stage keeps the take while its run reports to it")
+
+                model.stopTranscribingTake()
+
+                let letGo = try #require(model.recording)
+                #expect(!ContentRoutes.stageShows(letGo, model: model), "the Stage hands over once the run lets go")
+                let saved = try #require(await landedEntry(model))
+                #expect(saved.title.hasSuffix("(not transcribed)"))
+                await gate.open()
+            }
         }
 
         @Test("the Stage's Cancel ends a count-in with no word")

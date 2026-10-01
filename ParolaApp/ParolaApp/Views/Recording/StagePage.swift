@@ -49,7 +49,7 @@ struct StagePage: View {
             }
             Spacer(minLength: DS.Spacing.large)
                 .frame(maxHeight: 44)
-            StageBand(take: take, isOnScreen: isOnScreen)
+            stageBand
                 .frame(height: StageBand.height)
             Spacer(minLength: DS.Spacing.large)
                 .frame(maxHeight: 44)
@@ -78,17 +78,36 @@ struct StagePage: View {
     }
 
     @ViewBuilder
+    private var stageBand: some View {
+        switch take.mode {
+        case .transcribing(let progress):
+            TakeOverview(progress: progress)
+        default:
+            StageBand(take: take, isOnScreen: isOnScreen)
+        }
+    }
+
+    @ViewBuilder
     private var stageText: some View {
-        if take.isStreaming {
-            StageLiveText(isOnScreen: isOnScreen)
-        } else {
-            LiveQuietLine(text: "Transcript appears when you stop")
+        switch take.mode {
+        case .transcribing:
+            StageTakeText(isOnScreen: isOnScreen)
+        default:
+            if take.isStreaming {
+                StageLiveText(isOnScreen: isOnScreen)
+            } else {
+                LiveQuietLine(text: "Transcript appears when you stop")
+            }
         }
     }
 
     private var accessibilityTitle: LocalizedStringKey {
         let from = take.source.label.lowercased()
-        return take.isArming ? "Getting ready to record from \(from)" : "Recording from \(from)"
+        switch take.mode {
+        case .countIn, .preparing, .starting: return "Getting ready to record from \(from)"
+        case .transcribing: return "Transcribing the recording"
+        default: return "Recording from \(from)"
+        }
     }
 
     /// Only a take that just began plays the entrance; coming back from another page mid-take shows the Stage as it is.
@@ -251,12 +270,14 @@ struct StageFacts: View {
         VStack(spacing: DS.Spacing.snug) {
             HStack(spacing: DS.Spacing.snug) {
                 status
-                separator
-                StageDeviceMenu(take: take)
-                separator
-                Text(verbatim: Self.modeLine(isStreaming: take.isStreaming))
+                if take.isRunning {
+                    separator
+                    StageDeviceMenu(take: take)
+                    separator
+                    Text(verbatim: Self.modeLine(isStreaming: take.isStreaming))
+                }
             }
-            if let warning {
+            if take.isRunning, let warning {
                 Label(warning.message, systemImage: warning.symbol)
                     .foregroundStyle(DS.Color.warningText)
                     .fontWeight(.medium)
@@ -272,6 +293,14 @@ struct StageFacts: View {
             : String(localized: "Transcript after you stop", bundle: bundle)
     }
 
+    /// "Transcribing… · 42%" as the run reads the take; "Preparing audio…" while the engine has nothing to count yet.
+    nonisolated static func transcribingLine(stage: TranscribeStage?, progress: Double?, bundle: Bundle = .main) -> String {
+        if progress == nil, stage == .preparingAudio { return String(localized: "Preparing audio…", bundle: bundle) }
+        let line = String(localized: "Transcribing…", bundle: bundle)
+        guard let progress else { return line }
+        return line + " · " + AppFormat.percent(progress)
+    }
+
     private var status: some View {
         HStack(spacing: DS.Spacing.snug) {
             switch take.mode {
@@ -284,6 +313,9 @@ struct StageFacts: View {
             case .finishing:
                 RecDot(color: DS.Color.secondaryText)
                 statusWord("REC", color: DS.Color.secondaryText)
+            case .transcribing(let progress):
+                RecDot(color: DS.Color.accent)
+                StageTranscribingStatus(progress: progress)
             default:
                 RecDot(pulsesFrom: isOnScreen && take.state == .recording ? take.clockOrigin : nil)
                 statusWord("REC", color: DS.Color.dangerText)
@@ -312,6 +344,17 @@ struct StageFacts: View {
         case .microphone: return ("No voice detected — check your microphone.", "speaker.slash.fill")
         case .systemAudio: return ("No sound from your Mac — check that audio is playing.", "speaker.slash.fill")
         }
+    }
+}
+
+/// Its own view, so the engine's stage changes redraw this line alone.
+struct StageTranscribingStatus: View {
+    let progress: Double?
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Text(verbatim: StageFacts.transcribingLine(stage: model.takeTranscribeStage, progress: progress))
+            .monospacedDigit()
     }
 }
 

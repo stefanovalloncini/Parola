@@ -16,6 +16,7 @@ struct StageControls: View {
     enum Layout: Equatable {
         case bar
         case finishing
+        case stopTranscribing
         case none
     }
 
@@ -23,7 +24,8 @@ struct StageControls: View {
         switch mode {
         case .countIn, .preparing, .starting, .live, .paused: .bar
         case .finishing: .finishing
-        case .transcribing, .landing, .failed: .none
+        case .transcribing: .stopTranscribing
+        case .landing, .failed: .none
         }
     }
 
@@ -32,6 +34,7 @@ struct StageControls: View {
             switch Self.layout(for: take.mode) {
             case .bar: bar
             case .finishing: finishingPill
+            case .stopTranscribing: stopTranscribingButton
             case .none: EmptyView()
             }
         }
@@ -62,6 +65,21 @@ struct StageControls: View {
         .disabled(true)
         .accessibilityLabel("Finishing the recording")
         .axLeaf("Stage.Button.Finishing")
+    }
+
+    /// The take's audio is in the library either way; this only stops the words.
+    private var stopTranscribingButton: some View {
+        Button {
+            model.stopTranscribingTake()
+        } label: {
+            Label("Stop Transcribing", systemImage: "stop.fill")
+                .labelStyle(.titleAndIcon)
+                .font(DS.Font.bodyStrong)
+        }
+        .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: DS.Spacing.medium, minWidth: Self.stopWidth))
+        .help("The recording stays in your library.")
+        .accessibilityLabel("Stop Transcribing")
+        .axLeaf("Stage.Button.StopTranscribing")
     }
 
     private var bar: some View {

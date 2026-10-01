@@ -15,6 +15,7 @@ extension DS.Font {
     /// A line of words in the clock's slot, while the take has no time to show yet.
     static let takePreparingStage = SwiftUI.Font.system(size: 28, weight: .light, design: .rounded).monospacedDigit()
     static let liveTranscriptStage = SwiftUI.Font.system(size: 24, design: .serif)
+    static let footnoteDigits = SwiftUI.Font.system(size: 11).monospacedDigit()
 }
 
 extension DS.Motion {

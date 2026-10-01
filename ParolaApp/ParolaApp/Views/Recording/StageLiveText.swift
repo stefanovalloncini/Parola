@@ -29,38 +29,84 @@ enum LiveParagraphs {
     }
 }
 
-/// The Stage's teleprompter: the newest three or four lines in New York 24 pt, older ones fading out at the top.
+/// The Stage's teleprompter for a live take: the newest three or four lines in New York 24 pt, older ones fading out at the top.
 struct StageLiveText: View {
     /// Off while the Stage is out of sight, so the caret stops blinking.
     let isOnScreen: Bool
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     static let visibleLines = 4
     static let width: CGFloat = 720
     static let height: CGFloat = 156
     static let minHeight: CGFloat = 36
     static let lineSpacing: CGFloat = 7
-    private static let fade: CGFloat = 40
     private static let recentSegments = 16
 
     var body: some View {
-        let settled = Self.settledText(model.liveSegments)
-        let partial = model.livePartialText
+        StageTeleprompter(
+            settled: Self.settledText(model.liveSegments),
+            partial: model.livePartialText,
+            quietLine: "Your transcript appears here as you speak",
+            isOnScreen: isOnScreen
+        )
+    }
+
+    /// The newest segments, broken where the finished transcript will break them, so nothing reflows when the take lands.
+    static func settledText(_ segments: [TranscriptSegment]) -> String {
+        LiveParagraphs.make(from: Array(segments.suffix(recentSegments)))
+            .map(\.text)
+            .joined(separator: "\n")
+    }
+}
+
+/// The same teleprompter for a stopped take, reading the words its run sends back as it works through the file.
+struct StageTakeText: View {
+    let isOnScreen: Bool
+    @Environment(AppModel.self) private var model
+
+    /// Twice what four lines hold at the column's width, so the cut always sits above the fade.
+    static let recentCharacters = 600
+
+    var body: some View {
+        StageTeleprompter(
+            settled: Self.shown(model.takePartialText),
+            partial: "",
+            quietLine: "Transcript appears here as it comes in",
+            isOnScreen: isOnScreen
+        )
+    }
+
+    /// The run hands back everything it has read so far; an hour of it must not be laid out on every partial.
+    static func shown(_ text: String) -> String {
+        StreamingText.tail(of: text, maxChars: recentCharacters)
+    }
+}
+
+/// Settled words, the unsettled tail and a caret, clipped to the newest lines with the older ones fading at the top.
+struct StageTeleprompter: View {
+    let settled: String
+    let partial: String
+    let quietLine: LocalizedStringKey
+    let isOnScreen: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    private static let fade: CGFloat = 40
+
+    var body: some View {
         Group {
             if settled.isEmpty, partial.isEmpty {
-                LiveQuietLine(text: "Your transcript appears here as you speak")
+                LiveQuietLine(text: quietLine)
             } else {
                 LiveTail(
                     settled: settled,
                     partial: partial,
                     font: DS.Font.liveTranscriptStage,
-                    lineSpacing: Self.lineSpacing,
+                    lineSpacing: StageLiveText.lineSpacing,
                     blinks: isOnScreen
                 )
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: Self.width)
+                .frame(maxWidth: StageLiveText.width)
                 // Both bounds, or a frame with only a maximum grows to the text's full height and nothing gets clipped.
                 .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .bottom)
                 .animation(reduceMotion ? nil : DS.Motion.transcriptFollow, value: settled.count + partial.count)
@@ -69,13 +115,6 @@ struct StageLiveText: View {
             }
         }
         .padding(.horizontal, DS.Spacing.large)
-    }
-
-    /// The newest segments, broken where the finished transcript will break them, so nothing reflows when the take lands.
-    static func settledText(_ segments: [TranscriptSegment]) -> String {
-        LiveParagraphs.make(from: Array(segments.suffix(recentSegments)))
-            .map(\.text)
-            .joined(separator: "\n")
     }
 
     @ViewBuilder

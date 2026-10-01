@@ -10788,6 +10788,17 @@
         }
       }
     },
+    "Preparing audio…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparazione dell’audio…"
+          }
+        }
+      }
+    },
     "Preparing the translation…": {
       "extractionState": "manual",
       "localizations": {
@@ -11446,6 +11457,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione da %@, %@"
+          }
+        }
+      }
+    },
+    "Recording levels": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Livelli della registrazione"
           }
         }
       }
@@ -15513,6 +15535,17 @@
         }
       }
     },
+    "Transcribing the recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione della registrazione"
+          }
+        }
+      }
+    },
     "Transcribing · %@": {
       "extractionState": "manual",
       "localizations": {
@@ -15592,6 +15625,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La trascrizione appare mentre parli. Se disattivato, registra tutto e poi trascrive."
+          }
+        }
+      }
+    },
+    "Transcript appears here as it comes in": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione appare qui man mano che arriva"
           }
         }
       }

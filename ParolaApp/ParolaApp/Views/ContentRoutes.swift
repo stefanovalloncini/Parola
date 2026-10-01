@@ -187,6 +187,14 @@ struct ContentRoutes: View {
         return run
     }
 
+    /// The Stage holds a take from its count-in until Stop, and on through its transcription while the run reports to it.
+    static func stageShows(_ take: RecordingSession, model: AppModel) -> Bool {
+        switch take.state {
+        case .arming, .recording, .paused, .finishing: true
+        case .transcribing: stageTranscription(for: model) != nil
+        case .done, .failed: false
+        }
+    }
 }
 
 /// The take's page, read here rather than in `ContentRoutes`, which a title typed or a marker set would otherwise redraw whole.
@@ -197,41 +205,15 @@ private struct StageRoute<Library: View, PhasePage: View>: View {
     let phasePage: PhasePage
 
     var body: some View {
-        if let take = model.recording {
-            switch take.state {
-            case .arming, .recording, .paused, .finishing:
-                StagePage(take: take)
-            case .transcribing(let progress):
-                if let run = ContentRoutes.stageTranscription(for: model) {
-                    TakeTranscribingPane(file: run.file, progress: progress)
-                } else {
-                    phasePage
-                }
-            case .failed(let message):
-                ErrorPane(message: message, take: take)
-            case .done:
-                library
-            }
+        if let take = model.recording, ContentRoutes.stageShows(take, model: model) {
+            StagePage(take: take)
+        } else if let take = model.recording, case .failed(let message) = take.state {
+            ErrorPane(message: message, take: take)
+        } else if model.recording?.isTranscribing == true {
+            phasePage
         } else {
             library
         }
-    }
-}
-
-/// Owns the take's per-partial reads, as `LiveTranscribingPane` does for a file, so its words redraw this pane alone.
-private struct TakeTranscribingPane: View {
-    @Environment(AppModel.self) private var model
-    let file: URL
-    let progress: Double?
-
-    var body: some View {
-        TranscribingPane(
-            file: file,
-            partial: model.takePartialText,
-            progress: progress,
-            expectsPartials: model.activeEngineStreamsPartials,
-            stage: model.takeTranscribeStage
-        )
     }
 }
 
