@@ -1,7 +1,7 @@
 import SwiftUI
 import ParolaCore
 
-/// "● Record ⌄" in the toolbar; a take arming or recording puts its own control in the same item.
+/// "● Record ⌄" in the toolbar; a running take puts its session capsule in the same item.
 struct RecordControl: View {
     @Environment(AppModel.self) private var model
 
@@ -24,8 +24,8 @@ struct RecordControl: View {
     }
 
     var body: some View {
-        if model.takeIsRunning && model.recordingCountdown == nil {
-            RecordingToolbarButton()
+        if let take = model.recording, take.isRunning, model.recordingCountdown == nil {
+            SessionCapsule(take: take)
         } else if let source = Self.primarySource(features: model.features) {
             recordButton(source)
         }

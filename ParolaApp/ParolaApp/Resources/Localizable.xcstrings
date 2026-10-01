@@ -13050,6 +13050,17 @@
         }
       }
     },
+    "Show Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra registrazione"
+          }
+        }
+      }
+    },
     "Show Scratchpad": {
       "extractionState": "manual",
       "localizations": {
