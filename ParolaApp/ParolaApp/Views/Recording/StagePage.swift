@@ -311,14 +311,23 @@ struct StageFacts: View {
             .foregroundStyle(DS.Color.secondaryText.opacity(0.7))
     }
 
-    private var warning: (message: LocalizedStringKey, symbol: String)? {
+    private var warning: (message: String, symbol: String)? {
         if model.recordingDiskSpaceLow {
-            return ("Low disk space — recording stops automatically below 200 MB.", "internaldrive")
+            return (String(localized: "Low disk space — recording stops automatically below 200 MB."), "internaldrive")
         }
         guard model.recordingIsSilent else { return nil }
-        switch take.source {
-        case .microphone: return ("No voice detected — check your microphone.", "speaker.slash.fill")
-        case .systemAudio: return ("No sound from your Mac — check that audio is playing.", "speaker.slash.fill")
+        return (Self.silenceWarning(source: take.source, micTrack: model.takeMicTrackState), "speaker.slash.fill")
+    }
+
+    /// A quiet meeting that records your microphone heard neither side, so it names both.
+    nonisolated static func silenceWarning(source: AppModel.RecordSource, micTrack: MicTrackState?, bundle: Bundle = .main) -> String {
+        switch source {
+        case .microphone:
+            String(localized: "No voice detected — check your microphone.", bundle: bundle)
+        case .systemAudio where AppModel.silenceCountsMic(micTrack):
+            String(localized: "No sound from your Mac or your microphone.", bundle: bundle)
+        case .systemAudio:
+            String(localized: "No sound from your Mac — check that audio is playing.", bundle: bundle)
         }
     }
 }

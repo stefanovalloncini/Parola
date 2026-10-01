@@ -9262,6 +9262,17 @@
         }
       }
     },
+    "No sound from your Mac or your microphone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun suono dal Mac né dal microfono."
+          }
+        }
+      }
+    },
     "No sound from your Mac — check that audio is playing.": {
       "extractionState": "manual",
       "localizations": {

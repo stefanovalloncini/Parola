@@ -193,6 +193,22 @@ extension AppModel {
         return peak
     }
 
+    /// Whether a take's silence counts your microphone as one of its sides: only while a meeting records it.
+    nonisolated static func silenceCountsMic(_ state: MicTrackState?) -> Bool {
+        state == .recording
+    }
+
+    /// When your microphone last heard sound, while the take's silence counts it.
+    var micTrackLastSound: ContinuousClock.Instant? {
+        guard Self.silenceCountsMic(takeMicTrackState), let track = micTrack, track.takeID == activeTake?.id else { return nil }
+        return track.capture?.levelMeter.lastSound
+    }
+
+    /// The later of a take's sides' last sounds.
+    nonisolated static func latestSound(_ mac: ContinuousClock.Instant?, _ mic: ContinuousClock.Instant?) -> ContinuousClock.Instant? {
+        [mac, mic].compactMap { $0 }.max()
+    }
+
     /// The note beside the mic file says where it starts; only for the take's own working file, never beside a fixture.
     private func noteMicTrackStart(_ track: MicTrack) {
         guard let file = track.file, isInflightFile(file), let offset = track.offset else { return }

@@ -3943,7 +3943,7 @@ final class AppModel {
     }
 
     private func noteRecordingLevel() {
-        let lastSound = recordingLevelMeter?.lastSound
+        let lastSound = Self.latestSound(recordingLevelMeter?.lastSound, micTrackLastSound)
         let heard = lastSound.map { $0.duration(to: .now) < .seconds(1) } ?? false
         // Mac audio has pauses a mic take doesn't: it warns early only if it has heard nothing yet.
         if activeTake?.source == .systemAudio {

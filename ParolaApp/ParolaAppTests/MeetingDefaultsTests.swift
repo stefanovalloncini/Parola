@@ -123,6 +123,66 @@ struct MeetingDefaultsTests {
         #expect(String(localized: "You", bundle: it) == "Tu")
         #expect(String(localized: "Mac audio", bundle: it) == "Audio del Mac")
         #expect(String(localized: "Microphone not recorded", bundle: it) == "Microfono non registrato")
+        #expect(StageFacts.silenceWarning(source: .systemAudio, micTrack: .recording, bundle: it) == "Nessun suono dal Mac né dal microfono.")
+    }
+
+    // MARK: - The silence warning
+
+    @Test("a meeting's silence counts your microphone only while it records")
+    func silenceCountsTheMic() {
+        #expect(AppModel.silenceCountsMic(.recording))
+        #expect(!AppModel.silenceCountsMic(.starting))
+        #expect(!AppModel.silenceCountsMic(.unavailable))
+        #expect(!AppModel.silenceCountsMic(nil))
+    }
+
+    @Test("the take's latest sound is the later of its two sides")
+    func latestSound() {
+        let early = ContinuousClock.now
+        let late = early + .seconds(3)
+        #expect(AppModel.latestSound(nil, nil) == nil)
+        #expect(AppModel.latestSound(early, nil) == early)
+        #expect(AppModel.latestSound(nil, late) == late)
+        #expect(AppModel.latestSound(late, early) == late)
+        #expect(AppModel.latestSound(early, late) == late)
+    }
+
+    @Test("a quiet meeting names both sides while it records your microphone, and the Mac alone otherwise")
+    func silenceWarningNamesItsSides() {
+        let english = Bundle.main
+        let both = "No sound from your Mac or your microphone."
+        let mac = "No sound from your Mac — check that audio is playing."
+        #expect(StageFacts.silenceWarning(source: .systemAudio, micTrack: .recording, bundle: english) == both)
+        #expect(StageFacts.silenceWarning(source: .systemAudio, micTrack: .starting, bundle: english) == mac)
+        #expect(StageFacts.silenceWarning(source: .systemAudio, micTrack: .unavailable, bundle: english) == mac)
+        #expect(StageFacts.silenceWarning(source: .systemAudio, micTrack: nil, bundle: english) == mac)
+        #expect(StageFacts.silenceWarning(source: .microphone, micTrack: nil, bundle: english) == "No voice detected — check your microphone.")
+    }
+}
+
+/// A capture whose meter reads whatever the test records into it.
+private actor MeteredCapture: LiveAudioSource {
+    nonisolated let levelMeter = LevelMeter()
+    nonisolated let file: URL
+
+    init(file: URL) {
+        self.file = file
+    }
+
+    func start() async throws {}
+    func prepare() async throws -> URL { file }
+    func cancel() async {}
+    func inFlightURL() async -> URL? { file }
+}
+
+/// Feeds both sides of a meeting a buffer every 100 ms, the Mac's silent and yours at `micLevel`, until cancelled.
+private func feed(mac: LevelMeter, mic: LevelMeter, micLevel: Float) -> Task<Void, Never> {
+    Task {
+        while !Task.isCancelled {
+            mac.record(0)
+            mic.record(micLevel)
+            try? await Task.sleep(for: .milliseconds(100))
+        }
     }
 }
 
@@ -258,6 +318,45 @@ extension TranscriberMockSuites {
                 #expect(mic["category"] == .string("transcription"))
                 await end(model)
                 withExtendedLifetime(server) {}
+            }
+        }
+
+        @Test("a meeting stays unwarned while your microphone hears you and the Mac is quiet, and warns once both go quiet")
+        func meetingSilenceCountsBothSides() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeRecordingModel("meeting-silence")
+                model.useStreaming = false
+                model.silenceRule = AppModel.SilenceRule(microphone: 0.5, macAudioBeforeSound: 0.5, macAudioAfterSound: 0.5)
+                let macFile = try makeTakeWAV("meeting-silence-mac")
+                let micFile = try makeTakeWAV("meeting-silence-mic")
+                defer {
+                    try? FileManager.default.removeItem(at: macFile)
+                    try? FileManager.default.removeItem(at: micFile)
+                }
+                let mac = MeteredCapture(file: macFile)
+                let mic = MeteredCapture(file: micFile)
+                model.takeCaptureOverride = { _ in mac }
+                model.micTrackCaptureOverride = { mic }
+                let talking = feed(mac: mac.levelMeter, mic: mic.levelMeter, micLevel: 0.5)
+
+                model.startRecording(source: .systemAudio)
+                let micUp = await waitUntil(timeoutMs: 10_000) { model.takeMicTrackState == .recording }
+                #expect(micUp)
+                var warned = false
+                for _ in 0..<60 {
+                    warned = warned || model.recordingIsSilent
+                    await settle(for: .milliseconds(50))
+                }
+                #expect(!warned, "your voice is sound enough: the Mac side's quiet is the others listening")
+                talking.cancel()
+
+                let quiet = feed(mac: mac.levelMeter, mic: mic.levelMeter, micLevel: 0)
+                // A few 750 ms ticks of the watch, and a slow host can stall the main actor for seconds.
+                let silent = await waitUntil(timeoutMs: 15_000) { model.recordingIsSilent }
+                #expect(silent)
+                #expect(model.takeMicTrackState == .recording)
+                quiet.cancel()
+                await end(model)
             }
         }
     }
