@@ -43,12 +43,13 @@ struct StageBand: View {
     }
 
     var body: some View {
+        let micLane = Self.micLane(of: model)
         ZStack {
             bars
             Canvas { context, size in Self.drawPlayhead(in: &context, size: size) }
                 .accessibilityHidden(true)
-            if model.takeMicLevels != nil {
-                StageLaneNames(micState: model.takeMicTrackState)
+            if micLane.shown {
+                StageLaneNames(micState: micLane.state)
             }
         }
         .saturation(take.isPaused || Self.greys(take.state) ? 0 : 1)
@@ -103,6 +104,12 @@ struct StageBand: View {
             newest: newest,
             paused: paused
         )
+    }
+
+    /// Whether the band has a You lane, and where your microphone stands; the observed state is read first, so a microphone that attaches always redraws the band.
+    static func micLane(of model: AppModel) -> (shown: Bool, state: MicTrackState?) {
+        let state = model.takeMicTrackState
+        return (model.takeMicLevels != nil, state)
     }
 
     /// What the You lane says once your microphone isn't in the take, or no longer is; the lane greys and keeps its place until the session ends.

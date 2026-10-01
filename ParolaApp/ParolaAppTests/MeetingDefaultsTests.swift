@@ -71,6 +71,26 @@ struct MeetingDefaultsTests {
         #expect(StageBand.lostMicNote(.stopped, bundle: it) == "Microfono fermato")
     }
 
+    @Test("the band follows the microphone's observed state even before its levels exist, so the lanes always get their names")
+    func lanesFollowTheObservedState() {
+        let model = makeRecordingModel("meeting-lane-observed")
+        #expect(StageBand.micLane(of: model).shown == false)
+        let changed = LaneObservation()
+        withObservationTracking {
+            _ = StageBand.micLane(of: model)
+        } onChange: {
+            changed.fired = true
+        }
+
+        model.takeMicLevels = TakeLevelHistory()
+        model.takeMicTrackState = .starting
+
+        #expect(changed.fired)
+        let lane = StageBand.micLane(of: model)
+        #expect(lane.shown)
+        #expect(lane.state == .starting)
+    }
+
     @Test("the bars are drawn again when the You lane comes, goes or stops, never for a frame that only slides them")
     func tapeRedrawsForTheYouLane() {
         let one = StageTape(levels: [0.1], flags: [], newest: 4, paused: false)
@@ -578,6 +598,11 @@ extension TranscriberMockSuites {
             }
         }
     }
+}
+
+/// Set by an observation's change handler and read once the change is made; the test waits on nothing else.
+private final class LaneObservation: @unchecked Sendable {
+    var fired = false
 }
 
 /// How many times a take asked for the microphone; set and read on the main actor only.
