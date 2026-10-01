@@ -163,6 +163,26 @@ struct LibrarySearchListTests {
         #expect(results.numberOfRows == LibrarySearchResults.pageSize)
     }
 
+    @Test("a failure with results up puts its banner over them, and they give it room")
+    func failureShowsOverTheResults() async throws {
+        let hosted = await host(20)
+        defer { close(hosted) }
+        let ids = hosted.model.libraryEntries.map(\.id)
+        search(Array(ids.prefix(5)), in: hosted.model)
+        #expect(await settled(hosted) { tables(hosted).count == 2 })
+        func resultsHeight() -> CGFloat { tables(hosted).last?.enclosingScrollView?.frame.height ?? 0 }
+        let calm = resultsHeight()
+        #expect(calm > 100)
+
+        hosted.model.phase = .failed(message: "The file couldn't be decoded.")
+        let made = await settled(hosted) { resultsHeight() < calm - 40 }
+        #expect(made, "the results stayed \(resultsHeight()) pt tall")
+
+        hosted.model.phase = .idle
+        let back = await settled(hosted) { resultsHeight() == calm }
+        #expect(back, "the results stayed \(resultsHeight()) pt tall")
+    }
+
     @Test("the keyboard follows the list on screen, and Tab passes over the covered one")
     func keyboardFollowsTheListOnScreen() async throws {
         let hosted = await host(20)

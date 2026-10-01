@@ -595,12 +595,14 @@ private struct LibraryBrowseList: View, Equatable {
 }
 
 /// Its own view, so a phase change repaints the banner and never the rows under it.
-private struct LibraryFailureBanner: View {
+struct LibraryFailureBanner: View {
     @Environment(AppModel.self) private var model
+    var insets = EdgeInsets()
 
     var body: some View {
         if case .failed(let message) = model.phase {
             ErrorBanner(message: message)
+                .padding(insets)
         }
     }
 }
