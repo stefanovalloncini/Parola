@@ -784,12 +784,15 @@ extension TranscriberMockSuites {
 
 @Suite("Sidebar Recording row, after the take stops")
 struct SidebarRecordingRowStateTests {
-    @Test("VoiceOver hears the time while the take runs, then that it transcribes or failed")
+    @Test("VoiceOver hears \"Recording\" once, then the time, and once the take stops, what became of it")
     func spokenValue() {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
         var take = capturingTake(at: start)
         let at = start.addingTimeInterval(754)
-        #expect(SidebarRecordingRow.spokenValue(for: take, at: at, locale: english) == "Recording, 12 minutes, 34 seconds")
+        #expect(SidebarRecordingRow.spokenValue(for: take, at: at, locale: english) == "12 minutes, 34 seconds")
+        _ = take.pause(at: at)
+        #expect(SidebarRecordingRow.spokenValue(for: take, at: at, locale: english) == "Paused, 12 minutes, 34 seconds")
+        _ = take.resume(at: at)
         _ = take.finish(at: at)
         _ = take.transcribing(progress: nil)
         #expect(SidebarRecordingRow.spokenValue(for: take, at: at, locale: english) == "Transcribing…")

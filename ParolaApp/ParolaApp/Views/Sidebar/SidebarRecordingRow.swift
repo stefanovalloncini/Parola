@@ -5,11 +5,12 @@ struct SidebarRecordingRow: View {
     let isSelected: Bool
     @Environment(AppModel.self) private var model: AppModel?
 
-    /// What VoiceOver reads after "Recording": the take's state and time while it runs, then how it ended up.
+    /// What VoiceOver reads after the row's "Recording": just the time while it records, what it is doing otherwise.
     nonisolated static func spokenValue(
         for take: RecordingSession, at now: Date, bundle: Bundle = .main, locale: Locale = AppFormat.locale
     ) -> String {
         switch take.state {
+        case .recording: AppFormat.spokenDuration(seconds: Int(take.elapsed(at: now)), locale: locale)
         case .transcribing: String(localized: "Transcribing…", bundle: bundle)
         case .failed: String(localized: "Failed", bundle: bundle)
         default: TakeRemote.spokenStatus(for: take, at: now, bundle: bundle, locale: locale)
