@@ -40,6 +40,8 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
     private let ask: @MainActor () -> AppModel.QuitDuringTake
     private let confirmDiscard: @MainActor () async -> Bool
 
+    var wrapped: NSObject? { forwarded }
+
     private init(
         model: AppModel,
         forwarded: NSObject?,
@@ -81,7 +83,7 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
         let confirmDiscard = confirmDiscard
         Task { [weak sender] in
             await MainWindowClose.resolve(choice, model: model, confirmDiscard: confirmDiscard) {
-                guard let sender, model.mainWindow === sender else { return }
+                guard let sender, sender.isVisible || sender.isMiniaturized else { return }
                 sender.performClose(nil)
             }
         }

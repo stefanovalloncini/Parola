@@ -481,7 +481,8 @@ struct MainWindowCloseAnswerTests {
         let window = closableWindow()
         defer { window.close() }
         model.mainWindow = window
-        MainWindowCloseGuard.install(on: window, model: model, ask: { .keepRecording }, confirmDiscard: { false })
+        var asked = 0
+        MainWindowCloseGuard.install(on: window, model: model, ask: { asked += 1; return .keepRecording }, confirmDiscard: { false })
         model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
         defer { model.endTestTake() }
         let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
@@ -491,6 +492,7 @@ struct MainWindowCloseAnswerTests {
         window.performClose(nil)
         sheet.performClose(nil)
 
+        #expect(asked == 0, "AppKit refuses the close before anything is asked")
         #expect(window.isVisible)
         #expect(model.recording?.state == .recording)
     }
@@ -530,6 +532,33 @@ struct MainWindowCloseAnswerTests {
         #expect(installed != nil)
         #expect(MainWindowCloseGuard.install(on: window, model: model) === installed)
     }
+
+    @Test("the app's own window has the question in front of SwiftUI's delegate, the window's controller")
+    func appWindowIsGuarded() async throws {
+        let opened = await waitUntil { AppDelegate.launchModel?.mainWindow != nil }
+        #expect(opened)
+        let window = try #require(AppDelegate.launchModel?.mainWindow)
+        let closeGuard = try #require(window.delegate as? MainWindowCloseGuard)
+        let controller = try #require(window.windowController)
+        #expect(closeGuard.wrapped === controller)
+    }
+
+    @Test("a take puts the question back in front of a delegate that changed since the window opened")
+    func takeReinstallsTheGuard() async throws {
+        let audio = try tempWAV("close-reinstall")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("close-reinstall")
+        let window = reportedWindow(model)
+        defer { window.close() }
+        let replacement = SwiftUIStandIn()
+        window.delegate = replacement
+
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        defer { model.endTestTake() }
+
+        let guarded = await waitUntil { (window.delegate as? MainWindowCloseGuard)?.wrapped === replacement }
+        #expect(guarded)
+    }
 }
 
 extension TranscriberMockSuites {
@@ -552,6 +581,35 @@ extension TranscriberMockSuites {
                 })
 
                 #expect(closedWhileRunning == false)
+                let landed = await landedEntry(model, timeoutMs: 30_000)
+                #expect(landed != nil)
+            }
+        }
+
+        @Test("Stop and Save closes the window that asked, even while another window is the main one")
+        func closesTheWindowThatAsked() async throws {
+            let audio = try makeTakeWAV("close-save-other", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the right window went")])
+                let model = makeRecordingModel("close-save-other")
+                model.useStreaming = false
+                let asking = closableWindow()
+                let other = closableWindow()
+                defer {
+                    asking.close()
+                    other.close()
+                }
+                MainWindowCloseGuard.install(on: asking, model: model, ask: { .stopAndSave }, confirmDiscard: { false })
+                model.mainWindow = other
+                model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+
+                asking.performClose(nil)
+
+                let closed = await waitUntil { !asking.isVisible }
+                #expect(closed)
+                let otherStays = other.isVisible
+                #expect(otherStays)
                 let landed = await landedEntry(model, timeoutMs: 30_000)
                 #expect(landed != nil)
             }

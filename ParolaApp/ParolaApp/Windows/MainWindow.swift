@@ -88,6 +88,7 @@ struct MainWindowReporter: NSViewRepresentable {
             withObservationTracking {
                 _ = model.takeIsRunning
                 nameWindow()
+                guardClose()
             } onChange: { [weak self] in
                 Task { @MainActor [weak self] in
                     self?.followsTake = false
@@ -100,6 +101,12 @@ struct MainWindowReporter: NSViewRepresentable {
             guard let model, let window else { return }
             let title = MainWindowTitle.title(takeRunning: model.takeIsRunning)
             if window.title != title { window.title = title }
+        }
+
+        /// Again as each take starts, in case the window's delegate changed since the window opened.
+        private func guardClose() {
+            guard let model, let window, model.takeIsRunning else { return }
+            MainWindowCloseGuard.install(on: window, model: model)
         }
     }
 }
