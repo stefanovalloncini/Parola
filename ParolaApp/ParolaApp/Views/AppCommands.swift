@@ -165,7 +165,11 @@ struct CaptionsCommands: View {
             }
             .keyboardShortcut("k", modifiers: [.command, .shift])
             .disabled(model.introduction.isPresented)
-            Button("Start Dictation") { model.startDictationFromIntent() }
+            let dictationItem = MenuBarController.dictationMenuItem(for: model.dictationState)
+            Button(dictationItem.title) {
+                dictationItem.stops ? model.stopDictationFromIntent() : model.startDictationFromIntent()
+            }
+            .disabled(model.introduction.isPresented)
         }
         if model.features.isEnabled(.liveCaptions) {
             Divider()
