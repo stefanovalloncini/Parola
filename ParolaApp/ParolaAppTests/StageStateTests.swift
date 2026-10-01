@@ -209,6 +209,24 @@ struct StageStateTests {
         #expect(TakeSavedToast.dismissAfter == .seconds(3))
     }
 
+    @MainActor
+    @Test("the Stage's state words have their Italian")
+    func italian() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let it = try #require(Bundle(path: path))
+        #expect(StageTimeSlot.preparingText(name: "openai_whisper-large-v3_turbo", download: 0.42, bundle: it)
+            == "Preparazione di Whisper Turbo · 42%")
+        #expect(StageFacts.transcribingLine(stage: .preparingAudio, progress: nil, bundle: it) == "Preparazione dell’audio…")
+        #expect(TakeSavedToast.message(category: .meeting, bundle: it) == "Salvata in Riunioni")
+        #expect(TakeSavedToast.message(category: .transcription, bundle: it) == "Salvata in Trascrizioni")
+        #expect(String(localized: "PAUSED", bundle: it) == "IN PAUSA")
+        #expect(String(localized: "Finishing…", bundle: it) == "Completamento…")
+        #expect(String(localized: "Cancel Recording", bundle: it) == "Annulla registrazione")
+        #expect(String(localized: "Transcript appears here as it comes in", bundle: it) == "La trascrizione appare qui man mano che arriva")
+        #expect(String(localized: "Show in Finder", bundle: it) == "Mostra nel Finder")
+        #expect(String(localized: "The recording stopped", bundle: it) == "La registrazione si è interrotta")
+    }
+
     @Test("the time slot names the model a live take waits on, with its download")
     func preparingLine() {
         #expect(StageTimeSlot.preparingText(name: "openai_whisper-large-v3_turbo", download: 0.42) == "Preparing Whisper Turbo · 42%")
