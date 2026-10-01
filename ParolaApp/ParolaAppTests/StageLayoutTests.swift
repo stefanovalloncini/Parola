@@ -53,6 +53,19 @@ struct StageLayoutTests {
         #expect(AppFormat.spokenDuration(seconds: 3725, locale: italian) == "1 ora, 2 minuti e 5 secondi")
     }
 
+    @Test("the device menu checks the input the take listens on, the default when the chosen one is gone")
+    func deviceCheckMark() {
+        let builtIn = AudioInputDevice(uid: "built-in", name: "MacBook Pro Microphone", isDefault: true)
+        let usb = AudioInputDevice(uid: "usb", name: "USB Mic", isDefault: false)
+        let both = [builtIn, usb]
+        #expect(StageDeviceMenu.checkedUID(takeDevice: "USB Mic", preferredUID: "usb", devices: both) == "usb")
+        #expect(StageDeviceMenu.checkedUID(takeDevice: "MacBook Pro Microphone", preferredUID: "gone", devices: both) == "built-in")
+        #expect(StageDeviceMenu.checkedUID(takeDevice: nil, preferredUID: "gone", devices: both) == "built-in")
+        #expect(StageDeviceMenu.checkedUID(takeDevice: nil, preferredUID: nil, devices: both) == "built-in")
+        #expect(StageDeviceMenu.checkedUID(takeDevice: "USB Mic", preferredUID: nil, devices: both) == "usb")
+        #expect(StageDeviceMenu.checkedUID(takeDevice: "Unplugged Mic", preferredUID: nil, devices: both) == nil)
+    }
+
     @Test("the recording light is full as each second turns and faint halfway through it")
     func recDotPulse() {
         #expect(RecDot.pulse(at: 0) == 1)

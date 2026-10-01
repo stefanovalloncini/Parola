@@ -220,7 +220,7 @@ struct StageFacts: View {
 }
 
 /// The input a take listens on. A take keeps its input to the end, so the menu lists the Mac's inputs without switching.
-private struct StageDeviceMenu: View {
+struct StageDeviceMenu: View {
     let take: RecordingSession
     @Environment(AppModel.self) private var model
     @State private var devices: [AudioInputDevice] = []
@@ -229,7 +229,7 @@ private struct StageDeviceMenu: View {
         Group {
             if take.source == .microphone {
                 Menu {
-                    Picker("Input device", selection: .constant(currentUID)) {
+                    Picker("Input device", selection: .constant(checkedUID)) {
                         ForEach(devices) { device in
                             Text(verbatim: device.name).tag(device.uid)
                         }
@@ -274,8 +274,16 @@ private struct StageDeviceMenu: View {
         take.device ?? String(localized: "Microphone")
     }
 
-    private var currentUID: String {
-        model.preferredInputDeviceUID ?? devices.first(where: \.isDefault)?.uid ?? ""
+    private var checkedUID: String {
+        Self.checkedUID(takeDevice: take.device, preferredUID: model.preferredInputDeviceUID, devices: devices) ?? ""
+    }
+
+    /// The input the take listens on: picked the way the take picked it, the chosen device or else the default, and held to the name the take recorded.
+    nonisolated static func checkedUID(takeDevice: String?, preferredUID: String?, devices: [AudioInputDevice]) -> String? {
+        let picked = devices.first { $0.uid == preferredUID } ?? devices.first(where: \.isDefault)
+        guard let takeDevice else { return picked?.uid }
+        if let picked, picked.name == takeDevice { return picked.uid }
+        return devices.first { $0.name == takeDevice }?.uid
     }
 }
 
