@@ -549,6 +549,12 @@ extension AppModel {
         let target = inPlace
             ? take
             : scratch.deletingLastPathComponent().appendingPathComponent("parola-system-\(UUID().uuidString).wav")
+        do {
+            try DiskFlush.flush(scratch)
+        } catch {
+            try? FileManager.default.removeItem(at: scratch)
+            throw error
+        }
         guard rename(scratch.path, target.path) == 0 else {
             let failure = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             try? FileManager.default.removeItem(at: scratch)

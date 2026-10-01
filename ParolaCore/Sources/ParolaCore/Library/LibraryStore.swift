@@ -1134,8 +1134,10 @@ public actor LibraryStore {
         }
         cachedLoaded.remove(id)
         let duration = try await offActorThrowingIO {
-            let staged = bundleURL.appendingPathComponent(".replacing-\(UUID().uuidString).\(current.pathExtension)")
+            Self.removeLeftoverReplacements(in: bundleURL)
+            let staged = bundleURL.appendingPathComponent("\(Self.replacingPrefix)\(UUID().uuidString).\(current.pathExtension)")
             defer { try? FileManager.default.removeItem(at: staged) }
+            try DiskFlush.flush(file)
             try FileManager.default.moveItem(at: file, to: staged)
             _ = try FileManager.default.replaceItemAt(current, withItemAt: staged)
             return FileAudioSource(url: current).synchronousDuration()
@@ -1144,6 +1146,16 @@ public actor LibraryStore {
             try ParolaDocument.updateManifest(at: bundleURL) { $0.durationSeconds = duration }
         }
         try recacheEntry(at: bundleURL)
+    }
+
+    static let replacingPrefix = ".replacing-"
+
+    /// A replace that a crash cut short leaves its staged copy in the entry; the next replace clears it.
+    private nonisolated static func removeLeftoverReplacements(in bundleURL: URL) {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: bundleURL.path)) ?? []
+        for name in names where name.hasPrefix(replacingPrefix) {
+            try? FileManager.default.removeItem(at: bundleURL.appendingPathComponent(name))
+        }
     }
 
     /// Records the length the entry's media actually measures, for a transcript that stored a wrong one.

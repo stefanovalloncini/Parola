@@ -77,6 +77,37 @@ struct LibraryStoreTests {
         #expect(leftovers.isEmpty)
     }
 
+    @Test("a replace clears the staged copy a crash left behind from an earlier one")
+    func replaceClearsALeftoverStagedCopy() async throws {
+        let (store, _) = try makeTempLibrary()
+        let original = try makeFakeAudio()
+        defer { try? FileManager.default.removeItem(at: original) }
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: original, title: "Standup")
+        let leftover = entry.bundleURL.appendingPathComponent(".replacing-\(UUID().uuidString).wav")
+        try Data("half a replace".utf8).write(to: leftover)
+        let replacement = FileManager.default.temporaryDirectory.appendingPathComponent("parola-store-stereo-\(UUID().uuidString).wav")
+        try Data("RIFFstereoaudio".utf8).write(to: replacement)
+
+        try await store.replaceAudio(of: entry.id, with: replacement)
+
+        #expect(!FileManager.default.fileExists(atPath: leftover.path))
+        #expect(try Data(contentsOf: try #require(try await store.load(entry.id).document.audioURL)) == Data("RIFFstereoaudio".utf8))
+    }
+
+    @Test("a written file flushes to the disk, and one that isn't there says so")
+    func flushesAFile() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("parola-flush-\(UUID().uuidString)")
+        try Data("bytes".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        try DiskFlush.flush(file)
+
+        do {
+            try DiskFlush.flush(file.appendingPathExtension("missing"))
+            Issue.record("a file that isn't there flushed")
+        } catch {}
+    }
+
     @Test("chat history is never searchable")
     func chatHistoryIsNotIndexed() async throws {
         let (store, _) = try makeTempLibrary()
