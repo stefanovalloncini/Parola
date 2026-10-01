@@ -45,10 +45,13 @@ struct StageBand: View {
         return Canvas { context, size in
             Self.draw(levels: levels, flags: flags, in: &context, size: size)
         }
-        .accessibilityElement()
-        .accessibilityLabel("Input level")
-        .accessibilityValue(take.isPaused ? Text("Paused") : Text(verbatim: AppFormat.percent(Double(levels.last ?? 0))))
-        .accessibilityAddTraits(.updatesFrequently)
+        // A Canvas element carries no value; a text stand-in reads the level the way the clock reads its time.
+        .accessibilityRepresentation {
+            Text(verbatim: AppFormat.percent(Double(levels.last ?? 0)))
+                .accessibilityLabel("Input level")
+                .accessibilityValue(take.isPaused ? Text("Paused") : Text(verbatim: AppFormat.percent(Double(levels.last ?? 0))))
+                .accessibilityAddTraits(.updatesFrequently)
+        }
     }
 
     nonisolated static func playheadX(width: CGFloat) -> CGFloat {

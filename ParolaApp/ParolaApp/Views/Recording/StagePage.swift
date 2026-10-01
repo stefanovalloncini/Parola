@@ -244,6 +244,8 @@ private struct StageDeviceMenu: View {
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .help("Stop the recording to change the microphone")
+                .accessibilityLabel("Input device")
+                .accessibilityValue(Text(verbatim: take.device ?? String(localized: "Microphone")))
                 .axLeaf("Stage.Menu.Device")
                 .task {
                     devices = (try? await AppModel.offMainIO { AudioDevices.inputDevices() }) ?? []
@@ -262,6 +264,7 @@ private struct StageDeviceMenu: View {
             if opensMenu {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
+                    .accessibilityHidden(true)
             }
         }
         .contentShape(Rectangle())
