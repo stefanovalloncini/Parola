@@ -67,13 +67,13 @@ struct StagePage: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .scaleEffect(Self.entranceScale(entered: entered, reduceMotion: reduceMotion))
-        .opacity(entered ? 1 : 0)
+        .opacity(Self.entranceOpacity(entered: entered))
         .overlay(alignment: .bottom) {
             StageControls(take: take)
                 .leavesFirstOnLanding()
                 .padding(.bottom, StageControls.bottomInset)
                 .offset(y: Self.controlsLift(entered: entered, reduceMotion: reduceMotion))
-                .opacity(entered ? 1 : 0)
+                .opacity(Self.entranceOpacity(entered: entered))
         }
         .background(WindowShownReader { isOnScreen = $0 })
         .accessibilityElement(children: .contain)
@@ -129,6 +129,11 @@ struct StagePage: View {
 
     nonisolated static func controlsLift(entered: Bool, reduceMotion: Bool) -> CGFloat {
         entered || reduceMotion ? 0 : 18
+    }
+
+    /// Never fully clear: the entrance starts one hop after the page it replaces is gone, and a clear first frame flashes empty.
+    nonisolated static func entranceOpacity(entered: Bool) -> Double {
+        entered ? 1 : 0.3
     }
 
     static func entrance(reduceMotion: Bool) -> Animation {

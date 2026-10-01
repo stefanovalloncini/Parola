@@ -238,6 +238,12 @@ struct StageStateTests {
         #expect(StageClock.roll == .easeOut(duration: 0.2))
     }
 
+    @Test("the entrance starts from 30 %, so its first frame is never an empty window")
+    func entranceStartsInSight() {
+        #expect(StagePage.entranceOpacity(entered: false) == 0.3)
+        #expect(StagePage.entranceOpacity(entered: true) == 1)
+    }
+
     @MainActor
     @Test("the media bar's time reads as one line, while the duration stands on its own for a landing take's clock")
     func timeReadoutReadsAsOne() {
