@@ -300,7 +300,27 @@ struct LibraryOriginTests {
         #expect(model.isBrowsingWholeLibrary)
     }
 
-    // MARK: - Where the link shows
+    @Test("a failure over an open transcript is the Library page to the sidebar, the bridge and ⌘[")
+    func failureOverATranscriptIsTheLibraryPage() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "standup notes")
+        #expect(await openEntry(entry.id, in: model))
+
+        model.phase = .failed(message: "The file couldn't be decoded.")
+
+        #expect(ContentRoutes.routeID(for: model) == .library)
+        #expect(model.isBrowsingLibrary)
+        #expect(model.isBrowsingWholeLibrary, "the bridge's libraryBrowsingAll")
+        #expect(sidebar(model) == .library)
+        #expect(!model.canReturnToOrigin, "no transcript is on screen for ⌘[ to leave")
+        #expect(LibraryListContent.showsBrowseList(hasTranscript: model.hasTranscript, failed: true))
+
+        model.dismissError()
+        #expect(!model.isBrowsingLibrary, "the transcript comes back once the failure goes")
+        #expect(model.canReturnToOrigin)
+    }
+
+    // MARK: - Where the link shows    // MARK: - Where the link shows
 
     @Test("the back link needs a transcript standing on its own")
     func linkVisibility() async throws {

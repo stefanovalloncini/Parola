@@ -95,9 +95,9 @@ enum LibraryListContent {
         }
     }
 
-    /// A browse list sits under the results only when clearing the query would show it: not over a transcript.
-    static func showsBrowseList(hasTranscript: Bool) -> Bool {
-        !hasTranscript
+    /// A browse list sits under the results only when clearing the query would show it: not over a transcript, unless a failure's banner is up.
+    static func showsBrowseList(hasTranscript: Bool, failed: Bool) -> Bool {
+        !hasTranscript || failed
     }
 
     /// What Clear Filters resets: every dimension the list can be narrowed by, including the person.

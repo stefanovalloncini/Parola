@@ -1455,7 +1455,10 @@ final class AppModel {
     var isBrowsingLibrary: Bool {
         guard route == .transcript else { return false }
         switch transcriptRoutePhase {
-        case .idle, .ready, .failed:
+        case .failed:
+            // The failure's banner is on the Library page, which the route draws over an open transcript too.
+            return true
+        case .idle, .ready:
             // Results the transcript did not come from take the content area; clearing them gives it back.
             if hasTranscript { return hasSearchResults && !openedFromSearch }
             return true
@@ -1466,6 +1469,11 @@ final class AppModel {
     /// The phase the transcript route draws: a batch job's run shows under Activity, so the page it would cover stays up.
     var transcriptRoutePhase: Phase {
         batchOwnsPhase ? .ready : phase
+    }
+
+    var transcriptRouteFailed: Bool {
+        if case .failed = transcriptRoutePhase { return true }
+        return false
     }
 
     /// The Library page with nothing narrowing it: no category or person filter, and no search results.

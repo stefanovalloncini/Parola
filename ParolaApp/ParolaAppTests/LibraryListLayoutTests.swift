@@ -232,6 +232,22 @@ struct LibraryListLayoutTests {
         #expect(backAtTop, "a new failure left the list at row \(firstVisibleRow())")
     }
 
+    @Test("a failure over an open transcript draws the Library page's list, banner first")
+    func failureOverATranscriptDrawsTheList() async throws {
+        let shown = entries(3)
+        let hosted = await host(shown, groupsByDate: false)
+        defer { close(hosted) }
+        hosted.model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "open")], language: "en", modelName: "stub"
+        )
+        hosted.model.phase = .ready
+        _ = await settled(hosted)
+
+        hosted.model.phase = .failed(message: "The file couldn't be decoded.")
+        let listed = await settled(hosted) { (table(hosted)?.numberOfRows ?? 0) == shown.count + 1 }
+        #expect(listed, "rows: \(table(hosted)?.numberOfRows ?? -1)")
+    }
+
     @Test("no row draws a rule under it: not the page's top, not a date title, not an entry")
     func rowsDrawNoRule() async throws {
         let hosted = await host(threeGroups())

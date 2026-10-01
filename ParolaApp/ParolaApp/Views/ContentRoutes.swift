@@ -170,7 +170,9 @@ struct ContentRoutes: View {
 
     /// One call site on purpose: an `if` per case would give each branch its own identity and tear the List down on every sidebar move.
     private var libraryBrowseList: some View {
-        libraryPage(browses: LibraryListContent.showsBrowseList(hasTranscript: model.hasTranscript))
+        libraryPage(browses: LibraryListContent.showsBrowseList(
+            hasTranscript: model.hasTranscript, failed: model.transcriptRouteFailed
+        ))
     }
 
     private func libraryPage(browses: Bool) -> some View {
