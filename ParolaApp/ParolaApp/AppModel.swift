@@ -5163,7 +5163,7 @@ final class AppModel {
         Task { [weak self] in
             if let entry = try? await failure.save?.value, let self {
                 guard await self.library.list().contains(where: { $0.id == entry.id }) else {
-                    // The deleted entry keeps the audio; a working file a failed Stage still held goes, or a later sweep would bring the take back.
+                    // The user deleted this take, so a working file a failed Stage still held goes too, the last copy once the entry is purged; a later sweep would bring it back.
                     self.releaseTakeFile(url)
                     let restorable = await self.library.listDeleted().contains { $0.id == entry.id }
                     self.exportNotice = Self.deletedTakeNotice(restorable: restorable)
