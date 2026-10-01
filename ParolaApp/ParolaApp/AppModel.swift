@@ -5142,12 +5142,10 @@ final class AppModel {
         let url = failure.audioURL
         Task { [weak self] in
             if let entry = try? await failure.save?.value, let self {
-                // Once its entry holds the audio the working file is gone, so a deleted entry leaves nothing to retry.
                 guard await self.library.list().contains(where: { $0.id == entry.id }) else {
-                    self.exportNotice = ExportNotice(
-                        message: String(localized: "This recording is no longer in your library."),
-                        failures: [], folder: nil, tone: .failure
-                    )
+                    // The deleted entry keeps the audio; a working file a failed Stage still held goes, or a later sweep would bring the take back.
+                    self.releaseTakeFile(url)
+                    self.exportNotice = await self.retryRefusedNotice(entryID: entry.id)
                     return
                 }
                 if (try? await self.openEntry(entry.id)) != nil {
@@ -5163,6 +5161,18 @@ final class AppModel {
                 )
             }
         }
+    }
+
+    /// A Retry whose entry was deleted points to where it can come back from, while it can.
+    private func retryRefusedNotice(entryID: LibraryEntry.ID) async -> ExportNotice {
+        guard await library.listDeleted().contains(where: { $0.id == entryID }) else {
+            return ExportNotice(message: String(localized: "This recording was deleted."), failures: [], folder: nil, tone: .info)
+        }
+        return ExportNotice(
+            message: String(localized: "This recording was deleted. Restore it from Recently Deleted to try again."),
+            failures: [], folder: nil, tone: .info,
+            actions: [ExportNotice.Action(title: String(localized: "Show Recently Deleted"), handler: .openRecentlyDeleted)]
+        )
     }
 
     /// Schedules a debounced (~1 s) persist of the current transcript. Rapid edits coalesce: only the

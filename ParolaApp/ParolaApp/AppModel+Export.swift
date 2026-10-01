@@ -131,6 +131,8 @@ extension AppModel {
                 guard let entry = try? await failure.save?.value else { return }
                 self?.openEntryFromLibrary(entry.id, inNewWindow: false)
             }
+        case .openRecentlyDeleted:
+            openRecentlyDeleted()
         }
     }
 

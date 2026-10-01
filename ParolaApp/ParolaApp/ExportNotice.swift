@@ -24,11 +24,12 @@ struct ExportNotice: Equatable, Identifiable {
             case retrySavedTake(RecordingSession.Failure)
             /// Opens what a failed take saved, once a newer take has replaced it on the Stage.
             case showSavedTake(RecordingSession.Failure)
+            case openRecentlyDeleted
 
             var takeID: Int? {
                 switch self {
                 case .retryTake(let id), .showTake(let id): id
-                case .openEntry, .transcribeEntry, .retrySavedTake, .showSavedTake: nil
+                case .openEntry, .transcribeEntry, .retrySavedTake, .showSavedTake, .openRecentlyDeleted: nil
                 }
             }
         }

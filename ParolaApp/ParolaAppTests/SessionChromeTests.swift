@@ -59,8 +59,9 @@ struct SessionChromeStringTests {
     func italian() throws {
         let it = try italianBundle()
         #expect(String(localized: "Show Recording", bundle: it) == "Mostra registrazione")
-        #expect(String(localized: "This recording is no longer in your library.", bundle: it)
-            == "Questa registrazione non è più nella tua libreria.")
+        #expect(String(localized: "This recording was deleted. Restore it from Recently Deleted to try again.", bundle: it)
+            == "Questa registrazione è stata eliminata. Ripristinala da Eliminati di recente per riprovare.")
+        #expect(String(localized: "This recording was deleted.", bundle: it) == "Questa registrazione è stata eliminata.")
     }
 }
 
@@ -670,7 +671,7 @@ extension TranscriberMockSuites {
     @MainActor
     @Suite("A replaced take's notice outlives its entry", .serialized)
     struct ReplacedTakeNoticeTests {
-        @Test("Retry on a notice whose saved recording was deleted says the recording is gone, and adds nothing")
+        @Test("Retry on a notice whose saved recording was deleted points to Recently Deleted, and adds nothing")
         func retryAfterTheEntryWasDeleted() async throws {
             let fixture = try tempWAV("replaced-notice-mic")
             defer { try? FileManager.default.removeItem(at: fixture) }
@@ -706,13 +707,77 @@ extension TranscriberMockSuites {
                 let retry = try #require(notice.actions.first)
                 model.performNoticeAction(retry)
 
-                let told = await waitUntil { model.exportNotice?.message == "This recording is no longer in your library." }
+                let told = await waitUntil { model.exportNotice?.message == Self.restoreFirst }
                 #expect(told)
                 await settle()
                 let entries = await model.library.list()
-                #expect(entries.isEmpty, "nothing comes back from a recording that is gone")
+                #expect(entries.isEmpty, "nothing comes back from a recording that was deleted")
                 #expect(!model.hasPendingTakeWork)
+                let show = try #require(model.exportNotice?.actions.first)
+                #expect(show.title == "Show Recently Deleted")
+                model.performNoticeAction(show)
+                #expect(model.route == .recentlyDeleted)
             }
+        }
+
+        static let restoreFirst = "This recording was deleted. Restore it from Recently Deleted to try again."
+
+        @Test("Retry on a failed Stage whose saved recording was deleted lets go of the working file and points to Recently Deleted")
+        func retryOnAStageAfterTheEntryWasDeleted() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine boom")
+                ))
+                let model = makeRecordingModel("retry-stage-deleted")
+                model.selectedModel = "openai_whisper-tiny"
+                try FileManager.default.createDirectory(at: model.inflightRecordingsURL, withIntermediateDirectories: true)
+                let working = try makeTakeWAV("stage", seconds: 1, in: model.inflightRecordingsURL, prefix: "parola-mic")
+                defer { try? FileManager.default.removeItem(at: working) }
+                recordAndStop(model, audio: working, seconds: 2)
+                let failedOnStage = await waitUntil {
+                    if case .failed = model.recording?.state { return true }
+                    return false
+                }
+                #expect(failedOnStage)
+                let saved = try #require(await landedEntry(model))
+                await waitUntil { !model.hasPendingTakeWork }
+                let heldForRetry = FileManager.default.fileExists(atPath: working.path)
+                #expect(heldForRetry, "a failed Stage keeps the working file for its Retry")
+
+                model.deleteEntry(saved.id)
+                let deleted = await waitUntil { await model.library.list().isEmpty }
+                #expect(deleted)
+                model.retryFailedTake()
+
+                let told = await waitUntil { model.exportNotice?.message == Self.restoreFirst }
+                #expect(told)
+                let released = await waitUntil { !FileManager.default.fileExists(atPath: working.path) }
+                #expect(released, "the deleted entry keeps the audio, so the working file goes")
+                let entries = await model.library.list()
+                #expect(entries.isEmpty)
+            }
+        }
+
+        @Test("once the deleted recording is gone from Recently Deleted too, Retry just says it was deleted")
+        func retryAfterTheEntryWasPurged() async throws {
+            let model = makeRecordingModel("retry-purged")
+            let entry = try await model.library.add(
+                transcript: AppModel.untranscribedTranscript(of: URL(fileURLWithPath: "/tmp/purged.wav"), language: nil),
+                audioSource: nil
+            )
+            try await model.library.purge(entry.id)
+            let failure = RecordingSession.Failure(
+                audioURL: URL(fileURLWithPath: "/tmp/parola-purged-working.wav"),
+                save: Task { entry }, recovery: nil, title: "R", category: .transcription, source: .microphone,
+                annotations: AppModel.TakeAnnotations()
+            )
+
+            model.retryTake(failure)
+
+            let told = await waitUntil { model.exportNotice?.message == "This recording was deleted." }
+            #expect(told)
+            #expect(model.exportNotice?.actions.isEmpty == true)
+            #expect(!model.hasPendingTakeWork)
         }
     }
 }
