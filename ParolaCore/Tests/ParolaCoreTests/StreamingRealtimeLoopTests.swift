@@ -453,8 +453,8 @@ struct StreamingRealtimeLoopTests {
         capture.push(seconds: 10, value: 0.5)
         let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
         #expect(oneBatchRecorded)
-        let windowOffsetAt2SecondsSecondBatch = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
-        #expect(windowOffsetAt2SecondsSecondBatch)
+        let windowOffsetAt2Seconds = await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate }
+        #expect(windowOffsetAt2Seconds)
 
         capture.push(seconds: 4, value: 0.5)
         let scriptCalledTwice = await eventually { await script.callCount == 2 }
