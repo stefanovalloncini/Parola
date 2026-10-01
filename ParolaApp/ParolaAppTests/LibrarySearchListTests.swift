@@ -183,6 +183,22 @@ struct LibrarySearchListTests {
         #expect(back, "the results stayed \(resultsHeight()) pt tall")
     }
 
+    @Test("midnight rebuilds the results' rows, as it does the browse list's")
+    func midnightRebuildsTheResults() async throws {
+        let hosted = await host(20)
+        defer { close(hosted) }
+        let ids = Array(hosted.model.libraryEntries.map(\.id).prefix(5))
+        search(ids, in: hosted.model)
+        #expect(await settled(hosted) { tables(hosted).count == 2 })
+        // A rebuild asks for its rows' snippets again, the one trace it leaves while the clock can't be moved.
+        hosted.model.searchSnippetIDs = []
+
+        NotificationCenter.default.post(name: .NSCalendarDayChanged, object: nil)
+
+        let rebuilt = await settled(hosted) { hosted.model.searchSnippetIDs == Set(ids) }
+        #expect(rebuilt, "asked again for \(hosted.model.searchSnippetIDs.count) of \(ids.count)")
+    }
+
     @Test("the keyboard follows the list on screen, and Tab passes over the covered one")
     func keyboardFollowsTheListOnScreen() async throws {
         let hosted = await host(20)

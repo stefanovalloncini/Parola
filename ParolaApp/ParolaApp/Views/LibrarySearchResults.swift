@@ -125,6 +125,8 @@ struct LibrarySearchResults: View {
             recompute()
         }
         .onChange(of: model.libraryVersion) { _, _ in recompute() }
+        // A row's time names its day, so midnight has to rewrite it.
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in recompute() }
         .onReceive(NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)) { _ in
             displayCache.removeAll()
             recompute()
