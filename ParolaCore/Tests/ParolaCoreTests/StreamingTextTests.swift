@@ -68,15 +68,16 @@ struct StreamingTextTests {
         #expect(parts.fresh == "")
     }
 
-    @Test("two long partials that share no border split quickly")
-    func longMismatchIsQuick() {
+    @Test("two long partials that share no border split in linear work")
+    func longMismatchIsLinear() {
         let base = String(repeating: "the quick brown fox jumps over the lazy dog ", count: 1_000)
         let shown = base + "alpha"
         let latest = base + "omega"
-        let clock = ContinuousClock()
-        var parts: (settled: String, fresh: String) = ("", "")
-        let elapsed = clock.measure { parts = StreamingText.split(shown: shown, latest: latest) }
-        #expect(elapsed < .milliseconds(100))
+        // This thread's CPU time, not wall time: a starved scheduler parks the thread for seconds, while on these 45k characters KMP costs 5 ms of CPU and the quadratic suffix scan it replaced about a second.
+        let start = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+        let parts = StreamingText.split(shown: shown, latest: latest)
+        let cpuNanoseconds = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - start
+        #expect(cpuNanoseconds < 100_000_000, "\(cpuNanoseconds / 1_000_000) ms of CPU")
         #expect(parts.settled == latest)
         #expect(parts.fresh == "")
     }
