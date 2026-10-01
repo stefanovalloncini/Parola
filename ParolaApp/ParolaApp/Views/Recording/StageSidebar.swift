@@ -62,9 +62,22 @@ struct TakeSidebarHold: ViewModifier {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Well past the route's 0.2 s crossfade, which a first Stage render can stretch, so the page the Stage replaced is gone before the sidebar moves.
+    static let foldDelay: Duration = .milliseconds(500)
+
     func body(content: Content) -> some View {
         content.onChange(of: SidebarCollapsePolicy.holds(model.recording), initial: true) { _, holds in
-            model.mainSidebar.hold(holds, animation: reduceMotion ? nil : DS.Motion.sidebarCollapse)
+            let animation = reduceMotion ? nil : DS.Motion.sidebarCollapse
+            guard holds, animation != nil else {
+                model.mainSidebar.hold(holds, animation: animation)
+                return
+            }
+            // A List dismantled mid-collapse has AppKit rebuild its rows on a torn-down graph: "No Observable object of type AppModel found".
+            Task { @MainActor in
+                try? await Task.sleep(for: Self.foldDelay)
+                guard SidebarCollapsePolicy.holds(model.recording) else { return }
+                model.mainSidebar.hold(true, animation: animation)
+            }
         }
     }
 }
