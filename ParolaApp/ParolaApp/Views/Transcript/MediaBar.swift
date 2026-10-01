@@ -74,7 +74,6 @@ struct MediaBar: View {
     private var readout: some View {
         HStack(spacing: DS.Spacing.small) {
             PlaybackTimeLabel(scrubbingTo: scrubbingTo)
-                .stageLandingDestination(.time)
             speedMenu
         }
     }
@@ -206,7 +205,7 @@ struct PlaybackProgressView: View {
         "\(format(current)) / \(format(total))"
     }
 
-    private static func format(_ t: Double) -> String {
+    static func format(_ t: Double) -> String {
         let total = Int(max(0, t.rounded()))
         let h = total / 3600
         let m = (total % 3600) / 60
@@ -215,17 +214,23 @@ struct PlaybackProgressView: View {
     }
 }
 
+/// The playhead's time, then the duration on its own, which a landing take's clock shrinks into.
 struct PlaybackTimeLabel: View {
     @Environment(AppModel.self) private var model
     let scrubbingTo: Double?
 
     var body: some View {
-        Text(PlaybackProgressView.timeLabel(
-            current: scrubbingTo ?? model.currentTimeSeconds,
-            total: model.transcript?.durationSeconds ?? 0
-        ))
+        let current = scrubbingTo ?? model.currentTimeSeconds
+        let total = model.transcript?.durationSeconds ?? 0
+        HStack(spacing: 0) {
+            Text(verbatim: PlaybackProgressView.format(current) + " / ")
+            Text(verbatim: PlaybackProgressView.format(total))
+                .stageLandingDestination(.time)
+        }
         .font(DS.Font.mono)
         .foregroundStyle(DS.Color.secondaryText)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: PlaybackProgressView.timeLabel(current: current, total: total)))
     }
 }
 

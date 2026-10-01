@@ -239,6 +239,19 @@ struct StageStateTests {
     }
 
     @MainActor
+    @Test("the media bar's time reads as one line, while the duration stands on its own for a landing take's clock")
+    func timeReadoutReadsAsOne() {
+        let model = makeRecordingModel("stage-time-readout")
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "x")], language: "en", modelName: "stub", durationSeconds: 280
+        )
+        let hosted = HostedWindow(PlaybackTimeLabel(scrubbingTo: 0).environment(model), width: 300, height: 40)
+        defer { hosted.close() }
+        let words = HostedAccessibility.words(in: hosted.host)
+        #expect(words.contains("00:00 / 04:40"))
+    }
+
+    @MainActor
     @Test("under Reduce Motion the Stage only crossfades: a still dot, the band four times a second, no morph, nothing carried over")
     func reduceMotionOnlyCrossfades() {
         #expect(StagePage.entrance(reduceMotion: true) == DS.Motion.crossfade)
