@@ -1390,8 +1390,13 @@ extension TranscriberMockSuites {
 
                 model.acceptPendingRecovery()
 
-                let landed = await waitUntil { model.selectedEntryID == existing.id && model.transcript?.text == "at last" }
-                #expect(landed)
+                await pollUntil("the saved take to open and its re-run to start") {
+                    model.fileTranscribeTask != nil || model.transcript?.text == "at last"
+                }
+                await awaitGuarded("the saved take's re-run") { await model.fileTranscribeTask?.value }
+                await awaitGuarded("the re-run's landing") { await model.awaitLandingSteps() }
+                #expect(model.selectedEntryID == existing.id)
+                #expect(model.transcript?.text == "at last")
                 #expect(await model.library.list().map(\.id) == [existing.id])
                 let checkpointsCleared = await waitUntil { model.recoveryCheckpointFiles.isEmpty }
                 #expect(checkpointsCleared)
