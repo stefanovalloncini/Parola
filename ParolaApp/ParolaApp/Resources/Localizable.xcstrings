@@ -8322,6 +8322,17 @@
         }
       }
     },
+    "Microphone not recorded": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microfono non registrato"
+          }
+        }
+      }
+    },
     "Milliseconds": {
       "extractionState": "manual",
       "localizations": {
@@ -17056,6 +17067,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ieri %@"
+          }
+        }
+      }
+    },
+    "You": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu"
           }
         }
       }

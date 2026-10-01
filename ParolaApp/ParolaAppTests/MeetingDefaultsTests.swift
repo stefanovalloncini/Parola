@@ -13,6 +13,117 @@ struct MeetingDefaultsTests {
         #expect(AppModel.defaultCategory(for: .systemAudio) == .meeting)
         #expect(AppModel.defaultCategory(for: .microphone) == .transcription)
     }
+
+    // MARK: - The You and Mac audio meters
+
+    @Test("one lane is the whole band as before; a meeting's two share it in halves, You on top")
+    func lanes() {
+        let size = CGSize(width: 1180, height: StageBand.height)
+        #expect(StageBand.lanes(1, in: size) == [CGRect(x: 0, y: 0, width: 1180, height: 140)])
+        #expect(StageBand.lanes(2, in: size) == [
+            CGRect(x: 0, y: 0, width: 1180, height: 70),
+            CGRect(x: 0, y: 70, width: 1180, height: 70),
+        ])
+    }
+
+    @Test("the You lane reads the microphone's levels and the Mac audio lane the take's, sample for sample")
+    func lanesReadTheirSides() {
+        let mac = TakeLevelHistory()
+        let mic = TakeLevelHistory()
+        for sample in 0..<20 {
+            mac.append(0.25)
+            mic.append(sample < 5 ? 0 : 0.75)
+        }
+        let meeting = StageBand.tape(levels: mac, micLevels: mic, micState: .recording, markers: [], paused: false)
+        #expect(meeting.levels == [Float](repeating: 0.25, count: 20))
+        #expect(meeting.micLevels == [Float](repeating: 0, count: 5) + [Float](repeating: 0.75, count: 15))
+        #expect(meeting.newest == 19)
+        #expect(!meeting.micOff)
+
+        let plain = StageBand.tape(levels: mac, micLevels: nil, micState: nil, markers: [], paused: false)
+        #expect(plain.levels == meeting.levels)
+        #expect(plain.micLevels == nil)
+    }
+
+    @Test("the You lane greys once the microphone isn't in the take, and stays, flat, after Stop")
+    func offLane() {
+        #expect(StageBand.micOff(.unavailable))
+        #expect(!StageBand.micOff(.starting))
+        #expect(!StageBand.micOff(.recording))
+        #expect(!StageBand.micOff(nil), "Stop lets the state go and keeps the levels: the lane stays as it was")
+        #expect(StageBand.offLaneStrength < 1)
+
+        let mac = TakeLevelHistory()
+        let mic = TakeLevelHistory()
+        mac.append(0.5)
+        mic.append(0)
+        #expect(StageBand.tape(levels: mac, micLevels: mic, micState: .unavailable, markers: [], paused: false).micOff)
+        #expect(StageBand.tape(levels: mac, micLevels: mic, micState: nil, markers: [], paused: false).micLevels == [0])
+    }
+
+    @Test("the bars are drawn again when the You lane comes, goes or stops, never for a frame that only slides them")
+    func tapeRedrawsForTheYouLane() {
+        let one = StageTape(levels: [0.1], flags: [], newest: 4, paused: false)
+        let two = StageTape(levels: [0.1], micLevels: [0.2], flags: [], newest: 4, paused: false)
+        #expect(one != two)
+        #expect(two != StageTape(levels: [0.1], micLevels: [0.2], micOff: true, flags: [], newest: 4, paused: false))
+        #expect(two == StageTape(levels: [0.1], micLevels: [0.2], flags: [], newest: 4, paused: false))
+    }
+
+    private func meetingTake() -> RecordingSession {
+        var take = RecordingSession(
+            takeID: 1, source: .systemAudio, category: .meeting, title: "M", isStreaming: false, arming: .startingCapture
+        )
+        _ = take.markCapturing(at: Date(timeIntervalSinceNow: -60))
+        return take
+    }
+
+    private func stageElements(_ take: RecordingSession, model: AppModel) -> [HostedAccessibility.Element] {
+        model.route = .recording
+        let hosted = HostedWindow(StagePage(take: take).environment(model), width: 1180, height: 708)
+        defer { hosted.close() }
+        return HostedAccessibility.elements(in: hosted.host)
+    }
+
+    @Test("a meeting that records your microphone shows a You lane over a Mac audio lane in the band's place")
+    func meetingStageShowsTwoLanes() throws {
+        let model = makeRecordingModel("meeting-lanes")
+        let plain = stageElements(meetingTake(), model: model)
+        #expect(plain.contains { $0.label == "Input level" })
+        #expect(!plain.contains { $0.label == "You" })
+
+        model.takeMicLevels = TakeLevelHistory()
+        model.takeMicTrackState = .recording
+        let meeting = stageElements(meetingTake(), model: model)
+        let youLane = meeting.first { $0.label == "You" }
+        let macLane = meeting.first { $0.label == "Mac audio" }
+        let you = try #require(youLane)
+        let mac = try #require(macLane)
+        #expect(!meeting.contains { $0.label == "Input level" })
+        #expect(you.frame.midY > mac.frame.midY, "screen coordinates grow upwards: You sits above Mac audio")
+        #expect(you.value != "Microphone not recorded")
+    }
+
+    @Test("the You lane says so in place once your microphone isn't in the take")
+    func offLaneSaysSo() throws {
+        let model = makeRecordingModel("meeting-lane-off")
+        model.takeMicLevels = TakeLevelHistory()
+        model.takeMicTrackState = .unavailable
+        let elements = stageElements(meetingTake(), model: model)
+        let youLane = elements.first { $0.label == "You" }
+        let you = try #require(youLane)
+        #expect(you.value == "Microphone not recorded")
+        #expect(elements.contains { $0.label == "Mac audio" })
+    }
+
+    @Test("the meters' words have their Italian")
+    func italian() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let it = try #require(Bundle(path: path))
+        #expect(String(localized: "You", bundle: it) == "Tu")
+        #expect(String(localized: "Mac audio", bundle: it) == "Audio del Mac")
+        #expect(String(localized: "Microphone not recorded", bundle: it) == "Microfono non registrato")
+    }
 }
 
 extension TranscriberMockSuites {

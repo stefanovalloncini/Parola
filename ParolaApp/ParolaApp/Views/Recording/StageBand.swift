@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// About fifteen seconds of the take scrolling into a red playhead at 70 % of the width, its markers standing as flags.
+/// About fifteen seconds of the take scrolling into a red playhead at 70 % of the width, its markers standing as flags; a meeting's microphone gets a lane of its own.
 struct StageBand: View {
     let take: RecordingSession
     /// Off while the Stage is out of sight, so the band stops drawing; the take's levels keep filling regardless.
@@ -16,6 +16,8 @@ struct StageBand: View {
     nonisolated static let visibleSamples = 480
     /// The bars slide at most this often; between samples nothing but their offset changes.
     nonisolated static let glideFrame: TimeInterval = 1.0 / 30
+    /// How far past the playhead a lane's name starts, in the band's empty stretch.
+    nonisolated static let laneNameInset: CGFloat = 12
 
     /// How the band follows the take: redrawn with each sample and sliding between them, or under Reduce Motion redrawn four times a second and standing still.
     enum Cadence: Equatable {
@@ -45,6 +47,9 @@ struct StageBand: View {
             bars
             Canvas { context, size in Self.drawPlayhead(in: &context, size: size) }
                 .accessibilityHidden(true)
+            if model.takeMicLevels != nil {
+                StageLaneNames(micOff: Self.micOff(model.takeMicTrackState))
+            }
         }
         .saturation(take.isPaused || Self.greys(take.state) ? 0 : 1)
         .opacity(Self.greys(take.state) ? 0.45 : 1)
@@ -78,15 +83,41 @@ struct StageBand: View {
     }
 
     private var tape: StageTape {
-        let history = model.takeLevels
-        let count = history.map { min(Self.visibleSamples, $0.sampleCount, $0.recentCapacity) } ?? 0
-        let newest = (history?.sampleCount ?? 0) - 1
-        return StageTape(
-            levels: history?.recent(count) ?? [],
-            flags: take.markers.compactMap { Self.markerOffset($0, newestSample: newest) },
-            newest: newest,
-            paused: take.isPaused
+        Self.tape(
+            levels: model.takeLevels, micLevels: model.takeMicLevels, micState: model.takeMicTrackState,
+            markers: take.markers, paused: take.isPaused
         )
+    }
+
+    /// The band's bars as of the newest sample: the take's own levels, or for a meeting that records your microphone, its levels as "You" over the Mac audio.
+    static func tape(
+        levels: TakeLevelHistory?, micLevels: TakeLevelHistory?, micState: MicTrackState?, markers: [TimeInterval], paused: Bool
+    ) -> StageTape {
+        let count = levels.map { min(visibleSamples, $0.sampleCount, $0.recentCapacity) } ?? 0
+        let newest = (levels?.sampleCount ?? 0) - 1
+        return StageTape(
+            levels: levels?.recent(count) ?? [],
+            micLevels: micLevels?.recent(count),
+            micOff: micOff(micState),
+            flags: markers.compactMap { markerOffset($0, newestSample: newest) },
+            newest: newest,
+            paused: paused
+        )
+    }
+
+    /// The You lane greys once your microphone isn't in the take; it keeps its place, flat, until the take's session ends.
+    nonisolated static func micOff(_ state: MicTrackState?) -> Bool {
+        state == .unavailable
+    }
+
+    /// A lane whose microphone isn't in the take draws at this strength.
+    nonisolated static let offLaneStrength = 0.4
+
+    /// The band's lanes, top to bottom: one fills it, and a meeting's two share it in equal halves, each with the band's own margins.
+    nonisolated static func lanes(_ count: Int, in size: CGSize) -> [CGRect] {
+        let lanes = max(1, count)
+        let height = size.height / CGFloat(lanes)
+        return (0..<lanes).map { CGRect(x: 0, y: CGFloat($0) * height, width: size.width, height: height) }
     }
 
     nonisolated static func playheadX(width: CGFloat) -> CGFloat {
@@ -105,10 +136,10 @@ struct StageBand: View {
         return offset < visibleSamples ? offset : nil
     }
 
-    fileprivate static func drawTape(levels: [Float], flags: [Int], in context: inout GraphicsContext, size: CGSize) {
+    fileprivate static func drawTape(
+        levels: [Float], micLevels: [Float]?, micOff: Bool, flags: [Int], in context: inout GraphicsContext, size: CGSize
+    ) {
         let playheadX = playheadX(width: size.width)
-        let mid = size.height / 2
-        let tallest = size.height - 16
         let flagColor = DS.Color.accent
 
         for offset in flags {
@@ -117,6 +148,29 @@ struct StageBand: View {
             context.fill(Path(roundedRect: pole, cornerRadius: 0.75), with: .color(flagColor.opacity(0.5)))
         }
 
+        let rows: [(levels: [Float], strength: Double)] = micLevels.map { [($0, micOff ? offLaneStrength : 1), (levels, 1)] }
+            ?? [(levels, 1)]
+        for (row, lane) in zip(rows, lanes(rows.count, in: size)) {
+            drawBars(row.levels, in: lane, strength: row.strength, playheadX: playheadX, context: &context)
+        }
+
+        for offset in flags {
+            let poleRight = barX(offset: offset, playheadX: playheadX) + barWidth / 2 + 0.75
+            var pennant = Path()
+            pennant.move(to: CGPoint(x: poleRight, y: 3))
+            pennant.addLine(to: CGPoint(x: poleRight + 8, y: 6.5))
+            pennant.addLine(to: CGPoint(x: poleRight, y: 10))
+            pennant.closeSubpath()
+            context.fill(pennant, with: .color(flagColor))
+        }
+    }
+
+    /// One lane's bars, mirrored about its middle inside the band's 8 pt margins, inked darker at the top than the bottom.
+    private static func drawBars(
+        _ levels: [Float], in lane: CGRect, strength: Double, playheadX: CGFloat, context: inout GraphicsContext
+    ) {
+        let mid = lane.midY
+        let tallest = lane.height - 16
         var bars = Path()
         for (offset, level) in levels.reversed().enumerated() {
             let x = barX(offset: offset, playheadX: playheadX)
@@ -130,24 +184,14 @@ struct StageBand: View {
             bars,
             with: .linearGradient(
                 Gradient(stops: [
-                    .init(color: ink.opacity(0.55), location: 0),
-                    .init(color: ink.opacity(0.55), location: 0.5),
-                    .init(color: ink.opacity(0.26), location: 1),
+                    .init(color: ink.opacity(0.55 * strength), location: 0),
+                    .init(color: ink.opacity(0.55 * strength), location: 0.5),
+                    .init(color: ink.opacity(0.26 * strength), location: 1),
                 ]),
-                startPoint: .zero,
-                endPoint: CGPoint(x: 0, y: size.height)
+                startPoint: CGPoint(x: 0, y: lane.minY),
+                endPoint: CGPoint(x: 0, y: lane.maxY)
             )
         )
-
-        for offset in flags {
-            let poleRight = barX(offset: offset, playheadX: playheadX) + barWidth / 2 + 0.75
-            var pennant = Path()
-            pennant.move(to: CGPoint(x: poleRight, y: 3))
-            pennant.addLine(to: CGPoint(x: poleRight + 8, y: 6.5))
-            pennant.addLine(to: CGPoint(x: poleRight, y: 10))
-            pennant.closeSubpath()
-            context.fill(pennant, with: .color(flagColor))
-        }
     }
 
     private static func drawPlayhead(in context: inout GraphicsContext, size: CGSize) {
@@ -160,27 +204,77 @@ struct StageBand: View {
     }
 }
 
-/// The band's bars and flags as of one sample. Equal until the next sample, marker or pause, so the frames that slide it between samples never draw it again.
+/// The band's bars and flags as of one sample. Equal until the next sample, marker, pause or change of lanes, so the frames that slide it between samples never draw it again.
 struct StageTape: View, Equatable {
     let levels: [Float]
+    /// A meeting's microphone, drawn as the You lane over `levels`; nil for a take with one lane.
+    var micLevels: [Float]?
+    var micOff = false
     let flags: [Int]
     let newest: Int
     let paused: Bool
 
     nonisolated static func == (lhs: StageTape, rhs: StageTape) -> Bool {
         lhs.newest == rhs.newest && lhs.flags == rhs.flags && lhs.paused == rhs.paused
+            && (lhs.micLevels == nil) == (rhs.micLevels == nil) && lhs.micOff == rhs.micOff
     }
 
     var body: some View {
         Canvas { context, size in
-            StageBand.drawTape(levels: levels, flags: flags, in: &context, size: size)
+            StageBand.drawTape(levels: levels, micLevels: micLevels, micOff: micOff, flags: flags, in: &context, size: size)
         }
-        // A Canvas element carries no value; a text stand-in reads the level the way the clock reads its time.
+        // A Canvas element carries no value; a text stand-in per lane reads its level the way the clock reads its time.
         .accessibilityRepresentation {
-            Text(verbatim: AppFormat.percent(Double(levels.last ?? 0)))
-                .accessibilityLabel("Input level")
-                .accessibilityValue(paused ? Text("Paused") : Text(verbatim: AppFormat.percent(Double(levels.last ?? 0))))
-                .accessibilityAddTraits(.updatesFrequently)
+            if let micLevels {
+                VStack {
+                    level(micLevels, label: "You", off: micOff)
+                    level(levels, label: "Mac audio")
+                }
+            } else {
+                level(levels, label: "Input level")
+            }
+        }
+    }
+
+    private func level(_ levels: [Float], label: LocalizedStringKey, off: Bool = false) -> some View {
+        let reading = Text(verbatim: AppFormat.percent(Double(levels.last ?? 0)))
+        return reading
+            .accessibilityLabel(label)
+            .accessibilityValue(off ? Text("Microphone not recorded") : paused ? Text("Paused") : reading)
+            .accessibilityAddTraits(.updatesFrequently)
+    }
+}
+
+/// "You" and "Mac audio" just past the playhead, each beside its lane; the You lane says so once your microphone isn't in the take.
+private struct StageLaneNames: View {
+    let micOff: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            let lanes = StageBand.lanes(2, in: proxy.size)
+            let x = StageBand.playheadX(width: proxy.size.width) + StageBand.laneNameInset
+            ZStack(alignment: .topLeading) {
+                you
+                    .fixedSize()
+                    .frame(height: lanes[0].height)
+                    .offset(x: x, y: lanes[0].minY)
+                Text("Mac audio")
+                    .fixedSize()
+                    .frame(height: lanes[1].height)
+                    .offset(x: x, y: lanes[1].minY)
+            }
+        }
+        .font(DS.Font.secondary)
+        .foregroundStyle(DS.Color.secondaryText)
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var you: some View {
+        if micOff {
+            Label("Microphone not recorded", systemImage: "mic.slash")
+        } else {
+            Text("You")
         }
     }
 }
