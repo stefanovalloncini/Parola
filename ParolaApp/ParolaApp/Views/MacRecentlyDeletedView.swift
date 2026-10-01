@@ -48,6 +48,8 @@ struct MacRecentlyDeletedView: View {
         // One rebuild for the previews that arrived together, not one per row.
         .onChange(of: previews) { recomputeRows() }
         .onChange(of: model.showAITitles) { recomputeRows() }
+        // The one input that moves with the active library, which nothing else on this page watches.
+        .onChange(of: model.usualLanguage) { recomputeRows() }
         .task(id: searchText.isEmpty ? "" : categoryFilter.rawValue) { await loadPreviewsForSearch() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)

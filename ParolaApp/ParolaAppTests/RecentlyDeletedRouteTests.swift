@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
@@ -23,6 +25,37 @@ struct RecentlyDeletedRouteTests {
             bundleURL: URL(fileURLWithPath: "/tmp/RecentlyDeletedRouteTests/\(id).parola"),
             manifest: manifest
         )
+    }
+
+    private func entry(_ id: String, language: String, deletedAt: Date? = nil) -> LibraryEntry {
+        var manifest = ParolaDocument.Manifest(originalAudioName: "\(id).m4a", title: id, modelName: "stub", language: language)
+        manifest.deletedAt = deletedAt
+        return LibraryEntry(
+            id: id,
+            bundleURL: URL(fileURLWithPath: "/tmp/RecentlyDeletedRouteTests/\(id).parola"),
+            manifest: manifest
+        )
+    }
+
+    @Test("a row names its language against the library's usual one, and follows it when it changes")
+    func rowsFollowTheUsualLanguage() async {
+        let model = makeModel()
+        await model.libraryRefreshTask?.value
+        model.libraryEntries = ["a", "b", "c"].map { entry($0, language: "en") }
+        model.setDeletedEntries([entry("trashed", language: "it", deletedAt: Date())])
+        model.openRecentlyDeleted()
+        let page = HostedWindow(ContentRoutes().environment(model))
+        defer { page.close() }
+        let italian = LanguageDisplay.name(for: "it") ?? "IT"
+        // The row rebuilds once its preview loads, so the library changes only after that.
+        _ = await waitUntil {
+            let words = HostedAccessibility.words(in: page.host)
+            return words.contains(italian) && words.contains("No transcript text.")
+        }
+
+        model.libraryEntries = ["a", "b", "c"].map { entry($0, language: "it") }
+        let dropped = await waitUntil { !HostedAccessibility.words(in: page.host).contains(italian) }
+        #expect(dropped, "Italian is the usual language now, so the row stops naming it")
     }
 
     private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
