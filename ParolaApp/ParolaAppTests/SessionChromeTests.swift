@@ -370,13 +370,17 @@ struct MainWindowCloseDecisionTests {
         let starting = AppDelegate.closeQuestion(starting: true)
         #expect(starting.message == "A recording is starting")
         #expect(starting.detail == "Nothing has been recorded yet.")
+        #expect(starting.discard == "Discard", "no second question follows, so no ellipsis")
         let recording = AppDelegate.closeQuestion(starting: false)
         #expect(recording.message == "A recording is in progress")
         #expect(recording.detail == "Stop and Save keeps what you've recorded so far in your library.")
+        #expect(recording.discard == "Discard…")
         let it = try italianBundle()
         let italian = AppDelegate.closeQuestion(starting: true, bundle: it)
         #expect(italian.message == "Una registrazione sta per iniziare")
         #expect(italian.detail == "Non è ancora stato registrato nulla.")
+        #expect(italian.discard == "Scarta")
+        #expect(AppDelegate.closeQuestion(starting: false, bundle: it).discard == "Scarta…")
     }
 
     @Test("closing asks from the count-in until Stop; never without a take, nor once it finishes")
