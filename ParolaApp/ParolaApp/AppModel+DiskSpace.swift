@@ -12,11 +12,12 @@ extension AppModel {
     nonisolated static let diskSpaceWarnFloorBytes: Int64 = 1_000_000_000
     nonisolated static let diskSpaceRefuseFloorBytes: Int64 = 200_000_000
 
-    /// nil (the volume couldn't be statted) counts as ok: never block a recording on a failed probe.
-    nonisolated static func diskSpaceVerdict(freeBytes: Int64?) -> DiskSpaceVerdict {
+    /// nil (the volume couldn't be statted) counts as ok: never block a recording on a failed probe; `reserving` is room already promised.
+    nonisolated static func diskSpaceVerdict(freeBytes: Int64?, reserving reserve: Int64 = 0) -> DiskSpaceVerdict {
         guard let freeBytes else { return .ok }
-        if freeBytes < diskSpaceRefuseFloorBytes { return .refuse }
-        if freeBytes < diskSpaceWarnFloorBytes { return .warn }
+        let spare = freeBytes - reserve
+        if spare < diskSpaceRefuseFloorBytes { return .refuse }
+        if spare < diskSpaceWarnFloorBytes { return .warn }
         return .ok
     }
 
@@ -80,9 +81,10 @@ extension AppModel {
     func checkRecordingDiskSpace() async {
         guard takeIsRunning else { return }
         let freeBytes = await Self.freeDiskSpace(freeDiskSpaceProvider)
+        let reserve = await meetingFoldReserve()
         // The take can end while the volume is statted.
         guard takeIsRunning else { return }
-        switch Self.diskSpaceVerdict(freeBytes: freeBytes) {
+        switch Self.diskSpaceVerdict(freeBytes: freeBytes, reserving: reserve) {
         case .refuse:
             stopRecordingAndTranscribe()
         case .warn:

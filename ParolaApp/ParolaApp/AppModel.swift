@@ -4291,7 +4291,9 @@ final class AppModel {
                     endUnheardTake(url, recovery: recovery, take: take?.id)
                     return
                 }
-                let folded = await foldMicTrack(micFile, into: url, take: take, recovery: recovery, wantsEngineInput: true)
+                let folded = await foldMicTrack(
+                    micFile, into: url, take: take, recovery: recovery, wantsEngineInput: engineNeedsMonoMix()
+                )
                 if folded.stopped { return }
                 await transcribeRecordedTake(
                     url: folded.audio, engineInput: folded.engineInput, title: title, source: takeSource, category: category,
@@ -4513,7 +4515,7 @@ final class AppModel {
             try Task.checkCancellation()
             var meeting = engineInput != nil
             if !meeting { meeting = await isMeetingStereo(url, source: source) }
-            if meeting, engineFile == nil { engineFile = await meetingEngineInput(for: url) }
+            if meeting, engineFile == nil, engineNeedsMonoMix() { engineFile = await meetingEngineInput(for: url) }
             let handlers = take.map { makeTakeHandlers(run: run, takeID: $0) } ?? TranscribeHandlers()
             let result = try await session.transcribe(
                 source: FileAudioSource(url: engineFile ?? url),

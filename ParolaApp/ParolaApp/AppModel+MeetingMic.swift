@@ -293,6 +293,7 @@ extension AppModel {
             return true
         }
         if await !Self.isStereoFile(audio) {
+            guard await hasRoomToFold(mac: audio, mic: record.mic.file, mono: false) else { return false }
             let scratch = meetingScratchURL()
             meetingScratchInUse.insert(scratch)
             defer { meetingScratchInUse.remove(scratch) }
@@ -360,6 +361,10 @@ extension AppModel {
         var audio = mac
         var engineInput: URL?
         if await !Self.isStereoFile(mac) {
+            guard await hasRoomToFold(mac: mac, mic: mic.file, mono: wantsEngineInput) else {
+                ParolaLog.notice(.audioRecording, "no room on disk to fold a meeting's microphone track in")
+                return .failed
+            }
             let scratch = meetingScratchURL()
             let mono = wantsEngineInput ? meetingScratchURL() : nil
             meetingScratchInUse.formUnion([scratch, mono].compactMap { $0 })
@@ -430,6 +435,36 @@ extension AppModel {
             throw error
         }
         return mixed
+    }
+
+    /// The engines other than WhisperKit get a mono mix of a meeting's sides; WhisperKit sums the channels itself.
+    func engineNeedsMonoMix(model: String? = nil) -> Bool {
+        ModelCatalog.variant(id: model ?? selectedModel)?.engineID != .whisperKit
+    }
+
+    /// What a meeting's fold at Stop will write: the stereo take, and the engine's mono mix when it needs one.
+    nonisolated static func foldBytes(mac: URL, mic: URL, mono: Bool) async -> Int64 {
+        let sizes = (try? await offMainIO {
+            [mac, mic].map { Int64((try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }
+        }) ?? []
+        return (sizes.max() ?? 0) * (mono ? 2 : 1)
+    }
+
+    /// The room a meeting recording its mic keeps free for its fold, so the guard stops the take while the fold still fits.
+    func meetingFoldReserve() async -> Int64 {
+        guard micTrack?.capture != nil, let mac = liveRecordingAudioURL, let mic = liveCompanionAudioURL else { return 0 }
+        return await Self.foldBytes(mac: mac, mic: mic, mono: engineNeedsMonoMix())
+    }
+
+    /// Left free after a fold; less than the guard's floor, which already set the fold's room aside.
+    nonisolated static let meetingFoldMarginBytes: Int64 = 50_000_000
+
+    /// Whether the volume holds a fold of these files with a margin still free after it.
+    func hasRoomToFold(mac: URL, mic: URL, mono: Bool) async -> Bool {
+        let provider = freeDiskSpaceProvider
+        let need = await Self.foldBytes(mac: mac, mic: mic, mono: mono)
+        guard let free = await Self.freeDiskSpace(provider) else { return true }
+        return free - need >= Self.meetingFoldMarginBytes
     }
 
     /// A scratch file for a meeting's mix, in the working folder, where a sweep clears what a crash leaves.

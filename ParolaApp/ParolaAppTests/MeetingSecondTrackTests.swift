@@ -148,6 +148,8 @@ extension TranscriberMockSuites {
             _ model: AppModel, mac: ScriptedTrack, mic: ScriptedTrack?, category: EntryCategory = .meeting,
             micOverride: (@MainActor () -> (any LiveAudioSource)?)? = nil
         ) async throws {
+            // The launch's model scan swaps a model that isn't installed for the default, which needn't be Whisper.
+            await model.awaitModelListRefresh()
             model.useStreaming = false
             model.selectedModel = "openai_whisper-tiny"
             model.takeCaptureOverride = { _ in mac }
@@ -293,37 +295,135 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("Stop folds your microphone into the take: the entry is stereo, the engine reads one mono mix, and your side is labelled Me")
+        /// Stops a meeting take with `model` selected for its transcription; hands back the entry and what the engine read.
+        private func stopFoldedMeeting(engineModel: String) async throws -> (entry: LibraryEntry, reads: EngineReads, files: (mac: URL, mic: URL)) {
+            let model = makeModel()
+            let files = try meetingFiles(model)
+            let mic = ScriptedTrack(file: files.mic)
+            await installMockTranscriber(segments: [(0, 1, "Welcome, everyone"), (1, 2, "Thanks, glad to be here")])
+            let reads = EngineReads()
+            model.postProcessOperation = { transcript in
+                await reads.note(transcript.sourceURL)
+                return transcript
+            }
+            try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: mic)
+            model.selectedModel = engineModel
+            let micUp = await waitForMicTrack(model)
+            guard micUp else { throw FixtureTakeDidNotStart() }
+
+            model.stopRecordingAndTranscribe()
+
+            let entry = try #require(await landedEntry(model))
+            let stored = try await model.library.load(entry.id).document
+            let audio = try #require(stored.audioURL)
+            #expect(try channels(of: audio) == 2, "the entry keeps both sides")
+            let speakers = stored.transcript.segments.map(\.speaker)
+            #expect(speakers == [nil, AppModel.meLabel()])
+            let cleaned = await waitUntil {
+                let read = await reads.files
+                return !read.contains(where: exists) && !exists(files.mac) && !exists(files.mic)
+            }
+            #expect(cleaned, "the mix and both tracks go once the take is one file")
+            #expect(await mic.prepared)
+            #expect(model.liveCompanionAudioURL == nil)
+            return (entry, reads, files)
+        }
+
+        @Test("Stop folds your microphone into the take: the entry is stereo, WhisperKit reads it as it is, and your side is labelled Me")
         func stopFoldsTheMic() async throws {
             try await withMocksCleared([.audioSource, .transcriber]) {
+                let folded = try await stopFoldedMeeting(engineModel: "openai_whisper-tiny")
+                #expect(await folded.reads.channels == [2], "WhisperKit sums the sides itself, so no mono mix is written")
+            }
+        }
+
+        @Test("an engine that reads one channel gets a mono mix of both sides, made with the fold")
+        func otherEnginesReadAMonoMix() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let folded = try await stopFoldedMeeting(engineModel: "nvidia_parakeet-tdt-0.6b-v3")
+                #expect(await folded.reads.channels == [1])
+                let mono = try #require(await folded.reads.files.first)
+                #expect(mono.deletingLastPathComponent().lastPathComponent == "inflight", "in the working folder, where a sweep clears it")
+                #expect(mono.lastPathComponent.hasPrefix(RecordingScratch.meetingMixPrefix))
+            }
+        }
+
+        // MARK: - Room for the fold
+
+        @Test("a meeting recording its mic stops while its fold still fits on disk, and a take without one keeps going")
+        func guardReservesTheFold() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
                 let model = makeModel()
                 let files = try meetingFiles(model)
-                let mic = ScriptedTrack(file: files.mic)
-                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone"), (1, 2, "Thanks, glad to be here")])
-                let reads = EngineReads()
-                model.postProcessOperation = { transcript in
-                    await reads.note(transcript.sourceURL)
-                    return transcript
-                }
-                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: mic)
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
                 let micUp = await waitForMicTrack(model)
                 #expect(micUp)
+                let foldBytes = await AppModel.foldBytes(mac: files.mac, mic: files.mic, mono: false)
+                #expect(foldBytes > 0)
+                model.freeDiskSpaceProvider = { AppModel.diskSpaceRefuseFloorBytes + foldBytes / 2 }
+
+                await model.checkRecordingDiskSpace()
+
+                #expect(model.recording?.isCapturing == false, "stopped while the fold still fits")
+                let landed = try #require(await landedEntry(model))
+                let audio = try #require(try await model.library.load(landed.id).document.audioURL)
+                #expect(try channels(of: audio) == 2, "and the fold did fit")
+
+                let plain = makeModel()
+                let plainFiles = try meetingFiles(plain)
+                try await startMeeting(plain, mac: ScriptedTrack(file: plainFiles.mac), mic: nil, category: .transcription)
+                plain.freeDiskSpaceProvider = { AppModel.diskSpaceRefuseFloorBytes + foldBytes / 2 }
+                await plain.checkRecordingDiskSpace()
+                #expect(plain.recording?.isCapturing == true, "no fold to make room for")
+                plain.cancelCurrentWork()
+            }
+        }
+
+        @Test("the room a meeting keeps doubles for an engine that needs a mono mix")
+        func reserveFollowsTheEngine() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                let whisper = await model.meetingFoldReserve()
+                model.selectedModel = "nvidia_parakeet-tdt-0.6b-v3"
+                let parakeet = await model.meetingFoldReserve()
+
+                #expect(whisper > 0)
+                #expect(parakeet == 2 * whisper)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("with no room for the fold at Stop, nothing is mixed and the mic waits for the next launch")
+        func noRoomLeavesTheMicWaiting() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let library = makeTempLibraryURL("second-track-no-room")
+                let model = makeModel(libraryURL: library)
+                let files = try meetingFiles(model)
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                model.freeDiskSpaceProvider = { AppModel.meetingFoldMarginBytes + 1_000 }
 
                 model.stopRecordingAndTranscribe()
 
+                let notice = await waitForNotice(model)
+                #expect(notice?.message == AppModel.micTrackKeptMessage())
                 let entry = try #require(await landedEntry(model))
-                let stored = try await model.library.load(entry.id).document
-                let audio = try #require(stored.audioURL)
-                #expect(try channels(of: audio) == 2, "the entry keeps both sides")
-                let speakers = stored.transcript.segments.map(\.speaker)
-                #expect(speakers == [nil, AppModel.meLabel()])
-                #expect(await reads.channels == [1], "the engine read the mono mix")
-                let mono = try #require(await reads.files.first)
-                #expect(mono != audio)
-                let cleaned = await waitUntil { !exists(mono) && !exists(files.mac) && !exists(files.mic) }
-                #expect(cleaned, "the mix and both tracks go once the take is one file")
-                #expect(await mic.prepared)
-                #expect(model.liveCompanionAudioURL == nil)
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                #expect(try channels(of: audio) == 1)
+                let recorded = await waitUntil { model.micTrackRecords[entry.id] != nil }
+                #expect(recorded)
+                #expect(exists(files.mic))
+                #expect(mixLeftovers(library).isEmpty, "no half-written mix")
+
+                model.recoveryOwner = nil
+                try await expectLaterFold(library: library, entry: entry.id, mic: files.mic)
             }
         }
 
@@ -757,7 +857,8 @@ extension TranscriberMockSuites {
 
         @Test("a meeting take keeps your microphone's levels beside the Mac audio's, sample for sample")
         func micLevelsBesideMacLevels() async throws {
-            try await withMocksCleared(.audioSource) {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
                 let model = makeModel()
                 let files = try meetingFiles(model)
                 let mac = ScriptedTrack(file: files.mac)
@@ -956,7 +1057,8 @@ extension TranscriberMockSuites {
 
         @Test("Cancel while a meeting folds leaves its checkpoint on disk until the take is saved, with both sides")
         func cancelDuringTheFoldKeepsTheCheckpoint() async throws {
-            try await withMocksCleared(.audioSource) {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
                 let library = makeTempLibraryURL("second-track-cancel-fold")
                 let model = makeModel(libraryURL: library)
                 let files = try meetingFiles(model)

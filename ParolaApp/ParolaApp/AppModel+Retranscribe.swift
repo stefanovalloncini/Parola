@@ -80,7 +80,7 @@ extension AppModel {
                 ? .loadingModel(name: modelName)
                 : .downloadingModel(name: modelName, progress: 0)
             let meeting = await isMeetingStereo(audioURL, source: loaded.entry.manifest.source)
-            if meeting { engineFile = await meetingEngineInput(for: audioURL) }
+            if meeting, engineNeedsMonoMix(model: modelName) { engineFile = await meetingEngineInput(for: audioURL) }
             let result = try await session.transcribe(
                 source: FileAudioSource(url: engineFile ?? audioURL),
                 options: meeting ? meetingOptions(options, stereo: audioURL) : options,

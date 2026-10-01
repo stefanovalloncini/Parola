@@ -508,7 +508,9 @@ extension AppModel {
                         return
                     }
                     let adopted = self.adoptRecovery(checkpoint)
-                    let folded = await self.foldRecoveredMicTrack(checkpoint, audio: url, generation: adopted, notifies: true)
+                    let folded = await self.foldRecoveredMicTrack(
+                        checkpoint, audio: url, generation: adopted, notifies: true, wantsEngineInput: self.engineNeedsMonoMix()
+                    )
                     if folded.stopped { return }
                     self.startTakeTask { [weak self] in
                         await self?.transcribeRecordedTake(
@@ -804,7 +806,9 @@ extension AppModel {
                 var mixed: URL?
                 var waitingMic: StoppedMicTrack?
                 if let mic, await !AppModel.isStereoFile(file) {
-                    mixed = try? await AppModel.mixMeetingFiles(mac: file, mic: mic, micOffset: 0, in: dir, mono: nil)
+                    if await self?.hasRoomToFold(mac: file, mic: mic, mono: false) == true {
+                        mixed = try? await AppModel.mixMeetingFiles(mac: file, mic: mic, micOffset: 0, in: dir, mono: nil)
+                    }
                     if mixed == nil { waitingMic = StoppedMicTrack(file: mic, offset: 0) }
                 }
                 do {
