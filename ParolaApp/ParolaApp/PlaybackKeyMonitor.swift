@@ -74,9 +74,10 @@ final class PlaybackKeyMonitor {
         return responder.map { String(describing: type(of: $0)) == "KeyViewProxy" } ?? false
     }
 
-    /// From Record until the capture winds down, a count-in and finishing included: the Stage owns Space all that time.
+    /// Whenever the Stage shows its take, from the count-in through its transcription: the Stage owns Space all that time.
     static func stageShowsTake(_ model: AppModel) -> Bool {
-        TakeTitleBar.take(on: model) != nil
+        guard model.route == .recording, let take = model.recording else { return false }
+        return ContentRoutes.stageShows(take, model: model)
     }
 
     func bind(_ model: AppModel) {

@@ -139,6 +139,34 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Space on a transcribing Stage does nothing: the take's run goes on and a transcript's player stays still")
+        func spaceWhileTranscribing() async throws {
+            let audio = try makeTakeWAV("stage-space-transcribing", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "held")], gate: gate)
+                let model = makeRecordingModel("stage-space-transcribing")
+                model.selectedModel = "openai_whisper-tiny"
+                recordAndStop(model, audio: audio, seconds: 1)
+                let transcribing = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                #expect(transcribing)
+                #expect(model.route == .recording)
+                model.installPlayer(for: playerFile())
+
+                let used = pressSpace(model)
+                let rate = model.player?.rate
+                let stillTranscribing = ContentRoutes.stageTranscription(for: model) != nil
+                #expect(used)
+                #expect(rate == 0)
+                #expect(stillTranscribing)
+
+                await gate.open()
+                let landed = await landedEntry(model)
+                #expect(landed != nil)
+            }
+        }
+
         @Test("a confirmed Discard deletes only the take it named")
         func discardNamesItsTake() async throws {
             try await withMocksCleared(.audioSource) {
