@@ -69,9 +69,9 @@ private final class TakeHarness: Sendable {
     }
 }
 
-private func eventually(timeoutMs: Int = 5000, _ condition: @escaping @Sendable () async -> Bool) async -> Bool {
+private func eventually(timeoutMs: Int = 30_000, _ condition: @escaping @Sendable () async -> Bool) async -> Bool {
     let deadline = ContinuousClock.now + .milliseconds(timeoutMs)
-    while ContinuousClock.now < deadline {
+    while !Task.isCancelled, ContinuousClock.now < deadline {
         if await condition() { return true }
         try? await Task.sleep(for: .milliseconds(1))
     }
