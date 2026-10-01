@@ -7299,6 +7299,17 @@
         }
       }
     },
+    "Keeps your voice on a track of its own beside the Mac audio, so the transcript marks what you said as Me.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiene la tua voce su una traccia a parte, accanto all'audio del Mac, così la trascrizione segna come Io quello che hai detto."
+          }
+        }
+      }
+    },
     "Kept for 7 days, up to 10 MB. No transcript text, file names, or paths.": {
       "extractionState": "manual",
       "localizations": {
@@ -11408,6 +11419,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra le riunioni"
+          }
+        }
+      }
+    },
+    "Record my microphone in meetings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra il mio microfono nelle riunioni"
           }
         }
       }

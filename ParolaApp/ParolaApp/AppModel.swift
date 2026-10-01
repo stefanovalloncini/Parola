@@ -1091,6 +1091,7 @@ final class AppModel {
         self.summaryOptions = readJSON(SummaryOptions.self, forKey: "summaryOptions") ?? .default
         self.autostartSummary = readBool("autostartSummary", default: false)
         self.meetingCaptureAppOnly = defaults.bool(forKey: "meetingCaptureAppOnly")
+        self.meetingRecordsMicrophone = readBool("meetingRecordsMicrophone", default: true)
         self.subtitleFPS = readDouble("subtitleFPS", default: 30)
         self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
         self.transcriptCompact = defaults.bool(forKey: "transcriptCompact")
@@ -1426,6 +1427,8 @@ final class AppModel {
     /// The meeting app the detector saw last, for the Record menu and the menu bar; it outlives the alert `meetingDetectedApp` raises.
     var detectedMeetingAppName: String?
     var meetingCaptureAppOnly: Bool = false { didSet { defaults.set(meetingCaptureAppOnly, forKey: "meetingCaptureAppOnly") } }
+    /// A meeting take records your microphone too, as a second track beside the Mac audio.
+    var meetingRecordsMicrophone: Bool = true { didSet { defaults.set(meetingRecordsMicrophone, forKey: "meetingRecordsMicrophone") } }
     @ObservationIgnored var pendingRecordingCategory: EntryCategory = .transcription
     /// Where the take in flight is listening, for the manifest a persist writes after the phase has moved on.
     @ObservationIgnored var pendingRecordingSource: EntrySource = .microphone

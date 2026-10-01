@@ -95,7 +95,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "dock", "hide", "sound", "duplicate", "already transcribed", "login", "launch", "startup", "title", "window", "new window"]
         case .customization: return ["appearance", "theme", "light", "dark", "monospaced", "accent", "color", "slate", "terracotta", "sea", "sage", "indigo", "custom colors", "palette"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
-        case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio", "permission", "screen recording", "consent"]
+        case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio", "permission", "screen recording", "consent", "microphone", "my voice"]
         case .shortcuts: return ["hotkey", "key combo", "mic recording", "dictation key", "global", "keyboard"]
         case .microphone: return ["mic", "input device", "vu", "level", "preview", "count-in", "mute", "pause media", "music", "spotify", "auto-stop", "menu bar", "pill", "floating"]
         case .liveCaptions: return ["captions", "translate", "live"]
@@ -138,7 +138,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .watchedFolders:
             return ["watchedFolders"]
         case .recordMeetings:
-            return ["meetingDetectorEnabled", "meetingCaptureAppOnly"]
+            return ["meetingDetectorEnabled", "meetingCaptureAppOnly", "meetingRecordsMicrophone"]
         case .shortcuts:
             // The dictation hotkey keys also live in the .dictation scope; both panes
             // show the recorder, and removeObject is idempotent across scopes.

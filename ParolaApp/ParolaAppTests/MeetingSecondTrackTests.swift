@@ -10,11 +10,13 @@ extension TranscriberMockSuites {
     @Suite("Meeting second track", .serialized)
     struct MeetingSecondTrackTests {
 
-        private func makeModel(libraryURL: URL = makeTempLibraryURL("second-track")) -> AppModel {
+        private func makeModel(
+            libraryURL: URL = makeTempLibraryURL("second-track"), defaults: UserDefaults = temporaryDefaults()
+        ) -> AppModel {
             let model = AppModel(bootstrap: AppBootstrap(
                 mode: .test,
                 library: libraryURL,
-                defaultsOverride: temporaryDefaults(),
+                defaultsOverride: defaults,
                 sideEffects: [],
                 filePicker: TestFilePicker()
             ))
@@ -36,6 +38,34 @@ extension TranscriberMockSuites {
 
         private func writeLegacyCheckpoint(_ checkpoint: RecoveryCheckpoint, library: URL) throws {
             try JSONEncoder().encode(checkpoint).write(to: library.appendingPathComponent("recovery.json"))
+        }
+
+        // MARK: - The setting
+
+        @Test("recording your microphone in meetings starts on, is kept, resets with its pane, and the bridge may set it")
+        func micSettingStartsOn() {
+            let defaults = temporaryDefaults()
+            let model = makeModel(defaults: defaults)
+            #expect(model.meetingRecordsMicrophone)
+
+            model.meetingRecordsMicrophone = false
+            #expect(defaults.object(forKey: "meetingRecordsMicrophone") as? Bool == false)
+            model.reloadSettings()
+            #expect(!model.meetingRecordsMicrophone)
+
+            #expect(SettingsPaneScope.recordMeetings.defaultsKeys.contains("meetingRecordsMicrophone"))
+            #expect(ParolaAutomationServer.writableSettingKeys.contains("meetingRecordsMicrophone"))
+            for key in SettingsPaneScope.recordMeetings.defaultsKeys { defaults.removeObject(forKey: key) }
+            model.reloadSettings()
+            #expect(model.meetingRecordsMicrophone)
+            #expect(SettingsSidebarCatalog.matches(route: .recordMeetings, query: "microphone"))
+        }
+
+        @Test("the setting reads in Italian")
+        func micSettingReadsInItalian() throws {
+            let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+            let italian = try #require(Bundle(path: path))
+            #expect(String(localized: "Record my microphone in meetings", bundle: italian) == "Registra il mio microfono nelle riunioni")
         }
 
         // MARK: - The checkpoint and the sweep
