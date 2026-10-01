@@ -187,6 +187,42 @@ struct MeetingDefaultsTests {
 
 extension TranscriberMockSuites {
     @MainActor
+    @Suite("Meeting meter takes", .serialized)
+    struct MeetingMeterTakeTests {
+        @Test("a You lane whose microphone isn't in the take stays that way through Stop, and goes with the session")
+        func lostMicStaysLostThroughStop() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 0.3, "Welcome.")])
+                let model = makeRecordingModel("meeting-lane-stop")
+                model.useStreaming = false
+                model.selectedModel = "openai_whisper-tiny"
+                let macFile = try makeTakeWAV("meeting-lane-stop-mac")
+                defer { try? FileManager.default.removeItem(at: macFile) }
+                model.takeCaptureOverride = { _ in MeteredCapture(file: macFile) }
+                model.micAccessRequest = { false }
+                model.micTrackCaptureOverride = { MeteredCapture(file: macFile) }
+
+                model.startRecording(source: .systemAudio)
+                let lost = await waitUntil(timeoutMs: 10_000) { model.takeMicTrackState == .unavailable }
+                #expect(lost)
+                let recording = await waitUntil(timeoutMs: 10_000) { model.recording?.state == .recording }
+                #expect(recording)
+
+                model.stopRecordingAndTranscribe()
+                #expect(model.takeMicTrackState == .unavailable)
+                #expect(model.takeMicLevels != nil)
+
+                model.cancelCurrentWork()
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+                model.forgetTakeSession()
+                #expect(model.takeMicTrackState == nil)
+                #expect(model.takeMicLevels == nil)
+            }
+        }
+    }
+
+    @MainActor
     @Suite("Stage device menu takes", .serialized)
     struct StageDeviceMenuTakeTests {
         @Test("the device menu picks the microphone while the take counts in, and the take opens that one; once it starts, it only shows it")

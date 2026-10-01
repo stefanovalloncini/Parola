@@ -223,11 +223,11 @@ extension AppModel {
         return moment < startedAt ? moment.timeIntervalSince(startedAt) : session.elapsed(at: moment)
     }
 
-    /// Takes the microphone track away from the take, as Stop, a quit or a cancel does; one still coming up drops itself.
+    /// Takes the microphone track away from the take, as Stop, a quit or a cancel does; one still coming up drops itself, and a lost one stays unavailable for its You lane until the session ends.
     func detachMicTrack(of takeID: Int?) -> MicTrack? {
         guard let track = micTrack, takeID == nil || track.takeID == takeID else { return nil }
         micTrack = nil
-        takeMicTrackState = nil
+        if takeMicTrackState != .unavailable { takeMicTrackState = nil }
         return track
     }
 
