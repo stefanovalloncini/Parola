@@ -231,7 +231,8 @@ final class AppModel {
             refreshStageHoldsTake()
             if oldValue?.isRunning == true, !takeIsRunning { foregroundLetGo() }
             if route == .recording, !Self.stageHasSomethingToShow(recording) { route = .transcript }
-            if let noticeTake = exportNotice?.takeID, noticeTake != recording?.takeID { exportNotice = nil }
+            // A notice goes with its take's session; one about a take already let go stays while the next take records.
+            if let noticeTake = exportNotice?.takeID, noticeTake == oldValue?.takeID, noticeTake != recording?.takeID { exportNotice = nil }
         }
     }
     /// The main window's sidebar, which a take folds away and gives back as it was.

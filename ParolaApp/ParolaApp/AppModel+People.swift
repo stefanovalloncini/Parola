@@ -40,7 +40,7 @@ extension AppModel {
         people.first { $0.id == id }
     }
 
-    /// The person marked "This Is Me". The mark is kept with the directory, so it moves with the library.
+    /// The person marked "This Is Me"; the mark is kept in People.json, with the people themselves.
     var mePerson: Person? {
         people.first(where: \.isMe)
     }

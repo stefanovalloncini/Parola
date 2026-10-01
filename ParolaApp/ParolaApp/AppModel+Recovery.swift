@@ -856,11 +856,12 @@ extension AppModel {
                 }
                 do {
                     // Copied, not moved: the original goes only once the entry holds the audio.
+                    let category: EntryCategory = paired == nil ? .transcription : .meeting
                     let entry = try await library.add(
                         transcript: AppModel.untranscribedTranscript(of: mixed ?? file, language: nil),
                         audioSource: mixed ?? file,
-                        category: .transcription,
-                        title: AppModel.recoveredRecordingTitle(startedAt: startedAt),
+                        category: category,
+                        title: AppModel.recoveredRecordingTitle(startedAt: startedAt, category: category),
                         // The Mac file's own digest, even for a mix: a copy of it left behind is then known as saved.
                         sourceDigest: digest,
                         source: AppModel.inflightTakeSource(file)

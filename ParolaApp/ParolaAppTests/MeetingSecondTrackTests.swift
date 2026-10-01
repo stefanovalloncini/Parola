@@ -1204,6 +1204,117 @@ extension TranscriberMockSuites {
             #expect(String(localized: "Reveal in Finder", bundle: italian) == "Mostra nel Finder")
         }
 
+        @Test("a failed fold's notice for a take let go by Cancel while a new one records stays up, still about its own take")
+        func keptNoticeOutlivesTheNextTake() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let model = makeModel()
+                model.micTrackFinishLimit = .seconds(2)
+                let first = try meetingFiles(model)
+                try corrupt(first.mic)
+                let wedged = ScriptedTrack(file: first.mic, wedges: [.prepare])
+                try await startMeeting(model, mac: ScriptedTrack(file: first.mac), mic: wedged)
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                let firstTake = try #require(model.recording?.takeID)
+                model.stopRecordingAndTranscribe()
+                model.cancelCurrentWork()
+
+                let second = try meetingFiles(model)
+                try await startMeeting(model, mac: ScriptedTrack(file: second.mac), mic: ScriptedTrack(file: second.mic))
+                let secondTake = try #require(model.recording?.takeID)
+                #expect(secondTake != firstTake)
+
+                let notice = await waitForNotice(model)
+                #expect(notice?.message == AppModel.micTrackKeptMessage())
+                #expect(notice?.takeID == firstTake)
+                #expect(model.pauseTake())
+                #expect(model.exportNotice?.message == AppModel.micTrackKeptMessage(), "the next take's session doesn't sweep it away")
+                model.cancelCurrentWork()
+                await wedged.unwedge()
+            }
+        }
+
+        @Test("a fold whose hand-over the disk refuses keeps the take file as recorded and your mic for the next launch")
+        func refusedHandOverKeepsTheMic() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let library = makeTempLibraryURL("second-track-hand-over-refused")
+                let model = makeModel(libraryURL: library)
+                let files = try meetingFiles(model)
+                let folder = model.inflightRecordingsURL
+                model.foldStepHook = { step in
+                    if step == .mixed { try? FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path) }
+                    return true
+                }
+                defer { try? allowWrites(in: folder) }
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+
+                model.stopRecordingAndTranscribe()
+
+                let notice = await waitForNotice(model)
+                #expect(notice?.message == AppModel.micTrackKeptMessage())
+                let entry = try #require(await landedEntry(model))
+                let recorded = await waitUntil { model.micTrackRecords[entry.id] != nil }
+                #expect(recorded)
+                try allowWrites(in: folder)
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                #expect(try channels(of: audio) == 1)
+                #expect(try channels(of: files.mac) == 1, "the take file is as it was recorded")
+                #expect(exists(files.mic))
+                #expect(try micRecords(library).count == 1)
+
+                model.recoveryOwner = nil
+                try await expectLaterFold(library: library, entry: entry.id, mic: files.mic)
+            }
+        }
+
+        @Test("a waiting mic whose entry was purged goes at the next launch, with its record; one in Recently Deleted is still folded in")
+        func purgedEntryLetsItsMicGo() async throws {
+            let library = makeTempLibraryURL("second-track-purged")
+            let files = try crashedMeeting(in: library, age: 3_600)
+            try corrupt(files.mic)
+            try age(files.mic, by: 3_600)
+            let model = makeModel(libraryURL: library)
+            await model.inflightSweep?.value
+            let entry = try #require(await landedEntry(model))
+            let recorded = await waitUntil { model.micTrackRecords[entry.id] != nil }
+            #expect(recorded)
+
+            try await model.library.delete(entry.id)
+            try repairMic(files.mic)
+            model.recoveryOwner = nil
+            let second = makeModel(libraryURL: library)
+            await second.micTrackFolds?.value
+            let deleted = try await second.library.load(entry.id)
+            #expect(deleted.entry.manifest.deletedAt != nil)
+            let deletedAudio = try #require(deleted.document.audioURL)
+            #expect(try channels(of: deletedAudio) == 2, "Recently Deleted keeps the whole meeting")
+            #expect(!exists(files.mic))
+
+            let purgedLibrary = makeTempLibraryURL("second-track-purged-gone")
+            let gone = try crashedMeeting(in: purgedLibrary, age: 3_600)
+            try corrupt(gone.mic)
+            try age(gone.mic, by: 3_600)
+            let first = makeModel(libraryURL: purgedLibrary)
+            await first.inflightSweep?.value
+            let doomed = try #require(await landedEntry(first))
+            let waiting = await waitUntil { first.micTrackRecords[doomed.id] != nil }
+            #expect(waiting)
+            try await first.library.delete(doomed.id)
+            try await first.library.purge(doomed.id)
+            #expect(exists(gone.mic), "kept until a launch finds the entry gone")
+            first.recoveryOwner = nil
+
+            let next = makeModel(libraryURL: purgedLibrary)
+            await next.micTrackFolds?.value
+            await next.inflightSweep?.value
+            #expect(!exists(gone.mic))
+            #expect(try micRecords(purgedLibrary).isEmpty)
+        }
+
         @Test("while a take whose fold failed is transcribing, its checkpoint still names your mic")
         func failedFoldRunCarriesTheMic() async throws {
             try await withMocksCleared([.audioSource, .transcriber]) {
@@ -1777,6 +1888,8 @@ extension TranscriberMockSuites {
             let listed = await model.library.list()
             #expect(listed.count == 1, "one meeting, and a microphone track is never a take of its own")
             let entry = try #require(listed.first)
+            #expect(entry.category == .meeting, "a take with a mic beside it was a meeting")
+            #expect(entry.title.hasPrefix("Meeting"))
             let audio = try #require(try await model.library.load(entry.id).document.audioURL)
             #expect(try channels(of: audio) == 2)
             #expect(!exists(files.mac) && !exists(files.mic))
