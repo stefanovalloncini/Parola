@@ -197,7 +197,7 @@ extension TranscriberMockSuites {
                 let kept = await holder.value
                 #expect(kept, "the reset cleared the store while a suite held it")
                 _ = try await resetting.value
-                let left = await MockLanguageModelStore.shared.list()
+                let left = await MockLanguageModelStore.shared.withLease { await MockLanguageModelStore.shared.list() }
                 #expect(left.isEmpty)
                 withExtendedLifetime(server) {}
             }

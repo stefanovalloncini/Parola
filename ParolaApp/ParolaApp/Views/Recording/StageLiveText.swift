@@ -64,7 +64,7 @@ struct StageTakeText: View {
     let isOnScreen: Bool
     @Environment(AppModel.self) private var model
 
-    /// At most this many bytes of the run's text, in UTF-8, are laid out; never less than this minus one step, which still fills the column.
+    /// The most of the run's text laid out, in UTF-8 bytes; the cut's step and its reach for a space leave over half of it, more than the column's four lines.
     nonisolated static let recentBytes = 900
     /// The cut moves from the front only in steps this long, so new words never re-break the lines already on screen.
     nonisolated static let cutStep = 300

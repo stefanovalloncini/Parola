@@ -31,23 +31,6 @@ private actor HeldCutShortCapture: LiveAudioSource {
     func cancel() async {}
 }
 
-/// A gate the test opens once.
-private actor LandingGate {
-    private var isOpen = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    func open() {
-        isOpen = true
-        for waiter in waiters { waiter.resume() }
-        waiters = []
-    }
-
-    func wait() async {
-        guard !isOpen else { return }
-        await withCheckedContinuation { waiters.append($0) }
-    }
-}
-
 /// A live session whose last check holds the landing until the test lets it go, so a Cancel can arrive mid-landing.
 private actor HeldLandingSession: StreamingTranscriber {
     nonisolated let levelMeter = LevelMeter()
@@ -1000,7 +983,7 @@ extension TranscriberMockSuites {
                 let real = model.streamingConsumer
                 real?.cancel()
                 await real?.value
-                let deliver = LandingGate()
+                let deliver = FetchGate()
                 let session = HeldLandingSession()
                 let words = Transcript(
                     segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the live words")], language: "en", modelName: "stub"
@@ -1009,7 +992,7 @@ extension TranscriberMockSuites {
                     await deliver.wait()
                     await model.handleStreamingEvent(.finished(words), take: take, session: session)
                 }
-                let save = LandingGate()
+                let save = FetchGate()
                 model.beforeLandingSave = { await save.wait() }
                 model.stopRecordingAndTranscribe()
                 await deliver.open()
