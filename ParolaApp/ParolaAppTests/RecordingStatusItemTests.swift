@@ -335,6 +335,51 @@ struct RecordingSurfaceTests {
         model.endTestTake()
     }
 
+    @Test("a Discard answered after the take ended deletes nothing")
+    func discardAnsweredLate() async throws {
+        let audio = try tempWAV("remote-discard-late")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("remote-discard-late")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+
+        let discarded = await TakeRemote.discard(model) {
+            model.endTestTake()
+            return true
+        }
+
+        #expect(!discarded)
+        #expect(model.recording == nil)
+        #expect(FileManager.default.fileExists(atPath: audio.path))
+        let saved = await model.library.list()
+        #expect(saved.isEmpty)
+    }
+
+    @Test("one Discard question at a time: a second Discard… while it stands does nothing")
+    func discardAsksOnce() async throws {
+        let audio = try tempWAV("remote-discard-once")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("remote-discard-once")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+
+        var asked = 0
+        var second: Bool?
+        var askingMeanwhile: Bool?
+        let first = await TakeRemote.discard(model) {
+            asked += 1
+            askingMeanwhile = TakeRemote.askingToDiscard
+            second = await TakeRemote.discard(model) { asked += 1; return true }
+            return false
+        }
+
+        #expect(asked == 1)
+        #expect(askingMeanwhile == true)
+        #expect(second == false)
+        #expect(!first)
+        #expect(!TakeRemote.askingToDiscard)
+        #expect(model.recording?.state == .recording)
+        model.endTestTake()
+    }
+
     @Test("a count-in runs only with Parola in front; in the background the take starts at once")
     func countInNeedsParolaInFront() throws {
         let audio = try tempWAV("count-in-front")

@@ -57,10 +57,16 @@ enum TakeRemote {
         model.addTakeMarker()
     }
 
-    /// Discard… asks first; by the time it is answered the take may have stopped, and then it stays.
+    private(set) static var askingToDiscard = false
+
+    /// Discard… asks first, one question at a time; a take that ended or changed while it stood stays.
     @discardableResult
-    static func discard(_ model: AppModel, confirm: () -> Bool) async -> Bool {
-        guard let takeID = model.recording?.takeID, confirm() else { return false }
+    static func discard(_ model: AppModel, confirm: @MainActor () async -> Bool) async -> Bool {
+        guard !askingToDiscard, let takeID = model.recording?.takeID else { return false }
+        askingToDiscard = true
+        let confirmed = await confirm()
+        askingToDiscard = false
+        guard confirmed else { return false }
         return await StageControls.discard(takeID, model: model)
     }
 
