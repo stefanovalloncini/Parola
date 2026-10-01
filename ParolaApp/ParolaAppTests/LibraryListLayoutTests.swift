@@ -203,6 +203,35 @@ struct LibraryListLayoutTests {
         #expect(shrank, "row 0 stayed \(topRow()) pt")
     }
 
+    @Test("no row draws a rule under it: not the page's top, not a date title, not an entry")
+    func rowsDrawNoRule() async throws {
+        let hosted = await host(threeGroups())
+        defer { close(hosted) }
+        let table = try #require(table(hosted))
+        _ = await settled(hosted)
+        let rep = try #require(table.bitmapImageRepForCachingDisplay(in: table.bounds))
+        table.cacheDisplay(in: table.bounds, to: rep)
+        let scale = CGFloat(rep.pixelsWide) / table.bounds.width
+        let columns = Array(stride(from: Int(120 * scale), to: Int((table.bounds.width - 40) * scale), by: 2))
+        func inked(row y: Int) -> Int {
+            columns.count(where: { (rep.colorAt(x: $0, y: y)?.alphaComponent ?? 0) > 0.02 })
+        }
+
+        // Today, the take, …: the take's time and length sit inside the columns read.
+        let take = table.rect(ofRow: table.numberOfRows - 6)
+        let drawn = (Int(take.minY * scale)..<Int(take.maxY * scale)).contains { inked(row: $0) > 0 }
+        #expect(drawn, "the render holds no rows, so it can't show a rule either")
+        // The list draws a rule as a faint line across the whole row, in the row's last point.
+        var ruled: [Int] = []
+        for row in 0..<(table.numberOfRows - 1) {
+            let rect = table.rect(ofRow: row)
+            if (Int((rect.maxY - 2) * scale)..<Int(rect.maxY * scale)).contains(where: { inked(row: $0) > columns.count * 9 / 10 }) {
+                ruled.append(row)
+            }
+        }
+        #expect(ruled.isEmpty, "rows with a rule under them: \(ruled)")
+    }
+
     @Test("titles and entries run as one list, and a group with no title adds no row")
     func itemsRunInOneList() {
         let now = Date()
