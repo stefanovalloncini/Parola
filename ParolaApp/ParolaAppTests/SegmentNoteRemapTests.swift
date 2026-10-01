@@ -119,10 +119,10 @@ struct SegmentNoteEditTests {
         #expect(model.currentSegmentNote(for: 0) == nil)
         undo.undo()
         #expect(model.currentSegmentNote(for: 0) == "first")
-        let libraryWait = await waitUntil {
+        let persistedNoteBackToFirst = await waitUntil {
             (try? await model.library.load(entryID).entry.segmentNotes) == ["0": "first"]
         }
-        #expect(libraryWait)
+        #expect(persistedNoteBackToFirst)
     }
 
     @Test("splitting moves the note to the first half, and undo and redo carry it")
