@@ -400,6 +400,31 @@ struct RecordingSurfaceTests {
         #expect(model.recordingCountdown == nil)
         #expect(model.recording?.state == .arming(.startingCapture))
     }
+
+    @Test("the status item starts ticking once a real take reaches recording, not while it arms")
+    func tickStartsWhenArmingBecomesRecording() async throws {
+        let audio = try tempWAV("tick-arming")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("tick-arming")
+        model.useStreaming = false
+        model.selectedModel = "openai_whisper-tiny"
+        model.takeCaptureOverride = { _ in StubSource(url: audio) }
+        defer { model.cancelCurrentWork() }
+        let item = RecordingStatusItem(statusBar: nil)
+        item.bind(model)
+        #expect(item.face == nil)
+
+        model.startRecording(source: .microphone)
+        #expect(model.recording?.state == .arming(.startingCapture))
+        let shown = await waitUntil { item.face != nil }
+        #expect(shown)
+        #expect(!item.isTicking)
+
+        let recording = await waitUntil { model.recording?.state == .recording }
+        #expect(recording)
+        let ticking = await waitUntil { item.isTicking }
+        #expect(ticking)
+    }
 }
 
 // Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
