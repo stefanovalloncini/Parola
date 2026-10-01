@@ -349,5 +349,45 @@ struct PeopleStoreTests {
         let people = try JSONDecoder().decode([Person].self, from: Data(json.utf8))
         #expect(people.first?.colorIndex == 0)
         #expect(people.first?.usageCount == 3)
+        #expect(people.first?.isMe == false)
+    }
+
+    @Test("marking someone as you clears everyone else, survives a reopen, and nil clears it")
+    func markAsMe() async throws {
+        let url = makeTempURL()
+        let store = PeopleStore(storageURL: url)
+        let ada = await store.recordUsage(name: "Ada")
+        let grace = await store.recordUsage(name: "Grace")
+
+        await store.markAsMe(ada.id)
+        await store.markAsMe(grace.id)
+        let marked = await store.people.filter(\.isMe).map(\.id)
+        #expect(marked == [grace.id])
+        #expect(await PeopleStore(storageURL: url).me?.id == grace.id)
+
+        await store.markAsMe(UUID())
+        #expect(await store.me?.id == grace.id)
+
+        await store.markAsMe(nil)
+        #expect(await store.me == nil)
+        #expect(await PeopleStore(storageURL: url).me == nil)
+    }
+
+    @Test("the me mark moves with a merge and with a rename onto someone else, and goes with a delete")
+    func meMarkFollowsThePerson() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        let alias = await store.recordUsage(name: "SPEAKER_01")
+        let stefano = await store.recordUsage(name: "Stefano")
+        await store.markAsMe(alias.id)
+
+        _ = await store.merge(alias.id, into: stefano.id)
+        #expect(await store.me?.id == stefano.id)
+
+        let steve = await store.recordUsage(name: "Steve")
+        _ = await store.rename(stefano.id, to: "Steve")
+        #expect(await store.me?.id == steve.id)
+
+        _ = await store.delete(steve.id)
+        #expect(await store.me == nil)
     }
 }

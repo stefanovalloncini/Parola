@@ -40,13 +40,14 @@ extension AppModel {
         people.first { $0.id == id }
     }
 
-    /// The person marked "This Is Me", while they are in the directory.
+    /// The person marked "This Is Me". The mark is kept with the directory, so it moves with the library.
     var mePerson: Person? {
-        UUID(uuidString: mePersonID).flatMap(person(id:))
+        people.first(where: \.isMe)
     }
 
-    func setMePerson(_ id: UUID?) {
-        mePersonID = id?.uuidString ?? ""
+    func setMePerson(_ id: UUID?) async {
+        await peopleStore.markAsMe(id)
+        await refreshPeople()
     }
 
     /// A transcript whose "Me" took your name stands for you in its entry, as a speaker you assigned would.
@@ -272,7 +273,6 @@ extension AppModel {
         guard source != target, person(id: source) != nil, person(id: target) != nil else { return }
         let targets = entries(withPerson: source)
         guard let merged = await peopleStore.merge(source, into: target) else { return }
-        if mePersonID == source.uuidString { setMePerson(target) }
         await refreshPeople()
         await rewriteEntries(targets, from: source, toName: merged.name, keeping: merged.id)
     }
@@ -283,7 +283,6 @@ extension AppModel {
         let targets = entries(withPerson: id)
         guard await peopleStore.delete(id) else { return }
         if personFilter == id { personFilter = nil }
-        if mePersonID == id.uuidString { setMePerson(nil) }
         await refreshPeople()
         for entry in targets {
             await mutateAssignments(for: entry.id) { map in

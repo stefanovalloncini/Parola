@@ -189,7 +189,7 @@ struct PeopleDirectoryList: View {
 
     /// Your side of a meeting takes this person's name.
     private func isMe(_ person: Person) -> Binding<Bool> {
-        Binding(get: { model.mePersonID == person.id.uuidString }, set: { model.setMePerson($0 ? person.id : nil) })
+        Binding(get: { person.isMe }, set: { isMe in Task { await model.setMePerson(isMe ? person.id : nil) } })
     }
 
     private var isDeleting: Binding<Bool> {

@@ -877,8 +877,6 @@ final class AppModel {
     /// Bumped when a sidebar pick opens nothing; @Observable skips the same-value writes such a pick makes, so this makes the list look again.
     var sidebarRefusedPicks = 0
     var showMostUsedPeople: Bool = true { didSet { defaults.set(showMostUsedPeople, forKey: "showMostUsedPeople") } }
-    /// The person marked "This Is Me", whose name your side of a meeting takes; empty when nobody is.
-    var mePersonID: String = "" { didSet { defaults.set(mePersonID, forKey: "mePersonID") } }
     /// The speaker-map writes in flight, kept in order so the bundle never sees them out of turn.
     @ObservationIgnored var speakerAssignmentWriteTask: Task<Void, Never>?
 
@@ -1180,7 +1178,6 @@ final class AppModel {
         self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
         self.remoteAIAcknowledged = defaults.bool(forKey: "remoteAIAcknowledged")
         self.showMostUsedPeople = readBool("showMostUsedPeople", default: true)
-        self.mePersonID = defaults.string(forKey: "mePersonID") ?? ""
         self.openEntriesInNewWindow = defaults.bool(forKey: "openEntriesInNewWindow")
         self.libraryGroupsByDate = readBool("libraryGroupsByDate", default: true)
         self.lastRecordSource = defaults.string(forKey: "lastRecordSource").flatMap(RecordSource.init(rawValue:)) ?? .microphone

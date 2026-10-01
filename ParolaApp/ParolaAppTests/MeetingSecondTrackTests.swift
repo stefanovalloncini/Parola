@@ -1464,7 +1464,7 @@ extension TranscriberMockSuites {
                 let model = makeModel()
                 await model.addPerson(named: "Stefano")
                 let me = try #require(model.person(named: "Stefano"))
-                model.setMePerson(me.id)
+                await model.setMePerson(me.id)
                 #expect(model.meetingMeLabel == "Stefano")
                 let files = try meetingFiles(model)
                 await installMockTranscriber(segments: [(0, 1, "Welcome, everyone"), (1, 2, "Thanks, glad to be here")])
@@ -1485,10 +1485,11 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("the mark follows its person through a merge, goes with a delete, and People's reset clears it")
-        func meMarkFollowsThePerson() async throws {
+        @Test("the This Is Me mark lives with People in the library, not in settings, and follows its person through a merge and a delete")
+        func meMarkLivesWithPeople() async throws {
+            let library = makeTempLibraryURL("second-track-me")
             let defaults = temporaryDefaults()
-            let model = makeModel(defaults: defaults)
+            let model = makeModel(libraryURL: library, defaults: defaults)
             await model.addPerson(named: "Stefano")
             await model.addPerson(named: "Stefano V")
             let me = try #require(model.person(named: "Stefano V"))
@@ -1496,9 +1497,15 @@ extension TranscriberMockSuites {
             #expect(model.mePerson == nil)
             #expect(model.meetingMeLabel == AppModel.meLabel())
 
-            model.setMePerson(me.id)
+            await model.setMePerson(me.id)
             #expect(model.mePerson?.id == me.id)
-            #expect(defaults.string(forKey: "mePersonID") == me.id.uuidString)
+            #expect(defaults.object(forKey: "mePersonID") == nil)
+            #expect(!SettingsPaneScope.people.defaultsKeys.contains("mePersonID"))
+
+            let elsewhere = makeModel(libraryURL: library)
+            await elsewhere.refreshPeople()
+            #expect(elsewhere.mePerson?.id == me.id)
+            #expect(elsewhere.meetingMeLabel == "Stefano V")
 
             await model.mergePerson(me.id, into: other.id)
             #expect(model.mePerson?.id == other.id)
@@ -1506,8 +1513,8 @@ extension TranscriberMockSuites {
 
             await model.deletePerson(other.id)
             #expect(model.mePerson == nil)
-            #expect(model.mePersonID.isEmpty)
-            #expect(SettingsPaneScope.people.defaultsKeys.contains("mePersonID"))
+            await model.addPerson(named: "Stefano")
+            #expect(model.mePerson == nil)
         }
 
         @Test("the microphone notices and the Me label read in Italian")

@@ -70,13 +70,31 @@ public actor PeopleStore {
         return Array(sorted.prefix(limit))
     }
 
+    /// The person marked as you, if anyone is.
+    public var me: Person? {
+        people.first(where: \.isMe)
+    }
+
+    /// Marks one person as you and clears the mark from everyone else; nil clears it. An id the
+    /// directory doesn't hold changes nothing.
+    public func markAsMe(_ id: UUID?) {
+        if let id, !people.contains(where: { $0.id == id }) { return }
+        var changed = false
+        for index in people.indices where people[index].isMe != (people[index].id == id) {
+            people[index].isMe.toggle()
+            changed = true
+        }
+        if changed { save() }
+    }
+
     public func person(named name: String) -> Person? {
         let key = Self.normalize(name.trimmingCharacters(in: .whitespacesAndNewlines))
         guard !key.isEmpty else { return nil }
         return people.first { Self.normalize($0.name) == key }
     }
 
-    /// Folds `source` into `target`: usage counts add up, the newer date wins, and `source` is gone.
+    /// Folds `source` into `target`: usage counts add up, the newer date wins, the "me" mark moves
+    /// over, and `source` is gone.
     @discardableResult
     public func merge(_ source: UUID, into target: UUID) -> Person? {
         guard source != target,
@@ -87,6 +105,7 @@ public actor PeopleStore {
         if absorbed.lastUsedAt > people[targetIndex].lastUsedAt {
             people[targetIndex].lastUsedAt = absorbed.lastUsedAt
         }
+        if absorbed.isMe { people[targetIndex].isMe = true }
         people.remove(at: sourceIndex)
         save()
         return people.first { $0.id == target }
@@ -116,6 +135,7 @@ public actor PeopleStore {
             if absorbed.lastUsedAt > people[existing].lastUsedAt {
                 people[existing].lastUsedAt = absorbed.lastUsedAt
             }
+            if absorbed.isMe { people[existing].isMe = true }
             people[existing].name = trimmed
             people.remove(at: idx)
             save()
