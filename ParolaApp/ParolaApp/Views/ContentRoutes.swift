@@ -4,7 +4,7 @@ import ParolaCore
 struct ContentRoutes: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Namespace private var landing
+    @Namespace private var landingNamespace
     @State private var shownRouteID: RouteID?
 
     var body: some View {
@@ -23,9 +23,12 @@ struct ContentRoutes: View {
                 .id(model.route)
                 .transition(.opacity)
         }
-        .animation(Self.routeAnimation(from: shownRouteID, to: routeID, reduceMotion: reduceMotion), value: routeID)
+        .animation(
+            Self.routeAnimation(from: shownRouteID, to: routeID, landing: model.routeLandsTake, reduceMotion: reduceMotion),
+            value: routeID
+        )
         .onChange(of: routeID, initial: true) { _, shown in shownRouteID = shown }
-        .environment(\.stageLanding, landing)
+        .environment(\.stageLanding, landingNamespace)
         .environment(\.arrivesFromStage, shownRouteID == .stage && routeID != .stage)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
@@ -87,9 +90,9 @@ struct ContentRoutes: View {
 
     private var routeID: RouteID { Self.routeID(for: model) }
 
-    /// Leaving the Stage takes the landing's time, a crossfade under Reduce Motion; nothing fades into it, so the page it replaces is gone before the sidebar folds.
-    static func routeAnimation(from shown: RouteID?, to next: RouteID, reduceMotion: Bool) -> Animation? {
-        if shown == .stage, next != .stage { return reduceMotion ? DS.Motion.crossfade : DS.Motion.takeLanding }
+    /// A take landing off its Stage takes the landing's time, a crossfade under Reduce Motion; nothing fades into the Stage, so the page it replaces is gone before the sidebar folds.
+    static func routeAnimation(from shown: RouteID?, to next: RouteID, landing: Bool, reduceMotion: Bool) -> Animation? {
+        if shown == .stage, next != .stage, landing { return reduceMotion ? DS.Motion.crossfade : DS.Motion.takeLanding }
         return reduceMotion || next == .stage ? nil : DS.Motion.route
     }
 

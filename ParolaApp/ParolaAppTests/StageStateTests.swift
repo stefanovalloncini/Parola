@@ -254,17 +254,19 @@ struct StageStateTests {
         let shapes = [StageControls.Control.stop, .finishing].map { StageControls.glassShape($0, reduceMotion: true) }
         #expect(shapes == [nil, nil])
         #expect(!StageLanding.carries(eligible: true, reduceMotion: true))
-        #expect(ContentRoutes.routeAnimation(from: .stage, to: .phase, reduceMotion: true) == DS.Motion.crossfade)
+        #expect(ContentRoutes.routeAnimation(from: .stage, to: .phase, landing: true, reduceMotion: true) == DS.Motion.crossfade)
     }
 
     @MainActor
-    @Test("leaving the Stage takes the landing's time, a crossfade under Reduce Motion, and nothing fades into the Stage")
+    @Test("only a take landing off its Stage takes the landing's time; leaving mid-take is the usual crossfade, and nothing fades into the Stage")
     func landingRouteAnimation() {
-        #expect(ContentRoutes.routeAnimation(from: .stage, to: .phase, reduceMotion: false) == DS.Motion.takeLanding)
-        #expect(ContentRoutes.routeAnimation(from: .stage, to: .phase, reduceMotion: true) == DS.Motion.crossfade)
-        #expect(ContentRoutes.routeAnimation(from: .library, to: .stage, reduceMotion: false) == nil)
-        #expect(ContentRoutes.routeAnimation(from: .library, to: .statistics, reduceMotion: false) == DS.Motion.route)
-        #expect(ContentRoutes.routeAnimation(from: .library, to: .statistics, reduceMotion: true) == nil)
+        #expect(ContentRoutes.routeAnimation(from: .stage, to: .phase, landing: true, reduceMotion: false) == DS.Motion.takeLanding)
+        #expect(ContentRoutes.routeAnimation(from: .stage, to: .phase, landing: true, reduceMotion: true) == DS.Motion.crossfade)
+        #expect(ContentRoutes.routeAnimation(from: .stage, to: .library, landing: false, reduceMotion: false) == DS.Motion.route)
+        #expect(ContentRoutes.routeAnimation(from: .stage, to: .library, landing: false, reduceMotion: true) == nil)
+        #expect(ContentRoutes.routeAnimation(from: .library, to: .stage, landing: false, reduceMotion: false) == nil)
+        #expect(ContentRoutes.routeAnimation(from: .library, to: .statistics, landing: false, reduceMotion: false) == DS.Motion.route)
+        #expect(ContentRoutes.routeAnimation(from: .library, to: .statistics, landing: false, reduceMotion: true) == nil)
     }
 
     @Test("Esc cancels a take that is still starting, except while the title field has the keyboard")
@@ -677,6 +679,18 @@ extension TranscriberMockSuites {
                 #expect(!newTake)
                 model.endTestTake()
             }
+        }
+
+        @Test("leaving a recording take's Stage for another page is no landing")
+        func leavingMidTakeIsNoLanding() {
+            let model = makeModel("stage-leave-mid-take")
+            model.installTestTake(source: .microphone)
+            #expect(model.route == .recording)
+
+            model.route = .transcript
+
+            #expect(!model.routeLandsTake)
+            model.endTestTake()
         }
 
         @Test("a take cut short after Stop and Cancel still says so, while Record works again at once")
