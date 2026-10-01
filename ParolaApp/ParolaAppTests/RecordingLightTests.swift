@@ -38,7 +38,7 @@ private func loopGap(_ a: Double, _ b: Double) -> Double {
 @Suite("Recording light")
 struct RecordingLightTests {
     @MainActor
-    @Test("the render server loops one second of the light's curve: full as the second turns, 35 % halfway, full again")
+    @Test("the render server loops one second of the light's curve, full as the second turns and 35 % halfway, at about 30 frames a second")
     func pulseCurve() {
         let pulse = RecDot.pulseAnimation(beginTime: 0)
         let values = pulse.values as? [Double] ?? []
@@ -47,6 +47,7 @@ struct RecordingLightTests {
         #expect(pulse.keyPath == "opacity")
         #expect(pulse.duration == 1)
         #expect(pulse.repeatCount == .infinity)
+        #expect(pulse.preferredFrameRateRange == CAFrameRateRange(minimum: 15, maximum: 60, preferred: 30))
         #expect(values.count == times.count)
         #expect(values.count > 30)
         #expect(times.first == 0)

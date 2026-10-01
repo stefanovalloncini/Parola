@@ -113,6 +113,7 @@ struct RecDot: View {
         animation.keyTimes = (0...steps).map { NSNumber(value: Double($0) / Double(steps)) }
         animation.duration = 1
         animation.repeatCount = .infinity
+        animation.preferredFrameRateRange = CAFrameRateRange(minimum: 15, maximum: 60, preferred: 30)
         animation.beginTime = beginTime
         animation.isRemovedOnCompletion = false
         return animation
