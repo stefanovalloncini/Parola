@@ -41,6 +41,7 @@ public enum MacroArgumentClosureScanner {
         var results: [Violation] = []
         var stack: [BodyKind] = [.topLevel]
         var parenDepthStack: [Int] = []
+        var statementStartStack: [Int] = []
         var statementStart = 0
         var nonBraceDepth = 0
         var lastNonSpaceChar: Character?
@@ -69,7 +70,7 @@ public enum MacroArgumentClosureScanner {
             if c == "\n" {
                 if nonBraceDepth <= 0 {
                     let continues = lastNonSpaceChar.map(continuationChars.contains) ?? false
-                        || lastWord(t, i).map(continuationWords.contains) ?? false
+                        || lastWord(t, mask.isComment, i).map(continuationWords.contains) ?? false
                         || peekNextWord(t, mask.isComment, i + 1, n) == "where"
                     if !continues {
                         statementStart = i + 1
@@ -87,8 +88,9 @@ public enum MacroArgumentClosureScanner {
             }
             if c == "{" {
                 let fragment = sanitizedFragment(t, mask.isOpaque, statementStart, i)
-                stack.append(classify(fragment))
+                stack.append(nonBraceDepth > 0 ? .closure : classify(fragment))
                 parenDepthStack.append(nonBraceDepth)
+                statementStartStack.append(statementStart)
                 i += 1
                 statementStart = i
                 nonBraceDepth = 0
@@ -98,8 +100,9 @@ public enum MacroArgumentClosureScanner {
             if c == "}" {
                 if stack.count > 1 { stack.removeLast() }
                 nonBraceDepth = parenDepthStack.popLast() ?? 0
+                let savedStart = statementStartStack.popLast() ?? 0
                 i += 1
-                statementStart = i
+                statementStart = nonBraceDepth > 0 ? savedStart : i
                 lastNonSpaceChar = nil
                 continue
             }
@@ -135,12 +138,13 @@ public enum MacroArgumentClosureScanner {
         return results
     }
 
-    private static func lastWord(_ t: [Character], _ before: Int) -> String? {
+    private static func lastWord(_ t: [Character], _ isComment: [Bool], _ before: Int) -> String? {
         var j = before
-        while j > 0, t[j - 1] == " " || t[j - 1] == "\t" { j -= 1 }
+        while j > 0, isComment[j - 1] || t[j - 1] == " " || t[j - 1] == "\t" { j -= 1 }
         var k = j
         while k > 0, isIdentChar(t[k - 1]) { k -= 1 }
         guard k < j else { return nil }
+        if k > 0, t[k - 1] == "." { return nil }
         return String(t[k..<j])
     }
 
@@ -173,6 +177,10 @@ public enum MacroArgumentClosureScanner {
         let trimmed = fragment.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return .closure }
         guard let first = firstSignificantWord(trimmed) else { return .closure }
+        if let afterFirst = trimmed.range(of: first)?.upperBound,
+           trimmed[afterFirst...].first(where: { $0 != " " && $0 != "\t" }) == ":" {
+            return .closure
+        }
         if first == "get" || first == "set" || first == "willSet" || first == "didSet" {
             return .declaration
         }
@@ -319,9 +327,7 @@ public enum MacroArgumentClosureScanner {
         var isComment: [Bool]
     }
 
-    /// One pass classifying every character as code, comment, or string text — including a string's
-    /// own `\(...)`/`\#(...)` interpolation, which is scanned back out as ordinary code (comments and
-    /// nested strings included) so a closure hiding inside an interpolation is still visible.
+    /// One pass classifying every character as code, comment, or string text, scanning a string's own interpolation back out as ordinary code.
     private static func computeOpaqueMask(_ t: [Character]) -> OpaqueMask {
         let n = t.count
         var isOpaque = [Bool](repeating: false, count: n)
