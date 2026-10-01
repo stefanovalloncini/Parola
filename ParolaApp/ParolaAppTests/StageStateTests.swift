@@ -142,6 +142,24 @@ struct StageStateTests {
         #expect(shown.hasPrefix("word "), "the cut never starts mid-word")
     }
 
+    @Test("words arriving at the end leave the start of the shown text where it was, until a whole step has come in")
+    func takeTextCutMovesInSteps() {
+        var text = String(repeating: "steady words ", count: 120)
+        let first = StageTakeText.shown(text)
+        var cuts = 0
+        var previous = first
+        for index in 0..<40 {
+            text += "w\(index) "
+            let shown = StageTakeText.shown(text)
+            if !shown.hasPrefix(previous.trimmingCharacters(in: .whitespaces)) { cuts += 1 }
+            #expect(shown.count <= StageTakeText.recentCharacters)
+            #expect(shown.count >= StageTakeText.recentCharacters - StageTakeText.cutStep - 20, "still enough to fill the column")
+            previous = shown
+        }
+        #expect(cuts <= 1, "about 160 characters of new words move the cut once at most")
+        #expect(StageTakeText.shown(text).hasSuffix("w39 "))
+    }
+
     @MainActor
     @Test("a failed take offers Show in Finder once its failure saved the audio, and its band greys")
     func failedTakeLook() {
