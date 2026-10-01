@@ -599,11 +599,12 @@ private struct LibraryBrowseList: View, Equatable {
 
 /// Its own view, so a phase change repaints the banner and never the rows under it.
 struct LibraryFailureBanner: View {
-    @Environment(AppModel.self) private var model
+    // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
+    @Environment(AppModel.self) private var model: AppModel?
     var insets = EdgeInsets()
 
     var body: some View {
-        if case .failed(let message) = model.phase {
+        if case .failed(let message) = model?.phase {
             ErrorBanner(message: message)
                 .padding(insets)
         }

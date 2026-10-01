@@ -16,20 +16,21 @@ struct ErrorBanner: View {
     let message: String
     /// A failed take on its Stage: Retry and Dismiss act on the take, and nothing a file or link run left behind shows.
     var take: RecordingSession?
-    @Environment(AppModel.self) private var model
+    // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
+    @Environment(AppModel.self) private var model: AppModel?
 
     private var canRetry: Bool {
-        guard let take else { return model.canRetryFailedTranscription }
+        guard let take else { return model?.canRetryFailedTranscription == true }
         return take.failure != nil
     }
 
     private var failedName: String? {
-        guard let take else { return model.failedSourceName }
+        guard let take else { return model?.failedSourceName }
         return take.failure?.title
     }
 
     var body: some View {
-        let offer = take == nil ? model.ytDlpUpdateOffer : .none
+        let offer = take == nil ? model?.ytDlpUpdateOffer ?? .none : .none
         let updateLeads = offer == .update || offer == .updating
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -58,8 +59,8 @@ struct ErrorBanner: View {
                             .disabled(offer == .updating)
                             .axLeaf("Error.Button.Retry")
                     }
-                    if take == nil, model.failedFileURL != nil {
-                        Button("Reveal in Finder") { model.revealFailedFile() }
+                    if take == nil, model?.failedFileURL != nil {
+                        Button("Reveal in Finder") { model?.revealFailedFile() }
                             .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                             .axLeaf("Error.Button.RevealInFinder")
                     }
@@ -100,7 +101,7 @@ struct ErrorBanner: View {
         case .manual:
             YtDlpManualUpdate(command: nil, axPrefix: "Error")
         case .update:
-            if let error = model.ytDlpUpdateError {
+            if let error = model?.ytDlpUpdateError {
                 Text(error)
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.dangerText)
@@ -116,7 +117,7 @@ struct ErrorBanner: View {
     }
 
     private func updateButton(updating: Bool) -> some View {
-        Button { model.updateYtDlpViaBrew() } label: {
+        Button { model?.updateYtDlpViaBrew() } label: {
             if updating {
                 HStack(spacing: DS.Spacing.snug) {
                     ProgressView().controlSize(.small)
@@ -137,10 +138,10 @@ struct ErrorBanner: View {
     }
 
     private func retry() {
-        if take == nil { model.retryFailedTranscription() } else { model.retryFailedTake() }
+        if take == nil { model?.retryFailedTranscription() } else { model?.retryFailedTake() }
     }
 
     private func dismiss() {
-        if take == nil { model.dismissError() } else { model.dismissTakeFailure() }
+        if take == nil { model?.dismissError() } else { model?.dismissTakeFailure() }
     }
 }

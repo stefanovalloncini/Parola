@@ -36,7 +36,8 @@ struct LibraryFilterBar: View {
         case language
     }
 
-    @Environment(AppModel.self) private var model
+    // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
+    @Environment(AppModel.self) private var model: AppModel?
     @Binding var labelFilter: String?
     @Binding var languageFilter: String?
     @Binding var dateRangeFilter: LibraryDateRangeFilter
@@ -186,7 +187,7 @@ struct LibraryFilterBar: View {
     /// Falls back to the full directory: a filtered person can be absent from this category's own options.
     private var selectedName: String? {
         guard let personFilter else { return nil }
-        return (peopleOptions.first { $0.id == personFilter } ?? model.person(id: personFilter))?.name
+        return (peopleOptions.first { $0.id == personFilter } ?? model?.person(id: personFilter))?.name
     }
 
     private func languageName(_ code: String) -> String {

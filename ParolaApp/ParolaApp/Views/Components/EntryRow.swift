@@ -101,7 +101,8 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     let accessory: Accessory
     let trailingActions: Actions
 
-    @Environment(AppModel.self) private var model
+    // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
+    @Environment(AppModel.self) private var model: AppModel?
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.backgroundProminence) private var backgroundProminence
     @State private var isHovering = false
@@ -230,7 +231,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             if case .snippet(_, let timecode, let reserves) = detail, reserves {
                 // Hidden rather than empty: an empty Text sits on a different baseline and shifts the row.
                 Text(timecode ?? "00:00")
-                    .font(model.monospacedTimestamps ? DS.Font.mono : DS.Font.secondary)
+                    .font(model?.monospacedTimestamps == true ? DS.Font.mono : DS.Font.secondary)
                     .foregroundStyle(secondaryStyle)
                     .lineLimit(1)
                     .opacity(timecode == nil ? 0 : 1)

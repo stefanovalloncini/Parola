@@ -145,7 +145,8 @@ struct LibraryListRow: View, Equatable {
         case match(showsTimestamp: Bool)
     }
 
-    @Environment(AppModel.self) private var model
+    // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
+    @Environment(AppModel.self) private var model: AppModel?
     let row: LibraryRowDisplay
     let detail: Detail
     let isSelected: Bool
@@ -161,43 +162,48 @@ struct LibraryListRow: View, Equatable {
             .contentShape(Rectangle())
             .draggable(entry.bundleURL)
             .contextMenu {
-                Button("Open") {
-                    model.openEntryFromLibrary(entry.id, inNewWindow: false)
-                }
-                Button("Open in New Window") {
-                    model.openEntryWindow(entry.id)
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).openInNewWindow")
-                Button(entry.pinned ? "Unpin" : "Pin") {
-                    model.togglePinned(for: entry.id)
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).\(entry.pinned ? "unpin" : "pin")")
-                Menu("Move to") {
-                    ForEach(EntryCategory.allCases.filter { $0 != entry.category }, id: \.self) { target in
-                        Button(LocalizedStringKey(libraryCategoryName(target))) {
-                            model.moveEntry(entry.id, to: target)
-                        }
-                    }
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).moveTo")
-                if model.destinationsEnabled {
-                    SendToMenu(model: model, entryID: entry.id)
-                        .accessibilityIdentifier("library.row.\(entry.id).sendTo")
-                }
-                Button("Reveal in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL])
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).revealInFinder")
-                Button("Rename…") {
-                    rename(entry)
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).rename")
-                Button("Delete", role: .destructive) {
-                    model.deleteEntry(entry.id)
-                }
-                .accessibilityIdentifier("library.row.\(entry.id).delete")
+                if let model { menu(for: entry, model: model) }
             }
             .accessibilityIdentifier("library.row.\(entry.id)")
+    }
+
+    @ViewBuilder
+    private func menu(for entry: LibraryEntry, model: AppModel) -> some View {
+        Button("Open") {
+            model.openEntryFromLibrary(entry.id, inNewWindow: false)
+        }
+        Button("Open in New Window") {
+            model.openEntryWindow(entry.id)
+        }
+        .accessibilityIdentifier("library.row.\(entry.id).openInNewWindow")
+        Button(entry.pinned ? "Unpin" : "Pin") {
+            model.togglePinned(for: entry.id)
+        }
+        .accessibilityIdentifier("library.row.\(entry.id).\(entry.pinned ? "unpin" : "pin")")
+        Menu("Move to") {
+            ForEach(EntryCategory.allCases.filter { $0 != entry.category }, id: \.self) { target in
+                Button(LocalizedStringKey(libraryCategoryName(target))) {
+                    model.moveEntry(entry.id, to: target)
+                }
+            }
+        }
+        .accessibilityIdentifier("library.row.\(entry.id).moveTo")
+        if model.destinationsEnabled {
+            SendToMenu(model: model, entryID: entry.id)
+                .accessibilityIdentifier("library.row.\(entry.id).sendTo")
+        }
+        Button("Reveal in Finder") {
+            NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL])
+        }
+        .accessibilityIdentifier("library.row.\(entry.id).revealInFinder")
+        Button("Rename…") {
+            rename(entry)
+        }
+        .accessibilityIdentifier("library.row.\(entry.id).rename")
+        Button("Delete", role: .destructive) {
+            model.deleteEntry(entry.id)
+        }
+        .accessibilityIdentifier("library.row.\(entry.id).delete")
     }
 
     @ViewBuilder
@@ -208,7 +214,7 @@ struct LibraryListRow: View, Equatable {
         case .match(let showsTimestamp):
             SearchResultRow(
                 display: row,
-                match: model.searchMatches[row.id],
+                match: model?.searchMatches[row.id],
                 isSelected: isSelected,
                 showsTimestamp: showsTimestamp
             )
@@ -218,7 +224,8 @@ struct LibraryListRow: View, Equatable {
 
 /// Export and Delete for the rows a page has selected, in its header.
 struct LibraryBulkActions: View {
-    @Environment(AppModel.self) private var model
+    // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
+    @Environment(AppModel.self) private var model: AppModel?
     let selection: Set<LibraryEntry.ID>
     @Binding var pendingBulkDelete: Bool
 
@@ -232,7 +239,7 @@ struct LibraryBulkActions: View {
             Menu {
                 ForEach(ExportFormat.allCases) { format in
                     Button("\(format.displayName) (.\(format.fileExtension))") {
-                        model.bulkExportEntries(ids: selection, format: format)
+                        model?.bulkExportEntries(ids: selection, format: format)
                     }
                     .axLeaf("Header.MenuItem.Export\(format.rawValue.capitalized)")
                 }

@@ -11,7 +11,8 @@ struct IntakeStrip: View {
             : String(localized: "Drop audio or video", bundle: bundle)
     }
 
-    @Environment(AppModel.self) private var model
+    // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
+    @Environment(AppModel.self) private var model: AppModel?
 
     var body: some View {
         HStack(spacing: DS.Spacing.regular) {
@@ -19,12 +20,12 @@ struct IntakeStrip: View {
                 .font(.system(size: 17))
                 .foregroundStyle(DS.Color.accentInk)
                 .accessibilityHidden(true)
-            Text(verbatim: Self.prompt(linksEnabled: model.features.isEnabled(.youtube)))
+            Text(verbatim: Self.prompt(linksEnabled: model?.features.isEnabled(.youtube) == true))
                 .font(DS.Font.body)
                 .foregroundStyle(DS.Color.secondaryText)
                 .lineLimit(1)
             Spacer(minLength: DS.Spacing.small)
-            Button("Open Files…") { model.presentOpenPanel() }
+            Button("Open Files…") { model?.presentOpenPanel() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .tint(nil)
@@ -128,11 +129,12 @@ struct IntakeSettingsButton: View {
     var style: Style = .accent
     var leaf = "Intake.Button.Settings"
 
-    @Environment(AppModel.self) private var model
+    // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
+    @Environment(AppModel.self) private var model: AppModel?
     @State private var isPresented = false
 
     var body: some View {
-        let parts = IntakeSummary.parts(for: model, spellsOutAuto: style == .quiet)
+        let parts = model.map { IntakeSummary.parts(for: $0, spellsOutAuto: style == .quiet) } ?? []
         Button {
             isPresented = true
         } label: {

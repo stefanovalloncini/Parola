@@ -31,7 +31,8 @@ struct LibraryPageHeader: View {
     let selection: Set<LibraryEntry.ID>
     @Binding var pendingBulkDelete: Bool
 
-    @Environment(AppModel.self) private var model
+    // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
+    @Environment(AppModel.self) private var model: AppModel?
     @State private var rowWidth: CGFloat = 0
     @State private var unfoldedRowWidth: CGFloat = 0
 
@@ -81,15 +82,15 @@ struct LibraryPageHeader: View {
         if showsFilters, !folded {
             filters
         }
-        if showsListControls {
-            sortMenu
+        if showsListControls, let model {
+            sortMenu(model)
         }
         if showsFilters {
             moreMenu(folded: folded)
         }
     }
 
-    private var sortMenu: some View {
+    private func sortMenu(_ model: AppModel) -> some View {
         @Bindable var model = model
         return Menu {
             Picker("Sort", selection: $model.librarySortOrder) {
@@ -120,11 +121,11 @@ struct LibraryPageHeader: View {
                 inside
                 Divider()
             }
-            Button { model.openStatistics() } label: {
+            Button { model?.openStatistics() } label: {
                 Label("Statistics", systemImage: "chart.bar")
             }
             .axLeaf("MenuItem.Statistics")
-            Button { model.showingPeopleSheet = true } label: {
+            Button { model?.showingPeopleSheet = true } label: {
                 Label("Manage People…", systemImage: "person.2")
             }
             .axLeaf("MenuItem.ManagePeople")
