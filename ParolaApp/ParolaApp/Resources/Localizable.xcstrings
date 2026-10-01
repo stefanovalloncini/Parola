@@ -8344,6 +8344,17 @@
         }
       }
     },
+    "Microphone stopped": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microfono fermato"
+          }
+        }
+      }
+    },
     "Milliseconds": {
       "extractionState": "manual",
       "localizations": {

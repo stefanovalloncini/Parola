@@ -39,27 +39,35 @@ struct MeetingDefaultsTests {
         #expect(meeting.levels == [Float](repeating: 0.25, count: 20))
         #expect(meeting.micLevels == [Float](repeating: 0, count: 5) + [Float](repeating: 0.75, count: 15))
         #expect(meeting.newest == 19)
-        #expect(!meeting.micOff)
+        #expect(meeting.micLost == nil)
 
         let plain = StageBand.tape(levels: mac, micLevels: nil, micState: nil, markers: [], paused: false)
         #expect(plain.levels == meeting.levels)
         #expect(plain.micLevels == nil)
     }
 
-    @Test("the You lane greys once the microphone isn't in the take, and stays, flat, after Stop")
-    func offLane() {
-        #expect(StageBand.micOff(.unavailable))
-        #expect(!StageBand.micOff(.starting))
-        #expect(!StageBand.micOff(.recording))
-        #expect(!StageBand.micOff(nil), "Stop lets the state go and keeps the levels: the lane stays as it was")
+    @Test("the You lane greys and says why once the microphone isn't in the take: never recorded, or stopped partway")
+    func offLane() throws {
+        #expect(StageBand.lostMicNote(.unavailable) == "Microphone not recorded")
+        #expect(StageBand.lostMicNote(.stopped) == "Microphone stopped")
+        #expect(StageBand.lostMicNote(.starting) == nil)
+        #expect(StageBand.lostMicNote(.recording) == nil)
+        #expect(StageBand.lostMicNote(nil) == nil, "Stop lets a live state go and keeps the levels: the lane stays as it was")
         #expect(StageBand.offLaneStrength < 1)
+        #expect(MicTrackState.unavailable.isLost && MicTrackState.stopped.isLost)
+        #expect(!MicTrackState.starting.isLost && !MicTrackState.recording.isLost)
 
         let mac = TakeLevelHistory()
         let mic = TakeLevelHistory()
         mac.append(0.5)
         mic.append(0)
-        #expect(StageBand.tape(levels: mac, micLevels: mic, micState: .unavailable, markers: [], paused: false).micOff)
+        #expect(StageBand.tape(levels: mac, micLevels: mic, micState: .stopped, markers: [], paused: false).micLost == "Microphone stopped")
         #expect(StageBand.tape(levels: mac, micLevels: mic, micState: nil, markers: [], paused: false).micLevels == [0])
+
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let it = try #require(Bundle(path: path))
+        #expect(StageBand.lostMicNote(.unavailable, bundle: it) == "Microfono non registrato")
+        #expect(StageBand.lostMicNote(.stopped, bundle: it) == "Microfono fermato")
     }
 
     @Test("the bars are drawn again when the You lane comes, goes or stops, never for a frame that only slides them")
@@ -67,7 +75,11 @@ struct MeetingDefaultsTests {
         let one = StageTape(levels: [0.1], flags: [], newest: 4, paused: false)
         let two = StageTape(levels: [0.1], micLevels: [0.2], flags: [], newest: 4, paused: false)
         #expect(one != two)
-        #expect(two != StageTape(levels: [0.1], micLevels: [0.2], micOff: true, flags: [], newest: 4, paused: false))
+        #expect(two != StageTape(levels: [0.1], micLevels: [0.2], micLost: "Microphone not recorded", flags: [], newest: 4, paused: false))
+        #expect(
+            StageTape(levels: [0.1], micLevels: [0.2], micLost: "Microphone not recorded", flags: [], newest: 4, paused: false)
+                != StageTape(levels: [0.1], micLevels: [0.2], micLost: "Microphone stopped", flags: [], newest: 4, paused: false)
+        )
         #expect(two == StageTape(levels: [0.1], micLevels: [0.2], flags: [], newest: 4, paused: false))
     }
 
@@ -115,6 +127,12 @@ struct MeetingDefaultsTests {
         let you = try #require(youLane)
         #expect(you.value == "Microphone not recorded")
         #expect(elements.contains { $0.label == "Mac audio" })
+
+        model.takeMicTrackState = .stopped
+        let stopped = stageElements(meetingTake(), model: model)
+        let stoppedLane = stopped.first { $0.label == "You" }
+        let youStopped = try #require(stoppedLane)
+        #expect(youStopped.value == "Microphone stopped")
     }
 
     @Test("the meters' words have their Italian")
@@ -249,6 +267,62 @@ extension TranscriberMockSuites {
                 model.forgetTakeSession()
                 #expect(model.takeMicTrackState == nil)
                 #expect(model.takeMicLevels == nil)
+            }
+        }
+    }
+
+    @MainActor
+    @Suite("Lost microphone takes", .serialized)
+    struct LostMicrophoneTakeTests {
+        /// A meeting whose Mac audio keeps coming every 50 ms while your microphone sends `micReadings` and then nothing.
+        private func meetingWithAQuietMic(_ label: String, micReadings: Int) async throws -> (model: AppModel, files: [URL]) {
+            let model = makeRecordingModel(label)
+            model.useStreaming = false
+            model.micTrackStallTicks = 3
+            let macFile = try makeTakeWAV("\(label)-mac")
+            let micFile = try makeTakeWAV("\(label)-mic")
+            let mac = MeteredCapture(file: macFile)
+            let mic = MeteredCapture(file: micFile)
+            model.takeCaptureOverride = { _ in mac }
+            model.micTrackCaptureOverride = { mic }
+            model.startRecording(source: .systemAudio)
+            let micUp = await waitUntil(timeoutMs: 10_000) { model.takeMicTrackState == .recording }
+            guard micUp else { throw FixtureTakeDidNotStart() }
+            for tick in 0..<80 {
+                mac.levelMeter.record(0.3)
+                if tick < micReadings { mic.levelMeter.record(0.3) }
+                if model.takeMicTrackState?.isLost == true { break }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            return (model, [macFile, micFile])
+        }
+
+        @Test("a microphone that recorded and then went quiet reads as stopped, and stays so through Stop")
+        func stalledMicIsStopped() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 0.3, "Welcome.")])
+                let (model, files) = try await meetingWithAQuietMic("lost-mic-stopped", micReadings: 10)
+                defer { for file in files { try? FileManager.default.removeItem(at: file) } }
+                model.selectedModel = "openai_whisper-tiny"
+                #expect(model.takeMicTrackState == .stopped)
+
+                model.stopRecordingAndTranscribe()
+                #expect(model.takeMicTrackState == .stopped, "the lane keeps saying so through Finishing")
+                model.cancelCurrentWork()
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+            }
+        }
+
+        @Test("a microphone that came up but never sent a sound reads as not recorded")
+        func silentMicIsNotRecorded() async throws {
+            try await withMocksCleared(.audioSource) {
+                let (model, files) = try await meetingWithAQuietMic("lost-mic-never", micReadings: 0)
+                defer { for file in files { try? FileManager.default.removeItem(at: file) } }
+                #expect(model.takeMicTrackState == .unavailable)
+                model.cancelCurrentWork()
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
             }
         }
     }

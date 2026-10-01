@@ -21,8 +21,15 @@ struct MicTrack {
 enum MicTrackState: Equatable {
     case starting
     case recording
-    /// The microphone never came up, or went quiet while the Mac audio kept coming.
+    /// The microphone never came up, or never sent a sound while the Mac audio kept coming.
     case unavailable
+    /// The microphone recorded, then went quiet while the Mac audio kept coming.
+    case stopped
+
+    /// Not in the take, or no longer: the You lane greys and says which.
+    var isLost: Bool {
+        self == .unavailable || self == .stopped
+    }
 }
 
 /// Where a meeting's mic file starts in its take, kept beside it for a sweep that finds the pair with no checkpoint.
@@ -183,7 +190,7 @@ extension AppModel {
                 micTrack = track
                 noteMicTrackStart(track)
                 writeRecordingCheckpoint()
-                takeMicTrackState = .unavailable
+                takeMicTrackState = micReading != nil ? .stopped : .unavailable
                 noteMicTrackMissing(take.id, stopped: micReading != nil)
             }
             track.lastMicReading = micReading
@@ -227,7 +234,7 @@ extension AppModel {
     func detachMicTrack(of takeID: Int?) -> MicTrack? {
         guard let track = micTrack, takeID == nil || track.takeID == takeID else { return nil }
         micTrack = nil
-        if takeMicTrackState != .unavailable { takeMicTrackState = nil }
+        if takeMicTrackState?.isLost != true { takeMicTrackState = nil }
         return track
     }
 

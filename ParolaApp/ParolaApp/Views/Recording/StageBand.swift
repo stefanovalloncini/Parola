@@ -48,7 +48,7 @@ struct StageBand: View {
             Canvas { context, size in Self.drawPlayhead(in: &context, size: size) }
                 .accessibilityHidden(true)
             if model.takeMicLevels != nil {
-                StageLaneNames(micOff: Self.micOff(model.takeMicTrackState))
+                StageLaneNames(micState: model.takeMicTrackState)
             }
         }
         .saturation(take.isPaused || Self.greys(take.state) ? 0 : 1)
@@ -98,16 +98,20 @@ struct StageBand: View {
         return StageTape(
             levels: levels?.recent(count) ?? [],
             micLevels: micLevels?.recent(count),
-            micOff: micOff(micState),
+            micLost: lostMicNote(micState),
             flags: markers.compactMap { markerOffset($0, newestSample: newest) },
             newest: newest,
             paused: paused
         )
     }
 
-    /// The You lane greys once your microphone isn't in the take; it keeps its place, flat, until the take's session ends.
-    nonisolated static func micOff(_ state: MicTrackState?) -> Bool {
-        state == .unavailable
+    /// What the You lane says once your microphone isn't in the take, or no longer is; the lane greys and keeps its place until the session ends.
+    nonisolated static func lostMicNote(_ state: MicTrackState?, bundle: Bundle = .main) -> String? {
+        switch state {
+        case .unavailable: String(localized: "Microphone not recorded", bundle: bundle)
+        case .stopped: String(localized: "Microphone stopped", bundle: bundle)
+        case .starting, .recording, nil: nil
+        }
     }
 
     /// A lane whose microphone isn't in the take draws at this strength.
@@ -137,7 +141,7 @@ struct StageBand: View {
     }
 
     fileprivate static func drawTape(
-        levels: [Float], micLevels: [Float]?, micOff: Bool, flags: [Int], in context: inout GraphicsContext, size: CGSize
+        levels: [Float], micLevels: [Float]?, micLost: Bool, flags: [Int], in context: inout GraphicsContext, size: CGSize
     ) {
         let playheadX = playheadX(width: size.width)
         let flagColor = DS.Color.accent
@@ -148,7 +152,7 @@ struct StageBand: View {
             context.fill(Path(roundedRect: pole, cornerRadius: 0.75), with: .color(flagColor.opacity(0.5)))
         }
 
-        let rows: [(levels: [Float], strength: Double)] = micLevels.map { [($0, micOff ? offLaneStrength : 1), (levels, 1)] }
+        let rows: [(levels: [Float], strength: Double)] = micLevels.map { [($0, micLost ? offLaneStrength : 1), (levels, 1)] }
             ?? [(levels, 1)]
         for (row, lane) in zip(rows, lanes(rows.count, in: size)) {
             drawBars(row.levels, in: lane, strength: row.strength, playheadX: playheadX, context: &context)
@@ -209,25 +213,26 @@ struct StageTape: View, Equatable {
     let levels: [Float]
     /// A meeting's microphone, drawn as the You lane over `levels`; nil for a take with one lane.
     var micLevels: [Float]?
-    var micOff = false
+    /// Why the You lane is grey, once your microphone isn't in the take.
+    var micLost: String?
     let flags: [Int]
     let newest: Int
     let paused: Bool
 
     nonisolated static func == (lhs: StageTape, rhs: StageTape) -> Bool {
         lhs.newest == rhs.newest && lhs.flags == rhs.flags && lhs.paused == rhs.paused
-            && (lhs.micLevels == nil) == (rhs.micLevels == nil) && lhs.micOff == rhs.micOff
+            && (lhs.micLevels == nil) == (rhs.micLevels == nil) && lhs.micLost == rhs.micLost
     }
 
     var body: some View {
         Canvas { context, size in
-            StageBand.drawTape(levels: levels, micLevels: micLevels, micOff: micOff, flags: flags, in: &context, size: size)
+            StageBand.drawTape(levels: levels, micLevels: micLevels, micLost: micLost != nil, flags: flags, in: &context, size: size)
         }
         // A Canvas element carries no value; a text stand-in per lane reads its level the way the clock reads its time.
         .accessibilityRepresentation {
             if let micLevels {
                 VStack {
-                    level(micLevels, label: "You", off: micOff)
+                    level(micLevels, label: "You", lost: micLost)
                     level(levels, label: "Mac audio")
                 }
             } else {
@@ -236,18 +241,18 @@ struct StageTape: View, Equatable {
         }
     }
 
-    private func level(_ levels: [Float], label: LocalizedStringKey, off: Bool = false) -> some View {
+    private func level(_ levels: [Float], label: LocalizedStringKey, lost: String? = nil) -> some View {
         let reading = Text(verbatim: AppFormat.percent(Double(levels.last ?? 0)))
         return reading
             .accessibilityLabel(label)
-            .accessibilityValue(off ? Text("Microphone not recorded") : paused ? Text("Paused") : reading)
+            .accessibilityValue(lost.map { Text(verbatim: $0) } ?? (paused ? Text("Paused") : reading))
             .accessibilityAddTraits(.updatesFrequently)
     }
 }
 
 /// "You" and "Mac audio" just past the playhead, each beside its lane; the You lane says so once your microphone isn't in the take.
 private struct StageLaneNames: View {
-    let micOff: Bool
+    let micState: MicTrackState?
 
     var body: some View {
         GeometryReader { proxy in
@@ -271,8 +276,8 @@ private struct StageLaneNames: View {
 
     @ViewBuilder
     private var you: some View {
-        if micOff {
-            Label("Microphone not recorded", systemImage: "mic.slash")
+        if let lost = StageBand.lostMicNote(micState) {
+            Label(lost, systemImage: "mic.slash")
         } else {
             Text("You")
         }

@@ -992,7 +992,7 @@ extension TranscriberMockSuites {
                 #expect(notice?.message == AppModel.micTrackStoppedMessage())
                 #expect(model.recording?.state == .recording)
                 #expect(model.micTrack?.stalled == true)
-                #expect(model.takeMicTrackState == .unavailable)
+                #expect(model.takeMicTrackState == .stopped)
                 model.cancelCurrentWork()
             }
         }
