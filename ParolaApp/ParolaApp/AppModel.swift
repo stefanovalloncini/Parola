@@ -260,6 +260,12 @@ final class AppModel {
     @ObservationIgnored var micTrackStallTicks = 30
     /// A meeting's mix files while a fold or a run still reads them.
     @ObservationIgnored var meetingScratchInUse: Set<URL> = []
+    /// Mic tracks a fold couldn't add, by their take's file, until the take's entry can hold a record of them.
+    @ObservationIgnored var pendingMicTracks: [URL: StoppedMicTrack] = [:]
+    /// Mic tracks waiting in a record of their own to be folded into their entry, by entry.
+    @ObservationIgnored var micTrackRecords: [LibraryEntry.ID: MicTrackRecord] = [:]
+    /// The launch's folds of mic tracks that waited for their entries.
+    @ObservationIgnored var micTrackFolds: Task<Void, Never>?
     /// Test seam: runs after each step of a fold; false stops the fold there, as a crash would.
     @ObservationIgnored var foldStepHook: (@MainActor (FoldStep) async -> Bool)?
 
@@ -4724,6 +4730,10 @@ final class AppModel {
         if let audio { takeFilesBeingSaved[audio, default: 0] += 1 }
         trackTakeWork { [weak self, library] in
             let entry = try? await saving.value
+            // Before the take's checkpoint goes: it is what names a mic track a fold couldn't add.
+            if let entry, let audio, let self, let mic = self.pendingMicTracks.removeValue(forKey: audio) {
+                await self.keepMicTrack(mic, forEntry: entry.id)
+            }
             if let audio, let self {
                 let left = (self.takeFilesBeingSaved[audio] ?? 1) - 1
                 self.takeFilesBeingSaved[audio] = left > 0 ? left : nil
@@ -5258,6 +5268,7 @@ final class AppModel {
                     self.exportNotice = Self.deletedTakeNotice(restorable: restorable)
                     return
                 }
+                if let record = self.micTrackRecords[entry.id] { await self.foldWaitingMicTrack(record, intoEntry: entry.id) }
                 if (try? await self.openEntry(entry.id)) != nil {
                     self.retranscribeCurrentEntry(model: self.selectedModel, language: self.selectedLanguage, landingAs: .retriedTake)
                     self.releaseTakeFile(url)

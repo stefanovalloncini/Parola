@@ -29,6 +29,12 @@ struct StoppedMicTrack {
     let offset: TimeInterval
 }
 
+/// A mic track waiting in a record of its own for its entry, and the record's generation.
+struct MicTrackRecord {
+    let generation: Int
+    let mic: StoppedMicTrack
+}
+
 /// What a take's file is once its microphone track is folded in, and the mono mix the engine reads, when one was made.
 struct FoldedTake {
     let audio: URL
@@ -203,7 +209,8 @@ extension AppModel {
             updateSession(of: take?.id) { if $0.audioURL == mac { $0.audioURL = audio } }
             return FoldedTake(audio: audio, engineInput: engineInput)
         case .failed:
-            if let take { noteMicTrackMissing(take.id, stopped: false) }
+            pendingMicTracks[mac] = mic
+            noteMicTrackKept(take?.id)
             return FoldedTake(audio: mac)
         case .stopped:
             return FoldedTake(audio: mac, stopped: true)
@@ -211,7 +218,9 @@ extension AppModel {
     }
 
     /// A recovered meeting's mic folds into its take file before the take is saved; a take already stereo only lets its mic go.
-    func foldRecoveredMicTrack(_ checkpoint: RecoveryCheckpoint, audio: URL, generation: Int) async -> FoldedTake {
+    func foldRecoveredMicTrack(
+        _ checkpoint: RecoveryCheckpoint, audio: URL, generation: Int, notifies: Bool, wantsEngineInput: Bool = false
+    ) async -> FoldedTake {
         if await Self.isStereoFile(audio) {
             await rewriteRecoveryCheckpoint(generation) { $0 = $0.foldingMicTrack(into: audio) }
             for mic in Set([checkpoint.companionAudioURL, RecordingScratch.meetingMicURL(for: audio)].compactMap { $0 })
@@ -220,19 +229,124 @@ extension AppModel {
             }
             return FoldedTake(audio: audio)
         }
-        guard let companion = checkpoint.companionAudioURL,
-              let readable = (try? await Self.offMainIO { Self.readableRecordingURL(companion) }) ?? nil else {
+        guard let mic = checkpoint.micTrack, FileManager.default.fileExists(atPath: mic.file.path) else {
             return FoldedTake(audio: audio)
         }
-        let mic = StoppedMicTrack(file: readable, offset: checkpoint.companionStartOffset ?? 0)
-        switch await foldIntoTakeFile(mic, take: audio, generation: generation, wantsEngineInput: false) {
-        case .folded(let folded, _):
-            return FoldedTake(audio: folded)
+        guard await !Self.holdsNoAudio(mic.file) else {
+            await rewriteRecoveryCheckpoint(generation) { $0 = $0.foldingMicTrack(into: audio) }
+            releaseMicFile(mic.file)
+            return FoldedTake(audio: audio)
+        }
+        switch await foldIntoTakeFile(mic, take: audio, generation: generation, wantsEngineInput: wantsEngineInput) {
+        case .folded(let folded, let engineInput):
+            return FoldedTake(audio: folded, engineInput: engineInput)
         case .failed:
+            pendingMicTracks[audio] = mic
+            if notifies { noteMicTrackKept(nil) }
             return FoldedTake(audio: audio)
         case .stopped:
             return FoldedTake(audio: audio, stopped: true)
         }
+    }
+
+    /// A checkpoint's mic track whose take is in the library already waits for that entry, and gets a first try at once.
+    func keepMicTrack(of checkpoint: RecoveryCheckpoint, forEntry entryID: LibraryEntry.ID) async {
+        guard let mic = checkpoint.micTrack, FileManager.default.fileExists(atPath: mic.file.path) else { return }
+        await keepMicTrack(mic, forEntry: entryID)
+        guard let record = micTrackRecords[entryID] else { return }
+        await foldWaitingMicTrack(record, intoEntry: entryID)
+    }
+
+    /// The records a launch found are folded in one after another; those that still can't wait for the next launch.
+    func foldWaitingMicTracks(_ checkpoints: [RecoveryCheckpoint]) {
+        var waiting: [(entryID: LibraryEntry.ID, record: MicTrackRecord)] = []
+        for checkpoint in checkpoints {
+            guard let entryID = checkpoint.entryID, let mic = checkpoint.micTrack else { continue }
+            let record = MicTrackRecord(generation: adoptRecovery(checkpoint), mic: mic)
+            micTrackRecords[entryID] = record
+            waiting.append((entryID, record))
+        }
+        guard !waiting.isEmpty else { return }
+        micTrackFolds = Task { [weak self] in
+            for item in waiting { await self?.foldWaitingMicTrack(item.record, intoEntry: item.entryID) }
+        }
+    }
+
+    /// Folds a waiting mic track into its entry's audio and labels your side of what it says; false leaves the record for later.
+    @discardableResult
+    func foldWaitingMicTrack(_ record: MicTrackRecord, intoEntry entryID: LibraryEntry.ID) async -> Bool {
+        guard await !Self.holdsNoAudio(record.mic.file) else {
+            settleMicTrackRecord(record, entryID: entryID)
+            return true
+        }
+        let loaded: LoadedEntry
+        do {
+            loaded = try await library.load(entryID)
+        } catch LibraryStore.LibraryError.notFound {
+            settleMicTrackRecord(record, entryID: entryID)
+            return true
+        } catch {
+            return false
+        }
+        guard let audio = loaded.document.audioURL else {
+            settleMicTrackRecord(record, entryID: entryID)
+            return true
+        }
+        if await !Self.isStereoFile(audio) {
+            let scratch = meetingScratchURL()
+            meetingScratchInUse.insert(scratch)
+            defer { meetingScratchInUse.remove(scratch) }
+            let folder = inflightRecordingsURL
+            do {
+                try await Self.offMainIO { [offset = record.mic.offset, micFile = record.mic.file] in
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    WAVHeaderRepair.makeReadable(micFile)
+                    let start = Date(timeIntervalSinceReferenceDate: 0)
+                    try MeetingTakeMixer.mix(
+                        mac: audio, mic: micFile, macStart: start, micStart: start.addingTimeInterval(offset), into: scratch, mono: nil
+                    )
+                }
+                try await library.replaceAudio(of: entryID, with: scratch)
+            } catch {
+                ParolaLog.error(.audioRecording, "a waiting microphone track could not be folded in", [.error: .error(error)])
+                discardMeetingScratch([scratch])
+                return false
+            }
+        }
+        await labelSides(ofEntry: entryID)
+        settleMicTrackRecord(record, entryID: entryID)
+        refreshLibrary()
+        return true
+    }
+
+    private func settleMicTrackRecord(_ record: MicTrackRecord, entryID: LibraryEntry.ID) {
+        if micTrackRecords[entryID]?.generation == record.generation { micTrackRecords[entryID] = nil }
+        recoveryReferencedFiles.remove(record.mic.file.resolvingSymlinksInPath().path)
+        endRecovery(record.generation)
+        releaseMicFile(record.mic.file)
+    }
+
+    /// Labels your side of a meeting entry's transcript from its stereo audio, segment by segment as it stands now.
+    private func labelSides(ofEntry entryID: LibraryEntry.ID) async {
+        guard let loaded = try? await library.load(entryID), let stereo = loaded.document.audioURL,
+              !loaded.document.transcript.segments.isEmpty else { return }
+        let segments = loaded.document.transcript.segments
+        let label = meetingMeLabel
+        guard let labelled = try? await Self.offMainIO({
+            try SpeakerSideAttribution.label(segments: segments, stereo: stereo, meLabel: label)
+        }) else { return }
+        let sides = Dictionary(labelled.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        guard let updated = try? await library.mutateTranscript(for: entryID, { transcript in
+            for index in transcript.segments.indices {
+                guard let side = sides[transcript.segments[index].id], side.text == transcript.segments[index].text else { continue }
+                transcript.segments[index].speaker = side.speaker
+                transcript.segments[index].words = side.words
+            }
+        }) else { return }
+        assignMePerson(in: entryID, transcript: updated)
+        guard selectedEntryID == entryID else { return }
+        installStoredTranscript(updated)
+        installPlayer(for: stereo)
     }
 
     private enum FoldResult {
@@ -391,7 +505,20 @@ extension AppModel {
         guard micTrackNoticeTake != takeID, exportNotice?.actions.isEmpty ?? true else { return }
         micTrackNoticeTake = takeID
         let message = stopped ? Self.micTrackStoppedMessage() : Self.micTrackMissingMessage()
-        exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .info)
+        exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .info, forTake: takeID)
+    }
+
+    /// The fold failed and the mic waits: said for that take, and gone with it.
+    func noteMicTrackKept(_ takeID: Int?) {
+        guard exportNotice?.actions.isEmpty ?? true else { return }
+        exportNotice = ExportNotice(message: Self.micTrackKeptMessage(), failures: [], folder: nil, tone: .info, forTake: takeID)
+    }
+
+    nonisolated static func micTrackKeptMessage(bundle: Bundle = .main) -> String {
+        String(
+            localized: "Your microphone's track couldn't be added to this recording yet. Parola keeps it and tries again the next time it opens.",
+            bundle: bundle
+        )
     }
 
     nonisolated static func micTrackMissingMessage(bundle: Bundle = .main) -> String {

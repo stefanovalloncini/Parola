@@ -51,6 +51,32 @@ struct LibraryStoreTests {
         }
     }
 
+    @Test("replacing an entry's audio moves the new file in under the audio's own name and keeps the rest of the entry")
+    func replacesAudioInPlace() async throws {
+        let (store, _) = try makeTempLibrary()
+        let original = try makeFakeAudio()
+        defer { try? FileManager.default.removeItem(at: original) }
+        let entry = try await store.add(
+            transcript: makeTranscript(), audioSource: original, title: "Standup", sourceDigest: "digest-of-the-mac-side"
+        )
+        let before = try #require(try await store.load(entry.id).document.audioURL)
+        let replacement = FileManager.default.temporaryDirectory.appendingPathComponent("parola-store-stereo-\(UUID().uuidString).wav")
+        try Data("RIFFstereoaudio".utf8).write(to: replacement)
+
+        try await store.replaceAudio(of: entry.id, with: replacement)
+
+        let loaded = try await store.load(entry.id)
+        let after = try #require(loaded.document.audioURL)
+        #expect(after == before)
+        #expect(try Data(contentsOf: after) == Data("RIFFstereoaudio".utf8))
+        #expect(!FileManager.default.fileExists(atPath: replacement.path), "the new file is moved in, not copied")
+        #expect(loaded.entry.title == "Standup")
+        #expect(loaded.entry.sourceDigest == "digest-of-the-mac-side", "a copy of the take left behind is still known as saved")
+        #expect(loaded.document.transcript.text == "hi")
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: loaded.entry.bundleURL.path).filter { $0.hasPrefix(".replacing-") }
+        #expect(leftovers.isEmpty)
+    }
+
     @Test("chat history is never searchable")
     func chatHistoryIsNotIndexed() async throws {
         let (store, _) = try makeTempLibrary()

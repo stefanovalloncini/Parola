@@ -17115,6 +17115,17 @@
         }
       }
     },
+    "Your microphone's track couldn't be added to this recording yet. Parola keeps it and tries again the next time it opens.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La traccia del tuo microfono non è ancora stata aggiunta a questa registrazione. Parola la conserva e riprova alla prossima apertura."
+          }
+        }
+      }
+    },
     "Your services": {
       "extractionState": "manual",
       "localizations": {

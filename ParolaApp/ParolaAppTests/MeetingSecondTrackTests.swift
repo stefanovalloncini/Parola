@@ -543,6 +543,216 @@ extension TranscriberMockSuites {
             }
         }
 
+        // MARK: - A fold that fails
+
+        /// What a mic file holds when the mix can't read it: no header, but plenty of bytes.
+        private func corrupt(_ file: URL) throws {
+            try Data(repeating: 0x5A, count: 64 * 1024).write(to: file)
+        }
+
+        /// The mic readable again, as it is when the space or the device that failed the fold comes back.
+        private func repairMic(_ file: URL) throws {
+            let rate = 16_000.0
+            let quiet = [Float](repeating: 0, count: Int(rate))
+            try TestAudio.write(channels: [quiet + TestAudio.sine(seconds: 1, hz: 220, amplitude: 0.4, sampleRate: rate)], sampleRate: rate, to: file)
+        }
+
+        private func micRecords(_ library: URL) throws -> [RecoveryCheckpoint] {
+            try checkpointsOnDisk(library).filter { $0.kind == .micTrack }
+        }
+
+        /// The next launch folds the waiting mic into the entry, labels your side, and lets the record and the mic go.
+        private func expectLaterFold(library: URL, entry: LibraryEntry.ID, mic: URL) async throws {
+            try repairMic(mic)
+            let relaunched = makeModel(libraryURL: library)
+            await relaunched.micTrackFolds?.value
+            let stored = try await relaunched.library.load(entry).document
+            let audio = try #require(stored.audioURL)
+            #expect(try channels(of: audio) == 2, "the next launch folds the mic in")
+            let speakers = stored.transcript.segments.map(\.speaker)
+            if speakers.count == 2 { #expect(speakers == [nil, AppModel.meLabel()]) }
+            #expect(!exists(mic))
+            #expect(try micRecords(library).isEmpty)
+            #expect(await relaunched.library.list().count == 1)
+        }
+
+        @Test("a fold that fails at Stop keeps your mic: the take lands with the Mac side, a record names the mic, and the next launch folds it in")
+        func failedFoldAtStopKeepsTheMic() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let library = makeTempLibraryURL("second-track-fold-fails")
+                let model = makeModel(libraryURL: library)
+                let files = try meetingFiles(model)
+                try corrupt(files.mic)
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone."), (1, 2, "Thanks, glad to be here")])
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                let takeID = try #require(model.recording?.takeID)
+
+                model.stopRecordingAndTranscribe()
+
+                let notice = await waitForNotice(model)
+                #expect(notice?.message == AppModel.micTrackKeptMessage())
+                #expect(notice?.takeID == takeID, "the notice is about this take, and goes with it")
+                let entry = try #require(await landedEntry(model))
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                #expect(try channels(of: audio) == 1, "the Mac side is saved at once")
+                let recorded = await waitUntil { model.micTrackRecords[entry.id] != nil }
+                #expect(recorded)
+                let records = try micRecords(library)
+                #expect(records.count == 1)
+                #expect(records.first?.companionAudioURL == files.mic)
+                #expect(records.first?.entryID == entry.id)
+                #expect(exists(files.mic))
+                #expect(model.inflightFileInUse(files.mic))
+
+                model.recoveryOwner = nil
+                try await expectLaterFold(library: library, entry: entry.id, mic: files.mic)
+            }
+        }
+
+        @Test("while a take whose fold failed is transcribing, its checkpoint still names your mic")
+        func failedFoldRunCarriesTheMic() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let library = makeTempLibraryURL("second-track-fold-fails-run")
+                let model = makeModel(libraryURL: library)
+                let files = try meetingFiles(model)
+                try corrupt(files.mic)
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")], gate: gate)
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+
+                model.stopRecordingAndTranscribe()
+
+                let running = await waitUntil { model.takeRun != nil }
+                #expect(running)
+                await model.pendingRecoveryWrite?.value
+                let checkpoints = try checkpointsOnDisk(library)
+                #expect(checkpoints.count == 1)
+                #expect(checkpoints.first?.kind == .fileTranscription)
+                #expect(checkpoints.first?.companionAudioURL == files.mic, "a crash now still brings the mic back")
+                await gate.open()
+                let entry = try #require(await landedEntry(model))
+                let recorded = await waitUntil { model.micTrackRecords[entry.id] != nil }
+                #expect(recorded)
+            }
+        }
+
+        @Test("a fold that fails on Restore keeps your mic beside the restored take, and the next launch folds it in")
+        func failedFoldOnRestoreKeepsTheMic() async throws {
+            let library = makeTempLibraryURL("second-track-restore-fails")
+            let files = try crashedMeeting(in: library)
+            try corrupt(files.mic)
+            try age(files.mic, by: 300)
+            try writeLegacyCheckpoint(meetingCheckpoint(files), library: library)
+            let model = makeModel(libraryURL: library)
+
+            model.acceptPendingRecovery()
+
+            let notice = await waitForNotice(model)
+            #expect(notice?.message == AppModel.micTrackKeptMessage())
+            let entry = try #require(await landedEntry(model))
+            let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+            #expect(try channels(of: audio) == 1)
+            let recorded = await waitUntil { (try? micRecords(library).count) == 1 }
+            #expect(recorded)
+            #expect(try micRecords(library).first?.entryID == entry.id)
+            #expect(exists(files.mic))
+
+            model.recoveryOwner = nil
+            try await expectLaterFold(library: library, entry: entry.id, mic: files.mic)
+        }
+
+        @Test("a mix the sweep can't make brings the Mac side back and keeps your mic for it, never deleting the mic")
+        func failedFoldInTheSweepKeepsTheMic() async throws {
+            let library = makeTempLibraryURL("second-track-sweep-fails")
+            let files = try crashedMeeting(in: library, age: 3_600)
+            try corrupt(files.mic)
+            try age(files.mic, by: 3_600)
+            let model = makeModel(libraryURL: library)
+
+            await model.inflightSweep?.value
+
+            let entry = try #require(await landedEntry(model))
+            let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+            #expect(try channels(of: audio) == 1)
+            #expect(exists(files.mic), "the mic stays when the mix fails")
+            #expect(try micRecords(library).first?.entryID == entry.id)
+
+            model.recoveryOwner = nil
+            try await expectLaterFold(library: library, entry: entry.id, mic: files.mic)
+        }
+
+        @Test("a crashed meeting whose take already reached the library gets its mic folded into that entry, with no twin")
+        func micJoinsTheEntryAlreadySaved() async throws {
+            let library = makeTempLibraryURL("second-track-entry-holds")
+            let files = try crashedMeeting(in: library)
+            let seeded = try await LibraryStore(libraryURL: library, extraIndexer: nil).add(
+                transcript: AppModel.untranscribedTranscript(of: files.mac, language: nil), audioSource: files.mac,
+                category: .meeting, source: .systemAudio
+            )
+            try writeLegacyCheckpoint(meetingCheckpoint(files), library: library)
+            let model = makeModel(libraryURL: library)
+
+            model.declinePendingRecovery()
+
+            let folded = await waitUntil {
+                guard let audio = try? await model.library.load(seeded.id).document.audioURL else { return false }
+                return (try? channels(of: audio)) == 2
+            }
+            #expect(folded)
+            #expect(await model.library.list().count == 1)
+            let gone = await waitUntil { !exists(files.mic) && model.recoveryCheckpointFiles.isEmpty }
+            #expect(gone)
+        }
+
+        @Test("Retry folds a waiting mic in before it runs again, so your side is labelled Me")
+        func retryFoldsTheWaitingMic() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                try corrupt(files.mic)
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "the engine gave up")
+                ))
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                model.stopRecordingAndTranscribe()
+                let failed = await waitUntil { model.recording?.failure != nil && !model.hasPendingTakeWork }
+                #expect(failed)
+                let saved = try #require(await landedEntry(model))
+                #expect(model.micTrackRecords[saved.id] != nil)
+
+                try repairMic(files.mic)
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone"), (1, 2, "Thanks, glad to be here")])
+                await model.unloadTranscriptionSession()
+                model.retryFailedTake()
+
+                var speakers: [String?] = []
+                let labelled = await waitUntil {
+                    speakers = (try? await model.library.load(saved.id).document.transcript.segments.map(\.speaker)) ?? []
+                    return speakers.count == 2
+                }
+                #expect(labelled)
+                #expect(speakers == [nil, AppModel.meLabel()])
+                let audio = try #require(try await model.library.load(saved.id).document.audioURL)
+                #expect(try channels(of: audio) == 2)
+                #expect(model.micTrackRecords[saved.id] == nil)
+                #expect(!exists(files.mic))
+            }
+        }
+
+        @Test("the notice for a mic that waits reads in Italian")
+        func micTrackKeptReadsInItalian() throws {
+            let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+            let italian = try #require(Bundle(path: path))
+            #expect(AppModel.micTrackKeptMessage(bundle: italian)
+                == "La traccia del tuo microfono non è ancora stata aggiunta a questa registrazione. Parola la conserva e riprova alla prossima apertura.")
+        }
+
         // MARK: - The You meter
 
         @Test("a meeting take keeps your microphone's levels beside the Mac audio's, sample for sample")

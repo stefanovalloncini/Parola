@@ -56,7 +56,7 @@ struct ContentSheetsModifier: ViewModifier {
                 }
             } message: { checkpoint in
                 switch checkpoint.kind {
-                case .recording:
+                case .recording, .micTrack:
                     Text("Parola quit while recording. Restore opens what was captured; Not Now saves it to your library for later.")
                 case .fileTranscription where checkpoint.isTake:
                     Text("Parola quit while transcribing \(checkpoint.sourceName ?? "this recording"). Not Now saves the recording to your library without a transcript.")
@@ -85,7 +85,7 @@ struct ContentSheetsModifier: ViewModifier {
 
     private var recoveryTitle: String {
         switch model.pendingRecovery?.kind {
-        case .recording: String(localized: "Restore recovered recording?")
+        case .recording, .micTrack: String(localized: "Restore recovered recording?")
         case .fileTranscription: String(localized: "Transcribe \(model.pendingRecovery?.sourceName ?? "the file") again?")
         case nil: ""
         }

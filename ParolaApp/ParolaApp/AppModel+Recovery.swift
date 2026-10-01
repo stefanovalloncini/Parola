@@ -10,6 +10,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     enum Kind: String, Codable, Sendable {
         case fileTranscription
         case recording
+        /// A meeting's mic track that couldn't be folded in, waiting beside the entry its take was saved as.
+        case micTrack
     }
 
     /// Names the checkpoint's file; one written before the field gets a fresh id when it is read.
@@ -32,6 +34,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var companionAudioURL: URL?
     /// How far into `audioURL` the microphone track's first sample sits.
     var companionStartOffset: TimeInterval?
+    /// The entry a waiting mic track goes into.
+    var entryID: String?
 
     init(
         kind: Kind,
@@ -47,6 +51,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         owner: String? = nil,
         companionAudioURL: URL? = nil,
         companionStartOffset: TimeInterval? = nil,
+        entryID: String? = nil,
         id: UUID = UUID()
     ) {
         self.id = id
@@ -63,6 +68,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         self.source = source
         self.companionAudioURL = companionAudioURL
         self.companionStartOffset = companionStartOffset
+        self.entryID = entryID
     }
 
     init(from decoder: any Decoder) throws {
@@ -81,6 +87,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         owner = try c.decodeIfPresent(String.self, forKey: .owner)
         companionAudioURL = try c.decodeIfPresent(URL.self, forKey: .companionAudioURL)
         companionStartOffset = try c.decodeIfPresent(TimeInterval.self, forKey: .companionStartOffset)
+        entryID = try c.decodeIfPresent(String.self, forKey: .entryID)
     }
 
     /// A take by its title, a file by its name; a link by the video's title, or the link itself before the title was known.
@@ -100,9 +107,9 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         [sourceURL, audioURL, companionAudioURL].compactMap { $0?.isFileURL == true ? $0?.resolvingSymlinksInPath().path : nil }
     }
 
-    /// The take's own file: a recording's audio, or the file a take's transcription reads.
-    var takeFile: URL? {
-        kind == .recording ? audioURL : sourceURL
+    /// The microphone track it carries, and where that starts in the take.
+    var micTrack: StoppedMicTrack? {
+        companionAudioURL.map { StoppedMicTrack(file: $0, offset: companionStartOffset ?? 0) }
     }
 
     /// The same checkpoint once the microphone track is in the take's file, which may have moved to `file`.
@@ -149,12 +156,14 @@ extension AppModel {
         return checkpoints + [legacyRecoveryFileURL]
     }
 
+    /// A take whose mic track is still waiting to be folded in carries it, so a crash during the run keeps the pair.
     @discardableResult
     func beginFileTranscribeRecovery(
         sourceURL: URL, title: String? = nil, source: EntrySource = .file, category: EntryCategory? = nil
     ) -> Int {
         let generation = beginRecoveryGeneration()
         recordingRecoveryStartedAt = nil
+        let mic = pendingMicTracks[sourceURL]
         writeRecoveryFile(generation: generation, RecoveryCheckpoint(
             kind: .fileTranscription,
             startedAt: Date(),
@@ -162,7 +171,9 @@ extension AppModel {
             sourceURL: sourceURL,
             title: title,
             source: source,
-            category: category
+            category: category,
+            companionAudioURL: mic?.file,
+            companionStartOffset: mic?.offset
         ))
         return generation
     }
@@ -206,6 +217,23 @@ extension AppModel {
             companionAudioURL: liveCompanionAudioURL,
             companionStartOffset: liveCompanionAudioURL == nil ? nil : liveCompanionStartOffset
         ))
+    }
+
+    /// A mic track whose take is in the library now waits in a record of its own, which the next launch folds into that entry.
+    func keepMicTrack(_ mic: StoppedMicTrack, forEntry entryID: LibraryEntry.ID) async {
+        recoveryGeneration += 1
+        let generation = recoveryGeneration
+        recoveryFileIDs[generation] = UUID()
+        writeRecoveryFile(generation: generation, RecoveryCheckpoint(
+            kind: .micTrack,
+            startedAt: Date(),
+            modelName: "",
+            companionAudioURL: mic.file,
+            companionStartOffset: mic.offset,
+            entryID: entryID
+        ))
+        await pendingRecoveryWrite?.value
+        micTrackRecords[entryID] = MicTrackRecord(generation: generation, mic: mic)
     }
 
     /// Rewrites a live checkpoint from what it last said, and waits until the new one is on disk.
@@ -313,6 +341,7 @@ extension AppModel {
         let owners = recoveryOwnersDirectoryURL
         RecoveryOwner.removeDeadLocks(in: owners)
         var found: [RecoveryCheckpoint] = []
+        var waiting: [RecoveryCheckpoint] = []
         var live = Set<String>()
         for file in recoveryCheckpointFiles {
             guard let data = try? Data(contentsOf: file),
@@ -336,10 +365,15 @@ extension AppModel {
             var claimed = checkpoint
             claimed.owner = recoveryOwner?.id
             settleCheckpointFile(claimed, at: file)
-            found.append(claimed)
+            if claimed.kind == .micTrack {
+                waiting.append(claimed)
+            } else {
+                found.append(claimed)
+            }
         }
         found = collapsingShared(found)
-        recoveryReferencedFiles = live.union(found.flatMap(\.referencedPaths))
+        recoveryReferencedFiles = live.union((found + waiting).flatMap(\.referencedPaths))
+        foldWaitingMicTracks(waiting)
         guard let newest = found.max(by: { $0.startedAt < $1.startedAt }) else { return }
         for older in found where older.id != newest.id {
             keepRecoveredTake(older, releasingReferencesWhenSaved: true)
@@ -428,6 +462,9 @@ extension AppModel {
             if !checkpoint.segments.isEmpty { return true }
             guard let audioURL = checkpoint.audioURL else { return false }
             return FileManager.default.fileExists(atPath: audioURL.path)
+        case .micTrack:
+            guard checkpoint.entryID != nil, let mic = checkpoint.companionAudioURL else { return false }
+            return FileManager.default.fileExists(atPath: mic.path)
         }
     }
 
@@ -465,14 +502,17 @@ extension AppModel {
                 Task { [weak self] in
                     guard let self else { return }
                     if let entry = await self.entryHolding(url) {
+                        await self.keepMicTrack(of: checkpoint, forEntry: entry.id)
                         self.removeRecoveryFile(of: checkpoint)
                         await self.openRecoveredEntry(entry)
                         return
                     }
                     let adopted = self.adoptRecovery(checkpoint)
+                    let folded = await self.foldRecoveredMicTrack(checkpoint, audio: url, generation: adopted, notifies: true)
+                    if folded.stopped { return }
                     self.startTakeTask { [weak self] in
                         await self?.transcribeRecordedTake(
-                            url: url, title: title, source: checkpoint.source ?? .microphone,
+                            url: folded.audio, engineInput: folded.engineInput, title: title, source: checkpoint.source ?? .microphone,
                             category: checkpoint.category ?? .transcription, replacing: adopted
                         )
                     }
@@ -483,6 +523,8 @@ extension AppModel {
             }
         case .recording:
             restoreRecoveredRecording(checkpoint)
+        case .micTrack:
+            break
         }
     }
 
@@ -528,15 +570,21 @@ extension AppModel {
             }
             Task { [weak self] in
                 guard let self else { return }
-                guard await !self.libraryHolds(url) else { return alreadySaved() }
+                guard await !self.libraryHolds(url) else {
+                    if let entry = await self.entryHolding(url) { await self.keepMicTrack(of: checkpoint, forEntry: entry.id) }
+                    return alreadySaved()
+                }
+                let generation = self.adoptRecovery(checkpoint)
+                let folded = await self.foldRecoveredMicTrack(checkpoint, audio: url, generation: generation, notifies: false)
+                if folded.stopped { return }
                 self.saveTake(
-                    Self.untranscribedTranscript(of: url, language: checkpoint.language),
-                    audio: url,
+                    Self.untranscribedTranscript(of: folded.audio, language: checkpoint.language),
+                    audio: folded.audio,
                     title: Self.takeTitle(title, suffix: .notTranscribed),
                     source: checkpoint.source ?? .microphone,
                     category: checkpoint.category ?? .transcription,
                     landingAs: .salvagedTake,
-                    recovery: self.adoptRecovery(checkpoint),
+                    recovery: generation,
                     onSaved: release
                 )
             }
@@ -544,11 +592,14 @@ extension AppModel {
             Task { [weak self] in
                 let audioURL = await Self.probedRecordingURL(checkpoint.audioURL)
                 guard let self else { return }
-                if let audioURL, await self.libraryHolds(audioURL) { return alreadySaved() }
+                if let audioURL, await self.libraryHolds(audioURL) {
+                    if let entry = await self.entryHolding(audioURL) { await self.keepMicTrack(of: checkpoint, forEntry: entry.id) }
+                    return alreadySaved()
+                }
                 let generation = self.adoptRecovery(checkpoint)
                 var audio = audioURL
                 if let audioURL {
-                    let folded = await self.foldRecoveredMicTrack(checkpoint, audio: audioURL, generation: generation)
+                    let folded = await self.foldRecoveredMicTrack(checkpoint, audio: audioURL, generation: generation, notifies: false)
                     if folded.stopped { return }
                     audio = folded.audio
                 }
@@ -567,6 +618,8 @@ extension AppModel {
                     onSaved: release
                 )
             }
+        case .micTrack:
+            break
         }
     }
 
@@ -580,6 +633,7 @@ extension AppModel {
             let audioURL = await Self.probedRecordingURL(checkpoint.audioURL)
             guard let self else { return }
             if let audioURL, let entry = await self.entryHolding(audioURL) {
+                await self.keepMicTrack(of: checkpoint, forEntry: entry.id)
                 self.removeRecoveryFile(of: checkpoint)
                 await self.openRecoveredEntry(entry)
                 return
@@ -587,7 +641,7 @@ extension AppModel {
             let generation = self.adoptRecovery(checkpoint)
             var audio = audioURL
             if let audioURL {
-                let folded = await self.foldRecoveredMicTrack(checkpoint, audio: audioURL, generation: generation)
+                let folded = await self.foldRecoveredMicTrack(checkpoint, audio: audioURL, generation: generation, notifies: true)
                 if folded.stopped { return }
                 audio = folded.audio
             }
@@ -679,7 +733,8 @@ extension AppModel {
             liveCompanionAudioURL, pendingRecovery?.sourceURL, pendingRecovery?.audioURL, pendingRecovery?.companionAudioURL,
         ]
         if takeRun != nil { readers.append(recordedTake?.file) }
-        let files = readers.compactMap { $0 } + takeFilesBeingSaved.keys + meetingScratchInUse
+        let waitingMics = pendingMicTracks.values.map(\.file) + micTrackRecords.values.map(\.mic.file)
+        let files = readers.compactMap { $0 } + takeFilesBeingSaved.keys + meetingScratchInUse + waitingMics
         let paths = files.map { $0.resolvingSymlinksInPath().path }
         return recoveryReferencedFiles.union(paths)
     }
@@ -731,7 +786,8 @@ extension AppModel {
                 if self?.inflightFileInUse(file) == true { continue }
                 let bytes = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
                 let isTake = AppModel.isImportableTake(file, modified: modified[file] ?? .distantPast, takesSince: cutoff)
-                let mic = isTake ? AppModel.pairedMeetingMic(for: file, in: found) : nil
+                let paired = isTake ? AppModel.pairedMeetingMic(for: file, in: found) : nil
+                let mic = paired.flatMap { keep.contains($0.resolvingSymlinksInPath().path) ? nil : $0 }
                 let micBytes = (try? mic?.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
                 guard isTake, bytes > AppModel.emptyTakeBytes || micBytes > AppModel.emptyTakeBytes else {
                     if (try? FileManager.default.removeItem(at: file)) != nil { deleted += 1 }
@@ -746,12 +802,14 @@ extension AppModel {
                 }
                 let startedAt = (try? file.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
                 var mixed: URL?
+                var waitingMic: StoppedMicTrack?
                 if let mic, await !AppModel.isStereoFile(file) {
                     mixed = try? await AppModel.mixMeetingFiles(mac: file, mic: mic, micOffset: 0, in: dir, mono: nil)
+                    if mixed == nil { waitingMic = StoppedMicTrack(file: mic, offset: 0) }
                 }
                 do {
                     // Copied, not moved: the original goes only once the entry holds the audio.
-                    _ = try await library.add(
+                    let entry = try await library.add(
                         transcript: AppModel.untranscribedTranscript(of: mixed ?? file, language: nil),
                         audioSource: mixed ?? file,
                         category: .transcription,
@@ -761,8 +819,9 @@ extension AppModel {
                         source: AppModel.inflightTakeSource(file)
                     )
                     recovered += 1
+                    if let waitingMic { await self?.keepMicTrack(waitingMic, forEntry: entry.id) }
                     if self?.inflightFileInUse(file) != true { try? FileManager.default.removeItem(at: file) }
-                    if let mic, self?.inflightFileInUse(mic) != true { try? FileManager.default.removeItem(at: mic) }
+                    if let mic, waitingMic == nil, self?.inflightFileInUse(mic) != true { try? FileManager.default.removeItem(at: mic) }
                 } catch {
                     ParolaLog.error(.appRecovery, "an orphaned take could not be brought back", [.error: .error(error)])
                 }

@@ -1122,6 +1122,30 @@ public actor LibraryStore {
         try recacheEntry(at: bundleURL)
     }
 
+    /// Moves `file` into the entry in place of its audio, under the audio's own name; the rest of the entry stays as it was.
+    public func replaceAudio(of id: LibraryEntry.ID, with file: URL) async throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        let manifest = try makeEntry(bundleURL: bundleURL).manifest
+        guard let current = ParolaDocument.audioURL(in: bundleURL, manifest: manifest) else {
+            throw ParolaError.ioError("This entry has no audio to replace.")
+        }
+        cachedLoaded.remove(id)
+        let duration = try await offActorThrowingIO {
+            let staged = bundleURL.appendingPathComponent(".replacing-\(UUID().uuidString).\(current.pathExtension)")
+            defer { try? FileManager.default.removeItem(at: staged) }
+            try FileManager.default.moveItem(at: file, to: staged)
+            _ = try FileManager.default.replaceItemAt(current, withItemAt: staged)
+            return FileAudioSource(url: current).synchronousDuration()
+        }
+        if let duration, duration > 0 {
+            try ParolaDocument.updateManifest(at: bundleURL) { $0.durationSeconds = duration }
+        }
+        try recacheEntry(at: bundleURL)
+    }
+
     /// Records the length the entry's media actually measures, for a transcript that stored a wrong one.
     public func setDurationSeconds(_ seconds: Double, for id: LibraryEntry.ID) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
