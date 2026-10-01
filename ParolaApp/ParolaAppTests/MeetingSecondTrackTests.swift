@@ -18,6 +18,7 @@ private actor ScriptedTrack: LiveAudioSource {
     private(set) var pauseCalls: [Bool] = []
     private(set) var cancelled = false
     private(set) var prepared = false
+    private(set) var started = false
 
     init(
         file: URL, startFailure: (any Error)? = nil, prepareFailure: (any Error)? = nil, holdsStart: Bool = false,
@@ -31,6 +32,7 @@ private actor ScriptedTrack: LiveAudioSource {
     }
 
     func start() async throws {
+        started = true
         if holdsStart { await withCheckedContinuation { startGate = $0 } }
         if let startFailure { throw startFailure }
     }
@@ -345,6 +347,54 @@ extension TranscriberMockSuites {
                 let mono = try #require(await folded.reads.files.first)
                 #expect(mono.deletingLastPathComponent().lastPathComponent == "inflight", "in the working folder, where a sweep clears it")
                 #expect(mono.lastPathComponent.hasPrefix(RecordingScratch.meetingMixPrefix))
+            }
+        }
+
+        // MARK: - The permission prompt
+
+        @Test("a late Allow on the mic prompt, after the take has stopped, never switches the mic on")
+        func lateAllowLeavesTheMicOff() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                let prompt = Gate()
+                model.micAccessRequest = {
+                    await prompt.wait()
+                    return true
+                }
+                let mic = ScriptedTrack(file: files.mic)
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: mic)
+                let asked = await waitUntil { await prompt.reached }
+                #expect(asked)
+
+                model.stopRecordingAndTranscribe()
+                let entry = try #require(await landedEntry(model))
+                await prompt.open()
+                await settle()
+
+                #expect(await mic.started == false, "the Allow came after the take")
+                #expect(model.micTrack == nil)
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                #expect(try channels(of: audio) == 1)
+            }
+        }
+
+        @Test("a mic the user refuses leaves the take recording the Mac audio, and says so once")
+        func refusedPromptSaysSo() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                model.micAccessRequest = { false }
+                let mic = ScriptedTrack(file: files.mic)
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: mic)
+
+                let notice = await waitForNotice(model)
+                #expect(notice?.message == AppModel.micTrackMissingMessage())
+                #expect(model.takeMicTrackState == .unavailable)
+                #expect(await mic.started == false)
+                #expect(model.recording?.state == .recording)
+                model.cancelCurrentWork()
             }
         }
 

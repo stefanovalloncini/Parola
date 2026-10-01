@@ -75,7 +75,8 @@ extension AppModel {
             takeMicLevels = nil
             return
         }
-        if capture is MicAudioSource, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
+        let asks = micAccessRequest != nil || (capture is MicAudioSource && mode == .normal)
+        if asks, await requestMicAccess() == false {
             ParolaLog.notice(.appPermissions, "microphone access for a meeting's second track was denied")
             micTrackUnavailable(take.id)
             return
@@ -101,6 +102,11 @@ extension AppModel {
         liveCompanionStartOffset = nil
         if recording?.isPaused == true { queueCapturePause(true, on: capture) }
         writeRecordingCheckpoint()
+    }
+
+    private func requestMicAccess() async -> Bool {
+        if let micAccessRequest { return await micAccessRequest() }
+        return await AVCaptureDevice.requestAccess(for: .audio)
     }
 
     /// A test seam's capture, a fixture's, or the real microphone; a test host never opens the real one.

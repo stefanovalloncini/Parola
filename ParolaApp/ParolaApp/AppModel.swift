@@ -254,6 +254,8 @@ final class AppModel {
     @ObservationIgnored var micTrack: MicTrack?
     /// Test seam: when set, stands in for a meeting's microphone track; nil from it means this process has no microphone.
     @ObservationIgnored var micTrackCaptureOverride: (@MainActor () -> (any LiveAudioSource)?)?
+    /// Test seam: when set, answers the microphone permission prompt in its place, for any capture.
+    @ObservationIgnored var micAccessRequest: (@MainActor () async -> Bool)?
     /// The take that has already said its microphone isn't in the recording.
     @ObservationIgnored var micTrackNoticeTake: Int?
     /// Sampler ticks in which the Mac audio moved on and the microphone didn't, before its track counts as stopped.
