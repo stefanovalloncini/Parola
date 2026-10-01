@@ -37,6 +37,13 @@ struct QueueCountTests {
         #expect(QueueCount.label(for: three, locale: english) == "3 in queue")
     }
 
+    @Test("the Queue page's Resume reads in Italian")
+    func resumeIsLocalized() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        #expect(String(localized: String.LocalizationValue("Resume"), bundle: italian) == "Riprendi")
+    }
+
     @Test("matches the sidebar badge for the same jobs")
     func matchesBadge() {
         let jobs = [Self.makeJob("a", .pending), Self.makeJob("b", .transcribing), Self.makeJob("c", .done)]
