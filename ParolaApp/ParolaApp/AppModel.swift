@@ -4267,7 +4267,7 @@ final class AppModel {
         }
         // Hand off synchronously so a racing auto-stop or second click can't start a duplicate run.
         let take = activeTake
-        let mic = detachMicTrack(of: take?.id)
+        let mic = detachMicTrackAtStop(of: take?.id, macMeter: (source as? any LiveAudioSource)?.levelMeter)
         let unheard = takeIsUnheard
         liveSource = nil
         activeTake = nil
@@ -4283,6 +4283,7 @@ final class AppModel {
         startTakeTask { [weak self] in
             guard let self else { return }
             await mediaSession.exitRecording()
+            await recordMicStoppedAtStop(mic, recovery: recovery)
             let title = given.title(for: category)
             do {
                 let url = try await source.prepare()
@@ -4294,7 +4295,7 @@ final class AppModel {
                     return
                 }
                 let folded = await foldMicTrack(
-                    micFile, into: url, take: take, recovery: recovery, wantsEngineInput: engineNeedsMonoMix()
+                    micFile, into: url, take: take, recovery: recovery, wantsEngineInput: engineNeedsMonoMix(), trimsOverrun: true
                 )
                 if folded.stopped { return }
                 await transcribeRecordedTake(
@@ -5023,7 +5024,7 @@ final class AppModel {
         }
         guard let source = liveSource else { return }
         let take = activeTake
-        let mic = detachMicTrack(of: take?.id)
+        let mic = detachMicTrackAtStop(of: take?.id, macMeter: (source as? any LiveAudioSource)?.levelMeter)
         let unheard = takeIsUnheard
         liveSource = nil
         activeTake = nil
@@ -5037,6 +5038,7 @@ final class AppModel {
         let given = annotations(of: take?.id)
         let title = given.title(for: category)
         await mediaSession.exitRecording()
+        await recordMicStoppedAtStop(mic, recovery: recovery)
         var cutShort = false
         let prepared: URL?
         do {
@@ -5069,7 +5071,9 @@ final class AppModel {
             return
         }
         if cutShort { _ = try? await AppModel.offMainIO { WAVHeaderRepair.makeReadable(prepared) } }
-        let folded = await foldMicTrack(micFile, into: prepared, take: take, recovery: recovery, wantsEngineInput: false)
+        let folded = await foldMicTrack(
+            micFile, into: prepared, take: take, recovery: recovery, wantsEngineInput: false, trimsOverrun: !cutShort
+        )
         if folded.stopped { return }
         let url = folded.audio
         saveTake(

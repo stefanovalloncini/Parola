@@ -4,16 +4,18 @@ import Foundation
 /// Folds a meeting's two recordings into one take: the Mac's audio on the left, your microphone on the right,
 /// and a mono mix of both for an engine that hears one channel, the two averaged so loud overlapping speech never clips.
 public enum MeetingTakeMixer {
-    /// Two files that end within this fraction of each other ran on clocks that drifted, so the microphone is
-    /// stretched to end with the Mac audio; further apart, one side was cut short and the two are only lined up.
-    public static let driftTolerance = 0.001
+    /// A microphone that ends short of the Mac audio by less than this fraction ran on a slower clock, so it is
+    /// stretched to end with it; one shorter still stopped early, and one longer ran past, and both are only lined up.
+    public static let driftTolerance = 0.0002
 
     static let chunkFrames = 32_768
 
     /// `macStart` and `micStart` say when each file's first sample was captured, which lines the two up; a microphone
-    /// that stopped before the take did is never stretched. The stereo file is 16-bit; the mono mix is Float32.
+    /// that stopped before the take did is never stretched, and `trimsMicOverrun` drops what it heard after the Mac
+    /// audio ended, as at Stop. The stereo file is 16-bit; the mono mix is Float32.
     public static func mix(
-        mac: URL, mic: URL, macStart: Date, micStart: Date, into stereo: URL, mono: URL?, micStoppedEarly: Bool = false
+        mac: URL, mic: URL, macStart: Date, micStart: Date, into stereo: URL, mono: URL?, micStoppedEarly: Bool = false,
+        trimsMicOverrun: Bool = false
     ) throws {
         let macFile = try AVAudioFile(forReading: mac)
         let micFile = try AVAudioFile(forReading: mic)
@@ -24,7 +26,8 @@ public enum MeetingTakeMixer {
             micFrames: Int(micFile.length),
             micRate: micFile.processingFormat.sampleRate,
             offset: micStart.timeIntervalSince(macStart),
-            tolerance: micStoppedEarly ? 0 : driftTolerance
+            tolerance: micStoppedEarly ? 0 : driftTolerance,
+            trimsOverrun: trimsMicOverrun
         )
         var left = try MonoFileReader(file: macFile)
         var right = StretchedReader(source: try MonoFileReader(file: micFile), plan: plan)
@@ -84,7 +87,7 @@ struct MixPlan {
     let micFramesPerOutputFrame: Double
     let micFrames: Int
 
-    init(macFrames: Int, rate: Double, micFrames: Int, micRate: Double, offset: TimeInterval, tolerance: Double) {
+    init(macFrames: Int, rate: Double, micFrames: Int, micRate: Double, offset: TimeInterval, tolerance: Double, trimsOverrun: Bool) {
         self.micFrames = micFrames
         let natural = micRate / rate
         let start = max(0, offset * rate)
@@ -99,12 +102,13 @@ struct MixPlan {
         }
         let naturalEnd = start + usable / natural
         let span = Double(macFrames) - start
-        if span > 0, abs(naturalEnd - Double(macFrames)) / span < tolerance {
+        let shortfall = Double(macFrames) - naturalEnd
+        if span > 0, shortfall > 0, shortfall / span < tolerance {
             micFramesPerOutputFrame = usable / span
             outputFrames = macFrames
         } else {
             micFramesPerOutputFrame = natural
-            outputFrames = max(macFrames, Int(naturalEnd.rounded(.up)))
+            outputFrames = trimsOverrun ? macFrames : max(macFrames, Int(naturalEnd.rounded(.up)))
         }
     }
 }

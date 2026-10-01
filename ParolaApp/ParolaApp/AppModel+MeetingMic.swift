@@ -208,6 +208,26 @@ extension AppModel {
         return track
     }
 
+    /// How far the microphone's last reading may trail the Mac audio's at Stop before its track counts as stopped early.
+    nonisolated static let micTrackTrailLimit: Duration = .milliseconds(500)
+
+    /// Stop's detach: a microphone whose last reading trails the Mac audio's by more than the limit stopped before the take did.
+    func detachMicTrackAtStop(of takeID: Int?, macMeter: LevelMeter?) -> MicTrack? {
+        guard var track = detachMicTrack(of: takeID) else { return nil }
+        if !track.stoppedEarly, let mac = macMeter?.lastReadingAt, let mic = track.capture?.levelMeter.lastReadingAt,
+           mic.duration(to: mac) > Self.micTrackTrailLimit {
+            track.stoppedEarly = true
+            noteMicTrackStart(track)
+        }
+        return track
+    }
+
+    /// A mic Stop found trailing says so in its take's checkpoint too, so a crash before the fold lines it up the same way.
+    func recordMicStoppedAtStop(_ track: MicTrack?, recovery: Int?) async {
+        guard track?.stoppedEarly == true, let recovery else { return }
+        await rewriteRecoveryCheckpoint(recovery) { if $0.companionAudioURL != nil { $0.companionStopped = true } }
+    }
+
     /// Stops the microphone track and hands back what it recorded; a write that failed partway still keeps what landed.
     func finishMicTrack(_ track: MicTrack?) async -> StoppedMicTrack? {
         guard let track, let capture = track.capture else { return nil }
@@ -250,7 +270,7 @@ extension AppModel {
 
     /// Folds the microphone track into the take's own file, or leaves the take as it was when there is nothing to add.
     func foldMicTrack(
-        _ mic: StoppedMicTrack?, into mac: URL, take: TakeContext?, recovery: Int?, wantsEngineInput: Bool
+        _ mic: StoppedMicTrack?, into mac: URL, take: TakeContext?, recovery: Int?, wantsEngineInput: Bool, trimsOverrun: Bool = false
     ) async -> FoldedTake {
         guard let mic else { return FoldedTake(audio: mac) }
         forgetLiveCompanion(mic.file)
@@ -259,7 +279,7 @@ extension AppModel {
             releaseMicFile(mic.file)
             return FoldedTake(audio: mac)
         }
-        switch await foldIntoTakeFile(mic, take: mac, generation: recovery, wantsEngineInput: wantsEngineInput) {
+        switch await foldIntoTakeFile(mic, take: mac, generation: recovery, wantsEngineInput: wantsEngineInput, trimsOverrun: trimsOverrun) {
         case .folded(let audio, let engineInput):
             if liveRecordingAudioURL == mac { liveRecordingAudioURL = audio }
             updateSession(of: take?.id) { if $0.audioURL == mac { $0.audioURL = audio } }
@@ -437,7 +457,9 @@ extension AppModel {
     }
 
     /// Mix, rename over the take's own file, rewrite the checkpoint, then let the mic go: a crash after any step leaves one take file.
-    private func foldIntoTakeFile(_ mic: StoppedMicTrack, take mac: URL, generation: Int?, wantsEngineInput: Bool) async -> FoldResult {
+    private func foldIntoTakeFile(
+        _ mic: StoppedMicTrack, take mac: URL, generation: Int?, wantsEngineInput: Bool, trimsOverrun: Bool = false
+    ) async -> FoldResult {
         var audio = mac
         var engineInput: URL?
         if await !Self.isStereoFile(mac) {
@@ -458,7 +480,7 @@ extension AppModel {
                     let start = Date(timeIntervalSinceReferenceDate: 0)
                     try MeetingTakeMixer.mix(
                         mac: mac, mic: micFile, macStart: start, micStart: start.addingTimeInterval(offset), into: scratch, mono: mono,
-                        micStoppedEarly: stoppedEarly
+                        micStoppedEarly: stoppedEarly, trimsMicOverrun: trimsOverrun
                     )
                 }
             } catch {

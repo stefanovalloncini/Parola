@@ -511,7 +511,7 @@ extension TranscriberMockSuites {
                 let mic = folder.appendingPathComponent("\(RecordingScratch.meetingMicPrefix)-\(id).wav")
                 let rate = 16_000.0
                 try TestAudio.write(channels: [TestAudio.sine(seconds: 20, hz: 440, amplitude: 0.3, sampleRate: rate)], sampleRate: rate, to: mac)
-                var voice = [Float](repeating: 0, count: Int(19.99 * rate))
+                var voice = [Float](repeating: 0, count: Int(19.997 * rate))
                 for index in Int(10 * rate)..<Int(10 * rate) + 160 { voice[index] = 0.9 }
                 try TestAudio.write(channels: [voice], sampleRate: rate, to: mic)
                 let macTrack = ScriptedTrack(file: mac)
@@ -539,7 +539,76 @@ extension TranscriberMockSuites {
                 let sides = try TestAudio.read(audio)
                 let burst = sides.channels[1].firstIndex { $0 > 0.5 }
                 let onset = try #require(burst)
-                #expect(abs(Double(onset) / sides.sampleRate - 10) < 0.001, "lined up as recorded, not stretched by 20/19.99")
+                #expect(abs(Double(onset) / sides.sampleRate - 10) < 0.001, "lined up as recorded, not stretched by 20/19.997")
+            }
+        }
+
+        /// A 20 s meeting in the working folder whose mic is `micSeconds` long, with one burst of your voice at 10 s.
+        private func meetingWithBurst(in model: AppModel, micSeconds: Double) throws -> (mac: URL, mic: URL) {
+            let folder = model.inflightRecordingsURL
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let id = UUID().uuidString
+            let mac = folder.appendingPathComponent("parola-system-\(id).wav")
+            let mic = folder.appendingPathComponent("\(RecordingScratch.meetingMicPrefix)-\(id).wav")
+            let rate = 16_000.0
+            try TestAudio.write(channels: [TestAudio.sine(seconds: 20, hz: 440, amplitude: 0.3, sampleRate: rate)], sampleRate: rate, to: mac)
+            var voice = [Float](repeating: 0, count: Int(micSeconds * rate))
+            for index in Int(10 * rate)..<Int(10 * rate) + 160 { voice[index] = 0.9 }
+            try TestAudio.write(channels: [voice], sampleRate: rate, to: mic)
+            return (mac, mic)
+        }
+
+        /// When your side of the entry first hears the burst, and how long the entry's audio is.
+        private func burstAndLength(of entry: LibraryEntry, in model: AppModel) async throws -> (onset: Double, seconds: Double) {
+            let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+            let sides = try TestAudio.read(audio)
+            let burst = sides.channels[1].firstIndex { $0 > 0.5 }
+            let onset = try #require(burst)
+            return (Double(onset) / sides.sampleRate, Double(sides.frameCount) / sides.sampleRate)
+        }
+
+        @Test("a mic whose last reading trails the Mac audio's by more than half a second at Stop is lined up, not stretched")
+        func micTrailingAtStopIsNeverStretched() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let model = makeModel()
+                let files = try meetingWithBurst(in: model, micSeconds: 19.997)
+                let macTrack = ScriptedTrack(file: files.mac)
+                let micTrack = ScriptedTrack(file: files.mic)
+                try await startMeeting(model, mac: macTrack, mic: micTrack)
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                micTrack.levelMeter.record(0.3, capturedAt: macTrack.levelMeter.firstReadingAt)
+                for _ in 0..<16 {
+                    macTrack.levelMeter.record(0.3)
+                    try await Task.sleep(for: .milliseconds(50))
+                }
+                #expect(model.micTrack?.stoppedEarly == false, "too short a gap for the stall watch")
+
+                model.stopRecordingAndTranscribe()
+
+                let entry = try #require(await landedEntry(model))
+                let mixed = try await burstAndLength(of: entry, in: model)
+                #expect(abs(mixed.onset - 10) < 0.001, "lined up as recorded, not stretched by 20/19.997")
+            }
+        }
+
+        @Test("Stop ends the take with the Mac audio: what the mic heard after it is trimmed, and the rest isn't compressed")
+        func stopTrimsTheMicOverrun() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let model = makeModel()
+                let files = try meetingWithBurst(in: model, micSeconds: 20.2)
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+
+                model.stopRecordingAndTranscribe()
+
+                let entry = try #require(await landedEntry(model))
+                let mixed = try await burstAndLength(of: entry, in: model)
+                #expect(abs(mixed.onset - 10) < 0.001)
+                #expect(abs(mixed.seconds - 20) < 0.001, "as long as the Mac audio")
             }
         }
 
