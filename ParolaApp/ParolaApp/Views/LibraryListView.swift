@@ -339,9 +339,6 @@ private struct LibraryBrowseList: View, Equatable {
     @State private var pendingBulkDelete = false
     @State private var renamingEntry: LibraryEntry?
     @State private var renameDraft: String = ""
-    @State private var labelFilter: String?
-    @State private var languageFilter: String?
-    @State private var dateRangeFilter: LibraryDateRangeFilter = .all
     @State private var rowItems: [LibraryListItem] = []
     @State private var shownTotals = LibraryListContent.PageTotals()
     @State private var pageCount = 0
@@ -354,8 +351,19 @@ private struct LibraryBrowseList: View, Equatable {
 
     private var activeFilters: LibraryListContent.ActiveFilters {
         LibraryListContent.ActiveFilters(
-            label: labelFilter, language: languageFilter, dateRange: dateRangeFilter, person: model.personFilter
+            label: model.labelFilter, language: model.languageFilter, dateRange: model.dateRangeFilter, person: model.personFilter
         )
+    }
+
+    /// Filters outlive the list, so whatever page it opens on drops the ones it has no row for; the person is navigation's.
+    @discardableResult
+    private func keepFiltersThatMatch(in category: EntryCategory?) -> LibraryListContent.ActiveFilters {
+        var kept = LibraryListContent.filters(activeFilters, survivingIn: category, entries: model.libraryEntries)
+        kept.person = activeFilters.person
+        if model.labelFilter != kept.label { model.labelFilter = kept.label }
+        if model.languageFilter != kept.language { model.languageFilter = kept.language }
+        if model.dateRangeFilter != kept.dateRange { model.dateRangeFilter = kept.dateRange }
+        return kept
     }
 
     /// Narrows the category on screen; unlike a sidebar or bridge pick it never navigates.
@@ -437,16 +445,16 @@ private struct LibraryBrowseList: View, Equatable {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { recomputeEntries() }
+        .onAppear { recomputeEntries(with: keepFiltersThatMatch(in: category)) }
         // Later than onAppear's first fill, so the rows the route opens with don't animate in.
         .task { animatesRows = true }
         .onChange(of: model.libraryVersion) { _, _ in
             let newEntries = recomputeEntries()
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
-        .onChange(of: labelFilter) { _, _ in recomputeEntries() }
-        .onChange(of: languageFilter) { _, _ in recomputeEntries() }
-        .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
+        .onChange(of: model.labelFilter) { _, _ in recomputeEntries() }
+        .onChange(of: model.languageFilter) { _, _ in recomputeEntries() }
+        .onChange(of: model.dateRangeFilter) { _, _ in recomputeEntries() }
         .onChange(of: model.personFilter) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeEntries() }
@@ -454,17 +462,7 @@ private struct LibraryBrowseList: View, Equatable {
         // An empty library's first scan lands no entries, so only this says it has looked.
         .onChange(of: model.libraryLoaded) { _, _ in recomputeEntries() }
         .onChange(of: category) { _, newCategory in
-            // Navigation owns personFilter now; this only decides what to keep for label/language/date.
-            var kept = LibraryListContent.filters(
-                activeFilters,
-                survivingIn: newCategory,
-                entries: model.libraryEntries
-            )
-            kept.person = activeFilters.person
-            labelFilter = kept.label
-            languageFilter = kept.language
-            dateRangeFilter = kept.dateRange
-            let newEntries = recomputeEntries(with: kept)
+            let newEntries = recomputeEntries(with: keepFiltersThatMatch(in: newCategory))
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
         // Headers and row times are written when the groups are built, so midnight has to rewrite them.
@@ -497,7 +495,8 @@ private struct LibraryBrowseList: View, Equatable {
 
     /// The hero on an empty library says what the intake strip would, so the strip stands aside for it.
     private func pageTop(showsIntake: Bool) -> some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             LibraryPageHeader(
                 title: LibraryPageHeader.title(category: category, personName: selectedPerson?.name),
                 subtitle: LibraryPageHeader.subtitle(
@@ -509,9 +508,9 @@ private struct LibraryBrowseList: View, Equatable {
                 subtitleHelp: shownTotals.bytes > 0
                     ? String(localized: "Total size: \(AppFormat.byteSize(shownTotals.bytes))") : nil,
                 filters: LibraryFilterBar(
-                    labelFilter: $labelFilter,
-                    languageFilter: $languageFilter,
-                    dateRangeFilter: $dateRangeFilter,
+                    labelFilter: $model.labelFilter,
+                    languageFilter: $model.languageFilter,
+                    dateRangeFilter: $model.dateRangeFilter,
                     personFilter: personFilterBinding,
                     labelOptions: model.knownLabels(in: category),
                     languageOptions: model.knownLanguages(in: category),
@@ -566,9 +565,9 @@ private struct LibraryBrowseList: View, Equatable {
         ) {
             Button {
                 LibraryListContent.clearFilters(
-                    labelFilter: &labelFilter,
-                    languageFilter: &languageFilter,
-                    dateRangeFilter: &dateRangeFilter,
+                    labelFilter: &model.labelFilter,
+                    languageFilter: &model.languageFilter,
+                    dateRangeFilter: &model.dateRangeFilter,
                     personFilter: &model.personFilter
                 )
             } label: {

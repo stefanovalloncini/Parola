@@ -15,13 +15,14 @@ struct LibraryListLayoutTests {
         let window: NSWindow
     }
 
-    private func entry(_ index: Int, at date: Date) -> LibraryEntry {
+    private func entry(_ index: Int, at date: Date, labels: [String] = []) -> LibraryEntry {
         let manifest = ParolaDocument.Manifest(
             createdAt: date,
             originalAudioName: "take-\(index).m4a",
             title: "Take \(index)",
             modelName: "stub",
             language: "en",
+            labels: labels,
             durationSeconds: 60
         )
         let id = String(format: "%04d-layout", index)
@@ -273,6 +274,35 @@ struct LibraryListLayoutTests {
             HostedAccessibility.appKitElements(in: hosted.host).contains { $0.words.contains("Export (2)") }
         }
         #expect(bulk, "two rows picked bring Export into the header")
+    }
+
+    @Test("Labels, Language and the date come back as they were after a transcript opens and closes over the list")
+    func filtersOutliveATranscript() async throws {
+        let now = Date()
+        let shown = (0..<6).map { index in
+            entry(index, at: now.addingTimeInterval(-Double(index) * 3600), labels: index < 2 ? ["Work"] : [])
+        }
+        let hosted = await host(shown, groupsByDate: false)
+        defer { close(hosted) }
+        hosted.model.labelFilter = "Work"
+        hosted.model.dateRangeFilter = .month
+        #expect(await settled(hosted) { table(hosted)?.numberOfRows == 3 }, "the page top and the two Work rows")
+        let firstList = try #require(table(hosted))
+
+        hosted.model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "open")], language: "en", modelName: "stub"
+        )
+        hosted.model.phase = .ready
+        #expect(await settled(hosted) { ContentRoutes.routeID(for: hosted.model) == .phase })
+        await settle(for: .milliseconds(600))
+
+        hosted.model.transcript = nil
+        hosted.model.phase = .idle
+        let back = await settled(hosted) { table(hosted).map { $0 !== firstList && $0.numberOfRows > 0 } ?? false }
+        #expect(back, "the list was mounted again")
+        #expect(table(hosted)?.numberOfRows == 3, "rows: \(table(hosted)?.numberOfRows ?? -1)")
+        #expect(hosted.model.labelFilter == "Work")
+        #expect(hosted.model.dateRangeFilter == .month)
     }
 
     @Test("no row draws a rule under it: not the page's top, not a date title, not an entry")

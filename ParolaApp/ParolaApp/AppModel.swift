@@ -1602,6 +1602,10 @@ final class AppModel {
         return found
     }
     var libraryFilter: EntryCategory?
+    /// The Library page's Labels, Language and date choices, kept here so a transcript opened over the list leaves them as they were.
+    var labelFilter: String?
+    var languageFilter: String?
+    var dateRangeFilter: LibraryDateRangeFilter = .all
     /// Which list the open transcript was opened from; read it through `transcriptOrigin`, which pairs it with the entry.
     var libraryOrigin: LibraryOrigin?
     var libraryOriginEntryID: LibraryEntry.ID?
