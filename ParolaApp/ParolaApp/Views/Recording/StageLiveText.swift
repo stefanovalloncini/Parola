@@ -33,7 +33,6 @@ enum LiveParagraphs {
 struct StageLiveText: View {
     /// Off while the Stage is out of sight, so the caret stops blinking.
     let isOnScreen: Bool
-    var isLive = true
     @Environment(AppModel.self) private var model
 
     static let visibleLines = 4
@@ -48,7 +47,8 @@ struct StageLiveText: View {
             settled: Self.settledText(model.liveSegments),
             partial: model.livePartialText,
             quietLine: "Your transcript appears here as you speak",
-            isLive: isLive,
+            // The model's take, not the page's: a Stage on its way out keeps the take it was given, which is never over.
+            isLive: model.takeIsRunning,
             isOnScreen: isOnScreen
         )
     }
@@ -113,12 +113,12 @@ struct StageTeleprompter: View {
     let settled: String
     let partial: String
     let quietLine: LocalizedStringKey
-    /// While words may still come. After that the last ones stay, so a Stage leaving as its take lands never flashes the quiet line.
+    /// While more words can come; after that the last ones stay rather than the quiet line.
     var isLive = true
     let isOnScreen: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @State private var lastWords: Words?
+    @State private var drawn = DrawnWords()
 
     private static let fade: CGFloat = 40
 
@@ -134,10 +134,21 @@ struct StageTeleprompter: View {
         return isLive ? nil : last
     }
 
+    /// The words last drawn, noted as they are drawn: a copy kept by `onChange` can miss the newest when words come in faster than frames.
+    @MainActor
+    final class DrawnWords {
+        private(set) var last: Words?
+
+        func draw(_ words: Words?) -> Words? {
+            if let words { last = words }
+            return words
+        }
+    }
+
     var body: some View {
-        let now = Words(settled: settled, partial: partial)
+        let words = drawn.draw(Self.shown(Words(settled: settled, partial: partial), last: drawn.last, isLive: isLive))
         Group {
-            if let words = Self.shown(now, last: lastWords, isLive: isLive) {
+            if let words {
                 LiveTail(
                     settled: words.settled,
                     partial: words.partial,
@@ -157,9 +168,6 @@ struct StageTeleprompter: View {
             }
         }
         .padding(.horizontal, DS.Spacing.large)
-        .onChange(of: now, initial: true) { _, words in
-            if !words.isEmpty { lastWords = words }
-        }
     }
 
     @ViewBuilder

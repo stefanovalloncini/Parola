@@ -217,6 +217,32 @@ struct StageStateTests {
         #expect(!words.contains("Transcript appears here as it comes in"))
     }
 
+    @MainActor
+    @Test("a live take's words cleared in the turn that ends it stay on its Stage, not the quiet line")
+    func liveTakeKeepsItsWordsAsItEnds() async throws {
+        let model = makeRecordingModel("stage-live-last-words")
+        model.installTestTake(source: .microphone)
+        let shown = try #require(model.recording)
+        model.liveSegments = [TranscriptSegment(id: 0, start: 0, end: 1, text: "the last words of the live take")]
+        let hosted = HostedWindow(StageLiveText(isOnScreen: true).environment(model), width: 800, height: 200)
+        defer { hosted.close() }
+        await settle(for: .milliseconds(150))
+        let before = HostedAccessibility.words(in: hosted.host)
+        let showing = before.contains { $0.contains("the last words of the live take") }
+        #expect(showing)
+        #expect(shown.isStreaming, "a live take, whose Stage shows these words")
+
+        model.liveSegments = []
+        model.livePartialText = ""
+        model.endTestTake()
+        await settle(for: .milliseconds(150))
+
+        let after = HostedAccessibility.words(in: hosted.host)
+        let kept = after.contains { $0.contains("the last words of the live take") }
+        #expect(kept)
+        #expect(!after.contains("Your transcript appears here as you speak"))
+    }
+
     @Test("a covered window, one on another Space or a minimized one stops the Stage drawing; any part in view keeps it going")
     func coveredWindowStopsDrawing() {
         #expect(WindowShownReader.shows(isVisible: true, isMiniaturized: false, occlusion: .visible))
@@ -792,6 +818,46 @@ extension TranscriberMockSuites {
                 #expect(settled)
                 let afterSave = StageLanding.transcriptIsTheTake(model)
                 #expect(afterSave, "as its entry once the save lands")
+            }
+        }
+
+        @Test("a live take's Stage keeps the last words it drew as it lands, however fast its closing words came in")
+        func liveLandingKeepsTheLastWordsDrawn() async throws {
+            let lines = (1...11).map { "Line \($0) of the take." } + ["And the last words of all."]
+            let words = lines.joined(separator: " ").split(separator: " ").map(String.init)
+            // Rounds, because how many of the closing words one frame takes in varies from run to run.
+            for round in 0..<3 {
+                let audio = try makeTakeWAV("stage-live-burst-\(round)", seconds: 1)
+                defer { try? FileManager.default.removeItem(at: audio) }
+                try await withMocksCleared([.audioSource, .streaming]) {
+                    await MockAudioSourceRegistry.shared.clear()
+                    MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                        segments: lines.enumerated().map { index, text in
+                            TranscriptSegmentSeed(start: Double(index), end: Double(index) + 0.9, text: text)
+                        },
+                        partials: stride(from: 2, through: words.count, by: 2).map { words.prefix($0).joined(separator: " ") },
+                        delayMs: 600,
+                        recordedAudio: audio
+                    ))
+                    let model = makeModel("stage-live-burst-\(round)")
+                    model.useStreaming = true
+                    let hosted = HostedWindow(StageLiveText(isOnScreen: true).environment(model), width: 800, height: 220)
+                    defer { hosted.close() }
+                    model.startRecording(source: .microphone)
+                    let allIn = await waitUntil(timeoutMs: 30_000) { model.liveSegments.count == lines.count }
+                    #expect(allIn)
+                    await settle(for: .milliseconds(300))
+
+                    model.stopRecordingAndTranscribe()
+
+                    let landed = await waitUntil(timeoutMs: 10_000) { model.route == .transcript && model.recording?.isOver == true }
+                    #expect(landed)
+                    await settle(for: .milliseconds(150))
+                    let shown = HostedAccessibility.words(in: hosted.host)
+                    let kept = shown.contains { $0.contains("And the last words of all.") }
+                    #expect(kept, "round \(round)")
+                    _ = await landedEntry(model, timeoutMs: 10_000)
+                }
             }
         }
 

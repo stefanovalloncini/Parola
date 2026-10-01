@@ -105,7 +105,7 @@ struct StagePage: View {
                 .frame(maxHeight: .infinity, alignment: .top)
         default:
             if take.isStreaming {
-                StageLiveText(isOnScreen: isOnScreen, isLive: !take.isOver)
+                StageLiveText(isOnScreen: isOnScreen)
             } else {
                 LiveQuietLine(text: "Transcript appears when you stop")
             }
