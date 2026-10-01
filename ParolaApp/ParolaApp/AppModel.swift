@@ -444,6 +444,8 @@ final class AppModel {
     }
     /// The answer to a click the app refuses. Test mode clears it; a test stubs it to count them.
     @ObservationIgnored var refusalBeep: (@MainActor () -> Void)? = { NSSound.beep() }
+    /// Whether Parola is the app in front, which a count-in needs; a test model counts as such unless its test says otherwise.
+    @ObservationIgnored var appIsActive: @MainActor () -> Bool = { NSApp.isActive }
     var recordingCountInSeconds: Int = 0 { didSet { defaults.set(recordingCountInSeconds, forKey: "recordingCountInSeconds") } }
     var autoMuteWhileRecording: Bool = false { didSet { defaults.set(autoMuteWhileRecording, forKey: "autoMuteWhileRecording") } }
     var autoPauseMediaWhileRecording: Bool = false { didSet { defaults.set(autoPauseMediaWhileRecording, forKey: "autoPauseMediaWhileRecording") } }
@@ -2038,6 +2040,7 @@ final class AppModel {
         if bootstrap.mode == .test {
             self.completionSoundPlayer = nil
             self.refusalBeep = nil
+            self.appIsActive = { true }
         }
         // Suppress the settings didSets during the bulk read: side effects (notably startDictation)
         // must wait until after wireDictationController + the gated side-effect block below, or the
@@ -3225,9 +3228,8 @@ final class AppModel {
         }
         let diskCheck = startDiskSpaceCheck()
         let countIn = max(0, recordingCountInSeconds)
-        // The countdown overlay renders only in the main window; with no window visible
-        // (global hotkey, menu bar) it would delay the take invisibly and uncancellably.
-        let overlayVisible = mode == .test || NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
+        // The count-in shows only in a main window Parola has in front; anywhere else it would delay the take unseen.
+        let overlayVisible = appIsActive() && (mode == .test || NSApp.windows.contains { $0.isVisible && $0.canBecomeMain })
         if countIn > 0, overlayVisible {
             beginCountIn(seconds: countIn, source: source) { [weak self] showsStage in
                 self?.beginRecordingNow(source: source, diskCheck: diskCheck, showsStage: showsStage)

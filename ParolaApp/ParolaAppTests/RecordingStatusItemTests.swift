@@ -314,6 +314,27 @@ struct RecordingSurfaceTests {
         #expect(model.recording?.state == .recording)
         model.endTestTake()
     }
+
+    @Test("a count-in runs only with Parola in front; in the background the take starts at once")
+    func countInNeedsParolaInFront() throws {
+        let audio = try tempWAV("count-in-front")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("count-in-front")
+        model.useStreaming = false
+        model.takeCaptureOverride = { _ in StubSource(url: audio) }
+        model.recordingCountInSeconds = 3
+        defer { model.cancelCurrentWork() }
+
+        model.startRecording(source: .microphone)
+        #expect(model.recordingCountdown == 3)
+        model.cancelRecordingCountdown()
+        #expect(model.recording == nil)
+
+        model.appIsActive = { false }
+        model.startRecording(source: .microphone)
+        #expect(model.recordingCountdown == nil)
+        #expect(model.recording?.state == .arming(.startingCapture))
+    }
 }
 
 // Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
