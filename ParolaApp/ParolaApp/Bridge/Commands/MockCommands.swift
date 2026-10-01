@@ -149,6 +149,37 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "feedTakeLevels",
+                area: .test,
+                summary: "Plays a WAV fixture's loudness into the running take's level meter until the take lets it go. Test-mode only.",
+                kind: .async,
+                args: [
+                    .init(name: "fixturePath", kind: .string(), required: true, summary: "Absolute path to a WAV fixture"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    let url = URL(fileURLWithPath: try args.string("fixturePath"))
+                    guard FileManager.default.fileExists(atPath: url.path) else {
+                        throw AutomationError.invalidArgs(field: "fixturePath", reason: "file does not exist")
+                    }
+                    guard let meter = ctx.model.recordingLevelMeter else {
+                        throw AutomationError.precondition("no take is metering")
+                    }
+                    let fixture = FixtureAudioSource.make(fixtureURL: url, clock: ContinuousClock())
+                    try await fixture.start()
+                    let model = ctx.model
+                    Task { @MainActor [weak model] in
+                        while let model, model.recordingLevelMeter === meter {
+                            meter.record(fixture.levelMeter.takePeak())
+                            try? await Task.sleep(for: .milliseconds(50))
+                        }
+                        await fixture.cancel()
+                    }
+                    return .object(["feeding": .bool(true)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "clearMocks",
                 area: .test,
                 summary: "Clears installed mocks. Test-mode only.",
