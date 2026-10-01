@@ -2,6 +2,37 @@ import AppKit
 import SwiftUI
 import ParolaCore
 
+/// The one look the Stage wears for each state of a take's session.
+enum StageMode: Equatable {
+    case countIn(Int)
+    case preparing(String, Double?)
+    case starting
+    case live
+    case paused
+    case finishing
+    case transcribing(Double?)
+    case landing
+    case failed(String)
+
+    static func `for`(_ state: RecordingSession.State, isStreaming: Bool) -> StageMode {
+        switch state {
+        case .arming(.countIn(let remaining)): .countIn(remaining)
+        case .arming(.preparingModel(let name, let download)): .preparing(name, download)
+        case .arming(.startingCapture): .starting
+        case .recording: .live
+        case .paused: .paused
+        case .finishing: .finishing
+        case .transcribing(let progress): .transcribing(progress)
+        case .done: .landing
+        case .failed(let message): .failed(message)
+        }
+    }
+}
+
+extension RecordingSession {
+    var mode: StageMode { StageMode.for(state, isStreaming: isStreaming) }
+}
+
 /// The window while a take runs: a recorder built to be filmed.
 struct StagePage: View {
     let take: RecordingSession
