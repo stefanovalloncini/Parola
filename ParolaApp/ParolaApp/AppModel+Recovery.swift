@@ -856,7 +856,7 @@ extension AppModel {
                 }
                 do {
                     // Copied, not moved: the original goes only once the entry holds the audio.
-                    let category: EntryCategory = paired == nil ? .transcription : .meeting
+                    let category: EntryCategory = paired != nil || AppModel.inflightTakeSource(file) == .systemAudio ? .meeting : .transcription
                     let entry = try await library.add(
                         transcript: AppModel.untranscribedTranscript(of: mixed ?? file, language: nil),
                         audioSource: mixed ?? file,

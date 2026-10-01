@@ -3,6 +3,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 // Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind them first.
 @MainActor
@@ -249,6 +250,41 @@ extension TranscriberMockSuites {
                 #expect(model.takeMicTrackState == nil)
                 #expect(model.takeMicLevels == nil)
             }
+        }
+    }
+
+    @MainActor
+    @Suite("Orphaned take categories", .serialized)
+    struct OrphanedTakeCategoryTests {
+        @Test("the sweep brings back a crashed Mac-audio take as a meeting, with no microphone beside it, and a microphone take as a note")
+        func sweepFilesByTheTakeSource() async throws {
+            let library = makeTempLibraryURL("orphan-categories")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let recovery = library.appendingPathComponent("recovery", isDirectory: true)
+            try FileManager.default.createDirectory(at: recovery, withIntermediateDirectories: true)
+            try ISO8601DateFormatter().string(from: Date().addingTimeInterval(-86_400))
+                .write(to: recovery.appendingPathComponent("take-import-cutoff"), atomically: true, encoding: .utf8)
+            let mac = try makeTakeWAV("orphan-mac", seconds: 1, in: inflight, prefix: "parola-system")
+            let mic = try makeTakeWAV("orphan-mic", seconds: 1.1, in: inflight, prefix: "parola-mic")
+            for file in [mac, mic] {
+                try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-3_600)], ofItemAtPath: file.path)
+            }
+
+            let relaunched = AppModel(bootstrap: AppBootstrap(
+                mode: .test, library: library, defaultsOverride: temporaryDefaults(), sideEffects: [], filePicker: TestFilePicker()
+            ))
+            await relaunched.inflightSweep?.value
+
+            let listed = await relaunched.library.list()
+            let macEntry = listed.first { $0.manifest.source == .systemAudio }
+            let micEntry = listed.first { $0.manifest.source == .microphone }
+            let meeting = try #require(macEntry)
+            let note = try #require(micEntry)
+            #expect(meeting.category == .meeting)
+            #expect(meeting.title.hasPrefix("Meeting "))
+            #expect(note.category == .transcription)
+            #expect(note.title.hasPrefix("Recording "))
         }
     }
 
