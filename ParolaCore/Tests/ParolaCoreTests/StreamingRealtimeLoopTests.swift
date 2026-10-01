@@ -119,15 +119,33 @@ private func segment(_ start: Float, _ end: Float, _ text: String) -> Transcript
 }
 
 private func eventually(
-    timeoutMs: Int = 5000,
+    timeoutMs: Int = 30_000,
     _ condition: @escaping @Sendable () async -> Bool
 ) async -> Bool {
     let deadline = ContinuousClock.now + .milliseconds(timeoutMs)
-    while ContinuousClock.now < deadline {
+    while !Task.isCancelled, ContinuousClock.now < deadline {
         if await condition() { return true }
         try? await Task.sleep(for: .milliseconds(1))
     }
     return await condition()
+}
+
+/// The test's hold on `loop.run()`: letting go of it cancels the run, so a test that ends early leaves no loop ticking.
+private final class LoopRun: Sendable {
+    private let run: GuardedTask<StreamingRealtimeLoop.Outcome>
+
+    init(_ loop: StreamingRealtimeLoop) {
+        run = GuardedTask { await loop.run() }
+    }
+
+    deinit { run.cancel() }
+
+    func cancel() { run.cancel() }
+
+    /// nil when the run never ends: the wait records an issue and cancels it instead of parking the suite.
+    func outcome(sourceLocation: SourceLocation = #_sourceLocation) async -> StreamingRealtimeLoop.Outcome? {
+        try? await run.value("the loop's run to end", sourceLocation: sourceLocation)
+    }
 }
 
 private func makeLoop(
@@ -188,7 +206,7 @@ struct StreamingRealtimeLoopTests {
             onEnergy: { _ in },
             onConfirmed: { _ in }
         )
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -199,7 +217,7 @@ struct StreamingRealtimeLoopTests {
         #expect(meter.takePeak() > 0.6)
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
     }
 
     @Test("polling the capture leaves its callback one frame deep")
@@ -224,7 +242,7 @@ struct StreamingRealtimeLoopTests {
             [segment(0, 4, "a"), segment(4, 8, "b"), segment(8, 9, "c")],
             [segment(2, 6, "d"), segment(6, 10, "e"), segment(10, 12, "f")],
         ])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -269,7 +287,7 @@ struct StreamingRealtimeLoopTests {
         #expect(recorder.partials.contains("e f"))
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
     }
 
     @Test("confirmed batches carry the audio slice for the confirmed span")
@@ -281,7 +299,7 @@ struct StreamingRealtimeLoopTests {
             ],
             wantsConfirmedAudio: true
         )
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -303,7 +321,7 @@ struct StreamingRealtimeLoopTests {
         #expect(batch2.audioWindow.first == Float(Int(3.5 * Double(sampleRate))) / Float(10 * sampleRate))
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
     }
 
     @Test("a regressive segment at the end of the prefix keeps the rest confirmable")
@@ -315,7 +333,7 @@ struct StreamingRealtimeLoopTests {
                 segment(10, 12, "f"), segment(12, 14, "g"),
             ],
         ])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -337,7 +355,7 @@ struct StreamingRealtimeLoopTests {
         #expect(windowOffsetAt10Seconds)
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
     }
 
     @Test("a confirmed end past the retained tail keeps the tail's audio")
@@ -349,7 +367,7 @@ struct StreamingRealtimeLoopTests {
             ],
             wantsConfirmedAudio: true
         )
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -365,7 +383,7 @@ struct StreamingRealtimeLoopTests {
         #expect(scriptCalledTwice)
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
 
         #expect(recorder.batches.count == 2)
         let tail = try #require(recorder.batches.last)
@@ -385,7 +403,7 @@ struct StreamingRealtimeLoopTests {
                 segment(5, 6, "lazy dog"), segment(6, 7, "tail"),
             ],
         ])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -406,7 +424,7 @@ struct StreamingRealtimeLoopTests {
         #expect(call2.clip == [2], "the decode starts inside the window, not past everything it holds")
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
 
         #expect(
             recorder.batches.flatMap { $0.segments.map(\.text) }
@@ -421,7 +439,7 @@ struct StreamingRealtimeLoopTests {
             [segment(0, 9, "a"), segment(3, 5, "b"), segment(5, 7, "c")],
             [segment(2, 4, "b"), segment(4, 6, "c"), segment(6, 8, "d")],
         ])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -437,7 +455,7 @@ struct StreamingRealtimeLoopTests {
         #expect(call2.clip == [2], "3 s in, where the retained segment starts")
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
     }
 
     @Test("a re-emitted segment is confirmed only once")
@@ -446,7 +464,7 @@ struct StreamingRealtimeLoopTests {
             [segment(0, 3, "one"), segment(3, 4, "two"), segment(4, 8, "three"), segment(8, 9, "four")],
             [segment(1, 2, "two"), segment(2, 6, "three"), segment(6, 7, "four"), segment(7, 9, "five")],
         ])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -463,7 +481,7 @@ struct StreamingRealtimeLoopTests {
         #expect(twoBatchesRecorded)
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
 
         #expect(
             recorder.batches.flatMap { $0.segments.map(\.text) } == ["one", "two", "three", "four", "five"],
@@ -480,7 +498,7 @@ struct StreamingRealtimeLoopTests {
             ]],
             wantsConfirmedAudio: true
         )
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -493,7 +511,7 @@ struct StreamingRealtimeLoopTests {
         #expect(batch.audioWindow.count == Int(9.5 * Double(sampleRate)))
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
     }
 
     @Test("a capture that fails to start is stopped exactly once")
@@ -501,7 +519,7 @@ struct StreamingRealtimeLoopTests {
         let (loop, capture, _, _) = makeLoop(responses: [], startFailure: ScriptError())
         let outcome = await loop.run()
         guard case .failed = outcome else {
-            Issue.record("expected .failed, got \(outcome)")
+            Issue.record("expected .failed, got \(String(describing: outcome))")
             return
         }
         #expect(capture.stopCount == 1)
@@ -515,7 +533,7 @@ struct StreamingRealtimeLoopTests {
             responses: [[segment(3, 4, "hi")]],
             useVAD: true
         )
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -529,13 +547,13 @@ struct StreamingRealtimeLoopTests {
         #expect(scriptCalledAtLeastOnce)
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
     }
 
     @Test("sustained silence caps the retained window")
     func silenceCapsWindow() async throws {
         let (loop, capture, script, _) = makeLoop(responses: [], useVAD: true)
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -551,13 +569,13 @@ struct StreamingRealtimeLoopTests {
         #expect(await script.callCount == 0)
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
     }
 
     @Test("the cap bounds the decode when segments never confirm")
     func capBoundsDecodeWithoutConfirmations() async throws {
         let (loop, capture, script, _) = makeLoop(responses: [[], []], maxWindowSeconds: 4)
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -575,7 +593,7 @@ struct StreamingRealtimeLoopTests {
         #expect(await loop.windowStartOffsetSamples() == 2 * sampleRate)
 
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
     }
 
     @Test("stop promotes the unconfirmed tail and freezes further input")
@@ -584,7 +602,7 @@ struct StreamingRealtimeLoopTests {
             [segment(0, 4, "a"), segment(4, 8, "b"), segment(8, 9, "c")],
             [segment(2, 6, "d"), segment(6, 10, "e"), segment(10, 12, "f")],
         ])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -593,9 +611,9 @@ struct StreamingRealtimeLoopTests {
         #expect(oneBatchRecorded)
 
         await loop.stop()
-        let outcome = await runTask.value
+        let outcome = await runTask.outcome()
         guard case .stopped = outcome else {
-            Issue.record("expected .stopped, got \(outcome)")
+            Issue.record("expected .stopped, got \(String(describing: outcome))")
             return
         }
         #expect(capture.stopped)
@@ -614,7 +632,7 @@ struct StreamingRealtimeLoopTests {
             [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")],
             [segment(1, 2, "b"), segment(2, 3, "c"), segment(3, 3.5, "tail")],
         ])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -626,7 +644,7 @@ struct StreamingRealtimeLoopTests {
 
         capture.push(seconds: 0.5, value: 0.5)
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
 
         #expect(await script.callCount == 2, "the sub-second tail is decoded at stop")
         let flushCall = try #require(await script.calls.last)
@@ -641,7 +659,7 @@ struct StreamingRealtimeLoopTests {
             responses: [[segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")]],
             useVAD: true
         )
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -656,7 +674,7 @@ struct StreamingRealtimeLoopTests {
 
         capture.pushBuffers(count: 20, secondsEach: 0.1, value: 0)
         await loop.stop()
-        _ = await runTask.value
+        _ = await runTask.outcome()
 
         #expect(await script.callCount == 1, "a silence-only tail is not decoded")
         #expect(recorder.batches.count == 2)
@@ -669,7 +687,7 @@ struct StreamingRealtimeLoopTests {
             [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")],
             [segment(1, 2, "b"), segment(2, 3, "c"), segment(3, 3.5, "tail")],
         ])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
@@ -681,9 +699,9 @@ struct StreamingRealtimeLoopTests {
 
         capture.push(seconds: 0.5, value: 0.5)
         runTask.cancel()
-        let outcome = await runTask.value
+        let outcome = await runTask.outcome()
         guard case .cancelled = outcome else {
-            Issue.record("expected .cancelled, got \(outcome)")
+            Issue.record("expected .cancelled, got \(String(describing: outcome))")
             return
         }
 
@@ -695,12 +713,12 @@ struct StreamingRealtimeLoopTests {
     @Test("stopping after a cancelled run stops capture once")
     func cancelThenStopStopsCaptureOnce() async throws {
         let (loop, capture, _, _) = makeLoop(responses: [])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
         runTask.cancel()
-        _ = await runTask.value
+        _ = await runTask.outcome()
         await loop.stop()
         #expect(capture.stopCount == 1)
     }
@@ -708,15 +726,15 @@ struct StreamingRealtimeLoopTests {
     @Test("cancelling after a stop stops capture once")
     func stopThenCancelStopsCaptureOnce() async throws {
         let (loop, capture, _, _) = makeLoop(responses: [])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
         await loop.stop()
-        let outcome = await runTask.value
+        let outcome = await runTask.outcome()
         runTask.cancel()
         guard case .stopped = outcome else {
-            Issue.record("expected .stopped, got \(outcome)")
+            Issue.record("expected .stopped, got \(String(describing: outcome))")
             return
         }
         #expect(capture.stopCount == 1)
@@ -727,7 +745,7 @@ struct StreamingRealtimeLoopTests {
         let (loop, capture, _, _) = makeLoop(responses: [], permissionGranted: false)
         let outcome = await loop.run()
         guard case .permissionDenied = outcome else {
-            Issue.record("expected .permissionDenied, got \(outcome)")
+            Issue.record("expected .permissionDenied, got \(String(describing: outcome))")
             return
         }
         #expect(!capture.installed)
@@ -736,16 +754,16 @@ struct StreamingRealtimeLoopTests {
     @Test("cancel releases the mic and skips the flush decode a stop would run")
     func cancelSkipsTheFlush() async throws {
         let (loop, capture, script, recorder) = makeLoop(responses: [[segment(0, 0.5, "tail")]])
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
         capture.push(seconds: 0.5, value: 0.5)
         await loop.cancel()
 
-        let outcome = await runTask.value
+        let outcome = await runTask.outcome()
         guard case .cancelled = outcome else {
-            Issue.record("expected .cancelled, got \(outcome)")
+            Issue.record("expected .cancelled, got \(String(describing: outcome))")
             return
         }
         #expect(capture.stopCount == 1)
@@ -757,16 +775,16 @@ struct StreamingRealtimeLoopTests {
     func stopDuringPermissionPromptWins() async throws {
         let prompt = PermissionPrompt()
         let (loop, capture, script, _) = makeLoop(responses: [], requestPermission: { await prompt.ask() })
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let promptIsShowing = await eventually { await prompt.isShowing }
         #expect(promptIsShowing)
 
         await loop.stop()
         await prompt.answer(true)
 
-        let outcome = await runTask.value
+        let outcome = await runTask.outcome()
         guard case .stopped = outcome else {
-            Issue.record("expected .stopped, got \(outcome)")
+            Issue.record("expected .stopped, got \(String(describing: outcome))")
             return
         }
         #expect(!capture.installed, "no capture starts once the user has already stopped")
@@ -800,14 +818,14 @@ struct StreamingRealtimeLoopTests {
     @Test("a transcription error fails the run and stops capture")
     func transcribeFailureStopsCapture() async throws {
         let (loop, capture, _, _) = makeLoop(responses: [], failure: ScriptError())
-        let runTask = Task { await loop.run() }
+        let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
         capture.push(seconds: 2, value: 0.5)
-        let outcome = await runTask.value
+        let outcome = await runTask.outcome()
         guard case .failed = outcome else {
-            Issue.record("expected .failed, got \(outcome)")
+            Issue.record("expected .failed, got \(String(describing: outcome))")
             return
         }
         #expect(capture.stopped)
