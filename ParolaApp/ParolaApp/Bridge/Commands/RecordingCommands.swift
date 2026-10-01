@@ -19,7 +19,7 @@ extension ParolaAutomationServer {
                     ),
                     .init(
                         name: "category",
-                        kind: .string(),
+                        kind: .string(enum: EntryCategory.allCases.map(\.rawValue)),
                         required: false,
                         summary: "EntryCategory rawValue for the resulting library entry; without one, systemAudio files as meeting, microphone as transcription"
                     ),

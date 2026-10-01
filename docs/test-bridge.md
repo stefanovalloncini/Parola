@@ -61,7 +61,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_set_library_filter` | category | `transcription` / `meeting` / `dictation`, or `all` or empty for the whole Library page. Clears any search and unloads the transcript, like clicking the row. |
 | `parola_app_transcribe_youtube` | **url** | Paste a YouTube URL and start the download-then-transcribe flow. Replies `{started, parked}`: a link handed over during a recording or another run comes back `parked: true` and waits for that work to finish. |
 | `parola_app_fetch_youtube_subs` | **url** | Same input, but fetch existing captions instead of running Whisper. Replies `{started, parked}` on the same terms. |
-| `parola_app_start_recording` | source, category | Start mic (default) or systemAudio. Category tags the saved entry; without one, a systemAudio take files as a meeting. |
+| `parola_app_start_recording` | source, category | Start mic (default) or systemAudio. Category (`transcription`, `meeting` or `dictation`) tags the saved entry; without one, a systemAudio take files as a meeting. |
 | `parola_app_stop_recording` | — | Stop the active recording and finalize the transcript. |
 | `pauseRecording` | — | Test mode: pause the take that is recording, the way the Stage's Pause does. Replies `{paused, recording}`; `paused` is false when no take is recording. |
 | `resumeRecording` | — | Test mode: resume a paused take. Replies `{resumed, recording}`. |

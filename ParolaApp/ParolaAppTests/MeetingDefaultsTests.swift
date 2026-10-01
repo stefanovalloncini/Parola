@@ -772,6 +772,33 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("the bridge's startRecording takes only a real category, and refuses a word like note before any take starts")
+        func bridgeRefusesAnUnknownCategory() async throws {
+            let model = makeRecordingModel("meeting-default-bridge-enum")
+            let server = try ParolaAutomationServer(model: model)
+            let commands = Dictionary(uniqueKeysWithValues: server.recordingCommands().map { ($0.name, $0) })
+            let command = try #require(commands["startRecording"])
+            for category in ["transcription", "meeting", "dictation"] {
+                do {
+                    _ = try command.validate(AutomationArgs(["source": .string("systemAudio"), "category": .string(category)]))
+                } catch {
+                    Issue.record("\(category) should be accepted: \(error)")
+                }
+            }
+            for category in ["note", "Meeting", ""] {
+                do {
+                    _ = try command.validate(AutomationArgs(["category": .string(category)]))
+                    Issue.record("\(category) should be refused")
+                } catch AutomationError.invalidArgs(let field, _) {
+                    #expect(field == "category")
+                } catch {
+                    Issue.record("\(category) failed with \(error)")
+                }
+            }
+            #expect(model.recording == nil)
+            withExtendedLifetime(server) {}
+        }
+
         @Test("a meeting stays unwarned while your microphone hears you and the Mac is quiet, and warns once both go quiet")
         func meetingSilenceCountsBothSides() async throws {
             try await withMocksCleared(.audioSource) {
