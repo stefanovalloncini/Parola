@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 final class TakeLevelHistory {
-    static let samplesPerSecond: Double = 10
+    nonisolated static let samplesPerSecond: Double = 10
 
     private(set) var overview: [Float] = []
     private(set) var secondsPerOverviewSample: Double
@@ -17,7 +17,9 @@ final class TakeLevelHistory {
     private var recentHead = 0
     private var recentFilled = 0
 
-    init(recentSeconds: Double = 30, overviewCapacity: Int = 36_000) {
+    var recentCapacity: Int { recentStorage.count }
+
+    init(recentSeconds: Double = 48, overviewCapacity: Int = 36_000) {
         self.overviewCapacity = max(2, overviewCapacity)
         self.secondsPerOverviewSample = 1 / Self.samplesPerSecond
         self.recentStorage = Array(repeating: 0, count: max(1, Int(recentSeconds * Self.samplesPerSecond)))

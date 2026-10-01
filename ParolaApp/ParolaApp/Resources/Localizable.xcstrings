@@ -6886,6 +6886,17 @@
         }
       }
     },
+    "Input level": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Livello in ingresso"
+          }
+        }
+      }
+    },
     "Input level from the selected device, so you can check it before recording.": {
       "extractionState": "manual",
       "localizations": {
@@ -10338,6 +10349,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pausa quando l'app è nascosta"
+          }
+        }
+      }
+    },
+    "Paused": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa"
           }
         }
       }
