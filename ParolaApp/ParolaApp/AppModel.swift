@@ -4100,6 +4100,7 @@ final class AppModel {
         let hasContent = !processed.segments.isEmpty || processed.sourceURL != nil
         // Cancelled, or followed by another take, while those ran: it goes to the library without touching the screen.
         if let take, !takeIsCurrent(take) {
+            liveTakesFinishingAlone.removeValue(forKey: take.id)
             if hasContent {
                 let title = given.title(for: takeCategory)
                 saveTake(

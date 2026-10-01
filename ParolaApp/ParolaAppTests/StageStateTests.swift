@@ -31,6 +31,55 @@ private actor HeldCutShortCapture: LiveAudioSource {
     func cancel() async {}
 }
 
+/// A gate the test opens once.
+private actor LandingGate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func open() {
+        isOpen = true
+        for waiter in waiters { waiter.resume() }
+        waiters = []
+    }
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+}
+
+/// A live session whose last check holds the landing until the test lets it go, so a Cancel can arrive mid-landing.
+private actor HeldLandingSession: StreamingTranscriber {
+    nonisolated let levelMeter = LevelMeter()
+    private(set) var entered = false
+    private var released = false
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    func start(
+        options: TranscriptionOptions,
+        speakerLabeler: (any StreamingSpeakerLabeler)?,
+        downloadProgress: (@Sendable (Double) -> Void)?
+    ) async throws -> AsyncStream<StreamingEvent> {
+        AsyncStream { $0.finish() }
+    }
+
+    func stop() async {}
+    func cancel() async {}
+    func currentModel() async -> String? { nil }
+
+    func audioWasCutShort() async -> Bool {
+        entered = true
+        if !released { await withCheckedContinuation { waiter = $0 } }
+        return false
+    }
+
+    func release() {
+        released = true
+        waiter?.resume()
+        waiter = nil
+    }
+}
+
 @Suite("Stage states")
 struct StageStateTests {
     @Test("each session state has one Stage look")
@@ -807,6 +856,55 @@ extension TranscriberMockSuites {
             let samePage = before.first.map { page in after.first === page } ?? false
             #expect(samePage, "the take keeps its count-in's Stage, so its entrance doesn't play twice")
             model.cancelCurrentWork()
+        }
+
+        @Test("a Cancel while a take's own words are landing leaves it landing, its checkpoint held until the save")
+        func cancelDuringTheLanding() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["the", "the live"], delayMs: 200))
+                let model = makeModel("stage-cancel-landing")
+                model.useStreaming = true
+                model.startRecording(source: .microphone)
+                let recording = await waitUntil(timeoutMs: 30_000) { model.recording?.state == .recording }
+                #expect(recording)
+                let take = try #require(model.activeTake)
+                let recovery = try #require(take.recovery)
+                let real = model.streamingConsumer
+                real?.cancel()
+                await real?.value
+                let deliver = LandingGate()
+                let session = HeldLandingSession()
+                let words = Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the live words")], language: "en", modelName: "stub"
+                )
+                model.streamingConsumer = Task { @MainActor in
+                    await deliver.wait()
+                    await model.handleStreamingEvent(.finished(words), take: take, session: session)
+                }
+                let save = LandingGate()
+                model.beforeLandingSave = { await save.wait() }
+                model.stopRecordingAndTranscribe()
+                await deliver.open()
+                let landing = await waitUntil { await session.entered }
+                #expect(landing)
+
+                model.cancelCurrentWork()
+                await session.release()
+
+                let finished = await waitUntil { model.streamingConsumer == nil && model.recording?.isTranscribing == true }
+                #expect(finished)
+                await settle(for: .milliseconds(300))
+                let message = AppModel.streamEndedWithoutTranscriptMessage()
+                #expect(model.recording?.state != .failed(message: message), "the take was landing, not lost")
+                #expect(model.exportNotice?.message != message)
+                #expect(model.recoveryHeldByTake.contains(recovery), "its checkpoint stays until the save lands")
+                await save.open()
+                let landed = await landedEntry(model)
+                let entry = try #require(landed)
+                let settled = await waitUntil { model.recording?.state == .done(entryID: entry.id) }
+                #expect(settled)
+            }
         }
 
         @Test("the Stage's Cancel ends a count-in with no word")
