@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import ParolaCore
@@ -63,6 +64,32 @@ struct LevelMeterFirstReadingTests {
         #expect(meter.firstReadingAt == first)
         meter.reset()
         #expect(meter.firstReadingAt == nil)
+    }
+
+    @Test("a first reading keeps when its audio was captured, not when it was metered; later ones change neither")
+    func firstReadingKeepsItsCaptureTime() {
+        let meter = LevelMeter()
+        let captured = ContinuousClock.now - .milliseconds(85)
+
+        meter.record(0.2, capturedAt: captured)
+        meter.record(0.3, capturedAt: ContinuousClock.now)
+
+        #expect(meter.firstReadingAt == captured)
+        let arrived = meter.lastReadingAt.map { $0 > captured } ?? false
+        #expect(arrived, "the latest reading is when it came in")
+    }
+
+    @Test("a tap's host time turns into the continuous-clock moment its first sample was heard")
+    func hostTimeBecomesAnInstant() {
+        let now = mach_absolute_time()
+        let clockNow = ContinuousClock.now
+        let hostTime = now - AVAudioTime.hostTime(forSeconds: 0.085)
+
+        let heard = MicAudioSource.instant(ofHostTime: hostTime, now: now, clockNow: clockNow)
+
+        let ago = heard.duration(to: clockNow)
+        #expect(abs(Double(ago.components.attoseconds) / 1e18 + Double(ago.components.seconds) - 0.085) < 0.001)
+        #expect(MicAudioSource.instant(ofHostTime: now + 10, now: now, clockNow: clockNow) == clockNow)
     }
 
     @Test("the meter remembers when its latest reading came in, silent or not, and a reset forgets it")

@@ -101,9 +101,10 @@ public actor MicAudioSource: LiveAudioSource {
             consumerTask: consumer
         )
 
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { buffer, time in
             guard !writer.isPaused, let copy = Self.copy(buffer) else { return }
-            if case .dropped = cont.yield(BufferBox(buffer: copy)) {
+            let capturedAt = time.isHostTimeValid ? Self.instant(ofHostTime: time.hostTime) : nil
+            if case .dropped = cont.yield(BufferBox(buffer: copy, capturedAt: capturedAt)) {
                 writer.noteDrop()
             }
         }
@@ -135,8 +136,16 @@ public actor MicAudioSource: LiveAudioSource {
         return copy
     }
 
+    /// The continuous-clock moment of a host time, which is how a tap stamps its buffer's first sample.
+    static func instant(
+        ofHostTime hostTime: UInt64, now: UInt64 = mach_absolute_time(), clockNow: ContinuousClock.Instant = .now
+    ) -> ContinuousClock.Instant {
+        guard now > hostTime else { return clockNow }
+        return clockNow - .seconds(AVAudioTime.seconds(forHostTime: now - hostTime))
+    }
+
     private func write(box: BufferBox) {
-        levelMeter.record(AudioLevel.normalised(of: box.buffer))
+        levelMeter.record(AudioLevel.normalised(of: box.buffer), capturedAt: box.capturedAt)
 
         guard let current = session else { return }
         guard let outBuffer = StreamChunkConverter.convert(
@@ -188,7 +197,11 @@ public actor MicAudioSource: LiveAudioSource {
 /// Unchecked Sendable: each box owns a freshly-copied PCM buffer, handed off once to a single consumer.
 private final class BufferBox: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
-    init(buffer: AVAudioPCMBuffer) { self.buffer = buffer }
+    let capturedAt: ContinuousClock.Instant?
+    init(buffer: AVAudioPCMBuffer, capturedAt: ContinuousClock.Instant?) {
+        self.buffer = buffer
+        self.capturedAt = capturedAt
+    }
 }
 
 extension MicAudioSource {

@@ -19,8 +19,9 @@ public final class LevelMeter: Sendable {
 
     public init() {}
 
-    /// `level` is a 0...1 amplitude, as `AudioLevel` maps a buffer.
-    public func record(_ level: Float) {
+    /// `level` is a 0...1 amplitude, as `AudioLevel` maps a buffer; `capturedAt`, when the capture knows it, is when the
+    /// buffer's first sample was heard, which a first reading keeps rather than the moment it was metered.
+    public func record(_ level: Float, capturedAt: ContinuousClock.Instant? = nil) {
         let clamped = level.isFinite ? min(1, max(0, level)) : 0
         let now = ContinuousClock.now
         let soundNow: ContinuousClock.Instant? = clamped >= Self.soundFloor ? now : nil
@@ -28,7 +29,7 @@ public final class LevelMeter: Sendable {
             reading.level = clamped
             reading.peak = max(reading.peak, clamped)
             if let soundNow { reading.lastSound = soundNow }
-            if reading.firstReadingAt == nil { reading.firstReadingAt = now }
+            if reading.firstReadingAt == nil { reading.firstReadingAt = capturedAt ?? now }
             reading.lastReadingAt = now
         }
     }
