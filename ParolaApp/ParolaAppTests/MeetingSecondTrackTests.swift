@@ -1651,6 +1651,24 @@ extension TranscriberMockSuites {
             #expect(!stale.contains(take), "a take written a minute ago may still be recording")
         }
 
+        @Test("a mix a crash left half written is cleared once it has been quiet ten minutes; one being written stays")
+        func sweepClearsAMixLeftBehind() async throws {
+            let library = makeTempLibraryURL("second-track-sweep-mix")
+            let folder = try inflight(library)
+            let left = folder.appendingPathComponent("\(RecordingScratch.meetingMixPrefix)-\(UUID().uuidString).wav")
+            let writing = folder.appendingPathComponent("\(RecordingScratch.meetingMixPrefix)-\(UUID().uuidString).wav")
+            for file in [left, writing] { try Data(count: 64 * 1024).write(to: file) }
+            try age(left, by: 20 * 60)
+            try age(writing, by: 60)
+
+            let model = makeModel(libraryURL: library)
+            await model.inflightSweep?.value
+
+            #expect(!exists(left))
+            #expect(exists(writing))
+            #expect(await model.library.list().isEmpty, "a mix in progress is never a take")
+        }
+
         @Test("a sweep at launch deletes only the two-day-old orphaned microphone track")
         func launchSweepDeletesOnlyOldOrphans() async throws {
             let library = makeTempLibraryURL("second-track-sweep")
