@@ -76,8 +76,7 @@ final class PlaybackKeyMonitor {
 
     /// Whenever the Stage shows its take, from the count-in through its transcription: the Stage owns Space all that time.
     static func stageShowsTake(_ model: AppModel) -> Bool {
-        guard model.route == .recording, let take = model.recording else { return false }
-        return ContentRoutes.stageShows(take, model: model)
+        ContentRoutes.stageIsUp(model)
     }
 
     func bind(_ model: AppModel) {

@@ -191,6 +191,12 @@ struct ContentRoutes: View {
         return run
     }
 
+    /// The Stage is the page on screen, with the session's take on it.
+    static func stageIsUp(_ model: AppModel) -> Bool {
+        guard model.route == .recording, let take = model.recording else { return false }
+        return stageShows(take, model: model)
+    }
+
     /// The Stage holds a take from its count-in until it lands: through its transcription while the run reports to it, and through a failure until it is dismissed.
     static func stageShows(_ take: RecordingSession, model: AppModel) -> Bool {
         switch take.state {

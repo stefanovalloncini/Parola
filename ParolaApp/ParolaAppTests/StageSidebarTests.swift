@@ -117,7 +117,7 @@ struct StageSidebarTests {
         #expect(!defaults.bool(forKey: MainSidebar.foldedByTakeKey))
     }
 
-    @Test("a take holds the sidebar from its count-in through its transcription, and lets go when it lands or fails")
+    @Test("a take holds the sidebar while it runs and while it transcribes on its Stage, and lets go when it is let go, lands or fails")
     func holdsWhileTheTakeIsOn() {
         let start = Date()
         let arming = take()
@@ -126,25 +126,26 @@ struct StageSidebarTests {
         let transcribing = take { $0.markCapturing(at: start); $0.finish(at: start); $0.transcribing(progress: 0.5) }
         let landed = take { $0.land(entryID: "E") }
         let failed = take { $0.fail("The microphone stopped.") }
-        #expect(!SidebarCollapsePolicy.holds(nil))
-        #expect(SidebarCollapsePolicy.holds(arming))
-        #expect(SidebarCollapsePolicy.holds(recording))
-        #expect(SidebarCollapsePolicy.holds(paused))
-        #expect(SidebarCollapsePolicy.holds(transcribing))
-        #expect(!SidebarCollapsePolicy.holds(landed))
-        #expect(!SidebarCollapsePolicy.holds(failed))
+        #expect(!SidebarCollapsePolicy.holds(nil, stageIsUp: false))
+        #expect(SidebarCollapsePolicy.holds(arming, stageIsUp: false))
+        #expect(SidebarCollapsePolicy.holds(recording, stageIsUp: false), "a take recording behind another page keeps it")
+        #expect(SidebarCollapsePolicy.holds(paused, stageIsUp: true))
+        #expect(SidebarCollapsePolicy.holds(transcribing, stageIsUp: true))
+        #expect(!SidebarCollapsePolicy.holds(transcribing, stageIsUp: false), "let go to its save, off its Stage")
+        #expect(!SidebarCollapsePolicy.holds(landed, stageIsUp: false))
+        #expect(!SidebarCollapsePolicy.holds(failed, stageIsUp: true))
     }
 
     @Test("the model's sidebar folds while the take's session runs and comes back once it is gone")
     func modelOwnsTheSidebar() {
         let model = makeRecordingModel("stage-sidebar")
-        #expect(!SidebarCollapsePolicy.holds(model.recording))
+        #expect(!SidebarCollapsePolicy.holds(model.recording, stageIsUp: ContentRoutes.stageIsUp(model)))
         model.installTestTake(source: .microphone)
-        let holds = SidebarCollapsePolicy.holds(model.recording)
+        let holds = SidebarCollapsePolicy.holds(model.recording, stageIsUp: ContentRoutes.stageIsUp(model))
         model.mainSidebar.hold(holds, animation: nil)
         #expect(model.mainSidebar.visibility == .detailOnly)
         model.endTestTake()
-        model.mainSidebar.hold(SidebarCollapsePolicy.holds(model.recording), animation: nil)
+        model.mainSidebar.hold(SidebarCollapsePolicy.holds(model.recording, stageIsUp: ContentRoutes.stageIsUp(model)), animation: nil)
         #expect(model.mainSidebar.visibility == .automatic)
     }
 

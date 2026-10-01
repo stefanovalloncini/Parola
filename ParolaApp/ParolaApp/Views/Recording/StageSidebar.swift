@@ -14,10 +14,10 @@ enum SidebarCollapsePolicy {
         userChangedDuringTake ? current : previous
     }
 
-    /// From the count-in until the take lands or fails, including while it transcribes on its Stage.
-    static func holds(_ take: RecordingSession?) -> Bool {
+    /// While the take runs, and while it transcribes on its Stage; one let go to its save, landed or failed gives the sidebar back.
+    static func holds(_ take: RecordingSession?, stageIsUp: Bool) -> Bool {
         guard let take else { return false }
-        return !take.isOver
+        return take.isRunning || (take.isTranscribing && stageIsUp)
     }
 }
 
@@ -80,7 +80,7 @@ struct TakeSidebarRelease: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
-        content.onChange(of: SidebarCollapsePolicy.holds(model.recording), initial: true) { _, holds in
+        content.onChange(of: SidebarCollapsePolicy.holds(model.recording, stageIsUp: ContentRoutes.stageIsUp(model)), initial: true) { _, holds in
             guard !holds else { return }
             model.mainSidebar.hold(false, animation: reduceMotion ? nil : DS.Motion.sidebarCollapse)
         }
@@ -96,7 +96,7 @@ struct StageSidebarFold: ViewModifier {
         content.onAppear {
             let animation = reduceMotion ? nil : DS.Motion.sidebarCollapse
             Task { @MainActor in
-                guard SidebarCollapsePolicy.holds(model.recording) else { return }
+                guard SidebarCollapsePolicy.holds(model.recording, stageIsUp: ContentRoutes.stageIsUp(model)) else { return }
                 model.mainSidebar.hold(true, animation: animation)
             }
         }

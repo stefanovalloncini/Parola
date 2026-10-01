@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
@@ -541,6 +542,33 @@ extension TranscriberMockSuites {
                 let settled = await waitUntil { !model.hasPendingTakeWork }
                 #expect(settled)
             }
+        }
+
+        @Test("after Stop and Cancel the sidebar comes back at once, while the take still saves")
+        func sidebarReturnsAfterCancel() async throws {
+            let audio = try makeTakeWAV("stage-cancel-sidebar", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeModel("stage-cancel-sidebar")
+            let capture = HeldCutShortCapture(file: audio)
+            model.takeCaptureOverride = { _ in capture }
+            model.mainSidebar.userSet(.all)
+            let release = HostedWindow(Color.clear.modifier(TakeSidebarRelease()).environment(model))
+            defer { release.close() }
+            model.startRecording(source: .microphone)
+            let up = await waitUntil { model.liveSource != nil }
+            #expect(up)
+            model.mainSidebar.hold(true, animation: nil)
+            #expect(model.mainSidebar.visibility == .detailOnly)
+            model.stopRecordingAndTranscribe()
+
+            model.cancelCurrentWork()
+
+            let returned = await waitUntil { model.mainSidebar.visibility == .all }
+            #expect(returned)
+            #expect(model.recording?.isTranscribing == true, "the take is still saving")
+            await capture.letGo()
+            let over = await waitUntil { model.recording?.isOver == true }
+            #expect(over)
         }
 
         @Test("the Stage's Cancel ends a count-in with no word")
