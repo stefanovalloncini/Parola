@@ -121,11 +121,3 @@ struct StageBand: View {
         context.fill(Path(ellipseIn: CGRect(x: playheadX - 3.5, y: size.height - 9, width: 7, height: 7)), with: .color(red))
     }
 }
-
-enum LevelBars {
-    /// The same curve the production meter uses, so quiet speech still lifts the bars.
-    static func height(for level: Float, idle: CGFloat, max: CGFloat) -> CGFloat {
-        let shaped = CGFloat(pow(Double(min(1, Swift.max(0, level))), 0.6))
-        return idle + (max - idle) * shaped
-    }
-}
