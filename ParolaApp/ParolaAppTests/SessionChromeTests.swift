@@ -60,6 +60,8 @@ struct SessionChromeStringTests {
     func italian() throws {
         let it = try italianBundle()
         #expect(String(localized: "Show Recording", bundle: it) == "Mostra registrazione")
+        #expect(String(localized: "This recording is no longer in your library.", bundle: it)
+            == "Questa registrazione non è più nella tua libreria.")
     }
 }
 
@@ -652,5 +654,56 @@ struct RecordingMenuActionTests {
         #expect(model.recording?.state == .recording)
         #expect(HostedAccessibility.press(endingWith: "Menu.Recording.AddMarker", in: hosted.host))
         #expect(model.recording?.markers.count == 1)
+    }
+}
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("A replaced take's notice outlives its entry", .serialized)
+    struct ReplacedTakeNoticeTests {
+        @Test("Retry on a notice whose saved recording was deleted says the recording is gone, and adds nothing")
+        func retryAfterTheEntryWasDeleted() async throws {
+            let fixture = try tempWAV("replaced-notice-mic")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.transcriber, .audioSource]) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine boom"), gate: gate
+                ))
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let model = makeRecordingModel("replaced-notice-gone")
+                model.selectedModel = "openai_whisper-tiny"
+                try FileManager.default.createDirectory(at: model.inflightRecordingsURL, withIntermediateDirectories: true)
+                let older = try makeTakeWAV("older", seconds: 1, in: model.inflightRecordingsURL, prefix: "parola-mic")
+                defer { try? FileManager.default.removeItem(at: older) }
+                recordAndStop(model, audio: older, seconds: 2)
+                let transcribing = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                #expect(transcribing)
+                model.recordingCountInSeconds = 3
+                model.startRecording(source: .microphone)
+                await gate.open()
+
+                let notice = try #require(await waitForNotice(model))
+                #expect(notice.actions.map(\.title) == ["Retry", "Show"])
+                let saved = try #require(await landedEntry(model))
+                model.cancelRecordingCountdown()
+                let released = await waitUntil { !FileManager.default.fileExists(atPath: older.path) }
+                #expect(released, "the working file goes once the entry holds the audio")
+
+                model.deleteEntry(saved.id)
+                let deleted = await waitUntil { await model.library.list().isEmpty }
+                #expect(deleted)
+                await installMockTranscriber(segments: [(0, 1, "back from nowhere")])
+                let retry = try #require(notice.actions.first)
+                model.performNoticeAction(retry)
+
+                let told = await waitUntil { model.exportNotice?.message == "This recording is no longer in your library." }
+                #expect(told)
+                await settle()
+                let entries = await model.library.list()
+                #expect(entries.isEmpty, "nothing comes back from a recording that is gone")
+                #expect(!model.hasPendingTakeWork)
+            }
+        }
     }
 }

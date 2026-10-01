@@ -14977,6 +14977,17 @@
         }
       }
     },
+    "This recording is no longer in your library.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa registrazione non è più nella tua libreria."
+          }
+        }
+      }
+    },
     "This recording was deleted.": {
       "extractionState": "manual",
       "localizations": {

@@ -5139,10 +5139,20 @@ final class AppModel {
     func retryTake(_ failure: RecordingSession.Failure) {
         let url = failure.audioURL
         Task { [weak self] in
-            if let entry = try? await failure.save?.value, let self, (try? await self.openEntry(entry.id)) != nil {
-                self.retranscribeCurrentEntry(model: self.selectedModel, language: self.selectedLanguage, landingAs: .retriedTake)
-                self.releaseTakeFile(url)
-                return
+            if let entry = try? await failure.save?.value, let self {
+                // Once its entry holds the audio the working file is gone, so a deleted entry leaves nothing to retry.
+                guard await self.library.list().contains(where: { $0.id == entry.id }) else {
+                    self.exportNotice = ExportNotice(
+                        message: String(localized: "This recording is no longer in your library."),
+                        failures: [], folder: nil, tone: .failure
+                    )
+                    return
+                }
+                if (try? await self.openEntry(entry.id)) != nil {
+                    self.retranscribeCurrentEntry(model: self.selectedModel, language: self.selectedLanguage, landingAs: .retriedTake)
+                    self.releaseTakeFile(url)
+                    return
+                }
             }
             self?.startTakeTask { [weak self] in
                 await self?.transcribeRecordedTake(
