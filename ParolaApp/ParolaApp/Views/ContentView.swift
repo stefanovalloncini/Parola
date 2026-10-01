@@ -28,13 +28,14 @@ struct ContentView: View {
     }
 
     private var home: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: sidebarVisibility) {
             LibrarySidebar()
         } detail: {
             ContentRoutes()
                 .toolbar { ContentToolbar() }
                 .modifier(HideToolbarTitleIfAvailable())
         }
+        .modifier(TakeSidebarHold())
         .contentSheets()
         .background { TranslationHostView() }
         .modifier(SplitDropZone())
@@ -75,6 +76,10 @@ struct ContentView: View {
         }
         .onAppear { model.undoManager = windowUndoManager }
         .onChange(of: windowUndoManager) { _, newValue in model.undoManager = newValue }
+    }
+
+    private var sidebarVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding(get: { model.mainSidebar.visibility }, set: { model.mainSidebar.userSet($0) })
     }
 }
 

@@ -231,6 +231,8 @@ final class AppModel {
             if let noticeTake = exportNotice?.takeID, noticeTake != recording?.takeID { exportNotice = nil }
         }
     }
+    /// The main window's sidebar, which a take folds away and gives back as it was.
+    let mainSidebar = MainSidebar()
     /// The take's levels at ten a second, for as long as its session lasts; `takeLevelTick` moves with each one.
     @ObservationIgnored private(set) var takeLevels: TakeLevelHistory?
     private(set) var takeLevelTick = 0

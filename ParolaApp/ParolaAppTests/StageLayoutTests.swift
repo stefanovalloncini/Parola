@@ -14,6 +14,15 @@ struct StageLayoutTests {
         #expect(StageClock.text(seconds: 3 * 3600 + 5 * 60 + 9) == "3:05:09")
     }
 
+    @Test("the sidebar folds for the take and comes back as it was")
+    func sidebarPolicy() {
+        #expect(SidebarCollapsePolicy.enter(current: .all) == .detailOnly)
+        #expect(SidebarCollapsePolicy.exit(previous: .all, current: .detailOnly, userChangedDuringTake: false) == .all)
+        #expect(SidebarCollapsePolicy.exit(previous: .detailOnly, current: .detailOnly, userChangedDuringTake: false) == .detailOnly)
+        #expect(SidebarCollapsePolicy.exit(previous: .all, current: .all, userChangedDuringTake: true) == .all)
+        #expect(SidebarCollapsePolicy.exit(previous: .detailOnly, current: .all, userChangedDuringTake: true) == .all)
+    }
+
     @Test("the clock counts the take's capture, stands still through a pause and ticks on the take's own seconds")
     func clockSkipsPauses() throws {
         let start = Date(timeIntervalSinceReferenceDate: 0)
