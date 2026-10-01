@@ -43,6 +43,16 @@ struct StageStateTests {
         #expect(PausedBlink.dimmed > 0, "the time stays readable through the dim half")
     }
 
+    @Test("the controls are the bar until Stop, one Finishing pill while the take winds down, and none once it is over")
+    func controlsLayout() {
+        #expect(StageControls.layout(for: .countIn(3)) == .bar)
+        #expect(StageControls.layout(for: .live) == .bar)
+        #expect(StageControls.layout(for: .paused) == .bar)
+        #expect(StageControls.layout(for: .finishing) == .finishing)
+        #expect(StageControls.layout(for: .landing) == .none)
+        #expect(StageControls.layout(for: .failed("x")) == .none)
+    }
+
     @Test("the time slot names the model a live take waits on, with its download")
     func preparingLine() {
         #expect(StageTimeSlot.preparingText(name: "openai_whisper-large-v3_turbo", download: 0.42) == "Preparing Whisper Turbo · 42%")

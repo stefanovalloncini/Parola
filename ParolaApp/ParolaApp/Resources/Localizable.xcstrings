@@ -6119,6 +6119,17 @@
         }
       }
     },
+    "Finishing the recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completamento della registrazione"
+          }
+        }
+      }
+    },
     "Finishing, %@": {
       "extractionState": "manual",
       "localizations": {
@@ -6126,6 +6137,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Chiusura in corso, %@"
+          }
+        }
+      }
+    },
+    "Finishing…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completamento…"
           }
         }
       }

@@ -281,6 +281,9 @@ struct StageFacts: View {
             case .paused:
                 RecDot(color: DS.Palette.warning)
                 statusWord("PAUSED", color: DS.Color.warningText)
+            case .finishing:
+                RecDot(color: DS.Color.secondaryText)
+                statusWord("REC", color: DS.Color.secondaryText)
             default:
                 RecDot(pulsesFrom: isOnScreen && take.state == .recording ? take.clockOrigin : nil)
                 statusWord("REC", color: DS.Color.dangerText)

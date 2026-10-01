@@ -12,39 +12,28 @@ struct StageControls: View {
     nonisolated static let reservedHeight: CGFloat = buttonHeight + bottomInset + DS.Spacing.large
     nonisolated static let stopWidth: CGFloat = 96
 
+    /// Which controls a Stage state gets: the bar until Stop, one pill while the take winds down, none once it is over.
+    enum Layout: Equatable {
+        case bar
+        case finishing
+        case none
+    }
+
+    nonisolated static func layout(for mode: StageMode) -> Layout {
+        switch mode {
+        case .countIn, .preparing, .starting, .live, .paused: .bar
+        case .finishing: .finishing
+        case .transcribing, .landing, .failed: .none
+        }
+    }
+
     var body: some View {
         GlassEffectContainer(spacing: DS.Spacing.small) {
-            HStack(spacing: DS.Spacing.regular) {
-                pauseButton
-                Button {
-                    model.addTakeMarker()
-                } label: {
-                    Label("Mark", systemImage: "flag.fill")
-                }
-                .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: 18))
-                .keyboardShortcut("b", modifiers: .command)
-                .disabled(!take.isCapturing)
-                .help("Add Marker")
-                .accessibilityLabel("Add Marker")
-                .axLeaf("Stage.Button.Mark")
-                if take.isArming {
-                    cancelButton
-                } else {
-                    stopButton
-                }
-                Button {
-                    discarding = take.takeID
-                } label: {
-                    Label("Discard…", systemImage: "xmark")
-                }
-                .buttonStyle(GlassCapsuleButtonStyle(prominence: .secondary, height: Self.buttonHeight, horizontalPadding: 18))
-                .disabled(!take.isCapturing)
-                .help("Discard Recording…")
-                .accessibilityLabel("Discard Recording…")
-                .axLeaf("Stage.Button.Discard")
+            switch Self.layout(for: take.mode) {
+            case .bar: bar
+            case .finishing: finishingPill
+            case .none: EmptyView()
             }
-            .labelStyle(.titleAndIcon)
-            .font(DS.Font.bodyStrong)
         }
         .alert("Discard this recording?", isPresented: confirmingDiscard, presenting: discarding) { takeID in
             // Return keeps the take: only a deliberate click deletes it.
@@ -60,6 +49,55 @@ struct StageControls: View {
         }
     }
 
+    private var finishingPill: some View {
+        Button {} label: {
+            HStack(spacing: DS.Spacing.small) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Finishing…")
+            }
+            .font(DS.Font.bodyStrong)
+        }
+        .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: DS.Spacing.medium, minWidth: Self.stopWidth))
+        .disabled(true)
+        .accessibilityLabel("Finishing the recording")
+        .axLeaf("Stage.Button.Finishing")
+    }
+
+    private var bar: some View {
+        HStack(spacing: DS.Spacing.regular) {
+            pauseButton
+            Button {
+                model.addTakeMarker()
+            } label: {
+                Label("Mark", systemImage: "flag.fill")
+            }
+            .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: 18))
+            .keyboardShortcut("b", modifiers: .command)
+            .disabled(!take.isCapturing)
+            .help("Add Marker")
+            .accessibilityLabel("Add Marker")
+            .axLeaf("Stage.Button.Mark")
+            if take.isArming {
+                cancelButton
+            } else {
+                stopButton
+            }
+            Button {
+                discarding = take.takeID
+            } label: {
+                Label("Discard…", systemImage: "xmark")
+            }
+            .buttonStyle(GlassCapsuleButtonStyle(prominence: .secondary, height: Self.buttonHeight, horizontalPadding: 18))
+            .disabled(!take.isCapturing)
+            .help("Discard Recording…")
+            .accessibilityLabel("Discard Recording…")
+            .axLeaf("Stage.Button.Discard")
+        }
+        .labelStyle(.titleAndIcon)
+        .font(DS.Font.bodyStrong)
+    }
+
     private var stopButton: some View {
         Button {
             model.stopRecordingAndTranscribe()
@@ -73,7 +111,6 @@ struct StageControls: View {
             minWidth: Self.stopWidth
         ))
         .keyboardShortcut(.return, modifiers: .command)
-        .disabled(take.state == .finishing)
         .help("Stop recording and transcribe.")
         .accessibilityLabel("Stop Recording")
         .axLeaf("Stage.Button.Stop")
