@@ -25,6 +25,20 @@ enum MicTrackState: Equatable {
     case unavailable
 }
 
+/// Where a meeting's mic file starts in its take, kept beside it for a sweep that finds the pair with no checkpoint.
+struct MicTrackNote: Codable, Equatable {
+    var offset: TimeInterval
+    var stoppedEarly: Bool
+
+    static func url(for mic: URL) -> URL {
+        mic.deletingPathExtension().appendingPathExtension("json")
+    }
+
+    static func read(for mic: URL) -> MicTrackNote? {
+        (try? Data(contentsOf: url(for: mic))).flatMap { try? JSONDecoder().decode(MicTrackNote.self, from: $0) }
+    }
+}
+
 /// How a microphone track's finish came back, when it did.
 enum MicTrackFinish: Sendable {
     case finished(URL)
@@ -139,6 +153,7 @@ extension AppModel {
         let peak = meter.takePeak()
         if track.offset == nil, let heard = meter.firstReadingAt, let offset = takeOffset(of: heard, take: take.id) {
             track.offset = offset
+            noteMicTrackStart(track)
             if liveCompanionAudioURL == track.file {
                 liveCompanionStartOffset = offset
                 micTrack = track
@@ -159,6 +174,7 @@ extension AppModel {
                 track.stalled = true
                 track.stoppedEarly = true
                 micTrack = track
+                noteMicTrackStart(track)
                 writeRecordingCheckpoint()
                 takeMicTrackState = .unavailable
                 noteMicTrackMissing(take.id, stopped: micReading != nil)
@@ -168,6 +184,13 @@ extension AppModel {
         }
         micTrack = track
         return peak
+    }
+
+    /// The note beside the mic file says where it starts; only for the take's own working file, never beside a fixture.
+    private func noteMicTrackStart(_ track: MicTrack) {
+        guard let file = track.file, isInflightFile(file), let offset = track.offset else { return }
+        let note = MicTrackNote(offset: offset, stoppedEarly: track.stoppedEarly)
+        Task { _ = try? await Self.offMainIO { try JSONEncoder().encode(note).write(to: MicTrackNote.url(for: file), options: .atomic) } }
     }
 
     /// Where a moment sits in the take's own audio, pauses left out; earlier than the take's first sample is negative.
@@ -453,7 +476,9 @@ extension AppModel {
     }
 
     /// Mixes a meeting's two files into a stereo file under a scratch name in `folder`, which a sweep never takes for a take.
-    nonisolated static func mixMeetingFiles(mac: URL, mic: URL, micOffset: TimeInterval, in folder: URL, mono: URL?) async throws -> URL {
+    nonisolated static func mixMeetingFiles(
+        mac: URL, mic: URL, micOffset: TimeInterval, micStoppedEarly: Bool, in folder: URL, mono: URL?
+    ) async throws -> URL {
         let mixed = folder.appendingPathComponent("\(RecordingScratch.meetingMixPrefix)-\(UUID().uuidString).wav")
         do {
             try await offMainIO {
@@ -462,7 +487,8 @@ extension AppModel {
                 WAVHeaderRepair.makeReadable(mic)
                 let start = Date(timeIntervalSinceReferenceDate: 0)
                 try MeetingTakeMixer.mix(
-                    mac: mac, mic: mic, macStart: start, micStart: start.addingTimeInterval(micOffset), into: mixed, mono: mono
+                    mac: mac, mic: mic, macStart: start, micStart: start.addingTimeInterval(micOffset), into: mixed, mono: mono,
+                    micStoppedEarly: micStoppedEarly
                 )
             }
         } catch {
@@ -524,6 +550,7 @@ extension AppModel {
     func releaseMicFile(_ file: URL) {
         forgetLiveCompanion(file)
         releaseTakeFile(file)
+        if !FileManager.default.fileExists(atPath: file.path) { try? FileManager.default.removeItem(at: MicTrackNote.url(for: file)) }
     }
 
     nonisolated static func isStereoFile(_ url: URL) async -> Bool {

@@ -1377,6 +1377,64 @@ extension TranscriberMockSuites {
             #expect(AppModel.pairedMeetingMic(for: files.mac, in: [(orphan, Date()), (files.mic, Date())]) == files.mic)
         }
 
+        @Test("the sweep places an orphaned mic where the note beside it says it started, and lets the note go with it")
+        func sweepPlacesTheMicByItsNote() async throws {
+            let library = makeTempLibraryURL("second-track-sweep-note")
+            let folder = try inflight(library)
+            let id = UUID().uuidString
+            let mac = folder.appendingPathComponent("parola-system-\(id).wav")
+            let mic = folder.appendingPathComponent("\(RecordingScratch.meetingMicPrefix)-\(id).wav")
+            let rate = 16_000.0
+            try TestAudio.write(channels: [TestAudio.sine(seconds: 2, hz: 440, amplitude: 0.3, sampleRate: rate)], sampleRate: rate, to: mac)
+            var voice = [Float](repeating: 0, count: Int(1.5 * rate))
+            for index in Int(0.2 * rate)..<Int(0.2 * rate) + 160 { voice[index] = 0.9 }
+            try TestAudio.write(channels: [voice], sampleRate: rate, to: mic)
+            try JSONEncoder().encode(MicTrackNote(offset: 0.5, stoppedEarly: false)).write(to: MicTrackNote.url(for: mic))
+            let strayNote = folder.appendingPathComponent("\(RecordingScratch.meetingMicPrefix)-\(UUID().uuidString).json")
+            try Data("{}".utf8).write(to: strayNote)
+            for file in [mac, mic] { try age(file, by: 3_600) }
+
+            let model = makeModel(libraryURL: library)
+            await model.inflightSweep?.value
+
+            let entry = try #require(await landedEntry(model))
+            let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+            let sides = try TestAudio.read(audio)
+            let burst = sides.channels[1].firstIndex { $0 > 0.5 }
+            let onset = try #require(burst)
+            #expect(abs(Double(onset) / sides.sampleRate - 0.7) < 0.001, "half a second in, where the mic started")
+            #expect(!exists(mic))
+            #expect(!exists(MicTrackNote.url(for: mic)))
+            #expect(!exists(strayNote), "a note whose mic is gone goes too")
+        }
+
+        @Test("a meeting take notes where its mic starts beside the file, and the note goes once the mic is folded in")
+        func liveTakeNotesTheMicStart() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                let mic = ScriptedTrack(file: files.mic)
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: mic)
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                try await Task.sleep(for: .milliseconds(200))
+
+                mic.levelMeter.record(0.3)
+
+                let noted = await waitUntil { MicTrackNote.read(for: files.mic) != nil }
+                #expect(noted)
+                let offset = try #require(model.micTrack?.offset)
+                #expect(MicTrackNote.read(for: files.mic)?.offset == offset)
+
+                model.stopRecordingAndTranscribe()
+
+                _ = try #require(await landedEntry(model))
+                let gone = await waitUntil { !exists(files.mic) && !exists(MicTrackNote.url(for: files.mic)) }
+                #expect(gone)
+            }
+        }
+
         @Test("an orphaned meeting whose Mac side recorded nothing still comes back for its microphone")
         func sweepKeepsAMicWithAnEmptyMacSide() async throws {
             let library = makeTempLibraryURL("second-track-sweep-empty-mac")

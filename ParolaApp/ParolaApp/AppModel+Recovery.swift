@@ -555,6 +555,7 @@ extension AppModel {
         for file in files where isInflightFile(file) {
             try? FileManager.default.removeItem(at: file)
         }
+        if let mic = checkpoint.companionAudioURL, isInflightFile(mic) { try? FileManager.default.removeItem(at: MicTrackNote.url(for: mic)) }
     }
 
     /// Saves a take without opening it; its checkpoint goes once the entry exists, and a file or link's offer just lapses.
@@ -815,10 +816,14 @@ extension AppModel {
                 var mixed: URL?
                 var waitingMic: StoppedMicTrack?
                 if let mic, await !AppModel.isStereoFile(file) {
+                    let note = MicTrackNote.read(for: mic)
+                    let start = StoppedMicTrack(file: mic, offset: note?.offset ?? 0, stoppedEarly: note?.stoppedEarly ?? false)
                     if await self?.hasRoomToFold(mac: file, mic: mic, mono: false) == true {
-                        mixed = try? await AppModel.mixMeetingFiles(mac: file, mic: mic, micOffset: 0, in: dir, mono: nil)
+                        mixed = try? await AppModel.mixMeetingFiles(
+                            mac: file, mic: mic, micOffset: start.offset, micStoppedEarly: start.stoppedEarly, in: dir, mono: nil
+                        )
                     }
-                    if mixed == nil { waitingMic = StoppedMicTrack(file: mic, offset: 0) }
+                    if mixed == nil { waitingMic = start }
                 }
                 do {
                     // Copied, not moved: the original goes only once the entry holds the audio.
@@ -834,12 +839,16 @@ extension AppModel {
                     recovered += 1
                     if let waitingMic { await self?.keepMicTrack(waitingMic, forEntry: entry.id) }
                     if self?.inflightFileInUse(file) != true { try? FileManager.default.removeItem(at: file) }
-                    if let mic, waitingMic == nil, self?.inflightFileInUse(mic) != true { try? FileManager.default.removeItem(at: mic) }
+                    if let mic, waitingMic == nil, self?.inflightFileInUse(mic) != true {
+                        try? FileManager.default.removeItem(at: mic)
+                        try? FileManager.default.removeItem(at: MicTrackNote.url(for: mic))
+                    }
                 } catch {
                     ParolaLog.error(.appRecovery, "an orphaned take could not be brought back", [.error: .error(error)])
                 }
                 if let mixed { try? FileManager.default.removeItem(at: mixed) }
             }
+            _ = try? await AppModel.offMainIO(qos: .utility) { AppModel.removeOrphanedMicNotes(in: dir) }
             let staging = (try? await AppModel.offMainIO(qos: .utility) { AppModel.staleStagingFolders(in: root, now: Date()) }) ?? []
             for folder in staging where await AppModel.salvageStagingFolder(folder, into: library) {
                 recovered += 1
@@ -915,6 +924,16 @@ extension AppModel {
     /// A meeting's mix in progress, made again by the next fold: one left by a crash is cleared as soon as it is quiet.
     nonisolated static func isMeetingScratch(_ file: URL) -> Bool {
         file.pathExtension.lowercased() == "wav" && file.lastPathComponent.hasPrefix(RecordingScratch.meetingMixPrefix + "-")
+    }
+
+    /// A note beside a mic file that is gone says nothing any more.
+    nonisolated static func removeOrphanedMicNotes(in folder: URL) {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        for name in names where name.hasPrefix(RecordingScratch.meetingMicPrefix + "-") && name.hasSuffix(".json") {
+            let note = folder.appendingPathComponent(name)
+            let mic = note.deletingPathExtension().appendingPathExtension("wav")
+            if !FileManager.default.fileExists(atPath: mic.path) { try? FileManager.default.removeItem(at: note) }
+        }
     }
 
     /// The meeting microphone track named for `take`, among the files a sweep found beside it.
