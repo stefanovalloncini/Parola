@@ -293,6 +293,8 @@ final class AppModel {
     @ObservationIgnored private var takeWorkCounter = 0
     /// A take's prepare and transcription, which a quit stops so the take is saved rather than lost with the process.
     @ObservationIgnored private var takeTask: Task<Void, Never>?
+    /// Live takes a cancel let go while their last decode ran: their final transcript still goes to the library.
+    @ObservationIgnored private var liveTakesFinishingAlone: Set<Int> = []
     /// A live take finishing and every take's save, until its entry exists: what a quit waits for.
     @ObservationIgnored private var takeWork: [Int: Task<Void, Never>] = [:]
     var livePartialText: String = ""
@@ -1803,6 +1805,7 @@ final class AppModel {
     }
 
     private func teardownActiveCapture(exitsMedia: Bool = true) {
+        letLiveTakeFinishAlone()
         let takeRecovery = activeTake?.recovery
         endSession(of: activeTake?.id)
         letGoOfFinishingTake()
@@ -1829,6 +1832,16 @@ final class AppModel {
         }
         if exitsMedia { Task { await mediaSession.exitRecording() } }
         pendingRecordingCategory = .transcription
+    }
+
+    /// A live take already finishing keeps its stream and its checkpoint; the rest of the teardown no longer sees it as the active take.
+    private func letLiveTakeFinishAlone() {
+        guard streamingSession == nil, streamingConsumer != nil, let take = activeTake,
+              recording?.takeID == take.id, recording?.state == .finishing else { return }
+        liveTakesFinishingAlone.insert(take.id)
+        if let recovery = take.recovery { recoveryHeldByTake.insert(recovery) }
+        streamingConsumer = nil
+        activeTake = nil
     }
 
     /// A stopped take still finishing its file goes on alone, freeing Record and the Stage; it lands only with its save, so a cut-short file can still say so.
@@ -3971,8 +3984,13 @@ final class AppModel {
         take: TakeContext? = nil,
         session: (any StreamingTranscriber)? = nil
     ) async {
-        // A take that ended in the pane while its session ran on has nothing left to report.
-        if let take, !takeIsCurrent(take) { return }
+        // A take that ended in the pane has nothing left to report, unless a cancel let it go while it finished.
+        if let take, !takeIsCurrent(take) {
+            guard liveTakesFinishingAlone.contains(take.id), case .finished(let transcript) = event else { return }
+            liveTakesFinishingAlone.remove(take.id)
+            await landLiveTake(transcript, take: take, session: session)
+            return
+        }
         // The active copy rather than the one the stream started with: a take's category can change while it records.
         let owner = activeTake ?? take
         switch event {
@@ -4054,7 +4072,7 @@ final class AppModel {
         if let recovery { recoveryHeldByTake.insert(recovery) }
         let arming = takeArming
         let given = annotations(of: take?.id)
-        stopRecordingWatch()
+        if take.map(takeIsCurrent) ?? true { stopRecordingWatch() }
         let takeCategory = take?.category ?? pendingRecordingCategory
         let takeSource = take?.source.entrySource ?? pendingRecordingSource
         let cutShort = await session?.audioWasCutShort() ?? false
@@ -4148,11 +4166,12 @@ final class AppModel {
         }
         if let s = streamingSession {
             let take = activeTake
+            let consumer = streamingConsumer
             // Let go now, so a second Stop finds nothing left to stop.
             streamingSession = nil
             finishSession(of: take)
             trackTakeWork { [weak self] in
-                await self?.finishStreamingTake(s, take: take)
+                await self?.finishStreamingTake(s, take: take, consumer: consumer)
                 self?.resolveRecordingOutcome(.failure(IntentActionError.failed(Self.streamEndedWithoutTranscriptMessage())))
             }
             return
@@ -4226,14 +4245,18 @@ final class AppModel {
     }
 
     /// Stops a live take and waits for its last event, which saves it. Cleanup after the waits skips a take that started since.
-    private func finishStreamingTake(_ s: any StreamingTranscriber, take: TakeContext?) async {
-        let consumer = streamingConsumer
+    private func finishStreamingTake(_ s: any StreamingTranscriber, take: TakeContext?, consumer: Task<Void, Never>?) async {
         await s.stop()
         // Await delivery of the final .finished event; cancelling here can drop the whole recording.
         await consumer?.value
         if streamingConsumer == consumer { streamingConsumer = nil }
+        let message = Self.streamEndedWithoutTranscriptMessage()
+        if let take, liveTakesFinishingAlone.remove(take.id) != nil {
+            if let recovery = take.recovery { recoveryHeldByTake.remove(recovery) }
+            reportTakeFailure(message, take: take.id)
+        }
         // A no-op when .finished already ended the take; it covers a stream that ends without one.
-        updateSession(of: take?.id) { if $0.isRunning { $0.fail(Self.streamEndedWithoutTranscriptMessage()) } }
+        updateSession(of: take?.id) { if $0.isRunning { $0.fail(message) } }
         endLiveTake(take)
     }
 
@@ -4843,9 +4866,10 @@ final class AppModel {
         }
         if let s = streamingSession {
             let take = activeTake
+            let consumer = streamingConsumer
             streamingSession = nil
             finishSession(of: take)
-            await finishStreamingTake(s, take: take)
+            await finishStreamingTake(s, take: take, consumer: consumer)
             return
         }
         guard let source = liveSource else { return }

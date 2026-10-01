@@ -435,6 +435,114 @@ extension TranscriberMockSuites {
             #expect(model.takeSavedNotice == nil)
         }
 
+        enum FinishingCancel: String, CaseIterable, Sendable {
+            case cancel
+            case bridgeCancel
+            case cancelAllTasks
+        }
+
+        /// A live take whose final decode runs on for about a second and a half after Stop.
+        private func startLiveTake(_ model: AppModel) async -> Bool {
+            MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the live words")],
+                partials: ["the", "the live", "the live words", "the live words", "the live words"],
+                delayMs: 2_000
+            ))
+            model.useStreaming = true
+            model.startRecording(source: .microphone)
+            return await waitUntil { model.recording?.state == .recording }
+        }
+
+        private func cancel(_ path: FinishingCancel, _ model: AppModel, server: ParolaAutomationServer) async throws {
+            switch path {
+            case .cancel:
+                model.cancelCurrentWork()
+            case .bridgeCancel:
+                let commands = Dictionary(uniqueKeysWithValues: server.coreCommands().map { ($0.name, $0) })
+                let command = try #require(commands["cancel"])
+                _ = try await command.handler(try command.validate(AutomationArgs([:])), AutomationContext(model: model, server: server))
+            case .cancelAllTasks:
+                model.cancelAllTasks()
+            }
+        }
+
+        @Test("a live take cancelled while it finishes still lands its words, and Record is free at once", arguments: FinishingCancel.allCases)
+        func liveTakeFinishesAfterCancel(_ path: FinishingCancel) async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel("stage-live-cancel-\(path.rawValue)")
+                let server = try ParolaAutomationServer(model: model)
+                let recording = await startLiveTake(model)
+                #expect(recording)
+                model.stopRecordingAndTranscribe()
+                #expect(model.recording?.state == .finishing)
+
+                try await cancel(path, model, server: server)
+
+                #expect(!model.recordingActive, "the finishing take doesn't hold up the next one")
+                #expect(model.recording?.isOver == false, "the take lands only once its save does")
+                #expect(model.hasPendingTakeWork, "a quit waits for its words")
+                let landed = await landedEntry(model, timeoutMs: 10_000)
+                let entry = try #require(landed)
+                let document = try await model.library.load(entry.id).document
+                #expect(document.transcript.text == "the live words")
+                let settled = await waitUntil { model.recording?.state == .done(entryID: entry.id) }
+                #expect(settled)
+                withExtendedLifetime(server) {}
+            }
+        }
+
+        @Test("a live take let go by Cancel still lands when the next take starts at once, and leaves that take recording")
+        func liveTakeFinishesBehindTheNextTake() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel("stage-live-cancel-next")
+                let first = await startLiveTake(model)
+                #expect(first)
+                model.stopRecordingAndTranscribe()
+                model.cancelCurrentWork()
+
+                let second = await startLiveTake(model)
+                #expect(second)
+                let secondTake = model.recording?.takeID
+                let landed = await landedEntry(model, timeoutMs: 10_000)
+                let entry = try #require(landed)
+                let document = try await model.library.load(entry.id).document
+                #expect(document.transcript.text == "the live words")
+                #expect(model.recording?.takeID == secondTake)
+                #expect(model.recording?.state == .recording, "the first take's landing leaves the second one alone")
+                #expect(model.recordingWatchTask != nil, "the second take keeps its disk and checkpoint watch")
+                #expect(model.route == .recording)
+                model.cancelCurrentWork()
+            }
+        }
+
+        @Test("a live take let go by Cancel whose stream fails says so rather than waiting for words that never come")
+        func letGoLiveTakeThatFailsSaysSo() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    partials: ["the", "the live"], delayMs: 1_000,
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "the decoder gave up")
+                ))
+                let model = makeModel("stage-live-cancel-fails")
+                model.useStreaming = true
+                model.startRecording(source: .microphone)
+                let recording = await waitUntil { model.recording?.state == .recording }
+                #expect(recording)
+                model.stopRecordingAndTranscribe()
+                model.cancelCurrentWork()
+
+                let message = AppModel.streamEndedWithoutTranscriptMessage()
+                let failed = await waitUntil { model.recording?.state == .failed(message: message) }
+                #expect(failed)
+                let notice = await waitForNotice(model)
+                #expect(notice?.message == message)
+                let settled = await waitUntil { !model.hasPendingTakeWork }
+                #expect(settled)
+            }
+        }
+
         @Test("the Stage's Cancel ends a count-in with no word")
         func cancelDuringCountIn() {
             let model = makeModel("stage-cancel-count-in")
