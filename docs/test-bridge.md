@@ -56,7 +56,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_set_route` | **route** | `transcript` / `batch` / `queue` / `statistics` / `recentlyDeleted` / `recording`. Takes the page the way the app's own controls do: clears any search and the category filter. `recording` is the take's Stage and needs a take that hasn't landed yet (`getState.recording` set, its `state` not `done`); otherwise it is `PRECONDITION`. |
 | `openRecentlyDeleted` | — | Route the main window to the Recently Deleted page. Replies `{open, route}`. |
 | `closeRecentlyDeleted` | — | Leave that page for the Library page. Replies `{open, route}`. |
-| `goHome` | — | Show the Library page, the one the app opens on: clear the category and person filters and any search, and unload the transcript. Replies `{route}` once the list is back. |
+| `goHome` | — | Show the Library page, with any filters set on it: clear the category and person filters and any search, and unload the transcript. Replies `{route}` once the list is back. |
 | `goBack` | — | Follow the transcript header's back link: unload the transcript and restore the list it was opened from. Replies `{origin, route, libraryFilter, libraryBrowsingAll}` once that list is back. |
 | `parola_app_set_library_filter` | category | `transcription` / `meeting` / `dictation`, or `all` or empty for the whole Library page. Clears any search and unloads the transcript, like clicking the row. |
 | `parola_app_transcribe_youtube` | **url** | Paste a YouTube URL and start the download-then-transcribe flow. Replies `{started, parked}`: a link handed over during a recording or another run comes back `parked: true` and waits for that work to finish. |
