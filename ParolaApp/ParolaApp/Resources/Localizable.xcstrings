@@ -17126,6 +17126,17 @@
         }
       }
     },
+    "Your microphone's track was added to “%@”. Transcribe it again to include your words.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La traccia del tuo microfono è stata aggiunta a “%@”. Trascrivi di nuovo per includere le tue parole."
+          }
+        }
+      }
+    },
     "Your services": {
       "extractionState": "manual",
       "localizations": {

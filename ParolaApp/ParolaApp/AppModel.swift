@@ -5276,7 +5276,7 @@ final class AppModel {
                     self.exportNotice = Self.deletedTakeNotice(restorable: restorable)
                     return
                 }
-                if let record = self.micTrackRecords[entry.id] { await self.foldWaitingMicTrack(record, intoEntry: entry.id) }
+                if let record = self.micTrackRecords[entry.id] { await self.foldWaitingMicTrack(record, intoEntry: entry.id, notifies: false) }
                 if (try? await self.openEntry(entry.id)) != nil {
                     self.retranscribeCurrentEntry(model: self.selectedModel, language: self.selectedLanguage, landingAs: .retriedTake)
                     self.releaseTakeFile(url)

@@ -906,6 +906,60 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a mic folded into an entry that already has a transcript says your words aren't in it yet, and Transcribe Again adds them; nothing runs on its own")
+        func lateFoldOffersTranscribeAgain() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let library = makeTempLibraryURL("second-track-late-fold")
+                let model = makeModel(libraryURL: library)
+                let files = try meetingFiles(model)
+                try corrupt(files.mic)
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                model.stopRecordingAndTranscribe()
+                let entry = try #require(await landedEntry(model))
+                let recorded = await waitUntil { model.micTrackRecords[entry.id] != nil }
+                #expect(recorded)
+                model.recoveryOwner = nil
+                try repairMic(files.mic)
+
+                let relaunched = makeModel(libraryURL: library)
+                await relaunched.awaitModelListRefresh()
+                relaunched.selectedModel = "openai_whisper-tiny"
+                await relaunched.micTrackFolds?.value
+
+                let notice = try #require(relaunched.exportNotice)
+                #expect(notice.message == AppModel.micTrackAddedMessage(title: entry.title))
+                let handlers = notice.actions.map(\.handler)
+                #expect(handlers == [.transcribeEntry(entry.id)])
+                #expect(notice.actions.first?.title == String(localized: "Transcribe Again"))
+                #expect(relaunched.retranscribeRequest == nil, "nothing runs again until asked")
+                let kept = try await relaunched.library.load(entry.id).document.transcript.segments.count
+                #expect(kept == 1)
+
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone."), (1, 2, "Thanks, glad to be here")])
+                let action = try #require(notice.actions.first)
+                relaunched.performNoticeAction(action)
+
+                var speakers: [String?] = []
+                let rerun = await waitUntil {
+                    speakers = (try? await relaunched.library.load(entry.id).document.transcript.segments.map(\.speaker)) ?? []
+                    return speakers.count == 2
+                }
+                #expect(rerun)
+                #expect(speakers == [nil, AppModel.meLabel()])
+            }
+        }
+
+        @Test("the notice for a mic added late reads in Italian")
+        func micTrackAddedReadsInItalian() throws {
+            let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+            let italian = try #require(Bundle(path: path))
+            #expect(AppModel.micTrackAddedMessage(title: "Riunione", bundle: italian)
+                == "La traccia del tuo microfono è stata aggiunta a “Riunione”. Trascrivi di nuovo per includere le tue parole.")
+        }
+
         @Test("while a take whose fold failed is transcribing, its checkpoint still names your mic")
         func failedFoldRunCarriesTheMic() async throws {
             try await withMocksCleared([.audioSource, .transcriber]) {

@@ -351,7 +351,7 @@ extension AppModel {
 
     /// Folds a waiting mic track into its entry's audio and labels your side of what it says; false leaves the record for later.
     @discardableResult
-    func foldWaitingMicTrack(_ record: MicTrackRecord, intoEntry entryID: LibraryEntry.ID) async -> Bool {
+    func foldWaitingMicTrack(_ record: MicTrackRecord, intoEntry entryID: LibraryEntry.ID, notifies: Bool = true) async -> Bool {
         guard await !Self.holdsNoAudio(record.mic.file) else {
             settleMicTrackRecord(record, entryID: entryID)
             return true
@@ -369,7 +369,8 @@ extension AppModel {
             settleMicTrackRecord(record, entryID: entryID)
             return true
         }
-        if await !Self.isStereoFile(audio) {
+        let added = await !Self.isStereoFile(audio)
+        if added {
             guard await hasRoomToFold(mac: audio, mic: record.mic.file, mono: false) else { return false }
             let scratch = meetingScratchURL()
             meetingScratchInUse.insert(scratch)
@@ -395,6 +396,7 @@ extension AppModel {
         await labelSides(ofEntry: entryID)
         settleMicTrackRecord(record, entryID: entryID)
         refreshLibrary()
+        if added, notifies, !loaded.document.transcript.segments.isEmpty { noteMicTrackAdded(to: loaded.entry) }
         return true
     }
 
@@ -630,6 +632,19 @@ extension AppModel {
     func noteMicTrackKept(_ takeID: Int?) {
         guard exportNotice?.actions.isEmpty ?? true else { return }
         exportNotice = ExportNotice(message: Self.micTrackKeptMessage(), failures: [], folder: nil, tone: .info, forTake: takeID)
+    }
+
+    /// A transcript made before the mic joined its entry has none of your words; it says so, and Transcribe Again adds them.
+    func noteMicTrackAdded(to entry: LibraryEntry) {
+        guard exportNotice?.actions.isEmpty ?? true else { return }
+        exportNotice = ExportNotice(
+            message: Self.micTrackAddedMessage(title: entry.title), failures: [], folder: nil, tone: .info,
+            actions: [ExportNotice.Action(title: String(localized: "Transcribe Again"), handler: .transcribeEntry(entry.id))]
+        )
+    }
+
+    nonisolated static func micTrackAddedMessage(title: String, bundle: Bundle = .main) -> String {
+        String(localized: "Your microphone's track was added to “\(title)”. Transcribe it again to include your words.", bundle: bundle)
     }
 
     nonisolated static func micTrackKeptMessage(bundle: Bundle = .main) -> String {
