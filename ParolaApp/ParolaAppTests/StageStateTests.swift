@@ -125,6 +125,24 @@ struct StageStateTests {
         #expect(shown.hasPrefix("word "), "the cut never starts mid-word")
     }
 
+    @MainActor
+    @Test("a failed take offers Show in Finder once its failure saved the audio, and its band greys")
+    func failedTakeLook() {
+        var take = RecordingSession(
+            takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture
+        )
+        #expect(!StageBand.greys(take.state))
+        take.fail("Nothing was recorded.")
+        #expect(StageBand.greys(take.state))
+        #expect(!ErrorBanner.showsTakeInFinder(take), "nothing was recorded, so there is nothing to show")
+        take.failure = RecordingSession.Failure(
+            audioURL: URL(fileURLWithPath: "/tmp/parola-stage-failed.wav"),
+            save: Task<LibraryEntry, any Error> { throw CancellationError() },
+            recovery: nil, title: "R", category: .transcription, source: .microphone, annotations: AppModel.TakeAnnotations()
+        )
+        #expect(ErrorBanner.showsTakeInFinder(take))
+    }
+
     @Test("the time slot names the model a live take waits on, with its download")
     func preparingLine() {
         #expect(StageTimeSlot.preparingText(name: "openai_whisper-large-v3_turbo", download: 0.42) == "Preparing Whisper Turbo · 42%")
@@ -211,6 +229,46 @@ extension TranscriberMockSuites {
             #expect(notice?.actions.map(\.title) == ["Retry", "Show"])
             let saved = await landedEntry(model)
             #expect(saved?.title.hasSuffix("(interrupted)") == true)
+        }
+
+        @Test("a take whose transcription fails keeps its Stage, with Retry and Show in Finder on the audio it saved")
+        func failedTakeKeepsItsStage() async throws {
+            let audio = try makeTakeWAV("stage-failed", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "the engine gave up")
+                ))
+                let model = makeModel("stage-failed")
+
+                recordAndStop(model, audio: audio, seconds: 1)
+
+                var message: String?
+                let failed = await waitUntil {
+                    if case .failed(let text) = model.recording?.state { message = text }
+                    return message != nil
+                }
+                #expect(failed)
+                let take = try #require(model.recording)
+                #expect(model.route == .recording)
+                #expect(ContentRoutes.stageShows(take, model: model), "the Stage stays with the failed take")
+                #expect(message?.hasSuffix("The audio was saved to your library.") == true)
+                #expect(take.failure != nil, "Retry has what it needs")
+                #expect(ErrorBanner.showsTakeInFinder(take))
+                let failure = try #require(take.failure)
+                let shown = await model.savedAudio(of: failure)
+                let landed = await landedEntry(model)
+                let entry = try #require(landed)
+                #expect(entry.title.hasSuffix("(transcription failed)"))
+                let inLibrary = shown?.path.hasPrefix(model.library.libraryURL.path) ?? false
+                let exists = shown.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+                #expect(inLibrary, "Finder shows the entry's copy, not the working file")
+                #expect(exists)
+
+                model.dismissTakeFailure()
+                #expect(model.recording == nil)
+                #expect(model.route != .recording)
+            }
         }
 
         @Test("the Stage's Cancel ends a count-in with no word")

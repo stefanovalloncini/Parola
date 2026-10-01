@@ -187,12 +187,12 @@ struct ContentRoutes: View {
         return run
     }
 
-    /// The Stage holds a take from its count-in until Stop, and on through its transcription while the run reports to it.
+    /// The Stage holds a take from its count-in until it lands: through its transcription while the run reports to it, and through a failure until it is dismissed.
     static func stageShows(_ take: RecordingSession, model: AppModel) -> Bool {
         switch take.state {
-        case .arming, .recording, .paused, .finishing: true
+        case .arming, .recording, .paused, .finishing, .failed: true
         case .transcribing: stageTranscription(for: model) != nil
-        case .done, .failed: false
+        case .done: false
         }
     }
 }
@@ -207,8 +207,6 @@ private struct StageRoute<Library: View, PhasePage: View>: View {
     var body: some View {
         if let take = model.recording, ContentRoutes.stageShows(take, model: model) {
             StagePage(take: take)
-        } else if let take = model.recording, case .failed(let message) = take.state {
-            ErrorPane(message: message, take: take)
         } else if model.recording?.isTranscribing == true {
             phasePage
         } else {

@@ -13083,6 +13083,17 @@
         }
       }
     },
+    "Show in Finder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra nel Finder"
+          }
+        }
+      }
+    },
     "Show info": {
       "extractionState": "manual",
       "localizations": {
@@ -14578,6 +14589,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La registrazione resta nella libreria."
+          }
+        }
+      }
+    },
+    "The recording stopped": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La registrazione si è interrotta"
           }
         }
       }

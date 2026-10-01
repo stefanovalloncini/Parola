@@ -4981,6 +4981,23 @@ final class AppModel {
         endSession(of: session.takeID)
     }
 
+    /// Show in Finder on a failed take's Stage: the audio its failure saved.
+    func revealFailedTake() {
+        guard let failure = recording?.failure else { return }
+        Task { [weak self] in
+            guard let url = await self?.savedAudio(of: failure) else { return }
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+    }
+
+    /// Where a failed take's audio is now: its entry's copy once the save lands, else the working file it was saved from.
+    func savedAudio(of failure: RecordingSession.Failure) async -> URL? {
+        if let entry = try? await failure.save?.value, let audio = try? await library.load(entry.id).document.audioURL {
+            return audio
+        }
+        return FileManager.default.fileExists(atPath: failure.audioURL.path) ? failure.audioURL : nil
+    }
+
     /// Re-runs a failed take's transcription in the entry its failure saved, so no twin appears; from its working file when that save never landed.
     func retryTake(_ failure: RecordingSession.Failure) {
         let url = failure.audioURL

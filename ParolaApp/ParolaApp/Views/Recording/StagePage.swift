@@ -54,7 +54,7 @@ struct StagePage: View {
             Spacer(minLength: DS.Spacing.large)
                 .frame(maxHeight: 44)
             stageText
-                .frame(minHeight: StageLiveText.minHeight, maxHeight: StageLiveText.height)
+                .frame(minHeight: StageLiveText.minHeight, maxHeight: textHeight)
                 // Ahead of the spacers: a short window gives up spacing first, then lines, never the bar's clearance.
                 .layoutPriority(1)
             Spacer(minLength: 0)
@@ -92,6 +92,11 @@ struct StagePage: View {
         switch take.mode {
         case .transcribing:
             StageTakeText(isOnScreen: isOnScreen)
+        case .failed(let message):
+            ErrorBanner(message: message, take: take)
+                .frame(maxWidth: StageLiveText.width)
+                .padding(.horizontal, DS.Spacing.large)
+                .frame(maxHeight: .infinity, alignment: .top)
         default:
             if take.isStreaming {
                 StageLiveText(isOnScreen: isOnScreen)
@@ -101,11 +106,18 @@ struct StagePage: View {
         }
     }
 
+    /// A failure's banner can run longer than the teleprompter's lines, and nothing else needs the room by then.
+    private var textHeight: CGFloat? {
+        if case .failed = take.mode { return nil }
+        return StageLiveText.height
+    }
+
     private var accessibilityTitle: LocalizedStringKey {
         let from = take.source.label.lowercased()
         switch take.mode {
         case .countIn, .preparing, .starting: return "Getting ready to record from \(from)"
         case .transcribing: return "Transcribing the recording"
+        case .failed: return "The recording stopped"
         default: return "Recording from \(from)"
         }
     }
@@ -310,7 +322,7 @@ struct StageFacts: View {
             case .paused:
                 RecDot(color: DS.Palette.warning)
                 statusWord("PAUSED", color: DS.Color.warningText)
-            case .finishing:
+            case .finishing, .failed:
                 RecDot(color: DS.Color.secondaryText)
                 statusWord("REC", color: DS.Color.secondaryText)
             case .transcribing(let progress):

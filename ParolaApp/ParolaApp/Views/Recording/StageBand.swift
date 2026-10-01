@@ -16,6 +16,12 @@ struct StageBand: View {
 
     private var drawsLive: Bool { isOnScreen && take.state == .recording }
 
+    /// A failed take's band stays where it stopped, drained of colour and set back behind the banner.
+    nonisolated static func greys(_ state: RecordingSession.State) -> Bool {
+        if case .failed = state { return true }
+        return false
+    }
+
     var body: some View {
         Group {
             if reduceMotion {
@@ -25,7 +31,8 @@ struct StageBand: View {
                 band
             }
         }
-        .saturation(take.isPaused ? 0 : 1)
+        .saturation(take.isPaused || Self.greys(take.state) ? 0 : 1)
+        .opacity(Self.greys(take.state) ? 0.45 : 1)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: take.isPaused)
         .mask {
             LinearGradient(
