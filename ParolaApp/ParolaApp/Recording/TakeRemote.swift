@@ -64,8 +64,8 @@ enum TakeRemote {
     static func discard(_ model: AppModel, confirm: @MainActor () async -> Bool) async -> Bool {
         guard !askingToDiscard, let takeID = model.recording?.takeID else { return false }
         askingToDiscard = true
+        defer { askingToDiscard = false }
         let confirmed = await confirm()
-        askingToDiscard = false
         guard confirmed else { return false }
         return await StageControls.discard(takeID, model: model)
     }
