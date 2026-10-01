@@ -451,7 +451,8 @@ extension TranscriberMockSuites {
             ))
             model.useStreaming = true
             model.startRecording(source: .microphone)
-            return await waitUntil { model.recording?.state == .recording }
+            // The take records until Stop, so a loaded run's slow start hops can take their time.
+            return await waitUntil(timeoutMs: 30_000) { model.recording?.state == .recording }
         }
 
         private func cancel(_ path: FinishingCancel, _ model: AppModel, server: ParolaAutomationServer) async throws {

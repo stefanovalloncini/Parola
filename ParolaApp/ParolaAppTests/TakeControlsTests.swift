@@ -391,7 +391,8 @@ extension TranscriberMockSuites {
                 await MockAudioSourceRegistry.shared.clear()
                 let model = makeRecordingModel("take-discard-arming")
                 startLiveTake(model, MockTranscriberResponse(partials: ["never"], gate: MockTranscriberGate()))
-                let preparing = await waitUntil {
+                // The gate holds the take preparing for good; only a loaded run's slow start hop decides how long this takes.
+                let preparing = await waitUntil(timeoutMs: 30_000) {
                     if case .arming(.preparingModel) = model.recording?.state { return true }
                     return false
                 }
