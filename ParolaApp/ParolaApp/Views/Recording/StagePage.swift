@@ -126,8 +126,11 @@ struct StagePage: View {
             entered = true
             return
         }
-        withAnimation(reduceMotion ? .easeOut(duration: 0.25) : DS.Motion.takeEntry) {
-            entered = true
+        // The same hop the sidebar fold waits for, so the two start in one frame and read as one motion.
+        Task { @MainActor in
+            withAnimation(reduceMotion ? .easeOut(duration: 0.25) : DS.Motion.takeEntry) {
+                entered = true
+            }
         }
     }
 }
