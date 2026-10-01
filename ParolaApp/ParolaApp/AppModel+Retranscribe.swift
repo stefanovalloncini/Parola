@@ -65,6 +65,7 @@ extension AppModel {
         kind: RunLanding.Kind
     ) async {
         var landing: Task<LibraryEntry, any Error>?
+        var landed: Transcript?
         var engineFile: URL?
         defer { if let engineFile { try? FileManager.default.removeItem(at: engineFile) } }
         do {
@@ -109,6 +110,7 @@ extension AppModel {
                 )
             }
             landing = land(rerun)
+            landed = processed
         } catch {
             // applyTranscriptionError parks a cancelled run at .idle and a failed one at .failed;
             // either way the phase stops reading "transcribing" once this task has let go.
@@ -116,6 +118,7 @@ extension AppModel {
         }
         if let landing {
             let saved = (try? await landing.value) != nil
+            if saved, let landed { assignMePerson(in: entryID, transcript: landed) }
             // A save that failed leaves nothing else to move the phase off the run.
             if fileRunGeneration == runToken { phase = saved ? .ready : .idle }
         }

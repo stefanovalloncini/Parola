@@ -597,11 +597,66 @@ extension TranscriberMockSuites {
             #expect(try channels(of: audio) == 2)
         }
 
+        // MARK: - Me in People
+
+        @Test("with a person marked This Is Me, your side of a meeting takes their name, and the entry stands for them")
+        func meTakesTheMarkedPersonsName() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let model = makeModel()
+                await model.addPerson(named: "Stefano")
+                let me = try #require(model.person(named: "Stefano"))
+                model.setMePerson(me.id)
+                #expect(model.meetingMeLabel == "Stefano")
+                let files = try meetingFiles(model)
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone"), (1, 2, "Thanks, glad to be here")])
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+
+                model.stopRecordingAndTranscribe()
+
+                let entry = try #require(await landedEntry(model))
+                let speakers = try await model.library.load(entry.id).document.transcript.segments.map(\.speaker)
+                #expect(speakers == [nil, "Stefano"])
+                let assigned = await waitUntil { model.libraryEntry(id: entry.id)?.speakerAssignments["Stefano"] == me.id }
+                #expect(assigned)
+                await model.awaitSpeakerAssignmentWrites()
+                let stored = try await model.library.load(entry.id).entry.speakerAssignments
+                #expect(stored["Stefano"] == me.id)
+            }
+        }
+
+        @Test("the mark follows its person through a merge, goes with a delete, and People's reset clears it")
+        func meMarkFollowsThePerson() async throws {
+            let defaults = temporaryDefaults()
+            let model = makeModel(defaults: defaults)
+            await model.addPerson(named: "Stefano")
+            await model.addPerson(named: "Stefano V")
+            let me = try #require(model.person(named: "Stefano V"))
+            let other = try #require(model.person(named: "Stefano"))
+            #expect(model.mePerson == nil)
+            #expect(model.meetingMeLabel == AppModel.meLabel())
+
+            model.setMePerson(me.id)
+            #expect(model.mePerson?.id == me.id)
+            #expect(defaults.string(forKey: "mePersonID") == me.id.uuidString)
+
+            await model.mergePerson(me.id, into: other.id)
+            #expect(model.mePerson?.id == other.id)
+            #expect(model.meetingMeLabel == "Stefano")
+
+            await model.deletePerson(other.id)
+            #expect(model.mePerson == nil)
+            #expect(model.mePersonID.isEmpty)
+            #expect(SettingsPaneScope.people.defaultsKeys.contains("mePersonID"))
+        }
+
         @Test("the microphone notices and the Me label read in Italian")
         func micTrackStringsReadInItalian() throws {
             let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
             let italian = try #require(Bundle(path: path))
             #expect(AppModel.meLabel(bundle: italian) == "Io")
+            #expect(String(localized: "This Is Me", bundle: italian) == "Sono io")
             #expect(AppModel.micTrackMissingMessage(bundle: italian) == "Il tuo microfono non è in questa registrazione. Contiene solo l'audio del Mac.")
             #expect(AppModel.micTrackStoppedMessage(bundle: italian) == "Il tuo microfono si è fermato. Il resto della registrazione contiene solo l'audio del Mac.")
         }

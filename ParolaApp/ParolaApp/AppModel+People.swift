@@ -40,6 +40,23 @@ extension AppModel {
         people.first { $0.id == id }
     }
 
+    /// The person marked "This Is Me", while they are in the directory.
+    var mePerson: Person? {
+        UUID(uuidString: mePersonID).flatMap(person(id:))
+    }
+
+    func setMePerson(_ id: UUID?) {
+        mePersonID = id?.uuidString ?? ""
+    }
+
+    /// A transcript whose "Me" took your name stands for you in its entry, as a speaker you assigned would.
+    func assignMePerson(in entryID: LibraryEntry.ID, transcript: Transcript) {
+        guard let me = mePerson, transcript.segments.contains(where: { $0.speaker == me.name }) else { return }
+        let edit = SpeakerAssignmentEdit(assign: [me.name: me.id])
+        patchLibraryEntry(id: entryID) { edit.apply(to: &$0.speakerAssignments) }
+        scheduleAssignmentWrite(for: entryID) { edit.apply(to: &$0) }
+    }
+
     /// The person under a name, matched the way the store matches it.
     func person(named name: String) -> Person? {
         let key = Person.normalizedName(name)
@@ -255,6 +272,7 @@ extension AppModel {
         guard source != target, person(id: source) != nil, person(id: target) != nil else { return }
         let targets = entries(withPerson: source)
         guard let merged = await peopleStore.merge(source, into: target) else { return }
+        if mePersonID == source.uuidString { setMePerson(target) }
         await refreshPeople()
         await rewriteEntries(targets, from: source, toName: merged.name, keeping: merged.id)
     }
@@ -265,6 +283,7 @@ extension AppModel {
         let targets = entries(withPerson: id)
         guard await peopleStore.delete(id) else { return }
         if personFilter == id { personFilter = nil }
+        if mePersonID == id.uuidString { setMePerson(nil) }
         await refreshPeople()
         for entry in targets {
             await mutateAssignments(for: entry.id) { map in

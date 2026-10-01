@@ -273,9 +273,9 @@ extension AppModel {
         return sided
     }
 
-    /// The speaker label your own words take in a meeting.
+    /// The speaker label your own words take in a meeting: the name of the person marked as you, or Me.
     var meetingMeLabel: String {
-        Self.meLabel()
+        mePerson?.name ?? Self.meLabel()
     }
 
     nonisolated static func meLabel(bundle: Bundle = .main) -> String {

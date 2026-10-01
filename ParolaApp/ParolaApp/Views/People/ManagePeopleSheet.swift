@@ -125,6 +125,8 @@ struct PeopleDirectoryList: View {
                     }
                 }
                 .disabled(people.count < 2)
+                Toggle("This Is Me", isOn: isMe(person))
+                    .axLeaf("People.MenuItem.ThisIsMe.\(person.name)")
                 Divider()
                 Button("Delete", role: .destructive) { deleting = person }
                     .axLeaf("People.MenuItem.Delete.\(person.name)")
@@ -183,6 +185,11 @@ struct PeopleDirectoryList: View {
 
     private var isMerging: Binding<Bool> {
         Binding(get: { merging != nil }, set: { if !$0 { merging = nil } })
+    }
+
+    /// Your side of a meeting takes this person's name.
+    private func isMe(_ person: Person) -> Binding<Bool> {
+        Binding(get: { model.mePersonID == person.id.uuidString }, set: { model.setMePerson($0 ? person.id : nil) })
     }
 
     private var isDeleting: Binding<Bool> {

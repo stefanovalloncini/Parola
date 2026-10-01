@@ -14945,6 +14945,17 @@
         }
       }
     },
+    "This Is Me": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sono io"
+          }
+        }
+      }
+    },
     "This Mac can't translate into that language.": {
       "extractionState": "manual",
       "localizations": {

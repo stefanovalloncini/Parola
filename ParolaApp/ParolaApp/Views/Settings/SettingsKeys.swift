@@ -180,7 +180,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .people:
             // diarize is shared with the .general and .transcriptionDefaults scopes: all three
             // show the toggle, and each pane's reset must cover what it shows.
-            return ["showMostUsedPeople", "diarize"]
+            return ["showMostUsedPeople", "diarize", "mePersonID"]
         case .transcriptionDefaults:
             // wordTimestamps and diarize are shared with the .general scope: both panes
             // show the toggles, and each pane's reset must cover what it shows.
