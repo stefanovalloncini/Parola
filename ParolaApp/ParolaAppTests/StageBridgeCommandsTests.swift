@@ -31,8 +31,9 @@ extension TranscriberMockSuites {
 
                 let marked = try await run(server, model, "addRecordingMarker")
                 let marker = model.recording?.markers.first
+                let expected = marker.map { AutomationValue.double($0) }
                 #expect(marker != nil)
-                #expect(marked["marker"] == marker.map { .double($0) })
+                #expect(marked["marker"] == expected)
 
                 let resumed = try await run(server, model, "resumeRecording")
                 #expect(resumed["resumed"] == .bool(true))
