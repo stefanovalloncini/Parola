@@ -216,9 +216,31 @@ struct StageStateTests {
         #expect(StageTakeText.shown("a few words") == "a few words")
         let hour = String(repeating: "word ", count: 20_000) + "last"
         let shown = StageTakeText.shown(hour)
-        #expect(shown.count <= StageTakeText.recentCharacters)
+        #expect(shown.utf8.count <= StageTakeText.recentBytes)
         #expect(shown.hasSuffix("word last"))
         #expect(shown.hasPrefix("word "), "the cut never starts mid-word")
+    }
+
+    @Test("text with no spaces, like Japanese, still shows its newest stretch, cut between characters")
+    func takeTextWithoutSpaces() {
+        let text = String(repeating: "日本語のテキスト", count: 500)
+        let shown = StageTakeText.shown(text)
+        #expect(!shown.isEmpty)
+        #expect(shown.utf8.count <= StageTakeText.recentBytes)
+        #expect(shown.utf8.count >= StageTakeText.recentBytes - StageTakeText.cutStep - 3)
+        #expect(text.hasSuffix(shown))
+    }
+
+    @Test("a three-hour take's text costs a partial no more than the stretch it shows")
+    func takeTextCostsItsTail() {
+        let hours = String(repeating: "perché è già città, ", count: 7_500)
+        // This thread's CPU time, not wall time, so a starved scheduler can't fail it.
+        let start = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+        var laidOut = 0
+        for _ in 0..<200 { laidOut += StageTakeText.shown(hours).utf8.count }
+        let cpuNanoseconds = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - start
+        #expect(cpuNanoseconds < 20_000_000, "\(cpuNanoseconds / 1_000_000) ms of CPU")
+        #expect(laidOut <= 200 * StageTakeText.recentBytes)
     }
 
     @Test("words arriving at the end leave the start of the shown text where it was, until a whole step has come in")
@@ -231,8 +253,8 @@ struct StageStateTests {
             text += "w\(index) "
             let shown = StageTakeText.shown(text)
             if !shown.hasPrefix(previous.trimmingCharacters(in: .whitespaces)) { cuts += 1 }
-            #expect(shown.count <= StageTakeText.recentCharacters)
-            #expect(shown.count >= StageTakeText.recentCharacters - StageTakeText.cutStep - 20, "still enough to fill the column")
+            #expect(shown.utf8.count <= StageTakeText.recentBytes)
+            #expect(shown.utf8.count >= StageTakeText.recentBytes - StageTakeText.cutStep - 20, "still enough to fill the column")
             previous = shown
         }
         #expect(cuts <= 1, "about 160 characters of new words move the cut once at most")

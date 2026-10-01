@@ -64,10 +64,12 @@ struct StageTakeText: View {
     let isOnScreen: Bool
     @Environment(AppModel.self) private var model
 
-    /// At most this much of the run's text is laid out; never less than this minus one step, which still fills the column.
-    nonisolated static let recentCharacters = 900
+    /// At most this many bytes of the run's text, in UTF-8, are laid out; never less than this minus one step, which still fills the column.
+    nonisolated static let recentBytes = 900
     /// The cut moves from the front only in steps this long, so new words never re-break the lines already on screen.
     nonisolated static let cutStep = 300
+    /// How far past a step the cut looks for a space; text with none that close, like Japanese, is cut between characters.
+    nonisolated static let wordReach = 64
 
     var body: some View {
         StageTeleprompter(
@@ -83,17 +85,23 @@ struct StageTakeText: View {
         streamsPartials ? "Transcript appears here as it comes in" : "Transcript appears when it's done"
     }
 
-    /// The run hands back everything it has read so far; an hour of it must not be laid out on every partial.
+    /// The run hands back everything it has read so far; its newest stretch is found by byte offset, so hours of it cost no more than that stretch.
     nonisolated static func shown(_ text: String) -> String {
-        let excess = text.count - recentCharacters
+        let bytes = text.utf8
+        let excess = bytes.count - recentBytes
         guard excess > 0 else { return text }
-        let steps = (excess / cutStep + 1) * cutStep
-        var start = text.index(text.startIndex, offsetBy: steps, limitedBy: text.endIndex) ?? text.endIndex
-        if !text[text.index(before: start)].isWhitespace {
-            while start < text.endIndex, !text[start].isWhitespace { start = text.index(after: start) }
+        var start = bytes.index(bytes.startIndex, offsetBy: (excess / cutStep + 1) * cutStep)
+        if !isSpace(bytes[bytes.index(before: start)]) {
+            let reach = bytes.index(start, offsetBy: wordReach, limitedBy: bytes.endIndex) ?? bytes.endIndex
+            if let space = bytes[start..<reach].firstIndex(where: isSpace) { start = space }
         }
-        while start < text.endIndex, text[start].isWhitespace { start = text.index(after: start) }
+        while start < bytes.endIndex, isSpace(bytes[start]) { start = bytes.index(after: start) }
+        while String.Index(start, within: text) == nil { start = bytes.index(after: start) }
         return String(text[start...])
+    }
+
+    private nonisolated static func isSpace(_ byte: UInt8) -> Bool {
+        byte == 0x20 || byte == 0x0A || byte == 0x09 || byte == 0x0D
     }
 }
 
