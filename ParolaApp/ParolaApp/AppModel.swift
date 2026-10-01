@@ -1425,9 +1425,13 @@ final class AppModel {
             if counts != personUsageCounts { personUsageCounts = counts }
             let badges = LibraryCounts(libraryEntries)
             if badges != libraryCounts { libraryCounts = badges }
+            let usual = LibraryRowFormat.usualLanguage(codes: libraryEntries.compactMap { LanguageDisplay.code(for: $0.language) })
+            if usual != usualLanguage { usualLanguage = usual }
             updateSelectedEntryHasFavorites()
         }
     }
+    /// The language most of the library is in, as a code; a row names its own language only when it differs.
+    private(set) var usualLanguage: String?
     /// How many speaker labels across the library stand for each person. Read off the maps, so an assignment an undo takes back stops counting.
     private(set) var personUsageCounts: [UUID: Int] = [:]
     /// The sidebar's counts, set only when one moves, so a rename or an open repaints no badge.
@@ -1550,7 +1554,6 @@ final class AppModel {
         var labels: [String] = []
         var languages: [String] = []
         var personIDs: [UUID] = []
-        var usualLanguage: String?
     }
 
     @ObservationIgnored private var cachedVocabulary: [EntryCategory?: FilterVocabulary] = [:]
@@ -1564,9 +1567,6 @@ final class AppModel {
 
     /// Every label in the library. Label suggestions are not scoped to the category the entry happens to be in.
     var allKnownLabels: [String] { knownLabels(in: nil) }
-
-    /// The language most of the library is in, as a code; a row names its own language only when it differs.
-    var usualLanguage: String? { vocabulary(in: nil).usualLanguage }
 
     /// The people with at least one entry in one category, in the order every people list shows them.
     func knownPeople(in category: EntryCategory?) -> [Person] {
@@ -1585,14 +1585,12 @@ final class AppModel {
         var seenLanguages = Set<String>()
         var seenPeople = Set<UUID>()
         var found = FilterVocabulary()
-        var codes: [String] = []
         for entry in libraryEntries where category == nil || entry.category == category {
             for label in entry.labels where seenLabels.insert(label).inserted {
                 found.labels.append(label)
             }
-            if let code = LanguageDisplay.code(for: entry.language) {
-                codes.append(code)
-                if seenLanguages.insert(code).inserted { found.languages.append(code) }
+            if let code = LanguageDisplay.code(for: entry.language), seenLanguages.insert(code).inserted {
+                found.languages.append(code)
             }
             for id in entry.personIDs where seenPeople.insert(id).inserted {
                 found.personIDs.append(id)
@@ -1600,7 +1598,6 @@ final class AppModel {
         }
         found.labels.sort { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
         found.languages.sort()
-        found.usualLanguage = LibraryRowFormat.usualLanguage(codes: codes)
         cachedVocabulary[category] = found
         return found
     }
