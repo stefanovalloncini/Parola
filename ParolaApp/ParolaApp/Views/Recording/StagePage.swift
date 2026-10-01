@@ -82,6 +82,7 @@ struct StagePage: View {
         switch take.mode {
         case .transcribing(let progress):
             TakeOverview(progress: progress)
+                .padding(.horizontal, DS.Spacing.large)
         default:
             StageBand(take: take, isOnScreen: isOnScreen)
         }

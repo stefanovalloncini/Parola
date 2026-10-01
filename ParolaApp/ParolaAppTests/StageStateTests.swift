@@ -144,6 +144,38 @@ struct StageStateTests {
     }
 
     @MainActor
+    private func stage(_ take: RecordingSession, model: AppModel) -> (window: CGRect, elements: [HostedAccessibility.Element]) {
+        let hosted = HostedWindow(StagePage(take: take).environment(model), width: 1180, height: 708)
+        defer { hosted.close() }
+        return (hosted.window.frame, HostedAccessibility.elements(in: hosted.host))
+    }
+
+    @MainActor
+    private func liveTake() -> RecordingSession {
+        var take = RecordingSession(
+            takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture
+        )
+        _ = take.markCapturing(at: Date(timeIntervalSinceNow: -60))
+        return take
+    }
+
+    @MainActor
+    @Test("a transcribing take's overview keeps the page's margins")
+    func overviewMargins() throws {
+        let model = makeRecordingModel("stage-overview-margins")
+        var take = liveTake()
+        _ = take.finish(at: Date())
+        _ = take.transcribing(progress: 0.4)
+
+        let hosted = stage(take, model: model)
+
+        let overview = hosted.elements.first { $0.label == "Recording levels" }
+        let frame = try #require(overview).frame
+        #expect(frame.minX - hosted.window.minX >= DS.Spacing.large - 0.5)
+        #expect(hosted.window.maxX - frame.maxX >= DS.Spacing.large - 0.5)
+    }
+
+    @MainActor
     @Test("the saved toast names the place the take went, and goes after three seconds")
     func toast() {
         #expect(TakeSavedToast.message(category: .meeting) == "Saved to Meetings")
