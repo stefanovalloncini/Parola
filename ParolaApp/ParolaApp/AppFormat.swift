@@ -55,6 +55,13 @@ enum AppFormat {
         return String(format: "%d:%02d", minutes, rest)
     }
 
+    /// A running clock read aloud: whole words, with seconds kept past the hour ("1 hour, 2 minutes, 5 seconds").
+    static func spokenDuration(seconds: Int, locale: Locale = AppFormat.locale) -> String {
+        Duration.seconds(max(0, seconds)).formatted(
+            .units(allowed: [.hours, .minutes, .seconds], width: .wide).locale(locale)
+        )
+    }
+
     /// Every span on screen: the largest two units that carry meaning, rounded to whole seconds — a shorter span reads "<1 sec".
     static func duration(seconds: Double, locale: Locale = AppFormat.locale) -> String {
         let total = Int(max(0, seconds).rounded())

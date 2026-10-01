@@ -40,6 +40,19 @@ struct StageLayoutTests {
         #expect(StageClock.text(seconds: Int(take.elapsed(at: start.addingTimeInterval(100.2)))) == "1:25")
     }
 
+    @Test("the clock speaks its time in words, hours, minutes and seconds past the hour")
+    func spokenClock() {
+        let english = Locale(identifier: "en_US")
+        let italian = Locale(identifier: "it_IT")
+        #expect(AppFormat.spokenDuration(seconds: 0, locale: english) == "0 seconds")
+        #expect(AppFormat.spokenDuration(seconds: 754, locale: english) == "12 minutes, 34 seconds")
+        #expect(AppFormat.spokenDuration(seconds: 3725, locale: english) == "1 hour, 2 minutes, 5 seconds")
+        #expect(AppFormat.spokenDuration(seconds: 3 * 3600 + 5 * 60 + 9, locale: english) == "3 hours, 5 minutes, 9 seconds")
+        #expect(AppFormat.spokenDuration(seconds: 0, locale: italian) == "0 secondi")
+        #expect(AppFormat.spokenDuration(seconds: 754, locale: italian) == "12 minuti e 34 secondi")
+        #expect(AppFormat.spokenDuration(seconds: 3725, locale: italian) == "1 ora, 2 minuti e 5 secondi")
+    }
+
     @Test("the recording light is full as each second turns and faint halfway through it")
     func recDotPulse() {
         #expect(RecDot.pulse(at: 0) == 1)

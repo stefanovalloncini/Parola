@@ -102,7 +102,7 @@ struct StageClock: View {
             .contentTransition(rolls && !reduceMotion ? .numericText() : .identity)
             .animation(rolls && !reduceMotion ? .snappy(duration: 0.3) : nil, value: seconds)
             .accessibilityLabel("Recording time")
-            .accessibilityValue(AppFormat.duration(seconds: Double(seconds)))
+            .accessibilityValue(AppFormat.spokenDuration(seconds: seconds))
             .accessibilityAddTraits(.updatesFrequently)
     }
 }
