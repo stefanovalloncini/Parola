@@ -289,6 +289,8 @@ struct RecordingSurfaceTests {
         let model = makeRecordingModel("remote-stop-count-in")
         model.recordingCountInSeconds = 3
         model.startRecording(source: .microphone)
+        // A Stop that fails to end the count-in would otherwise reach the microphone three seconds on.
+        defer { model.cancelRecordingCountdown() }
         #expect(model.recordingCountdown != nil)
 
         TakeRemote.stop(model)
