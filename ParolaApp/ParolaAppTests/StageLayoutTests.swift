@@ -2,9 +2,60 @@ import AppKit
 import SwiftUI
 import Testing
 @testable import Parola
+import ParolaCore
 
 @Suite("Stage layout")
 struct StageLayoutTests {
+    @Test("the clock reads m:ss, then h:mm:ss after an hour")
+    func clock() {
+        #expect(StageClock.text(seconds: 0) == "0:00")
+        #expect(StageClock.text(seconds: 75) == "1:15")
+        #expect(StageClock.text(seconds: 3600) == "1:00:00")
+        #expect(StageClock.text(seconds: 3 * 3600 + 5 * 60 + 9) == "3:05:09")
+    }
+
+    @Test("the clock counts the take's capture, stands still through a pause and ticks on the take's own seconds")
+    func clockSkipsPauses() throws {
+        let start = Date(timeIntervalSinceReferenceDate: 0)
+        var take = RecordingSession(
+            takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture
+        )
+        #expect(take.clockOrigin == nil)
+        _ = take.markCapturing(at: start)
+        #expect(StageClock.text(seconds: Int(take.elapsed(at: start.addingTimeInterval(75.6)))) == "1:15")
+        _ = take.pause(at: start.addingTimeInterval(75.6))
+        #expect(StageClock.text(seconds: Int(take.elapsed(at: start.addingTimeInterval(90)))) == "1:15")
+        _ = take.resume(at: start.addingTimeInterval(90.2))
+        let origin = try #require(take.clockOrigin)
+        #expect(abs(origin.timeIntervalSince(start) - 14.6) < 0.0001)
+        #expect(StageClock.text(seconds: Int(take.elapsed(at: start.addingTimeInterval(100.2)))) == "1:25")
+    }
+
+    @Test("the recording light is full as each second turns and faint halfway through it")
+    func recDotPulse() {
+        #expect(RecDot.pulse(at: 0) == 1)
+        #expect(RecDot.pulse(at: 12) == 1)
+        #expect(abs(RecDot.pulse(at: 12.5) - 0.35) < 0.0001)
+    }
+
+    private func italianBundle() throws -> Bundle {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        return try #require(Bundle(path: path))
+    }
+
+    @Test("the Stage's words have their Italian")
+    @MainActor
+    func italian() throws {
+        let it = try italianBundle()
+        #expect(StageFacts.modeLine(isStreaming: true, bundle: it) == "Trascrizione in tempo reale")
+        #expect(StageFacts.modeLine(isStreaming: false, bundle: it) == "Trascrizione al termine")
+        #expect(StageFacts.modeLine(isStreaming: true) == "Live transcript")
+        #expect(String(localized: "Transcript appears when you stop", bundle: it) == "La trascrizione appare quando fermi la registrazione")
+        #expect(String(localized: "Stop the recording to change the microphone", bundle: it) == "Ferma la registrazione per cambiare microfono")
+        #expect(String(localized: "Pause Recording", bundle: it) == "Metti in pausa la registrazione")
+        #expect(String(localized: "The audio is deleted.", bundle: it) == "L'audio viene eliminato.")
+    }
+
     @MainActor
     private func measured(_ font: Font, text: String = "Hxg 019") -> CGSize {
         NSHostingView(rootView: Text(verbatim: text).font(font)).fittingSize

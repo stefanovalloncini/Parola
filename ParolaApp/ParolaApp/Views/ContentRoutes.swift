@@ -199,7 +199,7 @@ private struct StageRoute<Library: View, PhasePage: View>: View {
         if let take = model.recording {
             switch take.state {
             case .arming, .recording, .paused, .finishing:
-                RecordingPane(source: take.source)
+                StagePage(take: take)
             case .transcribing(let progress):
                 if let run = ContentRoutes.stageTranscription(for: model) {
                     TakeTranscribingPane(file: run.file, progress: progress)
