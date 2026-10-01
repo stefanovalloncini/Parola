@@ -203,6 +203,35 @@ struct LibraryListLayoutTests {
         #expect(shrank, "row 0 stayed \(topRow()) pt")
     }
 
+    @Test("a failure brings the list back to its first row, where the banner sits, once per failure")
+    func failureScrollsToTheBanner() async throws {
+        let hosted = await host(entries(120), groupsByDate: false)
+        defer { close(hosted) }
+        func firstVisibleRow() -> Int {
+            guard let table = table(hosted) else { return -1 }
+            return table.rows(in: table.visibleRect).location
+        }
+        func scrollToTheEnd() {
+            guard let table = table(hosted) else { return }
+            table.scrollRowToVisible(table.numberOfRows - 1)
+        }
+        scrollToTheEnd()
+        #expect(await settled(hosted) { firstVisibleRow() > 50 })
+
+        hosted.model.phase = .failed(message: "The file couldn't be decoded.")
+        let atTop = await settled(hosted) { firstVisibleRow() == 0 }
+        #expect(atTop, "the list stayed at row \(firstVisibleRow())")
+
+        scrollToTheEnd()
+        let away = await settled(hosted) { firstVisibleRow() > 50 }
+        await settle()
+        #expect(away && firstVisibleRow() > 50, "the same failure pulled the list back to row \(firstVisibleRow())")
+
+        hosted.model.phase = .failed(message: "The link couldn't be fetched.")
+        let backAtTop = await settled(hosted) { firstVisibleRow() == 0 }
+        #expect(backAtTop, "a new failure left the list at row \(firstVisibleRow())")
+    }
+
     @Test("no row draws a rule under it: not the page's top, not a date title, not an entry")
     func rowsDrawNoRule() async throws {
         let hosted = await host(threeGroups())

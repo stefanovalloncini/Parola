@@ -13,6 +13,9 @@ enum LibraryListItem: Identifiable, Equatable {
     case header(id: String, title: String)
     case entry(LibraryRowDisplay)
 
+    /// The page's own top, the row a list puts before every item.
+    static let pageTopID = "page/top"
+
     var id: String {
         switch self {
         // A file name can't hold a slash, so no entry id takes this form.
@@ -77,6 +80,7 @@ struct LibraryRowList<Top: View>: View {
                     .listRowInsets(Self.titleInsets)
                     .listRowSeparator(.hidden)
                     .selectionDisabled()
+                    .id(LibraryListItem.pageTopID)
             }
             ForEach(items) { item in
                 switch item {

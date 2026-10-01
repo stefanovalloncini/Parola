@@ -408,22 +408,25 @@ private struct LibraryBrowseList: View, Equatable {
     var body: some View {
         Group {
             if emptyKind == .none {
-                LibraryRowList(
-                    items: rowItems,
-                    selection: $selection,
-                    detail: .excerpt,
-                    animatesRows: animatesRows,
-                    rename: { entry in
-                        renameDraft = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: model.showAITitles)
-                        renamingEntry = entry
-                    },
-                    focus: focus,
-                    focusKey: .browse,
-                    top: pageTop(showsIntake: true)
-                        .padding(.top, DS.Spacing.small)
-                        .padding(.bottom, DS.Spacing.tight)
-                )
-                .scrollEdgeEffectStyle(.soft, for: .top)
+                ScrollViewReader { proxy in
+                    LibraryRowList(
+                        items: rowItems,
+                        selection: $selection,
+                        detail: .excerpt,
+                        animatesRows: animatesRows,
+                        rename: { entry in
+                            renameDraft = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: model.showAITitles)
+                            renamingEntry = entry
+                        },
+                        focus: focus,
+                        focusKey: .browse,
+                        top: pageTop(showsIntake: true)
+                            .padding(.top, DS.Spacing.small)
+                            .padding(.bottom, DS.Spacing.tight)
+                    )
+                    .scrollEdgeEffectStyle(.soft, for: .top)
+                    .background { FailureScroll(proxy: proxy) }
+                }
             } else {
                 VStack(spacing: 0) {
                     pageTop(showsIntake: !showsHero)
@@ -604,6 +607,25 @@ struct LibraryFailureBanner: View {
             ErrorBanner(message: message)
                 .padding(insets)
         }
+    }
+}
+
+/// Brings a page's first row back on screen when a failure lands, so its banner is seen; once per failure, so it never fights a scroll.
+private struct FailureScroll: View {
+    @Environment(AppModel.self) private var model
+    let proxy: ScrollViewProxy
+
+    var body: some View {
+        Color.clear
+            .onChange(of: failureMessage) { _, message in
+                guard message != nil else { return }
+                proxy.scrollTo(LibraryListItem.pageTopID, anchor: .top)
+            }
+    }
+
+    private var failureMessage: String? {
+        if case .failed(let message) = model.phase { return message }
+        return nil
     }
 }
 
