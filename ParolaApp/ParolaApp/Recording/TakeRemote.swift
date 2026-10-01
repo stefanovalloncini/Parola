@@ -85,11 +85,20 @@ enum TakeRemote {
     /// The Stage's Discard question; Return keeps the take, so only a deliberate click deletes it.
     static func askToDiscard() -> Bool {
         NSApp.activate(ignoringOtherApps: true)
+        return discardAlert().runModal() == .alertSecondButtonReturn
+    }
+
+    /// The same question as a sheet on the window it is asked from.
+    static func askToDiscard(on window: NSWindow) async -> Bool {
+        await discardAlert().beginSheetModal(for: window) == .alertSecondButtonReturn
+    }
+
+    private static func discardAlert() -> NSAlert {
         let alert = NSAlert()
         alert.messageText = String(localized: "Discard this recording?")
         alert.informativeText = String(localized: "The audio is deleted.")
         alert.addButton(withTitle: String(localized: "Cancel"))
         alert.addButton(withTitle: String(localized: "Discard")).hasDestructiveAction = true
-        return alert.runModal() == .alertSecondButtonReturn
+        return alert
     }
 }

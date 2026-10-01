@@ -123,26 +123,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     static func presentQuitDuringTakeAlert() -> AppModel.QuitDuringTake {
-        askAboutTake(discardTitle: String(localized: "Discard"))
-    }
-
-    /// The same question for the main window closing; its Discard… asks once more before anything is deleted.
-    static func presentCloseDuringTakeAlert() -> AppModel.QuitDuringTake {
-        askAboutTake(discardTitle: String(localized: "Discard…"))
-    }
-
-    private static func askAboutTake(discardTitle: String) -> AppModel.QuitDuringTake {
         NSApp.activate(ignoringOtherApps: true)
+        return choice(for: takeAlert(discardTitle: String(localized: "Discard")).runModal())
+    }
+
+    /// The same question as a sheet on the window that is closing; its Discard… asks once more before anything is deleted.
+    static func askAboutClosing(_ window: NSWindow) async -> AppModel.QuitDuringTake {
+        choice(for: await takeAlert(discardTitle: String(localized: "Discard…")).beginSheetModal(for: window))
+    }
+
+    private static func takeAlert(discardTitle: String) -> NSAlert {
         let alert = NSAlert()
         alert.messageText = String(localized: "A recording is in progress")
         alert.informativeText = String(localized: "Stop and Save keeps what you've recorded so far in your library.")
         alert.addButton(withTitle: String(localized: "Stop and Save"))
         alert.addButton(withTitle: String(localized: "Keep Recording")).keyEquivalent = "\u{1b}"
         alert.addButton(withTitle: discardTitle).hasDestructiveAction = true
-        switch alert.runModal() {
-        case .alertFirstButtonReturn: return .stopAndSave
-        case .alertThirdButtonReturn: return .discard
-        default: return .keepRecording
+        return alert
+    }
+
+    private static func choice(for response: NSApplication.ModalResponse) -> AppModel.QuitDuringTake {
+        switch response {
+        case .alertFirstButtonReturn: .stopAndSave
+        case .alertThirdButtonReturn: .discard
+        default: .keepRecording
         }
     }
 

@@ -37,16 +37,16 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
     private weak var model: AppModel?
     // Read by the Objective-C forwarding below, which AppKit only sends on the main thread.
     nonisolated(unsafe) private weak var forwarded: NSObject?
-    private let ask: @MainActor () -> AppModel.QuitDuringTake
-    private let confirmDiscard: @MainActor () async -> Bool
+    private let ask: @MainActor (NSWindow) async -> AppModel.QuitDuringTake
+    private let confirmDiscard: @MainActor (NSWindow) async -> Bool
 
     var wrapped: NSObject? { forwarded }
 
     private init(
         model: AppModel,
         forwarded: NSObject?,
-        ask: @escaping @MainActor () -> AppModel.QuitDuringTake,
-        confirmDiscard: @escaping @MainActor () async -> Bool
+        ask: @escaping @MainActor (NSWindow) async -> AppModel.QuitDuringTake,
+        confirmDiscard: @escaping @MainActor (NSWindow) async -> Bool
     ) {
         self.model = model
         self.forwarded = forwarded
@@ -59,8 +59,8 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
     static func install(
         on window: NSWindow,
         model: AppModel,
-        ask: @escaping @MainActor () -> AppModel.QuitDuringTake = AppDelegate.presentCloseDuringTakeAlert,
-        confirmDiscard: @escaping @MainActor () async -> Bool = TakeRemote.askToDiscard
+        ask: @escaping @MainActor (NSWindow) async -> AppModel.QuitDuringTake = AppDelegate.askAboutClosing,
+        confirmDiscard: @escaping @MainActor (NSWindow) async -> Bool = TakeRemote.askToDiscard(on:)
     ) -> MainWindowCloseGuard {
         if let installed = window.delegate as? MainWindowCloseGuard {
             installed.model = model
@@ -74,16 +74,17 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
         return closeGuard
     }
 
+    /// The window stays while the sheet asks; AppKit refuses another close as long as the sheet is up.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard let model, MainWindowClose.asks(take: model.recording) else {
             return (forwarded as? any NSWindowDelegate)?.windowShouldClose?(sender) ?? true
         }
-        let choice = ask()
-        guard choice != .keepRecording else { return false }
+        let ask = ask
         let confirmDiscard = confirmDiscard
-        Task { [weak sender] in
-            await MainWindowClose.resolve(choice, model: model, confirmDiscard: confirmDiscard) {
-                guard let sender, sender.isVisible || sender.isMiniaturized else { return }
+        Task {
+            let choice = await ask(sender)
+            await MainWindowClose.resolve(choice, model: model, confirmDiscard: { await confirmDiscard(sender) }) {
+                guard sender.isVisible || sender.isMiniaturized else { return }
                 sender.performClose(nil)
             }
         }
