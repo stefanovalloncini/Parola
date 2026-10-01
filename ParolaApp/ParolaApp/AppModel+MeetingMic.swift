@@ -111,6 +111,11 @@ extension AppModel {
             return
         }
         let asks = micAccessRequest != nil || (capture is MicAudioSource && mode == .normal)
+        if asks, Self.refusesMic(micAccessBeforeTake()) {
+            ParolaLog.notice(.appPermissions, "microphone access for a meeting's second track was already refused")
+            micTrackUnavailable(take.id, notifies: false)
+            return
+        }
         if asks, await requestMicAccess() == false {
             ParolaLog.notice(.appPermissions, "microphone access for a meeting's second track was denied")
             micTrackUnavailable(take.id)
@@ -139,6 +144,17 @@ extension AppModel {
         writeRecordingCheckpoint()
     }
 
+    /// The microphone permission as it stood before the take asked; a test that answers the prompt itself starts from not asked.
+    private func micAccessBeforeTake() -> AVAuthorizationStatus {
+        if let micAccessStatus { return micAccessStatus() }
+        return micAccessRequest == nil ? AVCaptureDevice.authorizationStatus(for: .audio) : .notDetermined
+    }
+
+    /// Refused before the take asked: the You lane says so, and a notice on every meeting would only repeat the user's own choice.
+    nonisolated static func refusesMic(_ status: AVAuthorizationStatus) -> Bool {
+        status == .denied || status == .restricted
+    }
+
     private func requestMicAccess() async -> Bool {
         if let micAccessRequest { return await micAccessRequest() }
         return await AVCaptureDevice.requestAccess(for: .audio)
@@ -154,10 +170,10 @@ extension AppModel {
         return MicAudioSource(deviceUID: preferredInputDeviceUID, fileURL: RecordingScratch.meetingMicURL(for: macFile))
     }
 
-    private func micTrackUnavailable(_ takeID: Int) {
+    private func micTrackUnavailable(_ takeID: Int, notifies: Bool = true) {
         guard micTrack?.takeID == takeID else { return }
         takeMicTrackState = .unavailable
-        noteMicTrackMissing(takeID, stopped: false)
+        if notifies { noteMicTrackMissing(takeID, stopped: false) }
     }
 
     /// Reads the microphone's meter once a tick: its first sample places it in the take, and one gone quiet while the Mac audio runs on has stopped.

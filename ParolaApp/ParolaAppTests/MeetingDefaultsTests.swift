@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Foundation
 import Testing
 @testable import Parola
@@ -314,6 +315,69 @@ extension TranscriberMockSuites {
             }
         }
 
+        /// A meeting whose microphone permission stood at `status` before the take; `answers` is the prompt's answer, counting each ask.
+        private func meetingWithMicAccess(
+            _ label: String, status: AVAuthorizationStatus, answers: Bool, asked: MicPrompts
+        ) async throws -> (model: AppModel, files: [URL]) {
+            let model = makeRecordingModel(label)
+            model.useStreaming = false
+            let macFile = try makeTakeWAV("\(label)-mac")
+            let micFile = try makeTakeWAV("\(label)-mic")
+            model.takeCaptureOverride = { _ in MeteredCapture(file: macFile) }
+            model.micTrackCaptureOverride = { MeteredCapture(file: micFile) }
+            model.micAccessStatus = { status }
+            model.micAccessRequest = {
+                asked.count += 1
+                return answers
+            }
+            model.startRecording(source: .systemAudio)
+            let settled = await waitUntil(timeoutMs: 10_000) { model.takeMicTrackState == .unavailable }
+            guard settled else { throw FixtureTakeDidNotStart() }
+            return (model, [macFile, micFile])
+        }
+
+        @Test("a microphone refused before the take asks no more and says nothing; its lane says it isn't recorded", arguments: [
+            AVAuthorizationStatus.denied, .restricted,
+        ])
+        func refusedBeforeTheTakeIsQuiet(_ status: AVAuthorizationStatus) async throws {
+            try await withMocksCleared(.audioSource) {
+                let asked = MicPrompts()
+                let (model, files) = try await meetingWithMicAccess("mic-refused-before", status: status, answers: false, asked: asked)
+                defer { for file in files { try? FileManager.default.removeItem(at: file) } }
+                await settle(for: .milliseconds(300))
+                #expect(model.exportNotice == nil)
+                #expect(asked.count == 0, "no prompt for a permission already refused")
+                #expect(StageBand.lostMicNote(model.takeMicTrackState) == "Microphone not recorded")
+                #expect(model.recording?.source == .systemAudio)
+                model.cancelCurrentWork()
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+            }
+        }
+
+        @Test("a microphone refused at this take's own prompt is said once, as a microphone that fails is")
+        func refusedAtThePromptSaysSo() async throws {
+            try await withMocksCleared(.audioSource) {
+                let asked = MicPrompts()
+                let (model, files) = try await meetingWithMicAccess("mic-refused-now", status: .notDetermined, answers: false, asked: asked)
+                defer { for file in files { try? FileManager.default.removeItem(at: file) } }
+                let notice = await waitForNotice(model)
+                #expect(notice?.message == AppModel.micTrackMissingMessage())
+                #expect(asked.count == 1)
+                model.cancelCurrentWork()
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+            }
+        }
+
+        @Test("only a refused or restricted permission counts as refused before the take")
+        func refusedStatuses() {
+            #expect(AppModel.refusesMic(.denied))
+            #expect(AppModel.refusesMic(.restricted))
+            #expect(!AppModel.refusesMic(.notDetermined))
+            #expect(!AppModel.refusesMic(.authorized))
+        }
+
         @Test("a microphone that came up but never sent a sound reads as not recorded")
         func silentMicIsNotRecorded() async throws {
             try await withMocksCleared(.audioSource) {
@@ -514,6 +578,12 @@ extension TranscriberMockSuites {
             }
         }
     }
+}
+
+/// How many times a take asked for the microphone; set and read on the main actor only.
+@MainActor
+private final class MicPrompts {
+    var count = 0
 }
 
 /// A capture whose meter reads whatever the test records into it.

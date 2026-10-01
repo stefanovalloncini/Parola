@@ -264,6 +264,8 @@ final class AppModel {
     @ObservationIgnored var micTrackCaptureOverride: (@MainActor () -> (any LiveAudioSource)?)?
     /// Test seam: when set, answers the microphone permission prompt in its place, for any capture.
     @ObservationIgnored var micAccessRequest: (@MainActor () async -> Bool)?
+    /// Test seam: when set, stands in for the microphone permission as it stood before a meeting's take asked.
+    @ObservationIgnored var micAccessStatus: (@MainActor () -> AVAuthorizationStatus)?
     /// The take that has already said its microphone isn't in the recording.
     @ObservationIgnored var micTrackNoticeTake: Int?
     /// Sampler ticks in which the Mac audio moved on and the microphone didn't, before its track counts as stopped.
