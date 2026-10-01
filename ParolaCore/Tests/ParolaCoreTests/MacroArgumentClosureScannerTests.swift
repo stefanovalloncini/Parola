@@ -246,7 +246,7 @@ struct MacroArgumentClosureScannerTests {
         #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
     }
 
-    // MARK: - R1-1: continuation heuristics must not hide a wrapper closure
+    // MARK: - continuation heuristics must not hide a wrapper closure
 
     @Test("an optional var declared right before a wrapper closure still flags it")
     func optionalVarBeforeWrapperStillFlags() {
@@ -321,8 +321,8 @@ struct MacroArgumentClosureScannerTests {
         #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
     }
 
-    @Test("the widened rule still finds exactly the 3 real allow-listed sites' shape")
-    func stillFindsTheAllowListedShape() {
+    @Test("a require-bound let then an expect on it inside a wrapper still flags it")
+    func requireBoundLetThenExpectInsideWrapperStillFlags() {
         let source = """
         struct RecordingTrustTests {
             func f() async throws {
@@ -336,7 +336,7 @@ struct MacroArgumentClosureScannerTests {
         #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
     }
 
-    // MARK: - R1-2: a closure hiding inside a string interpolation
+    // MARK: - a closure hiding inside a string interpolation
 
     @Test("flags a closure inside a string interpolation used as the condition")
     func flagsClosureInConditionInterpolation() {
@@ -368,7 +368,7 @@ struct MacroArgumentClosureScannerTests {
         #expect(MacroArgumentClosureScanner.violations(in: source).isEmpty)
     }
 
-    // MARK: - R1-4: function-level false positives
+    // MARK: - function-level false positives
 
     @Test("a force-unwrap then a for loop at function level stays safe")
     func forceUnwrapThenForStaysSafe() {
@@ -516,7 +516,7 @@ struct MacroArgumentClosureScannerTests {
         #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
     }
 
-    // MARK: - R2-2: scan Unicode scalars, not grapheme clusters
+    // MARK: - scan Unicode scalars, not grapheme clusters
 
     @Test("an emoji with a skin-tone modifier before a wrapper does not desync quote parity")
     func emojiSkinToneModifierDoesNotDesyncQuotes() {
@@ -528,6 +528,141 @@ struct MacroArgumentClosureScannerTests {
             }
         }
         """
+        #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
+    }
+
+    // MARK: - shapes the Swift 6.4 probe showed really collide
+
+    @Test("a trailing line comment after an optional var still flags the wrapper that follows")
+    func trailingCommentAfterOptionalVarStillFlagsWrapper() {
+        let source = """
+        func f() async {
+            var captured: String? // nil by default
+            await withMocksCleared {
+                #expect(list.contains { $0 == 1 })
+            }
+        }
+        """
+        #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
+    }
+
+    @Test("a closure argument opened while a guard header's parens are still open is flagged")
+    func closureOpenedInsideOpenGuardHeaderParensIsFlagged() {
+        let source = """
+        func f() async {
+            guard let v = await withValue({
+                #expect(list.contains { $0 == 2 })
+                return 1
+            }) else { return }
+            _ = v
+        }
+        """
+        #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
+    }
+
+    @Test("a closure argument opened while an if header's parens are still open is flagged")
+    func closureOpenedInsideOpenIfHeaderParensIsFlagged() {
+        let source = """
+        func f() async {
+            if let v = await withValue({
+                #expect(list.contains { $0 == 2 })
+                return 1
+            }) {
+                _ = v
+            }
+        }
+        """
+        #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
+    }
+
+    @Test("a closure argument opened while a for header's parens are still open is flagged")
+    func closureOpenedInsideOpenForHeaderParensIsFlagged() {
+        let source = """
+        func f() async {
+            for v in await withValue({
+                #expect(list.contains { $0 == 2 })
+                return [1]
+            }) {
+                _ = v
+            }
+        }
+        """
+        #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
+    }
+
+    @Test("a 'set:' second trailing closure is a label, not a set accessor, and still flags")
+    func setLabelSecondTrailingClosureIsNotAnAccessorAndStillFlags() {
+        let source = """
+        func f() {
+            let binding = Binding { 1 } set: { v in
+                #expect(list.contains { $0 == v })
+            }
+            _ = binding
+        }
+        """
+        #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
+    }
+
+    // MARK: - negative shapes that must stay safe
+
+    @Test("a where-labeled closure in an if-let condition does not desync the if body at function level")
+    func whereLabeledClosureInIfLetConditionStaysSafe() {
+        let source = """
+        func f() {
+            if let x = list.first(where: { $0 > 0 }) {
+                #expect(list.contains { $0 == x })
+            }
+        }
+        """
+        #expect(MacroArgumentClosureScanner.violations(in: source).isEmpty)
+    }
+
+    @Test("a member access ending in 'default' does not feed the continuation heuristic")
+    func memberAccessEndingInDefaultDoesNotContinueTheStatement() {
+        let source = """
+        func f() {
+            let mode = Mode.default
+            func g() {
+                #expect(list.contains { $0 == 1 })
+            }
+            g()
+        }
+        """
+        #expect(MacroArgumentClosureScanner.violations(in: source).isEmpty)
+    }
+
+    // MARK: - string and interpolation edge cases
+
+    @Test("flags a closure inside a raw string's hash-interpolation")
+    func flagsClosureInsideRawStringInterpolation() {
+        let source = ##"""
+        await withMocksCleared {
+            #expect(#"\#(items.first { $0 > 1 }!)"# == "x")
+        }
+        """##
+        #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
+    }
+
+    @Test("an escaped triple-quote inside a multi-line string literal does not end it early")
+    func escapedTripleQuoteInsideMultilineStringStaysInsideTheString() {
+        let source = #"""
+        await withMocksCleared {
+            let s = """
+            prefix \""" suffix
+            """
+            #expect(list.contains { $0 == 1 })
+        }
+        """#
+        #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
+    }
+
+    @Test("parens inside an interpolation do not desync the paren depth of the enclosing macro call")
+    func parensInsideInterpolationDoNotDesyncEnclosingParenDepth() {
+        let source = #"""
+        await withMocksCleared {
+            #expect("\(list.first(where: { $0 > 1 }) != nil)" == "true")
+        }
+        """#
         #expect(MacroArgumentClosureScanner.violations(in: source).count == 1)
     }
 }
