@@ -1,9 +1,18 @@
 import SwiftUI
 import ParolaCore
 
+/// Test seam: counts a Library page header's body passes, so a test can tell what makes it run.
+@MainActor
+final class LibraryHeaderPasses {
+    private(set) var count = 0
+
+    func note() {
+        count += 1
+    }
+}
+
 extension EnvironmentValues {
-    /// Test seam: run on each pass of a Library page header's body, so a test can tell what makes it run.
-    @Entry var libraryHeaderPass: (@MainActor @Sendable () -> Void)?
+    @Entry var libraryHeaderPasses: LibraryHeaderPasses?
 }
 
 /// The Library page's title and what it holds, with the menus that narrow and order the list.
@@ -49,12 +58,12 @@ struct LibraryPageHeader: View {
 
     // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
     @Environment(AppModel.self) private var model: AppModel?
-    @Environment(\.libraryHeaderPass) private var notePass
+    @Environment(\.libraryHeaderPasses) private var passes
     @State private var rowWidth: CGFloat = 0
     @State private var unfoldedRowWidth: CGFloat = 0
 
     var body: some View {
-        let _ = notePass?()
+        let _ = passes?.note()
         VStack(alignment: .leading, spacing: DS.Spacing.hair) {
             Text(verbatim: title)
                 .font(DS.Font.display)
