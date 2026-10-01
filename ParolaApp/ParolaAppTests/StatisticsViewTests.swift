@@ -136,7 +136,7 @@ struct StatisticsViewTests {
         let statistics = SidebarSelection.Page(
             route: .statistics, listShowing: false, searching: false, libraryFilter: .meeting, personFilter: nil
         )
-        #expect(SidebarSelection.current(statistics, sidebarPeople: [], showsActivity: true) == nil)
+        #expect(SidebarSelection.current(statistics, sidebarPeople: [], showsActivity: true, showsRecording: false) == nil)
     }
 
     @Test("opening the page drops the list the user was in")

@@ -150,7 +150,7 @@ struct RecentlyDeletedRouteTests {
         let page = SidebarSelection.Page(
             route: route, listShowing: route == .transcript, searching: searching, libraryFilter: filter, personFilter: nil
         )
-        return SidebarSelection.current(page, sidebarPeople: [], showsActivity: true)
+        return SidebarSelection.current(page, sidebarPeople: [], showsActivity: true, showsRecording: false)
     }
 
     @Test("the sidebar highlights the Recently Deleted row while the page shows")

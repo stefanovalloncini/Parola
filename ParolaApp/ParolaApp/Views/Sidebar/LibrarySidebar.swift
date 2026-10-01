@@ -8,6 +8,12 @@ struct LibrarySidebar: View {
     var body: some View {
         let people = sidebarPeople
         List(selection: selection(people: people)) {
+            if model.sidebarShowsRecording {
+                Section {
+                    SidebarRecordingRow(isSelected: current(people: people.map(\.id)) == .recording)
+                        .axLeaf("Row.Recording")
+                }
+            }
             Section {
                 Label("Library", systemImage: "books.vertical")
                     .badge(model.libraryCounts.total)
@@ -50,13 +56,14 @@ struct LibrarySidebar: View {
         .axBranch("Sidebar")
     }
 
-    /// Read from the model on every pass, so a page opened from a menu or the bridge moves the highlight too.
+    /// Read from the model on every pass, so a page opened from a menu or the bridge moves the highlight too; the Recording row lights itself.
     private func selection(people: [Person]) -> Binding<SidebarItem?> {
         let ids = people.map(\.id)
         return Binding(
             get: {
                 _ = model.sidebarRefusedPicks
-                return current(people: ids)
+                let item = current(people: ids)
+                return item == .recording ? nil : item
             },
             set: { item in
                 guard let item else { return }
@@ -67,7 +74,12 @@ struct LibrarySidebar: View {
     }
 
     private func current(people: [UUID]) -> SidebarItem? {
-        SidebarSelection.current(model.sidebarPage, sidebarPeople: people, showsActivity: model.sidebarShowsActivity)
+        SidebarSelection.current(
+            model.sidebarPage,
+            sidebarPeople: people,
+            showsActivity: model.sidebarShowsActivity,
+            showsRecording: model.sidebarShowsRecording
+        )
     }
 
     /// Checked once the transcript a pick closes is gone, so a page that does open never blinks its row.
@@ -78,6 +90,7 @@ struct LibrarySidebar: View {
 
     private func open(_ item: SidebarItem) {
         switch item {
+        case .recording: model.showStage()
         case .library: model.goHome()
         case .category(let category): model.browseCategory(category)
         case .person(let id): model.browsePerson(id)

@@ -226,6 +226,8 @@ final class AppModel {
         didSet {
             let countdown = Self.countIn(of: recording)
             if countdown != recordingCountdown { recordingCountdown = countdown }
+            let showsRecording = recording?.isRunning ?? false
+            if showsRecording != sidebarShowsRecording { sidebarShowsRecording = showsRecording }
             if oldValue?.isRunning == true, !takeIsRunning { foregroundLetGo() }
             if route == .recording, !Self.stageHasSomethingToShow(recording) { route = .transcript }
             if let noticeTake = exportNotice?.takeID, noticeTake != recording?.takeID { exportNotice = nil }
@@ -473,6 +475,8 @@ final class AppModel {
     var showRecordingPill: Bool = true { didSet { defaults.set(showRecordingPill, forKey: "showRecordingPill") } }
     /// The count-in's number, mirrored from the session so the window's overlay redraws only when it moves.
     private(set) var recordingCountdown: Int?
+    /// Whether the sidebar leads back to the Stage, mirrored from the session so the sidebar redraws only when it flips.
+    private(set) var sidebarShowsRecording = false
     @ObservationIgnored private(set) var countdownTask: Task<Void, Never>?
 
     /// A take that ended, or is in the library now, leaves nothing on its Stage.

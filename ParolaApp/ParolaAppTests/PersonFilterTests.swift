@@ -184,7 +184,7 @@ struct PersonFilterTests {
         model.libraryFilter = nil
         model.personFilter = grace
 
-        let selected = SidebarSelection.current(model.sidebarPage, sidebarPeople: [grace], showsActivity: false)
+        let selected = SidebarSelection.current(model.sidebarPage, sidebarPeople: [grace], showsActivity: false, showsRecording: false)
 
         #expect(selected == .person(grace))
         #expect(selected != .library)
@@ -196,7 +196,7 @@ struct PersonFilterTests {
         model.libraryFilter = .meeting
         model.personFilter = grace
 
-        let selected = SidebarSelection.current(model.sidebarPage, sidebarPeople: [grace], showsActivity: false)
+        let selected = SidebarSelection.current(model.sidebarPage, sidebarPeople: [grace], showsActivity: false, showsRecording: false)
 
         #expect(selected == .category(.meeting))
         #expect(selected != .person(grace))
@@ -208,7 +208,7 @@ struct PersonFilterTests {
         model.route = .batch
         model.personFilter = grace
 
-        let selected = SidebarSelection.current(model.sidebarPage, sidebarPeople: [grace], showsActivity: false)
+        let selected = SidebarSelection.current(model.sidebarPage, sidebarPeople: [grace], showsActivity: false, showsRecording: false)
 
         #expect(selected == nil)
     }

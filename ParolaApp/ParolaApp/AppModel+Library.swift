@@ -42,7 +42,7 @@ enum LibraryOrigin: Equatable {
         case .library?: return page.listShowing ? .all : nil
         case .category(let category)?: return .category(category)
         case .person(let id)?: return .person(id)
-        case .activity?, .recentlyDeleted?, nil: return nil
+        case .recording?, .activity?, .recentlyDeleted?, nil: return nil
         }
     }
 

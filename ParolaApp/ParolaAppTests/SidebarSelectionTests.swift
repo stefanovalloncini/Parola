@@ -19,43 +19,53 @@ struct SidebarSelectionTests {
 
     @Test("the library list highlights Library, a category or a person")
     func listPages() {
-        #expect(SidebarSelection.current(page(), sidebarPeople: [], showsActivity: false) == .library)
-        #expect(SidebarSelection.current(page(filter: .meeting), sidebarPeople: [], showsActivity: false) == .category(.meeting))
-        #expect(SidebarSelection.current(page(person: giulia), sidebarPeople: [giulia], showsActivity: false) == .person(giulia))
+        #expect(SidebarSelection.current(page(), sidebarPeople: [], showsActivity: false, showsRecording: false) == .library)
+        #expect(SidebarSelection.current(page(filter: .meeting), sidebarPeople: [], showsActivity: false, showsRecording: false) == .category(.meeting))
+        #expect(SidebarSelection.current(page(person: giulia), sidebarPeople: [giulia], showsActivity: false, showsRecording: false) == .person(giulia))
     }
 
     @Test("a person without a sidebar row highlights nothing")
     func hiddenPerson() {
-        #expect(SidebarSelection.current(page(person: giulia), sidebarPeople: [], showsActivity: false) == nil)
+        #expect(SidebarSelection.current(page(person: giulia), sidebarPeople: [], showsActivity: false, showsRecording: false) == nil)
     }
 
     @Test("a person picked in the header narrows the category, which keeps its row lit")
     func personNarrowingACategory() {
         let narrowed = page(filter: .meeting, person: giulia)
-        #expect(SidebarSelection.current(narrowed, sidebarPeople: [giulia], showsActivity: false) == .category(.meeting))
+        #expect(SidebarSelection.current(narrowed, sidebarPeople: [giulia], showsActivity: false, showsRecording: false) == .category(.meeting))
     }
 
     @Test("an open transcript, a progress page or search results leave every row clickable")
     func nothingHighlighted() {
-        #expect(SidebarSelection.current(page(listShowing: false), sidebarPeople: [], showsActivity: false) == nil)
-        #expect(SidebarSelection.current(page(searching: true), sidebarPeople: [], showsActivity: false) == nil)
-        #expect(SidebarSelection.current(page(route: .statistics), sidebarPeople: [], showsActivity: false) == nil)
-        #expect(SidebarSelection.current(page(route: .recording), sidebarPeople: [], showsActivity: false) == nil)
-        #expect(SidebarSelection.place(of: page(route: .recording)) == nil)
+        #expect(SidebarSelection.current(page(listShowing: false), sidebarPeople: [], showsActivity: false, showsRecording: false) == nil)
+        #expect(SidebarSelection.current(page(searching: true), sidebarPeople: [], showsActivity: false, showsRecording: false) == nil)
+        #expect(SidebarSelection.current(page(route: .statistics), sidebarPeople: [], showsActivity: false, showsRecording: false) == nil)
+        #expect(SidebarSelection.current(page(route: .recording), sidebarPeople: [], showsActivity: false, showsRecording: false) == nil)
+    }
+
+    @Test("the Stage lights the Recording row; other pages keep their own")
+    func recordingRow() {
+        let stage = page(route: .recording, listShowing: false)
+        #expect(SidebarSelection.current(stage, sidebarPeople: [], showsActivity: false, showsRecording: true) == .recording)
+        #expect(SidebarSelection.place(of: stage) == .recording)
+        #expect(SidebarSelection.current(page(), sidebarPeople: [], showsActivity: false, showsRecording: true) == .library)
+        #expect(SidebarSelection.current(page(filter: .meeting), sidebarPeople: [], showsActivity: false, showsRecording: true) == .category(.meeting))
+        #expect(SidebarSelection.current(page(route: .statistics), sidebarPeople: [], showsActivity: false, showsRecording: true) == nil)
+        #expect(LibraryOrigin.capture(from: stage) == nil, "the Stage is no list a transcript goes back to")
     }
 
     @Test("Recently Deleted and Activity own their pages")
     func ownPages() {
-        #expect(SidebarSelection.current(page(route: .recentlyDeleted), sidebarPeople: [], showsActivity: false) == .recentlyDeleted)
-        #expect(SidebarSelection.current(page(route: .queue), sidebarPeople: [], showsActivity: true) == .activity)
-        #expect(SidebarSelection.current(page(route: .batch), sidebarPeople: [], showsActivity: false) == nil)
+        #expect(SidebarSelection.current(page(route: .recentlyDeleted), sidebarPeople: [], showsActivity: false, showsRecording: false) == .recentlyDeleted)
+        #expect(SidebarSelection.current(page(route: .queue), sidebarPeople: [], showsActivity: true, showsRecording: false) == .activity)
+        #expect(SidebarSelection.current(page(route: .batch), sidebarPeople: [], showsActivity: false, showsRecording: false) == nil)
     }
 
     @Test("the page's destination counts a person or the queue the sidebar has no row for")
     func destinations() {
         #expect(SidebarSelection.destination(of: page(person: giulia)) == .person(giulia))
         #expect(SidebarSelection.destination(of: page(route: .queue)) == .activity)
-        #expect(SidebarSelection.current(page(route: .queue), sidebarPeople: [], showsActivity: false) == nil)
+        #expect(SidebarSelection.current(page(route: .queue), sidebarPeople: [], showsActivity: false, showsRecording: false) == nil)
         #expect(SidebarSelection.destination(of: page(listShowing: false, person: giulia)) == nil)
     }
 

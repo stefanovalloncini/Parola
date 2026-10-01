@@ -47,7 +47,7 @@ extension TranscriberMockSuites {
         }
 
         private func sidebar(_ model: AppModel) -> SidebarItem? {
-            SidebarSelection.current(model.sidebarPage, sidebarPeople: [], showsActivity: model.sidebarShowsActivity)
+            SidebarSelection.current(model.sidebarPage, sidebarPeople: [], showsActivity: model.sidebarShowsActivity, showsRecording: model.sidebarShowsRecording)
         }
 
         private func seedEntry(in model: AppModel, text: String) async throws -> LibraryEntry {

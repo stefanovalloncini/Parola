@@ -2,6 +2,7 @@ import Foundation
 import ParolaCore
 
 enum SidebarItem: Hashable {
+    case recording
     case library
     case category(EntryCategory)
     case person(UUID)
@@ -19,10 +20,11 @@ enum SidebarSelection {
         var personFilter: UUID?
     }
 
-    static func current(_ page: Page, sidebarPeople: [UUID], showsActivity: Bool) -> SidebarItem? {
+    static func current(_ page: Page, sidebarPeople: [UUID], showsActivity: Bool, showsRecording: Bool) -> SidebarItem? {
         switch destination(of: page) {
         case .person(let id)? where !sidebarPeople.contains(id): return nil
         case .activity? where !showsActivity: return nil
+        case .recording? where !showsRecording: return nil
         case let item: return item
         }
     }
@@ -38,7 +40,8 @@ enum SidebarSelection {
         switch page.route {
         case .recentlyDeleted: return .recentlyDeleted
         case .queue: return .activity
-        case .batch, .statistics, .recording: return nil
+        case .recording: return .recording
+        case .batch, .statistics: return nil
         case .transcript:
             // A person picked in the header narrows the category; the person's own row means the whole library.
             if let category = page.libraryFilter { return .category(category) }

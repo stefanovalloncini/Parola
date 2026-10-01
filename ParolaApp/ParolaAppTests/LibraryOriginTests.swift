@@ -50,7 +50,7 @@ struct LibraryOriginTests {
     }
 
     private func sidebar(_ model: AppModel) -> SidebarItem? {
-        SidebarSelection.current(model.sidebarPage, sidebarPeople: [], showsActivity: model.sidebarShowsActivity)
+        SidebarSelection.current(model.sidebarPage, sidebarPeople: [], showsActivity: model.sidebarShowsActivity, showsRecording: model.sidebarShowsRecording)
     }
 
     private func page(
@@ -411,7 +411,7 @@ struct LibraryOriginTests {
         let giulia = UUID()
         model.browsePerson(giulia)
         #expect(await openEntry(entry.id, in: model))
-        #expect(SidebarSelection.current(model.sidebarPage, sidebarPeople: [giulia], showsActivity: false) == nil)
+        #expect(SidebarSelection.current(model.sidebarPage, sidebarPeople: [giulia], showsActivity: false, showsRecording: false) == nil)
 
         model.browsePerson(giulia)
 
@@ -419,7 +419,7 @@ struct LibraryOriginTests {
         #expect(closed)
         #expect(model.personFilter == giulia)
         #expect(model.isBrowsingLibrary)
-        #expect(SidebarSelection.current(model.sidebarPage, sidebarPeople: [giulia], showsActivity: false) == .person(giulia))
+        #expect(SidebarSelection.current(model.sidebarPage, sidebarPeople: [giulia], showsActivity: false, showsRecording: false) == .person(giulia))
     }
 
     @Test("a sidebar list row retires the search that would mask it")

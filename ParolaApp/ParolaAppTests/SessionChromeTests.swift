@@ -204,3 +204,41 @@ extension TranscriberMockSuites {
         }
     }
 }
+
+@MainActor
+@Suite("Sidebar Recording row", .serialized)
+struct SidebarRecordingRowTests {
+    @Test("the row draws with no model: a late cell shows nothing and doesn't trap")
+    func drawsWithNoModel() {
+        let hosted = HostedWindow(SidebarRecordingRow(isSelected: true).frame(width: 240), width: 240, height: 80)
+        defer { hosted.close() }
+        #expect(!shows("Row.Recording", in: hosted))
+    }
+
+    @Test("a running take puts a Recording row first, and it leads back to the Stage")
+    func rowLeadsBackToTheStage() async throws {
+        let audio = try tempWAV("sidebar-row")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("sidebar-row")
+        await model.libraryRefreshTask?.value
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        model.route = .transcript
+        let sidebar = HostedWindow(LibrarySidebar().environment(model), width: 240, height: 600)
+        defer { sidebar.close() }
+
+        let rowShown = await waitUntil { sidebar.row(identifiedBy: "Sidebar.Row.Recording") != nil }
+        #expect(rowShown)
+        let recordingRow = try #require(sidebar.row(identifiedBy: "Sidebar.Row.Recording"))
+        let libraryRow = try #require(sidebar.row(identifiedBy: "Sidebar.Row.Library"))
+        #expect(recordingRow < libraryRow)
+        #expect(HostedAccessibility.press(endingWith: "Sidebar.Row.Recording", in: sidebar.host))
+        #expect(model.route == .recording)
+        let outline = try #require(sidebar.table)
+        await settle()
+        #expect(outline.selectedRow == -1, "the Recording row lights itself; no native row is lit on the Stage")
+
+        model.endTestTake()
+        let gone = await waitUntil { sidebar.row(identifiedBy: "Sidebar.Row.Recording") == nil }
+        #expect(gone)
+    }
+}
