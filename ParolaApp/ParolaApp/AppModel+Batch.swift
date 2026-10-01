@@ -55,6 +55,7 @@ extension AppModel {
             mutateBatchJob(id) { $0.status = .transcribing }
             let file = batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/")
             batchPhaseFile = file
+            postFailureBeforeBatchPhase()
             phase = .transcribing(file: file)
         case .progress(let id, let fraction):
             guard !isCancelled(id) else { return }
@@ -80,6 +81,7 @@ extension AppModel {
         case .cancelled(let id):
             mutateBatchJob(id) { $0.status = .cancelled }
         case .finished:
+            postFailureBeforeBatchPhase()
             phase = .ready
             batchPhaseFile = nil
             refreshLibraryOnceBatchAddsLand()
@@ -93,6 +95,11 @@ extension AppModel {
                 resumeBatch(pendingJobs: pending)
             }
         }
+    }
+
+    /// A failure from outside the batch, an open or a save, would vanish under the batch's own phase.
+    private func postFailureBeforeBatchPhase() {
+        if case .failed(let message) = phase { postFailureNotice(message) }
     }
 
     /// Every way a run ends short of its .finished: the refresh and the phase that event would have settled happen here.
@@ -418,6 +425,7 @@ extension AppModel {
         }
         if let t = job.transcript {
             selectedBatchJobID = id
+            leaveFailedPhase()
             showUnsavedBatchJobReplacingSelection(job, t)
             phase = .ready
             route = .transcript

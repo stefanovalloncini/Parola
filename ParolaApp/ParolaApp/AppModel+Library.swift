@@ -670,11 +670,14 @@ extension AppModel {
     /// Not `dismissError()`: that also cancels an in-flight yt-dlp update, which navigating away must not do.
     func leaveFailedPhase() {
         guard case .failed(let message) = phase else { return }
-        // The error card only ever renders on .transcript; anywhere else this failure was never shown.
-        if route != .transcript {
-            exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure)
-        }
+        // The banner only ever renders on .transcript, on the browse list and the results alike; anywhere else this failure was never shown.
+        if route != .transcript { postFailureNotice(message) }
         phase = transcript == nil ? .idle : .ready
+    }
+
+    /// The strip a failure moves to when whatever showed it is about to be replaced.
+    func postFailureNotice(_ message: String) {
+        exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure)
     }
 
     /// Results outrank every list, so anything that leaves one has to retire the query that would mask it.

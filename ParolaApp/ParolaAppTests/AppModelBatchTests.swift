@@ -801,6 +801,44 @@ struct AppModelBatchTests {
         #expect(restored.canResumeBatch)
     }
 
+    @Test("a batch job that starts or finishes over a failure posts the failure as a notice before taking the phase")
+    func batchPhaseWritesKeepTheFailure() async {
+        let model = makeModel()
+        let first = Self.makeJob("first")
+        let second = Self.makeJob("second")
+        model.batchJobs = [first, second]
+        model.phase = .failed(message: "Couldn't open Voice memo 3")
+
+        await model.handleBatchEvent(.started(jobID: first.id))
+        #expect(model.exportNotice?.message == "Couldn't open Voice memo 3")
+        #expect(model.exportNotice?.tone == .failure)
+        #expect(model.batchOwnsPhase)
+
+        model.exportNotice = nil
+        await model.handleBatchEvent(.started(jobID: second.id))
+        #expect(model.exportNotice == nil, "the batch's own phase was showing, not a failure")
+
+        model.phase = .failed(message: "Couldn't open Voice memo 4")
+        await model.handleBatchEvent(.finished)
+        #expect(model.exportNotice?.message == "Couldn't open Voice memo 4")
+        #expect(model.phase == .ready)
+    }
+
+    @Test("opening a job's unsaved transcript from the queue posts a failure the queue never showed")
+    func openingAJobKeepsTheFailure() {
+        let model = makeModel()
+        let done = BatchJob(url: Self.makeURL("done"), status: .done, transcript: Self.makeTranscript())
+        model.batchJobs = [done]
+        model.openQueue()
+        model.phase = .failed(message: "Couldn't open Voice memo 3")
+
+        model.openBatchJobTranscript(done.id)
+
+        #expect(model.exportNotice?.message == "Couldn't open Voice memo 3")
+        #expect(model.phase == .ready)
+        #expect(model.route == .transcript)
+    }
+
     @Test("the queue file is deleted when the batch clears or finishes")
     func batchQueueFileDeletedOnClear() {
         let model = makeModel()
