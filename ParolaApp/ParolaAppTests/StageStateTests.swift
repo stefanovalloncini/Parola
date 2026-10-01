@@ -160,6 +160,32 @@ struct StageStateTests {
     }
 
     @MainActor
+    @Test("a failed take's Stage keeps the clock and the band where they were, with the banner under the band")
+    func failedStageHoldsItsPlace() throws {
+        let model = makeRecordingModel("stage-failed-layout")
+        let live = liveTake()
+        var failed = live
+        failed.fail("Nothing was recorded.")
+
+        let before = stage(live, model: model)
+        let after = stage(failed, model: model)
+
+        let clockBefore = before.elements.first { $0.label == "Recording time" }
+        let clockAfter = after.elements.first { $0.label == "Recording time" }
+        let bandBefore = before.elements.first { $0.label == "Input level" }
+        let bandAfter = after.elements.first { $0.label == "Input level" }
+        let banner = after.elements.first { $0.words.contains("Something went wrong") }
+        let clockWas = try #require(clockBefore).frame
+        let clockIs = try #require(clockAfter).frame
+        let bandWas = try #require(bandBefore).frame
+        let bandIs = try #require(bandAfter).frame
+        let bannerIs = try #require(banner).frame
+        #expect(abs(clockIs.midY - clockWas.midY) < 1, "the clock stays put")
+        #expect(abs(bandIs.midY - bandWas.midY) < 1, "the band stays put")
+        #expect(bannerIs.minY > bandIs.maxY || bannerIs.maxY < bandIs.minY, "the banner sits clear of the band")
+    }
+
+    @MainActor
     @Test("a transcribing take's overview keeps the page's margins")
     func overviewMargins() throws {
         let model = makeRecordingModel("stage-overview-margins")

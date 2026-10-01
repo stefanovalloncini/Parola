@@ -54,7 +54,7 @@ struct StagePage: View {
             Spacer(minLength: DS.Spacing.large)
                 .frame(maxHeight: 44)
             stageText
-                .frame(minHeight: StageLiveText.minHeight, maxHeight: textHeight)
+                .frame(minHeight: StageLiveText.minHeight, maxHeight: StageLiveText.height)
                 // Ahead of the spacers: a short window gives up spacing first, then lines, never the bar's clearance.
                 .layoutPriority(1)
             Spacer(minLength: 0)
@@ -105,12 +105,6 @@ struct StagePage: View {
                 LiveQuietLine(text: "Transcript appears when you stop")
             }
         }
-    }
-
-    /// A failure's banner can run longer than the teleprompter's lines, and nothing else needs the room by then.
-    private var textHeight: CGFloat? {
-        if case .failed = take.mode { return nil }
-        return StageLiveText.height
     }
 
     private var accessibilityTitle: LocalizedStringKey {
