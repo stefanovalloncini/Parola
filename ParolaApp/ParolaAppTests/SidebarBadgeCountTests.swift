@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ParolaCore
 @testable import Parola
@@ -56,29 +58,49 @@ struct SidebarBadgeCountTests {
             job("b", status: .transcribing),
             job("c", status: .done),
         ]
-        #expect(model.activeBatchJobCount == 2)
+        #expect(model.sidebarActivity == .inProgress(count: 2))
 
         model.batchJobs[1].status = .done
-        #expect(model.activeBatchJobCount == 1)
+        #expect(model.sidebarActivity == .inProgress(count: 1))
 
         model.batchJobs[0].status = .failed
-        #expect(model.activeBatchJobCount == 0)
+        #expect(model.sidebarActivity == .failed(count: 1))
     }
 
-    @Test("the Activity row stays while a job waits, runs or failed, and goes once every job settles")
+    @Test("the Activity row stays while a job waits or runs, then while a failure is under a day old")
     func activityFollowsInPlaceStatus() async {
         let model = await makeModel()
         #expect(!model.sidebarShowsActivity)
 
         model.batchJobs = [job("a", status: .pending), job("b", status: .done)]
-        #expect(model.sidebarShowsActivity)
+        #expect(model.sidebarActivity == .inProgress(count: 1))
 
         model.batchJobs[0].status = .failed
-        #expect(model.sidebarShowsActivity, "a failure keeps the row up, with no count on it")
-        #expect(model.activeBatchJobCount == 0)
+        #expect(model.sidebarActivity == .failed(count: 1), "the row turns into Failed, counted")
+        let failedAt = model.batchFailedAt[model.batchJobs[0].id]
+        #expect(failedAt != nil)
+
+        model.refreshSidebarActivity(now: (failedAt ?? Date()).addingTimeInterval(SidebarActivity.failureWindow + 1))
+        #expect(!model.sidebarShowsActivity, "a day later the failure lets the row go")
+
+        model.batchJobs[0].status = .pending
+        #expect(model.sidebarActivity == .inProgress(count: 1), "a retry is work again")
+        #expect(model.batchFailedAt.isEmpty)
 
         model.batchJobs[0].status = .cancelled
         #expect(!model.sidebarShowsActivity)
+    }
+
+    @Test("the Activity row reads Failed once only failures remain")
+    func activityRowReadsFailed() async {
+        let model = await makeModel()
+        model.batchJobs = [job("a", status: .failed), job("b", status: .failed), job("c", status: .done)]
+        let sidebar = HostedWindow(LibrarySidebar().environment(model), width: 240, height: 600)
+        defer { sidebar.close() }
+        _ = await waitUntil { sidebar.rowCount > 4 }
+        let words = HostedAccessibility.words(in: sidebar.host)
+        #expect(words.contains("Failed"), "\(words)")
+        #expect(!words.contains("In Progress"), "\(words)")
     }
 
     @Test("a progress tick that leaves the count alone does not invalidate the badge or the Activity row")
@@ -87,7 +109,7 @@ struct SidebarBadgeCountTests {
         model.batchJobs = [job("a", status: .transcribing)]
         let invalidated = InvalidationFlag()
         withObservationTracking {
-            _ = model.activeBatchJobCount
+            _ = model.sidebarActivity
             _ = model.sidebarShowsActivity
         } onChange: {
             invalidated.fired = true

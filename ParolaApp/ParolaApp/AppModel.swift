@@ -556,21 +556,44 @@ final class AppModel {
             batchBuckets = BatchJobBuckets(batchJobs)
             guard !BatchJob.sameQueueShape(oldValue, batchJobs) else { return }
             batchProgress.retain(Set(batchJobs.map(\.id)))
-            let active = QueueCount.count(for: batchJobs)
-            if active != activeBatchJobCount { activeBatchJobCount = active }
             if batchIsEmpty != batchJobs.isEmpty { batchIsEmpty = batchJobs.isEmpty }
             let running = batchJobs.contains { $0.status == .transcribing }
             if batchIsRunning != running { batchIsRunning = running }
-            let showsActivity = SidebarSelection.showsActivity(jobs: batchJobs)
-            if sidebarShowsActivity != showsActivity { sidebarShowsActivity = showsActivity }
+            stampBatchFailures()
+            refreshSidebarActivity()
             saveBatchQueueSnapshot()
         }
     }
     /// Mirrors of `batchJobs` that change only on a status transition, so a progress tick reaches none of their readers.
-    private(set) var activeBatchJobCount: Int = 0
     private(set) var batchIsEmpty = true
     private(set) var batchIsRunning = false
-    private(set) var sidebarShowsActivity = false
+    private(set) var sidebarActivity: SidebarActivity?
+    var sidebarShowsActivity: Bool { sidebarActivity != nil }
+    /// When each failed job failed, so the Activity row lets a failure go a day later.
+    @ObservationIgnored private(set) var batchFailedAt: [BatchJob.ID: Date] = [:]
+    @ObservationIgnored private var sidebarActivityExpiry: Task<Void, Never>?
+
+    private func stampBatchFailures(now: Date = Date()) {
+        let failed = Set(batchJobs.lazy.filter { $0.status == .failed }.map(\.id))
+        batchFailedAt = batchFailedAt.filter { failed.contains($0.key) }
+        for id in failed where batchFailedAt[id] == nil { batchFailedAt[id] = now }
+    }
+
+    /// Settles the Activity row for `now`, and comes back when its oldest failure still counted leaves the window.
+    func refreshSidebarActivity(now: Date = Date()) {
+        let activity = SidebarActivity.current(jobs: batchJobs, failedAt: batchFailedAt, now: now)
+        if activity != sidebarActivity { sidebarActivity = activity }
+        sidebarActivityExpiry?.cancel()
+        sidebarActivityExpiry = nil
+        guard case .failed = activity, let expiry = SidebarActivity.nextExpiry(failedAt: batchFailedAt, now: now) else { return }
+        let clock = clock
+        sidebarActivityExpiry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(expiry.timeIntervalSince(now)), clock: clock)
+            guard !Task.isCancelled else { return }
+            self?.refreshSidebarActivity()
+        }
+    }
+
     private(set) var batchBuckets = BatchJobBuckets()
     @ObservationIgnored let batchProgress = BatchProgressBoard()
     struct UnsavedBatchJob {

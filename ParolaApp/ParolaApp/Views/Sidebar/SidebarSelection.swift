@@ -46,8 +46,4 @@ enum SidebarSelection {
             return .library
         }
     }
-
-    static func showsActivity(jobs: [BatchJob]) -> Bool {
-        jobs.contains { [.pending, .transcribing, .failed].contains($0.status) }
-    }
 }

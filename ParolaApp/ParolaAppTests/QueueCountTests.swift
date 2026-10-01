@@ -44,11 +44,11 @@ struct QueueCountTests {
 
         model.batchJobs = jobs
 
-        #expect(model.activeBatchJobCount == QueueCount.count(for: jobs))
-        #expect(model.activeBatchJobCount == 2)
+        #expect(model.sidebarActivity == .inProgress(count: QueueCount.count(for: jobs)))
+        #expect(model.sidebarActivity?.count == 2)
         #expect(
             QueueCount.label(for: jobs, locale: Locale(identifier: "en_US"))
-                == "\(model.activeBatchJobCount) in queue"
+                == "\(model.sidebarActivity?.count ?? 0) in queue"
         )
     }
 }

@@ -23,10 +23,10 @@ struct LibrarySidebar: View {
             if !people.isEmpty {
                 PeopleSidebarSection(people: people)
             }
-            if model.sidebarShowsActivity {
+            if let activity = model.sidebarActivity {
                 Section("Activity") {
-                    Label("In Progress", systemImage: "hourglass")
-                        .badge(model.activeBatchJobCount)
+                    Label(LocalizedStringKey(activity.title), systemImage: activity.systemImage)
+                        .badge(activity.count)
                         .tag(SidebarItem.activity)
                         .axLeaf("Row.Activity")
                 }

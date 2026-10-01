@@ -26,6 +26,17 @@ struct HostedWindow {
         window.orderOut(nil)
         window.contentView = nil
     }
+
+    /// The rows the hosted list has realised, laying it out first; 0 before a table is in.
+    var rowCount: Int {
+        host.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+        func table(in view: NSView) -> NSTableView? {
+            if let table = view as? NSTableView { return table }
+            return view.subviews.lazy.compactMap(table(in:)).first
+        }
+        return table(in: host)?.numberOfRows ?? 0
+    }
 }
 
 /// What SwiftUI hands VoiceOver in a hosted view; each walk raises an assistive app's flag and lowers it before it returns.
@@ -72,11 +83,15 @@ enum HostedAccessibility {
         _ = NSApp.perform(set, with: NSNumber(value: on), with: "AXEnhancedUserInterface" as NSString)
     }
 
+    /// Views are entered through their subviews too: a list's row elements don't hand over the cells hosting each row.
     private static func walk(_ root: NSObject) -> [Element] {
         var found: [Element] = []
+        var seen: Set<ObjectIdentifier> = [ObjectIdentifier(root)]
         func visit(_ node: NSObject, depth: Int) {
-            guard depth < 60 else { return }
-            for child in read("accessibilityChildren", of: node) as? [NSObject] ?? [] {
+            guard depth < 80 else { return }
+            let children = (read("accessibilityChildren", of: node) as? [NSObject] ?? [])
+                + ((node as? NSView)?.subviews ?? [])
+            for child in children where seen.insert(ObjectIdentifier(child)).inserted {
                 found.append(Element(
                     object: child,
                     identifier: read("accessibilityIdentifier", of: child) as? String,

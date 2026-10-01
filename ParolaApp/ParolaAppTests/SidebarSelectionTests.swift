@@ -64,14 +64,37 @@ struct SidebarSelectionTests {
         #expect(SidebarSelection.place(of: page(route: .statistics)) == nil)
     }
 
-    @Test("Activity shows while a job waits, runs or failed")
+    @Test("Activity counts the jobs still to run, then the ones that failed in the last day")
     func activity() {
         let file = URL(fileURLWithPath: "/tmp/a.m4a")
-        #expect(!SidebarSelection.showsActivity(jobs: []))
-        #expect(SidebarSelection.showsActivity(jobs: [BatchJob(url: file, status: .pending)]))
-        #expect(SidebarSelection.showsActivity(jobs: [BatchJob(url: file, status: .transcribing)]))
-        #expect(SidebarSelection.showsActivity(jobs: [BatchJob(url: file, status: .failed)]))
-        #expect(!SidebarSelection.showsActivity(jobs: [BatchJob(url: file, status: .done), BatchJob(url: file, status: .cancelled)]))
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let pending = BatchJob(url: file, status: .pending)
+        let running = BatchJob(url: file, status: .transcribing)
+        let failed = BatchJob(url: file, status: .failed)
+        let oldFailure = BatchJob(url: file, status: .failed)
+        let failedAt = [failed.id: now.addingTimeInterval(-3600), oldFailure.id: now.addingTimeInterval(-25 * 3600)]
+        func activity(_ jobs: [BatchJob]) -> SidebarActivity? {
+            SidebarActivity.current(jobs: jobs, failedAt: failedAt, now: now)
+        }
+
+        #expect(activity([]) == nil)
+        #expect(activity([pending]) == .inProgress(count: 1))
+        #expect(activity([pending, running, failed]) == .inProgress(count: 2), "work still to run outranks a failure")
+        #expect(activity([failed, oldFailure]) == .failed(count: 1), "a failure older than a day no longer counts")
+        #expect(activity([oldFailure]) == nil)
+        #expect(activity([BatchJob(url: file, status: .done), BatchJob(url: file, status: .cancelled)]) == nil)
+        #expect(activity([BatchJob(url: file, status: .failed)]) == .failed(count: 1), "a failure with no time on record is a new one")
+        #expect(SidebarActivity.nextExpiry(failedAt: failedAt, now: now) == now.addingTimeInterval(23 * 3600))
+    }
+
+    @Test("the Activity row reads In Progress or Failed, in Italian too")
+    func activityTitles() throws {
+        #expect(SidebarActivity.inProgress(count: 3).title == "In Progress")
+        #expect(SidebarActivity.failed(count: 2).title == "Failed")
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        #expect(String(localized: String.LocalizationValue(SidebarActivity.inProgress(count: 3).title), bundle: italian) == "In corso")
+        #expect(String(localized: String.LocalizationValue(SidebarActivity.failed(count: 2).title), bundle: italian) == "Errore")
     }
 
     @Test("dictations wear the keyboard everywhere the category shows")
