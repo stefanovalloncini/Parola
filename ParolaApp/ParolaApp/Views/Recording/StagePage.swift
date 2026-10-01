@@ -125,6 +125,9 @@ struct StageTimeSlot: View {
                         .font(DS.Font.takePreparingStage)
                         .lineLimit(1)
                 }
+            case .paused:
+                StageClock(take: take, font: DS.Font.takeTimerStage, rolls: true, ticks: isOnScreen)
+                    .modifier(PausedBlink(blinks: isOnScreen && !reduceMotion))
             default:
                 StageClock(take: take, font: DS.Font.takeTimerStage, rolls: true, ticks: isOnScreen)
             }
@@ -145,6 +148,30 @@ struct StageTimeSlot: View {
             .font(DS.Font.takeTimerStage)
             .hidden()
             .overlay { content().fixedSize() }
+    }
+}
+
+/// A paused clock dims for a second in every two, the way a recorder's display blinks on pause.
+struct PausedBlink: ViewModifier {
+    let blinks: Bool
+    @State private var epoch = Date()
+
+    nonisolated static let period: TimeInterval = 2
+    nonisolated static let dimmed = 0.3
+
+    func body(content: Content) -> some View {
+        if blinks {
+            TimelineView(.periodic(from: epoch, by: Self.period / 2)) { context in
+                content.opacity(Self.opacity(at: context.date.timeIntervalSince(epoch)))
+            }
+        } else {
+            content
+        }
+    }
+
+    nonisolated static func opacity(at elapsed: TimeInterval) -> Double {
+        let phase = elapsed.truncatingRemainder(dividingBy: period)
+        return phase < period / 2 ? 1 : dimmed
     }
 }
 
@@ -245,22 +272,27 @@ struct StageFacts: View {
             : String(localized: "Transcript after you stop", bundle: bundle)
     }
 
-    @ViewBuilder
     private var status: some View {
-        if take.isArming {
-            HStack(spacing: DS.Spacing.snug) {
+        HStack(spacing: DS.Spacing.snug) {
+            switch take.mode {
+            case .countIn, .preparing, .starting:
                 RecDot(color: DS.Color.secondaryText)
                 Text("Starting…")
-            }
-        } else {
-            HStack(spacing: DS.Spacing.snug) {
+            case .paused:
+                RecDot(color: DS.Palette.warning)
+                statusWord("PAUSED", color: DS.Color.warningText)
+            default:
                 RecDot(pulsesFrom: isOnScreen && take.state == .recording ? take.clockOrigin : nil)
-                Text("REC")
-                    .fontWeight(.semibold)
-                    .tracking(0.6)
-                    .foregroundStyle(DS.Color.dangerText)
+                statusWord("REC", color: DS.Color.dangerText)
             }
         }
+    }
+
+    private func statusWord(_ word: LocalizedStringKey, color: Color) -> some View {
+        Text(word)
+            .fontWeight(.semibold)
+            .tracking(0.6)
+            .foregroundStyle(color)
     }
 
     private var separator: some View {

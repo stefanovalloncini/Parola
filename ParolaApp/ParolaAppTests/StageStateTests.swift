@@ -32,6 +32,17 @@ struct StageStateTests {
         #expect(take.mode == .live)
     }
 
+    @Test("a paused clock blinks at half a hertz: a second full, a second dimmed")
+    func pausedBlink() {
+        #expect(PausedBlink.opacity(at: 0) == 1)
+        #expect(PausedBlink.opacity(at: 0.99) == 1)
+        #expect(PausedBlink.opacity(at: 1) == PausedBlink.dimmed)
+        #expect(PausedBlink.opacity(at: 1.99) == PausedBlink.dimmed)
+        #expect(PausedBlink.opacity(at: 2) == 1)
+        #expect(PausedBlink.opacity(at: 3.5) == PausedBlink.dimmed)
+        #expect(PausedBlink.dimmed > 0, "the time stays readable through the dim half")
+    }
+
     @Test("the time slot names the model a live take waits on, with its download")
     func preparingLine() {
         #expect(StageTimeSlot.preparingText(name: "openai_whisper-large-v3_turbo", download: 0.42) == "Preparing Whisper Turbo · 42%")

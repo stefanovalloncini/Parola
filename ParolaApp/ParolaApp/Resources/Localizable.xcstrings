@@ -10087,6 +10087,17 @@
         }
       }
     },
+    "PAUSED": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "IN PAUSA"
+          }
+        }
+      }
+    },
     "PDF": {
       "extractionState": "manual",
       "localizations": {
