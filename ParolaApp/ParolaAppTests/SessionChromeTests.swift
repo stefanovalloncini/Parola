@@ -652,9 +652,10 @@ extension TranscriberMockSuites {
                 defer { window.close() }
                 model.mainWindow = window
                 var confirmations = 0
+                var asked = 0
                 MainWindowCloseGuard.install(
                     on: window, model: model,
-                    ask: { _, _ in model.stopRecordingAndTranscribe(); return .discard },
+                    ask: { _, _ in asked += 1; model.stopRecordingAndTranscribe(); return .discard },
                     confirmDiscard: { _ in confirmations += 1; return true }
                 )
                 model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
@@ -662,14 +663,15 @@ extension TranscriberMockSuites {
                 window.performClose(nil)
 
                 let closed = await waitUntil { !window.isVisible }
-                #expect(closed)
+                #expect(closed, "with no take running, the window closes as answered")
+                #expect(asked == 1)
                 #expect(confirmations == 0, "a take already on its way to the library is not asked about again")
                 let landed = await landedEntry(model, timeoutMs: 30_000)
                 #expect(landed != nil, "the recording that stopped by itself is kept")
             }
         }
 
-        @Test("a take started under the close sheet is never stopped or discarded by the answer about the earlier one", arguments: [
+        @Test("a take started under the close sheet is asked about in turn, and the answer about the earlier one never ends it", arguments: [
             AppModel.QuitDuringTake.stopAndSave, .discard,
         ])
         func newTakeUnderTheSheet(_ answer: AppModel.QuitDuringTake) async throws {
@@ -685,13 +687,14 @@ extension TranscriberMockSuites {
                 let window = closableWindow()
                 defer { window.close() }
                 model.mainWindow = window
-                var asked = 0
+                var askedAbout: [Int] = []
                 var confirmations = 0
                 var newTake: Int?
                 MainWindowCloseGuard.install(
                     on: window, model: model,
-                    ask: { _, _ in
-                        asked += 1
+                    ask: { _, take in
+                        askedAbout.append(take.takeID)
+                        guard askedAbout.count == 1 else { return .keepRecording }
                         model.endTestTake()
                         model.installTestTake(source: .microphone, liveSource: StubSource(url: second))
                         newTake = model.recording?.takeID
@@ -704,9 +707,11 @@ extension TranscriberMockSuites {
 
                 window.performClose(nil)
 
-                let closed = await waitUntil { !window.isVisible }
-                #expect(closed, "the window closes as answered")
-                #expect(asked == 1, "the new take is not asked about on the way out")
+                let askedAgain = await waitUntil { askedAbout.count == 2 }
+                #expect(askedAgain, "the take still recording gets its own question")
+                #expect(askedAbout.last == newTake)
+                await settle()
+                #expect(window.isVisible, "Keep Recording on the second question keeps the window")
                 #expect(confirmations == 0)
                 let stillRecording = newTake != nil && model.recording?.takeID == newTake && model.recording?.state == .recording
                 #expect(stillRecording, "the new take records on")

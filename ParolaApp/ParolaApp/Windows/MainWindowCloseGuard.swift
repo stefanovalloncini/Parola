@@ -43,7 +43,6 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
     nonisolated(unsafe) private weak var forwarded: NSObject?
     private let ask: @MainActor (NSWindow, RecordingSession) async -> AppModel.QuitDuringTake
     private let confirmDiscard: @MainActor (NSWindow) async -> Bool
-    private var closingAsAnswered = false
 
     var wrapped: NSObject? { forwarded }
 
@@ -81,26 +80,20 @@ final class MainWindowCloseGuard: NSObject, NSWindowDelegate {
 
     /// The window stays while the sheet asks; AppKit refuses another close as long as the sheet is up.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        guard !closingAsAnswered, let model, let take = model.recording, MainWindowClose.asks(take: take) else {
+        guard let model, let take = model.recording, MainWindowClose.asks(take: take) else {
             return (forwarded as? any NSWindowDelegate)?.windowShouldClose?(sender) ?? true
         }
         let ask = ask
         let confirmDiscard = confirmDiscard
-        Task { [weak self] in
+        Task {
             let choice = await ask(sender, take)
             await MainWindowClose.resolve(choice, about: take.takeID, model: model, confirmDiscard: { await confirmDiscard(sender) }) {
+                // A take started while the sheet was up is asked about in turn; with none, the window closes as answered.
                 guard sender.isVisible || sender.isMiniaturized else { return }
-                self?.closeAsAnswered(sender)
+                sender.performClose(nil)
             }
         }
         return false
-    }
-
-    /// The answer already covers this close, so a take started while the sheet was up doesn't ask again.
-    private func closeAsAnswered(_ window: NSWindow) {
-        closingAsAnswered = true
-        window.performClose(nil)
-        closingAsAnswered = false
     }
 
     nonisolated override func responds(to aSelector: Selector!) -> Bool {
