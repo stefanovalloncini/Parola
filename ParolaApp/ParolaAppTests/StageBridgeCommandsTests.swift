@@ -168,6 +168,41 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("resetTestState leaves the language-model mocks to a suite holding them until it is done")
+        func resetWaitsForTheModelLease() async throws {
+            try await withMocksCleared(.streaming) {
+                let model = makeRecordingModel("stage-bridge-reset-lease")
+                let server = try ParolaAutomationServer(model: model)
+                let context = AutomationContext(model: model, server: server)
+                let lifecycle = Dictionary(uniqueKeysWithValues: server.lifecycleCommands().map { ($0.name, $0) })
+                let reset = try #require(lifecycle["resetTestState"])
+                let arguments = try reset.validate(AutomationArgs([:]))
+                let installed = FetchGate()
+                let done = FetchGate()
+                let holder = Task {
+                    await MockLanguageModelStore.shared.withLease {
+                        await MockLanguageModelStore.shared.install(provider: .ollama, response: MockLanguageModelResponse(text: "held"))
+                        await installed.open()
+                        await done.wait()
+                        return await MockLanguageModelStore.shared.resolve(for: .ollama) != nil
+                    }
+                }
+                await installed.wait()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["held"]))
+                let resetting = Task { @MainActor in try await reset.handler(arguments, context) }
+                let reached = await waitUntil { MockStreamingTranscriberRegistry.shared.resolve() == nil }
+                #expect(reached)
+                await settle(for: .milliseconds(200))
+                await done.open()
+                let kept = await holder.value
+                #expect(kept, "the reset cleared the store while a suite held it")
+                _ = try await resetting.value
+                let left = await MockLanguageModelStore.shared.list()
+                #expect(left.isEmpty)
+                withExtendedLifetime(server) {}
+            }
+        }
+
         @Test("outside test mode the take controls and the level feed are refused by the test-mode guard")
         func testModeOnly() async throws {
             let fixture = try makeTakeWAV("stage-bridge-normal")

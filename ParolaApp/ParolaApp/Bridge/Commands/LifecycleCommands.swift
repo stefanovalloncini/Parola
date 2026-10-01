@@ -54,7 +54,7 @@ extension ParolaAutomationServer {
                     model.refreshLibrary()
                     await MockTranscriberRegistry.shared.clear()
                     MockStreamingTranscriberRegistry.shared.clear()
-                    await MockLanguageModelStore.shared.clear()
+                    await MockLanguageModelStore.shared.withLease { await MockLanguageModelStore.shared.clear() }
                     await MockAudioSourceRegistry.shared.clear()
                     CapturedInsertionStore.shared.clear()
                     model.linkFetcher = YtDlpLinkFetcher(features: model.features)
