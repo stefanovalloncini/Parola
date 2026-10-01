@@ -15,7 +15,7 @@ struct StageBand: View {
     nonisolated static let playhead: CGFloat = 0.7
     nonisolated static let visibleSamples = 480
     /// The bars slide at most this often; between samples nothing but their offset changes.
-    nonisolated static let glideFrame: TimeInterval = 1.0 / 60
+    nonisolated static let glideFrame: TimeInterval = 1.0 / 30
 
     /// How the band follows the take: redrawn with each sample and sliding between them, or under Reduce Motion redrawn four times a second and standing still.
     enum Cadence: Equatable {

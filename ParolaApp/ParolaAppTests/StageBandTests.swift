@@ -29,6 +29,13 @@ struct StageBandTests {
         #expect(StageBand.glide(sinceTick: -0.01) == 0, "a frame dated a moment before its sample")
     }
 
+    @Test("the bars slide at most thirty times a second, about 1.7 pt a frame")
+    func glideCap() {
+        #expect(StageBand.glideFrame == 1.0 / 30)
+        let perFrame = StageBand.step * CGFloat(StageBand.glideFrame * TakeLevelHistory.samplesPerSecond)
+        #expect(abs(perFrame - 5.0 / 3) < 0.001)
+    }
+
     @Test("under Reduce Motion the band redraws four times a second and never slides")
     func reduceMotionCadence() {
         #expect(StageBand.cadence(reduceMotion: false) == .glides)
