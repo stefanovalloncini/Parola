@@ -3571,6 +3571,17 @@
         }
       }
     },
+    "Continue transcribing the queued files.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continua a trascrivere i file in coda."
+          }
+        }
+      }
+    },
     "Copied": {
       "extractionState": "manual",
       "localizations": {

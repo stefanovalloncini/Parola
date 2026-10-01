@@ -293,7 +293,7 @@ extension AppModel {
         }
     }
 
-    /// Rebuilds a queue that a quit interrupted: jobs come back pending and wait for Resume.
+    /// Rebuilds a queue that a quit interrupted: jobs come back pending under Activity and wait for Resume.
     func restoreBatchQueue() {
         guard features.isEnabled(.batch) else { return }
         guard batchJobs.isEmpty,
@@ -304,7 +304,6 @@ extension AppModel {
         lastSavedBatchQueueURLs = urls
         batchJobs = urls.map { BatchJob(url: $0) }
         selectedBatchJobID = batchJobs.first?.id
-        route = .batch
     }
 
     var canResumeBatch: Bool {

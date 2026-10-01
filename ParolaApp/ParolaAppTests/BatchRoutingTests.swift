@@ -156,6 +156,39 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a queue restored at launch leaves Parola on the Library page, and the Queue page's Resume runs it")
+        func restoredQueueResumesFromTheQueue() async throws {
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(start: 0, end: 1, text: "resumed")])
+                let file = try tempWAV("batch-routing-restored")
+                defer { try? FileManager.default.removeItem(at: file) }
+                let library = makeTempLibraryURL("batch-routing-restored")
+                try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+                try JSONEncoder().encode([file]).write(to: library.appendingPathComponent("batch-queue.json"))
+                let model = AppModel(bootstrap: AppBootstrap(
+                    mode: .test, library: library, defaultsOverride: temporaryDefaults(),
+                    sideEffects: [], filePicker: TestFilePicker(), clock: ContinuousClock(),
+                    enabledFeaturesOverride: Set(ParolaFeature.allCases)
+                ))
+                model.batchExportPresetIDs = []
+                model.generatesCardMetadata = false
+                #expect(model.batchJobs.map(\.status) == [.pending])
+                #expect(model.route == .transcript)
+                #expect(model.isBrowsingWholeLibrary)
+                #expect(sidebar(model) == .library)
+                #expect(model.sidebarShowsActivity)
+
+                model.openQueue()
+                let queue = HostedWindow(QueueView().environment(model))
+                defer { queue.close() }
+                let pressed = HostedAccessibility.press(endingWith: "Queue.Toolbar.Button.Resume", in: queue.host)
+                #expect(pressed, "Resume is in the Queue page's header")
+
+                let ran = await waitUntil { model.batchJobs.first?.status == .done }
+                #expect(ran)
+            }
+        }
+
         @Test("a batch that grows while a take records leaves the take on screen")
         func takeKeepsTheScreen() async {
             let model = makeModel()

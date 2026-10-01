@@ -795,7 +795,10 @@ struct AppModelBatchTests {
         #expect(restored.batchJobs.map(\.url) == [pending.url, failed.url, running.url])
         #expect(restored.batchJobs.allSatisfy { $0.status == .pending })
         #expect(restored.batchTask == nil)
-        #expect(restored.route == .batch)
+        #expect(restored.route == .transcript, "Parola opens on the Library page; the queue waits under Activity")
+        #expect(restored.isBrowsingWholeLibrary)
+        #expect(restored.sidebarShowsActivity)
+        #expect(restored.canResumeBatch)
     }
 
     @Test("the queue file is deleted when the batch clears or finishes")

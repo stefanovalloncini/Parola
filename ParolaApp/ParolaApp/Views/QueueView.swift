@@ -45,6 +45,16 @@ struct QueueView: View {
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .disabled(!hasFinishedJobs)
                 .axLeaf("Toolbar.Button.ClearFinished")
+                if model.canResumeBatch {
+                    Button {
+                        model.resumePendingBatchJobs()
+                    } label: {
+                        Label("Resume", systemImage: "play.fill")
+                    }
+                    .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                    .help("Continue transcribing the queued files.")
+                    .axLeaf("Toolbar.Button.Resume")
+                }
             }
         )
     }
