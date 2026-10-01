@@ -227,6 +227,7 @@ struct StageStateTests {
         #expect(String(localized: "The recording stopped", bundle: it) == "La registrazione si è interrotta")
     }
 
+    @MainActor
     @Test("the time slot names the model a live take waits on, with its download")
     func preparingLine() {
         #expect(StageTimeSlot.preparingText(name: "openai_whisper-large-v3_turbo", download: 0.42) == "Preparing Whisper Turbo · 42%")

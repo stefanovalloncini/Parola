@@ -162,7 +162,7 @@ struct StageTimeSlot: View {
     }
 
     /// "Preparing Whisper Turbo · 42 %" while the model downloads, "Preparing Whisper Turbo…" while it loads.
-    nonisolated static func preparingText(name: String, download: Double?, bundle: Bundle = .main) -> String {
+    static func preparingText(name: String, download: Double?, bundle: Bundle = .main) -> String {
         let model = ModelPickerView.shortLabel(for: AppModel.modelLabel(name))
         guard let download else { return String(localized: "Preparing \(model)…", bundle: bundle) }
         return String(localized: "Preparing \(model)", bundle: bundle) + " · " + AppFormat.percent(download)

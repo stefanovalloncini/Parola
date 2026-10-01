@@ -65,7 +65,7 @@ struct StageTakeText: View {
     @Environment(AppModel.self) private var model
 
     /// Twice what four lines hold at the column's width, so the cut always sits above the fade.
-    static let recentCharacters = 600
+    nonisolated static let recentCharacters = 600
 
     var body: some View {
         StageTeleprompter(
@@ -77,7 +77,7 @@ struct StageTakeText: View {
     }
 
     /// The run hands back everything it has read so far; an hour of it must not be laid out on every partial.
-    static func shown(_ text: String) -> String {
+    nonisolated static func shown(_ text: String) -> String {
         StreamingText.tail(of: text, maxChars: recentCharacters)
     }
 }
