@@ -83,22 +83,28 @@ struct LibrarySearchResults: View {
             if rows.isEmpty {
                 emptyState
             } else {
-                LibraryRowList<EmptyView>(
-                    items: items,
-                    selection: selectionBinding,
-                    // Read over every result, not the realised rows, so the column doesn't jump as pages land.
-                    detail: .match(showsTimestamp: LibraryListContent.showsTimestampSlot(
-                        for: resultIDs, matches: model.searchMatches
-                    )),
-                    animatesRows: animatesRows,
-                    rename: { entry in
-                        renameDraft = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: model.showAITitles)
-                        renamingEntry = entry
-                    },
-                    focus: focus,
-                    focusKey: .results,
-                    rowAppeared: rowAppeared
-                )
+                ScrollViewReader { proxy in
+                    LibraryRowList<EmptyView>(
+                        items: items,
+                        selection: selectionBinding,
+                        // Read over every result, not the realised rows, so the column doesn't jump as pages land.
+                        detail: .match(showsTimestamp: LibraryListContent.showsTimestampSlot(
+                            for: resultIDs, matches: model.searchMatches
+                        )),
+                        animatesRows: animatesRows,
+                        rename: { entry in
+                            renameDraft = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: model.showAITitles)
+                            renamingEntry = entry
+                        },
+                        focus: focus,
+                        focusKey: .results,
+                        rowAppeared: rowAppeared
+                    )
+                    // Back to the first result before rows near the old scroll can ask for the next page.
+                    .onChange(of: shownQuery) { _, _ in
+                        if let first = items.first?.id { proxy.scrollTo(first, anchor: .top) }
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -130,12 +130,32 @@ struct LibrarySearchListTests {
         _ = await settled(hosted)
         #expect(results.numberOfRows == firstPage + LibrarySearchResults.pageSize, "the same query re-ranked keeps its pages")
 
-        // Back at the top first: a query keeps the list's scroll, and rows near the end would fetch a page of their own.
-        results.scrollRowToVisible(0)
-        _ = await settled(hosted)
         hosted.model.searchQuery = "tak"
         hosted.model.searchRanking = ids.reversed()
         #expect(await settled(hosted) { tables(hosted).last?.numberOfRows == firstPage })
+    }
+
+    @Test("a new query opens its results at the top, so it neither lands mid-list nor fetches a second page at once")
+    func newQueryOpensAtTheTop() async throws {
+        let hosted = await host(130)
+        defer { close(hosted) }
+        let ids = hosted.model.libraryEntries.map(\.id)
+        search(ids, in: hosted.model)
+        #expect(await settled(hosted) { tables(hosted).last?.numberOfRows == LibrarySearchResults.pageSize })
+        let results = try #require(tables(hosted).last)
+        results.scrollRowToVisible(results.numberOfRows - 1)
+        #expect(await settled(hosted) { results.numberOfRows == 2 * LibrarySearchResults.pageSize })
+        let deep = results.rows(in: results.visibleRect).location
+        #expect(deep > 0)
+
+        hosted.model.searchQuery = "tak"
+        hosted.model.searchRanking = ids.reversed()
+        let atTop = await settled(hosted) {
+            guard let table = tables(hosted).last else { return false }
+            return table.rows(in: table.visibleRect).location == 0
+        }
+        #expect(atTop, "the new results open at row \(results.rows(in: results.visibleRect).location)")
+        #expect(results.numberOfRows == LibrarySearchResults.pageSize)
     }
 
     @Test("the keyboard follows the list on screen, and Tab passes over the covered one")
