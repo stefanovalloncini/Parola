@@ -6108,6 +6108,17 @@
         }
       }
     },
+    "Finishing, %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiusura in corso, %@"
+          }
+        }
+      }
+    },
     "First match at %@": {
       "extractionState": "manual",
       "localizations": {
@@ -6343,6 +6354,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Generazione riepilogo…"
+          }
+        }
+      }
+    },
+    "Getting ready to record": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparazione della registrazione"
           }
         }
       }
@@ -10430,6 +10452,17 @@
         }
       }
     },
+    "Paused, %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa, %@"
+          }
+        }
+      }
+    },
     "Pauses the player when you switch to another app.": {
       "extractionState": "manual",
       "localizations": {
@@ -11413,6 +11446,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione — %@"
+          }
+        }
+      }
+    },
+    "Recording, %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione, %@"
           }
         }
       }
@@ -12848,6 +12892,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra Mini Player"
+          }
+        }
+      }
+    },
+    "Show Parola": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra Parola"
           }
         }
       }

@@ -14,11 +14,21 @@ enum ThemeColor: Sendable, Codable, Equatable {
         switch self {
         case .system(let semantic):
             return semantic.color
+        case .dynamic:
+            return Color(nsColor: nsColor)
+        }
+    }
+
+    /// The same color for AppKit drawing, such as a menu bar title.
+    var nsColor: NSColor {
+        switch self {
+        case .system(let semantic):
+            return semantic.nsColor
         case .dynamic(let light, let dark):
-            return Color(nsColor: NSColor(name: nil) { appearance in
+            return NSColor(name: nil) { appearance in
                 let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
                 return (isDark ? dark : light).nsColor
-            })
+            }
         }
     }
 }
@@ -181,6 +191,14 @@ enum SystemColor: String, Sendable, Codable {
         case .primary: return .primary
         case .secondary: return .secondary
         case .red: return .red
+        }
+    }
+
+    var nsColor: NSColor {
+        switch self {
+        case .primary: return .labelColor
+        case .secondary: return .secondaryLabelColor
+        case .red: return .systemRed
         }
     }
 }
