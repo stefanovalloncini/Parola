@@ -19,7 +19,7 @@ private func capturingTake(at start: Date) -> RecordingSession {
 /// The pixel halfway down the capsule, 6 pt in from its left end: fill, clear of the dot and the digits.
 @MainActor
 private func capsuleFill(_ take: RecordingSession, dark: Bool) throws -> NSColor {
-    let face = SessionCapsuleFace(take: take, showsMeter: false, isOnScreen: false, showStage: {}, stop: {})
+    let face = SessionCapsuleFace(take: take, showsMeter: false, isOnScreen: false, showStage: {}, stop: { _ in })
         .environment(\.controlActiveState, .inactive)
         .environment(\.colorScheme, dark ? .dark : .light)
     let renderer = ImageRenderer(content: face)
@@ -179,6 +179,31 @@ struct SessionCapsuleHostedTests {
         #expect(model.exportNotice == nil)
         #expect(model.phase == .idle)
     }
+
+    @Test("the button acts on what it drew: a Cancel drawn while the take started leaves it alone once it records")
+    func cancelActsOnWhatItDrew() async throws {
+        let audio = try tempWAV("capsule-drawn")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("capsule-drawn")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        defer { model.endTestTake() }
+        let takeID = try #require(model.recording?.takeID)
+        let drawn = RecordingSession(
+            takeID: takeID, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture
+        )
+        let face = SessionCapsuleFace(
+            take: drawn, showsMeter: false, isOnScreen: false, showStage: {},
+            stop: { SessionCapsule.stopOrCancel(model, cancels: $0) }
+        )
+        let hosted = HostedWindow(face.frame(maxWidth: .infinity, maxHeight: .infinity), width: 400, height: 120)
+        defer { hosted.close() }
+        let shown = await waitUntil { shows("Toolbar.Button.SessionStop", in: hosted) }
+        #expect(shown)
+
+        #expect(HostedAccessibility.press(endingWith: "Toolbar.Button.SessionStop", in: hosted.host))
+
+        #expect(model.recording?.state == .recording, "the Cancel it showed never becomes a Stop")
+    }
 }
 
 // Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
@@ -196,7 +221,7 @@ extension TranscriberMockSuites {
                 model.useStreaming = false
                 model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
 
-                SessionCapsule.stopOrCancel(model)
+                SessionCapsule.stopOrCancel(model, cancels: false)
 
                 let stopping = model.recording?.isCapturing == false
                 #expect(stopping)

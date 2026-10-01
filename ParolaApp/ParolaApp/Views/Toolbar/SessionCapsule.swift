@@ -22,9 +22,9 @@ struct SessionCapsule: View {
         windowWidth >= meterMinimumWindowWidth
     }
 
-    /// A take still starting has captured nothing, so its Cancel ends it quietly; a count-in ends as its own Cancel ends it.
-    static func stopOrCancel(_ model: AppModel) {
-        if model.takeArming != nil {
+    /// Acts on what the capsule drew: a Cancel ends a take that has captured nothing, quietly, and leaves one that has since begun recording.
+    static func stopOrCancel(_ model: AppModel, cancels: Bool) {
+        if cancels {
             model.cancelRecordingBeforeCapture()
         } else {
             TakeRemote.stop(model)
@@ -37,7 +37,7 @@ struct SessionCapsule: View {
             showsMeter: showsMeter,
             isOnScreen: isOnScreen,
             showStage: { model.showStage() },
-            stop: { Self.stopOrCancel(model) }
+            stop: { Self.stopOrCancel(model, cancels: $0) }
         )
         .background(WindowShownReader { isOnScreen = $0 })
         .background(WindowWidthReader { showsMeter = Self.showsMeter(windowWidth: $0) })
@@ -50,7 +50,8 @@ struct SessionCapsuleFace: View {
     let showsMeter: Bool
     let isOnScreen: Bool
     let showStage: () -> Void
-    let stop: () -> Void
+    /// Told whether the button read Cancel when it was clicked.
+    let stop: (_ cancels: Bool) -> Void
 
     var body: some View {
         if isOnScreen, take.state == .recording, let origin = take.clockOrigin {
@@ -104,7 +105,7 @@ struct SessionCapsuleFace: View {
     @ViewBuilder
     private var stopButton: some View {
         let starting = take.isArming
-        Button(action: stop) {
+        Button { stop(starting) } label: {
             Text(starting ? "Cancel" : "Stop")
                 .padding(.leading, 10)
                 .padding(.trailing, 14)
