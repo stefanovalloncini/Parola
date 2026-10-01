@@ -1271,6 +1271,8 @@ private func withChatModel(_ body: @MainActor () async throws -> Void) async thr
 @MainActor
 private func withHostApp(_ body: @MainActor (AppModel, NSWindow) async throws -> Void) async throws {
     let host = try #require(AppDelegate.launchModel)
+    let library = host.library.libraryURL.standardizedFileURL.path
+    try #require(library == TestHostSandbox.current.library.standardizedFileURL.path, "the host's library is the test sandbox, whose entries this empties")
     let window = try #require(host.mainWindow)
     let found = HostModelState(host)
     host.showRecordingStatusItem = false
