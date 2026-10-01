@@ -31,6 +31,11 @@ enum LibraryEmptyState {
         return entries.count(where: { $0.category == category })
     }
 
+    /// True when filters hid every row of a page that holds transcripts, so the subtitle leaves the line to No Matches.
+    static func filtersEmptied(_ kind: Kind, pageCount: Int) -> Bool {
+        kind == .noMatches && pageCount > 0
+    }
+
     /// The hero belongs to the Library page itself; a category or a person over an empty library keeps its own empty state.
     static func showsHero(_ kind: Kind, category: EntryCategory?, person: UUID?) -> Bool {
         kind == .emptyLibrary && category == nil && person == nil
@@ -489,7 +494,9 @@ private struct LibraryBrowseList: View, Equatable {
             LibraryPageHeader(
                 title: LibraryPageHeader.title(category: category, personName: selectedPerson?.name),
                 subtitle: LibraryPageHeader.subtitle(
-                    count: shownTotals.count, totalSeconds: shownTotals.seconds, filteredOut: emptyKind == .noMatches
+                    count: shownTotals.count,
+                    totalSeconds: shownTotals.seconds,
+                    filteredOut: LibraryEmptyState.filtersEmptied(emptyKind, pageCount: pageCount)
                 ),
                 subtitleHelp: shownTotals.bytes > 0
                     ? String(localized: "Total size: \(AppFormat.byteSize(shownTotals.bytes))") : nil,

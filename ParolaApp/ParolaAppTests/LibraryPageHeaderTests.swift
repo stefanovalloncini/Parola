@@ -97,6 +97,36 @@ struct LibraryPageHeaderTests {
         #expect(LibraryPageHeader.subtitle(count: totals.count, totalSeconds: totals.seconds) == "2 transcripts · 1 h 29 min")
     }
 
+    @Test("a person with no transcripts keeps No transcripts yet; filters that empty a page with some leave the line blank")
+    func emptyPersonPageSubtitle() {
+        let entries = [
+            entry("a", seconds: 60, labels: ["Work"]),
+            entry("b", category: .meeting, seconds: 1800, person: giulia),
+        ]
+        let nobody = UUID()
+        func subtitle(category: EntryCategory?, label: String?, person: UUID?) -> String {
+            let shown = LibraryListContent.rows(
+                from: entries, category: category, labelFilter: label, languageFilter: nil, dateRange: .all, personFilter: person
+            )
+            let filters = LibraryListContent.ActiveFilters(label: label, person: person)
+            let kind = LibraryEmptyState.kind(
+                entryCount: LibraryEmptyState.entryCount(in: entries, category: category),
+                visibleCount: shown.count,
+                filtersActive: !filters.isEmpty
+            )
+            let pageCount = LibraryListContent.pageCount(of: entries, category: category, person: person)
+            let totals = LibraryListContent.totals(of: shown, sizes: [:])
+            return LibraryPageHeader.subtitle(
+                count: totals.count,
+                totalSeconds: totals.seconds,
+                filteredOut: LibraryEmptyState.filtersEmptied(kind, pageCount: pageCount)
+            )
+        }
+        #expect(subtitle(category: nil, label: nil, person: nobody) == "No transcripts yet")
+        #expect(subtitle(category: nil, label: "Missing", person: nil) == "")
+        #expect(subtitle(category: .meeting, label: nil, person: giulia) == "1 transcript · 30 min")
+    }
+
     @Test("the chips stay while the page holds something before its filters, a person's own page included")
     func pageCountIgnoresTheFilters() {
         let entries = [
