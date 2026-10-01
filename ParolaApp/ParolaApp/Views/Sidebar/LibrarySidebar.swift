@@ -8,7 +8,7 @@ struct LibrarySidebar: View {
     var body: some View {
         let people = sidebarPeople
         List(selection: selection(people: people)) {
-            if model.sidebarShowsRecording {
+            if model.stageHoldsTake {
                 Section {
                     SidebarRecordingRow(isSelected: current(people: people.map(\.id)) == .recording)
                         .axLeaf("Row.Recording")
@@ -78,7 +78,7 @@ struct LibrarySidebar: View {
             model.sidebarPage,
             sidebarPeople: people,
             showsActivity: model.sidebarShowsActivity,
-            showsRecording: model.sidebarShowsRecording
+            showsRecording: model.stageHoldsTake
         )
     }
 

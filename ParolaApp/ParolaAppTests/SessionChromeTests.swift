@@ -916,7 +916,7 @@ extension TranscriberMockSuites {
                 recordAndStop(model, audio: older, seconds: 2)
                 let transcribing = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
                 #expect(transcribing)
-                #expect(model.sidebarShowsRecording, "a take transcribing on its Stage keeps the row")
+                #expect(model.stageHoldsTake, "a take transcribing on its Stage keeps the row")
                 model.recordingCountInSeconds = 3
                 model.startRecording(source: .microphone)
                 await gate.open()
@@ -944,7 +944,7 @@ extension TranscriberMockSuites {
                 #expect(opened)
                 #expect(model.route == .transcript)
 
-                #expect(model.sidebarShowsRecording)
+                #expect(model.stageHoldsTake)
                 let sidebar = HostedWindow(LibrarySidebar().environment(model), width: 240, height: 600)
                 defer { sidebar.close() }
                 let rowShown = await waitUntil { sidebar.row(identifiedBy: "Sidebar.Row.Recording") != nil }
@@ -1216,6 +1216,96 @@ extension TranscriberMockSuites {
             let gone = await waitUntil { model.recording == nil }
             #expect(gone)
             #expect(model.exportNotice == nil)
+        }
+    }
+}
+
+/// A capture that hands back its file, cut short, only once the test lets it go.
+private actor HeldCapture: LiveAudioSource {
+    nonisolated let levelMeter = LevelMeter()
+    private let file: URL
+    private var released = false
+    private var held: CheckedContinuation<Void, Never>?
+
+    init(file: URL) { self.file = file }
+
+    func start() async throws {}
+
+    func prepare() async throws -> URL {
+        if !released { await withCheckedContinuation { held = $0 } }
+        throw CaptureInterrupted(url: file, reason: "the disk is full")
+    }
+
+    func letGo() {
+        released = true
+        held?.resume()
+        held = nil
+    }
+
+    func cancel() async {}
+}
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("One rule for whether the Stage holds a take", .serialized)
+    struct StageHoldsTakeTests {
+        @Test("a take let go to its save holds no Stage: no sidebar row, no Show Recording, and showStage changes nothing")
+        func letGoTakeHoldsNoStage() async throws {
+            let audio = try makeTakeWAV("stage-holds-let-go", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeRecordingModel("stage-holds-let-go")
+            model.useStreaming = false
+            model.selectedModel = "openai_whisper-tiny"
+            let capture = HeldCapture(file: audio)
+            model.takeCaptureOverride = { _ in capture }
+            model.startRecording(source: .microphone)
+            let up = await waitUntil { model.liveSource != nil }
+            #expect(up)
+            model.stopRecordingAndTranscribe()
+            #expect(model.stageHoldsTake, "a finishing take is still on its Stage")
+
+            model.cancelCurrentWork()
+
+            #expect(model.recording?.state == .transcribing(progress: nil), "let go to its save")
+            #expect(!model.stageHoldsTake)
+            let page = model.route
+            #expect(!model.showStage())
+            #expect(model.route == page)
+            let menu = RecordingMenuState(take: model.recording, showsRecording: model.stageHoldsTake, composerFocused: false)
+            #expect(!menu.canShow)
+            let sidebar = HostedWindow(LibrarySidebar().environment(model), width: 240, height: 600)
+            defer { sidebar.close() }
+            _ = await waitUntil { sidebar.rowCount > 3 }
+            #expect(sidebar.row(identifiedBy: "Sidebar.Row.Recording") == nil)
+
+            await capture.letGo()
+            await waitUntil { !model.hasPendingTakeWork }
+        }
+
+        @Test("Stop Transcribing lets the take go from its Stage at once, and the row and Show Recording go with it")
+        func stopTranscribingLetsTheStageGo() async throws {
+            let audio = try makeTakeWAV("stage-holds-run", seconds: 2)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "words")], partials: ["some"], gate: gate)
+                let model = makeRecordingModel("stage-holds-run")
+                model.selectedModel = "openai_whisper-tiny"
+                recordAndStop(model, audio: audio, seconds: 2)
+                let onStage = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                #expect(onStage)
+                #expect(model.stageHoldsTake, "a take transcribing on its Stage holds it")
+
+                model.stopTranscribingTake()
+
+                #expect(model.recording?.isTranscribing == true, "the take still saves")
+                #expect(!model.stageHoldsTake)
+                #expect(!model.showStage())
+                let saved = await landedEntry(model)
+                #expect(saved != nil)
+                await gate.open()
+                await waitUntil { !model.hasPendingTakeWork }
+            }
         }
     }
 }

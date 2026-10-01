@@ -228,8 +228,7 @@ final class AppModel {
         didSet {
             let countdown = Self.countIn(of: recording)
             if countdown != recordingCountdown { recordingCountdown = countdown }
-            let showsRecording = Self.stageHasSomethingToShow(recording)
-            if showsRecording != sidebarShowsRecording { sidebarShowsRecording = showsRecording }
+            refreshStageHoldsTake()
             if oldValue?.isRunning == true, !takeIsRunning { foregroundLetGo() }
             if route == .recording, !Self.stageHasSomethingToShow(recording) { route = .transcript }
             if let noticeTake = exportNotice?.takeID, noticeTake != recording?.takeID { exportNotice = nil }
@@ -321,7 +320,9 @@ final class AppModel {
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
     /// The take run the Stage shows while it transcribes; nil once the run ends or is stopped, so its late callbacks land nowhere.
-    private(set) var takeTranscription: TakeTranscription?
+    private(set) var takeTranscription: TakeTranscription? {
+        didSet { refreshStageHoldsTake() }
+    }
     private(set) var takePartialText: String = ""
     private(set) var takeTranscribeStage: TranscribeStage?
     /// A link run's video title with the file it was downloaded to, so the pane never names the working file.
@@ -477,8 +478,8 @@ final class AppModel {
     var showRecordingPill: Bool = true { didSet { defaults.set(showRecordingPill, forKey: "showRecordingPill") } }
     /// The count-in's number, mirrored from the session so the window's overlay redraws only when it moves.
     private(set) var recordingCountdown: Int?
-    /// Whether the sidebar leads back to the Stage: while the take runs, transcribes or waits there failed. Mirrored so the sidebar redraws only when it flips.
-    private(set) var sidebarShowsRecording = false
+    /// The Stage has a take on it, by the rule its page draws by: the sidebar row, Show Recording and `showStage()` all go by this. Mirrored so the sidebar redraws only when it flips.
+    private(set) var stageHoldsTake = false
     @ObservationIgnored private(set) var countdownTask: Task<Void, Never>?
 
     /// A take that ended, or is in the library now, leaves nothing on its Stage.
@@ -3412,9 +3413,14 @@ final class AppModel {
     /// The take's page; false, and nothing changes, without a take to show on it.
     @discardableResult
     func showStage() -> Bool {
-        guard Self.stageHasSomethingToShow(recording) else { return false }
+        guard stageHoldsTake else { return false }
         route = .recording
         return true
+    }
+
+    private func refreshStageHoldsTake() {
+        let holds = recording.map { ContentRoutes.stageShows($0, model: self) } ?? false
+        if holds != stageHoldsTake { stageHoldsTake = holds }
     }
 
     /// New work shows on the transcript page, so a Stage whose take is over gives way to it; a landed take never holds the Stage.
