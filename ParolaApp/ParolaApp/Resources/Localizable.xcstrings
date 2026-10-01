@@ -1547,6 +1547,17 @@
         }
       }
     },
+    "Add Marker": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi marcatore"
+          }
+        }
+      }
+    },
     "Add Pattern": {
       "extractionState": "manual",
       "localizations": {
@@ -4788,6 +4799,17 @@
         }
       }
     },
+    "Discard Recording…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarta la registrazione…"
+          }
+        }
+      }
+    },
     "Discard this recording?": {
       "extractionState": "manual",
       "localizations": {
@@ -7932,6 +7954,17 @@
         }
       }
     },
+    "Mark": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segna"
+          }
+        }
+      }
+    },
     "Markdown": {
       "extractionState": "manual",
       "localizations": {
@@ -10342,6 +10375,17 @@
         }
       }
     },
+    "Pause Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metti in pausa la registrazione"
+          }
+        }
+      }
+    },
     "Pause when app is hidden": {
       "extractionState": "manual",
       "localizations": {
@@ -11841,6 +11885,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riprendi"
+          }
+        }
+      }
+    },
+    "Resume Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprendi la registrazione"
           }
         }
       }
@@ -14116,6 +14171,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il server MCP con cui altre app e agenti pilotano Parola."
+          }
+        }
+      }
+    },
+    "The audio is deleted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'audio viene eliminato."
           }
         }
       }

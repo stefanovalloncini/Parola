@@ -36,4 +36,20 @@ struct PlaybackKeyMonitorTests {
         #expect(plainLeft == nil)
         #expect(commandSpace == nil)
     }
+
+    @Test("on the Stage, Space pauses the take, even with a transcript's player loaded")
+    func spacePausesTheTakeOnTheStage() {
+        let overPlayer = PlaybackKeyMonitor.action(keyCode: 49, modifiers: [], textInputActive: false, hasPlayer: true, stageShowsTake: true)
+        let noPlayer = PlaybackKeyMonitor.action(keyCode: 49, modifiers: [], textInputActive: false, hasPlayer: false, stageShowsTake: true)
+        #expect(overPlayer == .toggleTakePause)
+        #expect(noPlayer == .toggleTakePause)
+    }
+
+    @Test("on the Stage, Space typed into the title stays text, and modified Space is not Pause")
+    func stageSpaceLeavesTextAlone() {
+        let typing = PlaybackKeyMonitor.action(keyCode: 49, modifiers: [], textInputActive: true, hasPlayer: true, stageShowsTake: true)
+        let commandSpace = PlaybackKeyMonitor.action(keyCode: 49, modifiers: [.command], textInputActive: false, hasPlayer: false, stageShowsTake: true)
+        #expect(typing == nil)
+        #expect(commandSpace == nil)
+    }
 }
