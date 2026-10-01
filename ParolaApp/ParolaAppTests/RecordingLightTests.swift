@@ -1,0 +1,170 @@
+import AppKit
+import Foundation
+import QuartzCore
+import SwiftUI
+import Testing
+@testable import Parola
+import ParolaCore
+
+/// The lights a hosted view put up, as AppKit holds them.
+@MainActor
+private func lights(in hosted: HostedWindow) -> [RecDot.LightView] {
+    func lights(in view: NSView) -> [RecDot.LightView] {
+        ((view as? RecDot.LightView).map { [$0] } ?? []) + view.subviews.flatMap(lights(in:))
+    }
+    hosted.host.layoutSubtreeIfNeeded()
+    return lights(in: hosted.host)
+}
+
+@MainActor
+private func pulsingLights(in hosted: HostedWindow) -> Int {
+    lights(in: hosted).filter { $0.dot.animation(forKey: RecDot.pulseKey) != nil }.count
+}
+
+/// How far into its one-second loop a light's pulse is right now.
+@MainActor
+private func loopPosition(_ light: RecDot.LightView) -> Double? {
+    guard let pulse = light.dot.animation(forKey: RecDot.pulseKey) else { return nil }
+    let now = light.dot.convertTime(CACurrentMediaTime(), from: nil)
+    return (now - pulse.beginTime).truncatingRemainder(dividingBy: 1)
+}
+
+/// The distance between two moments of a one-second loop, either way round.
+private func loopGap(_ a: Double, _ b: Double) -> Double {
+    let gap = abs(a - b).truncatingRemainder(dividingBy: 1)
+    return min(gap, 1 - gap)
+}
+
+@Suite("Recording light")
+struct RecordingLightTests {
+    @MainActor
+    @Test("the render server loops one second of the light's curve: full as the second turns, 35 % halfway, full again")
+    func pulseCurve() {
+        let pulse = RecDot.pulseAnimation(beginTime: 0)
+        let values = pulse.values as? [Double] ?? []
+        let times = pulse.keyTimes?.map(\.doubleValue) ?? []
+        let offCurve = zip(times, values).filter { abs(RecDot.pulse(at: $0) - $1) > 0.0001 }
+        #expect(pulse.keyPath == "opacity")
+        #expect(pulse.duration == 1)
+        #expect(pulse.repeatCount == .infinity)
+        #expect(values.count == times.count)
+        #expect(values.count > 30)
+        #expect(times.first == 0)
+        #expect(times.last == 1)
+        #expect(values.first == 1)
+        #expect(values.last == 1)
+        #expect(abs((values.min() ?? 0) - 0.35) < 0.0001)
+        #expect(offCurve.isEmpty)
+    }
+
+    @Test("the loop begins where the take's current second began, however far into the take the light is built")
+    func pulseBegin() {
+        let origin = Date(timeIntervalSinceReferenceDate: 1_000)
+        #expect(RecDot.pulseBegin(origin: origin, now: origin.addingTimeInterval(12.25), layerTime: 100) == 99.75)
+        #expect(RecDot.pulseBegin(origin: origin, now: origin.addingTimeInterval(12), layerTime: 100) == 100)
+        let threeHours = RecDot.pulseBegin(origin: origin, now: origin.addingTimeInterval(3 * 3600 + 0.5), layerTime: 100)
+        #expect(abs(threeHours - 99.5) < 0.000_001)
+    }
+
+    @MainActor
+    @Test("a light built mid-take pulses in step with the take's seconds, and one built later joins the same beat")
+    func pulseLocksToTheTake() async throws {
+        let origin = Date(timeIntervalSinceNow: -12.25)
+        let first = HostedWindow(RecDot(pulsesFrom: origin), width: 40, height: 40)
+        defer { first.close() }
+        let light = try #require(lights(in: first).first)
+        let position = try #require(loopPosition(light))
+        let expected = Date().timeIntervalSince(origin).truncatingRemainder(dividingBy: 1)
+        #expect(loopGap(position, expected) < 0.03, "the loop is \(position) s in, the take's second \(expected) s")
+
+        await settle(for: .milliseconds(350))
+        let second = HostedWindow(RecDot(pulsesFrom: origin), width: 40, height: 40)
+        defer { second.close() }
+        let rebuilt = try #require(lights(in: second).first)
+        let firstBegin = try #require(light.dot.animation(forKey: RecDot.pulseKey)?.beginTime)
+        let secondBegin = try #require(rebuilt.dot.animation(forKey: RecDot.pulseKey)?.beginTime)
+        #expect(loopGap(firstBegin, secondBegin) < 0.01, "a light built 0.35 s later starts its loop on the same whole seconds")
+    }
+
+    @MainActor
+    @Test("the light is an 8 pt disc of the recording red in either appearance, and clicks pass through it to its button")
+    func lightShape() throws {
+        let sRGB = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        let reds: [(ColorScheme, RGBA)] = [(.light, RGBA(0.769, 0.137, 0.165)), (.dark, RGBA(0.839, 0.208, 0.184))]
+        for (scheme, red) in reds {
+            let hosted = HostedWindow(RecDot(pulsesFrom: Date()).environment(\.colorScheme, scheme), width: 40, height: 40)
+            defer { hosted.close() }
+            let light = try #require(lights(in: hosted).first)
+            let fill = light.dot.backgroundColor?.converted(to: sRGB, intent: .defaultIntent, options: nil)
+            let rgb = fill?.components ?? []
+            #expect(rgb.count == 4)
+            #expect(abs((rgb.first ?? 0) - red.r) < 0.01 && abs((rgb.dropFirst().first ?? 0) - red.g) < 0.01, "\(scheme): \(rgb)")
+            #expect(light.dot.frame.size == CGSize(width: 8, height: 8))
+            #expect(light.dot.cornerRadius == 4)
+            #expect(light.hitTest(NSPoint(x: 4, y: 4)) == nil)
+        }
+    }
+
+    @MainActor
+    @Test("under Reduce Motion, or with nothing to pulse from, the light holds still at full strength")
+    func stillUnderReduceMotion() {
+        let origin = Date(timeIntervalSinceNow: -5)
+        let reduced = HostedWindow(RecDot(pulsesFrom: origin).environment(\._accessibilityReduceMotion, true), width: 40, height: 40)
+        defer { reduced.close() }
+        let idle = HostedWindow(RecDot(pulsesFrom: nil), width: 40, height: 40)
+        defer { idle.close() }
+        let moving = HostedWindow(RecDot(pulsesFrom: origin), width: 40, height: 40)
+        defer { moving.close() }
+        #expect(lights(in: reduced).isEmpty)
+        #expect(lights(in: idle).isEmpty)
+        #expect(pulsingLights(in: moving) == 1)
+    }
+}
+
+@MainActor
+@Suite("Recording light on the take's surfaces", .serialized)
+struct RecordingLightSurfaceTests {
+    private func stage(_ take: RecordingSession, _ model: AppModel, onScreen: Bool) -> HostedWindow {
+        HostedWindow(StageFacts(take: take, isOnScreen: onScreen).environment(model), width: 700, height: 80)
+    }
+
+    private func capsule(_ take: RecordingSession, onScreen: Bool) -> HostedWindow {
+        let face = SessionCapsuleFace(take: take, showsMeter: false, isOnScreen: onScreen, showStage: {}, stop: { _ in })
+        return HostedWindow(face, width: 400, height: 80)
+    }
+
+    private func pill(_ model: AppModel) -> HostedWindow {
+        HostedWindow(RecordingPillView(model: model, onShowParola: {}, onStop: {}, onSize: { _ in }), width: 400, height: 80)
+    }
+
+    /// The Stage's, the capsule's and the pill's lights that pulse for the model's take as it stands.
+    private func pulsing(_ model: AppModel, onScreen: Bool = true) throws -> [Int] {
+        let take = try #require(model.recording)
+        let surfaces = [stage(take, model, onScreen: onScreen), capsule(take, onScreen: onScreen), pill(model)]
+        defer { surfaces.forEach { $0.close() } }
+        return surfaces.map(pulsingLights(in:))
+    }
+
+    @Test("the Stage, the capsule and the pill pulse while the take records; paused or finishing every light holds still")
+    func stillWhilePausedOrFinishing() throws {
+        let audio = try tempWAV("light-surfaces")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("light-surfaces")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -30))
+        defer { model.endTestTake() }
+        let takeID = model.recording?.takeID
+
+        let recording = try pulsing(model)
+        let covered = try pulsing(model, onScreen: false)
+        model.updateSession(of: takeID) { $0.pause(at: Date()) }
+        let paused = try pulsing(model)
+        model.updateSession(of: takeID) { $0.finish(at: Date()) }
+        let finishing = try pulsing(model)
+
+        #expect(recording == [1, 1, 1])
+        #expect(covered == [0, 0, 1], "the main window's lights rest while it is out of sight; the pill floats on its own")
+        #expect(model.recording?.state == .finishing)
+        #expect(paused == [0, 0, 0])
+        #expect(finishing == [0, 0, 0])
+    }
+}

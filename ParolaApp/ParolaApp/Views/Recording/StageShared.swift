@@ -75,26 +75,107 @@ struct RecDot: View {
     var pulsesFrom: Date?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    nonisolated static let pulseKey = "pulse"
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || pulsesFrom == nil)) { context in
-            Circle()
-                .fill(color)
-                .frame(width: side, height: side)
-                .opacity(Self.opacity(sincePulseStart: pulsesFrom.map { context.date.timeIntervalSince($0) }, reduceMotion: reduceMotion))
+        Group {
+            if let origin = Self.pulseOrigin(pulsesFrom, reduceMotion: reduceMotion) {
+                PulsingLight(color: color, origin: origin)
+            } else {
+                Circle()
+                    .fill(color)
+            }
         }
         .frame(width: side, height: side)
         .accessibilityHidden(true)
     }
 
-    /// Still at full strength under Reduce Motion, or with nothing to pulse from.
-    nonisolated static func opacity(sincePulseStart elapsed: TimeInterval?, reduceMotion: Bool) -> Double {
-        guard let elapsed, !reduceMotion else { return 1 }
-        return pulse(at: elapsed)
+    /// Nil while the light holds still at full strength: under Reduce Motion, or with nothing to pulse from.
+    nonisolated static func pulseOrigin(_ origin: Date?, reduceMotion: Bool) -> Date? {
+        reduceMotion ? nil : origin
     }
 
     nonisolated static func pulse(at elapsed: TimeInterval) -> Double {
         let phase = elapsed - elapsed.rounded(.down)
         return 0.35 + 0.65 * (0.5 + 0.5 * cos(2 * .pi * phase))
+    }
+
+    /// When the take's current second began, in a layer's time, so a light built at any moment pulses in step with the take.
+    nonisolated static func pulseBegin(origin: Date, now: Date, layerTime: CFTimeInterval) -> CFTimeInterval {
+        let elapsed = now.timeIntervalSince(origin)
+        return layerTime - (elapsed - elapsed.rounded(.down))
+    }
+
+    static func pulseAnimation(beginTime: CFTimeInterval) -> CAKeyframeAnimation {
+        let steps = 60
+        let animation = CAKeyframeAnimation(keyPath: "opacity")
+        animation.values = (0...steps).map { pulse(at: Double($0) / Double(steps)) }
+        animation.keyTimes = (0...steps).map { NSNumber(value: Double($0) / Double(steps)) }
+        animation.duration = 1
+        animation.repeatCount = .infinity
+        animation.beginTime = beginTime
+        animation.isRemovedOnCompletion = false
+        return animation
+    }
+
+    /// A layer the render server pulses, so the app does no work for the light from frame to frame.
+    final class LightView: NSView {
+        let dot = CALayer()
+        private var origin: Date?
+
+        init() {
+            super.init(frame: .zero)
+            layer = CALayer()
+            wantsLayer = true
+            dot.actions = ["backgroundColor": NSNull(), "bounds": NSNull(), "position": NSNull(), "cornerRadius": NSNull()]
+            layer?.addSublayer(dot)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("not used") }
+
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            dot.frame = CGRect(origin: .zero, size: newSize)
+            dot.cornerRadius = min(newSize.width, newSize.height) / 2
+        }
+
+        // A click on the light belongs to the button it sits in.
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            nil
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            pulse()
+        }
+
+        func show(_ color: CGColor, pulsingFrom origin: Date) {
+            dot.backgroundColor = color
+            guard origin != self.origin else { return }
+            self.origin = origin
+            pulse()
+        }
+
+        private func pulse() {
+            dot.removeAnimation(forKey: RecDot.pulseKey)
+            guard window != nil, let origin else { return }
+            let begin = RecDot.pulseBegin(origin: origin, now: Date(), layerTime: dot.convertTime(CACurrentMediaTime(), from: nil))
+            dot.add(RecDot.pulseAnimation(beginTime: begin), forKey: RecDot.pulseKey)
+        }
+    }
+}
+
+private struct PulsingLight: NSViewRepresentable {
+    let color: Color
+    let origin: Date
+
+    func makeNSView(context: Context) -> RecDot.LightView {
+        RecDot.LightView()
+    }
+
+    func updateNSView(_ view: RecDot.LightView, context: Context) {
+        view.show(color.resolve(in: context.environment).cgColor, pulsingFrom: origin)
     }
 }
 
