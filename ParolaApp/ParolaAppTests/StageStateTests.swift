@@ -737,6 +737,28 @@ extension TranscriberMockSuites {
             model.endTestTake()
         }
 
+        @Test("a take started from a failed take's Stage folds the sidebar and enters as any new take does")
+        func newTakeOnAFailedStageFolds() async throws {
+            let model = makeModel("stage-refold")
+            model.mainSidebar.userSet(.all)
+            model.recordingCountInSeconds = 60
+            model.startRecording(source: .microphone)
+            let routes = HostedWindow(ContentRoutes().modifier(TakeSidebarRelease()).environment(model))
+            defer { routes.close() }
+            let folded = await waitUntil { model.mainSidebar.visibility == .detailOnly }
+            #expect(folded)
+            model.failCountIn("Parola can't use the microphone.")
+            let released = await waitUntil { model.mainSidebar.visibility == .all }
+            #expect(released)
+            #expect(model.route == .recording, "the failed take keeps its Stage")
+
+            model.installTestTake(source: .microphone)
+
+            let refolded = await waitUntil { model.mainSidebar.visibility == .detailOnly }
+            #expect(refolded)
+            model.endTestTake()
+        }
+
         @Test("the Stage's Cancel ends a count-in with no word")
         func cancelDuringCountIn() {
             let model = makeModel("stage-cancel-count-in")
