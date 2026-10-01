@@ -172,60 +172,6 @@ struct ReloadSettingsTests {
         #expect(model.preferredInputDeviceUID == nil)
     }
 
-    @Test("resetTestState restores inputDeviceUID to the system default")
-    func resetTestStateRestoresInputDevice() async throws {
-        let defaults = temporaryDefaults()
-        let bootstrap = AppBootstrap(
-            mode: .test,
-            library: makeTempLibraryURL("reset-mic"),
-            defaultsOverride: defaults,
-            sideEffects: [],
-            filePicker: TestFilePicker()
-        )
-        let model = AppModel(bootstrap: bootstrap)
-        let server = try ParolaAutomationServer(model: model)
-        let context = AutomationContext(model: model, server: server)
-        let reset = try #require(server.lifecycleCommands().first { $0.name == "resetTestState" })
-
-        model.inputDeviceUID = "USBAudioDevice"
-        #expect(model.preferredInputDeviceUID == "USBAudioDevice")
-
-        _ = try await reset.handler(reset.validate(AutomationArgs([:])), context)
-        withExtendedLifetime(server) {}
-
-        #expect(model.inputDeviceUID == "")
-        #expect(model.preferredInputDeviceUID == nil)
-    }
-
-    @Test("resetTestState restores live settings properties, not just UserDefaults")
-    func resetTestStateRestoresLiveSettings() async throws {
-        let defaults = temporaryDefaults()
-        let bootstrap = AppBootstrap(
-            mode: .test,
-            library: makeTempLibraryURL("reset-live"),
-            defaultsOverride: defaults,
-            sideEffects: [],
-            filePicker: TestFilePicker()
-        )
-        let model = AppModel(bootstrap: bootstrap)
-        let server = try ParolaAutomationServer(model: model)
-        let context = AutomationContext(model: model, server: server)
-        let reset = try #require(server.lifecycleCommands().first { $0.name == "resetTestState" })
-
-        model.selectedModel = "openai_whisper-base"
-        model.selectedLanguage = "it"
-        model.translate = true
-        model.wordTimestamps = true
-
-        _ = try await reset.handler(reset.validate(AutomationArgs([:])), context)
-        withExtendedLifetime(server) {}
-
-        #expect(model.selectedModel == ModelCatalog.defaultModelID())
-        #expect(model.selectedLanguage == nil)
-        #expect(model.translate == false)
-        #expect(model.wordTimestamps == false)
-    }
-
     @Test("the microphone recording options persist through their didSets")
     func recordingOptionsPersist() {
         let defaults = temporaryDefaults()
@@ -259,35 +205,6 @@ struct ReloadSettingsTests {
         #expect(model.recordingCountInSeconds == 5)
         #expect(model.autoMuteWhileRecording == true)
         #expect(model.autoPauseMediaWhileRecording == true)
-    }
-
-    @Test("resetTestState restores the microphone recording options to their defaults")
-    func resetTestStateRestoresRecordingOptions() async throws {
-        let defaults = temporaryDefaults()
-        let bootstrap = AppBootstrap(
-            mode: .test,
-            library: makeTempLibraryURL("reset-recopt"),
-            defaultsOverride: defaults,
-            sideEffects: [],
-            filePicker: TestFilePicker()
-        )
-        let model = AppModel(bootstrap: bootstrap)
-        let server = try ParolaAutomationServer(model: model)
-        let context = AutomationContext(model: model, server: server)
-        let reset = try #require(server.lifecycleCommands().first { $0.name == "resetTestState" })
-
-        model.recordingMaxMinutes = 60
-        model.recordingCountInSeconds = 3
-        model.autoMuteWhileRecording = true
-        model.autoPauseMediaWhileRecording = true
-
-        _ = try await reset.handler(reset.validate(AutomationArgs([:])), context)
-        withExtendedLifetime(server) {}
-
-        #expect(model.recordingMaxMinutes == 0)
-        #expect(model.recordingCountInSeconds == 0)
-        #expect(model.autoMuteWhileRecording == false)
-        #expect(model.autoPauseMediaWhileRecording == false)
     }
 
     @Test("turning karaoke off leaves wordTimestamps as the user set it")
@@ -379,5 +296,95 @@ struct ReloadSettingsTests {
         model.loadAutoExportRules()
 
         #expect(model.autoExportRules.isEmpty)
+    }
+}
+
+// resetTestState clears the process-global mock registries, so these run one at a time with the suites that install them.
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("reloadSettings via resetTestState", .serialized)
+    struct ReloadSettingsResetTests {
+        @Test("resetTestState restores inputDeviceUID to the system default")
+        func resetTestStateRestoresInputDevice() async throws {
+            let defaults = temporaryDefaults()
+            let bootstrap = AppBootstrap(
+                mode: .test,
+                library: makeTempLibraryURL("reset-mic"),
+                defaultsOverride: defaults,
+                sideEffects: [],
+                filePicker: TestFilePicker()
+            )
+            let model = AppModel(bootstrap: bootstrap)
+            let server = try ParolaAutomationServer(model: model)
+            let context = AutomationContext(model: model, server: server)
+            let reset = try #require(server.lifecycleCommands().first { $0.name == "resetTestState" })
+
+            model.inputDeviceUID = "USBAudioDevice"
+            #expect(model.preferredInputDeviceUID == "USBAudioDevice")
+
+            _ = try await reset.handler(reset.validate(AutomationArgs([:])), context)
+            withExtendedLifetime(server) {}
+
+            #expect(model.inputDeviceUID == "")
+            #expect(model.preferredInputDeviceUID == nil)
+        }
+
+        @Test("resetTestState restores live settings properties, not just UserDefaults")
+        func resetTestStateRestoresLiveSettings() async throws {
+            let defaults = temporaryDefaults()
+            let bootstrap = AppBootstrap(
+                mode: .test,
+                library: makeTempLibraryURL("reset-live"),
+                defaultsOverride: defaults,
+                sideEffects: [],
+                filePicker: TestFilePicker()
+            )
+            let model = AppModel(bootstrap: bootstrap)
+            let server = try ParolaAutomationServer(model: model)
+            let context = AutomationContext(model: model, server: server)
+            let reset = try #require(server.lifecycleCommands().first { $0.name == "resetTestState" })
+
+            model.selectedModel = "openai_whisper-base"
+            model.selectedLanguage = "it"
+            model.translate = true
+            model.wordTimestamps = true
+
+            _ = try await reset.handler(reset.validate(AutomationArgs([:])), context)
+            withExtendedLifetime(server) {}
+
+            #expect(model.selectedModel == ModelCatalog.defaultModelID())
+            #expect(model.selectedLanguage == nil)
+            #expect(model.translate == false)
+            #expect(model.wordTimestamps == false)
+        }
+
+        @Test("resetTestState restores the microphone recording options to their defaults")
+        func resetTestStateRestoresRecordingOptions() async throws {
+            let defaults = temporaryDefaults()
+            let bootstrap = AppBootstrap(
+                mode: .test,
+                library: makeTempLibraryURL("reset-recopt"),
+                defaultsOverride: defaults,
+                sideEffects: [],
+                filePicker: TestFilePicker()
+            )
+            let model = AppModel(bootstrap: bootstrap)
+            let server = try ParolaAutomationServer(model: model)
+            let context = AutomationContext(model: model, server: server)
+            let reset = try #require(server.lifecycleCommands().first { $0.name == "resetTestState" })
+
+            model.recordingMaxMinutes = 60
+            model.recordingCountInSeconds = 3
+            model.autoMuteWhileRecording = true
+            model.autoPauseMediaWhileRecording = true
+
+            _ = try await reset.handler(reset.validate(AutomationArgs([:])), context)
+            withExtendedLifetime(server) {}
+
+            #expect(model.recordingMaxMinutes == 0)
+            #expect(model.recordingCountInSeconds == 0)
+            #expect(model.autoMuteWhileRecording == false)
+            #expect(model.autoPauseMediaWhileRecording == false)
+        }
     }
 }
