@@ -31,11 +31,24 @@ struct HostedWindow {
     var rowCount: Int {
         host.layoutSubtreeIfNeeded()
         window.displayIfNeeded()
+        return table?.numberOfRows ?? 0
+    }
+
+    var table: NSTableView? {
         func table(in view: NSView) -> NSTableView? {
             if let table = view as? NSTableView { return table }
             return view.subviews.lazy.compactMap(table(in:)).first
         }
-        return table(in: host)?.numberOfRows ?? 0
+        return table(in: host)
+    }
+
+    /// The row whose content carries an element with this identifier.
+    func row(identifiedBy identifier: String) -> Int? {
+        guard let table else { return nil }
+        return (0..<table.numberOfRows).first { row in
+            guard let view = table.rowView(atRow: row, makeIfNecessary: true) else { return false }
+            return HostedAccessibility.elements(in: view).contains { $0.identifier?.hasSuffix(identifier) == true }
+        }
     }
 }
 

@@ -1,7 +1,10 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 @Suite("Sidebar selection")
 struct SidebarSelectionTests {
@@ -100,5 +103,30 @@ struct SidebarSelectionTests {
     @Test("dictations wear the keyboard everywhere the category shows")
     func dictationGlyph() {
         #expect(DS.categorySymbol(for: .dictation) == "keyboard")
+    }
+}
+
+@MainActor
+@Suite("The sidebar on screen")
+struct SidebarOnScreenTests {
+    @Test("a row picked while its page can't open lets go of its highlight")
+    func refusedPickLetsGo() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("sidebar-refused"))
+        await model.libraryRefreshTask?.value
+        let run = AppModel.Phase.transcribing(file: URL(fileURLWithPath: "/tmp/SidebarOnScreenTests.m4a"))
+        model.phase = run
+        let sidebar = HostedWindow(LibrarySidebar().environment(model), width: 240, height: 600)
+        defer { sidebar.close() }
+        _ = await waitUntil { sidebar.rowCount > 4 }
+        let outline = try #require(sidebar.table)
+        let library = try #require(sidebar.row(identifiedBy: "Sidebar.Row.Library"))
+        #expect(outline.selectedRow == -1, "nothing is lit over the progress pane")
+
+        outline.selectRowIndexes([library], byExtendingSelection: false)
+        #expect(outline.selectedRow == library)
+
+        let letGo = await waitUntil { outline.selectedRow == -1 }
+        #expect(letGo, "the Library row stayed lit over the progress pane")
+        #expect(model.phase == run, "the pick leaves the run alone")
     }
 }

@@ -809,6 +809,8 @@ final class AppModel {
     var people: [Person] = []
     /// Which person the library list is filtered to, set from the sidebar, the filter bar or the bridge.
     var personFilter: UUID?
+    /// Bumped when a sidebar pick opens nothing; @Observable skips the same-value writes such a pick makes, so this makes the list look again.
+    var sidebarRefusedPicks = 0
     var showMostUsedPeople: Bool = true { didSet { defaults.set(showMostUsedPeople, forKey: "showMostUsedPeople") } }
     /// The speaker-map writes in flight, kept in order so the bundle never sees them out of turn.
     @ObservationIgnored var speakerAssignmentWriteTask: Task<Void, Never>?

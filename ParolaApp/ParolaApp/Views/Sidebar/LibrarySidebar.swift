@@ -52,16 +52,28 @@ struct LibrarySidebar: View {
 
     /// Read from the model on every pass, so a page opened from a menu or the bridge moves the highlight too.
     private func selection(people: [Person]) -> Binding<SidebarItem?> {
-        Binding(
+        let ids = people.map(\.id)
+        return Binding(
             get: {
-                SidebarSelection.current(
-                    model.sidebarPage, sidebarPeople: people.map(\.id), showsActivity: model.sidebarShowsActivity
-                )
+                _ = model.sidebarRefusedPicks
+                return current(people: ids)
             },
             set: { item in
-                if let item { open(item) }
+                guard let item else { return }
+                open(item)
+                Task { await letGoIfRefused(item, people: ids) }
             }
         )
+    }
+
+    private func current(people: [UUID]) -> SidebarItem? {
+        SidebarSelection.current(model.sidebarPage, sidebarPeople: people, showsActivity: model.sidebarShowsActivity)
+    }
+
+    /// Checked once the transcript a pick closes is gone, so a page that does open never blinks its row.
+    private func letGoIfRefused(_ item: SidebarItem, people: [UUID]) async {
+        await model.awaitTranscriptClose()
+        if current(people: people) != item { model.sidebarRefusedPicks &+= 1 }
     }
 
     private func open(_ item: SidebarItem) {
