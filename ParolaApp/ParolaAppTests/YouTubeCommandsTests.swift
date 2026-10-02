@@ -60,6 +60,38 @@ extension TranscriberMockSuites {
             #expect(model.deferredLinks.isEmpty)
         }
 
+        @Test("a link sent while a take transcribes on its Stage waits behind it and leaves the Stage up, so the take lands in place", arguments: [
+            "transcribeYouTube", "fetchYouTubeSubs",
+        ])
+        func linkBehindATakeKeepsItsStage(name: String) async throws {
+            let audio = try makeTakeWAV("bridge-link-behind-take", seconds: 2)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                defer { Task { await gate.open() } }
+                await installMockTranscriber(segments: [(0, 1, "the take's words")], gate: gate)
+                let (model, server, context, commands) = try makeRig()
+                model.selectedModel = "openai_whisper-tiny"
+                // Fails at once when the link's turn comes, so nothing transcribes after the test.
+                model.linkFetcher = ScriptedLinkFetcher(fixture: audio, failure: LinkDownloadFailure(reason: .unreachable))
+                recordAndStop(model, audio: audio, seconds: 2)
+                let transcribing = await waitUntil { ContentRoutes.stageTranscription(for: model) != nil }
+                try #require(transcribing, "the take never transcribed on its Stage")
+                let command = try #require(commands[name])
+                let args = try command.validate(AutomationArgs(["url": .string(Self.link)]))
+
+                let result = try await command.handler(args, context)
+
+                #expect(result == .object(["started": .bool(false), "parked": .bool(true)]))
+                #expect(model.route == .recording, "the link took the Stage from the take it waits for")
+                await gate.open()
+                let landed = await waitUntil { model.takeSavedNotice != nil || model.arrivalNotice?.origin == .take }
+                #expect(landed, "the take never landed")
+                #expect(model.arrivalNotice?.origin != .take, "the take landed out of sight")
+                withExtendedLifetime(server) {}
+            }
+        }
+
         @Test("fetchYouTubeSubs owns up to parking a fetch handed over during a take")
         func fetchYouTubeSubsReportsParked() async throws {
             let (model, server, context, commands) = try makeRig()

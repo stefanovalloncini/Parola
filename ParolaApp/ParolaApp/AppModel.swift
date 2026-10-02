@@ -2601,6 +2601,12 @@ final class AppModel {
         route = .transcript
     }
 
+    /// A link that waits behind a run in flight, a take's included, starts later wherever the user is, so the page stays as it is.
+    func showLinkRunPage() {
+        guard !linkArrivalsDeferred else { return }
+        showRunPage()
+    }
+
     /// Open Recent, as ⌘O: the file's page comes up, unless a batch takes the file in.
     func openRecentFile(_ url: URL) {
         if !batchIsRunning { showRunPage() }
