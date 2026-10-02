@@ -281,12 +281,4 @@ struct AppModelRulesTests {
         let exportsDir = model.library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
         #expect(FileManager.default.fileExists(atPath: exportsDir.path) == false)
     }
-
-    private func pollUntil(_ condition: () -> Bool) async throws {
-        for _ in 0..<100 {
-            if condition() { return }
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(condition())
-    }
 }
