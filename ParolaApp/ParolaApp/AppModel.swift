@@ -322,6 +322,8 @@ final class AppModel {
     }
     /// Test seam: how long the saved-take toast stays once nothing holds it.
     @ObservationIgnored var takeSavedLifetime: Duration = TakeSavedNotice.lifetime
+    /// Test seam: VoiceOver running keeps the saved-take toast up until it is dismissed.
+    @ObservationIgnored var voiceOverIsRunning: @MainActor () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
     @ObservationIgnored private var takeSavedExpiry: Task<Void, Never>?
     @ObservationIgnored private var takeSavedHeld = false
     /// True while a quit waits for takes to reach the library; the window says so.
@@ -5235,12 +5237,12 @@ final class AppModel {
     private func restartTakeSavedExpiry() {
         takeSavedExpiry?.cancel()
         takeSavedExpiry = nil
-        guard let notice = takeSavedNotice, !takeSavedHeld else { return }
+        guard let notice = takeSavedNotice, !takeSavedHeld, !voiceOverIsRunning() else { return }
         let lifetime = takeSavedLifetime
         let clock = clock
         takeSavedExpiry = Task { [weak self] in
             try? await Task.sleep(for: lifetime, clock: clock)
-            guard !Task.isCancelled, let self, self.takeSavedNotice == notice else { return }
+            guard !Task.isCancelled, let self, self.takeSavedNotice == notice, !self.voiceOverIsRunning() else { return }
             self.takeSavedNotice = nil
         }
     }

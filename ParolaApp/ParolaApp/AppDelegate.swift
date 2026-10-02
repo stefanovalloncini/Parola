@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let dockBadge = DockBadge()
     private let recordingStatusItem = RecordingStatusItem()
     private let recordingPill = RecordingPill()
+    private let takeAnnouncer = TakeAnnouncer()
     private let playbackKeys = PlaybackKeyMonitor()
 
     func bind(model: AppModel) {
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dockBadge.bind(model)
         recordingStatusItem.bind(model)
         recordingPill.bind(model, appActive: NSApp.isActive)
+        takeAnnouncer.bind(model)
         playbackKeys.bind(model)
         model.activationPolicyApplier = { NSApp.setActivationPolicy($0) }
         model.applyAppVisibilityMode()
