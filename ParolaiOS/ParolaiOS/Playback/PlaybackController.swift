@@ -18,6 +18,7 @@ final class PlaybackController {
     @ObservationIgnored private var durationTask: Task<Void, Never>?
     @ObservationIgnored private var seekGeneration = 0
     @ObservationIgnored private var pendingSeek: Int?
+    @ObservationIgnored var seekHoldLimit: Duration = .milliseconds(750)
 
     var hasAudio: Bool { player != nil }
 
@@ -56,6 +57,8 @@ final class PlaybackController {
         guard let player else { return }
         configurePlaybackSession()
         if duration > 0, currentTime >= duration - 0.05 {
+            seekGeneration += 1
+            pendingSeek = nil
             player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
             tick(to: 0)
         }
@@ -80,9 +83,14 @@ final class PlaybackController {
         let generation = seekGeneration
         pendingSeek = generation
         tick(to: time)
+        let holdLimit = seekHoldLimit
         Task { [weak self] in
             _ = await player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
             self?.seekCompleted(generation: generation, time: time)
+        }
+        Task { [weak self] in
+            try? await Task.sleep(for: holdLimit)
+            self?.releaseHold(generation: generation)
         }
     }
 
@@ -101,6 +109,11 @@ final class PlaybackController {
         guard pendingSeek == generation else { return }
         pendingSeek = nil
         tick(to: time)
+    }
+
+    private func releaseHold(generation: Int) {
+        guard pendingSeek == generation else { return }
+        pendingSeek = nil
     }
 
     private func tick(to time: TimeInterval) {
@@ -126,6 +139,10 @@ final class PlaybackController {
 
     func _simulateObserverTickForTest(_ value: TimeInterval) {
         observerTick(value)
+    }
+
+    func _releaseHoldForTest(generation: Int) {
+        releaseHold(generation: generation)
     }
     #endif
 

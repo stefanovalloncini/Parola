@@ -121,6 +121,60 @@ struct PlaybackControllerTests {
         #expect(controller.currentSegmentID == 1)
     }
 
+    @Test("a stalled seek releases its hold after the bound")
+    func stalledSeekReleasesHoldAfterBound() {
+        let controller = PlaybackController()
+        controller.load(audioURL: sampleAudioURL, transcript: Fixtures.makeTranscript())
+        controller.seek(to: 1.2)
+        let generation = controller._latestSeekGenerationForTest
+
+        controller._simulateObserverTickForTest(0.5)
+        #expect(controller.currentTime == 1.2)
+        #expect(controller.currentSegmentID == 1)
+
+        controller._releaseHoldForTest(generation: generation)
+        controller._simulateObserverTickForTest(0.5)
+        #expect(controller.currentTime == 0.5)
+        #expect(controller.currentSegmentID == 0)
+    }
+
+    @Test("a late completion after the hold already released doesn't regress the highlight")
+    func lateCompletionAfterReleaseDoesNotRegress() {
+        let controller = PlaybackController()
+        controller.load(audioURL: sampleAudioURL, transcript: Fixtures.makeTranscript())
+        controller.seek(to: 1.2)
+        let generation = controller._latestSeekGenerationForTest
+
+        controller._releaseHoldForTest(generation: generation)
+        controller._simulateObserverTickForTest(0.5)
+        #expect(controller.currentTime == 0.5)
+        #expect(controller.currentSegmentID == 0)
+
+        controller._completeSeekForTest(generation: generation, time: 1.2)
+        #expect(controller.currentTime == 0.5)
+        #expect(controller.currentSegmentID == 0)
+    }
+
+    @Test("play's rewind clears a pending seek so a stale completion can't snap back")
+    func rewindClearsPendingSeekBeforeStaleCompletion() async throws {
+        let controller = PlaybackController()
+        controller.load(audioURL: sampleAudioURL, transcript: Fixtures.makeTranscript())
+        try await pollUntil { controller.duration > 0 }
+
+        controller.seek(to: controller.duration)
+        let staleGeneration = controller._latestSeekGenerationForTest
+        let staleTarget = controller.duration
+
+        controller.play()
+        #expect(controller.currentTime == 0)
+        #expect(controller.currentSegmentID == 0)
+        #expect(controller.isPlaying)
+
+        controller._completeSeekForTest(generation: staleGeneration, time: staleTarget)
+        #expect(controller.currentTime == 0)
+        #expect(controller.currentSegmentID == 0)
+    }
+
     @Test("playing at the end rewinds to zero before resuming")
     func playRewindsAtEnd() async throws {
         let controller = PlaybackController()
