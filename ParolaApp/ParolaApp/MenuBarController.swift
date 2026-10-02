@@ -41,16 +41,34 @@ final class MenuBarController: NSObject {
         var showsMicrophonePicker: Bool = false
         var pinned: [Item] = []
         var recents: [Item] = []
+        /// Off while a take runs, as File ▸ New Recording is: a second Record would only be refused.
+        var canRecordMicrophone: Bool = true
+        var canRecordSystemAudio: Bool = true
     }
 
     private weak var model: AppModel?
     private var statusItem: NSStatusItem?
     private(set) var lastSnapshot: MenuSnapshot?
     private var lastInputDevices: [AudioInputDevice] = []
+    private var takeBlocksRecord: Bool?
 
     func bind(_ model: AppModel) {
         self.model = model
         observeAndRefresh()
+        observeTake()
+    }
+
+    /// Apart from the rest: a take's session changes with every title keystroke, and only its start and end matter here.
+    private func observeTake() {
+        guard let model else { return }
+        let blocks = withObservationTracking {
+            model.recordingActive
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in self?.observeTake() }
+        }
+        guard blocks != takeBlocksRecord else { return }
+        takeBlocksRecord = blocks
+        refresh()
     }
 
     private func observeAndRefresh() {
@@ -95,6 +113,8 @@ final class MenuBarController: NSObject {
             snapshot.captionsUnavailableReason = model.liveCaptionsUnavailableReason
         }
         snapshot.selectedInputDeviceUID = model.inputDeviceUID
+        snapshot.canRecordMicrophone = model.canStartTake(.microphone)
+        snapshot.canRecordSystemAudio = model.canStartTake(.systemAudio)
         snapshot.showsUpdateCheck = SparkleUpdater.feedURLConfigured
         snapshot.showsMicrophonePicker = SettingsRoute.microphone.isVisible(features: model.features)
         let entries = model.libraryEntries
@@ -243,21 +263,29 @@ final class MenuBarController: NSObject {
     private static func recordItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem? {
         guard snapshot.showsSystemAudio else {
             guard snapshot.showsMicRecording else { return nil }
-            return menuItem(title: String(localized: "Record Microphone"), action: #selector(recordMic), target: target)
+            let mic = menuItem(title: String(localized: "Record Microphone"), action: #selector(recordMic), target: target)
+            mic.isEnabled = snapshot.canRecordMicrophone
+            return mic
         }
         let submenu = NSMenu()
         submenu.autoenablesItems = false
         if let app = snapshot.detectedMeetingApp {
             let detected = menuItem(title: String(localized: "Record \(app)"), action: #selector(recordDetectedMeeting(_:)), target: target)
             detected.representedObject = app
+            detected.isEnabled = snapshot.canRecordSystemAudio
             submenu.addItem(detected)
         }
-        submenu.addItem(menuItem(title: String(localized: "Record System Audio"), action: #selector(recordSystem), target: target))
+        let system = menuItem(title: String(localized: "Record System Audio"), action: #selector(recordSystem), target: target)
+        system.isEnabled = snapshot.canRecordSystemAudio
+        submenu.addItem(system)
         if snapshot.showsMicRecording {
-            submenu.addItem(menuItem(title: String(localized: "Record Microphone"), action: #selector(recordMic), target: target))
+            let mic = menuItem(title: String(localized: "Record Microphone"), action: #selector(recordMic), target: target)
+            mic.isEnabled = snapshot.canRecordMicrophone
+            submenu.addItem(mic)
         }
         let item = NSMenuItem(title: String(localized: "Record Meeting"), action: nil, keyEquivalent: "")
         item.submenu = submenu
+        item.isEnabled = submenu.items.contains(where: \.isEnabled)
         return item
     }
 

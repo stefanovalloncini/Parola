@@ -9,6 +9,15 @@ enum LibraryEmptyAction {
     case startDictation
     case meetingSettings
     case dictationSettings
+
+    /// What a Record action records from; nil for the others.
+    var recordSource: AppModel.RecordSource? {
+        switch self {
+        case .recordMicrophone: .microphone
+        case .recordSystemAudio: .systemAudio
+        case .openFile, .startDictation, .meetingSettings, .dictationSettings: nil
+        }
+    }
 }
 
 /// What an emptied list shows: the page's own empty state when it holds nothing, Clear Filters when the filters hid it all.
@@ -44,6 +53,12 @@ enum LibraryEmptyState {
 }
 
 enum LibraryListContent {
+    /// A Record action waits while a take runs, as the hero's Record does.
+    @MainActor
+    static func isAvailable(_ action: LibraryEmptyAction, in model: AppModel) -> Bool {
+        action.recordSource.map { model.canStartTake($0) } ?? true
+    }
+
     /// Leads with the action that produces the kind of entry the category holds, then the fallbacks.
     static func emptyActions(for category: EntryCategory, features: FeatureSet) -> [LibraryEmptyAction] {
         var actions: [LibraryEmptyAction] = []
@@ -575,6 +590,7 @@ private struct LibraryBrowseList: View, Equatable {
                     Label(action.title, systemImage: action.systemImage)
                 }
                 .buttonStyle(DSPillButtonStyle(kind: index == 0 ? .primary : .secondary))
+                .disabled(!LibraryListContent.isAvailable(action, in: model))
                 .axLeaf(action.axLeaf)
             }
         }
