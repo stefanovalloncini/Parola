@@ -1283,6 +1283,28 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.contains { $0.url == url })
     }
 
+    @Test("Retry on a failed run, pressed during a take, waits for it as a file or link handed over then does, and the file runs once the take ends")
+    func retryDuringATakeWaitsForIt() async {
+        let model = makeModel()
+        model.linkFetcher = ScriptedLinkFetcher(fixture: URL(fileURLWithPath: "/tmp/never.wav"), failure: LinkDownloadFailure(reason: .unreachable))
+        model.installTestTake(source: .microphone)
+        let url = Self.makeFile("retried.wav")
+        let link = "https://youtu.be/dQw4w9WgXcQ"
+
+        model.performNoticeAction(ExportNotice.Action(title: "Retry", handler: .retryRun(.file(url, translateOverride: nil))))
+        model.performNoticeAction(ExportNotice.Action(title: "Retry", handler: .retryRun(.link(.transcribe(link)))))
+
+        #expect(model.deferredArrivals == [url], "the file's Retry went with its notice")
+        #expect(model.deferredLinks == [.transcribe(link)], "the link's Retry went with its notice")
+        #expect(model.exportNotice?.message == "Finish the recording first.")
+        #expect(model.route == .recording)
+        let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
+        await model.handleStreamingEvent(.finished(final))
+        await model.awaitArrivalDrain()
+        await model.awaitBatchImport()
+        #expect(model.batchJobs.contains { $0.url == url }, "the retried file never ran after the take")
+    }
+
     @Test("cancelling discards deferred arrivals, but those waiting for a take that records wait on with it")
     func cancelDiscardsDeferredArrivals() {
         let model = makeModel()

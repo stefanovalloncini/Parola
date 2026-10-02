@@ -143,16 +143,27 @@ extension AppModel {
         case .revealFile(let file):
             NSWorkspace.shared.activateFileViewerSelecting([file])
         case .retryRun(let retry):
+            retryRun(retry)
+        }
+    }
+
+    /// A failed run's Retry, from its notice: the run starts again on its page, or waits for a take as a file or a link handed over during it does, so the Retry outlives its notice.
+    func retryRun(_ retry: RunRetry) {
+        switch retry {
+        case .file(let url, let translateOverride):
             guard !takeIsRunning else {
+                deferredArrivals.append(url)
                 noteRunWaitsForTake()
                 return
             }
-            route = .transcript
-            switch retry {
-            case .file(let url, let translateOverride): beginFileTranscription(fileURL: url, translateOverride: translateOverride)
-            case .link(.transcribe(let link)): transcribeYouTube(urlString: link)
-            case .link(.subtitles(let link)): fetchYouTubeSubs(urlString: link)
-            }
+            showRunPage()
+            beginFileTranscription(fileURL: url, translateOverride: translateOverride)
+        case .link(.transcribe(let link)):
+            showLinkRunPage()
+            transcribeYouTube(urlString: link)
+        case .link(.subtitles(let link)):
+            showLinkRunPage()
+            fetchYouTubeSubs(urlString: link)
         }
     }
 
