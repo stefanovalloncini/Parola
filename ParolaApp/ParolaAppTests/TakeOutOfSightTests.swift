@@ -128,7 +128,7 @@ struct TakeFailsOutOfSightTests {
     func countInFailureStays() async throws {
         let model = makeRecordingModel("out-of-sight-count-in")
         model.recordingCountInSeconds = 60
-        let pill = RecordingPill(makesPanel: false)
+        let pill = RecordingPill(makesPanel: false, appIsActive: { false })
         pill.bind(model, appActive: false)
         let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
         item.bind(model)
@@ -157,7 +157,7 @@ struct TakeFailsOutOfSightTests {
     func dismissedFailureGoes() async throws {
         let model = makeRecordingModel("out-of-sight-dismissed")
         model.recordingCountInSeconds = 60
-        let pill = RecordingPill(makesPanel: false)
+        let pill = RecordingPill(makesPanel: false, appIsActive: { false })
         pill.bind(model, appActive: false)
         let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
         item.bind(model)
@@ -204,7 +204,12 @@ struct TakeFailsOutOfSightTests {
             #expect(counting)
 
             model.failCountIn("Parola can't use the microphone.")
-            await settle(for: .milliseconds(300))
+            if active {
+                await settle(for: .milliseconds(300))
+            } else {
+                let bounced = await waitUntil { calls.count == 1 }
+                #expect(bounced)
+            }
             model.updateSession(of: model.recording?.takeID) { $0.title = "Renamed" }
             await settle(for: .milliseconds(100))
 
@@ -212,6 +217,27 @@ struct TakeFailsOutOfSightTests {
             model.forgetTakeSession()
             withExtendedLifetime(badge) {}
         }
+    }
+
+    @Test("the pill weighs a failure by whether Parola is in front, as the menu bar item and the Dock do, not by its own last word on it")
+    func pillWeighsLikeTheOthers() async throws {
+        let model = makeRecordingModel("out-of-sight-pill-source")
+        model.recordingCountInSeconds = 60
+        let pill = RecordingPill(makesPanel: false, appIsActive: { true })
+        pill.bind(model, appActive: false)
+        let item = RecordingStatusItem(statusBar: nil, appIsActive: { true })
+        item.bind(model)
+        model.startRecording(source: .microphone)
+        let up = await waitUntil { pill.isShown && item.face != nil }
+        #expect(up)
+
+        model.failCountIn("Parola can't use the microphone.")
+
+        let itemGone = await waitUntil { item.face == nil }
+        #expect(itemGone)
+        let pillGone = await waitUntil { !pill.isShown }
+        #expect(pillGone, "the pill held a failure the menu bar item let go, for the same take")
+        model.forgetTakeSession()
     }
 }
 
@@ -230,7 +256,7 @@ extension TranscriberMockSuites {
                     gate: gate
                 ))
                 let model = makeRecordingModel("out-of-sight-transcription")
-                let pill = RecordingPill(makesPanel: false)
+                let pill = RecordingPill(makesPanel: false, appIsActive: { false })
                 pill.bind(model, appActive: false)
                 let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
                 item.bind(model)
@@ -273,7 +299,7 @@ extension TranscriberMockSuites {
                 let model = makeRecordingModel("out-of-sight-live")
                 model.useStreaming = true
                 model.selectedModel = "openai_whisper-tiny"
-                let pill = RecordingPill(makesPanel: false)
+                let pill = RecordingPill(makesPanel: false, appIsActive: { false })
                 pill.bind(model, appActive: false)
                 let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
                 item.bind(model)

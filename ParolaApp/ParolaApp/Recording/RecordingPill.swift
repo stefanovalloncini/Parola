@@ -8,6 +8,7 @@ final class RecordingPill {
 
     private weak var model: AppModel?
     private let makesPanel: Bool
+    private let appIsActive: @MainActor () -> Bool
     private var panel: NSPanel?
     private var moveObserver: (any NSObjectProtocol)?
     private var placing = false
@@ -15,9 +16,10 @@ final class RecordingPill {
     private(set) var appActive = true
     private(set) var isShown = false
 
-    /// Without a panel the decision is kept and nothing reaches the screen, as a test wants it.
-    init(makesPanel: Bool = true) {
+    /// Without a panel the decision is kept and nothing reaches the screen, as a test wants it. A failure is weighed by `appIsActive`, as the menu bar item and the Dock weigh it, so the three agree.
+    init(makesPanel: Bool = true, appIsActive: @escaping @MainActor () -> Bool = { NSApp.isActive }) {
         self.makesPanel = makesPanel
+        self.appIsActive = appIsActive
     }
 
     /// A take that failed while the pill showed it stays, as stopped, until Parola comes to the front.
@@ -59,7 +61,7 @@ final class RecordingPill {
         guard let model else { return }
         let running = model.takeIsRunning
         let enabled = model.showRecordingPill
-        let held = failure.holds(model.recording, appActive: appActive)
+        let held = failure.holds(model.recording, appActive: appIsActive())
         if Self.shouldShow(appActive: appActive, takeRunning: running, enabled: enabled, failureHeld: held) {
             show(model)
         } else {
