@@ -1208,12 +1208,40 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("the saved toast goes on its own after its time, whether or not a window shows it")
+        @Test("the saved toast goes on its own once its window has shown it, and not before")
         func savedToastExpires() async {
             let model = makeModel("stage-saved-expiry")
             model.takeSavedLifetime = .milliseconds(50)
+            model.mainWindowPresenceOverride = .hidden
 
-            model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+            model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .meeting)
+            await settle(for: .milliseconds(500))
+            #expect(model.takeSavedNotice != nil, "the toast went while its window was out of sight")
+
+            model.takeSavedCameOnScreen()
+            let gone = await waitUntil { model.takeSavedNotice == nil }
+            #expect(gone)
+        }
+
+        @Test("the saved toast's window coming on screen is what starts its time")
+        func savedToastStartsWhenShown() async throws {
+            let model = makeModel("stage-saved-shown")
+            model.takeSavedLifetime = .milliseconds(50)
+            let notice = TakeSavedNotice(entryID: "E", category: .transcription)
+            model.takeSavedNotice = notice
+            let hosted = HostedWindow(TakeSavedToast(notice: notice).environment(model), width: 600, height: 120)
+            defer { hosted.close() }
+            func reader(in view: NSView) -> WindowShownReader.ReaderView? {
+                view as? WindowShownReader.ReaderView ?? view.subviews.lazy.compactMap(reader(in:)).first
+            }
+            let found = reader(in: hosted.host)
+            let shown = try #require(found)
+            hosted.window.orderOut(nil)
+            shown.onChange?(false)
+            await settle(for: .milliseconds(400))
+            #expect(model.takeSavedNotice == notice)
+
+            shown.onChange?(true)
 
             let gone = await waitUntil { model.takeSavedNotice == nil }
             #expect(gone)
@@ -1224,10 +1252,12 @@ extension TranscriberMockSuites {
             let model = makeModel("stage-saved-hold-ends")
             model.takeSavedLifetime = .milliseconds(50)
             model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+            model.takeSavedCameOnScreen()
             model.holdTakeSaved(true)
             model.dismissTakeSaved()
 
             model.takeSavedNotice = TakeSavedNotice(entryID: "F", category: .transcription)
+            model.takeSavedCameOnScreen()
 
             let gone = await waitUntil { model.takeSavedNotice == nil }
             #expect(gone)
@@ -1238,6 +1268,7 @@ extension TranscriberMockSuites {
             let model = makeModel("stage-saved-hover")
             model.takeSavedLifetime = .milliseconds(100)
             model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+            model.takeSavedCameOnScreen()
 
             model.holdTakeSaved(true)
             await settle(for: .milliseconds(400))

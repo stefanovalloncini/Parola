@@ -312,12 +312,15 @@ final class AppModel {
     private(set) var recordedTake: RecordedTake?
     /// The take's title field has the keyboard, so Esc edits the title instead of cancelling a take that is still starting.
     var takeTitleHasFocus = false
-    /// A take that landed on its own Stage, for the toast that says where it went; it goes on its own unless the pointer holds it.
+    /// A take that landed on its own Stage, for the toast that says where it went; it goes on its own once seen, unless the pointer holds it.
     var takeSavedNotice: TakeSavedNotice? {
         didSet {
             // A pointer that left as the toast's window hid sends no exit, so the hold goes with the toast.
             if takeSavedNotice == nil { takeSavedHeld = false }
-            if takeSavedNotice != oldValue { restartTakeSavedExpiry() }
+            if takeSavedNotice != oldValue {
+                takeSavedSeen = false
+                restartTakeSavedExpiry()
+            }
         }
     }
     /// Test seam: how long the saved-take toast stays once nothing holds it.
@@ -326,6 +329,7 @@ final class AppModel {
     @ObservationIgnored var voiceOverIsRunning: @MainActor () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
     @ObservationIgnored private var takeSavedExpiry: Task<Void, Never>?
     @ObservationIgnored private var takeSavedHeld = false
+    @ObservationIgnored private var takeSavedSeen = false
     /// True while a quit waits for takes to reach the library; the window says so.
     private(set) var savingTakesBeforeQuit = false
     /// A quit already winding the takes down; the app delegate answers any other quit with a no.
@@ -5226,6 +5230,13 @@ final class AppModel {
         takeSavedNotice = nil
     }
 
+    /// The toast's window is on screen: its time starts the first time, as an arrival toast's does, so a take landed behind a hidden window keeps it.
+    func takeSavedCameOnScreen() {
+        guard takeSavedNotice != nil, !takeSavedSeen else { return }
+        takeSavedSeen = true
+        restartTakeSavedExpiry()
+    }
+
     /// The pointer over the saved-take toast holds it; when it leaves, the toast's time starts again.
     func holdTakeSaved(_ held: Bool) {
         guard takeSavedHeld != held else { return }
@@ -5237,7 +5248,7 @@ final class AppModel {
     private func restartTakeSavedExpiry() {
         takeSavedExpiry?.cancel()
         takeSavedExpiry = nil
-        guard let notice = takeSavedNotice, !takeSavedHeld, !voiceOverIsRunning() else { return }
+        guard let notice = takeSavedNotice, takeSavedSeen, !takeSavedHeld, !voiceOverIsRunning() else { return }
         let lifetime = takeSavedLifetime
         let clock = clock
         takeSavedExpiry = Task { [weak self] in

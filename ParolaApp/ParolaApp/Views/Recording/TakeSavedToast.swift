@@ -11,7 +11,7 @@ struct TakeSavedNotice: Equatable, Identifiable {
     static let lifetime: Duration = .seconds(5)
 }
 
-/// "Saved to Meetings" under the transcript a take just became, with Summarize and Copy; it goes after a few seconds.
+/// "Saved to Meetings" under the transcript a take just became, with Summarize and Copy; it goes a few seconds after its window shows it.
 struct TakeSavedToast: View {
     @Environment(AppModel.self) private var model
     let notice: TakeSavedNotice
@@ -61,6 +61,7 @@ struct TakeSavedToast: View {
                 .strokeBorder(DS.Palette.success.opacity(0.35), lineWidth: 1)
         )
         .padding(DS.Spacing.regular)
+        .background(WindowShownReader { if $0 { model.takeSavedCameOnScreen() } }.id(notice.id))
         .onHover { model.holdTakeSaved($0) }
         .onDisappear { model.holdTakeSaved(false) }
         .axBranch("TakeSavedToast")

@@ -138,6 +138,7 @@ struct TakeAnnouncerTests {
         model.takeSavedLifetime = .milliseconds(50)
 
         model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+        model.takeSavedCameOnScreen()
 
         await settle(for: .milliseconds(400))
         #expect(model.takeSavedNotice != nil)
