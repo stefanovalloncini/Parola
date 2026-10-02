@@ -58,11 +58,14 @@ enum TakeRemote {
         let symbol: String
     }
 
-    /// Low disk space before silence: it is the one that ends the take.
+    /// Low disk space first, as it ends the take; then a Mac capture that stopped while your microphone records on; then silence.
     static func warning(for take: RecordingSession, in model: AppModel) -> Warning? {
         guard take.isRunning else { return nil }
         if model.recordingDiskSpaceLow {
             return Warning(message: String(localized: "Low disk space — recording stops automatically below 200 MB."), symbol: "internaldrive")
+        }
+        if model.takeMacAudioStopped, take.isCapturing {
+            return Warning(message: String(localized: "Mac audio stopped"), symbol: "waveform.slash")
         }
         guard model.recordingIsSilent else { return nil }
         return Warning(

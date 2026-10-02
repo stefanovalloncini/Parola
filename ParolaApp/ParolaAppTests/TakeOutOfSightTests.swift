@@ -386,3 +386,57 @@ struct TakeWarningsOutsideTests {
         model.endTestTake()
     }
 }
+
+@MainActor
+@Suite("A meeting's Mac audio that stopped, outside the window", .serialized)
+struct MacAudioStoppedOutsideTests {
+    @Test("while your microphone records on, the stopped Mac audio warns on the pill, in the menu bar and on the Stage, after low disk space")
+    func warns() async throws {
+        let audio = try tempWAV("mac-stopped-warning")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("mac-stopped-warning")
+        let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
+        item.bind(model)
+        model.installTestTake(source: .systemAudio, liveSource: StubSource(url: audio))
+        let shown = await waitUntil { item.face != nil }
+        #expect(shown)
+        let pill = HostedWindow(RecordingPillFace(model: model, isOnScreen: false, onShowParola: {}, onStop: { _ in }, onSize: { _ in }))
+        defer { pill.close() }
+        let take = try #require(model.recording)
+        // Stretched, or the window shrinks to the line and its next line has nowhere to go.
+        let stage = HostedWindow(
+            StageFacts(take: take, isOnScreen: false).environment(model).frame(maxWidth: .infinity, maxHeight: .infinity),
+            width: 900, height: 160
+        )
+        defer { stage.close() }
+        func pillValue() -> String? {
+            HostedAccessibility.elements(in: pill.host).first { $0.identifier == "RecordingPill.Button.ShowParola" }?.value
+        }
+
+        model.takeMacAudioStopped = true
+
+        let inMenu = await waitUntil { item.face?.notice == "Mac audio stopped" }
+        #expect(inMenu)
+        #expect(TakeRemote.warning(for: take, in: model)?.symbol == "waveform.slash")
+        let onPill = await waitUntil { pillValue() == "Mac audio stopped" }
+        #expect(onPill)
+        let onStage = await waitUntil { HostedAccessibility.words(in: stage.host).contains("Mac audio stopped") }
+        #expect(onStage)
+        model.recordingDiskSpaceLow = true
+        #expect(TakeRemote.warning(for: take, in: model)?.symbol == "internaldrive", "low disk space ends the take, so it comes first")
+        model.endTestTake()
+    }
+
+    @Test("once the take stops, a stopped Mac capture is no warning: it is what ended the take")
+    func noWarningOnceStopped() throws {
+        let model = makeRecordingModel("mac-stopped-finishing")
+        model.takeMacAudioStopped = true
+        var take = RecordingSession(takeID: 1, source: .systemAudio, category: .meeting, title: "R", isStreaming: false, arming: .startingCapture)
+        take.markCapturing(at: .now)
+        #expect(TakeRemote.warning(for: take, in: model)?.message == "Mac audio stopped")
+        take.finish(at: .now)
+        #expect(TakeRemote.warning(for: take, in: model) == nil)
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        #expect(String(localized: "Mac audio stopped", bundle: try #require(Bundle(path: path))) == "Audio del Mac fermato")
+    }
+}
