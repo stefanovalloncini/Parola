@@ -2,9 +2,9 @@ import Foundation
 import ParolaCore
 
 extension ParolaAutomationServer {
-    /// What a drop does first: the page its run shows on comes up, so a run the bridge starts never lands out of sight.
+    /// What a drop does first: the page its run shows on comes up, so a run the bridge starts never lands out of sight; one a take parks leaves the Stage up.
     static func showRunPage(_ model: AppModel) {
-        guard !model.stageHoldsTake else { return }
+        guard !model.takeIsRunning else { return }
         model.route = .transcript
     }
 
