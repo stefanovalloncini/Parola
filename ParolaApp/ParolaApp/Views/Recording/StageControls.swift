@@ -36,6 +36,26 @@ struct StageControls: View {
         case pause, mark, stop, cancel, discard, finishing, stopTranscribing
     }
 
+    /// The bar's controls with a key of their own; their help names it, as a menu shows it beside the command.
+    enum KeyedControl {
+        case pause, resume, mark, stop, cancel
+    }
+
+    nonisolated static func help(for control: KeyedControl, bundle: Bundle = .main) -> String {
+        let space = String(localized: "Space", bundle: bundle)
+        switch control {
+        case .pause: return withKey(String(localized: "Pause Recording", bundle: bundle), space)
+        case .resume: return withKey(String(localized: "Resume Recording", bundle: bundle), space)
+        case .mark: return withKey(String(localized: "Add Marker", bundle: bundle), "⌘B")
+        case .stop: return withKey(String(localized: "Stop recording and transcribe", bundle: bundle), "⌘↩")
+        case .cancel: return withKey(String(localized: "Cancel the recording before it starts", bundle: bundle), "Esc")
+        }
+    }
+
+    private nonisolated static func withKey(_ text: String, _ key: String) -> String {
+        text + " (" + key + ")"
+    }
+
     /// The glass each control morphs from: whatever ends the take sits in Stop's capsule, so Stop becomes the Finishing pill and then Stop Transcribing.
     enum GlassShape: Hashable, Sendable {
         case pause, mark, end, discard
@@ -150,7 +170,7 @@ struct StageControls: View {
             }
             .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: 18))
             .disabled(!take.isCapturing)
-            .help("Add Marker")
+            .help(Self.help(for: .mark))
             .accessibilityLabel("Add Marker")
             .axLeaf("Stage.Button.Mark")
             .morphs(as: .mark, in: glass, reduceMotion: reduceMotion)
@@ -187,7 +207,7 @@ struct StageControls: View {
             horizontalPadding: DS.Spacing.medium,
             minWidth: Self.stopWidth
         ))
-        .help("Stop recording and transcribe.")
+        .help(Self.help(for: .stop))
         .accessibilityLabel("Stop Recording")
         .axLeaf("Stage.Button.Stop")
         .morphs(as: .stop, in: glass, reduceMotion: reduceMotion)
@@ -202,7 +222,7 @@ struct StageControls: View {
         }
         .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: DS.Spacing.medium, minWidth: Self.stopWidth))
         .keyboardShortcut(Self.cancelShortcut(titleFocused: model.takeTitleHasFocus))
-        .help("Cancel the recording before it starts.")
+        .help(Self.help(for: .cancel))
         .accessibilityLabel("Cancel Recording")
         .axLeaf("Stage.Button.Cancel")
         .morphs(as: .cancel, in: glass, reduceMotion: reduceMotion)
@@ -223,7 +243,7 @@ struct StageControls: View {
         }
         .buttonStyle(GlassCapsuleButtonStyle(height: Self.buttonHeight, horizontalPadding: 18))
         .disabled(!take.isCapturing)
-        .help(spoken)
+        .help(Self.help(for: take.isPaused ? .resume : .pause))
         .accessibilityLabel(spoken)
         .axLeaf("Stage.Button.Pause")
         .morphs(as: .pause, in: glass, reduceMotion: reduceMotion)

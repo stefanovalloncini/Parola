@@ -2900,6 +2900,28 @@
         }
       }
     },
+    "Cancel a Starting Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla una registrazione in avvio"
+          }
+        }
+      }
+    },
+    "Cancel the recording before it starts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla la registrazione prima che inizi"
+          }
+        }
+      }
+    },
     "Cancel the recording before it starts.": {
       "extractionState": "manual",
       "localizations": {
@@ -2962,6 +2984,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli"
+          }
+        }
+      }
+    },
+    "Capture": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acquisizione"
           }
         }
       }
@@ -6534,6 +6567,17 @@
         }
       }
     },
+    "Help": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aiuto"
+          }
+        }
+      }
+    },
     "Helper tools Parola uses to fetch audio from links.": {
       "extractionState": "manual",
       "localizations": {
@@ -8724,6 +8768,17 @@
         }
       }
     },
+    "Navigation": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Navigazione"
+          }
+        }
+      }
+    },
     "Never": {
       "extractionState": "manual",
       "localizations": {
@@ -9898,6 +9953,17 @@
         }
       }
     },
+    "Open Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri Impostazioni"
+          }
+        }
+      }
+    },
     "Open System Settings → Privacy & Security → Microphone and grant Parola access.": {
       "extractionState": "manual",
       "localizations": {
@@ -10573,6 +10639,17 @@
         }
       }
     },
+    "Pause or Resume Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metti in pausa o riprendi la registrazione"
+          }
+        }
+      }
+    },
     "Pause when app is hidden": {
       "extractionState": "manual",
       "localizations": {
@@ -10767,6 +10844,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riproduci"
+          }
+        }
+      }
+    },
+    "Play / Pause": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riproduci / Pausa"
           }
         }
       }
@@ -10982,6 +11070,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Match precedente"
+          }
+        }
+      }
+    },
+    "Print Transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stampa trascrizione"
           }
         }
       }
@@ -13435,6 +13534,28 @@
         }
       }
     },
+    "Skip Back 5 Seconds": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indietro di 5 secondi"
+          }
+        }
+      }
+    },
+    "Skip Forward 5 Seconds": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avanti di 5 secondi"
+          }
+        }
+      }
+    },
     "Skip silences": {
       "extractionState": "manual",
       "localizations": {
@@ -13640,6 +13761,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Origine: %@"
+          }
+        }
+      }
+    },
+    "Space": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spazio"
           }
         }
       }
@@ -14077,6 +14209,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ferma la lettura"
+          }
+        }
+      }
+    },
+    "Stop recording and transcribe": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferma la registrazione e trascrivi"
           }
         }
       }
