@@ -141,6 +141,7 @@ final class AppModel {
         didSet {
             if oldValue == .recentlyDeleted { recentlyDeletedSelection = [] }
             if routeLandsTake { routeLandsTake = false }
+            if route != oldValue { holdSavedToastBehindStage() }
         }
     }
     /// Set as a take's own landing replaces its Stage with its transcript, so the window plays that change as a landing; the next route change clears it.
@@ -532,6 +533,8 @@ final class AppModel {
     private(set) var recordingCountdown: Int?
     /// The Stage has a take on it, by the rule its page draws by: the sidebar row, Show Recording and `showStage()` all go by this. Mirrored so the sidebar redraws only when it flips.
     private(set) var stageHoldsTake = false
+    /// The Stage on screen with a take has no room for the page's notices and toasts; they wait for the page after it.
+    var noticesWaitForStage: Bool { route == .recording && stageHoldsTake }
     @ObservationIgnored private(set) var countdownTask: Task<Void, Never>?
 
     /// A take that ended, or is in the library now, leaves nothing on its Stage.
@@ -3484,7 +3487,6 @@ final class AppModel {
 
     private func beginSession(_ session: RecordingSession) {
         takeLevels = TakeLevelHistory()
-        takeSavedNotice = nil
         takeMicLevels = nil
         if takeMicTrackState != nil { takeMicTrackState = nil }
         if takeMacAudioStopped { takeMacAudioStopped = false }
@@ -3573,7 +3575,9 @@ final class AppModel {
 
     private func refreshStageHoldsTake() {
         let holds = recording.map { ContentRoutes.stageShows($0, model: self) } ?? false
-        if holds != stageHoldsTake { stageHoldsTake = holds }
+        guard holds != stageHoldsTake else { return }
+        stageHoldsTake = holds
+        holdSavedToastBehindStage()
     }
 
     /// New work shows on the transcript page, so a Stage whose take is over gives way to it; a landed take never holds the Stage.
@@ -5357,6 +5361,13 @@ final class AppModel {
     func takeSavedCameOnScreen() {
         guard takeSavedNotice != nil, !takeSavedSeen else { return }
         takeSavedSeen = true
+        restartTakeSavedExpiry()
+    }
+
+    /// A saved take's toast the Stage covers keeps its Summarize and Copy: its time starts again once it is back in view.
+    private func holdSavedToastBehindStage() {
+        guard noticesWaitForStage, takeSavedSeen else { return }
+        takeSavedSeen = false
         restartTakeSavedExpiry()
     }
 

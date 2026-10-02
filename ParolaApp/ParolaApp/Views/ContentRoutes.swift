@@ -31,24 +31,7 @@ struct ContentRoutes: View {
         .environment(\.stageLanding, landingNamespace)
         .environment(\.arrivesFromStage, shownRouteID == .stage && routeID != .stage)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                if let notice = model.exportNotice {
-                    ExportNoticeStrip(notice: notice)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                if let job = model.burnJob {
-                    BurnJobStrip(job: job)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                if let notice = model.arrivalNotice ?? model.runningArrivalNotice {
-                    ArrivalToast(notice: notice)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                if let saved = model.takeSavedNotice {
-                    TakeSavedToast(notice: saved)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
+            PageNotices()
         }
     }
 
@@ -236,6 +219,34 @@ private struct StageRoute<Library: View, PhasePage: View>: View {
             phasePage
         } else {
             library
+        }
+    }
+}
+
+/// The notices and toasts under the page. The Stage has no room for them, so while it holds a take they wait and its layout never moves for one.
+private struct PageNotices: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        if !model.noticesWaitForStage {
+            VStack(spacing: 0) {
+                if let notice = model.exportNotice {
+                    ExportNoticeStrip(notice: notice)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                if let job = model.burnJob {
+                    BurnJobStrip(job: job)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                if let notice = model.arrivalNotice ?? model.runningArrivalNotice {
+                    ArrivalToast(notice: notice)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                if let saved = model.takeSavedNotice {
+                    TakeSavedToast(notice: saved)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
         }
     }
 }

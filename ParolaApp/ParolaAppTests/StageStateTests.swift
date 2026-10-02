@@ -1254,14 +1254,33 @@ extension TranscriberMockSuites {
             #expect(gone)
         }
 
-        @Test("a new take takes the saved toast down, so it never sits on that take's Stage")
-        func newTakeClearsTheSavedToast() {
+        @Test("a new take keeps the saved toast waiting off its Stage, and the toast's time starts again once it is back in view")
+        func newTakeKeepsTheSavedToastWaiting() async {
             let model = makeModel("stage-saved-new-take")
-            model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+            model.takeSavedLifetime = .milliseconds(50)
+            let notice = TakeSavedNotice(entryID: "E", category: .transcription)
+            model.takeSavedNotice = notice
+            model.takeSavedCameOnScreen()
 
             model.installTestTake(source: .microphone)
+            #expect(model.noticesWaitForStage)
+            await settle(for: .milliseconds(300))
+            #expect(model.takeSavedNotice == notice, "the toast went while the Stage covered it")
 
-            #expect(model.takeSavedNotice == nil)
+            model.route = .transcript
+            #expect(!model.noticesWaitForStage)
+            await settle(for: .milliseconds(300))
+            #expect(model.takeSavedNotice == notice, "its time waits until it is back in view")
+
+            model.takeSavedCameOnScreen()
+            let gone = await waitUntil { model.takeSavedNotice == nil }
+            #expect(gone)
+
+            model.takeSavedNotice = notice
+            model.takeSavedCameOnScreen()
+            model.route = .recording
+            await settle(for: .milliseconds(300))
+            #expect(model.takeSavedNotice == notice, "going back to the Stage covers it again")
             model.endTestTake()
         }
 

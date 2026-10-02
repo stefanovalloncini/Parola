@@ -144,6 +144,8 @@ open as usual, a file, link or batch handed over waits for it (a link replies `p
 is `PRECONDITION`. While its run transcribes, links, drops and batches still wait behind it, but `transcribeFile` and
 `retranscribeEntry` stop the run and save the take "(not transcribed)" with a notice, and `downloadModel` is
 `PRECONDITION` whatever `phase` reads.
+While the Stage holds a take the window draws no notice or toast under it: `getState` still reports them, and they show
+on the page after the Stage.
 
 `getState.burn` is the subtitle burn running beside the phase, `{state, progress, output}` with `state` one of
 `running` / `finished` / `failed` (a failed one adds `message`), or `null` when there is none.

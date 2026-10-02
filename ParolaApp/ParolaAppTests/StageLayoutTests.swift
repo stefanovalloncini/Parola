@@ -121,4 +121,80 @@ struct StageLayoutTests {
         #expect(measured(DS.Font.liveTranscriptStage) == measured(.system(size: 24, design: .serif)))
         #expect(measured(DS.Font.liveTranscriptStage) != measured(.system(size: 24)))
     }
+
+    /// What can be up under the page when a take starts, each with a control that only its strip draws.
+    enum PendingStrip: String, CaseIterable, Sendable {
+        case takeSavedElsewhere, failureNotice, takeSavedOnItsStage, watchedFileRunning
+
+        var control: String {
+            switch self {
+            case .takeSavedElsewhere: "Arrival.Button.Open"
+            case .failureNotice: "ExportNotice.Button.Dismiss"
+            case .takeSavedOnItsStage: "TakeSaved.Button.Copy"
+            case .watchedFileRunning: "Arrival.Button.Stop"
+            }
+        }
+
+        @MainActor
+        func post(on model: AppModel) {
+            let title = "Recording 2 Oct 2026 at 10:52"
+            switch self {
+            case .takeSavedElsewhere:
+                let manifest = ParolaDocument.Manifest(originalAudioName: "\(title).m4a", title: title, modelName: "stub", language: "en")
+                let entry = LibraryEntry(id: "saved", bundleURL: URL(fileURLWithPath: "/tmp/saved.parola"), manifest: manifest)
+                model.arrivalNotice = ArrivalNotice(landed: entry, origin: .take)
+            case .failureNotice:
+                model.exportNotice = ExportNotice(
+                    message: "Auto-export couldn't write to its folder: \(title).txt couldn't be saved.",
+                    failures: [], folder: nil, tone: .failure
+                )
+            case .takeSavedOnItsStage:
+                model.takeSavedNotice = TakeSavedNotice(entryID: "saved", category: .transcription)
+            case .watchedFileRunning:
+                model.runningArrivalNotice = ArrivalNotice(running: URL(fileURLWithPath: "/tmp/\(title).m4a"))
+            }
+        }
+    }
+
+    @MainActor
+    private func stageFrames(_ elements: [HostedAccessibility.Element]) throws -> [CGRect] {
+        let clock = elements.first { $0.label == "Recording time" }
+        let band = elements.first { $0.label == "Input level" }
+        let stop = elements.first { $0.identifier?.hasSuffix("Stage.Button.Stop") == true }
+        return [try #require(clock).frame, try #require(band).frame, try #require(stop).frame]
+    }
+
+    @MainActor
+    private func draws(_ control: String, _ elements: [HostedAccessibility.Element]) -> Bool {
+        elements.contains { $0.identifier?.hasSuffix(control) == true }
+    }
+
+    @Test("a notice or toast pending as a take records leaves the Stage as it is, and waits for the page after it", arguments: PendingStrip.allCases)
+    @MainActor
+    func pendingStripLeavesTheStage(_ strip: PendingStrip) async throws {
+        let model = makeRecordingModel("stage-pending-\(strip.rawValue)")
+        let wav = try tempWAV("stage-pending")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        // A minute in, so the Stage shows without its entrance.
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: wav), startedAt: Date(timeIntervalSinceNow: -60))
+        let hosted = HostedWindow(ContentView().environment(model))
+        defer {
+            hosted.close()
+            model.endTestTake()
+        }
+        await settle(for: .milliseconds(300))
+        let clear = try stageFrames(HostedAccessibility.elements(in: hosted.host))
+
+        strip.post(on: model)
+        await settle(for: .milliseconds(300))
+
+        let onStage = HostedAccessibility.elements(in: hosted.host)
+        let pending = try stageFrames(onStage)
+        #expect(pending == clear, "the clock, band and controls moved for the \(strip.rawValue) strip")
+        #expect(!draws(strip.control, onStage), "the Stage has no room for the strip")
+
+        model.route = .transcript
+        await settle(for: .milliseconds(300))
+        #expect(draws(strip.control, HostedAccessibility.elements(in: hosted.host)), "the strip waited for the page after the Stage")
+    }
 }
