@@ -198,6 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         recordingPill.appActiveChanged(true)
+        recordingStatusItem.appBecameActive()
         model?.refreshLibraryIfChangedElsewhere()
     }
 
@@ -220,16 +221,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// The Dock badge, kept by the app delegate so it follows a take with no window open.
+/// The Dock badge, kept by the app delegate so it follows a take with no window open; a take that fails while Parola is in the background bounces the icon once.
 @MainActor
 final class DockBadge {
     private weak var model: AppModel?
     private let show: @MainActor (String?) -> Void
+    private let appIsActive: @MainActor () -> Bool
+    private let requestAttention: @MainActor () -> Void
     private var shown: String??
     private var tick: Task<Void, Never>?
+    private var failure = OutOfSightFailure()
 
-    init(show: @escaping @MainActor (String?) -> Void = { NSApp.dockTile.badgeLabel = $0 }) {
+    init(
+        show: @escaping @MainActor (String?) -> Void = { NSApp.dockTile.badgeLabel = $0 },
+        appIsActive: @escaping @MainActor () -> Bool = { NSApp.isActive },
+        requestAttention: @escaping @MainActor () -> Void = { _ = NSApp.requestUserAttention(.informationalRequest) }
+    ) {
         self.show = show
+        self.appIsActive = appIsActive
+        self.requestAttention = requestAttention
     }
 
     func bind(_ model: AppModel) {
@@ -247,6 +257,8 @@ final class DockBadge {
     }
 
     private func update(_ model: AppModel) {
+        let heldBefore = failure.held
+        if failure.holds(model.recording, appActive: appIsActive()), failure.held != heldBefore { requestAttention() }
         if let take = model.recording, take.isRunning {
             display(Self.recordingBadge(for: take, now: Date()))
             startTick()

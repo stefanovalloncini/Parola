@@ -4,16 +4,17 @@ import Foundation
 /// A take's controls from outside the window, as the menu bar item and the pill offer them: the calls the Stage makes.
 @MainActor
 enum TakeRemote {
-    /// The take's light: red while it records, amber while it pauses, grey while it starts or finishes.
+    /// The take's light: red while it records, amber while it pauses, grey while it starts or finishes, amber once it failed.
     enum Lamp: Equatable {
         case recording
         case paused
         case waiting
+        case stopped
 
         var tint: ThemeColor {
             switch self {
             case .recording: DS.Color.recordingFillTheme
-            case .paused: DS.theme.warningText
+            case .paused, .stopped: DS.theme.warningText
             case .waiting: DS.theme.textSecondary
             }
         }
@@ -23,8 +24,19 @@ enum TakeRemote {
         switch take.state {
         case .recording: .recording
         case .paused: .paused
+        case .failed: .stopped
         default: .waiting
         }
+    }
+
+    /// What a take that failed out of sight says where its time was.
+    nonisolated static func stoppedTitle(bundle: Bundle = .main) -> String {
+        String(localized: "Take.Stopped", defaultValue: "Stopped", bundle: bundle)
+    }
+
+    /// What VoiceOver hears, and the announcement, when a take fails.
+    nonisolated static func stoppedStatus(_ message: String, bundle: Bundle = .main) -> String {
+        String(localized: "Recording stopped: \(message)", bundle: bundle)
     }
 
     /// From the count-in until Stop there is a take to stop or cancel; one finishing is already on its way to the library.
@@ -47,6 +59,7 @@ enum TakeRemote {
         case .arming: return String(localized: "Getting ready to record", bundle: bundle)
         case .paused: return String(localized: "Paused, \(time)", bundle: bundle)
         case .finishing: return String(localized: "Finishing, \(time)", bundle: bundle)
+        case .failed(let message): return stoppedStatus(message, bundle: bundle)
         default: return String(localized: "Recording, \(time)", bundle: bundle)
         }
     }

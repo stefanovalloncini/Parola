@@ -11615,6 +11615,17 @@
         }
       }
     },
+    "Recording stopped: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione interrotta: %@"
+          }
+        }
+      }
+    },
     "Recording time": {
       "extractionState": "manual",
       "localizations": {
@@ -14479,6 +14490,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Marca ogni segmento con Speaker 1, Speaker 2, ecc. Carica un secondo modello al primo uso."
+          }
+        }
+      }
+    },
+    "Take.Stopped": {
+      "comment": "The pill and the menu bar item for a recording that failed while Parola was in the background; plain \"Stopped\" names Live Captions' state.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrotta"
           }
         }
       }

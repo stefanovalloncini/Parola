@@ -11,6 +11,7 @@ final class RecordingPill {
     private var panel: NSPanel?
     private var moveObserver: (any NSObjectProtocol)?
     private var placing = false
+    private var failure = OutOfSightFailure()
     private(set) var appActive = true
     private(set) var isShown = false
 
@@ -19,8 +20,9 @@ final class RecordingPill {
         self.makesPanel = makesPanel
     }
 
-    nonisolated static func shouldShow(appActive: Bool, takeRunning: Bool, enabled: Bool) -> Bool {
-        !appActive && takeRunning && enabled
+    /// A take that failed while the pill showed it stays, as stopped, until Parola comes to the front.
+    nonisolated static func shouldShow(appActive: Bool, takeRunning: Bool, enabled: Bool, failureHeld: Bool = false) -> Bool {
+        !appActive && (takeRunning || failureHeld) && enabled
     }
 
     /// Where the user left it while that spot is still on a screen; else bottom centre of the main screen, where the dictation overlay sits.
@@ -40,6 +42,7 @@ final class RecordingPill {
 
     func appActiveChanged(_ active: Bool) {
         appActive = active
+        if active { failure.release() }
         update()
     }
 
@@ -51,12 +54,13 @@ final class RecordingPill {
         }
     }
 
-    /// Both read before the rule combines them, so each stays tracked whichever one decides.
+    /// All read before the rule combines them, so each stays tracked whichever one decides.
     private func update() {
         guard let model else { return }
         let running = model.takeIsRunning
         let enabled = model.showRecordingPill
-        if Self.shouldShow(appActive: appActive, takeRunning: running, enabled: enabled) {
+        let held = failure.holds(model.recording, appActive: appActive)
+        if Self.shouldShow(appActive: appActive, takeRunning: running, enabled: enabled, failureHeld: held) {
             show(model)
         } else {
             hide()
@@ -161,14 +165,47 @@ struct RecordingPillFace: View {
 
     var body: some View {
         if let take = model.recording {
-            if isOnScreen, take.state == .recording, let origin = take.clockOrigin {
+            if case .failed(let message) = take.state {
+                chrome(stoppedFace(message))
+            } else if isOnScreen, take.state == .recording, let origin = take.clockOrigin {
                 TimelineView(.periodic(from: origin, by: 1)) { context in
-                    face(take, at: context.date)
+                    chrome(face(take, at: context.date))
                 }
             } else {
-                face(take, at: Date())
+                chrome(face(take, at: Date()))
             }
         }
+    }
+
+    /// A take that failed while Parola was in the background: what happened, and the way back to it.
+    private func stoppedFace(_ message: String) -> some View {
+        HStack(spacing: DS.Spacing.regular) {
+            HStack(spacing: DS.Spacing.small) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(DS.Color.warningText)
+                Text(verbatim: TakeRemote.stoppedTitle())
+                    .font(DS.Font.bodyStrong)
+                    .foregroundStyle(DS.Color.primaryText)
+            }
+            .help(message)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: TakeRemote.stoppedStatus(message)))
+            .axLeaf("Label.Stopped")
+            Button("Show Parola", action: onShowParola)
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                .axLeaf("Button.ShowParola")
+        }
+    }
+
+    private func chrome(_ content: some View) -> some View {
+        content
+            .padding(.leading, DS.Spacing.medium)
+            .padding(.trailing, DS.Spacing.small)
+            .padding(.vertical, DS.Spacing.small)
+            .glassEffect(.regular, in: Capsule())
+            .fixedSize()
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
+            .axBranch("RecordingPill")
     }
 
     private func face(_ take: RecordingSession, at now: Date) -> some View {
@@ -205,13 +242,6 @@ struct RecordingPillFace: View {
             .accessibilityLabel("Stop Recording")
             .axLeaf("Button.Stop")
         }
-        .padding(.leading, DS.Spacing.medium)
-        .padding(.trailing, DS.Spacing.small)
-        .padding(.vertical, DS.Spacing.small)
-        .glassEffect(.regular, in: Capsule())
-        .fixedSize()
-        .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
-        .axBranch("RecordingPill")
     }
 }
 
