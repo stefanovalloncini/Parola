@@ -19,6 +19,10 @@ final class PlaybackController {
 
     var hasAudio: Bool { player != nil }
 
+    isolated deinit {
+        tearDown()
+    }
+
     func load(audioURL: URL?, transcript: Transcript) {
         tearDown()
         index = TranscriptIndex(transcript: transcript)
@@ -41,6 +45,9 @@ final class PlaybackController {
                 self?.tick(to: time.seconds.isFinite ? time.seconds : 0)
             }
         }
+        #if DEBUG
+        Self.liveTimeObserverCount += 1
+        #endif
     }
 
     func play() {
@@ -88,6 +95,8 @@ final class PlaybackController {
     }
 
     #if DEBUG
+    static var liveTimeObserverCount = 0
+
     func _setCurrentTimeForTest(_ value: TimeInterval) {
         tick(to: value)
     }
@@ -98,6 +107,9 @@ final class PlaybackController {
         durationTask = nil
         if let timeObserver, let player {
             player.removeTimeObserver(timeObserver)
+            #if DEBUG
+            Self.liveTimeObserverCount -= 1
+            #endif
         }
         timeObserver = nil
         player?.pause()

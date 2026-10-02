@@ -124,6 +124,24 @@ struct PlaybackControllerTests {
         #expect(controller.currentWordID == nil)
         #expect(controller.hasAudio == false)
     }
+
+    @Test("a released controller cancels its duration task and removes its time observer")
+    func releasedControllerTearsDown() async throws {
+        let before = PlaybackController.liveTimeObserverCount
+        weak var observed: PlaybackController?
+        do {
+            let controller = PlaybackController()
+            controller.load(audioURL: sampleAudioURL, transcript: Fixtures.makeTranscript())
+            observed = controller
+            #expect(PlaybackController.liveTimeObserverCount == before + 1)
+        }
+        try await pollUntil { observed == nil }
+        let deallocated = observed == nil
+        #expect(deallocated)
+        try await pollUntil { PlaybackController.liveTimeObserverCount == before }
+        let afterCount = PlaybackController.liveTimeObserverCount
+        #expect(afterCount == before)
+    }
 }
 
 private final class BundleAnchor {}
