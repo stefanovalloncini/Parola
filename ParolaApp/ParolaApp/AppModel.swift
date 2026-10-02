@@ -5532,13 +5532,16 @@ final class AppModel {
 
     /// Reveal in Finder on a failed take's Stage: the entry its failure saved, selected as a library row selects it.
     func revealFailedTake() {
-        guard let failure = recording?.failure else { return }
+        guard let take = recording, let failure = take.failure else { return }
         Task { [weak self] in
             guard let self else { return }
             switch await self.takeReveal(for: failure) {
             case .reveal(let url):
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             case .deleted(let restorable):
+                // As Retry does: the failed Stage has nothing left to offer, and its notice would wait behind it.
+                self.endSession(of: take.takeID)
+                self.releaseTakeFile(failure.audioURL)
                 self.exportNotice = Self.deletedTakeNotice(restorable: restorable)
             case nil:
                 break

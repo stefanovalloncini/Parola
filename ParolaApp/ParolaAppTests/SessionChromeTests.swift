@@ -1039,7 +1039,7 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("Reveal in Finder on a failed take whose recording was deleted gives the same notice, with the way to Recently Deleted")
+        @Test("Reveal in Finder on a failed take whose recording was deleted lets the take go as Retry does, and gives the same notice, with the way to Recently Deleted")
         func revealAfterTheEntryWasDeleted() async throws {
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
@@ -1066,6 +1066,10 @@ extension TranscriberMockSuites {
 
                 let told = await waitUntil { model.exportNotice?.message == Self.restoreFirst }
                 #expect(told)
+                #expect(model.recording == nil, "the failed Stage stayed up over the notice")
+                #expect(!model.noticesWaitForStage)
+                let released = await waitUntil { !FileManager.default.fileExists(atPath: working.path) }
+                #expect(released, "the deleted entry keeps the audio, so the working file goes")
                 let show = try #require(model.exportNotice?.actions.first)
                 #expect(show.title == "Show Recently Deleted")
                 model.performNoticeAction(show)
