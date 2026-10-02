@@ -4116,6 +4116,17 @@
         }
       }
     },
+    "Couldn't start the recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvio della registrazione non riuscito"
+          }
+        }
+      }
+    },
     "Couldn't transcribe %@": {
       "localizations": {
         "it": {

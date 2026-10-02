@@ -522,7 +522,7 @@ struct StageStateTests {
         let clockAfter = after.elements.first { $0.label == "Recording time" }
         let bandBefore = before.elements.first { $0.label == "Input level" }
         let bandAfter = after.elements.first { $0.label == "Input level" }
-        let banner = after.elements.first { $0.words.contains("Something went wrong") }
+        let banner = after.elements.first { $0.words.contains("Nothing was recorded.") }
         let clockWas = try #require(clockBefore).frame
         let clockIs = try #require(clockAfter).frame
         let bandWas = try #require(bandBefore).frame

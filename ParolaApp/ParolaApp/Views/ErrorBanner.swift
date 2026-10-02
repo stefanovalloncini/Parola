@@ -26,7 +26,7 @@ struct ErrorBanner: View {
                 .font(DS.Font.heading)
                 .foregroundStyle(DS.Color.danger)
             VStack(alignment: .leading, spacing: DS.Spacing.tight) {
-                Text(title)
+                title
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
                     .lineLimit(2)
@@ -135,9 +135,19 @@ struct ErrorBanner: View {
         if take == nil { model?.revealFailedFile() } else { model?.revealFailedTake() }
     }
 
-    private var title: LocalizedStringKey {
-        guard let name = failedName, !name.isEmpty else { return "Something went wrong" }
-        return "Couldn't transcribe \(name)"
+    private var title: Text {
+        if let take, let failed = Self.takeTitle(failedWhile: take.failedWhile) { return Text(verbatim: failed) }
+        guard let name = failedName, !name.isEmpty else { return Text("Something went wrong") }
+        return Text("Couldn't transcribe \(name)")
+    }
+
+    /// A take that failed before its transcription began says what went wrong with the recording itself.
+    nonisolated static func takeTitle(failedWhile: RecordingSession.FailedWhile?, bundle: Bundle = .main) -> String? {
+        switch failedWhile {
+        case .starting: String(localized: "Couldn't start the recording", bundle: bundle)
+        case .recording: String(localized: "The recording stopped", bundle: bundle)
+        case .transcribing, nil: nil
+        }
     }
 
     private func retry() {

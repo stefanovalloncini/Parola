@@ -18,6 +18,13 @@ struct RecordingSession: Equatable, Sendable {
         case failed(message: String)
     }
 
+    /// What a failed take was doing when it failed, so its banner can say whether the recording or its transcription went wrong.
+    enum FailedWhile: Equatable, Sendable {
+        case starting
+        case recording
+        case transcribing
+    }
+
     /// What Retry needs of a take whose audio was saved but not transcribed.
     struct Failure: Equatable, Sendable {
         let audioURL: URL
@@ -52,6 +59,7 @@ struct RecordingSession: Equatable, Sendable {
     private(set) var endedElapsed: TimeInterval?
     private(set) var markers: [TimeInterval]
     private(set) var pauses: [TimeInterval]
+    private(set) var failedWhile: FailedWhile?
 
     init(
         takeID: Int, source: AppModel.RecordSource, category: EntryCategory, title: String, isStreaming: Bool, arming: Arming,
@@ -73,6 +81,7 @@ struct RecordingSession: Equatable, Sendable {
         self.endedElapsed = nil
         self.markers = []
         self.pauses = []
+        self.failedWhile = nil
     }
 
     var isArming: Bool {
@@ -193,8 +202,10 @@ struct RecordingSession: Equatable, Sendable {
         state = .done(entryID: entryID)
     }
 
+    /// Finishing counts as recording: the take's file is still being closed, and nothing has been transcribed yet.
     mutating func fail(_ message: String, at date: Date = Date()) {
         if case .done = state { return }
+        if !isOver { failedWhile = isArming ? .starting : isTranscribing ? .transcribing : .recording }
         if isCapturing { endedElapsed = elapsed(at: date) }
         state = .failed(message: message)
     }

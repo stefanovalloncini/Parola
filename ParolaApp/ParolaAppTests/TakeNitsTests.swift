@@ -126,3 +126,57 @@ struct StageSpokenNamesTests {
         #expect(TakeOverview.spoken(elapsed: 1, progress: nil, bundle: it).label == "Durata della registrazione")
     }
 }
+
+@Suite("A recording that fails says so, not that its transcription did")
+struct RecordingFailureTitleTests {
+    private func failed(after steps: (inout RecordingSession) -> Void) -> RecordingSession {
+        var take = armingTake()
+        steps(&take)
+        take.fail("The disk is full.")
+        return take
+    }
+
+    @Test("a failure is placed by what the take was doing: starting, recording up to its file closing, or transcribing")
+    func failedWhile() {
+        #expect(failed { _ in }.failedWhile == .starting)
+        #expect(failed { $0.markCapturing(at: .now) }.failedWhile == .recording)
+        #expect(failed { $0.markCapturing(at: .now); $0.pause(at: .now) }.failedWhile == .recording)
+        #expect(failed { $0.markCapturing(at: .now); $0.finish(at: .now) }.failedWhile == .recording)
+        #expect(failed { $0.markCapturing(at: .now); $0.finish(at: .now); $0.transcribing(progress: nil) }.failedWhile == .transcribing)
+        var again = failed { _ in }
+        again.fail("Another reason.")
+        #expect(again.failedWhile == .starting, "a failure keeps the moment it first failed")
+    }
+
+    @Test("the banner titles a recording failure as one, in Italian too")
+    func titles() throws {
+        #expect(ErrorBanner.takeTitle(failedWhile: .starting) == "Couldn't start the recording")
+        #expect(ErrorBanner.takeTitle(failedWhile: .recording) == "The recording stopped")
+        #expect(ErrorBanner.takeTitle(failedWhile: .transcribing) == nil)
+        #expect(ErrorBanner.takeTitle(failedWhile: nil) == nil)
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let it = try #require(Bundle(path: path))
+        #expect(ErrorBanner.takeTitle(failedWhile: .starting, bundle: it) == "Avvio della registrazione non riuscito")
+        #expect(ErrorBanner.takeTitle(failedWhile: .recording, bundle: it) == "La registrazione si è interrotta")
+    }
+
+    @Test("a take that couldn't keep writing to disk reads The recording stopped on its Stage, not Couldn't transcribe")
+    @MainActor
+    func hostedBanner() async {
+        var take = armingTake()
+        take.markCapturing(at: .now)
+        take.finish(at: .now)
+        take.failure = RecordingSession.Failure(
+            audioURL: URL(fileURLWithPath: "/tmp/take.wav"), save: nil, recovery: nil, title: "Recording 14:05",
+            category: .transcription, source: .microphone, annotations: AppModel.TakeAnnotations()
+        )
+        take.fail("Parola couldn't keep writing the recording to disk.")
+        let hosted = HostedWindow(ErrorBanner(message: "Parola couldn't keep writing the recording to disk.", take: take), width: 700, height: 300)
+        defer { hosted.close() }
+        await settle(for: .milliseconds(100))
+        let words = HostedAccessibility.words(in: hosted.host)
+        #expect(words.contains("The recording stopped"))
+        let saysTranscribe = words.contains { $0.hasPrefix("Couldn't transcribe") }
+        #expect(!saysTranscribe)
+    }
+}
