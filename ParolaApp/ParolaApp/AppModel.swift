@@ -1801,7 +1801,7 @@ final class AppModel {
     /// Bumped by every file run. An abandoned run's engine can keep emitting after the slot has
     /// moved on, and its partials would land in the pane the next run is filling.
     @ObservationIgnored private(set) var fileRunGeneration = 0
-    @ObservationIgnored var recordingOutcomeWaiters: [CheckedContinuation<String, any Error>] = []
+    @ObservationIgnored var recordingOutcomeWaiters: [RecordingOutcomeWaiter] = []
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     /// Test seam: stands in for a model's download, so a test decides how far it gets and when it ends.
     @ObservationIgnored var modelDownloadOperation: (@Sendable (String, @escaping @Sendable (Double) -> Void) async throws -> Void)?
@@ -1978,8 +1978,9 @@ final class AppModel {
         // Cancel stops what the window shows; a burn behind a run is stopped from its own strip.
         if !hadWork { cancelBurn() }
         if !keepsTake {
+            let ending = activeTake?.id ?? recording?.takeID
             teardownActiveCapture()
-            resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+            resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: ending)
         }
         if hadWork || phase != .ready { phase = .idle }
     }
@@ -2024,7 +2025,7 @@ final class AppModel {
         youtubeSubsTask?.cancel(); youtubeSubsTask = nil
         burnTask?.cancel(); burnTask = nil
         teardownActiveCapture()
-        resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+        resolveEveryRecordingOutcome(.failure(IntentActionError.cancelled))
     }
 
     func unloadTranscriptionSession() async {
@@ -3642,7 +3643,7 @@ final class AppModel {
         // A count-in that ends after a quit began would start a take the quit can only cut off.
         guard !quitPending else {
             forgetTakeRequest()
-            resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+            resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: countIn?.takeID)
             return
         }
         takeCounter &+= 1
@@ -3684,14 +3685,14 @@ final class AppModel {
             guard await passesPreRecordingDiskCheck(diskCheck) else {
                 if takeIsCurrent(take) { activeTake = nil }
                 reportTakeFailure(Self.diskSpaceRefusalMessage(), take: take.id)
-                resolveRecordingOutcome(.failure(IntentActionError.failed(Self.diskSpaceRefusalMessage())))
+                resolveRecordingOutcome(.failure(IntentActionError.failed(Self.diskSpaceRefusalMessage())), take: take.id)
                 return
             }
             guard takeIsCurrent(take) else { return }
             guard !stopRequestedDuringStart else {
                 activeTake = nil
                 endSession(of: take.id)
-                resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+                resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: take.id)
                 return
             }
             // A recording replaces any transcription in flight, like a user file-open does;
@@ -3704,7 +3705,7 @@ final class AppModel {
                 activeTake = nil
                 let message = Self.microphoneAccessOffMessage()
                 reportTakeFailure(message, take: take.id)
-                resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+                resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take.id)
                 return
             }
             guard takeIsCurrent(take) else { return }
@@ -3714,7 +3715,7 @@ final class AppModel {
                 guard !stopRequestedDuringStart else {
                     activeTake = nil
                     endSession(of: take.id)
-                    resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+                    resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: take.id)
                     return
                 }
                 startStreamingMic(take)
@@ -3762,7 +3763,7 @@ final class AppModel {
                 let message = Self.recordingFailureMessage(for: error, source: source)
                 reportTakeFailure(message, take: take.id)
                 recordingStartInFlight = false
-                resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+                resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take.id)
             }
         }
     }
@@ -3803,7 +3804,7 @@ final class AppModel {
         guard takeIsCurrent(take) else { return false }
         activeTake = nil
         recordingStartInFlight = false
-        resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+        resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: take.id)
         return false
     }
 
@@ -4104,7 +4105,7 @@ final class AppModel {
             let message = Self.transcriptionFailureMessage(for: error)
             reportTakeFailure(message, take: take.id)
             teardownStreaming(take)
-            resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+            resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take.id)
         }
     }
 
@@ -4231,7 +4232,7 @@ final class AppModel {
             )
         }
         reportTakeFailure(message, take: take?.id, retry: retry)
-        resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+        resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take?.id)
     }
 
     /// A live take's final transcript lands on screen and in the library; one with nothing in it says so.
@@ -4285,7 +4286,7 @@ final class AppModel {
             if let recovery { recoveryHeldByTake.remove(recovery) }
             reportTakeFailure(message, take: take?.id)
             endLiveTake(take)
-            resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+            resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take?.id)
             return
         }
         let title = given.title(for: takeCategory)
@@ -4327,7 +4328,7 @@ final class AppModel {
                 tone: .info
             )
         }
-        resolveRecordingOutcome(.success(processed.text))
+        resolveRecordingOutcome(.success(processed.text), take: take?.id)
     }
 
     func stopRecordingAndTranscribe() {
@@ -4347,7 +4348,7 @@ final class AppModel {
             finishSession(of: take)
             trackTakeWork { [weak self] in
                 await self?.finishStreamingTake(s, take: take, consumer: consumer)
-                self?.resolveRecordingOutcome(.failure(IntentActionError.failed(Self.streamEndedWithoutTranscriptMessage())))
+                self?.resolveRecordingOutcome(.failure(IntentActionError.failed(Self.streamEndedWithoutTranscriptMessage())), take: take?.id)
             }
             return
         }
@@ -4415,7 +4416,7 @@ final class AppModel {
                 liveRecordingAudioURL = nil
                 let message = Self.transcriptionFailureMessage(for: error)
                 reportTakeFailure(message, take: take?.id)
-                resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+                resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take?.id)
             }
         }
     }
@@ -4479,7 +4480,7 @@ final class AppModel {
             annotations: annotations
         )
         reportTakeFailure(message, take: take, retry: retry)
-        resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+        resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take)
     }
 
     /// The Stage's Cancel while a take arms: a count-in or a capture still starting ends without a word.
@@ -4529,9 +4530,9 @@ final class AppModel {
         stopRequestedDuringStart = false
         teardownActiveCapture()
         if let message {
-            resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+            resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take?.id)
         } else {
-            resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+            resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: take?.id)
         }
     }
 
@@ -4567,7 +4568,7 @@ final class AppModel {
         releaseTakeFile(file)
         let message = Self.nothingRecordedMessage()
         reportTakeFailure(message, take: take)
-        resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+        resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take)
     }
 
     /// Transcribes a finished take from its working file, retiring the checkpoint it replaces; a failure or a stop still saves it.
@@ -4628,7 +4629,7 @@ final class AppModel {
                     processed, audio: url, title: title, source: source, category: category, landingAs: .salvagedTake,
                     recovery: recovery, take: take, annotations: annotations
                 )
-                resolveRecordingOutcome(.success(processed.text))
+                resolveRecordingOutcome(.success(processed.text), take: take)
                 return
             }
             guard take.map({ stageShows($0) }) ?? true else {
@@ -4636,7 +4637,7 @@ final class AppModel {
                     processed, audio: url, title: title, source: source, category: category, landingAs: .backgroundTake,
                     recovery: recovery, take: take, annotations: annotations
                 )
-                resolveRecordingOutcome(.success(processed.text))
+                resolveRecordingOutcome(.success(processed.text), take: take)
                 return
             }
             let landing = Self.landingSignposter.beginInterval("install")
@@ -4652,7 +4653,7 @@ final class AppModel {
                 processed, audio: url, title: title, source: source, category: category, landingAs: .recording,
                 recovery: recovery, take: take, annotations: annotations
             )
-            resolveRecordingOutcome(.success(processed.text))
+            resolveRecordingOutcome(.success(processed.text), take: take)
         } catch {
             keepUntranscribedTake(
                 url: url, title: title, source: source, category: category, error: error,
@@ -4700,7 +4701,7 @@ final class AppModel {
         // Whatever stopped the run keeps the screen; only the take's own pane gives way.
         handBackTakePane(url)
         if stopped {
-            resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+            resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: take)
             return
         }
         let message = Self.transcriptionFailureMessage(for: error)
@@ -4713,7 +4714,7 @@ final class AppModel {
             )
             reportTakeFailure(message, take: take, retry: retry)
         }
-        resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+        resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take)
     }
 
     /// The transcribing pane a run with no session put up comes down; anything that took the phase since keeps it.
@@ -5183,7 +5184,7 @@ final class AppModel {
         } else {
             updateSession(of: take?.id) { $0.land(entryID: nil) }
         }
-        resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+        resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: take?.id)
         // Without a file the checkpoint stays, so the next launch offers what it points at.
         guard let prepared else { return }
         guard !heardNothing else {
@@ -5216,6 +5217,7 @@ final class AppModel {
 
     /// Stops the capture without keeping anything: the take's audio and checkpoint are deleted, and no entry is made.
     private func discardCapture() async {
+        let discarded = activeTake?.id
         let audio = recording?.takeID == activeTake?.id ? recording?.audioURL : nil
         let streaming = streamingSession
         let capture = liveSource
@@ -5232,7 +5234,7 @@ final class AppModel {
         await mediaSession.exitRecording()
         // Whatever the capture left of its file goes too, so the launch sweep can't bring a discarded take back.
         if let audio { releaseTakeFile(audio) }
-        resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+        resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: discarded)
     }
 
     /// A phase change means the last failure's file is no longer what the error card is about.

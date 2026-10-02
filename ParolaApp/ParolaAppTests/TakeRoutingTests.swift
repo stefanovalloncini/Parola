@@ -874,6 +874,39 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a Stop intent answers with its own take's words, not with an older take's that lands meanwhile")
+        func stopIntentAnswersForItsOwnTake() async throws {
+            let older = try tempWAV("intent-older-take")
+            defer { try? FileManager.default.removeItem(at: older) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the older take's words")])
+                let model = makeRecordingModel("intent-own-take")
+                let held = FetchGate()
+                let reached = FetchGate()
+                model.postProcessOperation = { transcript in
+                    guard transcript.text == "the older take's words" else { return transcript }
+                    await reached.open()
+                    await held.wait()
+                    return transcript
+                }
+                recordAndStop(model, audio: older, seconds: 1)
+                await reached.wait()
+                await installMockTranscriber(segments: [(0, 1, "the newer take's words")], delayMs: 1_000)
+                await model.unloadTranscriptionSession()
+                try await startMeteredTake(model)
+                let answer = Task { @MainActor () -> String in
+                    do { return try await model.stopRecordingFromIntent() } catch { return "threw \(error)" }
+                }
+                await settle(for: .milliseconds(300))
+
+                await held.open()
+
+                let text = await answer.value
+                #expect(text == "the newer take's words")
+                await waitUntil(timeoutMs: 10_000) { !model.hasPendingTakeWork }
+            }
+        }
+
         @Test("a take started over a file run hands the run's phase back, so the Library shows the library while it records")
         func takeOverAFileRunFreesThePage() async throws {
             let wav = try tempWAV("run-under-a-take")

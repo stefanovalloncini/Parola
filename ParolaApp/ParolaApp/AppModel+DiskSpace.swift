@@ -60,8 +60,9 @@ extension AppModel {
             guard let self, Self.diskSpaceVerdict(freeBytes: freeBytes) == .refuse,
                   let countdown, countdownTask == countdown else { return }
             let message = Self.diskSpaceRefusalMessage()
+            let countIn = recording?.takeID
             failCountIn(message)
-            resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+            resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: countIn)
         }
     }
 

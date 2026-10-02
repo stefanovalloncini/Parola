@@ -91,7 +91,7 @@ struct RecordingPredicateTests {
             }
         }
         // Frees a waiter the guard would have let through, so a failing run doesn't leave it hanging.
-        model.resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+        model.resolveEveryRecordingOutcome(.failure(IntentActionError.cancelled))
 
         #expect(answer == .some(.cancelled))
         #expect(!model.takeIsRunning)

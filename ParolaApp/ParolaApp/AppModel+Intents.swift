@@ -33,6 +33,12 @@ enum IntentActionError: LocalizedError, Equatable {
     }
 }
 
+/// A Stop intent waiting on the take it stopped; one that names no take hears only outcomes that name none.
+struct RecordingOutcomeWaiter {
+    let takeID: Int?
+    let continuation: CheckedContinuation<String, any Error>
+}
+
 /// A finished file run's hand-off to the library: the text it produced and the save still copying its media.
 struct FileRunLanding {
     let runToken: Int
@@ -121,21 +127,27 @@ extension AppModel {
         guard streamingConsumer != nil || fileTranscribeTask != nil || stopHeldForStartup else {
             throw IntentActionError.notRecording
         }
-        return try await awaitRecordingOutcome()
+        return try await awaitRecordingOutcome(of: take)
     }
 
-    func awaitRecordingOutcome() async throws -> String {
+    func awaitRecordingOutcome(of takeID: Int? = nil) async throws -> String {
         try await withCheckedThrowingContinuation { continuation in
-            recordingOutcomeWaiters.append(continuation)
+            recordingOutcomeWaiters.append(RecordingOutcomeWaiter(takeID: takeID, continuation: continuation))
         }
     }
 
-    func resolveRecordingOutcome(_ result: Result<String, any Error>) {
-        guard !recordingOutcomeWaiters.isEmpty else { return }
-        let waiters = recordingOutcomeWaiters
+    /// Answers the intents waiting on `takeID`'s take, and no other take's.
+    func resolveRecordingOutcome(_ result: Result<String, any Error>, take takeID: Int?) {
+        let due = recordingOutcomeWaiters.filter { $0.takeID == takeID }
+        guard !due.isEmpty else { return }
+        recordingOutcomeWaiters.removeAll { $0.takeID == takeID }
+        for waiter in due { waiter.continuation.resume(with: result) }
+    }
+
+    /// A reset or a quit answers every intent still waiting, whatever take it waits on.
+    func resolveEveryRecordingOutcome(_ result: Result<String, any Error>) {
+        let due = recordingOutcomeWaiters
         recordingOutcomeWaiters = []
-        for waiter in waiters {
-            waiter.resume(with: result)
-        }
+        for waiter in due { waiter.continuation.resume(with: result) }
     }
 }

@@ -345,6 +345,7 @@ extension TranscriberMockSuites {
                 model.recordingCountInSeconds = 0
 
                 model.startRecording(source: .microphone)
+                let take = model.recording?.takeID
                 model.stopRecordingAndTranscribe()
                 #expect(
                     model.stopHeldForStartup,
@@ -352,7 +353,7 @@ extension TranscriberMockSuites {
                 )
 
                 do {
-                    _ = try await model.awaitRecordingOutcome()
+                    _ = try await model.awaitRecordingOutcome(of: take)
                     Issue.record("expected IntentActionError.cancelled")
                 } catch let error as IntentActionError {
                     #expect(error == .cancelled)
