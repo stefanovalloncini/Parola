@@ -22,7 +22,7 @@ final class RecordingPill {
         self.appIsActive = appIsActive
     }
 
-    /// A take that failed while the pill showed it stays, as stopped, until Parola comes to the front.
+    /// A take that failed, or stopped on its own, while the pill showed it stays, as stopped, until Parola comes to the front.
     nonisolated static func shouldShow(appActive: Bool, takeRunning: Bool, enabled: Bool, failureHeld: Bool = false) -> Bool {
         !appActive && (takeRunning || failureHeld) && enabled
     }
@@ -61,7 +61,7 @@ final class RecordingPill {
         guard let model else { return }
         let running = model.takeIsRunning
         let enabled = model.showRecordingPill
-        let held = failure.holds(model.recording, appActive: appIsActive())
+        let held = failure.holds(model.recording, stoppedOnItsOwn: model.takeStoppedOnItsOwn, appActive: appIsActive())
         if Self.shouldShow(appActive: appActive, takeRunning: running, enabled: enabled, failureHeld: held) {
             show(model)
         } else {
@@ -169,8 +169,8 @@ struct RecordingPillFace: View {
     var body: some View {
         if let take = model.recording {
             let warning = TakeRemote.warning(for: take, in: model)
-            if case .failed(let message) = take.state {
-                chrome(stoppedFace(message, failedWhile: take.failedWhile), warned: false)
+            if let ending = TakeRemote.ending(of: take, stopReason: model.takeStopReason) {
+                chrome(stoppedFace(ending), warned: false)
             } else if isOnScreen, take.state == .recording, let origin = take.clockOrigin {
                 TimelineView(.periodic(from: origin, by: 1)) { context in
                     chrome(face(take, warning: warning, at: context.date), warned: warning != nil)
@@ -181,8 +181,8 @@ struct RecordingPillFace: View {
         }
     }
 
-    /// A take that failed while Parola was in the background: what happened, and the way back to it.
-    private func stoppedFace(_ message: String, failedWhile: RecordingSession.FailedWhile?) -> some View {
+    /// A take that failed, or stopped on its own, while Parola was in the background: what happened, and the way back to it.
+    private func stoppedFace(_ ending: TakeRemote.Ending) -> some View {
         HStack(spacing: DS.Spacing.regular) {
             HStack(spacing: DS.Spacing.small) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -191,9 +191,9 @@ struct RecordingPillFace: View {
                     .font(DS.Font.bodyStrong)
                     .foregroundStyle(DS.Color.primaryText)
             }
-            .help(message)
+            .help(ending.reason)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(verbatim: TakeRemote.failureStatus(message, failedWhile: failedWhile)))
+            .accessibilityLabel(Text(verbatim: ending.spoken))
             .axLeaf("Label.Stopped")
             Button("Show Parola", action: onShowParola)
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))

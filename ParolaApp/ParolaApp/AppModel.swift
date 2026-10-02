@@ -251,8 +251,9 @@ final class AppModel {
     var takeMicTrackState: MicTrackState?
     /// The take's Mac audio capture ended by itself; while the take still captures, your microphone records on. Lasts as long as the session.
     var takeMacAudioStopped = false
-    /// The take stopped without a Stop, because what it recorded ended by itself. Lasts as long as the session.
-    var takeStoppedOnItsOwn = false
+    /// Why the take stopped without a Stop, because what it recorded ended by itself: its notice's sentence. Lasts as long as the session.
+    var takeStopReason: String?
+    var takeStoppedOnItsOwn: Bool { takeStopReason != nil }
     private(set) var takeLevelTick = 0
     /// When the newest of the take's levels came in; the Stage's band slides from here until the next one.
     @ObservationIgnored private(set) var takeLevelTickAt = Date.distantPast
@@ -3479,7 +3480,7 @@ final class AppModel {
         takeMicLevels = nil
         if takeMicTrackState != nil { takeMicTrackState = nil }
         if takeMacAudioStopped { takeMacAudioStopped = false }
-        if takeStoppedOnItsOwn { takeStoppedOnItsOwn = false }
+        if takeStopReason != nil { takeStopReason = nil }
         recording = session
     }
 
@@ -3491,7 +3492,7 @@ final class AppModel {
         takeMicLevels = nil
         if takeMicTrackState != nil { takeMicTrackState = nil }
         if takeMacAudioStopped { takeMacAudioStopped = false }
-        if takeStoppedOnItsOwn { takeStoppedOnItsOwn = false }
+        if takeStopReason != nil { takeStopReason = nil }
     }
 
     /// Changes `takeID`'s session only; one a newer take owns by now is left alone.
@@ -4521,12 +4522,13 @@ final class AppModel {
 
     /// What the take records ended by itself: the take stops as Stop stops it, with a notice that stays until it is dismissed; one that never heard a sound ends with nothing saved, saying `unheard`.
     func stopTakeOnItsOwn(_ takeID: Int, saying message: String, unheard: String? = nil) {
-        takeStoppedOnItsOwn = true
         catchUpFirstBuffer()
         guard recording?.isArming != true else {
+            takeStopReason = unheard ?? message
             endTakeBeforeCapture(reporting: unheard ?? message)
             return
         }
+        takeStopReason = message
         stopRecordingAndTranscribe()
         exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure, forTake: takeID)
     }

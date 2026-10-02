@@ -57,6 +57,22 @@ struct OutOfSightFailureTests {
         #expect(dockHolds)
     }
 
+    @Test("a take that stopped on its own is held like a failed one, weighed once, and a running one never is")
+    func stoppedOnItsOwnHeld() {
+        var take = RecordingSession(takeID: 1, source: .systemAudio, category: .meeting, title: "R", isStreaming: false, arming: .startingCapture)
+        take.markCapturing(at: .now)
+        take.finish(at: .now)
+        take.land(entryID: "E")
+        var surface = OutOfSightFailure()
+        let asked = surface.holds(take, appActive: false)
+        #expect(!asked, "a take that landed after a Stop isn't held")
+        let ownStop = surface.holds(take, stoppedOnItsOwn: true, appActive: false)
+        #expect(ownStop)
+        var inFront = OutOfSightFailure()
+        let seen = inFront.holds(take, stoppedOnItsOwn: true, appActive: true)
+        #expect(!seen)
+    }
+
     @Test("a running take, a dismissed failure or the next take lets the hold go")
     func letGo() {
         var failure = OutOfSightFailure()
@@ -109,6 +125,26 @@ struct StoppedStatusItemTests {
         #expect(title.string.hasSuffix(" Stopped"))
         #expect(title.attribute(.attachment, at: 0, effectiveRange: nil) is NSTextAttachment)
         #expect(!title.string.contains("●"))
+    }
+
+    @Test("a take that stopped on its own says why in its notice's words, once it has stopped; a failure in its banner's")
+    func endings() {
+        var take = RecordingSession(takeID: 1, source: .systemAudio, category: .meeting, title: "R", isStreaming: false, arming: .startingCapture)
+        take.markCapturing(at: .now)
+        let reason = AppModel.macAudioStoppedTakeMessage()
+        #expect(TakeRemote.ending(of: take, stopReason: reason) == nil, "still recording")
+        take.finish(at: .now)
+        #expect(TakeRemote.ending(of: take, stopReason: reason) == nil, "still finishing")
+        take.land(entryID: "E")
+        #expect(TakeRemote.ending(of: take, stopReason: reason) == TakeRemote.Ending(reason: reason, spoken: reason))
+        #expect(TakeRemote.ending(of: take, stopReason: nil) == nil)
+        let face = RecordingStatusItem.face(for: take, now: .now, stopReason: reason)
+        #expect(face.clock == "Stopped")
+        #expect(face.notice == reason)
+        #expect(face.spoken == reason)
+        #expect(face.controls.map(\.title) == ["Show Parola"])
+        let failed = failedTake()
+        #expect(TakeRemote.ending(of: failed, stopReason: nil)?.spoken == "Recording stopped: The microphone stopped.")
     }
 
     @Test("the stopped words read in Italian")
@@ -279,6 +315,83 @@ extension TranscriberMockSuites {
                 #expect(!pillShown, "the pill came back as stopped for a transcription that failed")
                 #expect(itemFace == nil, "the menu bar item came back as stopped for a transcription that failed")
                 #expect(bounces.count == 1)
+                withExtendedLifetime(badge) {}
+            }
+        }
+    }
+
+    @MainActor
+    @Suite("A take that stops on its own out of sight", .serialized)
+    struct TakeStopsOnItsOwnOutOfSightTests {
+        @Test("a take that stops on its own with Parola in the background stays on the pill and in the menu bar as stopped, in its notice's words, and the Dock bounces once")
+        func heldAsStopped() async throws {
+            let audio = try makeTakeWAV("out-of-sight-on-its-own", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the Mac side")])
+                let model = makeRecordingModel("out-of-sight-on-its-own")
+                model.useStreaming = false
+                let pill = RecordingPill(makesPanel: false, appIsActive: { false })
+                pill.bind(model, appActive: false)
+                let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
+                item.bind(model)
+                let bounces = Calls()
+                let badge = DockBadge(show: { _ in }, appIsActive: { false }, requestAttention: { bounces.count += 1 })
+                badge.bind(model)
+                model.installTestTake(source: .systemAudio, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+                let take = try #require(model.recording?.takeID)
+                let reason = AppModel.macAudioStoppedTakeMessage()
+
+                model.stopTakeOnItsOwn(take, saying: reason)
+
+                let landed = await landedEntry(model)
+                #expect(landed != nil, "it was saved")
+                let stopped = await waitUntil { item.face?.lamp == .stopped }
+                #expect(stopped)
+                #expect(item.face?.notice == reason)
+                #expect(item.face?.spoken == reason)
+                let pillShown = pill.isShown
+                #expect(pillShown, "the take stopped on its own and the pill went away without a word")
+                let face = HostedWindow(RecordingPillFace(model: model, isOnScreen: false, onShowParola: {}, onStop: { _ in }, onSize: { _ in }))
+                defer { face.close() }
+                await settle(for: .milliseconds(100))
+                let label = HostedAccessibility.elements(in: face.host).first { $0.identifier == "RecordingPill.Label.Stopped" }?.label
+                #expect(label == reason)
+                let bounced = await waitUntil { bounces.count == 1 }
+                #expect(bounced)
+
+                pill.appActiveChanged(true)
+                item.appBecameActive()
+                let gone = await waitUntil { !pill.isShown && item.face == nil }
+                #expect(gone)
+                #expect(bounces.count == 1)
+                withExtendedLifetime(badge) {}
+            }
+        }
+
+        @Test("with Parola in front, a take that stops on its own leaves the pill and the menu bar as a Stop does, with no bounce")
+        func inFrontLetsGo() async throws {
+            let audio = try makeTakeWAV("out-of-sight-on-its-own-front", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the Mac side")])
+                let model = makeRecordingModel("out-of-sight-on-its-own-front")
+                model.useStreaming = false
+                let item = RecordingStatusItem(statusBar: nil, appIsActive: { true })
+                item.bind(model)
+                let bounces = Calls()
+                let badge = DockBadge(show: { _ in }, appIsActive: { true }, requestAttention: { bounces.count += 1 })
+                badge.bind(model)
+                model.installTestTake(source: .systemAudio, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+                let take = try #require(model.recording?.takeID)
+
+                model.stopTakeOnItsOwn(take, saying: AppModel.macAudioStoppedTakeMessage())
+
+                let landed = await landedEntry(model)
+                #expect(landed != nil)
+                let gone = await waitUntil { item.face == nil }
+                #expect(gone)
+                #expect(bounces.count == 0)
                 withExtendedLifetime(badge) {}
             }
         }

@@ -2486,3 +2486,44 @@ extension TranscriberMockSuites {
         }
     }
 }
+
+/// How many times a test's Dock asked for the user's attention.
+@MainActor
+private final class AttentionAsks {
+    var count = 0
+}
+
+extension TranscriberMockSuites.MeetingSecondTrackTests {
+    @Test("a Mac-audio take that stops by itself with Parola in the background stays on the pill and in the menu bar as stopped, in its notice's words, and the Dock bounces once")
+    func macStopsByItselfOutOfSight() async throws {
+        try await withMocksCleared([.audioSource, .transcriber]) {
+            await installMockTranscriber(segments: [(0, 1, "the Mac side")])
+            let model = makeModel()
+            let pill = RecordingPill(makesPanel: false, appIsActive: { false })
+            pill.bind(model, appActive: false)
+            let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
+            item.bind(model)
+            let asks = AttentionAsks()
+            let badge = DockBadge(show: { _ in }, appIsActive: { false }, requestAttention: { asks.count += 1 })
+            badge.bind(model)
+            let files = try meetingFiles(model)
+            let mac = ScriptedTrack(file: files.mac)
+            try await startMeeting(model, mac: mac, mic: nil, category: .transcription)
+
+            await mac.endByItself()
+
+            let landed = await landedEntry(model)
+            #expect(landed != nil)
+            let stopped = await waitUntil { item.face?.lamp == .stopped }
+            #expect(stopped)
+            #expect(item.face?.notice == AppModel.macAudioStoppedTakeMessage())
+            let pillShown = pill.isShown
+            #expect(pillShown)
+            let bounced = await waitUntil { asks.count == 1 }
+            #expect(bounced)
+            await settle()
+            #expect(asks.count == 1, "once for the take, not once more for the Mac audio")
+            withExtendedLifetime(badge) {}
+        }
+    }
+}

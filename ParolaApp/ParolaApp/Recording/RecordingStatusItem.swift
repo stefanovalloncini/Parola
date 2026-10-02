@@ -53,7 +53,7 @@ final class RecordingStatusItem: NSObject {
 
     /// Pause, Mark and Discard… need a capture; Stop has nothing left once the take finishes, and reads Cancel Recording while it starts; a failed take only leads back to Parola.
     nonisolated static func controls(for take: RecordingSession, bundle: Bundle = .main) -> [Control] {
-        let showParola = Control(title: String(localized: "Show Parola", bundle: bundle), isEnabled: true, action: #selector(showParola))
+        let showParola = showParolaControl(bundle: bundle)
         if case .failed = take.state { return [showParola] }
         let canEnd = TakeRemote.canEnd(take)
         let pause = take.isPaused ? String(localized: "Resume", bundle: bundle) : String(localized: "Pause", bundle: bundle)
@@ -64,6 +64,10 @@ final class RecordingStatusItem: NSObject {
             Control(title: String(localized: "Discard…", bundle: bundle), isEnabled: TakeRemote.canDiscard(take), action: #selector(discard)),
             showParola,
         ]
+    }
+
+    nonisolated static func showParolaControl(bundle: Bundle = .main) -> Control {
+        Control(title: String(localized: "Show Parola", bundle: bundle), isEnabled: true, action: #selector(showParola))
     }
 
     /// The dot in the take's colour, the clock in digits that hold their width as they turn over; a failed take shows a warning sign and the word for it.
@@ -102,11 +106,11 @@ final class RecordingStatusItem: NSObject {
         }
     }
 
-    /// A failure stays up, as stopped, when it came while Parola was in the background.
+    /// A failure, or a take that stopped on its own, stays up as stopped when it came while Parola was in the background.
     private func update(_ model: AppModel) {
         let enabled = model.showRecordingStatusItem
         let take = model.recording
-        let held = failure.holds(take, appActive: appIsActive())
+        let held = failure.holds(take, stoppedOnItsOwn: model.takeStoppedOnItsOwn, appActive: appIsActive())
         if enabled, let take, take.isRunning || held {
             show(take, now: Date())
             if take.state == .recording { startTick() } else { stopTick() }
@@ -115,15 +119,17 @@ final class RecordingStatusItem: NSObject {
         }
     }
 
-    /// A warning the Stage would show is the menu's first line, and VoiceOver hears it after the take's status.
-    nonisolated static func face(for take: RecordingSession, now: Date, warning: String? = nil, bundle: Bundle = .main) -> Face {
-        if case .failed(let message) = take.state {
+    /// A warning the Stage would show is the menu's first line, and VoiceOver hears it after the take's status; a take that ended without a Stop says why there instead.
+    nonisolated static func face(
+        for take: RecordingSession, now: Date, warning: String? = nil, stopReason: String? = nil, bundle: Bundle = .main
+    ) -> Face {
+        if let ending = TakeRemote.ending(of: take, stopReason: stopReason, bundle: bundle) {
             return Face(
                 clock: TakeRemote.stoppedTitle(bundle: bundle),
                 lamp: .stopped,
-                spoken: TakeRemote.failureStatus(message, failedWhile: take.failedWhile, bundle: bundle),
-                controls: controls(for: take, bundle: bundle),
-                notice: message
+                spoken: ending.spoken,
+                controls: [showParolaControl(bundle: bundle)],
+                notice: ending.reason
             )
         }
         let status = TakeRemote.spokenStatus(for: take, at: now, bundle: bundle)
@@ -143,7 +149,7 @@ final class RecordingStatusItem: NSObject {
             item = made
         }
         let warning = model.flatMap { TakeRemote.warning(for: take, in: $0) }
-        let face = Self.face(for: take, now: now, warning: warning?.message)
+        let face = Self.face(for: take, now: now, warning: warning?.message, stopReason: model?.takeStopReason)
         guard face != self.face else { return }
         if face.controls != self.face?.controls || face.notice != self.face?.notice {
             item?.menu = Self.menu(face.controls, notice: face.notice, target: self)

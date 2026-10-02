@@ -52,6 +52,19 @@ enum TakeRemote {
         }
     }
 
+    /// Why a take the pill and the menu bar item hold as stopped ended, and what VoiceOver hears for it.
+    struct Ending: Equatable {
+        let reason: String
+        let spoken: String
+    }
+
+    /// What it recorded ending by itself, in its notice's words, once the take stops; else its failure, worded as its banner.
+    nonisolated static func ending(of take: RecordingSession, stopReason: String?, bundle: Bundle = .main) -> Ending? {
+        if let stopReason, !take.isRunning { return Ending(reason: stopReason, spoken: stopReason) }
+        guard case .failed(let message) = take.state else { return nil }
+        return Ending(reason: message, spoken: failureStatus(message, failedWhile: take.failedWhile, bundle: bundle))
+    }
+
     /// What needs the user's eye while a take runs, on the Stage and on the surfaces outside the window.
     struct Warning: Equatable {
         let message: String

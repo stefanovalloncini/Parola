@@ -1,6 +1,6 @@
 import Foundation
 
-/// A take that failed while Parola was in the background: the pill and the menu bar item hold it as stopped until Parola is next in front, so the failure is never silent.
+/// A take that failed, or stopped on its own, while Parola was in the background: the pill and the menu bar item hold it as stopped until Parola is next in front, so the ending is never silent.
 struct OutOfSightFailure: Equatable {
     /// The Dock bounces for any failure; the pill and the menu bar item let a take go at Stop, so a transcription that fails after it doesn't bring them back.
     let includesTranscription: Bool
@@ -11,9 +11,9 @@ struct OutOfSightFailure: Equatable {
         self.includesTranscription = includesTranscription
     }
 
-    /// Each failure is weighed once, the first time a surface sees it: held only if Parola wasn't in front then.
-    mutating func holds(_ take: RecordingSession?, appActive: Bool) -> Bool {
-        guard let take, case .failed = take.state, includesTranscription || take.failedWhile != .transcribing else {
+    /// Each ending is weighed once, the first time a surface sees it: held only if Parola wasn't in front then. A take that stopped on its own counts as one that failed.
+    mutating func holds(_ take: RecordingSession?, stoppedOnItsOwn: Bool = false, appActive: Bool) -> Bool {
+        guard let take, stoppedOnItsOwn || counts(failureOf: take) else {
             held = nil
             weighed = nil
             return false
@@ -23,6 +23,11 @@ struct OutOfSightFailure: Equatable {
             held = appActive ? nil : take.takeID
         }
         return held == take.takeID
+    }
+
+    private func counts(failureOf take: RecordingSession) -> Bool {
+        guard case .failed = take.state else { return false }
+        return includesTranscription || take.failedWhile != .transcribing
     }
 
     /// Parola came to the front, where the failure shows on its Stage or in a notice.

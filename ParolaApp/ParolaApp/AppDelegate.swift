@@ -244,7 +244,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// The Dock badge, kept by the app delegate so it follows a take with no window open; a take that fails while Parola is in the background bounces the icon once.
+/// The Dock badge, kept by the app delegate so it follows a take with no window open; a take that fails, or stops on its own, while Parola is in the background bounces the icon once.
 @MainActor
 final class DockBadge {
     private weak var model: AppModel?
@@ -283,7 +283,9 @@ final class DockBadge {
 
     private func update(_ model: AppModel) {
         let heldBefore = failure.held
-        if failure.holds(model.recording, appActive: appIsActive()), failure.held != heldBefore { requestAttention() }
+        if failure.holds(model.recording, stoppedOnItsOwn: model.takeStoppedOnItsOwn, appActive: appIsActive()), failure.held != heldBefore {
+            requestAttention()
+        }
         if let take = model.recording, take.isRunning {
             display(Self.recordingBadge(for: take, now: Date()))
             if take.state == .recording { startTick() } else { stopTick() }
