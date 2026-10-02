@@ -93,6 +93,26 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "pressNoticeAction",
+                area: .core,
+                summary: "Test mode: presses one of the notice strip's buttons by the id getState.exportNotice.actions lists, the way a click does. Replies {pressed, notice}; pressed is false when no notice is up or it has no button with that id.",
+                kind: .mutating,
+                args: [
+                    .init(name: "actionID", kind: .string(), required: true, summary: "The button's id, from getState.exportNotice.actions"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    let id = try args.string("actionID")
+                    let action = ctx.model.exportNotice?.actions.first { $0.id.uuidString == id }
+                    if let action { ctx.model.performNoticeAction(action) }
+                    return .object([
+                        "pressed": .bool(action != nil),
+                        "notice": ParolaAutomationServer.exportNoticeState(ctx.model.exportNotice),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
                 name: "getTranscript",
                 area: .core,
                 summary: "Returns the current transcript text and metadata, or null.",

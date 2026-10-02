@@ -67,6 +67,42 @@ extension TranscriberMockSuites {
             withExtendedLifetime(server) {}
         }
 
+        @Test("the bridge presses a notice's button by its id, the way a click does, and says so only when it found one")
+        func pressNoticeButton() async throws {
+            let model = makeRecordingModel("stage-bridge-notice-button")
+            let server = try ParolaAutomationServer(model: model)
+            let commands = Dictionary(uniqueKeysWithValues: server.coreCommands().map { ($0.name, $0) })
+            let press = try #require(commands["pressNoticeAction"])
+            let context = AutomationContext(model: model, server: server)
+            func pressing(_ id: String) async throws -> [String: AutomationValue] {
+                let reply = try await press.handler(try press.validate(AutomationArgs(["actionID": .string(id)])), context)
+                guard case .object(let fields) = reply else { throw AutomationError.precondition("pressNoticeAction did not reply with an object") }
+                return fields
+            }
+
+            let nothingUp = try await pressing(UUID().uuidString)
+            #expect(nothingUp["pressed"] == .bool(false))
+            #expect(nothingUp["notice"] == .null)
+
+            model.installTestTake(source: .microphone)
+            let take = try #require(model.recording?.takeID)
+            model.goHome()
+            let show = ExportNotice.Action(title: "Show", handler: .showTake(take))
+            model.exportNotice = ExportNotice(message: "The take failed.", failures: [], folder: nil, tone: .failure, actions: [show])
+
+            let noSuchButton = try await pressing(UUID().uuidString)
+            #expect(noSuchButton["pressed"] == .bool(false))
+            #expect(model.exportNotice != nil)
+            #expect(model.route == .transcript)
+
+            let pressed = try await pressing(show.id.uuidString)
+            #expect(pressed["pressed"] == .bool(true))
+            #expect(pressed["notice"] == .null)
+            #expect(model.route == .recording)
+            model.endTestTake()
+            withExtendedLifetime(server) {}
+        }
+
         @Test("with nothing recording the bridge's take controls change nothing")
         func nothingToControl() async throws {
             let model = makeRecordingModel("stage-bridge-idle")
