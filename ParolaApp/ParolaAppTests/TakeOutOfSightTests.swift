@@ -380,9 +380,10 @@ extension TranscriberMockSuites {
                 #expect(pillShown, "the take stopped on its own and the pill went away without a word")
                 let face = HostedWindow(RecordingPillFace(model: model, isOnScreen: false, onShowParola: {}, onStop: { _ in }, onSize: { _ in }))
                 defer { face.close() }
-                await settle(for: .milliseconds(100))
-                let label = HostedAccessibility.elements(in: face.host).first { $0.identifier == "RecordingPill.Label.Stopped" }?.label
-                #expect(label == reason)
+                let labelled = await waitUntil {
+                    HostedAccessibility.elements(in: face.host).first { $0.identifier == "RecordingPill.Label.Stopped" }?.label == reason
+                }
+                #expect(labelled)
                 let bounced = await waitUntil { bounces.count == 1 }
                 #expect(bounced)
 
