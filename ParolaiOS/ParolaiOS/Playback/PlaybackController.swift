@@ -16,6 +16,8 @@ final class PlaybackController {
     @ObservationIgnored private var player: AVPlayer?
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var durationTask: Task<Void, Never>?
+    @ObservationIgnored private var seekGeneration = 0
+    @ObservationIgnored private var pendingSeek: Int?
 
     var hasAudio: Bool { player != nil }
 
@@ -42,7 +44,7 @@ final class PlaybackController {
         let interval = CMTime(seconds: 0.1, preferredTimescale: 1000)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             MainActor.assumeIsolated {
-                self?.tick(to: time.seconds.isFinite ? time.seconds : 0)
+                self?.observerTick(time.seconds.isFinite ? time.seconds : 0)
             }
         }
         #if DEBUG
@@ -74,9 +76,13 @@ final class PlaybackController {
     func seek(to time: TimeInterval) {
         guard let player else { return }
         let t = CMTime(seconds: max(0, time), preferredTimescale: 1000)
+        seekGeneration += 1
+        let generation = seekGeneration
+        pendingSeek = generation
+        tick(to: time)
         Task { [weak self] in
             _ = await player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
-            self?.tick(to: time)
+            self?.seekCompleted(generation: generation, time: time)
         }
     }
 
@@ -84,6 +90,17 @@ final class PlaybackController {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback)
         try? session.setActive(true)
+    }
+
+    private func observerTick(_ time: TimeInterval) {
+        guard pendingSeek == nil else { return }
+        tick(to: time)
+    }
+
+    private func seekCompleted(generation: Int, time: TimeInterval) {
+        guard pendingSeek == generation else { return }
+        pendingSeek = nil
+        tick(to: time)
     }
 
     private func tick(to time: TimeInterval) {
@@ -100,11 +117,22 @@ final class PlaybackController {
     func _setCurrentTimeForTest(_ value: TimeInterval) {
         tick(to: value)
     }
+
+    var _latestSeekGenerationForTest: Int { seekGeneration }
+
+    func _completeSeekForTest(generation: Int, time: TimeInterval) {
+        seekCompleted(generation: generation, time: time)
+    }
+
+    func _simulateObserverTickForTest(_ value: TimeInterval) {
+        observerTick(value)
+    }
     #endif
 
     private func tearDown() {
         durationTask?.cancel()
         durationTask = nil
+        pendingSeek = nil
         if let timeObserver, let player {
             player.removeTimeObserver(timeObserver)
             #if DEBUG

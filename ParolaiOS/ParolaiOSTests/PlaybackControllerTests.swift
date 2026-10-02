@@ -88,11 +88,35 @@ struct PlaybackControllerTests {
     }
 
     @Test("seek moves currentTime and updates the current segment")
-    func seekUpdatesTimeAndSegment() async throws {
+    func seekUpdatesTimeAndSegment() {
         let controller = PlaybackController()
         controller.load(audioURL: sampleAudioURL, transcript: Fixtures.makeTranscript())
         controller.seek(to: 1.2)
-        try await pollUntil { controller.currentTime == 1.2 }
+        #expect(controller.currentTime == 1.2)
+        #expect(controller.currentSegmentID == 1)
+    }
+
+    @Test("a periodic tick during a pending seek doesn't move the shown time")
+    func pendingSeekIgnoresObserverTicks() {
+        let controller = PlaybackController()
+        controller.load(audioURL: sampleAudioURL, transcript: Fixtures.makeTranscript())
+        controller.seek(to: 1.2)
+        controller._simulateObserverTickForTest(0.5)
+        #expect(controller.currentTime == 1.2)
+        #expect(controller.currentSegmentID == 1)
+    }
+
+    @Test("an older seek's completion doesn't release a newer seek's hold")
+    func olderSeekCompletionDoesNotReleaseNewerSeek() {
+        let controller = PlaybackController()
+        controller.load(audioURL: sampleAudioURL, transcript: Fixtures.makeTranscript())
+
+        controller.seek(to: 0.2)
+        let olderGeneration = controller._latestSeekGenerationForTest
+
+        controller.seek(to: 1.2)
+        controller._completeSeekForTest(generation: olderGeneration, time: 0.2)
+
         #expect(controller.currentTime == 1.2)
         #expect(controller.currentSegmentID == 1)
     }
