@@ -1031,6 +1031,59 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a take that lands on its Stage during a model download shows its transcript and leaves Settings the download's bar")
+        func takeLandsBesideADownload() async throws {
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the take's words")])
+                let model = makeRecordingModel("take-lands-beside-download")
+                let gate = FetchGate()
+                let downloading = await holdDownload(model, until: gate)
+                #expect(downloading)
+                try await startMeteredTake(model)
+
+                model.stopRecordingAndTranscribe()
+
+                let landed = await waitUntil { model.transcript?.text == "the take's words" && model.recording?.isOver == true }
+                #expect(landed)
+                #expect(model.phase == Self.downloading, "Settings keeps its bar, and its buttons stay off: \(model.phase)")
+                #expect(model.transcriptRoutePhase == .ready)
+                #expect(ContentRoutes.routeID(for: model) == .phase, "the transcript page")
+                await gate.open()
+                let handedBack = await waitUntil { model.phase == .ready }
+                #expect(handedBack)
+                #expect(model.transcript?.text == "the take's words")
+                await waitUntil { !model.hasPendingTakeWork }
+            }
+        }
+
+        @Test("a live take that lands on its Stage during a model download leaves Settings the download's bar too")
+        func liveTakeLandsBesideADownload() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the live take's words")], partials: ["the live"], delayMs: 300
+                ))
+                let model = makeRecordingModel("live-take-lands-beside-download")
+                let gate = FetchGate()
+                let downloading = await holdDownload(model, until: gate)
+                #expect(downloading)
+                model.useStreaming = true
+                model.selectedModel = "openai_whisper-tiny"
+                model.startRecording(source: .microphone)
+                let recording = await waitUntil { model.recording?.state == .recording }
+                #expect(recording)
+
+                model.stopRecordingAndTranscribe()
+
+                let landed = await waitUntil { model.transcript?.text == "the live take's words" && model.recording?.isOver == true }
+                #expect(landed)
+                #expect(model.phase == Self.downloading, "\(model.phase)")
+                #expect(model.transcriptRoutePhase == .ready)
+                await gate.open()
+                await waitUntil { model.phase == .ready && !model.hasPendingTakeWork }
+            }
+        }
+
         @Test("a model download that fails after a take landed on its Stage leaves the take's transcript on screen")
         func failedDownloadLeavesALandedTake() async throws {
             try await withMocksCleared(.transcriber) {
@@ -1041,7 +1094,7 @@ extension TranscriberMockSuites {
                 #expect(downloading)
                 try await startMeteredTake(model)
                 model.stopRecordingAndTranscribe()
-                let landed = await waitUntil { model.transcript?.text == "the take's words" && model.phase == .ready }
+                let landed = await waitUntil { model.transcript?.text == "the take's words" && model.recording?.isOver == true }
                 #expect(landed)
 
                 await gate.open()
@@ -1049,6 +1102,7 @@ extension TranscriberMockSuites {
                 let failed = await waitUntil { model.modelActionError != nil }
                 #expect(failed)
                 #expect(model.phase == .ready)
+                #expect(model.transcriptRoutePhase == .ready)
                 #expect(model.transcript?.text == "the take's words")
                 await waitUntil { !model.hasPendingTakeWork }
             }

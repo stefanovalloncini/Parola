@@ -1571,10 +1571,12 @@ final class AppModel {
         }
     }
 
-    /// The phase the transcript route draws: a batch job's run shows under Activity, and a model download waits behind a take until it lands, so the page either would cover stays up.
+    /// The phase the transcript route draws: a batch job's run shows under Activity, and a model download waits behind a take or a transcript, so the page either would cover stays up.
     var transcriptRoutePhase: Phase {
         if batchOwnsPhase { return .ready }
-        if case .downloadingModel = phase, recording.map({ !$0.isOver }) ?? false { return .ready }
+        if case .downloadingModel = phase, recording.map({ !$0.isOver }) ?? false || (downloadTask != nil && transcript != nil) {
+            return .ready
+        }
         return phase
     }
 
@@ -2506,8 +2508,8 @@ final class AppModel {
                 if !Task.isCancelled {
                     let message = Self.offlineMessage(for: error)
                         ?? "Download failed: \(error.localizedDescription)"
-                    // A take or a run that took the page since keeps it; Settings still says why.
-                    if case .downloadingModel = phase { phase = .failed(message: message) }
+                    // A take or a run that took the page since keeps it, as does a transcript the bar was drawn past; Settings still says why.
+                    if case .downloadingModel = phase { phase = transcript == nil ? .failed(message: message) : .ready }
                     modelActionError = message
                     correctSelectionIfNeeded()
                 }
@@ -2519,7 +2521,7 @@ final class AppModel {
 
     /// Hands the phase back only while it is still the download's: a run, a take or a batch owns it too.
     func finishModelDownload() {
-        if !runOwnsPhase, case .downloadingModel = phase { phase = .idle }
+        if !runOwnsPhase, case .downloadingModel = phase { phase = transcript == nil ? .idle : .ready }
         refreshModelList()
         if watchedLanePausedAt != nil { resumeWatchedLane() }
     }
@@ -2527,7 +2529,7 @@ final class AppModel {
     func cancelModelDownload() {
         downloadTask?.cancel()
         downloadTask = nil
-        if case .downloadingModel = phase { phase = .idle }
+        if case .downloadingModel = phase { phase = transcript == nil ? .idle : .ready }
         refreshModelList()
     }
 
@@ -4311,7 +4313,7 @@ final class AppModel {
             clearDerivedArtifacts()
             selectedEntryID = nil
             self.transcript = processed
-            phase = .ready
+            readyForLandedTake()
             showLandedTake()
             if let audioURL = processed.sourceURL {
                 recordedTake = RecordedTake(file: audioURL, title: given.typedTitle ?? title, takeID: take?.id)
@@ -4673,7 +4675,7 @@ final class AppModel {
             restorePlaybackSource(url)
             transcript = processed
             adoptLoadedMediaDuration()
-            phase = .ready
+            readyForLandedTake()
             if route == .recording { showLandedTake() }
             saveTake(
                 processed, audio: url, title: title, source: source, category: category, landingAs: .recording,
@@ -4815,6 +4817,12 @@ final class AppModel {
     private func armTakeRetry(_ retry: RecordingSession.Failure) {
         failureKind = .transcription
         failedTakeRetry = retry
+    }
+
+    /// A model download from Settings keeps the phase for its bar; the transcript page shows past it.
+    private func readyForLandedTake() {
+        if case .downloadingModel = phase, downloadTask != nil { return }
+        phase = .ready
     }
 
     private func showLandedTake() {
