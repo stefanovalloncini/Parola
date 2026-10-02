@@ -322,6 +322,41 @@ struct StageBandLayerTests {
         #expect(lane.animationKeys() == nil && view.tape.animationKeys() == nil)
     }
 
+    @Test("a band a landing's animation carries into the media bar builds its bars for every frame's size, and none of its layers animate on their own")
+    func followsAnAnimatedResize() async throws {
+        let frame = BandFrame()
+        let levels = [Float](repeating: 0.6, count: 40)
+        let tape = StageTape(levels: levels, micLevels: levels, flags: [3], newest: 39, paused: false)
+        let hosted = HostedWindow(BandInFrame(tape: tape, frame: frame), width: 1180, height: StageBand.height)
+        defer { hosted.close() }
+        let found = tapeViews(in: hosted).first
+        let view = try #require(found)
+        let host = try #require(view.layer)
+        let landed = CGSize(width: 600, height: 70)
+
+        withAnimation(.linear(duration: 0.4)) { frame.wide = false }
+        var widths: [CGFloat] = []
+        var unbuilt: [CGSize] = []
+        var animated: Set<String> = []
+        let started = ContinuousClock.now
+        while ContinuousClock.now < started + .seconds(3) {
+            let size = view.frame.size
+            widths.append(size.width)
+            if view.tape.bounds.size != size { unbuilt.append(size) }
+            for layer in [host, view.tape, view.poles, view.pennants] + view.lanes + view.lanes.compactMap(\.mask) {
+                animated.formUnion(layer.animationKeys() ?? [])
+            }
+            if size == landed, ContinuousClock.now > started + .milliseconds(500) { break }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        let between = Set(widths.filter { $0 > landed.width && $0 < 1180 })
+
+        #expect(between.count > 1, "the band went through \(Set(widths).sorted())")
+        #expect(unbuilt.isEmpty, "bars built for another size while the band was \(unbuilt)")
+        #expect(animated.isEmpty, "layers animating on their own: \(animated.sorted())")
+        #expect(view.frame.size == landed)
+    }
+
     @Test("a band already up follows its window from light to dark and back, the bars' ink and the flags' accent alike")
     func followsTheAppearance() async throws {
         let tape = StageTape(levels: [0.5, 0.9], flags: [0], newest: 1, paused: false)
@@ -343,6 +378,23 @@ struct StageBandLayerTests {
         }
         let same = tapeViews(in: hosted).first === view
         #expect(same, "the band that was up, not one built again")
+    }
+}
+
+@MainActor
+@Observable
+private final class BandFrame {
+    var wide = true
+}
+
+/// The band at the Stage's size or the media bar's, as a landing carries it from one to the other.
+private struct BandInFrame: View {
+    let tape: StageTape
+    let frame: BandFrame
+
+    var body: some View {
+        tape.drawn(.held)
+            .frame(width: frame.wide ? 1180 : 600, height: frame.wide ? StageBand.height : 70)
     }
 }
 
