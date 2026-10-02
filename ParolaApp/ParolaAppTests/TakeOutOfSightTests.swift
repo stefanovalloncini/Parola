@@ -604,3 +604,78 @@ struct MacAudioStoppedOutsideTests {
         #expect(String(localized: "Mac audio stopped", bundle: italian) == "Audio del Mac fermato")
     }
 }
+
+private func unfoldableNotice() -> ExportNotice {
+    ExportNotice(
+        message: AppModel.micTrackUnfoldableMessage(title: "Weekly sync"), failures: [], folder: nil, tone: .failure,
+        actions: [ExportNotice.Action(title: "Reveal in Finder", handler: .revealFile(URL(fileURLWithPath: "/tmp/parola-mic.wav")))]
+    )
+}
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("A failure notice a Mac-audio notice covers", .serialized)
+    struct CoveredFailureNoticeTests {
+        @Test("a take that stops on its own covers an unrelated failure notice, which comes back once its notice is dismissed, once")
+        func comesBackOnce() async throws {
+            let audio = try makeTakeWAV("covered-notice", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the Mac side")])
+                let model = makeRecordingModel("covered-notice")
+                model.useStreaming = false
+                let unfoldable = unfoldableNotice()
+                model.exportNotice = unfoldable
+                model.installTestTake(source: .systemAudio, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+                let take = try #require(model.recording?.takeID)
+
+                model.stopTakeOnItsOwn(take, saying: AppModel.macAudioStoppedTakeMessage())
+
+                #expect(model.exportNotice?.message == AppModel.macAudioStoppedTakeMessage())
+                model.dismissExportNotice()
+                #expect(model.exportNotice?.id == unfoldable.id, "the Reveal in Finder notice came back")
+                model.dismissExportNotice()
+                #expect(model.exportNotice == nil, "one deep, never a queue")
+                _ = await landedEntry(model)
+            }
+        }
+
+        @Test("resetTestState forgets a notice waiting under a Mac-audio notice, so nothing from before the reset comes back")
+        func resetForgetsIt() async throws {
+            let model = makeRecordingModel("covered-notice-reset")
+            let server = try ParolaAutomationServer(model: model)
+            let context = AutomationContext(model: model, server: server)
+            let lifecycle = Dictionary(uniqueKeysWithValues: server.lifecycleCommands().map { ($0.name, $0) })
+            let reset = try #require(lifecycle["resetTestState"])
+            model.noticeUnderMacAudio = unfoldableNotice()
+
+            _ = try await reset.handler(try reset.validate(AutomationArgs([:])), context)
+
+            #expect(model.noticeUnderMacAudio == nil)
+            withExtendedLifetime(server) {}
+        }
+
+        @Test("an info notice, or a failure about the same take, isn't brought back")
+        func onlyAnUnrelatedFailure() async throws {
+            let audio = try makeTakeWAV("covered-notice-not", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the Mac side")])
+                let model = makeRecordingModel("covered-notice-not")
+                model.useStreaming = false
+                model.installTestTake(source: .systemAudio, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
+                let take = try #require(model.recording?.takeID)
+                model.exportNotice = ExportNotice(message: "Finish the recording first.", failures: [], folder: nil, tone: .info)
+
+                model.stopTakeOnItsOwn(take, saying: AppModel.macAudioStoppedTakeMessage())
+                model.dismissExportNotice()
+
+                #expect(model.exportNotice == nil)
+                _ = await landedEntry(model)
+                model.exportNotice = ExportNotice(message: "About this take", failures: [], folder: nil, tone: .failure, forTake: take)
+                model.keepCoveredFailure(model.exportNotice, take: take)
+                #expect(model.noticeUnderMacAudio == nil)
+            }
+        }
+    }
+}

@@ -751,10 +751,18 @@ extension AppModel {
             return
         }
         // Over any notice already up: this one is about the recording in progress, the others about what is saved.
+        let covered = exportNotice
         exportNotice = ExportNotice(
             message: Self.macAudioStoppedMessage(), failures: [], folder: nil, tone: .info,
             actions: [ExportNotice.Action(title: String(localized: "Show"), handler: .showTake(takeID))]
         )
+        keepCoveredFailure(covered, take: takeID)
+    }
+
+    /// A failure about something else that a Mac-audio notice went over waits under it, to come back once the strip is clear.
+    func keepCoveredFailure(_ covered: ExportNotice?, take takeID: Int) {
+        guard let covered, covered.id != exportNotice?.id, covered.tone == .failure, covered.takeID != takeID else { return }
+        noticeUnderMacAudio = covered
     }
 
     /// What a take's Mac capture calls if it ends by itself.

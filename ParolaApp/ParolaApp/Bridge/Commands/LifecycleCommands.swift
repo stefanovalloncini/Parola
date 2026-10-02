@@ -39,6 +39,7 @@ extension ParolaAutomationServer {
                         throw AutomationError.precondition("resetTestState is only available in --test-mode")
                     }
                     let model = ctx.model
+                    model.noticeUnderMacAudio = nil
                     model.cancelAllTasks()
                     await ctx.server.releaseHeldStreamingStart()
                     await model.settleTakeWork(within: .seconds(5))

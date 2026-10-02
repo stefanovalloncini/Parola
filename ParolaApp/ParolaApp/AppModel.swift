@@ -952,7 +952,15 @@ final class AppModel {
     /// Written only through `setDestinations(_:)`.
     var destinations: [AnyDestination] = []
     var deliveryNotice: DeliveryNotice?
-    var exportNotice: ExportNotice?
+    var exportNotice: ExportNotice? {
+        didSet {
+            guard exportNotice == nil, let covered = noticeUnderMacAudio else { return }
+            noticeUnderMacAudio = nil
+            exportNotice = covered
+        }
+    }
+    /// A failure about something else that a Mac-audio notice went over: it comes back once the strip is clear again. One deep, never a queue.
+    @ObservationIgnored var noticeUnderMacAudio: ExportNotice?
     @ObservationIgnored lazy var deliveryEngine: DeliveryEngine = makeDeliveryEngine()
     @ObservationIgnored var volumeMountObservation: NotificationObservation?
 
@@ -4522,15 +4530,18 @@ final class AppModel {
 
     /// What the take records ended by itself: the take stops as Stop stops it, with a notice that stays until it is dismissed; one that never heard a sound ends with nothing saved, saying `unheard`.
     func stopTakeOnItsOwn(_ takeID: Int, saying message: String, unheard: String? = nil) {
+        let covered = exportNotice
         catchUpFirstBuffer()
         guard recording?.isArming != true else {
             takeStopReason = unheard ?? message
             endTakeBeforeCapture(reporting: unheard ?? message)
+            keepCoveredFailure(covered, take: takeID)
             return
         }
         takeStopReason = message
         stopRecordingAndTranscribe()
         exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure, forTake: takeID)
+        keepCoveredFailure(covered, take: takeID)
     }
 
     /// Cancel on a take that has captured nothing: there is nothing to lose, so it ends without a word.

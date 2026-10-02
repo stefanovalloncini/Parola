@@ -2494,6 +2494,33 @@ private final class AttentionAsks {
 }
 
 extension TranscriberMockSuites.MeetingSecondTrackTests {
+    @Test("a Mac-audio notice mid-meeting covers the one-shot Reveal in Finder notice, which comes back once its Show is pressed")
+    func macStopsByItselfOverAFailureNotice() async throws {
+        try await withMocksCleared([.audioSource, .transcriber]) {
+            let model = makeModel()
+            model.micTrackStallTicks = 10_000
+            let unfoldable = ExportNotice(
+                message: AppModel.micTrackUnfoldableMessage(title: "Weekly sync"), failures: [], folder: nil, tone: .failure,
+                actions: [ExportNotice.Action(title: "Reveal in Finder", handler: .revealFile(URL(fileURLWithPath: "/tmp/parola-mic.wav")))]
+            )
+            model.exportNotice = unfoldable
+            let files = try meetingFiles(model)
+            let mac = ScriptedTrack(file: files.mac)
+            try await startMeeting(model, mac: mac, mic: ScriptedTrack(file: files.mic))
+            let micUp = await waitForMicTrack(model)
+            #expect(micUp)
+
+            await mac.endByItself()
+
+            let said = await waitUntil { model.exportNotice?.message == AppModel.macAudioStoppedMessage() }
+            #expect(said)
+            let show = try #require(model.exportNotice?.actions.first)
+            model.performNoticeAction(show)
+            #expect(model.exportNotice?.id == unfoldable.id, "the Reveal in Finder notice came back")
+            await model.discardTake()
+        }
+    }
+
     @Test("a meeting whose Mac audio stops by itself with Parola in the background says so in the menu bar, and bounces the Dock once while your microphone records on")
     func macStopsByItselfMidMeetingOutOfSight() async throws {
         try await withMocksCleared([.audioSource, .transcriber]) {
