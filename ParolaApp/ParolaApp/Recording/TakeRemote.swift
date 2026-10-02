@@ -96,6 +96,19 @@ enum TakeRemote {
         model.stopTake()
     }
 
+    /// Acts on what the control drew: Stop ends the take; a Cancel drawn while it started leaves it alone once it records.
+    static func stopOrCancel(_ model: AppModel, cancels: Bool) {
+        guard !cancels || model.recording?.isArming == true else { return }
+        stop(model)
+    }
+
+    /// What ends the take from outside the Stage says what it does: Cancel Recording while the take starts, as the Stage's own Cancel does.
+    nonisolated static func endTitle(for take: RecordingSession?, bundle: Bundle = .main) -> String {
+        take?.isArming == true
+            ? String(localized: "Cancel Recording", bundle: bundle)
+            : String(localized: "Stop Recording", bundle: bundle)
+    }
+
     static func togglePause(_ model: AppModel) {
         StageControls.togglePause(model)
     }

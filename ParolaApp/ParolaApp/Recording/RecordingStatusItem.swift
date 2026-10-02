@@ -51,14 +51,14 @@ final class RecordingStatusItem: NSObject {
         controls(for: take).map(\.title)
     }
 
-    /// Pause, Mark and Discard… need a capture; Stop has nothing left once the take finishes; a failed take only leads back to Parola.
+    /// Pause, Mark and Discard… need a capture; Stop has nothing left once the take finishes, and reads Cancel Recording while it starts; a failed take only leads back to Parola.
     nonisolated static func controls(for take: RecordingSession, bundle: Bundle = .main) -> [Control] {
         let showParola = Control(title: String(localized: "Show Parola", bundle: bundle), isEnabled: true, action: #selector(showParola))
         if case .failed = take.state { return [showParola] }
         let canEnd = TakeRemote.canEnd(take)
         let pause = take.isPaused ? String(localized: "Resume", bundle: bundle) : String(localized: "Pause", bundle: bundle)
         return [
-            Control(title: String(localized: "Stop Recording", bundle: bundle), isEnabled: canEnd, action: #selector(stop)),
+            Control(title: TakeRemote.endTitle(for: take, bundle: bundle), isEnabled: canEnd, action: take.isArming ? #selector(cancel) : #selector(stop)),
             Control(title: pause, isEnabled: take.isCapturing, action: #selector(togglePause)),
             Control(title: String(localized: "Add Marker", bundle: bundle), isEnabled: take.isCapturing, action: #selector(addMarker)),
             Control(title: String(localized: "Discard…", bundle: bundle), isEnabled: TakeRemote.canDiscard(take), action: #selector(discard)),
@@ -214,6 +214,11 @@ final class RecordingStatusItem: NSObject {
     @objc private func stop() {
         guard let model else { return }
         TakeRemote.stop(model)
+    }
+
+    @objc private func cancel() {
+        guard let model else { return }
+        TakeRemote.stopOrCancel(model, cancels: true)
     }
 
     @objc private func togglePause() {

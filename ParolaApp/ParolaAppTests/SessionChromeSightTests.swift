@@ -45,7 +45,7 @@ private struct ChromeInSight: View {
             case .capsule:
                 SessionCapsuleFace(take: take, showsMeter: true, isOnScreen: sight.shown, showStage: {}, stop: { _ in })
             case .pill:
-                RecordingPillFace(model: model, isOnScreen: sight.shown, onShowParola: {}, onStop: {}, onSize: { _ in })
+                RecordingPillFace(model: model, isOnScreen: sight.shown, onShowParola: {}, onStop: { _ in }, onSize: { _ in })
             }
         }
         .environment(\._accessibilityReduceMotion, reduceMotion)

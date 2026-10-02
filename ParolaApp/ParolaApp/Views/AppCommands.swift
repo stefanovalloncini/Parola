@@ -92,6 +92,8 @@ enum CommandReturn {
 /// What the Recording menu offers for the take as it stands.
 struct RecordingMenuState: Equatable {
     var canEnd: Bool
+    /// The take is still starting, so ending it cancels it and the item says so.
+    var cancels: Bool
     var canCapture: Bool
     var canDiscard: Bool
     var resumes: Bool
@@ -100,6 +102,7 @@ struct RecordingMenuState: Equatable {
 
     init(take: RecordingSession?, showsRecording: Bool, composerFocused: Bool) {
         canEnd = TakeRemote.canEnd(take)
+        cancels = take?.isArming ?? false
         canCapture = take?.isCapturing ?? false
         canDiscard = TakeRemote.canDiscard(take)
         resumes = take?.isPaused ?? false
@@ -118,7 +121,7 @@ struct RecordingCommands: View {
             take: model.recording, showsRecording: model.stageHoldsTake, composerFocused: model.chatComposerHasFocus
         )
         let _ = RecordingMenuRefresher.shared.menuDrew()
-        Button("Stop Recording") { TakeRemote.stop(model) }
+        Button(menu.cancels ? "Cancel Recording" : "Stop Recording") { TakeRemote.stopOrCancel(model, cancels: menu.cancels) }
             .keyboardShortcut(menu.stopOwnsCommandReturn ? CommandReturn.shortcut : nil)
             .disabled(!menu.canEnd)
             .axLeaf("Menu.Recording.Stop")

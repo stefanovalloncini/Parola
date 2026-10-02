@@ -88,7 +88,7 @@ final class RecordingPill {
             RecordingPillView(
                 model: model,
                 onShowParola: { self?.showParola() },
-                onStop: { TakeRemote.stop(model) },
+                onStop: { TakeRemote.stopOrCancel(model, cancels: $0) },
                 onSize: { self?.fit($0) }
             )
         }
@@ -142,7 +142,7 @@ final class RecordingPill {
 struct RecordingPillView: View {
     let model: AppModel
     let onShowParola: () -> Void
-    let onStop: () -> Void
+    let onStop: (_ cancels: Bool) -> Void
     let onSize: (CGSize) -> Void
     @State private var isOnScreen = true
 
@@ -158,7 +158,8 @@ struct RecordingPillFace: View {
     /// Off while the panel is hidden, so the clock, the light and the meter stop drawing.
     let isOnScreen: Bool
     let onShowParola: () -> Void
-    let onStop: () -> Void
+    /// Told whether the button read Cancel when it was clicked.
+    let onStop: (_ cancels: Bool) -> Void
     let onSize: (CGSize) -> Void
 
     nonisolated static let stopSide: CGFloat = 26
@@ -238,8 +239,9 @@ struct RecordingPillFace: View {
             .accessibilityHint("Show Parola")
             .axLeaf("Button.ShowParola")
             PillMeter(model: model, paused: take.isPaused, isOnScreen: isOnScreen)
-            Button(action: onStop) {
-                Image(systemName: "stop.fill")
+            let cancels = take.isArming
+            Button { onStop(cancels) } label: {
+                Image(systemName: cancels ? "xmark" : "stop.fill")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: Self.stopSide, height: Self.stopSide)
@@ -248,8 +250,8 @@ struct RecordingPillFace: View {
             .buttonStyle(.plain)
             .disabled(take.state == .finishing)
             .opacity(take.state == .finishing ? DS.Opacity.disabled : 1)
-            .help("Stop recording and transcribe.")
-            .accessibilityLabel("Stop Recording")
+            .help(cancels ? "Cancel the recording before it starts." : "Stop recording and transcribe.")
+            .accessibilityLabel(Text(verbatim: TakeRemote.endTitle(for: take)))
             .axLeaf("Button.Stop")
         }
     }

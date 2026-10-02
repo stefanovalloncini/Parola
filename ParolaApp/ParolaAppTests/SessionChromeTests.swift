@@ -191,7 +191,7 @@ struct SessionCapsuleHostedTests {
         )
         let face = SessionCapsuleFace(
             take: drawn, showsMeter: false, isOnScreen: false, showStage: {},
-            stop: { SessionCapsule.stopOrCancel(model, cancels: $0) }
+            stop: { TakeRemote.stopOrCancel(model, cancels: $0) }
         )
         let hosted = HostedWindow(face.frame(maxWidth: .infinity, maxHeight: .infinity), width: 400, height: 120)
         defer { hosted.close() }
@@ -219,7 +219,7 @@ extension TranscriberMockSuites {
                 model.useStreaming = false
                 model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -1))
 
-                SessionCapsule.stopOrCancel(model, cancels: false)
+                TakeRemote.stopOrCancel(model, cancels: false)
 
                 let stopping = model.recording?.isCapturing == false
                 #expect(stopping)

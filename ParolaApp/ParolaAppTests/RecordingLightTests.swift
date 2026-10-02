@@ -197,7 +197,7 @@ struct RecordingLightSurfaceTests {
     }
 
     private func pill(_ model: AppModel, onScreen: Bool) -> HostedWindow {
-        let face = RecordingPillFace(model: model, isOnScreen: onScreen, onShowParola: {}, onStop: {}, onSize: { _ in })
+        let face = RecordingPillFace(model: model, isOnScreen: onScreen, onShowParola: {}, onStop: { _ in }, onSize: { _ in })
         return HostedWindow(face, width: 400, height: 80)
     }
 
@@ -245,7 +245,7 @@ struct RecordingLightSurfaceTests {
         let capsuleFace = SessionCapsuleFace(take: take, showsMeter: false, isOnScreen: true, showStage: { stageShown += 1 }, stop: { _ in })
         let capsule = HostedWindow(capsuleFace, width: 400, height: 80)
         defer { capsule.close() }
-        let pillFace = RecordingPillFace(model: model, isOnScreen: true, onShowParola: { parolaShown += 1 }, onStop: {}, onSize: { _ in })
+        let pillFace = RecordingPillFace(model: model, isOnScreen: true, onShowParola: { parolaShown += 1 }, onStop: { _ in }, onSize: { _ in })
         let pill = HostedWindow(pillFace, width: 400, height: 80)
         defer { pill.close() }
 

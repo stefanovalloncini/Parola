@@ -287,7 +287,7 @@ struct TakeWarningsOutsideTests {
         defer { try? FileManager.default.removeItem(at: audio) }
         let model = makeRecordingModel("warning-pill")
         model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
-        let pill = HostedWindow(RecordingPillFace(model: model, isOnScreen: false, onShowParola: {}, onStop: {}, onSize: { _ in }))
+        let pill = HostedWindow(RecordingPillFace(model: model, isOnScreen: false, onShowParola: {}, onStop: { _ in }, onSize: { _ in }))
         defer { pill.close() }
         func showParola() -> HostedAccessibility.Element? {
             HostedAccessibility.elements(in: pill.host).first { $0.identifier == "RecordingPill.Button.ShowParola" }

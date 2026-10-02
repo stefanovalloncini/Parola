@@ -22,19 +22,13 @@ struct SessionCapsule: View {
         windowWidth >= meterMinimumWindowWidth
     }
 
-    /// Acts on what the capsule drew: Stop and Cancel both go the shared way, but a Cancel that finds the take recording by now leaves it.
-    static func stopOrCancel(_ model: AppModel, cancels: Bool) {
-        guard !cancels || model.recording?.isArming == true else { return }
-        TakeRemote.stop(model)
-    }
-
     var body: some View {
         SessionCapsuleFace(
             take: take,
             showsMeter: showsMeter ?? Self.showsMeter(windowWidth: model.mainWindow?.frame.width ?? 0),
             isOnScreen: isOnScreen,
             showStage: { model.showStage() },
-            stop: { Self.stopOrCancel(model, cancels: $0) }
+            stop: { TakeRemote.stopOrCancel(model, cancels: $0) }
         )
         .background(WindowShownReader { isOnScreen = $0 })
         .background(WindowWidthReader { showsMeter = Self.showsMeter(windowWidth: $0) })
@@ -112,7 +106,7 @@ struct SessionCapsuleFace: View {
         .buttonStyle(SessionCapsuleButtonStyle())
         .disabled(take.state == .finishing)
         .help(starting ? "Cancel the recording before it starts." : "Stop recording and transcribe.")
-        .accessibilityLabel(starting ? "Cancel" : "Stop Recording")
+        .accessibilityLabel(Text(verbatim: TakeRemote.endTitle(for: take)))
         .axLeaf("Toolbar.Button.SessionStop")
     }
 
