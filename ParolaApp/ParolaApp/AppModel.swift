@@ -5061,6 +5061,12 @@ final class AppModel {
         return true
     }
 
+    /// The bridge's quit asks nobody: a take capturing is stopped and saved, as the prompt's Stop and Save does, and nothing new starts meanwhile.
+    func stopAndSaveTakeForQuit() async {
+        quitPending = true
+        if takeInProgress { _ = await resolveQuitDuringTake(.stopAndSave) }
+    }
+
     /// Holds a quit, with the window saying so, until every take is in the library or the limit passes; a take still transcribing stops and is saved as audio.
     func finishTakeWorkForQuit() async {
         await withinQuitLimit { [weak self] in await self?.waitForTakeWork() }

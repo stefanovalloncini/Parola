@@ -9,16 +9,21 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "quit",
                 area: .lifecycle,
-                summary: "Cancels in-flight work, removes the bridge discovery file, and terminates the app.",
+                summary: "Stops and saves a take in progress, as the quit prompt's Stop and Save does, cancels the rest of the in-flight work, removes the bridge discovery file, and terminates the app.",
                 kind: .async,
                 handler: { _, ctx in
-                    ctx.model.cancelAllTasks()
+                    let model = ctx.model
+                    await model.stopAndSaveTakeForQuit()
+                    model.cancelAllTasks()
                     ctx.server.stop()
-                    let library = ctx.model.library
+                    let library = model.library
+                    let terminate = ctx.server.terminateApp
                     Task { @MainActor in
                         await library.flush()
                         try? await Task.sleep(for: .milliseconds(50))
-                        NSApp.terminate(nil)
+                        // The app delegate turns a terminate down while a quit is pending, and this one has done its waiting.
+                        model.quitPending = false
+                        terminate()
                     }
                     return .object(["terminating": .bool(true)])
                 }

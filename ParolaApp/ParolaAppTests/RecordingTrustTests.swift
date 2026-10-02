@@ -1531,6 +1531,29 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("the bridge's quit stops and saves a take that records, as Stop and Save does, before the app goes")
+        func bridgeQuitSavesTheTake() async throws {
+            let model = makeRecordingModel("bridge-quit-take")
+            let server = try ParolaAutomationServer(model: model)
+            let terminated = QuitReply()
+            server.terminateApp = { terminated.value = true }
+            try await startMeteredTake(model)
+            let quitCommand = server.lifecycleCommands().first { $0.name == "quit" }
+            let quit = try #require(quitCommand)
+
+            let reply = try await quit.handler(AutomationArgs([:]), AutomationContext(model: model, server: server))
+
+            #expect(reply == .object(["terminating": .bool(true)]))
+            let went = await waitUntil { terminated.value == true }
+            #expect(went)
+            let saved = await model.library.list()
+            #expect(saved.count == 1, "the take is in the library before the app goes")
+            #expect(saved.first?.title.hasSuffix("(not transcribed)") == true)
+            #expect(model.recoveryCheckpointFiles.isEmpty)
+            #expect(!model.quitPending, "the app delegate turns a terminate down while a quit is pending")
+            withExtendedLifetime(server) {}
+        }
+
         @Test("quitting while a take transcribes stops the run, saves the take untranscribed, then lets the app quit")
         func quitWhileATakeTranscribes() async throws {
             let wav = try makeTakeWAV("quit-transcribing")

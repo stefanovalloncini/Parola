@@ -27,6 +27,8 @@ final class ParolaAutomationServer {
     private var revision: Int = 0
     /// Test mode: the gate a mock live take's model load waits behind, from `holdStart` until it is released.
     var heldStreamingStart: MockTranscriberGate?
+    /// Test seam: what `quit` does once its work is done; a test host must not terminate.
+    var terminateApp: @MainActor () -> Void = { NSApp.terminate(nil) }
     private let auditLog: AutomationAuditLog?
     let revisionLog: RevisionLog
 
