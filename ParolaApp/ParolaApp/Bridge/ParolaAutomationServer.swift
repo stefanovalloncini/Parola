@@ -681,9 +681,19 @@ final class ParolaAutomationServer {
         return .object([
             "message": .string(notice.message),
             "succeeded": .bool(notice.succeeded),
+            "tone": .string(noticeToneName(notice.tone)),
             "failures": .array(notice.failures.map { .object(["name": .string($0.name), "reason": .string($0.reason)]) }),
             "folder": notice.folder.map { .string($0.path) } ?? .null,
+            "actions": .array(notice.actions.map { .object(["id": .string($0.id.uuidString), "title": .string($0.title)]) }),
         ])
+    }
+
+    static func noticeToneName(_ tone: ExportNotice.Tone) -> String {
+        switch tone {
+        case .success: return "success"
+        case .info: return "info"
+        case .failure: return "failure"
+        }
     }
 
     static func stageName(_ stage: TranscribeStage) -> String {

@@ -116,6 +116,30 @@ struct BridgeStateDetailTests {
         #expect(elapsed >= 12 && elapsed < 15)
     }
 
+    @Test("a notice reports its tone and its buttons, so an info notice no longer reads as a failure")
+    func noticeCarriesToneAndButtons() throws {
+        let (model, server) = try makeRig()
+        let open = ExportNotice.Action(title: "Open", handler: .openEntry("entry"))
+        let transcribe = ExportNotice.Action(title: "Transcribe", handler: .transcribeEntry("entry"))
+        model.exportNotice = ExportNotice(
+            message: "Saved the previous recording without transcribing it.", failures: [], folder: nil, tone: .info,
+            actions: [open, transcribe]
+        )
+
+        let notice = try object(server.snapshotState(), "exportNotice")
+
+        #expect(notice["tone"] == .string("info"))
+        #expect(notice["succeeded"] == .bool(false))
+        #expect(notice["actions"] == .array([
+            .object(["id": .string(open.id.uuidString), "title": .string("Open")]),
+            .object(["id": .string(transcribe.id.uuidString), "title": .string("Transcribe")]),
+        ]))
+        model.exportNotice = ExportNotice(message: "Exported 2 of 2", failures: [], folder: nil, tone: .success)
+        let exported = try object(server.snapshotState(), "exportNotice")
+        #expect(exported["tone"] == .string("success"))
+        #expect(exported["actions"] == .array([]))
+    }
+
     @Test("favoriteSegments and favoritesOnly reflect the selected entry and the filter")
     func favoriteSegmentsInState() throws {
         let (model, server) = try makeRig()
