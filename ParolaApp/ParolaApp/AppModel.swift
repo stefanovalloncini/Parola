@@ -3612,6 +3612,8 @@ final class AppModel {
         let holds = recording.map { ContentRoutes.stageShows($0, model: self) } ?? false
         guard holds != stageHoldsTake else { return }
         stageHoldsTake = holds
+        // Once the Stage lets go of its take, to new work say, the window shows the transcript page, and the route says so.
+        if !holds, route == .recording { route = .transcript }
         holdSavedToastBehindStage()
     }
 

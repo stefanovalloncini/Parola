@@ -336,6 +336,37 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a quick file opened over a take transcribing on its Stage lands on its page, while the take's own save is still going")
+        func quickRunOverATranscribingTakeLandsInPlace() async throws {
+            let audio = try makeTakeWAV("take-quick-run", seconds: 2)
+            let file = try makeTakeWAV("take-quick-run-file")
+            defer {
+                try? FileManager.default.removeItem(at: audio)
+                try? FileManager.default.removeItem(at: file)
+            }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "the file's words")], partials: ["the take's words"], gate: gate)
+                let model = makeModel("take-quick-run")
+                let saves = FetchGate()
+                model.beforeLandingSave = { await saves.wait() }
+                recordAndStop(model, audio: audio, seconds: 2)
+                let streaming = await waitUntil { model.takePartialText == "the take's words" }
+                #expect(streaming)
+
+                model.beginFileTranscription(fileURL: file, translateOverride: nil)
+                #expect(model.route == .transcript, "the Stage let go of its take, so the page under it is the transcript page")
+                await gate.open()
+
+                let landed = await waitUntil { model.transcript?.text == "the file's words" }
+                #expect(landed, "the run landed out of sight while the take's save held the old route")
+                #expect(model.recording?.isTranscribing == true, "the take's own save is still going")
+                #expect(model.arrivalNotice == nil)
+                await saves.open()
+                await waitUntil { !model.hasPendingTakeWork }
+            }
+        }
+
         @Test("a Retry from the error card while a take transcribes stops that take's run as new work does")
         func retryStopsATranscribingTake() async throws {
             let audio = try makeTakeWAV("take-retry-over", seconds: 2)
