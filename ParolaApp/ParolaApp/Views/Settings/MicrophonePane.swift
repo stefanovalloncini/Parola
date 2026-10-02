@@ -102,21 +102,7 @@ struct MicrophonePane: View {
             SettingHelper(text: "Both apply to dictation too. Mute is skipped when the recording source is system audio.")
 
             if RecordControl.primarySource(features: model.features) != nil {
-                SettingsSection("Recording controls") {
-                    SettingRow("Show the recording in the menu bar",
-                               description: "The time stays in the menu bar while you record, with the recording's controls in its menu.",
-                               isFirst: true) {
-                        Toggle("", isOn: $model.showRecordingStatusItem).labelsHidden()
-                            .accessibilityLabel("Show the recording in the menu bar")
-                            .axLeaf("Microphone.Toggle.ShowRecordingStatusItem")
-                    }
-                    SettingRow("Show a floating recording pill when Parola is in the background",
-                               description: "The time and a Stop button float over other apps. Drag the pill wherever you like.") {
-                        Toggle("", isOn: $model.showRecordingPill).labelsHidden()
-                            .accessibilityLabel("Show a floating recording pill when Parola is in the background")
-                            .axLeaf("Microphone.Toggle.ShowRecordingPill")
-                    }
-                }
+                RecordingControlsSection(pane: "Microphone")
             }
             ResetPaneButton(scope: .microphone)
         }
@@ -279,5 +265,31 @@ private struct VUMeter: View {
         if fraction > 0.85 { return DS.Color.danger }
         if fraction > 0.65 { return DS.Palette.warning }
         return DS.Palette.success
+    }
+}
+
+/// The switches for the take's menu bar item and pill: in the Microphone pane, or in Record Meetings for a build without one.
+struct RecordingControlsSection: View {
+    /// The pane it sits in, which its switches' identifiers start with.
+    let pane: String
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        SettingsSection("Recording controls") {
+            SettingRow("Show the recording in the menu bar",
+                       description: "The time stays in the menu bar while you record, with the recording's controls in its menu.",
+                       isFirst: true) {
+                Toggle("", isOn: $model.showRecordingStatusItem).labelsHidden()
+                    .accessibilityLabel("Show the recording in the menu bar")
+                    .axLeaf("\(pane).Toggle.ShowRecordingStatusItem")
+            }
+            SettingRow("Show a floating recording pill when Parola is in the background",
+                       description: "The time and a Stop button float over other apps. Drag the pill wherever you like.") {
+                Toggle("", isOn: $model.showRecordingPill).labelsHidden()
+                    .accessibilityLabel("Show a floating recording pill when Parola is in the background")
+                    .axLeaf("\(pane).Toggle.ShowRecordingPill")
+            }
+        }
     }
 }

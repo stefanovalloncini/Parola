@@ -138,7 +138,11 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .watchedFolders:
             return ["watchedFolders"]
         case .recordMeetings:
-            return ["meetingDetectorEnabled", "meetingCaptureAppOnly", "meetingRecordsMicrophone"]
+            // The menu bar and pill switches are shared with the .microphone scope: a build without that pane shows them here.
+            return [
+                "meetingDetectorEnabled", "meetingCaptureAppOnly", "meetingRecordsMicrophone",
+                "showRecordingStatusItem", "showRecordingPill"
+            ]
         case .shortcuts:
             // The dictation hotkey keys also live in the .dictation scope; both panes
             // show the recorder, and removeObject is idempotent across scopes.

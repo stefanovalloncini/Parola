@@ -515,8 +515,43 @@ struct RecordingSurfaceWiringTests {
     @Test("the Microphone pane shows both switches wherever a take can be recorded")
     func paneRows() throws {
         let pane = try source("Views/Settings/MicrophonePane")
-        #expect(pane.contains("if RecordControl.primarySource(features: model.features) != nil { SettingsSection(\"Recording controls\") {"))
+        #expect(pane.contains("if RecordControl.primarySource(features: model.features) != nil { RecordingControlsSection(pane: \"Microphone\") }"))
+        #expect(pane.contains("SettingsSection(\"Recording controls\") {"))
         #expect(pane.contains("Toggle(\"\", isOn: $model.showRecordingStatusItem)"))
         #expect(pane.contains("Toggle(\"\", isOn: $model.showRecordingPill)"))
+    }
+}
+
+@MainActor
+@Suite("Recording controls in a meetings-only build", .serialized)
+struct RecordingControlsMeetingsOnlyTests {
+    @Test("Record Meetings carries the switches only when the build has no Microphone pane")
+    func whereTheSwitchesGo() {
+        #expect(RecordMeetingsPane.showsRecordingControls(features: FeatureSet(enabled: [.meetings])))
+        #expect(!RecordMeetingsPane.showsRecordingControls(features: .all))
+        #expect(!RecordMeetingsPane.showsRecordingControls(features: FeatureSet(enabled: [.meetings, .micRecording])))
+        #expect(!RecordMeetingsPane.showsRecordingControls(features: FeatureSet(enabled: [.meetings, .dictation])))
+        for key in ["showRecordingStatusItem", "showRecordingPill"] {
+            #expect(SettingsPaneScope.recordMeetings.defaultsKeys.contains(key), "the pane's reset covers what it shows")
+        }
+    }
+
+    @Test("a meetings-only build's Record Meetings pane shows both switches; a full build's leaves them to Microphone")
+    func hostedPane() async {
+        func identifiers(_ features: Set<ParolaFeature>) async -> [String] {
+            let model = AppModel(
+                skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("meetings-only-pane"), features: features
+            )
+            let hosted = HostedWindow(RecordMeetingsPane().environment(model), width: 700, height: 1_400)
+            defer { hosted.close() }
+            await settle(for: .milliseconds(150))
+            return HostedAccessibility.elements(in: hosted.host).compactMap(\.identifier)
+        }
+        let meetingsOnly = await identifiers([.meetings])
+        #expect(meetingsOnly.contains { $0.hasSuffix("RecordMeetings.Toggle.ShowRecordingStatusItem") })
+        #expect(meetingsOnly.contains { $0.hasSuffix("RecordMeetings.Toggle.ShowRecordingPill") })
+        let full = await identifiers(Set(ParolaFeature.allCases))
+        #expect(!full.contains { $0.hasSuffix("RecordMeetings.Toggle.ShowRecordingPill") })
+        #expect(full.contains { $0.hasSuffix("RecordMeetings.Toggle.AppOnly") }, "the pane itself drew")
     }
 }

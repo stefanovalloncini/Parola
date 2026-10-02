@@ -4,6 +4,11 @@ import ParolaCore
 struct RecordMeetingsPane: View {
     @Environment(AppModel.self) private var model
 
+    /// A build that records only meetings has no Microphone pane, so the take's switches come here.
+    static func showsRecordingControls(features: FeatureSet) -> Bool {
+        !SettingsRoute.microphone.isVisible(features: features)
+    }
+
     var body: some View {
         @Bindable var model = model
         @Bindable var detector = model.meetingDetector
@@ -48,6 +53,9 @@ struct RecordMeetingsPane: View {
                 }
             }
             SettingHelper(text: "Parola watches running applications; nothing leaves your Mac.")
+            if Self.showsRecordingControls(features: model.features) {
+                RecordingControlsSection(pane: "RecordMeetings")
+            }
             ResetPaneButton(scope: .recordMeetings)
         }
         .onAppear { model.capturePermissions.refresh() }
