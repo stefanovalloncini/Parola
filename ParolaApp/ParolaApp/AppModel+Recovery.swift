@@ -527,7 +527,8 @@ extension AppModel {
                 message: String(localized: "Finish the recording first. Parola offers the recovered one again when it ends."),
                 failures: [],
                 folder: nil,
-                tone: .info
+                tone: .info,
+                whileTakeRuns: true
             )
             return
         }

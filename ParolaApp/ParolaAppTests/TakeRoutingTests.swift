@@ -556,6 +556,24 @@ struct TakeRoutingTests {
         #expect(model.route == .recording)
     }
 
+    @Test("the notice that a run waits for the take goes when the take stops, so it never shows after the recording it speaks of")
+    func waitNoticeGoesWhenTheTakeStops() {
+        let model = makeModel()
+        model.installTestTake(source: .microphone)
+        model.transcribe(fileURL: URL(fileURLWithPath: "/tmp/parola-take-routing-after-stop.wav"))
+        #expect(model.exportNotice?.message == "Finish the recording first.")
+
+        model.endTestTake()
+
+        #expect(model.exportNotice == nil)
+
+        let other = ExportNotice(message: "Auto-export couldn't write to its folder.", failures: [], folder: nil, tone: .failure)
+        model.installTestTake(source: .microphone)
+        model.exportNotice = other
+        model.endTestTake()
+        #expect(model.exportNotice?.id == other.id, "a notice about something else stays")
+    }
+
     @Test("running an entry again during a take is refused, and says so")
     func rerunWaitsForTheTake() async throws {
         let audio = try tempWAV("entry-audio")

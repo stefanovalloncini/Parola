@@ -51,6 +51,8 @@ struct ExportNotice: Equatable, Identifiable {
     var actions: [Action] = []
     /// The take a notice is about when it has no button for it.
     var forTake: Int?
+    /// Only true while a take records, so it goes when the take stops: one that waited behind the Stage never shows after it.
+    var whileTakeRuns = false
 
     var succeeded: Bool { tone == .success }
     /// The take a notice is about, or its buttons act on; the notice lasts only as long as that take's session.

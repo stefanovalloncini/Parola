@@ -236,7 +236,10 @@ final class AppModel {
             let countdown = Self.countIn(of: recording)
             if countdown != recordingCountdown { recordingCountdown = countdown }
             refreshStageHoldsTake()
-            if oldValue?.isRunning == true, !takeIsRunning { foregroundLetGo() }
+            if oldValue?.isRunning == true, !takeIsRunning {
+                foregroundLetGo()
+                if exportNotice?.whileTakeRuns == true { exportNotice = nil }
+            }
             if route == .recording, !Self.stageHasSomethingToShow(recording) { route = .transcript }
             // A notice goes with its take's session; one about a take already let go stays while the next take records.
             if let noticeTake = exportNotice?.takeID, noticeTake == oldValue?.takeID, noticeTake != recording?.takeID { exportNotice = nil }
@@ -3643,7 +3646,7 @@ final class AppModel {
         // One with buttons, like a saved take's Open and Transcribe, is worth more than this.
         guard exportNotice?.actions.isEmpty ?? true else { return }
         exportNotice = ExportNotice(
-            message: String(localized: "Finish the recording first."), failures: [], folder: nil, tone: .info
+            message: String(localized: "Finish the recording first."), failures: [], folder: nil, tone: .info, whileTakeRuns: true
         )
     }
 
