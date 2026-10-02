@@ -46,6 +46,24 @@ extension TranscriberMockSuites {
             #expect(MenuBarController.snapshot(for: model).detectedMeetingApp == nil)
         }
 
+        @Test("a meeting app that quits while its prompt is up takes the prompt with it, and comes back prompting when it launches again")
+        func quitDismissesThePrompt() {
+            let model = makeModel()
+            model.meetingDetector.isEnabled = true
+            model.meetingDetectedApp = nil
+            model.meetingDetector.fire(appName: "Acme Conference")
+            #expect(model.meetingDetectedApp == "Acme Conference")
+
+            model.meetingDetector.quit(appName: "Other Conference")
+            #expect(model.meetingDetectedApp == "Acme Conference", "another app quitting leaves the prompt up")
+
+            model.meetingDetector.quit(appName: "Acme Conference")
+            #expect(model.meetingDetectedApp == nil)
+
+            model.meetingDetector.fire(appName: "Acme Conference")
+            #expect(model.meetingDetectedApp == "Acme Conference", "a prompt taken down by a quit isn't a Not Now: the app isn't snoozed")
+        }
+
         @Test("a second detection while the prompt is up keeps the first app")
         func secondDetectionKeepsFirstPrompt() {
             let model = makeModel()

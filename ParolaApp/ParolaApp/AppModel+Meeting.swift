@@ -31,9 +31,10 @@ extension AppModel {
         startRecording(source: .systemAudio)
     }
 
-    /// A meeting app that quit no longer offers its meeting in the Record menu or the menu bar.
+    /// A meeting app that quit no longer offers its meeting in the Record menu or the menu bar, and its prompt goes, unsnoozed.
     func meetingAppQuit(_ appName: String) {
         if detectedMeetingAppName == appName { detectedMeetingAppName = nil }
+        if meetingDetectedApp == appName { meetingDetectedApp = nil }
     }
 
     func dismissMeetingPrompt() {
