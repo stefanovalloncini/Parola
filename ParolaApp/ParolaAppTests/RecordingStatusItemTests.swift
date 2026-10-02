@@ -449,7 +449,7 @@ struct RecordingSurfaceTests {
         model.useStreaming = false
         model.selectedModel = "openai_whisper-tiny"
         model.takeCaptureOverride = { _ in StubSource(url: audio) }
-        defer { Task { await model.discardTake() } }
+        defer { await model.discardTake() }
         let item = RecordingStatusItem(statusBar: nil)
         item.bind(model)
         #expect(item.face == nil)

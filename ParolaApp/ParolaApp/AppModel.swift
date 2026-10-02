@@ -1855,9 +1855,7 @@ final class AppModel {
             || duplicateCheckTask != nil
     }
 
-    /// The runs that paint a phase of their own. A duplicate-check digest is not one: it hashes the
-    /// file before its run claims the phase, so a bar behind it is still the download's to hand back.
-    /// Nor is a take's run, which reports on its Stage, or as transcribing, never on a download's bar.
+    /// The runs that paint a phase of their own: not a duplicate check's digest, nor a take's run, so a download's bar behind either is its own to hand back.
     var runOwnsPhase: Bool {
         (fileTranscribeTask != nil && fileTranscribeTask != takeTask) || youtubeTranscribeTask != nil
             || youtubeSubsTask != nil || batchTask != nil

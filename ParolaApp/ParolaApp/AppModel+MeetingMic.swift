@@ -739,7 +739,7 @@ extension AppModel {
         String(localized: "Me", bundle: bundle)
     }
 
-    /// The take's Mac audio capture ended by itself: a meeting records on with your microphone, and a take with nothing else recording stops.
+    /// The take's Mac audio ended by itself: the take records on with your microphone, or stops.
     func macCaptureEnded(take takeID: Int) {
         guard activeTake?.id == takeID, liveSource != nil, let session = recording, session.takeID == takeID, session.isRunning,
               !takeMacAudioStopped else { return }
