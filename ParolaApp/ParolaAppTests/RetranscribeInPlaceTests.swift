@@ -317,7 +317,7 @@ extension TranscriberMockSuites {
                 // The engine is done and the file is closed; this is the only suspension left
                 // before the write that replaces the old take.
                 model.postProcessOperation = { [weak model] transcript in
-                    await MainActor.run { model?.cancelCurrentWork() }
+                    await MainActor.run { _ = model?.cancelCurrentWork() }
                     return transcript
                 }
 

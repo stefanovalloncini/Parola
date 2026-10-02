@@ -1953,11 +1953,14 @@ final class AppModel {
         if letGo, route == .recording { route = .transcript }
     }
 
-    /// Stops what the window shows. A take that records or is paused is left alone, with the files and links waiting for it; one still starting ends, having recorded nothing.
-    func cancelCurrentWork() {
+    /// Stops what the window shows, and says whether it stopped anything. A take that records or is paused is left alone, with the files and links waiting for it; one still starting ends, having recorded nothing.
+    @discardableResult
+    func cancelCurrentWork() -> Bool {
         catchUpFirstBuffer()
         let keepsTake = takeIsCapturing
         let hadWork = hasForegroundWork || (liveSource != nil && !keepsTake)
+        let endsStartingTake = !keepsTake && activeTake.map { take in recording?.takeID == take.id && recording?.isArming == true } ?? false
+        let endsBurn = !hadWork && burnTask != nil
         // A new pass reports on its own runs only: one abandoned an hour ago must not make an
         // honest cancel look like it never finished.
         cancelPass &+= 1
@@ -1983,6 +1986,7 @@ final class AppModel {
             resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: ending)
         }
         if hadWork || phase != .ready { phase = .idle }
+        return hadWork || endsStartingTake || endsBurn
     }
 
     func cancelAndTrack(_ task: inout Task<Void, Never>?) {

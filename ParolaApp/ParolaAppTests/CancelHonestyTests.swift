@@ -34,6 +34,25 @@ private final class StallGate: @unchecked Sendable {
     }
 }
 
+/// A capture whose start waits until the test lets it go.
+private actor HeldStartCapture: LiveAudioSource {
+    private var held: CheckedContinuation<Void, Never>?
+    private var released = false
+
+    func start() async throws {
+        if !released { await withCheckedContinuation { held = $0 } }
+    }
+
+    func prepare() async throws -> URL { URL(fileURLWithPath: "/dev/null") }
+    func cancel() async {}
+
+    func letGo() {
+        released = true
+        held?.resume()
+        held = nil
+    }
+}
+
 @MainActor
 @Suite("Bridge cancel tells the truth")
 struct CancelHonestyTests {
@@ -151,6 +170,26 @@ struct CancelHonestyTests {
         #expect(model.recording?.state == .recording)
         #expect(FileManager.default.fileExists(atPath: file.path))
         await model.discardTake()
+    }
+
+    @Test("cancel while a take is still starting ends it and says it cancelled something")
+    func startingTakeIsCancelled() async throws {
+        let (model, server, context, command) = try takeRig("cancel-honesty-starting")
+        let capture = HeldStartCapture()
+        model.useStreaming = false
+        model.takeCaptureOverride = { _ in capture }
+        model.startRecording(source: .microphone)
+        let starting = await waitUntil { model.activeTake?.captureRequested == true }
+        #expect(starting)
+
+        let result = try await command.handler(AutomationArgs([:]), context)
+        withExtendedLifetime(server) {}
+
+        #expect(flag(result, "cancelled") == true)
+        #expect(model.recording == nil)
+        await capture.letGo()
+        let released = await waitUntil { !model.recordingActive }
+        #expect(released)
     }
 
     @Test("cancel during a take stops a model download beside it and leaves the take")
