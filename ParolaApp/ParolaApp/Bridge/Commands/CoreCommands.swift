@@ -93,20 +93,32 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "pressNoticeAction",
                 area: .core,
-                summary: "Test mode: presses one of the notice strip's buttons by the id getState.exportNotice.actions lists, the way a click does. Replies {pressed, notice}; pressed is false when no notice is up or it has no button with that id.",
+                summary: "Test mode: presses a button under the page by the id getState lists in exportNotice.actions, takeSavedNotice.actions or arrivalNotice.actions, the way a click does. Replies {pressed, notice, takeSavedNotice, arrivalNotice}, plus copied after a saved take's Copy; pressed is false when nothing up has that button, or while the Stage holds a take and draws none.",
                 kind: .mutating,
                 args: [
-                    .init(name: "actionID", kind: .string(), required: true, summary: "The button's id, from getState.exportNotice.actions"),
+                    .init(name: "actionID", kind: .string(), required: true, summary: "The button's id, from getState's exportNotice, takeSavedNotice or arrivalNotice actions"),
                 ],
                 handler: { args, ctx in
                     try requireTestMode(ctx)
                     let id = try args.string("actionID")
-                    let action = ctx.model.exportNotice?.actions.first { $0.id.uuidString == id }
-                    if let action { ctx.model.performNoticeAction(action) }
-                    return .object([
-                        "pressed": .bool(action != nil),
+                    var pressed = false
+                    var copied: String?
+                    if !ctx.model.noticesWaitForStage {
+                        if let action = ctx.model.exportNotice?.actions.first(where: { $0.id.uuidString == id }) {
+                            ctx.model.performNoticeAction(action)
+                            pressed = true
+                        } else {
+                            (pressed, copied) = await ParolaAutomationServer.pressToastButton(id, model: ctx.model)
+                        }
+                    }
+                    var reply: [String: AutomationValue] = [
+                        "pressed": .bool(pressed),
                         "notice": ParolaAutomationServer.exportNoticeState(ctx.model.exportNotice),
-                    ])
+                        "takeSavedNotice": ParolaAutomationServer.takeSavedState(ctx.model),
+                        "arrivalNotice": ParolaAutomationServer.arrivalNoticeState(ctx.model),
+                    ]
+                    if let copied { reply["copied"] = .string(copied) }
+                    return .object(reply)
                 }
             ),
 

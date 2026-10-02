@@ -115,6 +115,16 @@ struct ArrivalNotice: Equatable, Identifiable {
         Self.savedTitle(name: name, origin: origin, bundle: bundle)
     }
 
+    /// What the toast says, by where the file stands.
+    func title(bundle: Bundle = .main) -> String {
+        switch state {
+        case .running: String(localized: "Transcribing \(name) from a watched folder", bundle: bundle)
+        case .saved: savedTitle(bundle: bundle)
+        case .failed, .paused: String(localized: "Couldn't transcribe \(name)", bundle: bundle)
+        case .unsaved: String(localized: "Couldn't save \(name) to your library", bundle: bundle)
+        }
+    }
+
     init(failed url: URL, reason: String) {
         name = url.deletingPathExtension().lastPathComponent
         state = .failed(reason)

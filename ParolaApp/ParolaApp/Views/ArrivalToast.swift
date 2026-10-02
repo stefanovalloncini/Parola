@@ -97,16 +97,7 @@ struct ArrivalToast: View {
     }
 
     private var title: Text {
-        switch notice.state {
-        case .running:
-            return Text("Transcribing \(notice.name) from a watched folder")
-        case .saved:
-            return Text(verbatim: notice.savedTitle())
-        case .failed, .paused:
-            return Text("Couldn't transcribe \(notice.name)")
-        case .unsaved:
-            return Text("Couldn't save \(notice.name) to your library")
-        }
+        Text(verbatim: notice.title())
     }
 
     private var symbol: String {

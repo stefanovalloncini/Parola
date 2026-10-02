@@ -140,6 +140,49 @@ struct BridgeStateDetailTests {
         #expect(exported["actions"] == .array([]))
     }
 
+    @Test("the saved take's toast and a landing's toast report their words, where the take went and their buttons")
+    func toastsCarryTheirWordsAndButtons() throws {
+        let (model, server) = try makeRig()
+        model.aiUnavailableReason = "Apple Intelligence is turned off."
+        let saved = TakeSavedNotice(entryID: "entry", category: .meeting)
+        model.takeSavedNotice = saved
+
+        let toast = try object(server.snapshotState(), "takeSavedNotice")
+
+        #expect(toast["title"] == .string("Saved to Meetings"))
+        #expect(toast["category"] == .string("meeting"))
+        #expect(toast["entryID"] == .string("entry"))
+        #expect(toast["actions"] == .array([
+            .object(["id": .string("\(saved.id.uuidString).copy"), "title": .string("Copy")]),
+            .object(["id": .string("\(saved.id.uuidString).dismiss"), "title": .string("Dismiss")]),
+        ]))
+
+        let manifest = ParolaDocument.Manifest(originalAudioName: "Budget review.wav", title: "Budget review", modelName: "stub", language: "en")
+        let landed = ArrivalNotice(landed: LibraryEntry(id: "landed", bundleURL: URL(fileURLWithPath: "/tmp/landed.parola"), manifest: manifest), origin: .run)
+        model.arrivalNotice = landed
+
+        let arrival = try object(server.snapshotState(), "arrivalNotice")
+
+        #expect(arrival["title"] == .string("Saved Budget review"))
+        #expect(arrival["state"] == .string("saved"))
+        #expect(arrival["origin"] == .string("run"))
+        #expect(arrival["entryID"] == .string("landed"))
+        #expect(arrival["actions"] == .array([
+            .object(["id": .string("\(landed.id.uuidString).open"), "title": .string("Open")]),
+            .object(["id": .string("\(landed.id.uuidString).dismiss"), "title": .string("Dismiss")]),
+        ]))
+
+        model.takeSavedNotice = nil
+        model.arrivalNotice = nil
+        guard case .object(let state) = server.snapshotState() else {
+            Issue.record("getState should return an object")
+            return
+        }
+        #expect(state["takeSavedNotice"] == .null)
+        #expect(state["arrivalNotice"] == .null)
+        #expect(state["noticesWaitForStage"] == .bool(false))
+    }
+
     @Test("favoriteSegments and favoritesOnly reflect the selected entry and the filter")
     func favoriteSegmentsInState() throws {
         let (model, server) = try makeRig()

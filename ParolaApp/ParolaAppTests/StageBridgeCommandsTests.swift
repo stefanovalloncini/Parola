@@ -103,6 +103,81 @@ extension TranscriberMockSuites {
             withExtendedLifetime(server) {}
         }
 
+        @Test("the bridge presses the saved toast's Copy, Dismiss and Summarize and a landing toast's Open, by the ids getState lists")
+        func pressToastButtons() async throws {
+            let model = makeRecordingModel("stage-bridge-toasts")
+            let server = try ParolaAutomationServer(model: model)
+            let commands = Dictionary(uniqueKeysWithValues: server.coreCommands().map { ($0.name, $0) })
+            let press = try #require(commands["pressNoticeAction"])
+            let context = AutomationContext(model: model, server: server)
+            func pressing(_ id: String) async throws -> [String: AutomationValue] {
+                let reply = try await press.handler(try press.validate(AutomationArgs(["actionID": .string(id)])), context)
+                guard case .object(let fields) = reply else { throw AutomationError.precondition("pressNoticeAction did not reply with an object") }
+                return fields
+            }
+            /// The toast's buttons as getState lists them, by title.
+            func buttons(_ toast: String) throws -> [String: String] {
+                guard case .object(let state) = server.snapshotState(), case .object(let fields)? = state[toast],
+                      case .array(let actions)? = fields["actions"] else { throw AutomationError.notFound(kind: "toast", id: toast) }
+                var byTitle: [String: String] = [:]
+                for case .object(let action) in actions {
+                    if case .string(let title)? = action["title"], case .string(let id)? = action["id"] { byTitle[title] = id }
+                }
+                return byTitle
+            }
+            let words = Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "a take worth a summary")], language: "en", modelName: "stub"
+            )
+            let entry = try await LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+                .add(transcript: words, audioSource: nil, category: .meeting)
+            model.aiUnavailableReason = nil
+            model.summariseOperation = { _, _ in Summary(text: "the gist") }
+
+            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+            let saved = try buttons("takeSavedNotice")
+            #expect(Set(saved.keys) == ["Summarize", "Copy", "Dismiss"])
+            let copied = try await pressing(try #require(saved["Copy"]))
+            #expect(copied["pressed"] == .bool(true))
+            #expect(copied["copied"] == .string("a take worth a summary"))
+            #expect(copied["takeSavedNotice"] == .null)
+
+            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+            let dismiss = try #require(try buttons("takeSavedNotice")["Dismiss"])
+            let dismissed = try await pressing(dismiss)
+            #expect(dismissed["pressed"] == .bool(true))
+            #expect(model.takeSavedNotice == nil)
+            let again = try await pressing(dismiss)
+            #expect(again["pressed"] == .bool(false), "a toast that went takes its buttons with it")
+
+            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+            model.route = .statistics
+            _ = try await pressing(try #require(try buttons("takeSavedNotice")["Summarize"]))
+            let summarized = await waitUntil { model.transcript?.summary?.text == "the gist" }
+            #expect(summarized)
+            #expect(model.route == .transcript)
+            #expect(model.transcriptPaneMode == .summary)
+
+            model.clearLoadedEntry()
+            model.route = .statistics
+            model.arrivalNotice = ArrivalNotice(landed: entry, origin: .take)
+            let landed = try buttons("arrivalNotice")
+            #expect(Set(landed.keys) == ["Open", "Dismiss"])
+            let opened = try await pressing(try #require(landed["Open"]))
+            #expect(opened["pressed"] == .bool(true))
+            #expect(opened["arrivalNotice"] == .null)
+            let open = await waitUntil { model.selectedEntryID == entry.id && model.route == .transcript }
+            #expect(open)
+
+            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+            model.installTestTake(source: .microphone)
+            #expect(model.noticesWaitForStage)
+            let covered = try await pressing(try #require(try buttons("takeSavedNotice")["Dismiss"]))
+            #expect(covered["pressed"] == .bool(false), "nothing under the Stage is drawn, so nothing there is pressed")
+            #expect(model.takeSavedNotice != nil)
+            model.endTestTake()
+            withExtendedLifetime(server) {}
+        }
+
         @Test("with nothing recording the bridge's take controls change nothing")
         func nothingToControl() async throws {
             let model = makeRecordingModel("stage-bridge-idle")

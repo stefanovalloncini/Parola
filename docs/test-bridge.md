@@ -102,7 +102,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `readMockDeliveries` | — | Test mode: `{deliveries, receipts}` — what the mock destinations were handed (`entryID`, `title`, `category`, `segmentCount`, `markdownBytes`, `favorites`) and the receipts they gave back. |
 | `exportDiagnostics` | — | Render the diagnostics report and write it to the save destination. Returns `{path}`. In test mode, queue the destination with `queueSaveDestination` first. A dismissed panel is `PRECONDITION`; a failed write is `INTERNAL`. |
 | `parola_app_dismiss_error` | — | Clear a failed phase (equivalent to clicking "Try again"). |
-| `pressNoticeAction` | **actionID** | Test mode: press one of the notice strip's buttons, the way a click does. `getState.exportNotice` carries `tone` (`success`, `info` or `failure`) and `actions`, each `{id, title}`; pass that `id`. Replies `{pressed, notice}`; `pressed: false` when no notice is up or it has no button with that id. |
+| `pressNoticeAction` | **actionID** | Test mode: press a button under the page, the way a click does. `getState.exportNotice` carries `tone` (`success`, `info` or `failure`) and `actions`, each `{id, title}`; so do `getState.takeSavedNotice` (Summarize, Copy, Dismiss) and `getState.arrivalNotice` (Open, Stop, Retry or Dismiss, as the toast draws them). Pass that `id`. Replies `{pressed, notice, takeSavedNotice, arrivalNotice}`, and after Copy `copied` with the text, which goes to a pasteboard of the bridge's own and never to the clipboard. `pressed: false` when nothing up has that button, or while the Stage holds a take and draws none. |
 | `parola_app_screenshot` | path | Capture the main window to PNG via ScreenCaptureKit (needs Screen Recording permission). `path` is a bare filename stored under `Caches/Parola/Screenshots`. |
 | `parola_app_list_windows` | — | Visible NSWindows: title, size, key/main flags. A transcript window carries the entry's title, so a driver can find it. The main window reads "Recording — Parola" while a take runs, and "Parola" otherwise. |
 | `translateTranscript` | **language** | Translate the loaded transcript into that language code and store the result. Uses whichever translator is installed (`installMockTranslator` in test mode). Replies `{translated, targetLanguage, segmentCount, provider}`, or `{translated: false, reason}` when the run failed or was refused. |
@@ -149,6 +149,11 @@ on the page after the Stage. A notice only true while the take records, like "Fi
 the take stops.
 A file, link or captions run lands the same way: with its own page up it opens there; after an entry or a document was
 opened, or another page shown, it goes to the library with a "Saved <title>" toast and Open, and loads nothing.
+`getState.takeSavedNotice` is the toast a take that landed on its own Stage leaves, `{title, category, entryID, actions}`
+("Saved to Meetings", `meeting`), and `getState.arrivalNotice` the toast for a take, a run or a watched file that landed
+or failed out of sight, `{title, state, origin, entryID, reason, actions}` with `state` one of `saved` / `running` /
+`failed` / `paused` / `unsaved` and `origin` one of `take` / `run` / `watchedFolder`; each is `null` when it isn't up.
+`getState.noticesWaitForStage` is true while the Stage holds a take and so draws none of them.
 
 `getState.burn` is the subtitle burn running beside the phase, `{state, progress, output}` with `state` one of
 `running` / `finished` / `failed` (a failed one adds `message`), or `null` when there is none.
