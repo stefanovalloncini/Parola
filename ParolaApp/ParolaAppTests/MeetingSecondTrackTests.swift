@@ -1142,6 +1142,44 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a microphone that stops after the Mac audio did is noticed too, and with nothing left recording the take stops and lands")
+        func micStopsAfterTheMacAudio() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let model = makeModel()
+                model.micTrackStallTicks = 3
+                let files = try meetingFiles(model)
+                let mac = ScriptedTrack(file: files.mac)
+                let mic = ScriptedTrack(file: files.mic)
+                try await startMeeting(model, mac: mac, mic: mic)
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                for _ in 0..<6 {
+                    mac.levelMeter.record(0.3)
+                    mic.levelMeter.record(0.2)
+                    try await Task.sleep(for: .milliseconds(50))
+                }
+                await mac.endByItself()
+                let macGone = await waitUntil { model.takeMacAudioStopped }
+                #expect(macGone)
+                for _ in 0..<6 {
+                    mic.levelMeter.record(0.2)
+                    try await Task.sleep(for: .milliseconds(50))
+                }
+                #expect(model.recording?.state == .recording, "your microphone still records")
+
+                let stopped = await waitUntil { model.exportNotice?.message == AppModel.micTrackStoppedTooMessage() }
+
+                #expect(stopped)
+                #expect(model.exportNotice?.tone == .failure)
+                #expect(model.takeMicTrackState == .stopped)
+                #expect(model.takeStoppedOnItsOwn)
+                let entry = try #require(await landedEntry(model))
+                #expect(entry.title.contains("(") == false)
+                #expect(!model.recordingActive)
+            }
+        }
+
         @Test("a test host never opens the real microphone: with no microphone mock, a meeting records the Mac audio alone, quietly")
         func noRealMicInTests() async throws {
             try await withMocksCleared(.audioSource) {

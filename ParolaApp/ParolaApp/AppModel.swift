@@ -4521,11 +4521,11 @@ final class AppModel {
     }
 
     /// What the take records ended by itself: the take stops as Stop stops it, with a notice that stays until it is dismissed; one that never heard a sound ends with nothing saved, saying `unheard`.
-    func stopTakeOnItsOwn(_ takeID: Int, saying message: String, unheard: String) {
+    func stopTakeOnItsOwn(_ takeID: Int, saying message: String, unheard: String? = nil) {
         takeStoppedOnItsOwn = true
         catchUpFirstBuffer()
         guard recording?.isArming != true else {
-            endTakeBeforeCapture(reporting: unheard)
+            endTakeBeforeCapture(reporting: unheard ?? message)
             return
         }
         stopRecordingAndTranscribe()

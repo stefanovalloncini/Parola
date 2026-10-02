@@ -17474,6 +17474,17 @@
         }
       }
     },
+    "Your microphone stopped too, so Parola stopped the recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anche il tuo microfono si è fermato, quindi Parola ha fermato la registrazione."
+          }
+        }
+      }
+    },
     "Your microphone stopped. The rest of this recording has the Mac audio only.": {
       "extractionState": "manual",
       "localizations": {

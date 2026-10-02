@@ -197,7 +197,7 @@ extension AppModel {
                 track.quietTicks = 0
                 if track.stalled { takeMicTrackState = .recording }
                 track.stalled = false
-            } else if macReading != track.lastMacReading {
+            } else if macReading != track.lastMacReading || takeMacAudioStopped {
                 track.quietTicks += 1
             }
             if !track.stalled, track.quietTicks >= micTrackStallTicks {
@@ -207,6 +207,11 @@ extension AppModel {
                 noteMicTrackStart(track)
                 writeRecordingCheckpoint()
                 takeMicTrackState = micReading != nil ? .stopped : .unavailable
+                guard !takeMacAudioStopped else {
+                    // Stop takes the track away, so nothing here may write it back.
+                    stopTakeOnItsOwn(take.id, saying: Self.micTrackStoppedTooMessage())
+                    return peak
+                }
                 noteMicTrackMissing(take.id, stopped: micReading != nil)
             }
             track.lastMicReading = micReading
@@ -826,5 +831,9 @@ extension AppModel {
 
     nonisolated static func micTrackStoppedMessage(bundle: Bundle = .main) -> String {
         String(localized: "Your microphone stopped. The rest of this recording has the Mac audio only.", bundle: bundle)
+    }
+
+    nonisolated static func micTrackStoppedTooMessage(bundle: Bundle = .main) -> String {
+        String(localized: "Your microphone stopped too, so Parola stopped the recording.", bundle: bundle)
     }
 }
