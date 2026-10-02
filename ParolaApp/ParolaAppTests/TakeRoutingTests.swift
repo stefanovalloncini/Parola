@@ -916,5 +916,109 @@ extension TranscriberMockSuites {
             await gate.open()
             await model.discardTake()
         }
+
+        private static let downloading = AppModel.Phase.downloadingModel(name: "openai_whisper-tiny", progress: 0.4)
+
+        /// A model download from Settings that reports 40 % and waits for the test, then fails if `fails`.
+        private func holdDownload(_ model: AppModel, until gate: FetchGate, fails: Bool = false) async -> Bool {
+            model.modelDownloadOperation = { _, progress in
+                progress(0.4)
+                await gate.wait()
+                if fails { throw URLError(.badServerResponse) }
+            }
+            guard model.downloadModel("openai_whisper-tiny") else { return false }
+            return await waitUntil { model.phase == Self.downloading }
+        }
+
+        @Test("Record goes ahead over a model download, which keeps going off the take's pages and ends without touching the take")
+        func downloadBehindATake() async throws {
+            let model = makeRecordingModel("download-behind-take")
+            let gate = FetchGate()
+            let downloading = await holdDownload(model, until: gate)
+            #expect(downloading)
+
+            try await startMeteredTake(model)
+
+            #expect(model.phase == Self.downloading, "Settings still shows the download: \(model.phase)")
+            #expect(ContentRoutes.routeID(for: model) == .stage)
+            model.goHome()
+            #expect(model.isBrowsingLibrary)
+            #expect(ContentRoutes.routeID(for: model) == .library)
+            let take = model.recording?.takeID
+
+            await gate.open()
+
+            let ended = await waitUntil { model.phase == .idle }
+            #expect(ended)
+            #expect(model.recording?.takeID == take)
+            #expect(model.recording?.state == .recording)
+            #expect(model.isBrowsingLibrary)
+            await model.discardTake()
+        }
+
+        @Test("the mic hotkey starts a take over a model download")
+        func hotkeyRecordsOverADownload() async throws {
+            let model = makeRecordingModel("hotkey-over-download")
+            let gate = FetchGate()
+            let downloading = await holdDownload(model, until: gate)
+            #expect(downloading)
+            model.useStreaming = false
+            model.takeCaptureOverride = { _ in StubSource(url: URL(fileURLWithPath: "/dev/null")) }
+
+            model.toggleMicRecording()
+
+            #expect(model.recording != nil)
+            #expect(model.recordingActive)
+            await gate.open()
+            await model.discardTake()
+            await waitUntil { !model.recordingActive }
+        }
+
+        @Test("a model download that ends while a take transcribes out of sight hands its bar back")
+        func downloadEndsUnderATakesRun() async throws {
+            try await withMocksCleared(.transcriber) {
+                let run = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "the take's words")], gate: run)
+                let model = makeRecordingModel("download-under-take-run")
+                let gate = FetchGate()
+                let downloading = await holdDownload(model, until: gate)
+                #expect(downloading)
+                try await startMeteredTake(model)
+                model.goHome()
+                model.stopRecordingAndTranscribe()
+                let transcribing = await waitUntil { model.recording?.isTranscribing == true }
+                #expect(transcribing)
+
+                await gate.open()
+
+                let handedBack = await waitUntil { model.phase == .idle }
+                #expect(handedBack, "the download's bar: \(model.phase)")
+                await run.open()
+                await waitUntil { !model.hasPendingTakeWork }
+            }
+        }
+
+        @Test("a model download that fails after a take landed on its Stage leaves the take's transcript on screen")
+        func failedDownloadLeavesALandedTake() async throws {
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the take's words")])
+                let model = makeRecordingModel("download-fails-after-take")
+                let gate = FetchGate()
+                let downloading = await holdDownload(model, until: gate, fails: true)
+                #expect(downloading)
+                try await startMeteredTake(model)
+                model.stopRecordingAndTranscribe()
+                let landed = await waitUntil { model.transcript?.text == "the take's words" && model.phase == .ready }
+                #expect(landed)
+
+                await gate.open()
+
+                let failed = await waitUntil { model.modelActionError != nil }
+                #expect(failed)
+                #expect(model.phase == .ready)
+                #expect(model.transcript?.text == "the take's words")
+                await waitUntil { !model.hasPendingTakeWork }
+            }
+        }
     }
 }

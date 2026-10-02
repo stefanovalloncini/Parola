@@ -577,6 +577,8 @@ final class AppModel {
         switch phase {
         case .idle, .ready, .failed:
             startRecording(source: .microphone)
+        case .downloadingModel where downloadTask != nil:
+            startRecording(source: .microphone)
         default:
             // A take still transcribing gives way to the next one, whatever else holds the phase.
             if takeRun != nil { startRecording(source: .microphone) }
@@ -1564,9 +1566,11 @@ final class AppModel {
         }
     }
 
-    /// The phase the transcript route draws: a batch job's run shows under Activity, so the page it would cover stays up.
+    /// The phase the transcript route draws: a batch job's run shows under Activity, and a model download waits behind a take until it lands, so the page either would cover stays up.
     var transcriptRoutePhase: Phase {
-        batchOwnsPhase ? .ready : phase
+        if batchOwnsPhase { return .ready }
+        if case .downloadingModel = phase, recording.map({ !$0.isOver }) ?? false { return .ready }
+        return phase
     }
 
     var transcriptRouteFailed: Bool {
@@ -1796,6 +1800,8 @@ final class AppModel {
     @ObservationIgnored private(set) var fileRunGeneration = 0
     @ObservationIgnored var recordingOutcomeWaiters: [CheckedContinuation<String, any Error>] = []
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
+    /// Test seam: stands in for a model's download, so a test decides how far it gets and when it ends.
+    @ObservationIgnored var modelDownloadOperation: (@Sendable (String, @escaping @Sendable (Double) -> Void) async throws -> Void)?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>? {
         didSet { if oldValue != nil, youtubeTranscribeTask == nil { foregroundLetGo() } }
     }
@@ -1841,9 +1847,10 @@ final class AppModel {
 
     /// The runs that paint a phase of their own. A duplicate-check digest is not one: it hashes the
     /// file before its run claims the phase, so a bar behind it is still the download's to hand back.
+    /// Nor is a take's run, which reports on its Stage, or as transcribing, never on a download's bar.
     var runOwnsPhase: Bool {
-        fileTranscribeTask != nil || youtubeTranscribeTask != nil || youtubeSubsTask != nil
-            || batchTask != nil
+        (fileTranscribeTask != nil && fileTranscribeTask != takeTask) || youtubeTranscribeTask != nil
+            || youtubeSubsTask != nil || batchTask != nil
     }
 
     /// A stop held for the startup window: no transcribe task yet, but the take still resolves an outcome.
@@ -2459,19 +2466,25 @@ final class AppModel {
             return false
         }
         let progress = makeDownloadProgressHandler(for: name)
+        let downloadOverride = modelDownloadOperation
         downloadTask = Task {
             do {
                 phase = .downloadingModel(name: name, progress: 0)
-                // Cold launch reaches here before any transcribe has registered the engines,
-                // and an empty registry silently swaps in the generic HuggingFace downloader.
-                await ParolaCoreBootstrap.registerBuiltInEngines()
-                _ = try await store.download(variant: name, progress: progress)
+                if let downloadOverride {
+                    try await downloadOverride(name, progress)
+                } else {
+                    // Cold launch reaches here before any transcribe has registered the engines,
+                    // and an empty registry silently swaps in the generic HuggingFace downloader.
+                    await ParolaCoreBootstrap.registerBuiltInEngines()
+                    _ = try await store.download(variant: name, progress: progress)
+                }
                 finishModelDownload()
             } catch {
                 if !Task.isCancelled {
                     let message = Self.offlineMessage(for: error)
                         ?? "Download failed: \(error.localizedDescription)"
-                    phase = .failed(message: message)
+                    // A take or a run that took the page since keeps it; Settings still says why.
+                    if case .downloadingModel = phase { phase = .failed(message: message) }
                     modelActionError = message
                     correctSelectionIfNeeded()
                 }
@@ -2753,9 +2766,10 @@ final class AppModel {
         loadEntryGeneration != windowGeneration || sourceFileURL != fileURL
     }
 
-    /// Hands the phase back only while it still shows the run.
+    /// Hands the phase back only while it still shows the run; a model download from Settings keeps its bar.
     private func leaveRunPhase() {
         switch phase {
+        case .downloadingModel where downloadTask != nil: break
         case .loadingModel, .downloadingModel, .transcribing, .fetchingLink: phase = transcript == nil ? .idle : .ready
         default: break
         }
