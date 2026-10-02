@@ -68,6 +68,35 @@ func startFixtureTake(_ model: AppModel, copyingFixture: Bool = false, seconds: 
     return fixture
 }
 
+/// A capture that meters as it starts, so its take's clock runs at once, and deletes its file on cancel as a real capture does.
+actor DeletingCapture: LiveAudioSource {
+    nonisolated let levelMeter = LevelMeter()
+    let file: URL
+
+    init(file: URL) { self.file = file }
+
+    func start() async throws { levelMeter.record(0.5) }
+    func prepare() async throws -> URL { file }
+    func cancel() async { try? FileManager.default.removeItem(at: file) }
+    func inFlightURL() async -> URL? { file }
+}
+
+/// A take recording to a metered capture whose working file sits in the in-flight folder, once its clock runs; returns that file.
+@MainActor
+@discardableResult
+func startMeteredTake(_ model: AppModel, source: AppModel.RecordSource = .microphone, seconds: Double = 1) async throws -> URL {
+    try FileManager.default.createDirectory(at: model.inflightRecordingsURL, withIntermediateDirectories: true)
+    let prefix = source == .microphone ? "parola-mic" : "parola-system"
+    let file = try makeTakeWAV("metered", seconds: seconds, in: model.inflightRecordingsURL, prefix: prefix)
+    let capture = DeletingCapture(file: file)
+    model.useStreaming = false
+    model.takeCaptureOverride = { _ in capture }
+    model.startRecording(source: source)
+    let capturing = await waitUntil { model.recording?.state == .recording && model.liveSource != nil }
+    guard capturing else { throw FixtureTakeDidNotStart() }
+    return file
+}
+
 /// Every file transcription answers with these segments until the mocks are cleared, reporting the partials and seconds on the way.
 func installMockTranscriber(
     segments: [(start: Double, end: Double, text: String)] = [],

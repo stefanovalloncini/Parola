@@ -2756,7 +2756,7 @@ final class AppModel {
     /// Hands the phase back only while it still shows the run.
     private func leaveRunPhase() {
         switch phase {
-        case .loadingModel, .downloadingModel, .transcribing: phase = transcript == nil ? .idle : .ready
+        case .loadingModel, .downloadingModel, .transcribing, .fetchingLink: phase = transcript == nil ? .idle : .ready
         default: break
         }
     }
@@ -3645,6 +3645,7 @@ final class AppModel {
             // A recording replaces any transcription in flight, like a user file-open does;
             // otherwise the old run would finish later and stomp the new take's transcript.
             cancelTranscriptionRuns()
+            leaveRunPhase()
             if source == .microphone, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
                 guard takeIsCurrent(take) else { return }
                 ParolaLog.notice(.appPermissions, "microphone access request was denied")

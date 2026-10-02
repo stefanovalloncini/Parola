@@ -873,5 +873,48 @@ extension TranscriberMockSuites {
                 #expect(entries.first?.title.hasSuffix("(transcription failed)") == false)
             }
         }
+
+        @Test("a take started over a file run hands the run's phase back, so the Library shows the library while it records")
+        func takeOverAFileRunFreesThePage() async throws {
+            let wav = try tempWAV("run-under-a-take")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "the file's words")], gate: gate)
+                let model = makeRecordingModel("take-over-file-run")
+                model.transcribe(fileURL: wav)
+                let running = await waitUntil { model.fileTranscribeTask != nil && model.phase != .idle }
+                #expect(running)
+
+                try await startMeteredTake(model)
+
+                #expect(model.phase == .idle, "the cancelled run's phase: \(model.phase)")
+                model.goHome()
+                #expect(model.isBrowsingLibrary)
+                #expect(ContentRoutes.routeID(for: model) == .library)
+                await gate.open()
+                await model.discardTake()
+            }
+        }
+
+        @Test("a take started over a link's download hands its phase back too")
+        func takeOverALinkFreesThePage() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            let gate = FetchGate()
+            let model = makeRecordingModel("take-over-link")
+            model.linkFetcher = ScriptedLinkFetcher(fixture: fixture, gate: gate)
+            #expect(model.transcribeYouTube(urlString: "https://youtu.be/dQw4w9WgXcQ") == .started)
+            let fetching = await waitUntil { model.phase == .fetchingLink(title: "A talk", progress: 0.5) }
+            #expect(fetching)
+
+            try await startMeteredTake(model)
+
+            #expect(model.phase == .idle, "the cancelled link's phase: \(model.phase)")
+            model.goHome()
+            #expect(model.isBrowsingLibrary)
+            await gate.open()
+            await model.discardTake()
+        }
     }
 }
