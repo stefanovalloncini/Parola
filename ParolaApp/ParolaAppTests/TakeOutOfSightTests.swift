@@ -696,9 +696,10 @@ extension TranscriberMockSuites {
                 case .user: model.stopRecordingAndTranscribe()
                 case .onItsOwnSeenInFront: model.stopTakeOnItsOwn(take, saying: AppModel.macAudioStoppedTakeMessage())
                 }
-                // Parola is in front as the take stops: the pill and the menu bar item weigh that stop now, not on a later turn.
+                // Parola is in front as the take stops: the pill, the menu bar item and the Dock weigh that stop now, not on a later turn.
                 pill.appActiveChanged(true)
                 item.appBecameActive()
+                badge.appBecameActive()
                 front.active = false
                 pill.appActiveChanged(false)
                 switch failure {
@@ -723,6 +724,37 @@ extension TranscriberMockSuites {
                     #expect(!pillShown && itemFace == nil, "a transcription failure doesn't bring them back")
                 }
                 #expect(bounces.count == 1)
+                _ = await waitUntil { !model.hasPendingTakeWork }
+                withExtendedLifetime(badge) {}
+            }
+        }
+
+        @Test("a stop on its own out of sight, then Parola in front, then a save failure once it is behind again: two unseen endings, two bounces")
+        func secondUnseenEndingBouncesAgain() async throws {
+            let audio = try makeTakeWAV("later-failure-seen-between", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let model = makeRecordingModel("later-failure-seen-between")
+                model.useStreaming = false
+                let front = Front()
+                front.active = false
+                let bounces = Calls()
+                let badge = DockBadge(show: { _ in }, appIsActive: { front.active }, requestAttention: { bounces.count += 1 })
+                badge.bind(model)
+                let capture = HeldCutShortCapture(file: audio)
+                model.installTestTake(source: .systemAudio, liveSource: capture, startedAt: Date(timeIntervalSinceNow: -1))
+                let take = try #require(model.recording?.takeID)
+                model.stopTakeOnItsOwn(take, saying: AppModel.macAudioStoppedTakeMessage())
+                let first = await waitUntil { bounces.count == 1 }
+                #expect(first)
+
+                front.active = true
+                badge.appBecameActive()
+                front.active = false
+                await capture.letGo()
+
+                let second = await waitUntil { bounces.count == 2 }
+                #expect(second, "the failure came once Parola was behind again, after the stop had been seen")
                 _ = await waitUntil { !model.hasPendingTakeWork }
                 withExtendedLifetime(badge) {}
             }

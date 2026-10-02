@@ -509,6 +509,8 @@ struct RecordingSurfaceWiringTests {
         #expect(delegate.contains("recordingPill.bind(model, appActive: NSApp.isActive)"))
         #expect(delegate.contains("recordingPill.appActiveChanged(false)"))
         #expect(delegate.contains("recordingPill.appActiveChanged(true)"))
+        #expect(delegate.contains("recordingStatusItem.appBecameActive()"))
+        #expect(delegate.contains("dockBadge.appBecameActive()"))
     }
 
     @Test("the menu bar's record actions leave Parola where it is")

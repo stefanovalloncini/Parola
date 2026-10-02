@@ -222,6 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidBecomeActive(_ notification: Notification) {
         recordingPill.appActiveChanged(true)
         recordingStatusItem.appBecameActive()
+        dockBadge.appBecameActive()
         model?.refreshLibraryIfChangedElsewhere()
     }
 
@@ -280,6 +281,12 @@ final class DockBadge {
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in self?.observe() }
         }
+    }
+
+    /// Parola is in front: an ending held as unseen has been seen, so the next one out of sight asks for a look again.
+    func appBecameActive() {
+        failure.release()
+        if let model { update(model) }
     }
 
     private func update(_ model: AppModel) {
