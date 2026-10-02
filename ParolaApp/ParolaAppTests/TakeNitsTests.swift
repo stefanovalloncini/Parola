@@ -95,3 +95,34 @@ struct CancelRecordingActionTests {
         #expect(model.recordingCountdown == nil)
     }
 }
+
+@Suite("What VoiceOver calls the Stage and its overview")
+struct StageSpokenNamesTests {
+    private func italian() throws -> Bundle {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        return try #require(Bundle(path: path))
+    }
+
+    @Test("the overview's label names what its value is: the run's progress, or the take's length before it")
+    func overview() {
+        let english = Locale(identifier: "en_US")
+        let reading = TakeOverview.spoken(elapsed: 754, progress: 0.42, locale: english)
+        #expect(reading.label == "Transcription progress")
+        #expect(reading.value == AppFormat.percent(0.42, locale: english))
+        let before = TakeOverview.spoken(elapsed: 754, progress: nil, locale: english)
+        #expect(before.label == "Recording length")
+        #expect(before.value == "12 minutes, 34 seconds")
+    }
+
+    @Test("the Stage reads right while it pauses and while it finishes")
+    func stageTitle() throws {
+        #expect(StagePage.accessibilityTitle(for: .live, from: "microphone") == "Recording from microphone")
+        #expect(StagePage.accessibilityTitle(for: .paused, from: "microphone") == "Recording from microphone, paused")
+        #expect(StagePage.accessibilityTitle(for: .finishing, from: "microphone") == "Finishing the recording")
+        #expect(StagePage.accessibilityTitle(for: .starting, from: "microphone") == "Getting ready to record from microphone")
+        let it = try italian()
+        #expect(StagePage.accessibilityTitle(for: .paused, from: "microfono", bundle: it) == "Registrazione da microfono, in pausa")
+        #expect(TakeOverview.spoken(elapsed: 1, progress: 0.5, bundle: it).label == "Avanzamento della trascrizione")
+        #expect(TakeOverview.spoken(elapsed: 1, progress: nil, bundle: it).label == "Durata della registrazione")
+    }
+}

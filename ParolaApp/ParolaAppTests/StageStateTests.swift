@@ -635,7 +635,7 @@ struct StageStateTests {
 
         let hosted = stage(take, model: model)
 
-        let overview = hosted.elements.first { $0.label == "Recording levels" }
+        let overview = hosted.elements.first { $0.label == "Transcription progress" }
         let frame = try #require(overview).frame
         #expect(frame.minX - hosted.window.minX >= DS.Spacing.large - 0.5)
         #expect(hosted.window.maxX - frame.maxX >= DS.Spacing.large - 0.5)

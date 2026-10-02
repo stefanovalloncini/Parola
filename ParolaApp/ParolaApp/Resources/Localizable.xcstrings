@@ -11670,13 +11670,24 @@
         }
       }
     },
-    "Recording levels": {
+    "Recording from %@, paused": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Livelli della registrazione"
+            "value": "Registrazione da %@, in pausa"
+          }
+        }
+      }
+    },
+    "Recording length": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durata della registrazione"
           }
         }
       }
@@ -16116,6 +16127,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione non riuscita: %@"
+          }
+        }
+      }
+    },
+    "Transcription progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avanzamento della trascrizione"
           }
         }
       }

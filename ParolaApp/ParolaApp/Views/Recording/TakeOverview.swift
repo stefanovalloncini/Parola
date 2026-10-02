@@ -19,12 +19,23 @@ struct TakeOverview: View {
             Self.drawRuler(layout, width: size.width, in: &context)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-        // A Canvas element carries no value; a text stand-in reads the take's length and how far its run has read.
+        // A Canvas element carries no value; a text stand-in reads how far the take's run has read, or before that the take's length.
         .accessibilityRepresentation {
-            Text(verbatim: AppFormat.elapsed(layout.elapsed))
-                .accessibilityLabel("Recording levels")
-                .accessibilityValue(Text(verbatim: progress.map { AppFormat.percent($0) } ?? AppFormat.elapsed(layout.elapsed)))
+            let spoken = Self.spoken(elapsed: layout.elapsed, progress: progress)
+            Text(verbatim: spoken.value)
+                .accessibilityLabel(Text(verbatim: spoken.label))
+                .accessibilityValue(Text(verbatim: spoken.value))
         }
+    }
+
+    /// The label names what the value is: the run's progress while it reads the take, the take's length before.
+    nonisolated static func spoken(
+        elapsed: Double, progress: Double?, bundle: Bundle = .main, locale: Locale = AppFormat.locale
+    ) -> (label: String, value: String) {
+        if let progress {
+            return (String(localized: "Transcription progress", bundle: bundle), AppFormat.percent(progress, locale: locale))
+        }
+        return (String(localized: "Recording length", bundle: bundle), AppFormat.spokenDuration(seconds: Int(elapsed), locale: locale))
     }
 
     private static func drawBars(_ layout: TakeOverviewLayout, width: CGFloat, in context: inout GraphicsContext) {
