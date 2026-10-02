@@ -25,6 +25,24 @@ struct SystemAudioSourceTests {
         #expect(twice == 2)
     }
 
+    @Test("a source named by its own type gives the file it records to, as it does behind the protocol")
+    @available(macOS 14.2, *)
+    func inFlightURLByTypeAndByProtocol() async {
+        let system = SystemAudioSource()
+        let systemDirect = await system.inFlightURL()
+        let systemErased: any LiveAudioSource = system
+        let systemViaProtocol = await systemErased.inFlightURL()
+        #expect(systemDirect != nil)
+        #expect(systemDirect == systemViaProtocol)
+
+        let tap = ProcessTapAudioSource(processObjects: [])
+        let tapDirect = await tap.inFlightURL()
+        let tapErased: any LiveAudioSource = tap
+        let tapViaProtocol = await tapErased.inFlightURL()
+        #expect(tapDirect != nil)
+        #expect(tapDirect == tapViaProtocol)
+    }
+
     @Test("a capture asked to end says nothing when its stream stops after that")
     func stoppedCaptureSaysNothing() async {
         let heard = OSAllocatedUnfairLock(initialState: 0)

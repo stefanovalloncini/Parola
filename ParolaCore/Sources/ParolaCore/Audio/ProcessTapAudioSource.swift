@@ -169,7 +169,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         return outputURL
     }
 
-    public func inFlightURL() -> URL? { outputURL }
+    public func inFlightURL() async -> URL? { outputURL }
 
     public func setPaused(_ paused: Bool) async {
         handler?.setPaused(paused)

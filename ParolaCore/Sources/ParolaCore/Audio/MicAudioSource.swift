@@ -37,7 +37,7 @@ public actor MicAudioSource: LiveAudioSource {
         self.fileURL = fileURL
     }
 
-    public func inFlightURL() -> URL? { session?.outputURL }
+    public func inFlightURL() async -> URL? { session?.outputURL }
 
     public func setPaused(_ paused: Bool) async {
         session?.writer.setPaused(paused)
