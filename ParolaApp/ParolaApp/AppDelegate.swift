@@ -234,6 +234,8 @@ final class DockBadge {
     private var tick: Task<Void, Never>?
     private var failure = OutOfSightFailure()
 
+    var isTicking: Bool { tick != nil }
+
     init(
         show: @escaping @MainActor (String?) -> Void = { NSApp.dockTile.badgeLabel = $0 },
         appIsActive: @escaping @MainActor () -> Bool = { NSApp.isActive },
@@ -263,7 +265,7 @@ final class DockBadge {
         if failure.holds(model.recording, appActive: appIsActive()), failure.held != heldBefore { requestAttention() }
         if let take = model.recording, take.isRunning {
             display(Self.recordingBadge(for: take, now: Date()))
-            startTick()
+            if take.state == .recording { startTick() } else { stopTick() }
         } else {
             stopTick()
             let takeTranscribing = model.recording?.isTranscribing ?? false
@@ -277,7 +279,7 @@ final class DockBadge {
         show(label)
     }
 
-    /// Reads the take's own clock each second, turning over with the pane's.
+    /// Reads the take's own clock each second, turning over with the pane's; a clock that can't move needs no reading.
     private func startTick() {
         guard tick == nil else { return }
         tick = Task { @MainActor [weak self] in
@@ -294,7 +296,7 @@ final class DockBadge {
     }
 
     private func showTakeClock() -> Double {
-        guard let take = model?.recording, take.isRunning else { return 1 }
+        guard let take = model?.recording, take.state == .recording else { return 1 }
         let now = Date()
         display(Self.recordingBadge(for: take, now: now))
         return Self.secondsToNextTick(for: take, now: now)
@@ -307,7 +309,7 @@ final class DockBadge {
     }
 
     nonisolated static func secondsToNextTick(for take: RecordingSession, now: Date) -> Double {
-        guard take.startedAt != nil else { return 1 }
+        guard take.state == .recording, take.startedAt != nil else { return 1 }
         let elapsed = take.elapsed(at: now)
         let next = elapsed.rounded(.down) + 1 - elapsed
         return max(0.05, next)

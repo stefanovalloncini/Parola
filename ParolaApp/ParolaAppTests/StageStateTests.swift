@@ -209,7 +209,7 @@ struct StageStateTests {
     func leavingStageKeepsItsWords() async {
         func prompter(_ words: String, isLive: Bool) -> some View {
             StageTeleprompter(
-                settled: words, partial: "", quietLine: "Transcript appears here as it comes in", isLive: isLive, isOnScreen: true
+                settled: words, partial: "", quietLine: "Transcript appears here as it comes in", isLive: isLive, caretBlinks: true
             )
         }
         let host = NSHostingView(rootView: prompter("the last words of the take", isLive: true))

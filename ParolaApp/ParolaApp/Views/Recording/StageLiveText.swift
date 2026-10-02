@@ -49,8 +49,13 @@ struct StageLiveText: View {
             quietLine: "Your transcript appears here as you speak",
             // The model's take, not the page's: a Stage on its way out keeps the take it was given, which is never over.
             isLive: model.takeIsRunning,
-            isOnScreen: isOnScreen
+            caretBlinks: Self.caretBlinks(isOnScreen: isOnScreen, take: model.recording)
         )
+    }
+
+    /// Only while words can come in and someone can see them: paused, the caret holds still and the text doesn't redraw.
+    nonisolated static func caretBlinks(isOnScreen: Bool, take: RecordingSession?) -> Bool {
+        isOnScreen && take?.state == .recording
     }
 
     /// The newest segments, broken where the finished transcript will break them, so nothing reflows when the take lands.
@@ -79,7 +84,7 @@ struct StageTakeText: View {
             partial: "",
             quietLine: Self.quietLine(streamsPartials: model.activeEngineStreamsPartials),
             isLive: model.takeTranscription != nil,
-            isOnScreen: isOnScreen
+            caretBlinks: isOnScreen
         )
     }
 
@@ -115,7 +120,8 @@ struct StageTeleprompter: View {
     let quietLine: LocalizedStringKey
     /// While more words can come; after that the last ones stay rather than the quiet line.
     var isLive = true
-    let isOnScreen: Bool
+    /// Off while the page is out of sight, or the take can't add words, so the text isn't redrawn for the caret.
+    let caretBlinks: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var drawn = DrawnWords()
@@ -154,7 +160,7 @@ struct StageTeleprompter: View {
                     partial: words.partial,
                     font: DS.Font.liveTranscriptStage,
                     lineSpacing: StageLiveText.lineSpacing,
-                    blinks: isOnScreen
+                    blinks: caretBlinks
                 )
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: StageLiveText.width)

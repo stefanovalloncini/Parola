@@ -4,6 +4,12 @@ import SwiftUI
 struct SidebarRecordingRow: View {
     let isSelected: Bool
     @Environment(AppModel.self) private var model: AppModel?
+    @State private var isOnScreen = true
+
+    /// The time ticks only where it can be seen: a recording take, its window on screen, the sidebar open.
+    nonisolated static func ticks(_ take: RecordingSession, windowShown: Bool, sidebar: NavigationSplitViewVisibility) -> Bool {
+        take.state == .recording && windowShown && sidebar != .detailOnly
+    }
 
     /// What VoiceOver reads after the row's "Recording": just the time while it records, what it is doing otherwise.
     nonisolated static func spokenValue(
@@ -19,21 +25,24 @@ struct SidebarRecordingRow: View {
 
     var body: some View {
         if let model, let take = model.recording {
-            SidebarRecordingRowFace(take: take, isSelected: isSelected) { model.showStage() }
+            let ticks = Self.ticks(take, windowShown: isOnScreen, sidebar: model.mainSidebar.visibility)
+            SidebarRecordingRowFace(take: take, isSelected: isSelected, ticks: ticks) { model.showStage() }
+                .background(WindowShownReader { isOnScreen = $0 })
         }
     }
 }
 
-/// Ticks each second while the take records; paused, starting or finishing, it holds still.
+/// Ticks each second while the take records where it can be seen; paused, starting, finishing or out of sight, it holds still.
 private struct SidebarRecordingRowFace: View {
     let take: RecordingSession
     let isSelected: Bool
+    let ticks: Bool
     let open: () -> Void
 
     nonisolated static let washInset: CGFloat = 6
 
     var body: some View {
-        if take.state == .recording, let origin = take.clockOrigin {
+        if ticks, let origin = take.clockOrigin {
             TimelineView(.periodic(from: origin, by: 1)) { context in
                 row(at: context.date)
             }
