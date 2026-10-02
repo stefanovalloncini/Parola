@@ -322,6 +322,28 @@ struct StreamingTakeEndingTests {
         #expect(try AVAudioFile(forReading: audio).length == 48_000)
         #expect(harness.lastDecodeSampleCount == 48_000)
     }
+
+    @Test("a buffer the text took is always written, even one that reaches the file as a pause lands")
+    func fileNeverSecondGuessesTheText() async throws {
+        let session = StreamingTranscriptionSession(persistAudio: true)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        let harness = TakeHarness()
+        let events = await launchTake(on: session, persister: persister, harness: harness)
+        let installedWait = await eventually { harness.installed }
+        #expect(installedWait)
+        harness.push([Float](repeating: 0.5, count: 16_000))
+        await session.setPaused(true)
+        persister.append([Float](repeating: 0.5, count: 1_600))
+        await session.setPaused(false)
+        harness.push([Float](repeating: 0.5, count: 16_000))
+        let audio = persister.url
+        defer { try? FileManager.default.removeItem(at: audio) }
+
+        await session.stop()
+
+        for await _ in events {}
+        #expect(try AVAudioFile(forReading: audio).length == 33_600)
+    }
 }
 
 @Suite("Streaming session event translation")

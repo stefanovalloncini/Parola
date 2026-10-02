@@ -260,9 +260,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         return stream
     }
 
+    /// The loop's intake decides for the file as well: what it takes is written, so the two never drift apart.
     public func setPaused(_ paused: Bool) async {
         loop?.setPaused(paused)
-        persister?.setPaused(paused)
     }
 
     /// Stops the mic stream, flushes a final transcript, and finishes the stream.

@@ -68,19 +68,6 @@ struct StreamingAudioPersisterTests {
         #expect(!FileManager.default.fileExists(atPath: persister.url.path))
     }
 
-    @Test("a paused persister drops what arrives until it resumes")
-    func pausedPersister() async throws {
-        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
-        defer { try? FileManager.default.removeItem(at: persister.url) }
-        persister.append([Float](repeating: 0.1, count: 1_600))
-        persister.setPaused(true)
-        persister.append([Float](repeating: 0.1, count: 1_600))
-        persister.setPaused(false)
-        persister.append([Float](repeating: 0.1, count: 1_600))
-        _ = await persister.finish()
-        #expect(try AVAudioFile(forReading: persister.url).length == 3_200)
-    }
-
     @Test("discard deletes the written file")
     func discardDeletesFile() async throws {
         let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
