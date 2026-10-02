@@ -113,7 +113,7 @@ struct RecDot: View {
         animation.keyTimes = (0...steps).map { NSNumber(value: Double($0) / Double(steps)) }
         animation.duration = 1
         animation.repeatCount = .infinity
-        animation.preferredFrameRateRange = CAFrameRateRange(minimum: 15, maximum: 60, preferred: 30)
+        animation.preferredFrameRateRange = .stage
         animation.beginTime = beginTime
         animation.isRemovedOnCompletion = false
         return animation
@@ -182,6 +182,11 @@ struct RecDot: View {
             dot.add(RecDot.pulseAnimation(beginTime: begin), forKey: RecDot.pulseKey)
         }
     }
+}
+
+extension CAFrameRateRange {
+    /// What the Stage's render-server motion runs at: about thirty frames a second, the cadence it was filmed at.
+    static let stage = CAFrameRateRange(minimum: 15, maximum: 60, preferred: 30)
 }
 
 private struct PulsingLight: NSViewRepresentable {
