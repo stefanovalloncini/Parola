@@ -49,7 +49,7 @@ struct StageBand: View {
             Canvas { context, size in Self.drawPlayhead(in: &context, size: size) }
                 .accessibilityHidden(true)
             if micLane.shown {
-                StageLaneNames(micState: micLane.state)
+                StageLaneNames(micState: micLane.state, macStopped: model.takeMacAudioStopped)
             }
         }
         .saturation(take.isPaused || Self.greys(take.state) ? 0 : 1)
@@ -86,13 +86,14 @@ struct StageBand: View {
     private var tape: StageTape {
         Self.tape(
             levels: model.takeLevels, micLevels: model.takeMicLevels, micState: model.takeMicTrackState,
-            markers: take.markers, paused: take.isPaused
+            markers: take.markers, paused: take.isPaused, macStopped: model.takeMacAudioStopped
         )
     }
 
     /// The band's bars as of the newest sample: the take's own levels, or for a meeting that records your microphone, its levels as "You" over the Mac audio.
     static func tape(
-        levels: TakeLevelHistory?, micLevels: TakeLevelHistory?, micState: MicTrackState?, markers: [TimeInterval], paused: Bool
+        levels: TakeLevelHistory?, micLevels: TakeLevelHistory?, micState: MicTrackState?, markers: [TimeInterval], paused: Bool,
+        macStopped: Bool = false
     ) -> StageTape {
         let count = levels.map { min(visibleSamples, $0.sampleCount, $0.recentCapacity) } ?? 0
         let newest = (levels?.sampleCount ?? 0) - 1
@@ -100,6 +101,7 @@ struct StageBand: View {
             levels: levels?.recent(count) ?? [],
             micLevels: micLevels?.recent(count),
             micLost: lostMicNote(micState),
+            macLost: stoppedMacNote(macStopped),
             flags: markers.compactMap { markerOffset($0, newestSample: newest) },
             newest: newest,
             paused: paused
@@ -119,6 +121,11 @@ struct StageBand: View {
         case .stopped: String(localized: "Microphone stopped", bundle: bundle)
         case .starting, .recording, nil: nil
         }
+    }
+
+    /// What the Mac audio lane says once its capture ended by itself while your microphone records on.
+    nonisolated static func stoppedMacNote(_ stopped: Bool, bundle: Bundle = .main) -> String? {
+        stopped ? String(localized: "Mac audio stopped", bundle: bundle) : nil
     }
 
     /// A lane whose microphone isn't in the take draws at this strength.
@@ -222,13 +229,15 @@ struct StageTape: View, Equatable {
     var micLevels: [Float]?
     /// Why the You lane is grey, once your microphone isn't in the take.
     var micLost: String?
+    /// What the Mac audio lane says once its capture ended by itself.
+    var macLost: String?
     let flags: [Int]
     let newest: Int
     let paused: Bool
 
     nonisolated static func == (lhs: StageTape, rhs: StageTape) -> Bool {
         lhs.newest == rhs.newest && lhs.flags == rhs.flags && lhs.paused == rhs.paused
-            && (lhs.micLevels == nil) == (rhs.micLevels == nil) && lhs.micLost == rhs.micLost
+            && (lhs.micLevels == nil) == (rhs.micLevels == nil) && lhs.micLost == rhs.micLost && lhs.macLost == rhs.macLost
     }
 
     var body: some View {
@@ -240,7 +249,7 @@ struct StageTape: View, Equatable {
             if let micLevels {
                 VStack {
                     level(micLevels, label: "You", lost: micLost)
-                    level(levels, label: "Mac audio")
+                    level(levels, label: "Mac audio", lost: macLost)
                 }
             } else {
                 level(levels, label: "Input level")
@@ -257,9 +266,10 @@ struct StageTape: View, Equatable {
     }
 }
 
-/// "You" and "Mac audio" just past the playhead, each beside its lane; the You lane says so once your microphone isn't in the take.
+/// "You" and "Mac audio" just past the playhead, each beside its lane; each says so once its side isn't in the take.
 private struct StageLaneNames: View {
     let micState: MicTrackState?
+    let macStopped: Bool
 
     var body: some View {
         GeometryReader { proxy in
@@ -270,7 +280,7 @@ private struct StageLaneNames: View {
                     .fixedSize()
                     .frame(height: lanes[0].height)
                     .offset(x: x, y: lanes[0].minY)
-                Text("Mac audio")
+                mac
                     .fixedSize()
                     .frame(height: lanes[1].height)
                     .offset(x: x, y: lanes[1].minY)
@@ -287,6 +297,15 @@ private struct StageLaneNames: View {
             Label(lost, systemImage: "mic.slash")
         } else {
             Text("You")
+        }
+    }
+
+    @ViewBuilder
+    private var mac: some View {
+        if let stopped = StageBand.stoppedMacNote(macStopped) {
+            Label(stopped, systemImage: "speaker.slash")
+        } else {
+            Text("Mac audio")
         }
     }
 }

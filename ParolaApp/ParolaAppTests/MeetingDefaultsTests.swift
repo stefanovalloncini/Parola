@@ -71,6 +71,24 @@ struct MeetingDefaultsTests {
         #expect(StageBand.lostMicNote(.stopped, bundle: it) == "Microfono fermato")
     }
 
+    @Test("the Mac audio lane says so once its capture ends by itself, and the notices say it in Italian too")
+    func macLaneStopped() throws {
+        let mac = TakeLevelHistory()
+        let mic = TakeLevelHistory()
+        mac.append(0.5)
+        mic.append(0.5)
+        #expect(StageBand.stoppedMacNote(false) == nil)
+        #expect(StageBand.tape(levels: mac, micLevels: mic, micState: .recording, markers: [], paused: false, macStopped: true).macLost == "Mac audio stopped")
+        let before = StageTape(levels: [0.1], micLevels: [0.2], flags: [], newest: 4, paused: false)
+        #expect(before != StageTape(levels: [0.1], micLevels: [0.2], macLost: "Mac audio stopped", flags: [], newest: 4, paused: false))
+
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let it = try #require(Bundle(path: path))
+        #expect(StageBand.stoppedMacNote(true, bundle: it) == "Audio del Mac fermato")
+        #expect(AppModel.macAudioStoppedMessage(bundle: it) == "L'audio del Mac si è fermato. Il tuo microfono continua a registrare.")
+        #expect(AppModel.macAudioStoppedTakeMessage(bundle: it) == "L'audio del Mac si è fermato, quindi Parola ha fermato la registrazione.")
+    }
+
     @Test("the band follows the microphone's observed state even before its levels exist, so the lanes always get their names")
     func lanesFollowTheObservedState() {
         let model = makeRecordingModel("meeting-lane-observed")

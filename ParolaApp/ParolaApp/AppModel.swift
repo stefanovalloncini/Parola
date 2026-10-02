@@ -249,6 +249,8 @@ final class AppModel {
     @ObservationIgnored var takeMicLevels: TakeLevelHistory?
     /// Where a meeting's microphone track stands; nil for a take that records none.
     var takeMicTrackState: MicTrackState?
+    /// The take's Mac audio capture ended by itself while your microphone records on; its lane says so until the session ends.
+    var takeMacAudioStopped = false
     private(set) var takeLevelTick = 0
     /// When the newest of the take's levels came in; the Stage's band slides from here until the next one.
     @ObservationIgnored private(set) var takeLevelTickAt = Date.distantPast
@@ -3461,6 +3463,7 @@ final class AppModel {
         takeSavedNotice = nil
         takeMicLevels = nil
         if takeMicTrackState != nil { takeMicTrackState = nil }
+        if takeMacAudioStopped { takeMacAudioStopped = false }
         recording = session
     }
 
@@ -3471,6 +3474,7 @@ final class AppModel {
         takeLevels = nil
         takeMicLevels = nil
         if takeMicTrackState != nil { takeMicTrackState = nil }
+        if takeMacAudioStopped { takeMacAudioStopped = false }
     }
 
     /// Changes `takeID`'s session only; one a newer take owns by now is left alone.
@@ -3728,6 +3732,7 @@ final class AppModel {
                     guard await adoptLiveSource(mic, take: take) else { return }
                 case .systemAudio:
                     let sys = await makeTakeCapture(.systemAudio, take: take)
+                    await sys.whenCaptureEnds(macCaptureEndHandler(take: take.id))
                     // Tap setup blocks indefinitely while macOS waits for the System Audio
                     // Recording consent; abandon it after 20s so Stop never goes dead.
                     let started: Result<Void, any Error>? = await AsyncTimeout.run(.seconds(20)) {

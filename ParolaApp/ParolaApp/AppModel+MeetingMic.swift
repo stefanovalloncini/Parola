@@ -734,6 +734,36 @@ extension AppModel {
         String(localized: "Me", bundle: bundle)
     }
 
+    /// The Mac audio's capture ended by itself: a meeting goes on with your microphone and its Mac lane says so; a take with nothing else recording stops, as Stop stops it. Either way a notice says the Mac audio stopped. One that ends before its take took it up is the start's to report.
+    func macCaptureEnded(take takeID: Int) {
+        guard activeTake?.id == takeID, liveSource != nil, let session = recording, session.takeID == takeID, session.isRunning,
+              !takeMacAudioStopped else { return }
+        ParolaLog.notice(.audioRecording, "a take's Mac audio stopped on its own")
+        let micRecords = micTrack?.takeID == takeID && micTrack?.capture != nil && takeMicTrackState?.isLost != true
+        if exportNotice?.actions.isEmpty ?? true {
+            let message = micRecords ? Self.macAudioStoppedMessage() : Self.macAudioStoppedTakeMessage()
+            exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .info, forTake: takeID)
+        }
+        if micRecords {
+            takeMacAudioStopped = true
+        } else {
+            stopTake()
+        }
+    }
+
+    /// What a take's Mac capture calls if it ends by itself.
+    func macCaptureEndHandler(take takeID: Int) -> @Sendable () -> Void {
+        { [weak self] in Task { @MainActor in self?.macCaptureEnded(take: takeID) } }
+    }
+
+    nonisolated static func macAudioStoppedMessage(bundle: Bundle = .main) -> String {
+        String(localized: "The Mac audio stopped. Your microphone is still recording.", bundle: bundle)
+    }
+
+    nonisolated static func macAudioStoppedTakeMessage(bundle: Bundle = .main) -> String {
+        String(localized: "The Mac audio stopped, so Parola stopped the recording.", bundle: bundle)
+    }
+
     /// Says once per take that your microphone is not, or no longer, in the recording.
     func noteMicTrackMissing(_ takeID: Int, stopped: Bool) {
         guard micTrackNoticeTake != takeID, exportNotice?.actions.isEmpty ?? true else { return }

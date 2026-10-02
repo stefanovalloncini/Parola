@@ -114,7 +114,7 @@ struct CaptureLoggingTests {
         #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 5)
     }
 
-    @Test("the system audio source logs availability, start and cut-short failures")
+    @Test("the system audio source logs availability, start and cut-short failures, and a capture that stops on its own")
     func systemAudioSites() throws {
         let source = try audioSource("SystemAudioSource")
         expectCalls([
@@ -122,8 +122,9 @@ struct CaptureLoggingTests {
             #"ParolaLog.error(.audioCapture, "no display available for system audio")"#,
             #"ParolaLog.error( .audioCapture, "system audio capture failed to start", [.error: .error(error)] )"#,
             #"ParolaLog.error(.audioRecording, "system audio take cut short by a write failure")"#,
+            #"ParolaLog.error(.audioCapture, "system audio capture stopped on its own", [.error: .error(error)])"#,
         ], in: source)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 4)
+        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 5)
     }
 
     @Test("the process tap source logs the tap, the aggregate device and a cut-short take")

@@ -16,6 +16,10 @@ public actor SystemAudioSource: LiveAudioSource {
     private let callbackQueue = DispatchQueue(label: "com.parola.system-audio")
     public nonisolated let levelMeter = LevelMeter()
     private var captureFailure: String?
+    /// Set once the capture is asked to end; a stream that stops after that has nothing to report.
+    private var stopping = false
+    private var endHandler: (@Sendable () -> Void)?
+    private var endedByItself = false
 
     public init() {
         self.outputURL = RecordingScratch.fileURL(prefix: "parola-system")
@@ -78,7 +82,8 @@ public actor SystemAudioSource: LiveAudioSource {
             writer: CaptureFileWriter(file: writeFile),
             outputFormat: outputFormat,
             queue: callbackQueue,
-            onLevel: { [levelMeter] in levelMeter.record($0) }
+            onLevel: { [levelMeter] in levelMeter.record($0) },
+            onEnd: { [weak self] error in Task { await self?.captureEnded(error) } }
         )
         let stream = SCStream(filter: filter, configuration: config, delegate: handler)
         do {
@@ -113,12 +118,30 @@ public actor SystemAudioSource: LiveAudioSource {
         handler?.setPaused(paused)
     }
 
+    public func whenCaptureEnds(_ handler: @escaping @Sendable () -> Void) async {
+        if endedByItself {
+            handler()
+        } else {
+            endHandler = handler
+        }
+    }
+
+    /// ScreenCaptureKit stopped the stream without being asked, after a display change or an error say.
+    func captureEnded(_ error: any Error) {
+        guard !stopping, !endedByItself else { return }
+        ParolaLog.error(.audioCapture, "system audio capture stopped on its own", [.error: .error(error)])
+        endedByItself = true
+        endHandler?()
+        endHandler = nil
+    }
+
     public func cancel() async {
         try? await stop()
         try? FileManager.default.removeItem(at: outputURL)
     }
 
     private func stop() async throws {
+        stopping = true
         if let stream {
             try? await stream.stopCapture()
             self.stream = nil
@@ -142,6 +165,7 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
     private let outputFormat: AVAudioFormat
     private let queue: DispatchQueue
     private let onLevel: @Sendable (Float) -> Void
+    private let onEnd: @Sendable (any Error) -> Void
     private var sampleScratch: AVAudioPCMBuffer?
     private var outputScratch: AVAudioPCMBuffer?
 
@@ -152,13 +176,19 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         writer: CaptureFileWriter,
         outputFormat: AVAudioFormat,
         queue: DispatchQueue,
-        onLevel: @escaping @Sendable (Float) -> Void
+        onLevel: @escaping @Sendable (Float) -> Void,
+        onEnd: @escaping @Sendable (any Error) -> Void
     ) {
         self.converter = converter
         self.writer = writer
         self.outputFormat = outputFormat
         self.queue = queue
         self.onLevel = onLevel
+        self.onEnd = onEnd
+    }
+
+    func stream(_ stream: SCStream, didStopWithError error: any Error) {
+        onEnd(error)
     }
 
     func setPaused(_ paused: Bool) {

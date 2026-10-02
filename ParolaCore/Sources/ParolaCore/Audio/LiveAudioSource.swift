@@ -17,12 +17,16 @@ public protocol LiveAudioSource: AudioSource {
     /// Pausing stops new audio landing in the file without ending the capture; a paused
     /// stretch is absent when it resumes.
     func setPaused(_ paused: Bool) async
+    /// Calls `handler` once if the capture ends by itself, before anyone stops it; what it wrote stays in the file.
+    /// A source that can't tell never calls it.
+    func whenCaptureEnds(_ handler: @escaping @Sendable () -> Void) async
 }
 
 public extension LiveAudioSource {
     func inFlightURL() async -> URL? { nil }
     var levelMeter: LevelMeter { LevelMeter() }
     func setPaused(_ paused: Bool) async {}
+    func whenCaptureEnds(_ handler: @escaping @Sendable () -> Void) async {}
 }
 
 public enum LiveAudioSourceFactory {

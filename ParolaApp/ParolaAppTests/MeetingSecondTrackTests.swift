@@ -28,6 +28,7 @@ private actor ScriptedTrack: LiveAudioSource {
     private(set) var cancelled = false
     private(set) var prepared = false
     private(set) var started = false
+    private var ends: (@Sendable () -> Void)?
 
     init(
         file: URL, startFailure: (any Error)? = nil, prepareFailure: (any Error)? = nil, holdsStart: Bool = false,
@@ -89,6 +90,15 @@ private actor ScriptedTrack: LiveAudioSource {
         holdsInFlightRead = false
         heldRead?.resume()
         heldRead = nil
+    }
+
+    func whenCaptureEnds(_ handler: @escaping @Sendable () -> Void) async {
+        ends = handler
+    }
+
+    /// Ends as ScreenCaptureKit's capture does after a display change, without being asked.
+    func endByItself() {
+        ends?()
     }
 }
 
@@ -789,6 +799,51 @@ extension TranscriberMockSuites {
                 let mixed = try await burstAndLength(of: entry, in: model)
                 #expect(abs(mixed.onset - 8) < 0.001, "your words after the Mac audio stopped are kept")
                 #expect(abs(mixed.seconds - 10) < 0.001, "as long as your side")
+            }
+        }
+
+        @Test("a meeting whose Mac audio stops by itself goes on with your microphone, says so on its Mac lane and in a notice, and keeps your side")
+        func macStopsByItselfMidMeeting() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                let mac = ScriptedTrack(file: files.mac)
+                try await startMeeting(model, mac: mac, mic: ScriptedTrack(file: files.mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+
+                await mac.endByItself()
+
+                let said = await waitUntil { model.takeMacAudioStopped }
+                #expect(said)
+                #expect(model.recording?.state == .recording)
+                #expect(model.micTrack?.capture != nil)
+                #expect(model.exportNotice?.message == AppModel.macAudioStoppedMessage())
+                model.stopRecordingAndTranscribe()
+                let entry = try #require(await landedEntry(model))
+                let audio = try #require(try await model.library.load(entry.id).document.audioURL)
+                #expect(try channels(of: audio) == 2)
+            }
+        }
+
+        @Test("a Mac-audio take with nothing else recording stops when its capture ends by itself, says so, and lands")
+        func macStopsByItselfAlone() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "the Mac side")])
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                let mac = ScriptedTrack(file: files.mac)
+                try await startMeeting(model, mac: mac, mic: nil, category: .transcription)
+
+                await mac.endByItself()
+
+                let notice = await waitForNotice(model)
+                #expect(notice?.message == AppModel.macAudioStoppedTakeMessage())
+                #expect(!model.takeMacAudioStopped)
+                let entry = try #require(await landedEntry(model))
+                #expect(entry.title.contains("(") == false, "it lands as Stop lands it")
+                #expect(!model.recordingActive)
             }
         }
 

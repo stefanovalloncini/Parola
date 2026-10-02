@@ -8075,6 +8075,17 @@
         }
       }
     },
+    "Mac audio stopped": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio del Mac fermato"
+          }
+        }
+      }
+    },
     "Make the dictation HUD translucent.": {
       "extractionState": "manual",
       "localizations": {
@@ -14805,6 +14816,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il server MCP con cui altre app e agenti pilotano Parola."
+          }
+        }
+      }
+    },
+    "The Mac audio stopped, so Parola stopped the recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'audio del Mac si è fermato, quindi Parola ha fermato la registrazione."
+          }
+        }
+      }
+    },
+    "The Mac audio stopped. Your microphone is still recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'audio del Mac si è fermato. Il tuo microfono continua a registrare."
           }
         }
       }
