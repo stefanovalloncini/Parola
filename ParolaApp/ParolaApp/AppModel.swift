@@ -3748,8 +3748,8 @@ final class AppModel {
 
     /// A run asked for while a take records waits for it, or is turned away; either way the user hears why.
     func noteRunWaitsForTake() {
-        // One with buttons, like a saved take's Open and Transcribe, is worth more than this.
-        guard exportNotice?.actions.isEmpty ?? true else { return }
+        // One with buttons, like a saved take's Open and Transcribe, or a failure still to be read, is worth more than this.
+        guard exportNotice.map({ $0.actions.isEmpty && $0.tone != .failure }) ?? true else { return }
         exportNotice = ExportNotice(
             message: String(localized: "Finish the recording first."), failures: [], folder: nil, tone: .info, whileTakeRuns: true
         )

@@ -542,6 +542,20 @@ struct TakeRoutingTests {
         #expect(model.exportNotice?.id == saved.id)
     }
 
+    @Test("a failure waiting behind the Stage stays when a run asked for during the take waits, and is there after the take")
+    func waitingRunKeepsAFailure() {
+        let model = makeModel()
+        let failure = ExportNotice(message: "Auto-export couldn't write to its folder.", failures: [], folder: nil, tone: .failure)
+        model.exportNotice = failure
+        model.installTestTake(source: .microphone)
+
+        model.transcribe(fileURL: URL(fileURLWithPath: "/tmp/parola-take-routing-failure-waits.wav"))
+        #expect(model.exportNotice?.id == failure.id)
+
+        model.endTestTake()
+        #expect(model.exportNotice?.id == failure.id, "the failure went with the take it had nothing to do with")
+    }
+
     @Test("a file opened during a take waits for it, and says so")
     func fileOpenWaitsForTheTake() {
         let model = makeModel()
