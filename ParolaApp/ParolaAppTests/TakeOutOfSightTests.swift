@@ -590,7 +590,7 @@ struct MacAudioStoppedOutsideTests {
         withExtendedLifetime(badge) {}
     }
 
-    @Test("once the take stops, a stopped Mac capture is no warning: it is what ended the take")
+    @Test("once the take stops, a stopped Mac capture warns of nothing, since it is what ended the take")
     func noWarningOnceStopped() throws {
         let model = makeRecordingModel("mac-stopped-finishing")
         model.takeMacAudioStopped = true
