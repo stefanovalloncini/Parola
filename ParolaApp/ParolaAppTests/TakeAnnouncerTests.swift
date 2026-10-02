@@ -24,11 +24,11 @@ struct TakeAnnouncementLineTests {
         let arming = Moment(takeID: 1, take: .arming)
         let recording = Moment(takeID: 1, take: .recording)
         let paused = Moment(takeID: 1, take: .paused)
-        #expect(TakeAnnouncer.lines(from: arming, to: recording) == ["Recording"])
+        #expect(TakeAnnouncer.lines(from: arming, to: recording).map(\.text) == ["Recording"])
         #expect(TakeAnnouncer.lines(from: recording, to: recording).isEmpty)
-        #expect(TakeAnnouncer.lines(from: recording, to: paused) == ["Paused"])
-        #expect(TakeAnnouncer.lines(from: paused, to: recording) == ["Recording"])
-        #expect(TakeAnnouncer.lines(from: Moment(), to: recording) == ["Recording"], "a take first seen recording still says so")
+        #expect(TakeAnnouncer.lines(from: recording, to: paused).map(\.text) == ["Paused"])
+        #expect(TakeAnnouncer.lines(from: paused, to: recording).map(\.text) == ["Recording"])
+        #expect(TakeAnnouncer.lines(from: Moment(), to: recording).map(\.text) == ["Recording"], "a take first seen recording still says so")
         #expect(TakeAnnouncer.lines(from: Moment(), to: arming).isEmpty)
     }
 
@@ -36,11 +36,11 @@ struct TakeAnnouncementLineTests {
     func failures() {
         let recording = Moment(takeID: 1, take: .recording)
         let failed = Moment(takeID: 1, take: .failed("The microphone stopped."))
-        #expect(TakeAnnouncer.lines(from: recording, to: failed) == ["Recording stopped: The microphone stopped."])
+        #expect(TakeAnnouncer.lines(from: recording, to: failed).map(\.text) == ["Recording stopped: The microphone stopped."])
         #expect(TakeAnnouncer.lines(from: failed, to: failed).isEmpty)
         let windingDown = Moment(takeID: 1, take: .windingDown)
         let transcriptionFailed = Moment(takeID: 1, take: .failed("Transcription failed: no words."))
-        #expect(TakeAnnouncer.lines(from: windingDown, to: transcriptionFailed) == ["Transcription failed: no words."])
+        #expect(TakeAnnouncer.lines(from: windingDown, to: transcriptionFailed).map(\.text) == ["Transcription failed: no words."])
     }
 
     @Test("a notice about the failure just said isn't said again; any other failure or info notice is")
@@ -52,31 +52,57 @@ struct TakeAnnouncementLineTests {
         let recording = Moment(takeID: 1, take: .recording)
         var failed = Moment(takeID: 1, take: .failed("The microphone stopped."))
         failed.notice = failure
-        #expect(TakeAnnouncer.lines(from: recording, to: failed) == ["Recording stopped: The microphone stopped."])
+        #expect(TakeAnnouncer.lines(from: recording, to: failed).map(\.text) == ["Recording stopped: The microphone stopped."])
 
         let info = ExportNotice(message: "Finish the recording first.", failures: [], folder: nil, tone: .info)
-        #expect(TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .recording, notice: info)) == ["Finish the recording first."])
+        #expect(TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .recording, notice: info)).map(\.text) == ["Finish the recording first."])
         let exported = ExportNotice(message: "Exported 3 of 3", failures: [], folder: nil, tone: .success)
         #expect(TakeAnnouncer.lines(from: Moment(), to: Moment(notice: exported)).isEmpty)
         let other = ExportNotice(message: "Export failed: disk full", failures: [], folder: nil, tone: .failure)
-        #expect(TakeAnnouncer.lines(from: Moment(), to: Moment(notice: other)) == ["Export failed: disk full"])
+        #expect(TakeAnnouncer.lines(from: Moment(), to: Moment(notice: other)).map(\.text) == ["Export failed: disk full"])
     }
 
     @Test("the saved toast says where the take went, once")
     func savedToast() {
         let saved = TakeSavedNotice(entryID: "E", category: .meeting)
         let landed = Moment(takeID: 1, take: .over, saved: saved)
-        #expect(TakeAnnouncer.lines(from: Moment(takeID: 1, take: .windingDown), to: landed) == ["Saved to Meetings"])
+        #expect(TakeAnnouncer.lines(from: Moment(takeID: 1, take: .windingDown), to: landed).map(\.text) == ["Saved to Meetings"])
         #expect(TakeAnnouncer.lines(from: landed, to: landed).isEmpty)
+    }
+
+    @Test("a failure cuts in at high priority, a failure notice too; capture, pause, the saved toast and an info notice wait their turn")
+    func priorities() {
+        let recording = Moment(takeID: 1, take: .recording)
+        let failed = TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .failed("The microphone stopped.")))
+        #expect(failed.map(\.priority) == [.high])
+        let paused = TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .paused))
+        #expect(paused.map(\.priority) == [.medium])
+        let started = TakeAnnouncer.lines(from: Moment(takeID: 1, take: .arming), to: recording)
+        #expect(started.map(\.priority) == [.medium])
+        let saved = TakeAnnouncer.lines(from: Moment(), to: Moment(saved: TakeSavedNotice(entryID: "E", category: .meeting)))
+        #expect(saved.map(\.priority) == [.medium])
+        let info = ExportNotice(message: "Finish the recording first.", failures: [], folder: nil, tone: .info)
+        #expect(TakeAnnouncer.lines(from: Moment(), to: Moment(notice: info)).map(\.priority) == [.medium])
+        let exportFailed = ExportNotice(message: "Export failed: disk full", failures: [], folder: nil, tone: .failure)
+        #expect(TakeAnnouncer.lines(from: Moment(), to: Moment(notice: exportFailed)).map(\.priority) == [.high])
+    }
+
+    @Test("an announcement carries its words and a priority, as AppKit asks of every one")
+    func announcementCarriesPriority() {
+        let high = announcementInfo("Recording stopped: X", priority: .high)
+        #expect(high[.announcement] as? String == "Recording stopped: X")
+        #expect(high[.priority] as? Int == NSAccessibilityPriorityLevel.high.rawValue)
+        let medium = announcementInfo("Paused", priority: .medium)
+        #expect(medium[.priority] as? Int == NSAccessibilityPriorityLevel.medium.rawValue)
     }
 
     @Test("the lines read in Italian")
     func italian() throws {
         let it = try italianBundle()
         let recording = Moment(takeID: 1, take: .recording)
-        #expect(TakeAnnouncer.lines(from: Moment(takeID: 1, take: .arming), to: recording, bundle: it) == ["Registrazione"])
-        #expect(TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .paused), bundle: it) == ["In pausa"])
-        #expect(TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .failed("X")), bundle: it) == ["Registrazione interrotta: X"])
+        #expect(TakeAnnouncer.lines(from: Moment(takeID: 1, take: .arming), to: recording, bundle: it).map(\.text) == ["Registrazione"])
+        #expect(TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .paused), bundle: it).map(\.text) == ["In pausa"])
+        #expect(TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .failed("X")), bundle: it).map(\.text) == ["Registrazione interrotta: X"])
     }
 }
 
@@ -90,7 +116,7 @@ struct TakeAnnouncerTests {
         let model = makeRecordingModel("announcer")
         model.mainWindowPresenceOverride = .closed
         let heard = Heard()
-        let announcer = TakeAnnouncer { heard.lines.append($0) }
+        let announcer = TakeAnnouncer { heard.lines.append($0.text) }
         announcer.bind(model)
 
         model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
@@ -118,7 +144,7 @@ struct TakeAnnouncerTests {
         let model = makeRecordingModel("announcer-failure")
         model.recordingCountInSeconds = 60
         let heard = Heard()
-        let announcer = TakeAnnouncer { heard.lines.append($0) }
+        let announcer = TakeAnnouncer { heard.lines.append($0.text) }
         announcer.bind(model)
         model.startRecording(source: .microphone)
         let counting = await waitUntil { model.recordingCountdown != nil }

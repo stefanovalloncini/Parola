@@ -1,10 +1,14 @@
 import AppKit
-import SwiftUI
 
-/// Says a line to VoiceOver, with or without a window open.
+/// Says a line to VoiceOver, with or without a window open: posted on the app through AppKit, whose announcement carries the priority VoiceOver weighs.
 @MainActor
-func announce(_ text: String) {
-    AccessibilityNotification.Announcement(text).post()
+func announce(_ text: String, priority: NSAccessibilityPriorityLevel = .medium) {
+    NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: announcementInfo(text, priority: priority))
+}
+
+/// AppKit asks every announcement for a priority: medium waits for what VoiceOver is saying, high cuts in.
+nonisolated func announcementInfo(_ text: String, priority: NSAccessibilityPriorityLevel) -> [NSAccessibility.NotificationUserInfoKey: Any] {
+    [.announcement: text, .priority: priority.rawValue]
 }
 
 /// Tells VoiceOver what a take does that no focus change shows: capture starting, a pause or a resume from anywhere, a failure, where a saved take went, and a notice.
@@ -27,11 +31,17 @@ final class TakeAnnouncer {
         var notice: ExportNotice?
     }
 
+    struct Line: Equatable {
+        let text: String
+        /// A failure cuts in over whatever VoiceOver is saying, so it isn't lost; the rest wait their turn.
+        var priority: NSAccessibilityPriorityLevel = .medium
+    }
+
     private weak var model: AppModel?
-    private let speak: @MainActor (String) -> Void
+    private let speak: @MainActor (Line) -> Void
     private var last = Moment()
 
-    init(speak: @escaping @MainActor (String) -> Void = announce) {
+    init(speak: @escaping @MainActor (Line) -> Void = { announce($0.text, priority: $0.priority) }) {
         self.speak = speak
     }
 
@@ -74,25 +84,26 @@ final class TakeAnnouncer {
     }
 
     /// A failure after Stop speaks for itself; one during the take says the recording stopped. A notice about that same failure isn't said twice.
-    nonisolated static func lines(from old: Moment, to new: Moment, bundle: Bundle = .main) -> [String] {
-        var lines: [String] = []
+    nonisolated static func lines(from old: Moment, to new: Moment, bundle: Bundle = .main) -> [Line] {
+        var lines: [Line] = []
         let before = old.takeID == new.takeID ? old.take : nil
         switch new.take {
         case .recording where before != .recording:
-            lines.append(String(localized: "Recording", bundle: bundle))
+            lines.append(Line(text: String(localized: "Recording", bundle: bundle)))
         case .paused where before != .paused:
-            lines.append(String(localized: "Paused", bundle: bundle))
+            lines.append(Line(text: String(localized: "Paused", bundle: bundle)))
         case .failed(let message) where !isFailure(before):
-            lines.append(before == .windingDown ? message : TakeRemote.stoppedStatus(message, bundle: bundle))
+            let text = before == .windingDown ? message : TakeRemote.stoppedStatus(message, bundle: bundle)
+            lines.append(Line(text: text, priority: .high))
         default:
             break
         }
         if let saved = new.saved, saved.id != old.saved?.id {
-            lines.append(TakeSavedToast.message(category: saved.category, bundle: bundle))
+            lines.append(Line(text: TakeSavedToast.message(category: saved.category, bundle: bundle)))
         }
         if let notice = new.notice, notice.id != old.notice?.id, notice.tone != .success {
             let saysTheTakeFailure = notice.takeID != nil && notice.takeID == new.takeID && isFailure(new.take)
-            if !saysTheTakeFailure { lines.append(notice.message) }
+            if !saysTheTakeFailure { lines.append(Line(text: notice.message, priority: notice.tone == .failure ? .high : .medium)) }
         }
         return lines
     }
