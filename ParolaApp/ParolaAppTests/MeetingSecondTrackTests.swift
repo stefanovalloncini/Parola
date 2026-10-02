@@ -2494,6 +2494,37 @@ private final class AttentionAsks {
 }
 
 extension TranscriberMockSuites.MeetingSecondTrackTests {
+    @Test("a meeting whose Mac audio stops by itself with Parola in the background says so in the menu bar, and bounces the Dock once while your microphone records on")
+    func macStopsByItselfMidMeetingOutOfSight() async throws {
+        try await withMocksCleared([.audioSource, .transcriber]) {
+            let model = makeModel()
+            // The scripted mic hears only what the test records; this keeps it from counting as stopped too and ending the take.
+            model.micTrackStallTicks = 10_000
+            let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
+            item.bind(model)
+            let asks = AttentionAsks()
+            let badge = DockBadge(show: { _ in }, appIsActive: { false }, requestAttention: { asks.count += 1 })
+            badge.bind(model)
+            let files = try meetingFiles(model)
+            let mac = ScriptedTrack(file: files.mac)
+            try await startMeeting(model, mac: mac, mic: ScriptedTrack(file: files.mic))
+            let micUp = await waitForMicTrack(model)
+            #expect(micUp)
+
+            await mac.endByItself()
+
+            let warned = await waitUntil { item.face?.notice == "Mac audio stopped" }
+            #expect(warned)
+            let asked = await waitUntil { asks.count == 1 }
+            #expect(asked)
+            #expect(model.recording?.state == .recording)
+            await settle()
+            #expect(asks.count == 1)
+            await model.discardTake()
+            withExtendedLifetime(badge) {}
+        }
+    }
+
     @Test("a Mac-audio take that stops by itself with Parola in the background stays on the pill and in the menu bar as stopped, in its notice's words, and the Dock bounces once")
     func macStopsByItselfOutOfSight() async throws {
         try await withMocksCleared([.audioSource, .transcriber]) {

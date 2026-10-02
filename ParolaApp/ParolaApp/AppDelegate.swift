@@ -254,6 +254,7 @@ final class DockBadge {
     private var shown: String??
     private var tick: Task<Void, Never>?
     private var failure = OutOfSightFailure(includesTranscription: true)
+    private var macStopWeighed: Int?
 
     var isTicking: Bool { tick != nil }
 
@@ -286,6 +287,7 @@ final class DockBadge {
         if failure.holds(model.recording, stoppedOnItsOwn: model.takeStoppedOnItsOwn, appActive: appIsActive()), failure.held != heldBefore {
             requestAttention()
         }
+        askForALookAtMacAudioStop(model)
         if let take = model.recording, take.isRunning {
             display(Self.recordingBadge(for: take, now: Date()))
             if take.state == .recording { startTick() } else { stopTick() }
@@ -294,6 +296,13 @@ final class DockBadge {
             let takeTranscribing = model.recording?.isTranscribing ?? false
             display(Self.badge(for: model.phase, takeTranscribing: takeTranscribing, burnProgress: model.burnJob?.progress))
         }
+    }
+
+    /// The Mac audio stopped while your microphone records on: one bounce then, if Parola is in the background, since the meeting goes on with your side only.
+    private func askForALookAtMacAudioStop(_ model: AppModel) {
+        guard model.takeMacAudioStopped, let take = model.recording, take.isCapturing, macStopWeighed != take.takeID else { return }
+        macStopWeighed = take.takeID
+        if !appIsActive() { requestAttention() }
     }
 
     private func display(_ label: String?) {

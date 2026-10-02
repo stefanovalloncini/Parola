@@ -540,6 +540,56 @@ struct MacAudioStoppedOutsideTests {
         model.endTestTake()
     }
 
+    @Test("the Mac audio stopping while your microphone records on bounces the Dock once with Parola in the background, never in front")
+    func asksForALookOnce() async throws {
+        for active in [false, true] {
+            let audio = try tempWAV("mac-stopped-attention-\(active)")
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let model = makeRecordingModel("mac-stopped-attention-\(active)")
+            let asks = Calls()
+            let badge = DockBadge(show: { _ in }, appIsActive: { active }, requestAttention: { asks.count += 1 })
+            badge.bind(model)
+            model.installTestTake(source: .systemAudio, liveSource: StubSource(url: audio))
+            await settle(for: .milliseconds(100))
+            #expect(asks.count == 0)
+
+            model.takeMacAudioStopped = true
+
+            if active {
+                await settle(for: .milliseconds(300))
+            } else {
+                let asked = await waitUntil { asks.count == 1 }
+                #expect(asked)
+            }
+            model.updateSession(of: model.recording?.takeID) { $0.title = "Renamed" }
+            #expect(model.pauseTake())
+            #expect(model.resumeTake())
+            await settle(for: .milliseconds(200))
+            #expect(asks.count == (active ? 0 : 1), "active \(active)")
+            model.endTestTake()
+            withExtendedLifetime(badge) {}
+        }
+    }
+
+    @Test("a Mac capture that stopped once the take had stopped asks for no look of its own")
+    func noLookOnceStopped() async throws {
+        let audio = try tempWAV("mac-stopped-after-stop")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("mac-stopped-after-stop")
+        let asks = Calls()
+        let badge = DockBadge(show: { _ in }, appIsActive: { false }, requestAttention: { asks.count += 1 })
+        badge.bind(model)
+        model.installTestTake(source: .systemAudio, liveSource: StubSource(url: audio))
+        model.updateSession(of: model.recording?.takeID) { $0.finish(at: .now) }
+
+        model.takeMacAudioStopped = true
+
+        await settle(for: .milliseconds(300))
+        #expect(asks.count == 0)
+        model.endTestTake()
+        withExtendedLifetime(badge) {}
+    }
+
     @Test("once the take stops, a stopped Mac capture is no warning: it is what ended the take")
     func noWarningOnceStopped() throws {
         let model = makeRecordingModel("mac-stopped-finishing")
