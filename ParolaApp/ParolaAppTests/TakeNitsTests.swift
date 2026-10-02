@@ -216,3 +216,24 @@ struct TakeFailureItalianTests {
         #expect(!keepsTheEnglish)
     }
 }
+
+@MainActor
+@Suite("⌘Q's Discard during a take")
+struct QuitDiscardTests {
+    @Test("the quit alert's Discard… reads as every other Discard that asks again")
+    func buttons() {
+        let alert = AppDelegate.quitAlert()
+        #expect(alert.buttons.map(\.title) == ["Stop and Save", "Keep Recording", "Discard…"])
+        #expect(alert.messageText == "A recording is in progress")
+    }
+
+    @Test("Discard… asks the shared question before the take is deleted; a no keeps it recording, and nothing else asks")
+    func asksAgain() {
+        var asked = 0
+        #expect(AppDelegate.confirmingDiscard(.discard) { asked += 1; return false } == .keepRecording)
+        #expect(AppDelegate.confirmingDiscard(.discard) { asked += 1; return true } == .discard)
+        #expect(AppDelegate.confirmingDiscard(.stopAndSave) { asked += 1; return true } == .stopAndSave)
+        #expect(AppDelegate.confirmingDiscard(.keepRecording) { asked += 1; return true } == .keepRecording)
+        #expect(asked == 2)
+    }
+}

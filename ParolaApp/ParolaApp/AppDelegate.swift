@@ -126,8 +126,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     static func presentQuitDuringTakeAlert() -> AppModel.QuitDuringTake {
         NSApp.activate(ignoringOtherApps: true)
+        return confirmingDiscard(choice(for: quitAlert().runModal()), ask: TakeRemote.askToDiscard)
+    }
+
+    /// ⌘Q only asks once the take captures, so it is never the question for a take still starting.
+    static func quitAlert() -> NSAlert {
         let question = closeQuestion(starting: false)
-        return choice(for: takeAlert(message: question.message, detail: question.detail, discard: String(localized: "Discard")).runModal())
+        return takeAlert(message: question.message, detail: question.detail, discard: question.discard)
+    }
+
+    /// Discard… asks once more before anything is deleted, as every other Discard in the app does; a no keeps the take recording.
+    static func confirmingDiscard(_ choice: AppModel.QuitDuringTake, ask: @MainActor () -> Bool) -> AppModel.QuitDuringTake {
+        guard choice == .discard else { return choice }
+        return ask() ? .discard : .keepRecording
     }
 
     /// The same question as a sheet on the window that is closing; its Discard… asks once more before anything is deleted.
