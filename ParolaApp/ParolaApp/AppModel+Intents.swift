@@ -86,6 +86,7 @@ extension AppModel {
             throw IntentActionError.notMedia
         }
         introduction.defer()
+        let windowGeneration = loadEntryGeneration
         let digest = await SourceDigest.digest(of: url, deadline: fileReadDeadline)
         if let digest, duplicateImportPolicy != .transcribeAgain,
            let existing = await library.findEntry(digest: digest) {
@@ -93,7 +94,7 @@ extension AppModel {
             return try await openEntryForIntent(existing.id)
         }
         try ensureIntentCanStartFileRun()
-        beginFileTranscription(fileURL: url, translateOverride: nil, sourceDigest: digest)
+        beginFileTranscription(fileURL: url, translateOverride: nil, sourceDigest: digest, windowGeneration: windowGeneration)
         guard let run = fileTranscribeTask else {
             throw IntentActionError.failed("Parola couldn't start transcribing \(url.lastPathComponent).")
         }

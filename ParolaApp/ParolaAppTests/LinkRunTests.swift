@@ -456,6 +456,41 @@ extension TranscriberMockSuites {
             #expect(model.nonFatalWarning == nil)
         }
 
+        @Test("a link whose download ends after the user opened an entry leaves that entry up, its player and phase too, and lands with a toast")
+        func linkDownloadedAfterAnOpenLandsOutOfSight() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.transcriber]) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: Self.words)
+                let gate = FetchGate()
+                defer { Task { await gate.open() } }
+                let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture, gate: gate))
+                let older = try await LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil).add(
+                    transcript: Transcript(
+                        segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "an older entry")], language: "en", modelName: "stub"
+                    ),
+                    audioSource: nil
+                )
+
+                #expect(model.transcribeYouTube(urlString: Self.link) == .started)
+                _ = try await model.openEntry(older.id)
+                let phases = PhaseRecorder(model)
+                await gate.open()
+
+                let landed = await waitUntil { model.arrivalNotice?.origin == .run }
+                #expect(landed, "the link never landed")
+                #expect(model.selectedEntryID == older.id, "the link took the entry the user opened")
+                #expect(model.transcript?.text == "an older entry")
+                #expect(model.player == nil, "the download took the player from the entry")
+                let seen = phases.names
+                #expect(seen == ["ready"], "the run's progress went over the entry")
+                let fetched = await model.library.list().filter { $0.id != older.id }
+                let entry = try #require(fetched.first)
+                #expect(entry.title == "A talk")
+                #expect(model.arrivalNotice?.state == .saved(entry.id))
+            }
+        }
+
         @Test("captions that arrive after the user opened an entry are saved out of sight with a toast, and the entry stays open")
         func captionsLeaveTheOpenedEntry() async throws {
             let fixture = try makeLinkFixtureWAV()

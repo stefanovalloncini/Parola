@@ -22,6 +22,7 @@ extension AppModel {
     func startFileImport(fileURL: URL, translateOverride: Bool?) {
         duplicateCheckTask?.cancel()
         let deadline = fileReadDeadline
+        let windowGeneration = loadEntryGeneration
         duplicateCheckTask = Task { [weak self] in
             guard let self else { return }
             // The user is waiting on this hash, so it gets the same budget as the header probe
@@ -32,12 +33,16 @@ extension AppModel {
             guard !Task.isCancelled else { return }
             self.duplicateCheckTask = nil
             guard let digest, let existing = lookup.entry else {
-                self.beginFileTranscription(fileURL: fileURL, translateOverride: translateOverride, sourceDigest: digest)
+                self.beginFileTranscription(
+                    fileURL: fileURL, translateOverride: translateOverride, sourceDigest: digest, windowGeneration: windowGeneration
+                )
                 return
             }
             switch self.duplicateImportPolicy {
             case .transcribeAgain:
-                self.beginFileTranscription(fileURL: fileURL, translateOverride: translateOverride, sourceDigest: digest)
+                self.beginFileTranscription(
+                    fileURL: fileURL, translateOverride: translateOverride, sourceDigest: digest, windowGeneration: windowGeneration
+                )
                 return
             case .openExisting:
                 self.loadEntry(existing.id)

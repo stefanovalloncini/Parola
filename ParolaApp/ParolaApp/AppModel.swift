@@ -2674,20 +2674,27 @@ final class AppModel {
     /// Retry means this file, now. A link's download lands here too, and Retry then means the link.
     func beginFileTranscription(
         fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil, fetchedLink: FetchedLink? = nil,
-        arrival: WatchedArrival? = nil
+        arrival: WatchedArrival? = nil, windowGeneration: Int? = nil
     ) {
         leaveFailedPhase()
         leaveFinishedStage()
         // Before the new token: cancelling retires the old run's token; a file opened mid-download keeps its duplicate check.
         cancelTranscriptionRuns(keepingDuplicateCheck: fetchedLink != nil)
+        // The window as the user left it when they started the run: moved on since, during a download or a duplicate check, the run keeps out of what they opened.
+        let windowGeneration = windowGeneration ?? loadEntryGeneration
+        let startsOutOfSight = userMovedOn(since: windowGeneration)
         let runToken = nextFileRunToken()
         let landingKind: RunLanding.Kind = arrival != nil ? .arrival : fetchedLink == nil ? .file : .link
         if landingKind.policy.recents { noteRecentFile(fileURL) }
         if let fetchedLink, let title = fetchedLink.media.metadata.title {
             linkRunTitle = LinkRunTitle(file: fileURL, title: title)
         }
-        sourceFileURL = fileURL
-        installPlayer(for: fileURL)
+        if startsOutOfSight {
+            leaveRunPhase()
+        } else {
+            sourceFileURL = fileURL
+            installPlayer(for: fileURL)
+        }
         let probeSource = FileAudioSource(url: fileURL)
         let deadline = fileReadDeadline
         Task { [weak self] in
@@ -2699,14 +2706,13 @@ final class AppModel {
                 self.failFileReadTimeout(fileURL, fetchedLink: fetchedLink)
                 return
             }
-            if let duration, self.mediaDurationSeconds == nil { self.mediaDurationSeconds = duration }
+            if !startsOutOfSight, let duration, self.mediaDurationSeconds == nil { self.mediaDurationSeconds = duration }
         }
         filePartialText = ""
         fileTranscribeFraction = nil
         fileTranscribeStage = nil
 
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
-        let windowGeneration = loadEntryGeneration
         // The lane keeps a watched file across a quit, so its run leaves no checkpoint to offer twice.
         let recoveryToken: Int? = arrival != nil ? nil : fetchedLink.map {
             beginFileTranscribeRecovery(sourceURL: $0.link, title: $0.media.metadata.title, source: .web)
@@ -2715,9 +2721,11 @@ final class AppModel {
         fileTranscribeTask = Task { [weak self] in
             guard let self else { return }
             do {
-                phase = store.isInstalled(selectedModel)
-                    ? .loadingModel(name: selectedModel)
-                    : .downloadingModel(name: selectedModel, progress: 0)
+                if !startsOutOfSight {
+                    phase = store.isInstalled(selectedModel)
+                        ? .loadingModel(name: selectedModel)
+                        : .downloadingModel(name: selectedModel, progress: 0)
+                }
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: fileURL),
                     options: makeOptions(task: task, model: selectedModel, language: selectedLanguage),
@@ -3142,6 +3150,7 @@ final class AppModel {
         leaveFinishedStage()
 
         cancelTranscriptionRuns()
+        let windowGeneration = loadEntryGeneration
         let runToken = nextFileRunToken()
         let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, source: .web)
         let fetcher = linkFetcher
@@ -3166,7 +3175,8 @@ final class AppModel {
                     return
                 }
                 self.beginFileTranscription(
-                    fileURL: media.fileURL, translateOverride: nil, fetchedLink: FetchedLink(link: url, media: media)
+                    fileURL: media.fileURL, translateOverride: nil, fetchedLink: FetchedLink(link: url, media: media),
+                    windowGeneration: windowGeneration
                 )
             } catch {
                 guard let self else { return }
