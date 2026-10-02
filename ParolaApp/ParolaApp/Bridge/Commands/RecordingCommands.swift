@@ -50,10 +50,10 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "stopRecording",
                 area: .recording,
-                summary: "Stops recording and starts transcription.",
+                summary: "Stops recording and starts transcription; a take still counting in or starting ends the way Cancel ends it.",
                 kind: .mutating,
                 handler: { _, ctx in
-                    ctx.model.stopRecordingAndTranscribe()
+                    ctx.model.stopTake()
                     return .object(["stopped": .bool(true)])
                 }
             ),

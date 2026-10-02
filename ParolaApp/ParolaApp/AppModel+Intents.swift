@@ -113,12 +113,11 @@ extension AppModel {
     }
 
     func stopRecordingFromIntent() async throws -> String {
-        guard takeIsRunning, recordingCountdown == nil, let take = recording?.takeID else { throw IntentActionError.notRecording }
-        stopRecordingAndTranscribe()
-        // A take stopped before it captured anything ends on the spot, with the reason on its session.
-        if let session = recording, session.takeID == take, case .failed(let message) = session.state {
-            throw IntentActionError.failed(message)
-        }
+        guard takeIsRunning, let take = recording?.takeID else { throw IntentActionError.notRecording }
+        stopTake()
+        // A count-in, or a take that has captured nothing, ends on the spot: quietly, or with the reason on its session.
+        guard let session = recording, session.takeID == take else { throw IntentActionError.cancelled }
+        if case .failed(let message) = session.state { throw IntentActionError.failed(message) }
         guard streamingConsumer != nil || fileTranscribeTask != nil || stopHeldForStartup else {
             throw IntentActionError.notRecording
         }

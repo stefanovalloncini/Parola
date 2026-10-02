@@ -48,6 +48,25 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("the bridge's Stop during a count-in cancels it, so no take starts after it")
+        func stopDuringCountIn() async throws {
+            let model = makeRecordingModel("stage-bridge-count-in-stop")
+            let server = try ParolaAutomationServer(model: model)
+            model.recordingCountInSeconds = 1
+            try armMeteredTake(model)
+            let countingIn = model.recording?.isCountingIn == true
+            #expect(countingIn)
+
+            let stopped = try await run(server, model, "stopRecording")
+
+            #expect(stopped["stopped"] == .bool(true))
+            #expect(model.recording == nil)
+            await settle(for: .milliseconds(1_500))
+            #expect(model.recording == nil, "no take starts once the count-in would have ended")
+            #expect(!model.recordingActive)
+            withExtendedLifetime(server) {}
+        }
+
         @Test("with nothing recording the bridge's take controls change nothing")
         func nothingToControl() async throws {
             let model = makeRecordingModel("stage-bridge-idle")

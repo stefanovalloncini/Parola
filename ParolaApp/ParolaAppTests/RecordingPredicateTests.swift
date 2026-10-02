@@ -69,7 +69,7 @@ struct RecordingPredicateTests {
         #expect(model.recording == nil)
     }
 
-    @Test("a Stop intent during a count-in finds nothing to stop yet, even with a file transcribing behind it")
+    @Test("a Stop intent during a count-in cancels it and says so, even with a file transcribing behind it")
     func stopIntentDuringCountIn() async {
         let model = makeModel()
         model.fileTranscribeTask = Task { try? await Task.sleep(for: .seconds(30)) }
@@ -93,9 +93,9 @@ struct RecordingPredicateTests {
         // Frees a waiter the guard would have let through, so a failing run doesn't leave it hanging.
         model.resolveRecordingOutcome(.failure(IntentActionError.cancelled))
 
-        #expect(answer == .some(.notRecording))
-        model.cancelRecordingCountdown()
+        #expect(answer == .some(.cancelled))
         #expect(!model.takeIsRunning)
+        #expect(model.recording == nil)
     }
 
     @Test("the mic hotkey stops a mic take by its session, whatever the phase says")
