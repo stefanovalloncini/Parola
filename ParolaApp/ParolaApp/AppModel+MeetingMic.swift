@@ -754,7 +754,7 @@ extension AppModel {
         let covered = exportNotice
         exportNotice = ExportNotice(
             message: Self.macAudioStoppedMessage(), failures: [], folder: nil, tone: .info,
-            actions: [ExportNotice.Action(title: String(localized: "Show"), handler: .showTake(takeID))]
+            actions: [ExportNotice.Action(title: String(localized: "Show"), handler: .showTake(takeID))], whileTakeRuns: true
         )
         keepCoveredFailure(covered, take: takeID)
     }

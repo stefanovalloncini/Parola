@@ -802,7 +802,7 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("a meeting whose Mac audio stops by itself goes on with your microphone, says so on its Mac lane and in a notice that stays, and keeps your side")
+        @Test("a meeting whose Mac audio stops by itself goes on with your microphone, says so on its Mac lane and in a notice that stays while it records, and keeps your side")
         func macStopsByItselfMidMeeting() async throws {
             try await withMocksCleared([.audioSource, .transcriber]) {
                 await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
@@ -837,6 +837,7 @@ extension TranscriberMockSuites {
                 #expect(recording["macAudioStopped"] == .bool(true))
                 model.stopRecordingAndTranscribe()
                 let entry = try #require(await landedEntry(model))
+                #expect(model.exportNotice?.id != notice.id, "the notice outlived its take, and your microphone no longer records")
                 let audio = try #require(try await model.library.load(entry.id).document.audioURL)
                 #expect(try channels(of: audio) == 2)
                 withExtendedLifetime(server) {}
