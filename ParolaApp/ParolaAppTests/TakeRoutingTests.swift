@@ -317,21 +317,39 @@ struct TakeRoutingTests {
         #expect(announced)
     }
 
-    @Test("a toast raised while the window is out of sight waits for the user before it counts down")
-    func toastWaitsToBeSeen() async {
+    @Test("a toast raised while the window is out of sight waits for the user before it counts down, and its window tells it, not a poll")
+    func toastWaitsToBeSeen() async throws {
         let model = makeModel()
-        model.mainWindowPresenceOverride = .hidden
         let notice = ArrivalNotice(failed: URL(fileURLWithPath: "/tmp/memo.wav"), reason: "unreadable")
         model.arrivalNotice = notice
-        let countdown = Task { await model.dismissArrivalNoticeOnceSeen(notice, after: .milliseconds(50)) }
+        let hosted = HostedWindow(ArrivalToast(notice: notice, dismissAfter: .milliseconds(300)).environment(model), width: 600, height: 120)
+        defer { hosted.close() }
+        func reader(in view: NSView) -> WindowShownReader.ReaderView? {
+            view as? WindowShownReader.ReaderView ?? view.subviews.lazy.compactMap(reader(in:)).first
+        }
+        let found = reader(in: hosted.host)
+        let shown = try #require(found)
+        hosted.window.orderOut(nil)
+        shown.onChange?(false)
 
         await settle(for: .milliseconds(600))
         #expect(model.arrivalNotice == notice, "nobody has seen it yet")
 
-        model.mainWindowPresenceOverride = .onScreen
+        shown.onChange?(true)
         let dismissed = await waitUntil { model.arrivalNotice == nil }
         #expect(dismissed)
+    }
+
+    @Test("the arrival toast's countdown leaves a toast that changed meanwhile")
+    func arrivalCountdownKeepsANewerToast() async {
+        let model = makeModel()
+        let first = ArrivalNotice(failed: URL(fileURLWithPath: "/tmp/one.wav"), reason: "unreadable")
+        let second = ArrivalNotice(failed: URL(fileURLWithPath: "/tmp/two.wav"), reason: "unreadable")
+        model.arrivalNotice = first
+        let countdown = Task { await model.dismissArrivalNotice(first, after: .milliseconds(50)) }
+        model.arrivalNotice = second
         await countdown.value
+        #expect(model.arrivalNotice == second)
     }
 
     // MARK: - Failures

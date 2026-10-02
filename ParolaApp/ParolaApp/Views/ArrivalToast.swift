@@ -5,6 +5,13 @@ import ParolaCore
 struct ArrivalToast: View {
     @Environment(AppModel.self) private var model
     let notice: ArrivalNotice
+    var dismissAfter: Duration = DeliveryToast.dismissAfter
+    @State private var isOnScreen = false
+
+    private struct Countdown: Equatable {
+        let notice: ArrivalNotice
+        let shown: Bool
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: DS.Spacing.regular) {
@@ -78,9 +85,11 @@ struct ArrivalToast: View {
                 .strokeBorder(tint.opacity(0.35), lineWidth: 1)
         )
         .padding(DS.Spacing.regular)
-        .task(id: notice) {
-            guard notice.dismissesItself else { return }
-            await model.dismissArrivalNoticeOnceSeen(notice, after: DeliveryToast.dismissAfter)
+        .background(WindowShownReader { isOnScreen = $0 })
+        // Counts down only while its window is on screen, so one raised out of sight waits for the user.
+        .task(id: Countdown(notice: notice, shown: isOnScreen)) {
+            guard notice.dismissesItself, isOnScreen else { return }
+            await model.dismissArrivalNotice(notice, after: dismissAfter)
         }
         .axBranch("ArrivalToast")
     }
