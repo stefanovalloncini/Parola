@@ -326,6 +326,34 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a Shortcut whose run fails after the user went to another page hears the run's own error", .timeLimit(.minutes(1)))
+        func failureOutOfSightReachesTheShortcut() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                defer { Task { await gate.open() } }
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom"), gate: gate
+                ))
+                let model = makeModel("fails-out-of-sight")
+                let wav = try makeWAV("fails")
+                defer { try? FileManager.default.removeItem(at: wav) }
+
+                let shortcut = Task { try await model.transcribeFileFromIntent(wav) }
+                let started = await waitUntil { model.fileTranscribeTask != nil }
+                try #require(started, "the Shortcut never started a run")
+                model.openStatistics()
+                await gate.open()
+
+                do {
+                    _ = try await shortcut.value
+                    Issue.record("the Shortcut heard a failed run succeed")
+                } catch let error as IntentActionError {
+                    #expect(error == .failed("Transcription failed: boom"))
+                }
+                #expect(model.exportNotice?.message == "Couldn't transcribe \(wav.lastPathComponent). boom", "the failure went unshown")
+            }
+        }
+
         @Test("a file the library holds answers with the stored text and opens the entry", .timeLimit(.minutes(1)),
               arguments: [DuplicateImportPolicy.alwaysAsk, .openExisting])
         func duplicateOpensTheStoredEntry(policy: DuplicateImportPolicy) async throws {

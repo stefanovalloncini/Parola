@@ -1821,6 +1821,7 @@ final class AppModel {
         }
     }
     @ObservationIgnored var fileRunLanding: FileRunLanding?
+    @ObservationIgnored var fileRunFailure: FileRunFailure?
     @ObservationIgnored var landingSteps: Task<Void, Never>?
     /// Test seam: runs before a landing's library add, and a throw fails the save.
     @ObservationIgnored var beforeLandingSave: (@Sendable () async throws -> Void)?
@@ -2731,7 +2732,9 @@ final class AppModel {
             }
             guard let self, self.fileRunGeneration == runToken else { return }
             guard case .done(let duration) = probe else {
-                self.failFileReadTimeout(fileURL, fetchedLink: fetchedLink, translateOverride: translateOverride, since: windowGeneration)
+                self.failFileReadTimeout(
+                    fileURL, runToken: runToken, fetchedLink: fetchedLink, translateOverride: translateOverride, since: windowGeneration
+                )
                 return
             }
             if !startsOutOfSight, let duration, self.mediaDurationSeconds == nil { self.mediaDurationSeconds = duration }
@@ -2828,6 +2831,7 @@ final class AppModel {
                     retireFileRun(runToken)
                 }
                 if !Task.isCancelled {
+                    noteFileRunFailure(error, runToken: runToken)
                     // A failure stays out of the way of whatever the user opened while it ran.
                     let outOfSight = userMovedOn(from: fileURL, since: windowGeneration)
                     if outOfSight {
@@ -2883,9 +2887,12 @@ final class AppModel {
 
     /// A probe that never came back means the file itself is out of reach, so the run reading the
     /// same bytes is not going to report anything of its own.
-    private func failFileReadTimeout(_ fileURL: URL, fetchedLink: FetchedLink?, translateOverride: Bool?, since windowGeneration: Int) {
+    private func failFileReadTimeout(
+        _ fileURL: URL, runToken: Int, fetchedLink: FetchedLink?, translateOverride: Bool?, since windowGeneration: Int
+    ) {
         guard fileTranscribeTask != nil else { return }
         let error = ParolaError.fileReadTimedOut(name: fileURL.lastPathComponent)
+        noteFileRunFailure(error, runToken: runToken)
         let outOfSight = userMovedOn(from: fileURL, since: windowGeneration)
         let arrival = watchedArrivals.first { $0.id == visibleArrivalID }
         if let arrival { failArrival(arrival, error: error, announces: outOfSight) }
@@ -2898,6 +2905,12 @@ final class AppModel {
         letGoOfRunMedia(fileURL)
         // An unreachable file keeps its Retry: asking the volume whether it is there could hang as the read did.
         if arrival == nil { reportRunFailure(error, of: fileURL, fetchedLink: fetchedLink, translateOverride: translateOverride, checksFile: false) }
+    }
+
+    /// What the Shortcut waiting on this run hears, wherever the failure itself was shown; a cancel is not a failure.
+    private func noteFileRunFailure(_ error: any Error, runToken: Int) {
+        guard !(error is CancellationError) else { return }
+        fileRunFailure = FileRunFailure(runToken: runToken, message: Self.transcriptionFailureMessage(for: error))
     }
 
     /// A run that failed after the user moved on leaves their page alone; a notice says so, and stays, with the run's Retry.

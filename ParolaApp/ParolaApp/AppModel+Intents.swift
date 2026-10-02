@@ -46,6 +46,12 @@ struct FileRunLanding {
     let entry: Task<LibraryEntry, any Error>
 }
 
+/// Why a file run failed, kept by its run token: a run that failed out of sight leaves the phase as it was.
+struct FileRunFailure {
+    let runToken: Int
+    let message: String
+}
+
 extension AppModel {
 
     func registerIntentPerformers() {
@@ -101,7 +107,7 @@ extension AppModel {
         let runToken = fileRunGeneration
         await run.value
         guard let landing = fileRunLanding, landing.runToken == runToken else {
-            if case .failed(let message) = phase { throw IntentActionError.failed(message) }
+            if let failure = fileRunFailure, failure.runToken == runToken { throw IntentActionError.failed(failure.message) }
             throw IntentActionError.cancelled
         }
         do {
