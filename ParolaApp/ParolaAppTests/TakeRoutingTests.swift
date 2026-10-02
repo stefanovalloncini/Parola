@@ -1007,6 +1007,20 @@ extension TranscriberMockSuites {
             await waitUntil { !model.recordingActive }
         }
 
+        @Test("a meeting that starts during a model download raises its prompt, since Record goes ahead over a download")
+        func meetingPromptDuringADownload() async throws {
+            let model = makeRecordingModel("meeting-prompt-during-download")
+            let gate = FetchGate()
+            let downloading = await holdDownload(model, until: gate)
+            #expect(downloading)
+            model.meetingDetector.isEnabled = true
+
+            model.meetingDetector.fire(appName: "Acme Conference")
+
+            #expect(model.meetingDetectedApp == "Acme Conference")
+            await gate.open()
+        }
+
         @Test("a model download that ends while a take transcribes out of sight hands its bar back")
         func downloadEndsUnderATakesRun() async throws {
             try await withMocksCleared(.transcriber) {

@@ -1503,13 +1503,14 @@ final class AppModel {
             self.detectedMeetingAppName = appName
             // Never prompt over in-flight work: accepting would stomp a live recording.
             guard !self.takeIsRunning, self.takeRun == nil else { return }
-            switch self.phase {
-            case .idle, .ready, .failed:
-                // A presented alert's title never updates, so keep the first prompt — accept
-                // and decline must act on the app name the user is actually reading.
-                if self.meetingDetectedApp == nil { self.meetingDetectedApp = appName }
-            default: break
+            let prompts = switch self.phase {
+            case .idle, .ready, .failed: true
+            case .downloadingModel: self.downloadTask != nil
+            default: false
             }
+            // A presented alert's title never updates, so keep the first prompt — accept
+            // and decline must act on the app name the user is actually reading.
+            if prompts, self.meetingDetectedApp == nil { self.meetingDetectedApp = appName }
         } onQuit: { [weak self] appName in
             self?.meetingAppQuit(appName)
         }
