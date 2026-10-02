@@ -65,6 +65,16 @@ struct ArrivalNotice: Equatable, Identifiable {
         case watchedFolder
         /// A take that finished while another page showed.
         case take
+        /// A file or link the user opened, finished after they moved on to something else.
+        case run
+
+        init(_ landing: RunLanding.Kind) {
+            switch landing {
+            case .backgroundTake: self = .take
+            case .backgroundRun: self = .run
+            default: self = .watchedFolder
+            }
+        }
     }
 
     let id = UUID()
@@ -93,10 +103,10 @@ struct ArrivalNotice: Equatable, Identifiable {
         self.origin = origin
     }
 
-    /// A take only says it was saved; a watched file also says where it came from.
+    /// A take or a run only says it was saved; a watched file also says where it came from.
     static func savedTitle(name: String, origin: Origin, bundle: Bundle = .main) -> String {
         switch origin {
-        case .take: String(localized: "Saved \(name)", bundle: bundle)
+        case .take, .run: String(localized: "Saved \(name)", bundle: bundle)
         case .watchedFolder: String(localized: "Transcribed \(name) from a watched folder", bundle: bundle)
         }
     }

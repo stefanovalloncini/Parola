@@ -2731,12 +2731,14 @@ final class AppModel {
                 // Post-processing is a suspension a cancel can land in; a replaced run must not land after it.
                 try Task.checkCancellation()
                 if let fetchedLink { processed.sourceURL = fetchedLink.media.metadata.webpageURL ?? fetchedLink.link }
-                // Idle when it started, busy now: what the user opened meanwhile keeps the window.
-                if let arrival, userMovedOn(from: fileURL, since: windowGeneration) {
+                // What the user opened meanwhile, or the page they went to, keeps the window: the run lands out of sight.
+                let outOfSight = userMovedOn(from: fileURL, since: windowGeneration)
+                if outOfSight, let arrival {
                     filePartialText = ""
                     fileTranscribeFraction = nil
                     fileTranscribeStage = nil
                     leaveRunPhase()
+                    letGoOfRunMedia(fileURL)
                     landVisibleArrivalOutOfSight(arrival, processed)
                     retireFileRun(runToken)
                     if !Task.isCancelled { self.fileTranscribeTask = nil }
@@ -2744,20 +2746,27 @@ final class AppModel {
                 }
                 let landing = Self.landingSignposter.beginInterval("install")
                 defer { Self.landingSignposter.endInterval("install", landing) }
-                clearDerivedArtifacts()
-                selectedEntryID = nil
-                restorePlaybackSource(fileURL)
-                transcript = processed
-                adoptLoadedMediaDuration()
+                if !outOfSight {
+                    clearDerivedArtifacts()
+                    selectedEntryID = nil
+                    restorePlaybackSource(fileURL)
+                    transcript = processed
+                    adoptLoadedMediaDuration()
+                }
                 filePartialText = ""
                 fileTranscribeFraction = nil
                 fileTranscribeStage = nil
                 if let recoveryToken { endRecovery(recoveryToken) }
-                phase = .ready
+                if outOfSight {
+                    leaveRunPhase()
+                    letGoOfRunMedia(fileURL)
+                } else {
+                    phase = .ready
+                }
                 let ownedDownload = fetchedLink.flatMap { $0.media.workingDirectory == nil ? nil : $0 }
                 let linkMetadataTitle = fetchedLink?.media.metadata.title
                 let finished = RunLanding(
-                    kind: landingKind,
+                    kind: outOfSight ? .backgroundRun : landingKind,
                     transcript: processed,
                     audioSource: fileURL,
                     source: fetchedLink == nil ? .file : .web,
@@ -2787,6 +2796,7 @@ final class AppModel {
                     let outOfSight = arrival != nil && userMovedOn(from: fileURL, since: windowGeneration)
                     if outOfSight {
                         leaveRunPhase()
+                        letGoOfRunMedia(fileURL)
                     } else {
                         applyTranscriptionError(
                             error,
@@ -2802,9 +2812,25 @@ final class AppModel {
         }
     }
 
-    /// The user opened something else while a run was going: an entry, a document, subtitles.
+    /// The user opened an entry while a run was going, or went to another page than the run's.
+    private func userMovedOn(since windowGeneration: Int) -> Bool {
+        loadEntryGeneration != windowGeneration || route != .transcript
+    }
+
+    /// The same for a run over a file, which a document or subtitles opened meanwhile take from it too.
     private func userMovedOn(from fileURL: URL, since windowGeneration: Int) -> Bool {
-        loadEntryGeneration != windowGeneration || sourceFileURL != fileURL
+        userMovedOn(since: windowGeneration) || sourceFileURL != fileURL
+    }
+
+    /// A run landing out of sight takes its media out of the player, with whatever transcript it ran over: the two never belonged together.
+    private func letGoOfRunMedia(_ fileURL: URL) {
+        guard sourceFileURL == fileURL else { return }
+        guard transcript != nil else {
+            sourceFileURL = nil
+            tearDownPlayer()
+            return
+        }
+        closeTranscript()
     }
 
     /// Hands the phase back only while it still shows the run; a model download from Settings keeps its bar.
@@ -3205,6 +3231,7 @@ final class AppModel {
 
         cancelTranscriptionRuns()
         let fetcher = linkFetcher
+        let windowGeneration = loadEntryGeneration
         youtubeSubsTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -3215,10 +3242,15 @@ final class AppModel {
                 let processed = await postProcessDetached(result.transcript)
                 let landing = Self.landingSignposter.beginInterval("install")
                 defer { Self.landingSignposter.endInterval("install", landing) }
-                installFetchedSubtitles(processed)
-                phase = .ready
+                let outOfSight = userMovedOn(since: windowGeneration)
+                if outOfSight {
+                    leaveRunPhase()
+                } else {
+                    installFetchedSubtitles(processed)
+                    phase = .ready
+                }
                 land(RunLanding(
-                    kind: .captions,
+                    kind: outOfSight ? .backgroundRun : .captions,
                     transcript: processed,
                     source: .web,
                     title: result.videoTitle ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()),

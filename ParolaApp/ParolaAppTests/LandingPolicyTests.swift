@@ -160,6 +160,10 @@ struct LandingPolicyTests {
                 selection: .none, sound: true, card: true, summary: .always,
                 export: .rules, autoSend: true, recents: false, announces: true
             ),
+            .backgroundRun: LandingPolicy(
+                selection: .none, sound: true, card: true, summary: .always,
+                export: .rules, autoSend: true, recents: false, announces: true
+            ),
         ]
         #expect(Set(expected.keys) == Set(RunLanding.Kind.allCases))
         for kind in RunLanding.Kind.allCases {

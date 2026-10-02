@@ -94,8 +94,24 @@ extension TranscriberMockSuites {
             return (entry.id, try #require(model.sourceFileURL))
         }
 
-        @Test("a file transcription that lands after the user opened an entry keeps its own audio")
-        func fileTranscribePairsWithItsSource() async throws {
+        /// The run saved out of sight: its entry, which holds the run's own words and audio, and the toast that says so.
+        private func savedOutOfSight(_ model: AppModel, besides other: LibraryEntry.ID? = nil) async throws -> LibraryEntry {
+            let saved = await model.library.list().filter { $0.id != other }
+            let run = try #require(saved.first)
+            let stored = try await model.library.load(run.id).document
+            #expect(stored.transcript.text.contains("own words"), mockWentMissing)
+            #expect(
+                stored.audioURL?.deletingLastPathComponent().lastPathComponent == run.bundleURL.lastPathComponent,
+                "the run keeps its own audio"
+            )
+            #expect(model.arrivalNotice?.state == .saved(run.id))
+            let title = model.arrivalNotice?.savedTitle()
+            #expect(title == "Saved \(LibraryEntryDisplay.title(for: run))")
+            return run
+        }
+
+        @Test("a file run that finishes after the user opened an entry is saved with its own audio, and the entry stays open")
+        func fileRunLeavesTheOpenedEntry() async throws {
             try await withMocksCleared(.transcriber) {
                 let gate = MockTranscriberGate()
                 defer { Task { await gate.open() } }
@@ -113,11 +129,70 @@ extension TranscriberMockSuites {
                 try #require(model.transcript?.text.contains("own words") != true, "the run must still be in flight")
 
                 await gate.open()
-                let finished = await waitUntil { model.phase == .ready && model.selectedEntryID != other.id }
-                #expect(finished, "the run never landed")
-                #expect(model.sourceFileURL == wav, "the run landed on the entry's audio instead of its own")
+                let landed = await waitUntil { model.arrivalNotice?.origin == .run }
+                #expect(landed, "the run never landed")
+                #expect(model.selectedEntryID == other.id, "the run took the entry the user opened")
+                #expect(model.transcript?.text.contains("own words") != true, "the run's words replaced the entry's")
+                #expect(model.sourceFileURL == other.audio, "the entry lost its own audio to the run")
+                #expect(playerURL(model) == other.audio, "the entry would play the run's audio")
+                #expect(model.phase == .ready)
+                _ = try await savedOutOfSight(model, besides: other.id)
+            }
+        }
+
+        @Test("a file run whose page stays up lands on it and opens there, with no toast")
+        func fileRunLandsOnItsPage() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                defer { Task { await gate.open() } }
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
+
+                let model = makeModel()
+                let wav = try makeSilentWAV(label: "stayed")
+                defer { try? FileManager.default.removeItem(at: wav) }
+
+                model.transcribe(fileURL: wav)
+                await model.awaitDuplicateCheck()
+                try #require(model.fileTranscribeTask != nil, "the import never started a run")
+
+                await gate.open()
+                let selected = await waitUntil { model.selectedEntryID != nil }
+                #expect(selected, "the run never opened as its entry")
+                #expect(model.route == .transcript)
+                #expect(model.phase == .ready)
                 #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
-                #expect(playerURL(model) == wav, "the transcript would play the entry's audio instead of the file it describes")
+                #expect(model.sourceFileURL == wav)
+                #expect(playerURL(model) == wav)
+                #expect(model.arrivalNotice == nil, "a run on its own page needs no toast")
+            }
+        }
+
+        @Test("a file run that finishes while another page shows is saved out of sight, and the page stays")
+        func fileRunLeavesAnotherPage() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                defer { Task { await gate.open() } }
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
+
+                let model = makeModel()
+                let wav = try makeSilentWAV(label: "statistics")
+                defer { try? FileManager.default.removeItem(at: wav) }
+
+                model.transcribe(fileURL: wav)
+                await model.awaitDuplicateCheck()
+                try #require(model.fileTranscribeTask != nil, "the import never started a run")
+                model.openStatistics()
+
+                await gate.open()
+                let landed = await waitUntil { model.arrivalNotice?.origin == .run }
+                #expect(landed, "the run never landed")
+                #expect(model.route == .statistics, "the run took the page back")
+                #expect(model.transcript == nil, "the run's words went into the window")
+                #expect(model.selectedEntryID == nil)
+                #expect(model.player == nil, "the run's audio stayed in the player with nothing to play it for")
+                #expect(model.sourceFileURL == nil)
+                #expect(model.phase == .idle)
+                _ = try await savedOutOfSight(model)
             }
         }
 
@@ -165,8 +240,39 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("a YouTube transcription that lands after a navigation keeps its own audio")
-        func youtubePairsWithItsSource() async throws {
+        @Test("a file run started over an open entry that finishes while another page shows lets go of that entry too, whose audio it had taken")
+        func fileRunOverAnEntryLeavesAnotherPage() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                defer { Task { await gate.open() } }
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
+
+                let model = makeModel()
+                let earlier = try await openOtherEntry(in: model)
+                let wav = try makeSilentWAV(label: "over-entry")
+                defer { try? FileManager.default.removeItem(at: wav) }
+
+                model.transcribe(fileURL: wav)
+                await model.awaitDuplicateCheck()
+                try #require(model.fileTranscribeTask != nil, "the import never started a run")
+                #expect(model.sourceFileURL == wav, "the run takes the player from the entry it started over")
+                model.openStatistics()
+
+                await gate.open()
+                let landed = await waitUntil { model.arrivalNotice?.origin == .run }
+                #expect(landed, "the run never landed")
+                let letGo = await waitUntil { model.transcript == nil }
+                #expect(letGo, "the entry stayed loaded over the run's audio")
+                #expect(model.route == .statistics)
+                #expect(model.selectedEntryID == nil)
+                #expect(model.player == nil)
+                #expect(model.phase == .idle)
+                _ = try await savedOutOfSight(model, besides: earlier.id)
+            }
+        }
+
+        @Test("a YouTube transcription that finishes after the user opened an entry is saved with its own audio, and the entry stays open")
+        func youtubeRunLeavesTheOpenedEntry() async throws {
             let fixture = try makeSilentWAV(label: "youtube")
             defer { try? FileManager.default.removeItem(at: fixture) }
             try await withMocksCleared([.transcriber]) {
@@ -185,11 +291,12 @@ extension TranscriberMockSuites {
                 try #require(model.transcript?.text.contains("own words") != true, "the fetch's run must still be in flight")
 
                 await gate.open()
-                let finished = await waitUntil { model.phase == .ready && model.selectedEntryID != other.id }
-                #expect(finished, "the fetched run never landed")
-                #expect(model.sourceFileURL == fixture, "the run landed on the entry's audio instead of the fetched file")
-                #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
-                #expect(playerURL(model) == fixture, "the fetched audio would be replaced by the entry's")
+                let landed = await waitUntil { model.arrivalNotice?.origin == .run }
+                #expect(landed, "the fetched run never landed")
+                #expect(model.selectedEntryID == other.id, "the run took the entry the user opened")
+                #expect(model.sourceFileURL == other.audio, "the entry lost its own audio to the fetched file")
+                #expect(playerURL(model) == other.audio)
+                _ = try await savedOutOfSight(model, besides: other.id)
             }
         }
     }

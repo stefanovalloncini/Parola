@@ -61,6 +61,7 @@ final class ScriptedLinkFetcher: LinkFetcher {
     var workingFolders: [URL] { folders.withLock { $0 } }
 
     func fetchCaptions(url: URL, language: String?) async throws -> FetchedCaptions {
+        await gate?.wait()
         guard let captions else { throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noCaptions)) }
         return captions
     }
@@ -453,6 +454,43 @@ extension TranscriberMockSuites {
             await waitUntil { FileManager.default.fileExists(atPath: exported.path) }
             #expect(try String(contentsOf: exported, encoding: .utf8).contains("own captions"))
             #expect(model.nonFatalWarning == nil)
+        }
+
+        @Test("captions that arrive after the user opened an entry are saved out of sight with a toast, and the entry stays open")
+        func captionsLeaveTheOpenedEntry() async throws {
+            let fixture = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            let captions = FetchedCaptions(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 2, text: "the video's own captions")],
+                    language: "en", modelName: "youtube-subs", sourceURL: Self.page
+                ),
+                metadata: ScriptedLinkFetcher.talk
+            )
+            let gate = FetchGate()
+            defer { Task { await gate.open() } }
+            let model = makeModel(fetcher: ScriptedLinkFetcher(fixture: fixture, gate: gate, captions: captions))
+            // A store with no Spotlight indexer: the real one can hang the test host.
+            let seed = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+            let older = try await seed.add(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "an older entry")], language: "en", modelName: "stub"
+                ),
+                audioSource: nil
+            )
+
+            #expect(model.fetchYouTubeSubs(urlString: Self.link) == .started)
+            _ = try await model.openEntry(older.id)
+            await gate.open()
+
+            let landed = await waitUntil { model.arrivalNotice?.origin == .run }
+            #expect(landed, "the captions never landed")
+            #expect(model.selectedEntryID == older.id, "the captions took the entry the user opened")
+            #expect(model.transcript?.text == "an older entry")
+            let fetched = await model.library.list().filter { $0.id != older.id }
+            let entry = try #require(fetched.first)
+            #expect(entry.title == "A talk")
+            #expect(model.arrivalNotice?.state == .saved(entry.id))
         }
 
         @Test("the fetch pane ends on the newest folded state, whatever order two readers deliver in")

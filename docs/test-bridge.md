@@ -147,6 +147,8 @@ is `PRECONDITION`. While its run transcribes, links, drops and batches still wai
 While the Stage holds a take the window draws no notice or toast under it: `getState` still reports them, and they show
 on the page after the Stage. A notice only true while the take records, like "Finish the recording first.", goes when
 the take stops.
+A file, link or captions run lands the same way: with its own page up it opens there; after an entry or a document was
+opened, or another page shown, it goes to the library with a "Saved <title>" toast and Open, and loads nothing.
 
 `getState.burn` is the subtitle burn running beside the phase, `{state, progress, output}` with `state` one of
 `running` / `finished` / `failed` (a failed one adds `message`), or `null` when there is none.

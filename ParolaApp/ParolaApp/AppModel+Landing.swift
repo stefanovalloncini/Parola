@@ -23,6 +23,8 @@ struct RunLanding {
         case backgroundArrival
         /// A take that finished while another page showed: delivered as a take is, with a toast instead of the screen.
         case backgroundTake
+        /// A file or link run that finished after the user opened something else or went to another page: a toast instead of the screen.
+        case backgroundRun
     }
 
     let kind: Kind
@@ -151,7 +153,7 @@ extension RunLanding.Kind {
                 selection: .none, sound: false, card: true, summary: .always,
                 export: .rules, autoSend: true, recents: false, announces: true
             )
-        case .backgroundTake:
+        case .backgroundTake, .backgroundRun:
             LandingPolicy(
                 selection: .none, sound: true, card: true, summary: .always,
                 export: .rules, autoSend: true, recents: false, announces: true
@@ -306,9 +308,9 @@ extension AppModel {
         switch landing.kind {
         case .rerun, .retriedTake:
             return String(localized: "The transcript ran again, but Parola couldn't save the result. \(reason)", bundle: bundle)
-        case .batchJob, .backgroundArrival, .backgroundTake:
-            // A take goes by its title: its file is a working copy with a made-up name.
-            let name = (landing.kind == .backgroundTake ? landing.title : landing.audioSource?.lastPathComponent) ?? ""
+        case .batchJob, .backgroundArrival, .backgroundTake, .backgroundRun:
+            // A take goes by its title, its file being a working copy with a made-up name; a link goes by its video's.
+            let name = (landing.kind == .backgroundTake ? landing.title : landing.title ?? landing.audioSource?.lastPathComponent) ?? ""
             return String(
                 localized: "\(name) was transcribed, but Parola couldn't save it to your library. \(reason)", bundle: bundle
             )
@@ -324,7 +326,7 @@ extension AppModel {
         let policy = landing.policy
         if policy.sound { playCompletionSound() }
         if policy.announces {
-            arrivalNotice = ArrivalNotice(landed: entry, origin: landing.kind == .backgroundTake ? .take : .watchedFolder)
+            arrivalNotice = ArrivalNotice(landed: entry, origin: ArrivalNotice.Origin(landing.kind))
         }
         let card = policy.card ? enqueueCardMetadata(for: entry.id, transcript: landing.transcript) : nil
         switch policy.summary {
