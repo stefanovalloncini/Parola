@@ -34,7 +34,9 @@ private actor StubCapture: LiveAudioSource {
         held = nil
     }
 
-    func cancel() async {}
+    func cancel() async {
+        letGo()
+    }
 }
 
 // Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
@@ -149,6 +151,18 @@ extension TranscriberMockSuites {
                 let saved = await model.library.list().map(\.id)
                 #expect(saved == [entryID])
             }
+        }
+
+        @Test("the test capture lets a held prepare go when it is cancelled, as a real capture's cancel ends it")
+        func stubCaptureCancelLetsGo() async throws {
+            let capture = StubCapture(file: URL(fileURLWithPath: "/dev/null"), holdsPrepare: true)
+            let preparing = Task { try await capture.prepare() }
+            await settle()
+
+            await capture.cancel()
+
+            let prepared = await awaitGuarded("the held prepare", timeout: .seconds(2)) { try? await preparing.value }
+            #expect(prepared != nil)
         }
 
         @Test("a live take says it transcribes live from Record on, through its count-in and before its start decides")
