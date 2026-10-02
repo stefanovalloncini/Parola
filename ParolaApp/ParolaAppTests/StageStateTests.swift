@@ -601,6 +601,39 @@ struct StageStateTests {
     }
 
     @MainActor
+    @Test("a take that never started says nothing beside its banner, and its clock stays where its arming Stage had it")
+    func neverStartedStageSaysNoStatus() async throws {
+        let model = makeRecordingModel("stage-never-started")
+        let arming = RecordingSession(
+            takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture
+        )
+        var neverStarted = arming
+        neverStarted.fail("Failed to load audio: fixture not found")
+        #expect(neverStarted.failedWhile == .starting)
+        model.route = .recording
+        /// A take at 0:00 plays the Stage's entrance, so it is read once that has run.
+        func settled(_ take: RecordingSession) async -> [HostedAccessibility.Element] {
+            let hosted = HostedWindow(StagePage(take: take).environment(model), width: 1180, height: 708)
+            defer { hosted.close() }
+            await settle(for: .milliseconds(800))
+            return HostedAccessibility.elements(in: hosted.host)
+        }
+
+        let starting = await settled(arming)
+        let failed = await settled(neverStarted)
+
+        let words = failed.flatMap(\.words)
+        #expect(words.contains("Couldn't start the recording"))
+        #expect(!words.contains("STOPPED"), "the take never ran, so nothing stopped")
+        #expect(!words.contains("REC"))
+        let clockStarting = starting.first { $0.label == "Recording time" }
+        let clockFailed = failed.first { $0.label == "Recording time" }
+        let before = try #require(clockStarting).frame
+        let after = try #require(clockFailed).frame
+        #expect(abs(after.midY - before.midY) < 1, "the empty status line keeps its height")
+    }
+
+    @MainActor
     @Test("a transcribing take's overview keeps the page's margins")
     func overviewMargins() throws {
         let model = makeRecordingModel("stage-overview-margins")

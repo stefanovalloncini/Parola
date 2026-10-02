@@ -288,6 +288,10 @@ struct StageFacts: View {
             case .finishing:
                 RecDot(color: DS.Color.secondaryText)
                 statusWord("REC", color: DS.Color.secondaryText)
+            case .failed where take.failedWhile == .starting:
+                // Above "Couldn't start the recording" a take that never ran has nothing to add; the blank keeps the line's height.
+                Text(verbatim: " ")
+                    .accessibilityHidden(true)
             case .failed:
                 RecDot(color: DS.Color.secondaryText)
                 statusWord("STOPPED", color: DS.Color.secondaryText)
