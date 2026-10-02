@@ -29,6 +29,15 @@ enum TakeRemote {
         }
     }
 
+    /// The take's time; while it arms, what it waits on: a model's download as a percentage, else "…", never a 0:00 that reads as recording.
+    nonisolated static func clock(for take: RecordingSession, now: Date) -> String {
+        switch take.state {
+        case .arming(.preparingModel(_, let download?)): AppFormat.percent(download)
+        case .arming: "…"
+        default: StageClock.text(seconds: Int(take.elapsed(at: now)))
+        }
+    }
+
     /// What a take that failed out of sight says where its time was.
     nonisolated static func stoppedTitle(bundle: Bundle = .main) -> String {
         String(localized: "Take.Stopped", defaultValue: "Stopped", bundle: bundle)

@@ -77,7 +77,7 @@ private struct SidebarRecordingRowFace: View {
             Text("Failed")
                 .foregroundStyle(DS.Color.warningText)
         default:
-            Text(verbatim: StageClock.text(seconds: Int(take.elapsed(at: now))))
+            Text(verbatim: TakeRemote.clock(for: take, now: now))
                 .monospacedDigit()
                 .foregroundStyle(DS.Color.secondaryText)
         }
@@ -89,7 +89,7 @@ private struct SidebarRecordingRowFace: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(DS.Palette.warning)
         } else {
-            RecDot(color: TakeRemote.lamp(for: take).tint.color)
+            TakeLight(take: take)
         }
     }
 }

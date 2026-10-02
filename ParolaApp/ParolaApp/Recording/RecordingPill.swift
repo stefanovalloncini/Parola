@@ -220,11 +220,8 @@ struct RecordingPillFace: View {
         HStack(spacing: DS.Spacing.regular) {
             Button(action: onShowParola) {
                 HStack(spacing: DS.Spacing.small) {
-                    RecDot(
-                        color: TakeRemote.lamp(for: take).tint.color,
-                        pulsesFrom: isOnScreen && take.state == .recording ? take.clockOrigin : nil
-                    )
-                    Text(verbatim: RecordingStatusItem.clock(for: take, now: now))
+                    TakeLight(take: take, pulsesFrom: isOnScreen && take.state == .recording ? take.clockOrigin : nil)
+                    Text(verbatim: TakeRemote.clock(for: take, now: now))
                         .font(DS.Font.takeTimerCompact)
                         .foregroundStyle(DS.Color.primaryText)
                     if let warning {

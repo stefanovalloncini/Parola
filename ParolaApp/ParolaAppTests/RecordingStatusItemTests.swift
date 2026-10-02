@@ -84,7 +84,7 @@ private func capturingTake(arming: RecordingSession.Arming = .startingCapture) -
 }
 
 private func menuBarTitle(_ take: RecordingSession, at now: Date) -> String {
-    RecordingStatusItem.attributedTitle(clock: RecordingStatusItem.clock(for: take, now: now), lamp: TakeRemote.lamp(for: take)).string
+    RecordingStatusItem.attributedTitle(clock: TakeRemote.clock(for: take, now: now), lamp: TakeRemote.lamp(for: take)).string
 }
 
 @Suite("Recording status item and pill")
@@ -123,11 +123,11 @@ struct RecordingStatusItemTests {
         #expect(RecordingStatusItem.controls(for: take).map(\.isEnabled) == [false, false, false, false, true])
     }
 
-    @Test("the title is the take's light and its clock: grey at 0:00 while it starts, red and ticking, amber and held while it pauses")
+    @Test("the title is the take's light and its clock: grey and waiting while it starts, red and ticking, a pause sign and held while it pauses")
     func title() {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
         var take = capturingTake()
-        #expect(menuBarTitle(take, at: start) == "● 0:00")
+        #expect(menuBarTitle(take, at: start) == "● …")
         #expect(TakeRemote.lamp(for: take) == .waiting)
 
         _ = take.markCapturing(at: start)
@@ -135,7 +135,7 @@ struct RecordingStatusItemTests {
         #expect(TakeRemote.lamp(for: take) == .recording)
 
         _ = take.pause(at: start.addingTimeInterval(754))
-        #expect(menuBarTitle(take, at: start.addingTimeInterval(800)) == "● 12:34")
+        #expect(menuBarTitle(take, at: start.addingTimeInterval(800)) == "\u{FFFC} 12:34")
         #expect(TakeRemote.lamp(for: take) == .paused)
 
         _ = take.resume(at: start.addingTimeInterval(800))
@@ -214,6 +214,39 @@ struct RecordingStatusItemTests {
         _ = take.resume(at: at)
         _ = take.finish(at: at)
         #expect(TakeRemote.spokenStatus(for: take, at: at, bundle: it, locale: italian) == "Chiusura in corso, \(time)")
+    }
+}
+
+@Suite("Paused and starting read without colour")
+struct TakeStateWithoutColourTests {
+    @Test("a starting take shows what it waits on, never a 0:00 that reads as recording")
+    func armingClock() {
+        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+        #expect(TakeRemote.clock(for: capturingTake(arming: .countIn(remaining: 3)), now: now) == "…")
+        #expect(TakeRemote.clock(for: capturingTake(arming: .startingCapture), now: now) == "…")
+        #expect(TakeRemote.clock(for: capturingTake(arming: .preparingModel(name: "openai_whisper-tiny", download: nil)), now: now) == "…")
+        let downloading = TakeRemote.clock(
+            for: capturingTake(arming: .preparingModel(name: "openai_whisper-tiny", download: 0.42)), now: now
+        )
+        #expect(downloading == AppFormat.percent(0.42))
+        var take = capturingTake()
+        _ = take.markCapturing(at: now)
+        #expect(TakeRemote.clock(for: take, now: now.addingTimeInterval(75)) == "1:15")
+    }
+
+    @Test("a paused take draws a pause sign in the dot's place, on the pill, the sidebar row and in the menu bar")
+    func pausedSign() throws {
+        var take = capturingTake()
+        _ = take.markCapturing(at: .now)
+        #expect(TakeLight.symbol(for: take) == nil)
+        _ = take.pause(at: .now)
+        #expect(TakeLight.symbol(for: take) == "pause.fill")
+        let title = RecordingStatusItem.attributedTitle(clock: "12:34", lamp: .paused)
+        let attachment = try #require(title.attribute(.attachment, at: 0, effectiveRange: nil) as? NSTextAttachment)
+        #expect(attachment.image != nil)
+        #expect(!title.string.contains("●"))
+        let recording = RecordingStatusItem.attributedTitle(clock: "12:34", lamp: .recording)
+        #expect(recording.string == "● 12:34")
     }
 }
 

@@ -65,7 +65,7 @@ struct SessionCapsuleFace: View {
             Button(action: showStage) {
                 HStack(spacing: DS.Spacing.snug) {
                     dot
-                    Text(verbatim: StageClock.text(seconds: Int(take.elapsed(at: now))))
+                    Text(verbatim: TakeRemote.clock(for: take, now: now))
                         .font(DS.Font.takeTimerCompact)
                     if take.isPaused {
                         Text("Paused")

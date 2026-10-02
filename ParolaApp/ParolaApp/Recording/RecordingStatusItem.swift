@@ -51,10 +51,6 @@ final class RecordingStatusItem: NSObject {
         controls(for: take).map(\.title)
     }
 
-    nonisolated static func clock(for take: RecordingSession, now: Date) -> String {
-        StageClock.text(seconds: Int(take.elapsed(at: now)))
-    }
-
     /// Pause, Mark and Discard… need a capture; Stop has nothing left once the take finishes; a failed take only leads back to Parola.
     nonisolated static func controls(for take: RecordingSession, bundle: Bundle = .main) -> [Control] {
         let showParola = Control(title: String(localized: "Show Parola", bundle: bundle), isEnabled: true, action: #selector(showParola))
@@ -85,8 +81,9 @@ final class RecordingStatusItem: NSObject {
     nonisolated static func glyph(for lamp: TakeRemote.Lamp, font: NSFont) -> NSAttributedString {
         let symbol: String
         switch lamp {
-        case .recording, .waiting, .paused:
+        case .recording, .waiting:
             return NSAttributedString(string: "●", attributes: [.font: font, .foregroundColor: lamp.tint.nsColor])
+        case .paused: symbol = TakeLight.pauseSymbol
         case .stopped: symbol = "exclamationmark.triangle.fill"
         }
         let configuration = NSImage.SymbolConfiguration(pointSize: font.pointSize * 0.8, weight: .semibold)
@@ -131,7 +128,7 @@ final class RecordingStatusItem: NSObject {
         }
         let status = TakeRemote.spokenStatus(for: take, at: now, bundle: bundle)
         return Face(
-            clock: clock(for: take, now: now),
+            clock: TakeRemote.clock(for: take, now: now),
             lamp: TakeRemote.lamp(for: take),
             spoken: warning.map { status + ". " + $0 } ?? status,
             controls: controls(for: take, bundle: bundle),
