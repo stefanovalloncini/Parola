@@ -165,14 +165,15 @@ struct RecordingPillFace: View {
 
     var body: some View {
         if let take = model.recording {
+            let warning = TakeRemote.warning(for: take, in: model)
             if case .failed(let message) = take.state {
-                chrome(stoppedFace(message))
+                chrome(stoppedFace(message), warned: false)
             } else if isOnScreen, take.state == .recording, let origin = take.clockOrigin {
                 TimelineView(.periodic(from: origin, by: 1)) { context in
-                    chrome(face(take, at: context.date))
+                    chrome(face(take, warning: warning, at: context.date), warned: warning != nil)
                 }
             } else {
-                chrome(face(take, at: Date()))
+                chrome(face(take, warning: warning, at: Date()), warned: warning != nil)
             }
         }
     }
@@ -197,18 +198,25 @@ struct RecordingPillFace: View {
         }
     }
 
-    private func chrome(_ content: some View) -> some View {
+    /// A warning rings the pill in amber, so it reads from across the screen.
+    private func chrome(_ content: some View, warned: Bool) -> some View {
         content
             .padding(.leading, DS.Spacing.medium)
             .padding(.trailing, DS.Spacing.small)
             .padding(.vertical, DS.Spacing.small)
             .glassEffect(.regular, in: Capsule())
+            .overlay {
+                if warned {
+                    Capsule().strokeBorder(DS.Color.warningText, lineWidth: 1.5)
+                }
+            }
             .fixedSize()
             .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
             .axBranch("RecordingPill")
     }
 
-    private func face(_ take: RecordingSession, at now: Date) -> some View {
+    /// A warning the Stage would show sits after the clock in amber, and is what the pointer and VoiceOver hear about.
+    private func face(_ take: RecordingSession, warning: TakeRemote.Warning?, at now: Date) -> some View {
         HStack(spacing: DS.Spacing.regular) {
             Button(action: onShowParola) {
                 HStack(spacing: DS.Spacing.small) {
@@ -219,12 +227,17 @@ struct RecordingPillFace: View {
                     Text(verbatim: RecordingStatusItem.clock(for: take, now: now))
                         .font(DS.Font.takeTimerCompact)
                         .foregroundStyle(DS.Color.primaryText)
+                    if let warning {
+                        Image(systemName: warning.symbol)
+                            .foregroundStyle(DS.Color.warningText)
+                    }
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Show Parola")
+            .help(warning.map { Text(verbatim: $0.message) } ?? Text("Show Parola"))
             .accessibilityLabel(Text(verbatim: TakeRemote.spokenStatus(for: take, at: now)))
+            .accessibilityValue(Text(verbatim: warning?.message ?? ""))
             .accessibilityHint("Show Parola")
             .axLeaf("Button.ShowParola")
             PillMeter(model: model, paused: take.isPaused, isOnScreen: isOnScreen)

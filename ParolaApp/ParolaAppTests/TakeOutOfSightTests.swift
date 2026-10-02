@@ -230,3 +230,74 @@ extension TranscriberMockSuites {
         }
     }
 }
+
+@MainActor
+@Suite("The take's warnings outside the window", .serialized)
+struct TakeWarningsOutsideTests {
+    @Test("low disk space comes before silence, and a take that isn't running warns of nothing")
+    func whichWarning() throws {
+        let audio = try tempWAV("warning-order")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("warning-order")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        let take = try #require(model.recording)
+        #expect(TakeRemote.warning(for: take, in: model) == nil)
+
+        model.recordingIsSilent = true
+        #expect(TakeRemote.warning(for: take, in: model)?.message == "No voice detected — check your microphone.")
+        model.recordingDiskSpaceLow = true
+        #expect(TakeRemote.warning(for: take, in: model)?.symbol == "internaldrive")
+        #expect(TakeRemote.warning(for: failedTake(), in: model) == nil)
+        model.endTestTake()
+    }
+
+    @Test("the menu bar item's menu says the warning first, on a line that does nothing, and VoiceOver hears it")
+    func statusItemWarns() async throws {
+        let audio = try tempWAV("warning-status-item")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("warning-status-item")
+        let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
+        item.bind(model)
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        let shown = await waitUntil { item.face != nil }
+        #expect(shown)
+        #expect(item.face?.notice == nil)
+
+        model.recordingIsSilent = true
+
+        let warned = await waitUntil { item.face?.notice == "No voice detected — check your microphone." }
+        #expect(warned)
+        let spoken = item.face?.spoken ?? ""
+        #expect(spoken.hasSuffix(". No voice detected — check your microphone."))
+        let face = try #require(item.face)
+        let menu = RecordingStatusItem.menu(face.controls, notice: face.notice, target: nil)
+        #expect(menu.items.map { $0.isSeparatorItem ? "—" : $0.title }
+            == ["No voice detected — check your microphone.", "Stop Recording", "Pause", "Add Marker", "Discard…", "—", "Show Parola"])
+        #expect(menu.items.first?.isEnabled == false)
+
+        model.recordingIsSilent = false
+        let cleared = await waitUntil { item.face?.notice == nil }
+        #expect(cleared)
+        model.endTestTake()
+    }
+
+    @Test("the pill rings in amber with the warning, which its help and VoiceOver value carry")
+    func pillWarns() async throws {
+        let audio = try tempWAV("warning-pill")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("warning-pill")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio))
+        let pill = HostedWindow(RecordingPillFace(model: model, isOnScreen: false, onShowParola: {}, onStop: {}, onSize: { _ in }))
+        defer { pill.close() }
+        func showParola() -> HostedAccessibility.Element? {
+            HostedAccessibility.elements(in: pill.host).first { $0.identifier == "RecordingPill.Button.ShowParola" }
+        }
+        #expect(showParola()?.value ?? "" == "")
+
+        model.recordingDiskSpaceLow = true
+
+        let warned = await waitUntil { showParola()?.value == "Low disk space — recording stops automatically below 200 MB." }
+        #expect(warned)
+        model.endTestTake()
+    }
+}

@@ -39,6 +39,25 @@ enum TakeRemote {
         String(localized: "Recording stopped: \(message)", bundle: bundle)
     }
 
+    /// What needs the user's eye while a take runs, on the Stage and on the surfaces outside the window.
+    struct Warning: Equatable {
+        let message: String
+        let symbol: String
+    }
+
+    /// Low disk space before silence: it is the one that ends the take.
+    static func warning(for take: RecordingSession, in model: AppModel) -> Warning? {
+        guard take.isRunning else { return nil }
+        if model.recordingDiskSpaceLow {
+            return Warning(message: String(localized: "Low disk space — recording stops automatically below 200 MB."), symbol: "internaldrive")
+        }
+        guard model.recordingIsSilent else { return nil }
+        return Warning(
+            message: StageFacts.silenceWarning(source: take.source, micTrack: model.takeMicTrackState),
+            symbol: "speaker.slash.fill"
+        )
+    }
+
     /// From the count-in until Stop there is a take to stop or cancel; one finishing is already on its way to the library.
     nonisolated static func canEnd(_ take: RecordingSession?) -> Bool {
         guard let take else { return false }

@@ -118,7 +118,8 @@ final class RecordingStatusItem: NSObject {
         }
     }
 
-    nonisolated static func face(for take: RecordingSession, now: Date, bundle: Bundle = .main) -> Face {
+    /// A warning the Stage would show is the menu's first line, and VoiceOver hears it after the take's status.
+    nonisolated static func face(for take: RecordingSession, now: Date, warning: String? = nil, bundle: Bundle = .main) -> Face {
         if case .failed(let message) = take.state {
             return Face(
                 clock: TakeRemote.stoppedTitle(bundle: bundle),
@@ -128,11 +129,13 @@ final class RecordingStatusItem: NSObject {
                 notice: message
             )
         }
+        let status = TakeRemote.spokenStatus(for: take, at: now, bundle: bundle)
         return Face(
             clock: clock(for: take, now: now),
             lamp: TakeRemote.lamp(for: take),
-            spoken: TakeRemote.spokenStatus(for: take, at: now, bundle: bundle),
-            controls: controls(for: take, bundle: bundle)
+            spoken: warning.map { status + ". " + $0 } ?? status,
+            controls: controls(for: take, bundle: bundle),
+            notice: warning
         )
     }
 
@@ -142,7 +145,8 @@ final class RecordingStatusItem: NSObject {
             made.button?.setAccessibilityIdentifier("MenuBar.Button.Recording")
             item = made
         }
-        let face = Self.face(for: take, now: now)
+        let warning = model.flatMap { TakeRemote.warning(for: take, in: $0) }
+        let face = Self.face(for: take, now: now, warning: warning?.message)
         guard face != self.face else { return }
         if face.controls != self.face?.controls || face.notice != self.face?.notice {
             item?.menu = Self.menu(face.controls, notice: face.notice, target: self)

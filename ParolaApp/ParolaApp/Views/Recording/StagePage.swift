@@ -244,7 +244,7 @@ struct StageFacts: View {
                     Text(verbatim: Self.modeLine(isStreaming: take.isStreaming))
                 }
             }
-            if take.isRunning, let warning {
+            if let warning = TakeRemote.warning(for: take, in: model) {
                 Label(warning.message, systemImage: warning.symbol)
                     .foregroundStyle(DS.Color.warningText)
                     .fontWeight(.medium)
@@ -309,14 +309,6 @@ struct StageFacts: View {
     private var separator: some View {
         Text(verbatim: "·")
             .foregroundStyle(DS.Color.secondaryText.opacity(0.7))
-    }
-
-    private var warning: (message: String, symbol: String)? {
-        if model.recordingDiskSpaceLow {
-            return (String(localized: "Low disk space — recording stops automatically below 200 MB."), "internaldrive")
-        }
-        guard model.recordingIsSilent else { return nil }
-        return (Self.silenceWarning(source: take.source, micTrack: model.takeMicTrackState), "speaker.slash.fill")
     }
 
     /// A quiet meeting that records your microphone heard neither side, so it names both.
