@@ -101,7 +101,7 @@ struct ExportNoticeStrip: View {
         switch handler {
         case .openEntry: "Open"
         case .transcribeEntry: "Transcribe"
-        case .retryTake, .retrySavedTake: "Retry"
+        case .retryTake, .retrySavedTake, .retryRun: "Retry"
         case .showTake, .showSavedTake: "Show"
         case .openRecentlyDeleted: "RecentlyDeleted"
         case .revealFile: "RevealInFinder"

@@ -62,6 +62,7 @@ final class ScriptedLinkFetcher: LinkFetcher {
 
     func fetchCaptions(url: URL, language: String?) async throws -> FetchedCaptions {
         await gate?.wait()
+        if let failure { throw ParolaError.linkDownloadFailed(failure) }
         guard let captions else { throw ParolaError.linkDownloadFailed(LinkDownloadFailure(reason: .noCaptions)) }
         return captions
     }

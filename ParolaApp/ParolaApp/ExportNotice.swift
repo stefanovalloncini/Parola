@@ -27,11 +27,13 @@ struct ExportNotice: Equatable, Identifiable {
             case openRecentlyDeleted
             /// Reveals a file in the Finder, as a microphone track Parola keeps.
             case revealFile(URL)
+            /// Runs again a file or link run that failed after the user moved on.
+            case retryRun(AppModel.RunRetry)
 
             var takeID: Int? {
                 switch self {
                 case .retryTake(let id), .showTake(let id): id
-                case .openEntry, .transcribeEntry, .retrySavedTake, .showSavedTake, .openRecentlyDeleted, .revealFile: nil
+                case .openEntry, .transcribeEntry, .retrySavedTake, .showSavedTake, .openRecentlyDeleted, .revealFile, .retryRun: nil
                 }
             }
         }

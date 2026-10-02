@@ -2703,7 +2703,7 @@ final class AppModel {
             }
             guard let self, self.fileRunGeneration == runToken else { return }
             guard case .done(let duration) = probe else {
-                self.failFileReadTimeout(fileURL, fetchedLink: fetchedLink)
+                self.failFileReadTimeout(fileURL, fetchedLink: fetchedLink, translateOverride: translateOverride, since: windowGeneration)
                 return
             }
             if !startsOutOfSight, let duration, self.mediaDurationSeconds == nil { self.mediaDurationSeconds = duration }
@@ -2800,11 +2800,14 @@ final class AppModel {
                     retireFileRun(runToken)
                 }
                 if !Task.isCancelled {
-                    // An arrival's failure stays out of the way of whatever the user opened while it ran.
-                    let outOfSight = arrival != nil && userMovedOn(from: fileURL, since: windowGeneration)
+                    // A failure stays out of the way of whatever the user opened while it ran.
+                    let outOfSight = userMovedOn(from: fileURL, since: windowGeneration)
                     if outOfSight {
                         leaveRunPhase()
                         letGoOfRunMedia(fileURL)
+                        if arrival == nil {
+                            reportRunFailure(error, of: fileURL, fetchedLink: fetchedLink, translateOverride: translateOverride)
+                        }
                     } else {
                         applyTranscriptionError(
                             error,
@@ -2852,14 +2855,47 @@ final class AppModel {
 
     /// A probe that never came back means the file itself is out of reach, so the run reading the
     /// same bytes is not going to report anything of its own.
-    private func failFileReadTimeout(_ fileURL: URL, fetchedLink: FetchedLink?) {
+    private func failFileReadTimeout(_ fileURL: URL, fetchedLink: FetchedLink?, translateOverride: Bool?, since windowGeneration: Int) {
         guard fileTranscribeTask != nil else { return }
         let error = ParolaError.fileReadTimedOut(name: fileURL.lastPathComponent)
-        if let arrival = watchedArrivals.first(where: { $0.id == visibleArrivalID }) {
-            failArrival(arrival, error: error)
-        }
+        let outOfSight = userMovedOn(from: fileURL, since: windowGeneration)
+        let arrival = watchedArrivals.first { $0.id == visibleArrivalID }
+        if let arrival { failArrival(arrival, error: error, announces: outOfSight) }
         cancelAndTrack(&fileTranscribeTask)
-        applyTranscriptionError(error, source: fetchedLink == nil ? fileURL : nil, link: fetchedLink?.retry)
+        guard outOfSight else {
+            applyTranscriptionError(error, source: fetchedLink == nil ? fileURL : nil, link: fetchedLink?.retry)
+            return
+        }
+        leaveRunPhase()
+        letGoOfRunMedia(fileURL)
+        // An unreachable file keeps its Retry: asking the volume whether it is there could hang as the read did.
+        if arrival == nil { reportRunFailure(error, of: fileURL, fetchedLink: fetchedLink, translateOverride: translateOverride, checksFile: false) }
+    }
+
+    /// A run that failed after the user moved on leaves their page alone; a notice says so, and stays, with the run's Retry.
+    private func reportRunFailure(
+        _ error: any Error, of fileURL: URL, fetchedLink: FetchedLink?, translateOverride: Bool?, checksFile: Bool = true
+    ) {
+        if let fetchedLink {
+            reportRunFailure(error, name: fetchedLink.media.metadata.title ?? fetchedLink.link.absoluteString, retry: .link(fetchedLink.retry))
+            return
+        }
+        let exists = !checksFile || FileManager.default.fileExists(atPath: fileURL.path)
+        reportRunFailure(error, name: fileURL.lastPathComponent, retry: exists ? .file(fileURL, translateOverride: translateOverride) : nil)
+    }
+
+    private func reportRunFailure(_ error: any Error, name: String, retry: RunRetry?) {
+        guard !(error is CancellationError) else { return }
+        var retry = retry
+        if case ParolaError.linkDownloadFailed(let failure) = error {
+            noteYtDlp(from: failure)
+            if !failure.isWorthRetrying { retry = nil }
+        }
+        let detail = Self.errorDetail(from: Self.transcriptionFailureMessage(for: error))
+        exportNotice = ExportNotice(
+            message: String(localized: "Couldn't transcribe \(name)") + ". " + detail, failures: [], folder: nil, tone: .failure,
+            actions: retry.map { [ExportNotice.Action(title: String(localized: "Retry"), handler: .retryRun($0))] } ?? []
+        )
     }
 
     func makeFilePartialHandler(runToken: Int) -> @Sendable (String) -> Void {
@@ -3103,6 +3139,12 @@ final class AppModel {
         case subtitles(String)
     }
 
+    /// What Retry runs again for a run that failed after the user moved on: the file, or the link.
+    enum RunRetry: Equatable {
+        case file(URL, translateOverride: Bool?)
+        case link(DeferredLink)
+    }
+
     /// A link run's download, handed to the file run that transcribes it.
     struct FetchedLink {
         /// What the user handed over: Retry and recovery replay it.
@@ -3183,7 +3225,12 @@ final class AppModel {
                 self.endRecovery(recoveryToken)
                 self.retireFileRun(runToken)
                 guard !Task.isCancelled else { return }
-                self.applyTranscriptionError(error, link: .transcribe(url.absoluteString))
+                if self.userMovedOn(since: windowGeneration) {
+                    self.leaveRunPhase()
+                    self.reportRunFailure(error, name: url.absoluteString, retry: .link(.transcribe(url.absoluteString)))
+                } else {
+                    self.applyTranscriptionError(error, link: .transcribe(url.absoluteString))
+                }
                 self.youtubeTranscribeTask = nil
             }
         }
@@ -3267,7 +3314,14 @@ final class AppModel {
                     titleSource: result.videoTitle == nil ? nil : .source
                 ))
             } catch {
-                if !Task.isCancelled { applyTranscriptionError(error, link: .subtitles(url.absoluteString)) }
+                if !Task.isCancelled {
+                    if userMovedOn(since: windowGeneration) {
+                        leaveRunPhase()
+                        reportRunFailure(error, name: url.absoluteString, retry: .link(.subtitles(url.absoluteString)))
+                    } else {
+                        applyTranscriptionError(error, link: .subtitles(url.absoluteString))
+                    }
+                }
             }
             if !Task.isCancelled { self.youtubeSubsTask = nil }
         }

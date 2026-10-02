@@ -135,6 +135,17 @@ extension AppModel {
             openRecentlyDeleted()
         case .revealFile(let file):
             NSWorkspace.shared.activateFileViewerSelecting([file])
+        case .retryRun(let retry):
+            guard !takeIsRunning else {
+                noteRunWaitsForTake()
+                return
+            }
+            route = .transcript
+            switch retry {
+            case .file(let url, let translateOverride): beginFileTranscription(fileURL: url, translateOverride: translateOverride)
+            case .link(.transcribe(let link)): transcribeYouTube(urlString: link)
+            case .link(.subtitles(let link)): fetchYouTubeSubs(urlString: link)
+            }
         }
     }
 

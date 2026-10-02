@@ -280,7 +280,9 @@ extension TranscriberMockSuites {
             #expect(model.exportNotice?.message == "Couldn't open Voice memo 3")
             #expect(model.exportNotice?.tone == .failure)
             #expect(model.phase == .fetchingLink(title: nil, progress: nil))
-            await waitUntil { model.phase == .failed(message: staleRefusalMessage) }
+            let failed = await waitUntil { model.exportNotice?.message == "Couldn't transcribe \(Self.link). \(staleRefusalMessage)" }
+            #expect(failed, "the run's own failure, away from its page, says so in a notice too")
+            #expect(model.phase == .idle)
         }
     }
 }
