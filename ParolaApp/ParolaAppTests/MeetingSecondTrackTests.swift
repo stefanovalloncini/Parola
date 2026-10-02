@@ -469,6 +469,8 @@ extension TranscriberMockSuites {
                 defer { try? allowWrites(in: folder) }
 
                 model.retranscribeCurrentEntry(model: "nvidia_parakeet-tdt-0.6b-v3", language: nil)
+                let started = model.retranscribeRequest != nil
+                #expect(started, "Transcribe Again started a run")
 
                 // The run loads, checks the room and fails its downmix off the main actor, which a loaded host can hold up for seconds.
                 let over = await waitUntil(timeoutMs: 30_000) { model.retranscribeRequest == nil }
