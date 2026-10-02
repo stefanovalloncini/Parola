@@ -151,6 +151,50 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a live take says it transcribes live from Record on, through its count-in and before its start decides")
+        func liveTakeSaysSoFromRecord() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["live"], gate: MockTranscriberGate()))
+                let model = makeModel()
+                model.useStreaming = true
+                model.selectedModel = "openai_whisper-tiny"
+                model.recordingCountInSeconds = 60
+                model.startRecording(source: .microphone)
+                let countingIn = model.recording?.isCountingIn == true
+                #expect(countingIn)
+                #expect(model.recording?.isStreaming == true)
+                model.cancelRecordingCountdown()
+
+                model.recordingCountInSeconds = 0
+                model.startRecording(source: .microphone)
+                #expect(model.recording?.isArming == true)
+                #expect(model.recording?.isStreaming == true)
+                await model.discardTake()
+                await waitUntil { !model.recordingActive }
+            }
+        }
+
+        @Test("a take expected to stream that records to its file after all says so once it captures")
+        func fileTakeCorrectsThePrediction() async throws {
+            let fixture = try makeTakeWAV("mirror-predicted-live", seconds: 2)
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                let model = makeModel()
+                model.useStreaming = true
+                model.selectedModel = "openai_whisper-tiny"
+                model.startRecording(source: .microphone)
+                #expect(model.recording?.isStreaming == true)
+
+                let recording = await waitUntil { model.recording?.state == .recording }
+
+                #expect(recording)
+                #expect(model.recording?.isStreaming == false)
+                await model.discardTake()
+            }
+        }
+
         @Test("a live take stopped while its model loads ends its session with the reason")
         func liveTakeStoppedWhileLoading() async throws {
             try await withMocksCleared([.audioSource, .streaming]) {

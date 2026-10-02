@@ -3404,7 +3404,7 @@ final class AppModel {
             source: source,
             category: category,
             title: Self.liveRecordingTitle(category: category, endedAt: stamp),
-            isStreaming: false,
+            isStreaming: predictsLiveTake(source),
             arming: .countIn(remaining: seconds),
             titleDate: stamp
         ))
@@ -3516,8 +3516,17 @@ final class AppModel {
     /// file-capture path instead, so the fixture transcribes the same way system audio does.
     /// Non-WhisperKit engines can't stream either — those record the take first, then transcribe.
     func shouldUseStreamingMic() async -> Bool {
-        guard useStreaming, ModelCatalog.canStream(id: selectedModel) else { return false }
+        guard streamsMicTakes else { return false }
         return await MockAudioSourceRegistry.shared.resolve(for: .mic) == nil
+    }
+
+    /// What a take from `source` shows from Record on: a mic take streams when the setting and the model allow it; the start corrects it if it records to its file after all.
+    private func predictsLiveTake(_ source: RecordSource) -> Bool {
+        source == .microphone && streamsMicTakes
+    }
+
+    private var streamsMicTakes: Bool {
+        useStreaming && ModelCatalog.canStream(id: selectedModel)
     }
 
     /// A take from its count-in until its capture has wound down: arming, recording, paused or finishing.
@@ -3647,7 +3656,7 @@ final class AppModel {
             source: source,
             category: take.category,
             title: Self.liveRecordingTitle(category: take.category, endedAt: stamp),
-            isStreaming: false,
+            isStreaming: predictsLiveTake(source),
             arming: .startingCapture,
             titleDate: stamp
         )
