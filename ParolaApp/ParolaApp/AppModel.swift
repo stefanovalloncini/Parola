@@ -241,6 +241,7 @@ final class AppModel {
                 if exportNotice?.whileTakeRuns == true { exportNotice = nil }
             }
             if route == .recording, !Self.stageHasSomethingToShow(recording) { route = .transcript }
+            if let coveredTake = coveredNotice?.takeID, coveredTake == oldValue?.takeID, coveredTake != recording?.takeID { coveredNotice = nil }
             // A notice goes with its take's session; one about a take already let go stays while the next take records.
             if let noticeTake = exportNotice?.takeID, noticeTake == oldValue?.takeID, noticeTake != recording?.takeID { exportNotice = nil }
         }
@@ -960,13 +961,13 @@ final class AppModel {
     var deliveryNotice: DeliveryNotice?
     var exportNotice: ExportNotice? {
         didSet {
-            guard exportNotice == nil, let covered = noticeUnderMacAudio else { return }
-            noticeUnderMacAudio = nil
+            guard exportNotice == nil, let covered = coveredNotice else { return }
+            coveredNotice = nil
             exportNotice = covered
         }
     }
-    /// A failure about something else that a Mac-audio notice went over: it comes back once the strip is clear again. One deep, never a queue.
-    @ObservationIgnored var noticeUnderMacAudio: ExportNotice?
+    /// A notice waiting to be dismissed that a newer one went over: it comes back once the strip is clear again. One deep, never a queue.
+    @ObservationIgnored var coveredNotice: ExportNotice?
     @ObservationIgnored lazy var deliveryEngine: DeliveryEngine = makeDeliveryEngine()
     @ObservationIgnored var volumeMountObservation: NotificationObservation?
 
@@ -2933,10 +2934,12 @@ final class AppModel {
             if !failure.isWorthRetrying { retry = nil }
         }
         let detail = Self.errorDetail(from: Self.transcriptionFailureMessage(for: error))
+        let covered = exportNotice
         exportNotice = ExportNotice(
             message: String(localized: "Couldn't transcribe \(name)") + ". " + detail, failures: [], folder: nil, tone: .failure,
             actions: retry.map { [ExportNotice.Action(title: String(localized: "Retry"), handler: .retryRun($0))] } ?? []
         )
+        keepCovered(covered, take: nil)
     }
 
     func makeFilePartialHandler(runToken: Int) -> @Sendable (String) -> Void {
@@ -4681,13 +4684,13 @@ final class AppModel {
         guard recording?.isArming != true else {
             takeStopReason = unheard ?? message
             endTakeBeforeCapture(reporting: unheard ?? message)
-            keepCoveredFailure(covered, take: takeID)
+            keepCovered(covered, take: takeID)
             return
         }
         takeStopReason = message
         stopRecordingAndTranscribe()
         exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure, forTake: takeID)
-        keepCoveredFailure(covered, take: takeID)
+        keepCovered(covered, take: takeID)
     }
 
     /// Cancel on a take that has captured nothing: there is nothing to lose, so it ends without a word.

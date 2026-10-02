@@ -819,6 +819,25 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a notice about a take, waiting under another, goes with that take's session as the strip's own notice does")
+        func coveredNoticeGoesWithItsTake() throws {
+            let model = makeRecordingModel("covered-notice-take")
+            model.installTestTake(source: .microphone)
+            let take = try #require(model.recording?.takeID)
+            let aboutTake = ExportNotice(
+                message: "The recording stopped.", failures: [], folder: nil, tone: .failure,
+                actions: [ExportNotice.Action(title: "Show", handler: .showTake(take))]
+            )
+            model.exportNotice = aboutTake
+            model.exportNotice = ExportNotice(message: "Auto-export couldn't write to its folder.", failures: [], folder: nil, tone: .failure)
+            model.keepCovered(aboutTake, take: nil)
+            #expect(model.coveredNotice?.id == aboutTake.id)
+
+            model.endTestTake()
+
+            #expect(model.coveredNotice == nil, "a notice whose buttons act on a take that is gone would come back")
+        }
+
         @Test("resetTestState forgets a notice waiting under a Mac-audio notice, so nothing from before the reset comes back")
         func resetForgetsIt() async throws {
             let model = makeRecordingModel("covered-notice-reset")
@@ -826,11 +845,11 @@ extension TranscriberMockSuites {
             let context = AutomationContext(model: model, server: server)
             let lifecycle = Dictionary(uniqueKeysWithValues: server.lifecycleCommands().map { ($0.name, $0) })
             let reset = try #require(lifecycle["resetTestState"])
-            model.noticeUnderMacAudio = unfoldableNotice()
+            model.coveredNotice = unfoldableNotice()
 
             _ = try await reset.handler(try reset.validate(AutomationArgs([:])), context)
 
-            #expect(model.noticeUnderMacAudio == nil)
+            #expect(model.coveredNotice == nil)
             withExtendedLifetime(server) {}
         }
 
@@ -854,8 +873,8 @@ extension TranscriberMockSuites {
                 let sameTake = ExportNotice(message: "About this take", failures: [], folder: nil, tone: .failure, forTake: take)
                 model.exportNotice = sameTake
                 model.exportNotice = ExportNotice(message: AppModel.macAudioStoppedMessage(), failures: [], folder: nil, tone: .info)
-                model.keepCoveredFailure(sameTake, take: take)
-                #expect(model.noticeUnderMacAudio == nil, "a failure about the take the Mac-audio notice is about doesn't wait under it")
+                model.keepCovered(sameTake, take: take)
+                #expect(model.coveredNotice == nil, "a failure about the take the Mac-audio notice is about doesn't wait under it")
             }
         }
     }

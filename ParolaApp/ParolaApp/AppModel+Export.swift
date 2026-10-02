@@ -103,6 +103,13 @@ extension AppModel {
         exportNotice = nil
     }
 
+    /// Keeps what a newer notice went over, to come back once the strip is clear: one that waits to be dismissed, about something other than `takeID`, the newer one's take.
+    func keepCovered(_ covered: ExportNotice?, take takeID: Int?) {
+        guard let covered, covered.id != exportNotice?.id, !covered.autoDismisses, !covered.whileTakeRuns else { return }
+        guard takeID == nil || covered.takeID != takeID else { return }
+        coveredNotice = covered
+    }
+
     /// A notice's button: the notice goes first, then its action runs.
     func performNoticeAction(_ action: ExportNotice.Action) {
         dismissExportNotice()

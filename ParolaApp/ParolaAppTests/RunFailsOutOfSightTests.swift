@@ -101,6 +101,39 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a run failing out of sight goes over a notice that waits to be dismissed, which comes back after it")
+        func failureKeepsTheNoticeItCovers() async throws {
+            let wav = try makeLinkFixtureWAV()
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                defer { Task { await gate.open() } }
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: Self.failing(after: gate))
+                let model = makeModel()
+                let saved = ExportNotice(
+                    message: "Saved the previous recording without transcribing it.", failures: [], folder: nil, tone: .info,
+                    actions: [
+                        ExportNotice.Action(title: "Open", handler: .openEntry("older")),
+                        ExportNotice.Action(title: "Transcribe", handler: .transcribeEntry("older")),
+                    ]
+                )
+
+                model.transcribe(fileURL: wav)
+                await model.awaitDuplicateCheck()
+                try #require(model.fileTranscribeTask != nil, "the import never started a run")
+                model.openStatistics()
+                model.exportNotice = saved
+                await gate.open()
+
+                let posted = await waitUntil { model.exportNotice?.tone == .failure }
+                #expect(posted, "the failure said nothing")
+                model.dismissExportNotice()
+                #expect(model.exportNotice?.id == saved.id, "the notice the failure went over never came back")
+                model.dismissExportNotice()
+                #expect(model.exportNotice == nil, "one deep, never a queue")
+            }
+        }
+
         @Test("a file gone by the time its run fails out of sight leaves the notice without Retry")
         func goneFileHasNoRetry() async throws {
             let wav = try makeLinkFixtureWAV()
