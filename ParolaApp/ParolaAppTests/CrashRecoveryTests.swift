@@ -554,12 +554,16 @@ extension TranscriberMockSuites {
                 try JSONDecoder().decode(RecoveryCheckpoint.self, from: Data(contentsOf: file))
             }
 
+            let writesBefore = model.checkpointWrites
             let title = "Board meeting"
             for end in title.indices { model.renameTake(String(title[...end])) }
             await model.pendingRecoveryWrite?.value
             #expect(try written().typedTitle == nil, "no write for each keystroke")
             let landed = await waitUntil(timeoutMs: 3_000) { (try? written())?.typedTitle == title }
             #expect(landed)
+            await settle(for: .milliseconds(500))
+            await model.pendingRecoveryWrite?.value
+            #expect(model.checkpointWrites - writesBefore == 1, "one write for the whole run of keystrokes")
 
             let mark = try #require(model.addTakeMarker())
             await model.pendingRecoveryWrite?.value

@@ -322,6 +322,7 @@ extension AppModel {
     @discardableResult
     private func writeRecoveryFile(generation: Int, _ checkpoint: RecoveryCheckpoint) -> Task<Bool, Never>? {
         guard let id = recoveryFileIDs[generation] else { return nil }
+        checkpointWrites += 1
         var checkpoint = checkpoint
         checkpoint.id = id
         checkpoint.owner = recoveryOwner?.id

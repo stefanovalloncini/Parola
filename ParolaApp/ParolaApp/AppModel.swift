@@ -597,6 +597,8 @@ final class AppModel {
 
     var pendingRecovery: RecoveryCheckpoint?
     @ObservationIgnored var recoveryGeneration: Int = 0
+    /// How many checkpoints have been queued for the disk, so a test can bound them.
+    @ObservationIgnored var checkpointWrites = 0
     @ObservationIgnored var activeRecoveryGeneration: Int?
     /// Each live generation's checkpoint file, named for its id; a generation missing here has ended.
     @ObservationIgnored var recoveryFileIDs: [Int: UUID] = [:]
