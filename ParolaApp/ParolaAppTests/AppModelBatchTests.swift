@@ -1320,6 +1320,22 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.isEmpty)
     }
 
+    @Test("Retry on a failed run, pressed while a batch runs, joins the batch rather than running beside it")
+    func retryDuringABatchJoinsIt() async {
+        let model = makeModel()
+        model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav")])
+        await model.handleBatchEvent(.started(jobID: model.batchJobs[0].id))
+        let page = model.route
+        let url = URL(fileURLWithPath: "/tmp/retried.wav")
+
+        model.performNoticeAction(ExportNotice.Action(title: "Retry", handler: .retryRun(.file(url, translateOverride: nil))))
+        await model.awaitBatchImport()
+
+        #expect(model.batchJobs.contains { $0.url == url && $0.status == .pending })
+        #expect(model.fileTranscribeTask == nil, "the Retry ran beside the batch")
+        #expect(model.route == page, "the Retry took the batch's page")
+    }
+
     @Test("single-file arrivals during a running batch join the queue")
     func runningBatchAbsorbsSingleArrival() async {
         let model = makeModel()

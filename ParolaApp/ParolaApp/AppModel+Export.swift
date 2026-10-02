@@ -156,6 +156,11 @@ extension AppModel {
                 noteRunWaitsForTake()
                 return
             }
+            // As for a file handed over now: a run beside the batch would fight it for the phase.
+            guard !batchIsRunning else {
+                importBatchFiles([url])
+                return
+            }
             showRunPage()
             beginFileTranscription(fileURL: url, translateOverride: translateOverride)
         case .link(.transcribe(let link)):
