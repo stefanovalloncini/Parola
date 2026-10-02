@@ -24,7 +24,7 @@ struct ArrivalToast: View {
                     .foregroundStyle(tint)
             }
             VStack(alignment: .leading, spacing: 2) {
-                // Unbounded, the window's minimum height counts this title wrapped a word a line, and the page outgrows the window.
+                // Unbounded, the window's minimum height counts this title wrapped about a character a line, and the page outgrows the window.
                 title
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.primaryText)

@@ -259,7 +259,7 @@ struct RouteLayoutTests {
         }
     }
 
-    /// A take saved out of sight, as its toast names it: long enough to wrap a word a line in a narrow measure.
+    /// A take saved out of sight, as its toast names it: long enough to run many lines tall in a narrow measure.
     private func savedElsewhereToast() -> ArrivalNotice {
         let title = "Recording 2 Oct 2026 at 9:56"
         let manifest = ParolaDocument.Manifest(originalAudioName: "\(title).m4a", title: title, modelName: "stub", language: "en")
@@ -296,7 +296,7 @@ struct RouteLayoutTests {
     }
 
     @Test("unfolding the sidebar leaves the page and its toast where they were, in the smallest window")
-    func sidebarUnfoldKeepsThePageInPlace() async {
+    func sidebarUnfoldKeepsThePageInPlace() async throws {
         let defaults = temporaryDefaults("test-route-layout-unfold-")
         let previous = DefaultsStore.current
         DefaultsStore.current = defaults
@@ -305,23 +305,29 @@ struct RouteLayoutTests {
         showUntranscribedEntry(model)
         model.arrivalNotice = savedElsewhereToast()
         model.mainSidebar.userSet(.detailOnly)
-        let hosted = HostedWindow(ContentView().environment(model), width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
-        defer { hosted.close() }
-        await ParolaAppTests.settle(for: .milliseconds(300))
-        func toastGap() -> CGFloat? {
+        func toastGap(in hosted: HostedWindow) -> CGFloat? {
             let open = HostedAccessibility.elements(in: hosted.host).first { $0.identifier?.hasSuffix("Arrival.Button.Open") == true }
             return open.map { $0.frame.minY - hosted.window.frame.minY }
         }
-        let folded = toastGap()
+        let roomy = HostedWindow(
+            ContentView().environment(model), width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight + 200
+        )
+        await ParolaAppTests.settle(for: .milliseconds(300))
+        let resting = try #require(toastGap(in: roomy), "the toast never came up")
+        roomy.close()
+        let hosted = HostedWindow(ContentView().environment(model), width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
+        defer { hosted.close() }
+        await ParolaAppTests.settle(for: .milliseconds(300))
+        let folded = toastGap(in: hosted)
+        #expect(folded == resting, "the toast sits off the place it has in a window with room to spare")
 
         model.mainSidebar.userSet(.all)
         await withCheckedContinuation { (turn: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { turn.resume() } }
-        let unfolded = toastGap()
+        let unfolded = toastGap(in: hosted)
         await ParolaAppTests.settle(for: .milliseconds(500))
 
-        #expect(folded == 20, "the toast sits off its place before the unfold")
-        #expect(unfolded == 20, "the toast moved as the sidebar unfolded")
-        #expect(toastGap() == 20)
+        #expect(unfolded == folded, "the toast moved as the sidebar unfolded")
+        #expect(toastGap(in: hosted) == folded, "the toast settled somewhere else after the unfold")
     }
 
     @Test(
