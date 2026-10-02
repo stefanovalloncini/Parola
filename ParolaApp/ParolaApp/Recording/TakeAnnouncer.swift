@@ -21,7 +21,7 @@ final class TakeAnnouncer {
             case recording
             case paused
             case windingDown
-            case failed(String)
+            case failed(String, RecordingSession.FailedWhile?)
             case over
         }
 
@@ -66,24 +66,24 @@ final class TakeAnnouncer {
     static func moment(of model: AppModel) -> Moment {
         Moment(
             takeID: model.recording?.takeID,
-            take: model.recording.map { kind(of: $0.state) },
+            take: model.recording.map { kind(of: $0) },
             saved: model.takeSavedNotice,
             notice: model.exportNotice
         )
     }
 
-    nonisolated static func kind(of state: RecordingSession.State) -> Moment.Take {
-        switch state {
+    nonisolated static func kind(of take: RecordingSession) -> Moment.Take {
+        switch take.state {
         case .arming: .arming
         case .recording: .recording
         case .paused: .paused
         case .finishing, .transcribing: .windingDown
-        case .failed(let message): .failed(message)
+        case .failed(let message): .failed(message, take.failedWhile)
         case .done: .over
         }
     }
 
-    /// A failure after Stop speaks for itself; one during the take says the recording stopped. A notice about that same failure isn't said twice.
+    /// A failure is said as its banner says it. A notice about that same failure isn't said twice.
     nonisolated static func lines(from old: Moment, to new: Moment, bundle: Bundle = .main) -> [Line] {
         var lines: [Line] = []
         let before = old.takeID == new.takeID ? old.take : nil
@@ -92,9 +92,8 @@ final class TakeAnnouncer {
             lines.append(Line(text: String(localized: "Recording", bundle: bundle)))
         case .paused where before != .paused:
             lines.append(Line(text: String(localized: "Paused", bundle: bundle)))
-        case .failed(let message) where !isFailure(before):
-            let text = before == .windingDown ? message : TakeRemote.stoppedStatus(message, bundle: bundle)
-            lines.append(Line(text: text, priority: .high))
+        case .failed(let message, let failedWhile) where !isFailure(before):
+            lines.append(Line(text: TakeRemote.failureStatus(message, failedWhile: failedWhile, bundle: bundle), priority: .high))
         default:
             break
         }

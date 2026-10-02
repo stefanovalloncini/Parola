@@ -32,15 +32,20 @@ struct TakeAnnouncementLineTests {
         #expect(TakeAnnouncer.lines(from: Moment(), to: arming).isEmpty)
     }
 
-    @Test("a failure during the take says the recording stopped; one after Stop says only what failed")
+    @Test("a failure is said as its banner says it: one while starting couldn't start, one during the take stopped, one after Stop says only what failed")
     func failures() {
         let recording = Moment(takeID: 1, take: .recording)
-        let failed = Moment(takeID: 1, take: .failed("The microphone stopped."))
+        let failed = Moment(takeID: 1, take: .failed("The microphone stopped.", .recording))
         #expect(TakeAnnouncer.lines(from: recording, to: failed).map(\.text) == ["Recording stopped: The microphone stopped."])
         #expect(TakeAnnouncer.lines(from: failed, to: failed).isEmpty)
         let windingDown = Moment(takeID: 1, take: .windingDown)
-        let transcriptionFailed = Moment(takeID: 1, take: .failed("Transcription failed: no words."))
+        let transcriptionFailed = Moment(takeID: 1, take: .failed("Transcription failed: no words.", .transcribing))
         #expect(TakeAnnouncer.lines(from: windingDown, to: transcriptionFailed).map(\.text) == ["Transcription failed: no words."])
+        let arming = Moment(takeID: 1, take: .arming)
+        let notStarted = Moment(takeID: 1, take: .failed("Microphone access is off.", .starting))
+        #expect(TakeAnnouncer.lines(from: arming, to: notStarted).map(\.text) == ["Couldn't start the recording: Microphone access is off."])
+        let liveEngine = Moment(takeID: 1, take: .failed("The engine stopped.", .transcribing))
+        #expect(TakeAnnouncer.lines(from: windingDown, to: liveEngine).map(\.text) == ["The engine stopped."])
     }
 
     @Test("a notice about the failure just said isn't said again; any other failure or info notice is")
@@ -50,7 +55,7 @@ struct TakeAnnouncementLineTests {
             actions: [ExportNotice.Action(title: "Show", handler: .showTake(1))]
         )
         let recording = Moment(takeID: 1, take: .recording)
-        var failed = Moment(takeID: 1, take: .failed("The microphone stopped."))
+        var failed = Moment(takeID: 1, take: .failed("The microphone stopped.", .recording))
         failed.notice = failure
         #expect(TakeAnnouncer.lines(from: recording, to: failed).map(\.text) == ["Recording stopped: The microphone stopped."])
 
@@ -73,7 +78,7 @@ struct TakeAnnouncementLineTests {
     @Test("a failure cuts in at high priority, a failure notice too; capture, pause, the saved toast and an info notice wait their turn")
     func priorities() {
         let recording = Moment(takeID: 1, take: .recording)
-        let failed = TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .failed("The microphone stopped.")))
+        let failed = TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .failed("The microphone stopped.", .recording)))
         #expect(failed.map(\.priority) == [.high])
         let paused = TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .paused))
         #expect(paused.map(\.priority) == [.medium])
@@ -102,7 +107,7 @@ struct TakeAnnouncementLineTests {
         let recording = Moment(takeID: 1, take: .recording)
         #expect(TakeAnnouncer.lines(from: Moment(takeID: 1, take: .arming), to: recording, bundle: it).map(\.text) == ["Registrazione"])
         #expect(TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .paused), bundle: it).map(\.text) == ["In pausa"])
-        #expect(TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .failed("X")), bundle: it).map(\.text) == ["Registrazione interrotta: X"])
+        #expect(TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .failed("X", .recording)), bundle: it).map(\.text) == ["Registrazione interrotta: X"])
     }
 }
 
@@ -139,7 +144,7 @@ struct TakeAnnouncerTests {
         withExtendedLifetime(announcer) {}
     }
 
-    @Test("a count-in that fails is announced with its reason")
+    @Test("a count-in that fails is announced with its reason, in its banner's words")
     func announcesAFailure() async throws {
         let model = makeRecordingModel("announcer-failure")
         model.recordingCountInSeconds = 60
@@ -152,7 +157,7 @@ struct TakeAnnouncerTests {
 
         model.failCountIn("Parola can't use the microphone.")
 
-        let said = await waitUntil { heard.lines == ["Recording stopped: Parola can't use the microphone."] }
+        let said = await waitUntil { heard.lines == ["Couldn't start the recording: Parola can't use the microphone."] }
         #expect(said)
         model.forgetTakeSession()
         withExtendedLifetime(announcer) {}

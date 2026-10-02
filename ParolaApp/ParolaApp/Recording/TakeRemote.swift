@@ -43,9 +43,13 @@ enum TakeRemote {
         String(localized: "Take.Stopped", defaultValue: "Stopped", bundle: bundle)
     }
 
-    /// What VoiceOver hears, and the announcement, when a take fails.
-    nonisolated static func stoppedStatus(_ message: String, bundle: Bundle = .main) -> String {
-        String(localized: "Recording stopped: \(message)", bundle: bundle)
+    /// What VoiceOver hears for a failed take, worded as its banner is: a recording that couldn't start or stopped, or only the reason once its transcription failed.
+    nonisolated static func failureStatus(_ message: String, failedWhile: RecordingSession.FailedWhile?, bundle: Bundle = .main) -> String {
+        switch failedWhile {
+        case .starting: String(localized: "Couldn't start the recording: \(message)", bundle: bundle)
+        case .transcribing: message
+        case .recording, nil: String(localized: "Recording stopped: \(message)", bundle: bundle)
+        }
     }
 
     /// What needs the user's eye while a take runs, on the Stage and on the surfaces outside the window.
@@ -87,7 +91,7 @@ enum TakeRemote {
         case .arming: return String(localized: "Getting ready to record", bundle: bundle)
         case .paused: return String(localized: "Paused, \(time)", bundle: bundle)
         case .finishing: return String(localized: "Finishing, \(time)", bundle: bundle)
-        case .failed(let message): return stoppedStatus(message, bundle: bundle)
+        case .failed(let message): return failureStatus(message, failedWhile: take.failedWhile, bundle: bundle)
         default: return String(localized: "Recording, \(time)", bundle: bundle)
         }
     }

@@ -12,6 +12,7 @@ private final class Calls {
 
 private func failedTake(_ id: Int = 1) -> RecordingSession {
     var take = RecordingSession(takeID: id, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture)
+    take.markCapturing(at: .now)
     take.fail("The microphone stopped.")
     return take
 }
@@ -115,7 +116,8 @@ struct StoppedStatusItemTests {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let it = try #require(Bundle(path: path))
         #expect(TakeRemote.stoppedTitle(bundle: it) == "Interrotta")
-        #expect(TakeRemote.stoppedStatus("Il microfono si è fermato.", bundle: it) == "Registrazione interrotta: Il microfono si è fermato.")
+        #expect(TakeRemote.failureStatus("Il microfono si è fermato.", failedWhile: .recording, bundle: it) == "Registrazione interrotta: Il microfono si è fermato.")
+        #expect(TakeRemote.failureStatus("Accesso negato.", failedWhile: .starting, bundle: it) == "Avvio della registrazione non riuscito: Accesso negato.")
     }
 }
 

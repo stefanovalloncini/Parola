@@ -143,6 +143,11 @@ struct RecordingFailureTitleTests {
         #expect(failed { $0.markCapturing(at: .now); $0.pause(at: .now) }.failedWhile == .recording)
         #expect(failed { $0.markCapturing(at: .now); $0.finish(at: .now) }.failedWhile == .recording)
         #expect(failed { $0.markCapturing(at: .now); $0.finish(at: .now); $0.transcribing(progress: nil) }.failedWhile == .transcribing)
+        var live = RecordingSession(takeID: 2, source: .microphone, category: .transcription, title: "R", isStreaming: true, arming: .startingCapture)
+        live.markCapturing(at: .now)
+        live.finish(at: .now)
+        live.fail("The engine stopped.")
+        #expect(live.failedWhile == .transcribing, "a live take's engine failing after Stop is its transcription's failure")
         var again = failed { _ in }
         again.fail("Another reason.")
         #expect(again.failedWhile == .starting, "a failure keeps the moment it first failed")

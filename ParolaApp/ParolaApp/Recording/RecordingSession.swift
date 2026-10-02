@@ -137,6 +137,13 @@ struct RecordingSession: Equatable, Sendable {
         return max(0, now.timeIntervalSince(startedAt) - pausedTotal - runningPause)
     }
 
+    /// Finishing counts as recording while a take's file is still closing; a live take finishes its words then, so a failure there is its transcription's.
+    private var failurePoint: FailedWhile {
+        if isArming { return .starting }
+        if isTranscribing || (state == .finishing && isStreaming) { return .transcribing }
+        return .recording
+    }
+
     @discardableResult
     mutating func arm(_ arming: Arming) -> Bool {
         guard isArming else { return false }
@@ -202,10 +209,9 @@ struct RecordingSession: Equatable, Sendable {
         state = .done(entryID: entryID)
     }
 
-    /// Finishing counts as recording: the take's file is still being closed, and nothing has been transcribed yet.
     mutating func fail(_ message: String, at date: Date = Date()) {
         if case .done = state { return }
-        if !isOver { failedWhile = isArming ? .starting : isTranscribing ? .transcribing : .recording }
+        if !isOver { failedWhile = failurePoint }
         if isCapturing { endedElapsed = elapsed(at: date) }
         state = .failed(message: message)
     }

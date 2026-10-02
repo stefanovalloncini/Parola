@@ -121,7 +121,7 @@ final class RecordingStatusItem: NSObject {
             return Face(
                 clock: TakeRemote.stoppedTitle(bundle: bundle),
                 lamp: .stopped,
-                spoken: TakeRemote.stoppedStatus(message, bundle: bundle),
+                spoken: TakeRemote.failureStatus(message, failedWhile: take.failedWhile, bundle: bundle),
                 controls: controls(for: take, bundle: bundle),
                 notice: message
             )
