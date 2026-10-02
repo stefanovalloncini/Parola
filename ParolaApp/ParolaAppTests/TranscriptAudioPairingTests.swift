@@ -38,13 +38,13 @@ extension TranscriberMockSuites {
     @Suite("Transcript audio pairing", .serialized)
     struct TranscriptAudioPairingTests {
 
-        private func makeModel() -> AppModel {
+        private func makeModel(picker: TestFilePicker = TestFilePicker()) -> AppModel {
             let bootstrap = AppBootstrap(
                 mode: .test,
                 library: makeTempLibraryURL("pairing"),
                 defaultsOverride: temporaryDefaults(),
                 sideEffects: [],
-                filePicker: TestFilePicker(),
+                filePicker: picker,
                 clock: ContinuousClock()
             )
             return AppModel(bootstrap: bootstrap)
@@ -295,6 +295,69 @@ extension TranscriberMockSuites {
                 #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
                 #expect(model.arrivalNotice == nil)
                 withExtendedLifetime(server) {}
+            }
+        }
+
+        /// The ways the user hands Parola a file, besides a drop on the window.
+        enum Opening: String, CaseIterable, Sendable {
+            case openPanel, openRecent, openWith
+        }
+
+        @Test("a file the user opens from another page brings up the run's page, as a drop does, and the run lands there", arguments: Opening.allCases)
+        func openedFileShowsItsPage(_ opening: Opening) async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the run's own words")]
+                ))
+                let picker = TestFilePicker()
+                let model = makeModel(picker: picker)
+                let wav = try makeSilentWAV(label: "opened-\(opening.rawValue)")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                model.openStatistics()
+
+                switch opening {
+                case .openPanel:
+                    await picker.queueInputResponse([wav])
+                    model.presentOpenPanel()
+                case .openRecent:
+                    model.openRecentFile(wav)
+                case .openWith:
+                    model.collectOpenedFile(wav)
+                }
+
+                let landed = await waitUntil { model.phase == .ready && model.selectedEntryID != nil }
+                #expect(landed, "the run never opened on its page")
+                #expect(model.route == .transcript, "the run started off the page it shows on")
+                #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
+                #expect(model.arrivalNotice == nil)
+            }
+        }
+
+        @Test("a Shortcut sent from another page leaves the page alone, and its run is on the transcript page when the user goes there")
+        func shortcutRunWaitsOnItsPage() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                defer { Task { await gate.open() } }
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
+                let model = makeModel()
+                let wav = try makeSilentWAV(label: "shortcut")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                model.openStatistics()
+
+                let shortcut = Task { try await model.transcribeFileFromIntent(wav) }
+                let started = await waitUntil { model.fileTranscribeTask != nil }
+                try #require(started, "the Shortcut never started a run")
+                #expect(model.route == .statistics, "a Shortcut changed the page")
+                #expect(model.sourceFileURL == wav, "the run started out of sight, so its page would show nothing")
+                model.goHome()
+                await gate.open()
+
+                let landed = await waitUntil { model.selectedEntryID != nil }
+                #expect(landed, "the run never opened on its page")
+                #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
+                #expect(model.arrivalNotice == nil, "the run landed out of sight though its page was up")
+                let text = try await shortcut.value
+                #expect(text.contains("own words"))
             }
         }
 

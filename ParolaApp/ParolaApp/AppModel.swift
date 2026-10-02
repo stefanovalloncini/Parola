@@ -2587,9 +2587,24 @@ final class AppModel {
         } else if files.media.count > 1, features.isEnabled(.batch) {
             importBatchFiles(files.media)
         } else {
+            showRunPage()
             transcribe(fileURL: files.media[0], translateOverride: translateOverride)
             deferredArrivals.append(contentsOf: files.media.dropFirst())
         }
+    }
+
+    /// What a drop does first, for a run the user or the bridge starts: the page it shows on comes up, so it never starts out of sight. A run a take parks leaves the Stage up.
+    func showRunPage() {
+        guard !takeIsRunning else { return }
+        // Before the route: a failure nobody saw on another page moves to a notice rather than going unread.
+        leaveFailedPhase()
+        route = .transcript
+    }
+
+    /// Open Recent, as ⌘O: the file's page comes up, unless a batch takes the file in.
+    func openRecentFile(_ url: URL) {
+        if !batchIsRunning { showRunPage() }
+        transcribe(fileURL: url)
     }
 
     // MARK: - Subtitle import
@@ -2687,9 +2702,9 @@ final class AppModel {
         leaveFinishedStage()
         // Before the new token: cancelling retires the old run's token; a file opened mid-download keeps its duplicate check.
         cancelTranscriptionRuns(keepingDuplicateCheck: fetchedLink != nil)
-        // The window as the user left it when they started the run: moved on since, during a download or a duplicate check, the run keeps out of what they opened.
+        // An entry opened since the user started the run, during a download or a duplicate check, keeps the run out of it; another page doesn't, so the run's pane is there when they go back.
         let windowGeneration = windowGeneration ?? loadEntryGeneration
-        let startsOutOfSight = userMovedOn(since: windowGeneration)
+        let startsOutOfSight = loadEntryGeneration != windowGeneration
         let runToken = nextFileRunToken()
         let landingKind: RunLanding.Kind = arrival != nil ? .arrival : fetchedLink == nil ? .file : .link
         if landingKind.policy.recents { noteRecentFile(fileURL) }

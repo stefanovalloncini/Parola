@@ -61,7 +61,7 @@ struct FileCommands: View {
                 Text("No Recent Files")
             } else {
                 ForEach(recents, id: \.self) { url in
-                    Button(url.lastPathComponent) { model.transcribe(fileURL: url) }
+                    Button(url.lastPathComponent) { model.openRecentFile(url) }
                 }
                 Divider()
                 Button("Clear Menu") { model.clearRecentFiles() }
