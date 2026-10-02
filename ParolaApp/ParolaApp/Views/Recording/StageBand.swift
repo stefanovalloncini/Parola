@@ -146,6 +146,9 @@ struct StageBand: View {
         stopped ? String(localized: "Mac audio stopped", bundle: bundle) : nil
     }
 
+    /// The one sign for Mac audio that stopped, on its lane and on the warning line alike; the silence warning's speaker stays its own.
+    nonisolated static let stoppedMacSymbol = "waveform.slash"
+
     /// A lane whose microphone isn't in the take draws at this strength.
     nonisolated static let offLaneStrength = 0.4
 
@@ -458,7 +461,7 @@ private struct StageLaneNames: View {
     @ViewBuilder
     private var mac: some View {
         if let stopped = StageBand.stoppedMacNote(macStopped) {
-            Label(stopped, systemImage: "speaker.slash")
+            Label(stopped, systemImage: StageBand.stoppedMacSymbol)
         } else {
             Text("Mac audio")
         }

@@ -5,11 +5,6 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
-@MainActor
-private final class Calls {
-    var count = 0
-}
-
 private func failedTake(_ id: Int = 1) -> RecordingSession {
     var take = RecordingSession(takeID: id, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture)
     take.markCapturing(at: .now)
@@ -558,6 +553,7 @@ struct MacAudioStoppedOutsideTests {
         let inMenu = await waitUntil { item.face?.notice == "Mac audio stopped" }
         #expect(inMenu)
         #expect(TakeRemote.warning(for: take, in: model)?.symbol == "waveform.slash")
+        #expect(TakeRemote.warning(for: take, in: model)?.symbol == StageBand.stoppedMacSymbol, "one sign for it, on the lane and the warning line")
         let onPill = await waitUntil { pillValue() == "Mac audio stopped" }
         #expect(onPill)
         let onStage = await waitUntil { HostedAccessibility.words(in: stage.host).contains("Mac audio stopped") }
@@ -615,6 +611,15 @@ struct MacAudioStoppedOutsideTests {
         #expect(asks.count == 0)
         model.endTestTake()
         withExtendedLifetime(badge) {}
+    }
+
+    @Test("the Stage's Mac lane draws the same sign as the warning line, not the silence warning's speaker")
+    func oneSignOnTheStage() throws {
+        let path = #filePath.replacingOccurrences(of: "ParolaAppTests/TakeOutOfSightTests.swift", with: "ParolaApp/Views/Recording/StageBand.swift")
+        let band = try String(contentsOfFile: path, encoding: .utf8)
+        #expect(band.contains("Label(stopped, systemImage: StageBand.stoppedMacSymbol)"))
+        #expect(!band.contains("\"speaker.slash\""))
+        #expect(StageBand.stoppedMacSymbol == "waveform.slash")
     }
 
     @Test("once the take stops, a stopped Mac capture warns of nothing, since it is what ended the take")

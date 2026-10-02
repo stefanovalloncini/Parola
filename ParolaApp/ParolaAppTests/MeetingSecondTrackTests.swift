@@ -2487,12 +2487,6 @@ extension TranscriberMockSuites {
     }
 }
 
-/// How many times a test's Dock asked for the user's attention.
-@MainActor
-private final class AttentionAsks {
-    var count = 0
-}
-
 extension TranscriberMockSuites.MeetingSecondTrackTests {
     @Test("a Mac-audio notice mid-meeting covers the one-shot Reveal in Finder notice, which comes back once its Show is pressed")
     func macStopsByItselfOverAFailureNotice() async throws {
@@ -2529,7 +2523,7 @@ extension TranscriberMockSuites.MeetingSecondTrackTests {
             model.micTrackStallTicks = 10_000
             let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
             item.bind(model)
-            let asks = AttentionAsks()
+            let asks = Calls()
             let badge = DockBadge(show: { _ in }, appIsActive: { false }, requestAttention: { asks.count += 1 })
             badge.bind(model)
             let files = try meetingFiles(model)
@@ -2561,7 +2555,7 @@ extension TranscriberMockSuites.MeetingSecondTrackTests {
             pill.bind(model, appActive: false)
             let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
             item.bind(model)
-            let asks = AttentionAsks()
+            let asks = Calls()
             let badge = DockBadge(show: { _ in }, appIsActive: { false }, requestAttention: { asks.count += 1 })
             badge.bind(model)
             let files = try meetingFiles(model)

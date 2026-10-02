@@ -4,6 +4,12 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
+/// How many times a test's stand-in was called, as a Dock asking for the user's attention.
+@MainActor
+final class Calls {
+    var count = 0
+}
+
 /// A capture whose file comes back only when the test lets it go, and then cut short.
 actor HeldCutShortCapture: LiveAudioSource {
     nonisolated let levelMeter = LevelMeter()
