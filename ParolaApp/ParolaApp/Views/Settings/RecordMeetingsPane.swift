@@ -5,7 +5,7 @@ struct RecordMeetingsPane: View {
     @Environment(AppModel.self) private var model
 
     /// A build that records only meetings has no Microphone pane, so the take's switches come here.
-    static func showsRecordingControls(features: FeatureSet) -> Bool {
+    nonisolated static func showsRecordingControls(features: FeatureSet) -> Bool {
         !SettingsRoute.microphone.isVisible(features: features)
     }
 

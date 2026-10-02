@@ -1,4 +1,5 @@
 import SwiftUI
+import ParolaCore
 
 enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case general
@@ -97,7 +98,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
         case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio", "permission", "screen recording", "consent", "microphone", "my voice"]
         case .shortcuts: return ["hotkey", "key combo", "mic recording", "dictation key", "global", "keyboard"]
-        case .microphone: return ["mic", "input device", "vu", "level", "preview", "count-in", "mute", "pause media", "music", "spotify", "auto-stop", "menu bar", "pill", "floating"]
+        case .microphone: return ["mic", "input device", "vu", "level", "preview", "count-in", "mute", "pause media", "music", "spotify", "auto-stop"] + Self.recordingControlsKeywords
         case .liveCaptions: return ["captions", "translate", "live"]
         case .dictation: return ["hotkey", "f5", "push to talk", "toggle", "indicator", "notch", "overlay", "cleanup", "workflows", "per-app", "hud", "opacity", "context", "clipboard", "screen", "ocr", "paste delay", "self-corrections", "url rule"]
         case .snippets: return ["snippet", "expand", "abbreviation", "trigger", "placeholder", "date", "time"]
@@ -120,6 +121,21 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The take's menu bar and pill switches, which the Microphone pane shows, and Record Meetings in a build without that pane.
+    static let recordingControlsKeys = ["showRecordingStatusItem", "showRecordingPill"]
+    static let recordingControlsKeywords = ["menu bar", "pill", "floating", "barra dei menu", "pillola", "fluttuante"]
+
+    /// What a pane holds only in some builds: Record Meetings shows the recording switches where there is no Microphone pane, so its reset and its search cover them there.
+    func defaultsKeys(features: FeatureSet) -> [String] {
+        guard self == .recordMeetings, RecordMeetingsPane.showsRecordingControls(features: features) else { return defaultsKeys }
+        return defaultsKeys + Self.recordingControlsKeys
+    }
+
+    func searchKeywords(features: FeatureSet) -> [String] {
+        guard self == .recordMeetings, RecordMeetingsPane.showsRecordingControls(features: features) else { return searchKeywords }
+        return searchKeywords + Self.recordingControlsKeywords
+    }
+
     var defaultsKeys: [String] {
         switch self {
         case .general:
@@ -138,11 +154,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .watchedFolders:
             return ["watchedFolders"]
         case .recordMeetings:
-            // The menu bar and pill switches are shared with the .microphone scope: a build without that pane shows them here.
-            return [
-                "meetingDetectorEnabled", "meetingCaptureAppOnly", "meetingRecordsMicrophone",
-                "showRecordingStatusItem", "showRecordingPill"
-            ]
+            return ["meetingDetectorEnabled", "meetingCaptureAppOnly", "meetingRecordsMicrophone"]
         case .shortcuts:
             // The dictation hotkey keys also live in the .dictation scope; both panes
             // show the recorder, and removeObject is idempotent across scopes.
@@ -266,7 +278,7 @@ struct ResetPaneButton: View {
             ) {
                 Button("Reset", role: .destructive) {
                     if scope == .aiServices { model.forgetAIServiceKeys() }
-                    SettingsResetService.reset(scope: scope)
+                    SettingsResetService.reset(scope: scope, features: model.features)
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -278,9 +290,9 @@ struct ResetPaneButton: View {
 
 enum SettingsResetService {
     @MainActor
-    static func reset(scope: SettingsPaneScope) {
+    static func reset(scope: SettingsPaneScope, features: FeatureSet = .all) {
         let defaults = DefaultsStore.current
-        for key in scope.defaultsKeys {
+        for key in scope.defaultsKeys(features: features) {
             defaults.removeObject(forKey: key)
         }
         NotificationCenter.default.post(name: .parolaSettingsReset, object: scope)

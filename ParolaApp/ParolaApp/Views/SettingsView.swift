@@ -157,14 +157,16 @@ enum SettingsSidebarCatalog {
         let query = search.trimmingCharacters(in: .whitespaces).lowercased()
         return all.compactMap { group in
             let routes = group.routes.filter { route in
-                route.isVisible(features: features) && (query.isEmpty || matches(route: route, query: query))
+                route.isVisible(features: features) && (query.isEmpty || matches(route: route, query: query, features: features))
             }
             return routes.isEmpty ? nil : SidebarGroup(id: group.id, title: group.title, routes: routes)
         }
     }
 
-    static func matches(route: SettingsRoute, query: String) -> Bool {
-        searchTerms[route]?.contains { $0.contains(query) } ?? false
+    static func matches(route: SettingsRoute, query: String, features: FeatureSet = .all) -> Bool {
+        if searchTerms[route]?.contains(where: { $0.contains(query) }) ?? false { return true }
+        let buildTerms = route.paneScope?.searchKeywords(features: features) ?? []
+        return buildTerms.contains { $0.lowercased().contains(query) }
     }
 
     /// Lowercased once per launch — a macOS app can't change its language without relaunching.

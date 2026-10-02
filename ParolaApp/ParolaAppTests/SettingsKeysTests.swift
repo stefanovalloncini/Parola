@@ -120,12 +120,10 @@ struct SettingsPaneScopeTests {
     @Test("no defaults key is claimed by more than one pane, except controls shown on two panes")
     func defaultsKeysAreDisjoint() {
         // Each of these is rendered on two panes, and each pane's reset must cover
-        // what it shows: the dictation hotkey (Shortcuts + Dictation), the word
-        // timestamps / diarize toggles (General + Transcription Defaults), and the
-        // recording's menu bar and pill switches (Microphone + Record Meetings).
+        // what it shows: the dictation hotkey (Shortcuts + Dictation) and the word
+        // timestamps / diarize toggles (General + Transcription Defaults).
         let sharedKeys: Set<String> = [
             "dictationKeyCode", "dictationKeyModifiers", "wordTimestamps", "diarize",
-            "showRecordingStatusItem", "showRecordingPill",
         ]
         var seen: Set<String> = []
         for scope in SettingsPaneScope.allCases {

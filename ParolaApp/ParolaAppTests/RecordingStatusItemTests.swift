@@ -538,8 +538,41 @@ struct RecordingControlsMeetingsOnlyTests {
         #expect(!RecordMeetingsPane.showsRecordingControls(features: .all))
         #expect(!RecordMeetingsPane.showsRecordingControls(features: FeatureSet(enabled: [.meetings, .micRecording])))
         #expect(!RecordMeetingsPane.showsRecordingControls(features: FeatureSet(enabled: [.meetings, .dictation])))
+        let meetingsOnly = FeatureSet(enabled: [.meetings])
         for key in ["showRecordingStatusItem", "showRecordingPill"] {
-            #expect(SettingsPaneScope.recordMeetings.defaultsKeys.contains(key), "the pane's reset covers what it shows")
+            #expect(SettingsPaneScope.recordMeetings.defaultsKeys(features: meetingsOnly).contains(key), "the pane's reset covers what it shows")
+            #expect(!SettingsPaneScope.recordMeetings.defaultsKeys(features: .all).contains(key), "and only where it shows them")
+            #expect(SettingsPaneScope.microphone.defaultsKeys(features: .all).contains(key))
+        }
+    }
+
+    @Test("Record Meetings' Reset to Defaults clears the switches only in a build where the pane shows them")
+    func resetFollowsTheBuild() {
+        let previous = DefaultsStore.current
+        let defaults = temporaryDefaults("test-meetings-reset-")
+        DefaultsStore.current = defaults
+        defer { DefaultsStore.current = previous }
+        for key in ["showRecordingStatusItem", "showRecordingPill"] { defaults.set(false, forKey: key) }
+
+        SettingsResetService.reset(scope: .recordMeetings, features: .all)
+        #expect(defaults.object(forKey: "showRecordingStatusItem") != nil, "a full build's Record Meetings doesn't show the switch")
+        #expect(defaults.object(forKey: "showRecordingPill") != nil)
+
+        SettingsResetService.reset(scope: .recordMeetings, features: FeatureSet(enabled: [.meetings]))
+        #expect(defaults.object(forKey: "showRecordingStatusItem") == nil)
+        #expect(defaults.object(forKey: "showRecordingPill") == nil)
+    }
+
+    @Test("searching for the pill or the menu bar, in English or Italian, finds the pane that shows the switches in this build")
+    func searchFollowsTheBuild() {
+        func found(_ query: String, _ features: FeatureSet) -> [SettingsRoute] {
+            SettingsSidebarCatalog.visibleGroups(features: features, search: query).flatMap(\.routes)
+        }
+        let meetingsOnly = FeatureSet(enabled: [.meetings])
+        for query in ["pill", "menu bar", "pillola", "barra dei menu"] {
+            #expect(found(query, meetingsOnly).contains(.recordMeetings), "\(query) in a meetings-only build")
+            #expect(found(query, .all).contains(.microphone), "\(query) in a full build")
+            #expect(!found(query, .all).contains(.recordMeetings), "\(query) leads a full build to Microphone only")
         }
     }
 
