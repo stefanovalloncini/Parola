@@ -47,12 +47,12 @@ enum StageLanding {
         model.route != .recording
     }
 
-    /// The transcript on screen is the window's take: over its working file until its save lands, then as its entry.
+    /// The transcript on screen is the window's take: over its working file until its save lands, then as its entry; an older take's file never counts.
     @MainActor
     static func transcriptIsTheTake(_ model: AppModel) -> Bool {
         guard let take = model.recording else { return false }
         let file = model.sourceFileURL
-        let overItsFile = file != nil && model.recordedTake?.file == file
+        let overItsFile = file != nil && model.recordedTake?.file == file && model.recordedTake?.takeID == take.takeID
         switch take.state {
         case .transcribing: return overItsFile
         case .done(let entryID): return overItsFile || (entryID != nil && model.selectedEntryID == entryID)

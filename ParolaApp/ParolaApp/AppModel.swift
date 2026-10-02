@@ -106,10 +106,11 @@ final class AppModel {
         var macAudioAfterSound: TimeInterval = 60
     }
 
-    /// A take's title with the file it was recorded to, so no pane names the working file.
+    /// A take's title with the file it was recorded to, so no pane names the working file; the take it was, so no later take is mistaken for it.
     struct RecordedTake: Equatable {
         let file: URL
         let title: String
+        let takeID: Int?
     }
 
     /// A take's transcription run, the take it belongs to and the file it reads.
@@ -4242,7 +4243,7 @@ final class AppModel {
             phase = .ready
             showLandedTake()
             if let audioURL = processed.sourceURL {
-                recordedTake = RecordedTake(file: audioURL, title: given.typedTitle ?? title)
+                recordedTake = RecordedTake(file: audioURL, title: given.typedTitle ?? title, takeID: take?.id)
                 sourceFileURL = audioURL
                 installPlayer(for: audioURL)
                 adoptLoadedMediaDuration()
@@ -4534,7 +4535,7 @@ final class AppModel {
         let recovery = beginFileTranscribeRecovery(sourceURL: url, title: named, source: source, category: category)
         // Held by the run itself, so a Cancel's cleanup leaves it for the save that follows.
         recoveryHeldByTake.insert(recovery)
-        if !startsStopped { recordedTake = RecordedTake(file: url, title: named) }
+        if !startsStopped { recordedTake = RecordedTake(file: url, title: named, takeID: take) }
         // A take's run reports to its session and its Stage; one with no session is a run like a file's.
         if let take {
             if !startsStopped { beginTakeTranscription(TakeTranscription(run: run, takeID: take, file: url)) }

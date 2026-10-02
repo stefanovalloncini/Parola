@@ -266,3 +266,39 @@ struct NoticeIconSpeechTests {
         #expect(String(localized: "Error", bundle: try #require(Bundle(path: path))) == "Errore")
     }
 }
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("A newer take never lands into an older take's transcript", .serialized)
+    struct StaleLandingGateTests {
+        @Test("while an older take's save is on its way, a newer take that lands is not that transcript's take")
+        func newerTakeIsNotTheOlderTranscript() async throws {
+            let audio = try makeTakeWAV("stale-landing-gate", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "the older take")])
+                let model = makeRecordingModel("stale-landing-gate")
+                let save = FetchGate()
+                model.beforeLandingSave = { await save.wait() }
+                recordAndStop(model, audio: audio, seconds: 1)
+                let onScreen = await waitUntil { model.route == .transcript && model.transcript != nil }
+                #expect(onScreen)
+                let older = StageLanding.transcriptIsTheTake(model)
+                #expect(older, "the older take is over its own working file")
+
+                model.installTestTake(source: .microphone)
+                let newer = try #require(model.recording?.takeID)
+                model.updateSession(of: newer) { session in
+                    session.finish(at: Date())
+                    session.land(entryID: nil)
+                }
+
+                let newerIsTheTranscript = StageLanding.transcriptIsTheTake(model)
+                #expect(!newerIsTheTranscript, "the newer take's pieces would fly into the older take's transcript")
+                await save.open()
+                _ = await landedEntry(model)
+                model.endTestTake()
+            }
+        }
+    }
+}
