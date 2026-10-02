@@ -25,13 +25,13 @@ final class RecordingPill {
         !appActive && (takeRunning || failureHeld) && enabled
     }
 
-    /// Where the user left it while that spot is still on a screen; else bottom centre of the main screen, where the dictation overlay sits.
+    /// Where the user left it while that spot is still on a screen; else bottom centre of the main screen, above where the dictation overlay sits.
     nonisolated static func frame(size: NSSize, remembered: NSPoint?, screens: [NSRect], fallback: NSRect) -> NSRect {
         if let remembered {
             let kept = NSRect(origin: remembered, size: size)
             if screens.contains(where: { $0.contains(kept) }) { return kept }
         }
-        return NSRect(origin: DictationHUDPlacement.overlayOrigin(for: size, in: fallback), size: size)
+        return NSRect(origin: DictationHUDPlacement.aboveOverlayOrigin(for: size, in: fallback), size: size)
     }
 
     func bind(_ model: AppModel, appActive: Bool) {

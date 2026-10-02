@@ -182,16 +182,23 @@ struct RecordingStatusItemTests {
         #expect(!RecordingPill.shouldShow(appActive: false, takeRunning: true, enabled: false))
     }
 
-    @Test("the pill sits where it was left, or bottom centre of the main screen when that spot is gone")
+    @Test("the pill sits where it was left, or bottom centre of the main screen, above the dictation overlay, when that spot is gone")
     func placement() {
         let size = NSSize(width: 160, height: 42)
         let screen = NSRect(x: 0, y: 0, width: 1440, height: 875)
         let kept = RecordingPill.frame(size: size, remembered: NSPoint(x: 1200, y: 700), screens: [screen], fallback: screen)
         #expect(kept == NSRect(x: 1200, y: 700, width: 160, height: 42))
         let offScreen = RecordingPill.frame(size: size, remembered: NSPoint(x: 1400, y: 700), screens: [screen], fallback: screen)
-        #expect(offScreen.origin == NSPoint(x: 640, y: 100))
+        #expect(offScreen.origin == NSPoint(x: 640, y: 268))
         let fresh = RecordingPill.frame(size: size, remembered: nil, screens: [screen], fallback: screen)
-        #expect(fresh == NSRect(x: 640, y: 100, width: 160, height: 42))
+        #expect(fresh == NSRect(x: 640, y: 268, width: 160, height: 42))
+        for hasPartial in [false, true] {
+            let overlay = DictationHUDPlacement.frame(DictationHUDPlacement.Context(
+                style: .overlay, hasPartial: hasPartial, failedMessageVisible: false, listeningCompact: true,
+                anchor: nil, screenFrame: screen, screenVisibleFrame: screen
+            ))
+            #expect(!fresh.intersects(overlay), "the dictation overlay covers the pill, words \(hasPartial)")
+        }
         let second = NSRect(x: 1440, y: 0, width: 1920, height: 1055)
         let onTheOther = RecordingPill.frame(size: size, remembered: NSPoint(x: 3000, y: 50), screens: [screen, second], fallback: screen)
         #expect(onTheOther.origin == NSPoint(x: 3000, y: 50))

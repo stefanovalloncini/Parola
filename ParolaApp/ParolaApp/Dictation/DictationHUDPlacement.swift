@@ -57,9 +57,18 @@ enum DictationHUDPlacement {
         return NSRect(origin: origin, size: size)
     }
 
-    /// Bottom centre of the visible screen, 100 pt up: the overlay's spot, and the recording pill's until it is dragged.
+    /// Bottom centre of the visible screen, 100 pt up: the overlay's spot.
     static func overlayOrigin(for size: NSSize, in visible: NSRect) -> NSPoint {
         NSPoint(x: visible.midX - size.width / 2, y: visible.minY + 100)
+    }
+
+    /// The overlay's height with words in it, the most it grows to.
+    static let overlayTallestHeight: CGFloat = 156
+
+    /// The recording pill's spot until it is dragged: centred over the overlay at its tallest, so a dictation during a take never covers the pill's Stop.
+    static func aboveOverlayOrigin(for size: NSSize, in visible: NSRect) -> NSPoint {
+        let overlay = overlayOrigin(for: size, in: visible)
+        return NSPoint(x: overlay.x, y: overlay.y + overlayTallestHeight + 12)
     }
 
     private static func size(for context: Context) -> NSSize {
@@ -69,7 +78,7 @@ enum DictationHUDPlacement {
             return NSSize(width: expanded ? 360 : 200, height: expanded ? 96 : 44)
         case .overlay:
             let compactWidth: CGFloat = context.listeningCompact ? 336 : 268
-            return NSSize(width: context.hasPartial ? 380 : compactWidth, height: context.hasPartial ? 156 : 64)
+            return NSSize(width: context.hasPartial ? 380 : compactWidth, height: context.hasPartial ? overlayTallestHeight : 64)
         case .notch:
             return NSSize(width: context.hasPartial ? 372 : 252, height: 36)
         case .minimal:
