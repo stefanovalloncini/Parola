@@ -295,7 +295,7 @@ struct StageLayoutTests {
         #expect(!draws("ExportNotice.Button.Dismiss", onStage), "the strip came up on the Stage too")
     }
 
-    @Test("the Stage's line gives a finishing take's stop reason first, else a notice for the take in progress, and nothing else")
+    @Test("the Stage's line gives a finishing take's stop reason first, else a notice for the take in progress that the Stage doesn't already say, and nothing else")
     func stageLineChoice() {
         var take = RecordingSession(
             takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture
@@ -305,9 +305,15 @@ struct StageLayoutTests {
         let other = ExportNotice(message: "Auto-export couldn't write to its folder.", failures: [], folder: nil, tone: .failure)
         let reason = "The Mac audio stopped, so Parola stopped the recording."
 
+        let macAudio = ExportNotice(
+            message: "The Mac audio stopped. Your microphone is still recording.", failures: [], folder: nil, tone: .info,
+            actions: [ExportNotice.Action(title: "Show", handler: .showTake(take.takeID))], whileTakeRuns: true
+        )
+
         #expect(StageNoticeLine.shown(for: take, stopReason: nil, notice: turnedAway) == .notice(turnedAway))
         #expect(StageNoticeLine.shown(for: take, stopReason: nil, notice: other) == nil)
         #expect(StageNoticeLine.shown(for: take, stopReason: nil, notice: nil) == nil)
+        #expect(StageNoticeLine.shown(for: take, stopReason: nil, notice: macAudio) == nil, "the facts' warning already says it")
         _ = take.finish(at: Date())
         #expect(StageNoticeLine.shown(for: take, stopReason: reason, notice: other) == .stopReason(reason))
         #expect(StageNoticeLine.shown(for: take, stopReason: nil, notice: turnedAway) == .notice(turnedAway))
@@ -340,8 +346,8 @@ struct StageLayoutTests {
         #expect(gone, "the notice outlived its seconds on the Stage")
 
         let withShow = ExportNotice(
-            message: "The Mac audio stopped. Your microphone is still recording.", failures: [], folder: nil, tone: .info,
-            actions: [ExportNotice.Action(title: "Show", handler: .showTake(take.takeID))], whileTakeRuns: true
+            message: "Finish the recording first. Parola offers the recovered one again when it ends.", failures: [], folder: nil,
+            tone: .info, actions: [ExportNotice.Action(title: "Show Recently Deleted", handler: .openRecentlyDeleted)], whileTakeRuns: true
         )
         model.exportNotice = withShow
         let redrawn = await waitUntil(timeoutMs: 1_000) { drawsStageLine(hosted) }

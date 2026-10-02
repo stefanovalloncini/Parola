@@ -342,7 +342,7 @@ struct StageFacts: View {
     }
 }
 
-/// The Stage's one line for a notice about its own take: why it stopped by itself while it finishes, else for a few seconds what it turned away.
+/// The Stage's one line for what it doesn't otherwise show: why its take stopped by itself while it finishes, else for a few seconds what the take turned away.
 struct StageNoticeLine: View {
     let take: RecordingSession
     var shownFor: Duration = ExportNoticeStrip.dismissAfter
@@ -357,7 +357,8 @@ struct StageNoticeLine: View {
 
     nonisolated static func shown(for take: RecordingSession, stopReason: String?, notice: ExportNotice?) -> Shown? {
         if let stopReason, take.state == .finishing || take.isTranscribing { return .stopReason(stopReason) }
-        guard let notice, notice.whileTakeRuns else { return nil }
+        // One about this take, like the Mac audio stopping, the facts' warning line and the lanes already say.
+        guard let notice, notice.whileTakeRuns, notice.takeID != take.takeID else { return nil }
         return .notice(notice)
     }
 
