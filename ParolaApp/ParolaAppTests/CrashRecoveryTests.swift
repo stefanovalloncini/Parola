@@ -516,5 +516,91 @@ extension TranscriberMockSuites {
             #expect(title.hasPrefix("Recording "))
             #expect(title.hasSuffix("(recovered)"))
         }
+
+        // MARK: - A crash keeps what the take was given
+
+        /// The next launch's answer to the offer: Restore, or Not Now.
+        private func answer(_ model: AppModel, restores: Bool) {
+            if restores {
+                model.acceptPendingRecovery()
+            } else {
+                model.declinePendingRecovery()
+            }
+        }
+
+        @Test("a run of keystrokes reaches the take's checkpoint once, within a second; a marker reaches it at once")
+        func renamesReachTheCheckpointCoalesced() async throws {
+            let model = makeRecordingModel("checkpoint-coalesced")
+            try await startMeteredTake(model)
+            await model.pendingRecoveryWrite?.value
+            let file = try #require(model.activeRecoveryFileURL)
+            func written() throws -> RecoveryCheckpoint {
+                try JSONDecoder().decode(RecoveryCheckpoint.self, from: Data(contentsOf: file))
+            }
+
+            let title = "Board meeting"
+            for end in title.indices { model.renameTake(String(title[...end])) }
+            await model.pendingRecoveryWrite?.value
+            #expect(try written().typedTitle == nil, "no write for each keystroke")
+            let landed = await waitUntil(timeoutMs: 3_000) { (try? written())?.typedTitle == title }
+            #expect(landed)
+
+            let mark = try #require(model.addTakeMarker())
+            await model.pendingRecoveryWrite?.value
+            #expect(try written().markers == [mark])
+            await model.discardTake()
+        }
+
+        @Test("a crash mid-take brings the take back under the title typed for it, with its markers", arguments: [false, true])
+        func crashMidTakeKeepsTitleAndMarkers(restores: Bool) async throws {
+            let library = makeTempLibraryURL("crash-mid-take")
+            let model = makeRecordingModel("crash-mid-take", library: library)
+            try await startMeteredTake(model)
+            model.renameTake("Board meeting")
+            let mark = try #require(model.addTakeMarker())
+            await settle(for: .milliseconds(1_500))
+            await model.pendingRecoveryWrite?.value
+
+            model.recoveryOwner = nil
+            let relaunched = makeRecordingModel("crash-mid-take", library: library)
+            #expect(relaunched.pendingRecovery?.kind == .recording)
+            answer(relaunched, restores: restores)
+
+            let saved = try #require(await landedEntry(relaunched))
+            #expect(saved.title == "Board meeting")
+            #expect(saved.manifest.titleSource == .user)
+            #expect(saved.manifest.takeMarkers == [mark])
+            await model.discardTake()
+        }
+
+        @Test("a crash mid-transcription brings the take back under the title typed for it, with its markers", arguments: [false, true])
+        func crashMidTranscriptionKeepsTitleAndMarkers(restores: Bool) async throws {
+            try await withMocksCleared(.transcriber) {
+                // The first instance's run never ends, as after a crash.
+                await installMockTranscriber(segments: [(0, 1, "never landed")], gate: MockTranscriberGate())
+                let library = makeTempLibraryURL("crash-mid-transcription")
+                let model = makeRecordingModel("crash-mid-transcription", library: library)
+                try await startMeteredTake(model)
+                model.renameTake("Board meeting")
+                let mark = try #require(model.addTakeMarker())
+                model.stopRecordingAndTranscribe()
+                let transcribing = await waitUntil { model.recording?.isTranscribing == true }
+                #expect(transcribing)
+                await model.pendingRecoveryWrite?.value
+
+                model.recoveryOwner = nil
+                await installMockTranscriber(segments: [(0, 1, "said before the crash")])
+                let relaunched = makeRecordingModel("crash-mid-transcription", library: library)
+                #expect(relaunched.pendingRecovery?.kind == .fileTranscription)
+                answer(relaunched, restores: restores)
+
+                let saved = try #require(await landedEntry(relaunched))
+                #expect(saved.title == "Board meeting")
+                #expect(saved.manifest.titleSource == .user)
+                #expect(saved.manifest.takeMarkers == [mark])
+                let settled = await waitUntil { !relaunched.hasPendingTakeWork }
+                #expect(settled)
+            }
+        }
     }
 }

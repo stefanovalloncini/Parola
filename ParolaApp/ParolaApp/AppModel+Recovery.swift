@@ -40,6 +40,10 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var companionFailedMixes: Int?
     /// The entry a waiting mic track goes into.
     var entryID: String?
+    /// A title the user typed for the take; nil while it has its generated name.
+    var typedTitle: String?
+    /// The moments marked in the take, as its session holds them.
+    var markers: [TimeInterval]?
 
     init(
         kind: Kind,
@@ -58,6 +62,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         companionStopped: Bool? = nil,
         companionFailedMixes: Int? = nil,
         entryID: String? = nil,
+        annotations: AppModel.TakeAnnotations? = nil,
         id: UUID = UUID()
     ) {
         self.id = id
@@ -77,6 +82,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         self.companionStopped = companionStopped
         self.companionFailedMixes = companionFailedMixes
         self.entryID = entryID
+        self.typedTitle = annotations?.typedTitle
+        self.markers = annotations.flatMap { $0.markers.isEmpty ? nil : $0.markers }
     }
 
     init(from decoder: any Decoder) throws {
@@ -98,6 +105,13 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         companionStopped = try c.decodeIfPresent(Bool.self, forKey: .companionStopped)
         companionFailedMixes = try c.decodeIfPresent(Int.self, forKey: .companionFailedMixes)
         entryID = try c.decodeIfPresent(String.self, forKey: .entryID)
+        typedTitle = try c.decodeIfPresent(String.self, forKey: .typedTitle)
+        markers = try c.decodeIfPresent([TimeInterval].self, forKey: .markers)
+    }
+
+    /// What the take's session held for its entry, which a recovered take lands with as its own landing would have.
+    var annotations: AppModel.TakeAnnotations {
+        AppModel.TakeAnnotations(typedTitle: typedTitle, markers: markers ?? [])
     }
 
     /// A take by its title, a file by its name; a link by the video's title, or the link itself before the title was known.
@@ -172,10 +186,11 @@ extension AppModel {
         return checkpoints + [legacyRecoveryFileURL]
     }
 
-    /// A take whose mic track is still waiting to be folded in carries it, so a crash during the run keeps the pair.
+    /// A take whose mic track is still waiting to be folded in carries it, so a crash during the run keeps the pair; a take's title and markers go with it too.
     @discardableResult
     func beginFileTranscribeRecovery(
-        sourceURL: URL, title: String? = nil, source: EntrySource = .file, category: EntryCategory? = nil
+        sourceURL: URL, title: String? = nil, source: EntrySource = .file, category: EntryCategory? = nil,
+        annotations: TakeAnnotations? = nil
     ) -> Int {
         let generation = beginRecoveryGeneration()
         recordingRecoveryStartedAt = nil
@@ -191,7 +206,8 @@ extension AppModel {
             companionAudioURL: mic?.file,
             companionStartOffset: mic?.offset,
             companionStopped: mic?.stoppedEarly,
-            companionFailedMixes: mic?.failedMixes
+            companionFailedMixes: mic?.failedMixes,
+            annotations: annotations
         ))
         return generation
     }
@@ -234,7 +250,8 @@ extension AppModel {
             category: activeTake?.category,
             companionAudioURL: liveCompanionAudioURL,
             companionStartOffset: liveCompanionAudioURL == nil ? nil : liveCompanionStartOffset,
-            companionStopped: liveCompanionAudioURL == nil ? nil : micTrack?.stoppedEarly
+            companionStopped: liveCompanionAudioURL == nil ? nil : micTrack?.stoppedEarly,
+            annotations: annotations(of: activeTake?.id)
         ))
     }
 
@@ -547,7 +564,7 @@ extension AppModel {
                     self.startTakeTask { [weak self] in
                         await self?.transcribeRecordedTake(
                             url: folded.audio, engineInput: folded.engineInput, title: title, source: checkpoint.source ?? .microphone,
-                            category: checkpoint.category ?? .transcription, replacing: adopted
+                            category: checkpoint.category ?? .transcription, replacing: adopted, annotations: checkpoint.annotations
                         )
                     }
                 }
@@ -620,6 +637,7 @@ extension AppModel {
                     category: checkpoint.category ?? .transcription,
                     landingAs: .salvagedTake,
                     recovery: generation,
+                    annotations: checkpoint.annotations,
                     onSaved: release
                 )
             }
@@ -650,6 +668,7 @@ extension AppModel {
                     category: checkpoint.category ?? .transcription,
                     landingAs: .salvagedTake,
                     recovery: generation,
+                    annotations: checkpoint.annotations,
                     onSaved: release
                 )
             }
@@ -733,7 +752,8 @@ extension AppModel {
             source: checkpoint.source ?? .microphone,
             category: checkpoint.category ?? .transcription,
             landingAs: .recording,
-            recovery: generation
+            recovery: generation,
+            annotations: checkpoint.annotations
         )
     }
 

@@ -352,6 +352,7 @@ final class AppModel {
     /// The take transcription Stop Transcribing ended, so its save can note it too.
     @ObservationIgnored var takeRunStoppedByStopTranscribing: Int?
     @ObservationIgnored private var takeWorkCounter = 0
+    @ObservationIgnored private var renameCheckpoint: Task<Void, Never>?
     /// A take's prepare and transcription, which a quit stops so the take is saved rather than lost with the process.
     @ObservationIgnored private var takeTask: Task<Void, Never>?
     /// A live take a cancel let go while its last decode ran, as it stood then: its final transcript lands with these.
@@ -4582,7 +4583,9 @@ final class AppModel {
             discardMeetingScratch([engineFile])
         }
         let named = annotations.typedTitle ?? title
-        let recovery = beginFileTranscribeRecovery(sourceURL: url, title: named, source: source, category: category)
+        let recovery = beginFileTranscribeRecovery(
+            sourceURL: url, title: named, source: source, category: category, annotations: annotations
+        )
         // Held by the run itself, so a Cancel's cleanup leaves it for the save that follows.
         recoveryHeldByTake.insert(recovery)
         if !startsStopped { recordedTake = RecordedTake(file: url, title: named, takeID: take) }
@@ -4944,6 +4947,7 @@ final class AppModel {
         guard let take = controlledTake else { return nil }
         var mark: TimeInterval?
         updateSession(of: take.id) { mark = $0.addMarker(at: Date()) }
+        if mark != nil { writeRecordingCheckpoint() }
         return mark
     }
 
@@ -4969,7 +4973,22 @@ final class AppModel {
             return
         }
         guard let take = controlledTake else { return }
+        let before = recording
         updateSession(of: take.id) { $0.rename(typed) }
+        if recording != before { checkpointRenameSoon(of: take.id) }
+    }
+
+    /// A rename reaches the take's checkpoint within a second: one write for a run of keystrokes, never one for each.
+    private func checkpointRenameSoon(of takeID: Int) {
+        guard renameCheckpoint == nil else { return }
+        let clock = clock
+        renameCheckpoint = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(1), clock: clock)
+            guard let self else { return }
+            self.renameCheckpoint = nil
+            guard self.activeTake?.id == takeID else { return }
+            self.writeRecordingCheckpoint()
+        }
     }
 
     /// Note or Meeting for the take in progress: its entry is saved under it, and a generated title follows it; a count-in hands the choice to the take it becomes.
@@ -4994,7 +5013,7 @@ final class AppModel {
     }
 
     /// What the take's session holds for its entry, while the session is still that take's.
-    private func annotations(of takeID: Int?) -> TakeAnnotations {
+    func annotations(of takeID: Int?) -> TakeAnnotations {
         guard let takeID, let session = recording, session.takeID == takeID else { return TakeAnnotations() }
         return TakeAnnotations(
             generatedTitle: session.generatedTitle,

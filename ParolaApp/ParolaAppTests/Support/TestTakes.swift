@@ -36,11 +36,11 @@ func makeTakeWAV(_ label: String, seconds: Double = 0.3, in directory: URL? = ni
     return url
 }
 
-/// A model for take tests: test mode, a library of its own, room on disk, no AI cards and no count-in.
+/// A model for take tests: test mode, a library of its own unless it is given one, room on disk, no AI cards and no count-in.
 @MainActor
-func makeRecordingModel(_ label: String, clock: any Clock<Duration> = ContinuousClock()) -> AppModel {
+func makeRecordingModel(_ label: String, library: URL? = nil, clock: any Clock<Duration> = ContinuousClock()) -> AppModel {
     let model = AppModel(bootstrap: AppBootstrap(
-        mode: .test, library: makeTempLibraryURL(label), defaultsOverride: temporaryDefaults(),
+        mode: .test, library: library ?? makeTempLibraryURL(label), defaultsOverride: temporaryDefaults(),
         sideEffects: [], filePicker: TestFilePicker(), clock: clock
     ))
     model.recordingCountInSeconds = 0
