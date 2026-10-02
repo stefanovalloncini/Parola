@@ -11,6 +11,15 @@ enum WindowFrameRequest {
         )
     }
 
+    /// Moves the window and answers with the frame it ended up with.
+    @MainActor
+    static func apply(_ target: CGRect, to window: NSWindow) -> CGRect {
+        window.setFrame(target, display: true)
+        // setFrame takes any size; the content's minimum clamps the window only in the layout after it.
+        window.layoutIfNeeded()
+        return window.frame
+    }
+
     private static func extent(_ value: Double?, field: String) throws -> Double? {
         guard let value else { return nil }
         guard value.isFinite, value > 0 else {
@@ -67,8 +76,7 @@ extension ParolaAutomationServer {
                         w: args.optionalDouble("w"),
                         h: args.optionalDouble("h")
                     )
-                    window.setFrame(target, display: true)
-                    let applied = window.frame
+                    let applied = WindowFrameRequest.apply(target, to: window)
                     return .object([
                         "x": .int(Int(applied.origin.x)),
                         "y": .int(Int(applied.origin.y)),

@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 
@@ -33,5 +35,28 @@ struct WindowFrameRequestTests {
     func allowsNegativeOrigin() throws {
         let frame = try WindowFrameRequest.resolve(current: current, x: -400, y: 0, w: nil, h: nil)
         #expect(frame.origin.x == -400)
+    }
+
+    @Test("the answer is the frame that landed: the content's minimum width clamps a narrower ask, as in the main window")
+    @MainActor
+    func answersTheLandedFrame() {
+        let window = NSWindow(
+            contentRect: NSRect(x: -12_000, y: -12_000, width: 1_180, height: 760),
+            styleMask: [.titled, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = NSHostingController(rootView: Color.clear.frame(
+            minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight
+        ))
+        defer { window.contentViewController = nil }
+
+        let narrow = WindowFrameRequest.apply(CGRect(x: -12_000, y: -12_000, width: 860, height: 700), to: window)
+        #expect(narrow.width == MainWindowLayout.minimumWidth)
+        #expect(narrow == window.frame)
+
+        let wide = WindowFrameRequest.apply(CGRect(x: -12_000, y: -12_000, width: 1_000, height: 700), to: window)
+        #expect(wide.width == 1_000)
+        #expect(wide.height == 700)
     }
 }
