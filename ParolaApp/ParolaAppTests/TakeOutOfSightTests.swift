@@ -812,9 +812,11 @@ extension TranscriberMockSuites {
 
                 #expect(model.exportNotice == nil)
                 _ = await landedEntry(model)
-                model.exportNotice = ExportNotice(message: "About this take", failures: [], folder: nil, tone: .failure, forTake: take)
-                model.keepCoveredFailure(model.exportNotice, take: take)
-                #expect(model.noticeUnderMacAudio == nil)
+                let sameTake = ExportNotice(message: "About this take", failures: [], folder: nil, tone: .failure, forTake: take)
+                model.exportNotice = sameTake
+                model.exportNotice = ExportNotice(message: AppModel.macAudioStoppedMessage(), failures: [], folder: nil, tone: .info)
+                model.keepCoveredFailure(sameTake, take: take)
+                #expect(model.noticeUnderMacAudio == nil, "a failure about the take the Mac-audio notice is about doesn't wait under it")
             }
         }
     }
