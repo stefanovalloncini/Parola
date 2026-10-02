@@ -3656,6 +3656,9 @@ final class AppModel {
         )
         forgetTakeRequest()
         activeTake = take
+        // Words an earlier live take left behind would otherwise go into this take's checkpoint.
+        liveSegments = []
+        livePartialText = ""
         let stamp = countIn?.titleDate ?? Date()
         var session = RecordingSession(
             takeID: take.id,

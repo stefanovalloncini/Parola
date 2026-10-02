@@ -528,6 +528,22 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a take's checkpoint never carries the words an earlier live take left behind")
+        func newTakeStartsWithoutOldWords() async throws {
+            let model = makeRecordingModel("checkpoint-no-old-words")
+            model.liveSegments = [TranscriptSegment(id: 0, start: 0, end: 1, text: "an earlier take's words")]
+            model.livePartialText = "and its last partial"
+
+            try await startMeteredTake(model)
+            await model.pendingRecoveryWrite?.value
+
+            let file = try #require(model.activeRecoveryFileURL)
+            let written = try JSONDecoder().decode(RecoveryCheckpoint.self, from: Data(contentsOf: file))
+            #expect(written.segments.isEmpty)
+            #expect(model.livePartialText.isEmpty)
+            await model.discardTake()
+        }
+
         @Test("a run of keystrokes reaches the take's checkpoint once, within a second; a marker reaches it at once")
         func renamesReachTheCheckpointCoalesced() async throws {
             let model = makeRecordingModel("checkpoint-coalesced")
