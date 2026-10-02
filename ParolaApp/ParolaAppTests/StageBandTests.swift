@@ -226,7 +226,7 @@ struct StageBandLayerTests {
         let held = tapeView()
         held.show(StageTape(levels: [0.5], flags: [], newest: 3, paused: true), slide: .held, ink: ink, accent: accent)
         let still = tapeView()
-        still.show(StageTape(levels: [0.5], flags: [], newest: 3, paused: false), slide: .none, ink: ink, accent: accent)
+        still.show(StageTape(levels: [0.5], flags: [], newest: 3, paused: false), slide: .still, ink: ink, accent: accent)
 
         #expect(held.tape.animation(forKey: StageBand.slideKey) == nil)
         #expect(held.tape.affineTransform() == heldStep)
@@ -459,28 +459,28 @@ extension TranscriberMockSuites {
                 defer { hosted.close() }
                 let found = tapeViews(in: hosted).first
                 let view = try #require(found)
-                let hiddenBars = view.drawn?.newest
+                let hiddenBars = view.built?.newest
                 let tick = model.takeLevelTick
                 let movedOn = await waitUntil { model.takeLevelTick >= tick + 3 }
                 #expect(movedOn)
-                #expect(view.drawn?.newest == hiddenBars, "out of sight the band keeps the bars it had")
+                #expect(view.built?.newest == hiddenBars, "out of sight the band keeps the bars it had")
                 #expect(view.tape.animation(forKey: StageBand.slideKey) == nil, "and slides nothing")
 
                 sight.shown = true
                 let caughtUp = await waitUntil {
-                    view.drawn?.newest == newestSample(model) && view.tape.animation(forKey: StageBand.slideKey) != nil
+                    view.built?.newest == newestSample(model) && view.tape.animation(forKey: StageBand.slideKey) != nil
                 }
                 #expect(caughtUp, "in sight it shows the newest sample's bars and slides from it")
 
                 let paused = model.pauseTake()
                 #expect(paused)
-                let pausedBars = await waitUntil { view.drawn?.paused == true }
+                let pausedBars = await waitUntil { view.built?.paused == true }
                 #expect(pausedBars)
                 await settle(for: .milliseconds(150))
-                let heldBars = view.drawn?.newest
+                let heldBars = view.built?.newest
                 let lastSlide = view.tape.animation(forKey: StageBand.slideKey)?.beginTime
                 await settle(for: .milliseconds(400))
-                #expect(view.drawn?.newest == heldBars)
+                #expect(view.built?.newest == heldBars)
                 #expect(view.tape.animation(forKey: StageBand.slideKey)?.beginTime == lastSlide, "no slide starts while the take is paused")
                 #expect(view.tape.affineTransform() == CGAffineTransform(translationX: -StageBand.step, y: 0))
                 await model.discardTake()
@@ -499,14 +499,14 @@ extension TranscriberMockSuites {
                 defer { hosted.close() }
                 let found = tapeViews(in: hosted).first
                 let view = try #require(found)
-                let first = view.drawn?.newest ?? -1
-                let followed = await waitUntil { (view.drawn?.newest ?? -1) >= first + 3 }
+                let first = view.built?.newest ?? -1
+                let followed = await waitUntil { (view.built?.newest ?? -1) >= first + 3 }
                 #expect(followed, "the bars keep up with the take")
 
                 var seen: Set<Int> = []
                 let watchUntil = ContinuousClock.now + .seconds(1)
                 while ContinuousClock.now < watchUntil {
-                    if let newest = view.drawn?.newest { seen.insert(newest) }
+                    if let newest = view.built?.newest { seen.insert(newest) }
                     try? await Task.sleep(for: .milliseconds(10))
                 }
                 #expect(seen.count <= 5, "the bars were built \(seen.count) times in a second")

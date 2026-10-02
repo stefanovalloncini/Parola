@@ -31,7 +31,7 @@ struct StageBand: View {
     /// Where the bars stand between samples.
     enum Slide: Equatable {
         /// Against the playhead, never moving: under Reduce Motion.
-        case none
+        case still
         /// A step on from the newest sample, standing still: a take paused or out of sight.
         case held
         /// A step left over one sample's time from the newest sample's moment, then still until the next.
@@ -45,11 +45,11 @@ struct StageBand: View {
         layerTime - now.timeIntervalSince(sampledAt)
     }
 
-    /// One step left over one sample's time in three frames, about thirty a second, each on the device pixel nearest the distance travelled, as the bars have always moved; until it begins they stand against the playhead.
+    /// One step left over one sample's time in three frames, about thirty a second, each on the device pixel nearest the distance travelled so the bars stay crisp; until it begins they stand against the playhead.
     static func slideAnimation(beginTime: CFTimeInterval, scale: CGFloat) -> CAKeyframeAnimation {
         let frames = 3
         let slide = CAKeyframeAnimation(keyPath: "transform.translation.x")
-        // Held values: a continuous slide lands between pixels, and a value for every pixel has the render server draw each one.
+        // Held values: a continuous slide lands between pixels, and one value per pixel makes the render server draw every pixel step.
         slide.calculationMode = .discrete
         slide.values = (0..<frames).map { -(step * CGFloat($0) / CGFloat(frames) * scale).rounded() / scale }
         slide.keyTimes = (0...frames).map { NSNumber(value: Double($0) / Double(frames)) }
@@ -94,7 +94,7 @@ struct StageBand: View {
     private var bars: some View {
         switch Self.cadence(reduceMotion: reduceMotion) {
         case .steps(let interval):
-            TimelineView(.animation(minimumInterval: interval, paused: !drawsLive)) { _ in tape.drawn(.none) }
+            TimelineView(.animation(minimumInterval: interval, paused: !drawsLive)) { _ in tape.drawn(.still) }
         case .glides:
             let _ = drawsLive ? model.takeLevelTick : 0
             tape.drawn(drawsLive ? .from(model.takeLevelTickAt) : .held)
@@ -237,7 +237,7 @@ struct StageBand: View {
         let pennants = CAShapeLayer()
         /// Each lane's ink, cut to its bars by a shape mask.
         private(set) var lanes: [CAGradientLayer] = []
-        private(set) var drawn: StageTape?
+        private(set) var built: StageTape?
         private var ink: CGColor?
         private var accent: CGColor?
         private var slide: Slide?
@@ -278,9 +278,9 @@ struct StageBand: View {
         /// The bars as of `tape`, in one transaction with the slide that starts from its sample, so the two reach the screen together.
         func show(_ tape: StageTape, slide: Slide, ink: CGColor, accent: CGColor) {
             withoutActions {
-                let newBars = tape != drawn
+                let newBars = tape != built
                 if newBars || ink != self.ink || accent != self.accent {
-                    if newBars { drawn = tape }
+                    if newBars { built = tape }
                     self.ink = ink
                     self.accent = accent
                     build()
@@ -300,12 +300,12 @@ struct StageBand: View {
         }
 
         private func build() {
-            guard let drawn, let ink, let accent else { return }
+            guard let built, let ink, let accent else { return }
             let size = bounds.size
             builtSize = size
             tape.bounds = CGRect(origin: .zero, size: size)
             let playheadX = StageBand.playheadX(width: size.width)
-            let rows = StageBand.rows(of: drawn)
+            let rows = StageBand.rows(of: built)
             while lanes.count < rows.count {
                 let lane = CAGradientLayer()
                 lane.locations = [0, 0.5, 1]
@@ -325,10 +325,10 @@ struct StageBand: View {
                 (lane.mask as? CAShapeLayer)?.path = StageBand.barsPath(row.levels, lane: rect.size, playheadX: playheadX).cgPath
             }
             poles.frame = tape.bounds
-            poles.path = StageBand.polesPath(drawn.flags, height: size.height, playheadX: playheadX).cgPath
+            poles.path = StageBand.polesPath(built.flags, height: size.height, playheadX: playheadX).cgPath
             poles.fillColor = accent.copy(alpha: accent.alpha * 0.5)
             pennants.frame = tape.bounds
-            pennants.path = StageBand.pennantsPath(drawn.flags, playheadX: playheadX).cgPath
+            pennants.path = StageBand.pennantsPath(built.flags, playheadX: playheadX).cgPath
             pennants.fillColor = accent
             for shape in [poles, pennants] + lanes + lanes.compactMap(\.mask) {
                 shape.contentsScale = scale
@@ -341,7 +341,7 @@ struct StageBand: View {
 
         private func place(_ slide: Slide) {
             switch slide {
-            case .none:
+            case .still:
                 tape.removeAnimation(forKey: StageBand.slideKey)
                 tape.setAffineTransform(.identity)
             case .held:
