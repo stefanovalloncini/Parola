@@ -326,8 +326,10 @@ final class AppModel {
     }
     /// Test seam: how long the saved-take toast stays once nothing holds it.
     @ObservationIgnored var takeSavedLifetime: Duration = TakeSavedNotice.lifetime
-    /// Test seam: VoiceOver running keeps the saved-take toast up until it is dismissed.
-    @ObservationIgnored var voiceOverIsRunning: @MainActor () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
+    /// VoiceOver running keeps the saved-take toast up until it is dismissed. The app delegate follows the system's setting; a model it doesn't bind, as a test's, starts with it off.
+    @ObservationIgnored var voiceOverIsRunning = false {
+        didSet { if voiceOverIsRunning != oldValue { restartTakeSavedExpiry() } }
+    }
     @ObservationIgnored private var takeSavedExpiry: Task<Void, Never>?
     @ObservationIgnored private var takeSavedHeld = false
     @ObservationIgnored private var takeSavedSeen = false
@@ -5247,12 +5249,12 @@ final class AppModel {
     private func restartTakeSavedExpiry() {
         takeSavedExpiry?.cancel()
         takeSavedExpiry = nil
-        guard let notice = takeSavedNotice, takeSavedSeen, !takeSavedHeld, !voiceOverIsRunning() else { return }
+        guard let notice = takeSavedNotice, takeSavedSeen, !takeSavedHeld, !voiceOverIsRunning else { return }
         let lifetime = takeSavedLifetime
         let clock = clock
         takeSavedExpiry = Task { [weak self] in
             try? await Task.sleep(for: lifetime, clock: clock)
-            guard !Task.isCancelled, let self, self.takeSavedNotice == notice, !self.voiceOverIsRunning() else { return }
+            guard !Task.isCancelled, let self, self.takeSavedNotice == notice else { return }
             self.takeSavedNotice = nil
         }
     }

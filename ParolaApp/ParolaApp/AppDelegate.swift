@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dictationSubscription: DictationSubscription?
     private var settingsResetSubscription: (any NSObjectProtocol)?
     private var startRecordingSubscription: (any NSObjectProtocol)?
+    private var voiceOverObservation: NSKeyValueObservation?
     private let menuBar = MenuBarController()
     private let dockBadge = DockBadge()
     private let recordingStatusItem = RecordingStatusItem()
@@ -54,6 +55,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if let startRecordingSubscription { NotificationCenter.default.removeObserver(startRecordingSubscription) }
         startRecordingSubscription = Self.observeStartRecording(for: model)
+        voiceOverObservation = Self.followVoiceOver(for: model)
+    }
+
+    /// The saved-take toast waits for a VoiceOver user, and goes on its own again as soon as VoiceOver stops.
+    static func followVoiceOver(for model: AppModel) -> NSKeyValueObservation {
+        model.voiceOverIsRunning = NSWorkspace.shared.isVoiceOverEnabled
+        return NSWorkspace.shared.observe(\.isVoiceOverEnabled) { @Sendable [weak model] _, _ in
+            Task { @MainActor [weak model] in model?.voiceOverIsRunning = NSWorkspace.shared.isVoiceOverEnabled }
+        }
     }
 
     /// The Start Recording intent's signal, heard by the app rather than a window, so a take starts with none open.

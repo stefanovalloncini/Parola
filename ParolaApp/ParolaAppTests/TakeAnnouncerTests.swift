@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Parola
@@ -134,7 +135,7 @@ struct TakeAnnouncerTests {
     @Test("with VoiceOver running the saved toast waits to be dismissed")
     func toastStaysUnderVoiceOver() async {
         let model = makeRecordingModel("announcer-toast")
-        model.voiceOverIsRunning = { true }
+        model.voiceOverIsRunning = true
         model.takeSavedLifetime = .milliseconds(50)
 
         model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
@@ -145,6 +146,35 @@ struct TakeAnnouncerTests {
         model.dismissTakeSaved()
         #expect(model.takeSavedNotice == nil)
     }
+
+    @Test("turning VoiceOver off lets a toast it held go on its own, without a hover to wake it")
+    func toastGoesWhenVoiceOverStops() async {
+        let model = makeRecordingModel("announcer-toast-off")
+        model.voiceOverIsRunning = true
+        model.takeSavedLifetime = .milliseconds(50)
+        model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+        model.takeSavedCameOnScreen()
+        await settle(for: .milliseconds(300))
+        #expect(model.takeSavedNotice != nil)
+
+        model.voiceOverIsRunning = false
+
+        let gone = await waitUntil { model.takeSavedNotice == nil }
+        #expect(gone)
+    }
+
+    @Test("a model nobody binds, as every test's is, starts with VoiceOver off; the app's follows the system")
+    func voiceOverStartsOff() {
+        let test = makeRecordingModel("announcer-voiceover-default")
+        #expect(!test.voiceOverIsRunning)
+        let plain = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("announcer-voiceover-plain"))
+        #expect(!plain.voiceOverIsRunning)
+
+        let followed = makeRecordingModel("announcer-voiceover-followed")
+        let observation = AppDelegate.followVoiceOver(for: followed)
+        #expect(followed.voiceOverIsRunning == NSWorkspace.shared.isVoiceOverEnabled)
+        withExtendedLifetime(observation) {}
+    }
 }
 
 @Suite("VoiceOver announcer wiring")
@@ -154,5 +184,6 @@ struct TakeAnnouncerWiringTests {
         let path = #filePath.replacingOccurrences(of: "ParolaAppTests/TakeAnnouncerTests.swift", with: "ParolaApp/AppDelegate.swift")
         let delegate = try String(contentsOfFile: path, encoding: .utf8)
         #expect(delegate.contains("takeAnnouncer.bind(model)"))
+        #expect(delegate.contains("voiceOverObservation = Self.followVoiceOver(for: model)"))
     }
 }
