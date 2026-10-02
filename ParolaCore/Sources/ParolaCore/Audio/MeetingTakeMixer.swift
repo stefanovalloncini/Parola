@@ -8,11 +8,16 @@ public enum MeetingTakeMixer {
     /// stretched to end with it; one shorter still stopped early, and one longer ran past, and both are only lined up.
     public static let driftTolerance = 0.0002
 
+    /// How far a microphone may run past the Mac audio and still be cut where the Mac audio ends: about how much longer it
+    /// records while Stop winds the Mac capture down. A longer run means the Mac capture stopped early, so your side is kept whole.
+    public static let stopOverrunLimit: TimeInterval = 2
+
     static let chunkFrames = 32_768
 
     /// `macStart` and `micStart` say when each file's first sample was captured, which lines the two up; a microphone
     /// that stopped before the take did is never stretched, and `trimsMicOverrun` drops what it heard after the Mac
-    /// audio ended, as at Stop. The stereo file is 16-bit; the mono mix is Float32.
+    /// audio ended, as at Stop, up to `stopOverrunLimit`; past that the Mac side gets silence to the end of yours.
+    /// The stereo file is 16-bit; the mono mix is Float32.
     public static func mix(
         mac: URL, mic: URL, macStart: Date, micStart: Date, into stereo: URL, mono: URL?, micStoppedEarly: Bool = false,
         trimsMicOverrun: Bool = false
@@ -108,7 +113,9 @@ struct MixPlan {
             outputFrames = macFrames
         } else {
             micFramesPerOutputFrame = natural
-            outputFrames = trimsOverrun ? macFrames : max(macFrames, Int(naturalEnd.rounded(.up)))
+            let micEnd = Int(naturalEnd.rounded(.up))
+            let trims = trimsOverrun && Double(micEnd - macFrames) <= MeetingTakeMixer.stopOverrunLimit * rate
+            outputFrames = trims ? macFrames : max(macFrames, micEnd)
         }
     }
 }

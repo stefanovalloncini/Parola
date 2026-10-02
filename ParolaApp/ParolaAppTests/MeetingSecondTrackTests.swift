@@ -760,6 +760,38 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a meeting whose Mac capture stopped early keeps your whole side, at Stop and when the app quits", arguments: [false, true])
+        func macStoppedEarlyKeepsYourSide(quits: Bool) async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
+                let model = makeModel()
+                let folder = model.inflightRecordingsURL
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let id = UUID().uuidString
+                let mac = folder.appendingPathComponent("parola-system-\(id).wav")
+                let mic = folder.appendingPathComponent("\(RecordingScratch.meetingMicPrefix)-\(id).wav")
+                let rate = 16_000.0
+                try TestAudio.write(channels: [TestAudio.sine(seconds: 2, hz: 440, amplitude: 0.3, sampleRate: rate)], sampleRate: rate, to: mac)
+                var voice = [Float](repeating: 0, count: Int(10 * rate))
+                for index in Int(8 * rate)..<Int(8 * rate) + 160 { voice[index] = 0.9 }
+                try TestAudio.write(channels: [voice], sampleRate: rate, to: mic)
+                try await startMeeting(model, mac: ScriptedTrack(file: mac), mic: ScriptedTrack(file: mic))
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+
+                if quits {
+                    _ = await model.resolveQuitDuringTake(.stopAndSave)
+                } else {
+                    model.stopRecordingAndTranscribe()
+                }
+
+                let entry = try #require(await landedEntry(model))
+                let mixed = try await burstAndLength(of: entry, in: model)
+                #expect(abs(mixed.onset - 8) < 0.001, "your words after the Mac audio stopped are kept")
+                #expect(abs(mixed.seconds - 10) < 0.001, "as long as your side")
+            }
+        }
+
         // MARK: - Room for the fold
 
         @Test("a meeting recording its mic stops while its fold still fits on disk, and a take without one keeps going")

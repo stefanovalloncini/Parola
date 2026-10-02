@@ -178,6 +178,37 @@ struct MeetingTakeMixerTests {
         #expect(abs(onset - 10) < 0.001)
     }
 
+    @Test("Stop cuts a microphone overrun of up to two seconds, about how long the Mac capture takes to stop, and keeps a longer one whole")
+    func stopTrimsOnlyALatencyOverrun() {
+        let rate = 16_000.0
+        for (overrun, kept) in [(1.0, false), (2.0, false), (2.5, true), (8.0, true)] {
+            let plan = MixPlan(
+                macFrames: Int(2 * rate), rate: rate, micFrames: Int((2 + overrun) * rate), micRate: rate, offset: 0,
+                tolerance: MeetingTakeMixer.driftTolerance, trimsOverrun: true
+            )
+            #expect(plan.outputFrames == (kept ? Int((2 + overrun) * rate) : Int(2 * rate)), "\(overrun) s past the Mac audio")
+        }
+    }
+
+    @Test("a Mac capture that stopped early keeps your whole side at Stop, with silence on the Mac side after it")
+    func macStoppedEarlyKeepsYourSide() throws {
+        let dir = try folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let mac = try macAudio(seconds: 2, in: dir, rate: 8_000)
+        let mic = try micWithBurst(at: 8, seconds: 10, in: dir, rate: 8_000)
+        let stereo = dir.appendingPathComponent("stereo.wav")
+        let start = Date()
+
+        try MeetingTakeMixer.mix(mac: mac, mic: mic, macStart: start, micStart: start, into: stereo, mono: nil, trimsMicOverrun: true)
+
+        #expect(try frames(of: stereo) == 10 * 8_000)
+        let onset = try #require(try burstOnset(in: stereo))
+        #expect(abs(onset - 8) < 0.001)
+        let macSide = try TestAudio.read(stereo).channels[0]
+        let silentAfterItStopped = macSide[Int(2.1 * 8_000)...].allSatisfy { $0 == 0 }
+        #expect(silentAfterItStopped)
+    }
+
     @Test("a microphone half a percent short is lined up, not stretched: that is a mic that stopped, not drift")
     func halfAPercentIsNotDrift() throws {
         let dir = try folder()
