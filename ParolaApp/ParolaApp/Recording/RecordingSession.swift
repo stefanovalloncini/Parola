@@ -144,6 +144,18 @@ struct RecordingSession: Equatable, Sendable {
         return .recording
     }
 
+    /// A title the user typed becomes the take's own; an empty one gives it its generated name back.
+    mutating func rename(_ typed: String) {
+        if typed.isEmpty {
+            guard titleSource != nil else { return }
+            titleSource = nil
+            title = generatedTitle
+        } else if typed != title {
+            title = typed
+            titleSource = .user
+        }
+    }
+
     @discardableResult
     mutating func arm(_ arming: Arming) -> Bool {
         guard isArming else { return false }

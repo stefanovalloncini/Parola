@@ -3368,8 +3368,10 @@ final class AppModel {
         let overlayVisible = appIsActive() && (mode == .test || NSApp.windows.contains { $0.isVisible && $0.canBecomeMain })
         let askedForMeeting = requestedCategory(for: source) == .meeting
         if countIn > 0, overlayVisible {
-            beginCountIn(seconds: countIn, source: source) { [weak self] showsStage in
-                self?.beginRecordingNow(source: source, askedForMeeting: askedForMeeting, diskCheck: diskCheck, showsStage: showsStage)
+            beginCountIn(seconds: countIn, source: source) { [weak self] showsStage, counted in
+                self?.beginRecordingNow(
+                    source: source, askedForMeeting: askedForMeeting, diskCheck: diskCheck, showsStage: showsStage, countIn: counted
+                )
             }
             refuseDuringCountIn(diskCheck)
         } else {
@@ -3389,8 +3391,10 @@ final class AppModel {
     }
 
     /// The count-in is the take's first arming, under the id the take will get.
-    /// `then` learns whether the Stage is still up: someone who left it during the count-in keeps their page.
-    private func beginCountIn(seconds: Int, source: RecordSource, then: @escaping (_ showsStage: Bool) -> Void) {
+    /// `then` learns whether the Stage is still up, so someone who left it during the count-in keeps their page, and what the count-in's session holds for the take.
+    private func beginCountIn(
+        seconds: Int, source: RecordSource, then: @escaping (_ showsStage: Bool, _ countIn: RecordingSession?) -> Void
+    ) {
         countdownTask?.cancel()
         let takeID = takeCounter &+ 1
         let stamp = Date()
@@ -3414,8 +3418,9 @@ final class AppModel {
             }
             guard !Task.isCancelled else { return }
             let showsStage = self?.route == .recording
+            let countIn = self?.recording.flatMap { $0.takeID == takeID ? $0 : nil }
             self?.endCountIn()
-            then(showsStage)
+            then(showsStage, countIn)
         }
     }
 
@@ -3615,7 +3620,11 @@ final class AppModel {
         activeTake?.id == take.id
     }
 
-    private func beginRecordingNow(source: RecordSource, askedForMeeting: Bool, diskCheck: Task<Int64?, Never>, showsStage: Bool = true) {
+    /// `countIn` is the session the take counted in under: its name, typed or generated, is the take's.
+    private func beginRecordingNow(
+        source: RecordSource, askedForMeeting: Bool, diskCheck: Task<Int64?, Never>, showsStage: Bool = true,
+        countIn: RecordingSession? = nil
+    ) {
         // A count-in that ends after a quit began would start a take the quit can only cut off.
         guard !quitPending else {
             forgetTakeRequest()
@@ -3632,8 +3641,8 @@ final class AppModel {
         )
         forgetTakeRequest()
         activeTake = take
-        let stamp = Date()
-        beginSession(RecordingSession(
+        let stamp = countIn?.titleDate ?? Date()
+        var session = RecordingSession(
             takeID: take.id,
             source: source,
             category: take.category,
@@ -3641,7 +3650,9 @@ final class AppModel {
             isStreaming: false,
             arming: .startingCapture,
             titleDate: stamp
-        ))
+        )
+        if let countIn, countIn.titleSource == .user { session.rename(countIn.title) }
+        beginSession(session)
         if showsStage { showStage() }
         if source == .microphone { nameTakeDevice(take) }
         pendingRecordingSource = source.entrySource
@@ -4941,20 +4952,15 @@ final class AppModel {
         await discardCapture()
     }
 
-    /// A title the user typed becomes the entry's own; an empty one gives the take its generated name back.
+    /// A title the user typed becomes the entry's own; an empty one gives the take its generated name back. A count-in hands its title to the take it becomes.
     func renameTake(_ title: String) {
-        guard let take = controlledTake else { return }
         let typed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        updateSession(of: take.id) { session in
-            if typed.isEmpty {
-                guard session.titleSource != nil else { return }
-                session.titleSource = nil
-                session.title = session.generatedTitle
-            } else if typed != session.title {
-                session.title = typed
-                session.titleSource = .user
-            }
+        if let countIn = recording, countIn.isCountingIn {
+            updateSession(of: countIn.takeID) { $0.rename(typed) }
+            return
         }
+        guard let take = controlledTake else { return }
+        updateSession(of: take.id) { $0.rename(typed) }
     }
 
     /// Note or Meeting for the take in progress: its entry is saved under it, and a generated title follows it; a count-in hands the choice to the take it becomes.

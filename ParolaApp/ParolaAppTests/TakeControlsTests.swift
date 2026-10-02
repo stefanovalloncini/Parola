@@ -522,6 +522,47 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a title typed while the take counts in is the take's, and its entry is saved under it")
+        func titleTypedDuringCountIn() async throws {
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "said after the count-in")])
+                let model = makeRecordingModel("take-title-count-in")
+                model.recordingCountInSeconds = 1
+                try armMeteredTake(model)
+                let countingIn = model.recording?.isCountingIn == true
+                #expect(countingIn)
+                let takeID = try #require(model.recording?.takeID)
+
+                TakeTitleField.commit("Board meeting", to: takeID, model: model)
+
+                #expect(model.recording?.title == "Board meeting")
+                let capturing = await waitUntil(timeoutMs: 6_000) { model.recording?.state == .recording }
+                #expect(capturing)
+                #expect(model.recording?.title == "Board meeting")
+                #expect(model.recording?.titleSource == .user)
+                model.stopRecordingAndTranscribe()
+                let entry = try #require(await landedEntry(model))
+                #expect(entry.title == "Board meeting")
+                #expect(entry.manifest.titleSource == .user)
+                await waitUntil { !model.hasPendingTakeWork }
+            }
+        }
+
+        @Test("a take that counted in keeps the name its count-in showed, stamped when Record was pressed")
+        func countInNameIsTheTakes() async throws {
+            let model = makeRecordingModel("take-count-in-name")
+            model.recordingCountInSeconds = 1
+            try armMeteredTake(model)
+            let shown = try #require(model.recording)
+
+            let capturing = await waitUntil(timeoutMs: 6_000) { model.recording?.state == .recording }
+
+            #expect(capturing)
+            #expect(model.recording?.titleDate == shown.titleDate)
+            #expect(model.recording?.title == shown.title)
+            await model.discardTake()
+        }
+
         @Test("an untyped title follows the category, and clearing a typed one brings the generated name back")
         func untypedTitleFollowsTheCategory() async throws {
             try await withMocksCleared([.audioSource, .transcriber]) {

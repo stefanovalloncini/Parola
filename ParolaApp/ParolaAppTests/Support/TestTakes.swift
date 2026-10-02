@@ -81,10 +81,10 @@ actor DeletingCapture: LiveAudioSource {
     func inFlightURL() async -> URL? { file }
 }
 
-/// A take recording to a metered capture whose working file sits in the in-flight folder, once its clock runs; returns that file.
+/// Presses Record for a take on a metered capture whose working file sits in the in-flight folder; returns that file.
 @MainActor
 @discardableResult
-func startMeteredTake(_ model: AppModel, source: AppModel.RecordSource = .microphone, seconds: Double = 1) async throws -> URL {
+func armMeteredTake(_ model: AppModel, source: AppModel.RecordSource = .microphone, seconds: Double = 1) throws -> URL {
     try FileManager.default.createDirectory(at: model.inflightRecordingsURL, withIntermediateDirectories: true)
     let prefix = source == .microphone ? "parola-mic" : "parola-system"
     let file = try makeTakeWAV("metered", seconds: seconds, in: model.inflightRecordingsURL, prefix: prefix)
@@ -92,6 +92,14 @@ func startMeteredTake(_ model: AppModel, source: AppModel.RecordSource = .microp
     model.useStreaming = false
     model.takeCaptureOverride = { _ in capture }
     model.startRecording(source: source)
+    return file
+}
+
+/// A take on a metered capture, once its clock runs; returns its working file.
+@MainActor
+@discardableResult
+func startMeteredTake(_ model: AppModel, source: AppModel.RecordSource = .microphone, seconds: Double = 1) async throws -> URL {
+    let file = try armMeteredTake(model, source: source, seconds: seconds)
     let capturing = await waitUntil { model.recording?.state == .recording && model.liveSource != nil }
     guard capturing else { throw FixtureTakeDidNotStart() }
     return file
