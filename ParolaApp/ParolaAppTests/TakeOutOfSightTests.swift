@@ -41,6 +41,21 @@ struct OutOfSightFailureTests {
         #expect(!laterInBackground)
     }
 
+    @Test("a transcription that fails after Stop isn't held by the pill or the menu bar item; the Dock still counts it")
+    func transcriptionFailureNotHeld() {
+        var take = RecordingSession(takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture)
+        take.markCapturing(at: .now)
+        take.finish(at: .now)
+        take.transcribing(progress: nil)
+        take.fail("Transcription failed: the engine stopped.")
+        var surface = OutOfSightFailure()
+        let surfaceHolds = surface.holds(take, appActive: false)
+        #expect(!surfaceHolds)
+        var dock = OutOfSightFailure(includesTranscription: true)
+        let dockHolds = dock.holds(take, appActive: false)
+        #expect(dockHolds)
+    }
+
     @Test("a running take, a dismissed failure or the next take lets the hold go")
     func letGo() {
         var failure = OutOfSightFailure()
@@ -199,6 +214,48 @@ struct TakeFailsOutOfSightTests {
 }
 
 extension TranscriberMockSuites {
+    @MainActor
+    @Suite("A transcription that fails out of sight", .serialized)
+    struct TranscriptionFailsOutOfSightTests {
+        @Test("a take stopped in the background whose transcription then fails doesn't come back as stopped on the pill or in the menu bar, and the Dock bounces once")
+        func transcriptionFailureStaysOff() async throws {
+            let audio = try makeTakeWAV("out-of-sight-transcription", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "the engine stopped"),
+                    gate: gate
+                ))
+                let model = makeRecordingModel("out-of-sight-transcription")
+                let pill = RecordingPill(makesPanel: false)
+                pill.bind(model, appActive: false)
+                let item = RecordingStatusItem(statusBar: nil, appIsActive: { false })
+                item.bind(model)
+                let bounces = Calls()
+                let badge = DockBadge(show: { _ in }, appIsActive: { false }, requestAttention: { bounces.count += 1 })
+                badge.bind(model)
+
+                recordAndStop(model, audio: audio, seconds: 1)
+                let transcribing = await waitUntil { model.recording?.isTranscribing == true && !pill.isShown && item.face == nil }
+                #expect(transcribing)
+                await gate.open()
+                let failed = await waitUntil { model.recording?.failedWhile == .transcribing }
+                #expect(failed)
+                let bounced = await waitUntil { bounces.count == 1 }
+                #expect(bounced, "a transcript that failed in the background still asks for a look")
+                await settle(for: .milliseconds(300))
+
+                let pillShown = pill.isShown
+                let itemFace = item.face
+                #expect(!pillShown, "the pill came back as stopped for a transcription that failed")
+                #expect(itemFace == nil, "the menu bar item came back as stopped for a transcription that failed")
+                #expect(bounces.count == 1)
+                withExtendedLifetime(badge) {}
+            }
+        }
+    }
+
     @MainActor
     @Suite("A live take that fails out of sight", .serialized)
     struct LiveTakeFailsOutOfSightTests {

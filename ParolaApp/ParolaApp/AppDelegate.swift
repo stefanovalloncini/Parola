@@ -243,7 +243,7 @@ final class DockBadge {
     private let requestAttention: @MainActor () -> Void
     private var shown: String??
     private var tick: Task<Void, Never>?
-    private var failure = OutOfSightFailure()
+    private var failure = OutOfSightFailure(includesTranscription: true)
 
     var isTicking: Bool { tick != nil }
 
