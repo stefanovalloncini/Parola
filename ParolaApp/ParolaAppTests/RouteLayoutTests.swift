@@ -312,12 +312,12 @@ struct RouteLayoutTests {
         let roomy = HostedWindow(
             ContentView().environment(model), width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight + 200
         )
-        await ParolaAppTests.settle(for: .milliseconds(300))
+        await waitUntil { toastGap(in: roomy) != nil }
         let resting = try #require(toastGap(in: roomy), "the toast never came up")
         roomy.close()
         let hosted = HostedWindow(ContentView().environment(model), width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
         defer { hosted.close() }
-        await ParolaAppTests.settle(for: .milliseconds(300))
+        await waitUntil { toastGap(in: hosted) != nil }
         let folded = toastGap(in: hosted)
         #expect(folded == resting, "the toast sits off the place it has in a window with room to spare")
 

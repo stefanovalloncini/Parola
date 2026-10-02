@@ -169,6 +169,15 @@ struct StageLayoutTests {
         elements.contains { $0.identifier?.hasSuffix(control) == true }
     }
 
+    /// The Stage is up once its clock sits in the middle of the window: the sidebar has folded, and nothing on it is moving.
+    @MainActor
+    private func stageCameUp(in hosted: HostedWindow) async -> Bool {
+        await waitUntil {
+            let clock = HostedAccessibility.elements(in: hosted.host).first { $0.label == "Recording time" }
+            return clock.map { abs($0.frame.midX - hosted.window.frame.midX) < 0.5 } ?? false
+        }
+    }
+
     @Test("a notice or toast pending as a take records leaves the Stage as it is, and waits for the page after it", arguments: PendingStrip.allCases)
     @MainActor
     func pendingStripLeavesTheStage(_ strip: PendingStrip) async throws {
@@ -182,7 +191,7 @@ struct StageLayoutTests {
             hosted.close()
             model.endTestTake()
         }
-        await settle(for: .milliseconds(300))
+        try #require(await stageCameUp(in: hosted), "the Stage never came up")
         let clear = try stageFrames(HostedAccessibility.elements(in: hosted.host))
 
         strip.post(on: model)
@@ -194,8 +203,8 @@ struct StageLayoutTests {
         #expect(!draws(strip.control, onStage), "the Stage has no room for the strip")
 
         model.route = .transcript
-        await settle(for: .milliseconds(300))
-        #expect(draws(strip.control, HostedAccessibility.elements(in: hosted.host)), "the strip waited for the page after the Stage")
+        let shows = await waitUntil { draws(strip.control, HostedAccessibility.elements(in: hosted.host)) }
+        #expect(shows, "the strip waited for the page after the Stage")
     }
 
     /// What the Stage says on its own line: a run turned away while the take records, or why a finishing take stopped by itself.
@@ -242,10 +251,13 @@ struct StageLayoutTests {
         let frame: CGRect
     }
 
-    /// Every element but the line, where it sits.
+    /// Every element on the Stage but the line, where it sits; the folded sidebar beside the Stage is not the Stage's.
     @MainActor
-    private func placed(_ elements: [HostedAccessibility.Element]) -> [Placed] {
-        elements.filter { $0.identifier?.hasSuffix("Stage.Notice") != true }.map {
+    private func placed(onStageOf model: AppModel, in hosted: HostedWindow) -> [Placed] {
+        guard let take = model.recording else { return [] }
+        let title = StagePage.accessibilityTitle(for: take.mode, failedWhile: take.failedWhile, from: take.source.label.lowercased())
+        guard let stage = HostedAccessibility.elements(in: hosted.host).first(where: { $0.label == title }) else { return [] }
+        return HostedAccessibility.elements(in: stage.object).filter { $0.identifier?.hasSuffix("Stage.Notice") != true }.map {
             Placed(name: ($0.identifier ?? "") + "|" + ($0.label ?? ""), frame: $0.frame)
         }
     }
@@ -263,16 +275,18 @@ struct StageLayoutTests {
             hosted.close()
             model.endTestTake()
         }
-        await settle(for: .milliseconds(300))
-        let clear = placed(HostedAccessibility.elements(in: hosted.host))
+        try #require(await stageCameUp(in: hosted), "the Stage never came up")
+        let clear = placed(onStageOf: model, in: hosted)
+        try #require(!clear.isEmpty, "the Stage's own elements never showed")
 
         line.post(on: model)
-        await settle(for: .milliseconds(300))
+        let drawn = await waitUntil { draws("Stage.Notice", HostedAccessibility.elements(in: hosted.host)) }
+        try #require(drawn, "the Stage has no line for it")
 
         let onStage = HostedAccessibility.elements(in: hosted.host)
         let shown = try #require(onStage.first { $0.identifier?.hasSuffix("Stage.Notice") == true }, "the Stage has no line for it")
         #expect(shown.value == line.message)
-        #expect(placed(onStage) == clear, "the line moved the Stage")
+        #expect(placed(onStageOf: model, in: hosted) == clear, "the line moved the Stage")
         let modeLine = StageFacts.modeLine(isStreaming: false)
         let facts = try #require(onStage.first { $0.value == modeLine }).frame
         let band = try #require(onStage.first { $0.label == "Input level" }).frame
