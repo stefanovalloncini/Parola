@@ -1800,7 +1800,14 @@ final class AppModel {
             if once.count != deferredArrivals.count { deferredArrivals = once }
         }
     }
-    @ObservationIgnored var deferredLinks: [DeferredLink] = []
+    /// A link pasted again while it waits still runs once, as a file handed over twice does.
+    @ObservationIgnored var deferredLinks: [DeferredLink] = [] {
+        didSet {
+            var seen = Set<DeferredLink>()
+            let once = deferredLinks.filter { seen.insert($0).inserted }
+            if once.count != deferredLinks.count { deferredLinks = once }
+        }
+    }
     @ObservationIgnored var arrivalDrain: Task<Void, Never>?
     /// Test seam: whether a parked file is still there when the drain comes for it.
     @ObservationIgnored var parkedFileProbe: @Sendable (URL) -> Bool = {
@@ -3178,7 +3185,7 @@ final class AppModel {
     }
 
     /// A link parked by a take or a run in flight, kept with the action it was handed to.
-    enum DeferredLink: Equatable {
+    enum DeferredLink: Hashable {
         case transcribe(String)
         case subtitles(String)
     }

@@ -1032,6 +1032,23 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.isEmpty)
     }
 
+    @Test("a link pasted again while a take records waits once, and the take answers each time")
+    func recordingDefersARepeatedLinkOnce() {
+        let model = makeModel()
+        model.installTestTake(source: .microphone)
+        let link = "https://youtu.be/dQw4w9WgXcQ"
+
+        #expect(model.transcribeYouTube(urlString: link) == .parked)
+        let first = model.exportNotice?.id
+        model.dismissExportNotice()
+        #expect(model.transcribeYouTube(urlString: link) == .parked)
+        #expect(model.fetchYouTubeSubs(urlString: link) == .parked)
+
+        #expect(model.deferredLinks == [.transcribe(link), .subtitles(link)])
+        #expect(model.exportNotice?.message == "Finish the recording first.")
+        #expect(model.exportNotice?.id != first, "the repeat got no answer of its own")
+    }
+
     @Test("a file handed over again while a take records waits once, and the take answers each time")
     func recordingDefersARepeatOnce() {
         let model = makeModel()
