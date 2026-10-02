@@ -5482,6 +5482,17 @@
         }
       }
     },
+    "Error": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Errore"
+          }
+        }
+      }
+    },
     "Every main-branch build. Expect bugs.": {
       "extractionState": "manual",
       "localizations": {

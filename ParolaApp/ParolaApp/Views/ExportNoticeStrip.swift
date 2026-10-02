@@ -14,6 +14,8 @@ struct ExportNoticeStrip: View {
             Image(systemName: iconName)
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(iconColor)
+                .accessibilityLabel("Error")
+                .accessibilityHidden(!Self.iconIsSpoken(notice.tone))
             VStack(alignment: .leading, spacing: DS.Spacing.hair) {
                 Text(verbatim: notice.message)
                     .font(DS.Font.secondary)
@@ -72,6 +74,11 @@ struct ExportNoticeStrip: View {
             model.dismissExportNotice()
         }
         .axBranch("ExportNotice")
+    }
+
+    /// Only a failure's sign adds to its message; the system reads the others as Info and Selected, which say nothing or mislead.
+    nonisolated static func iconIsSpoken(_ tone: ExportNotice.Tone) -> Bool {
+        tone == .failure
     }
 
     private var iconName: String {

@@ -237,3 +237,32 @@ struct QuitDiscardTests {
         #expect(asked == 2)
     }
 }
+
+@MainActor
+@Suite("The notice's sign for VoiceOver", .serialized)
+struct NoticeIconSpeechTests {
+    private func words(_ notice: ExportNotice) async -> [String] {
+        let model = makeRecordingModel("notice-icon")
+        let hosted = HostedWindow(ExportNoticeStrip(notice: notice).environment(model), width: 700, height: 120)
+        defer { hosted.close() }
+        await settle(for: .milliseconds(100))
+        return HostedAccessibility.words(in: hosted.host)
+    }
+
+    @Test("a failure's sign reads Error; a success's or an info's isn't read at all")
+    func spokenOnlyForFailure() async throws {
+        #expect(ExportNoticeStrip.iconIsSpoken(.failure))
+        #expect(!ExportNoticeStrip.iconIsSpoken(.info))
+        #expect(!ExportNoticeStrip.iconIsSpoken(.success))
+        let failure = await words(ExportNotice(message: "Export failed: disk full", failures: [], folder: nil, tone: .failure))
+        #expect(failure.contains("Error"))
+        #expect(!failure.contains("Warning"), "the system's own name for the sign")
+        let info = await words(ExportNotice(message: "Finish the recording first.", failures: [], folder: nil, tone: .info))
+        #expect(!info.contains("Error"))
+        #expect(!info.contains("Info"), "the system's own name for the sign")
+        let success = await words(ExportNotice(message: "Exported 3 of 3", failures: [], folder: nil, tone: .success))
+        #expect(!success.contains("Selected"), "a check mark that reads Selected says something untrue")
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        #expect(String(localized: "Error", bundle: try #require(Bundle(path: path))) == "Errore")
+    }
+}
