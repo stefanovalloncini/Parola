@@ -180,3 +180,39 @@ struct RecordingFailureTitleTests {
         #expect(!saysTranscribe)
     }
 }
+
+@Suite("A take's last English-only failures read in Italian")
+struct TakeFailureItalianTests {
+    private func italian() throws -> Bundle {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        return try #require(Bundle(path: path))
+    }
+
+    @Test("the refusal for want of disk space reads in Italian")
+    func diskRefusal() throws {
+        #expect(AppModel.diskSpaceRefusalMessage(bundle: try italian())
+            == "Non c'è abbastanza spazio libero su disco per registrare. Libera almeno 200 MB e riprova.")
+    }
+
+    @Test("Mac audio that never started says so whole, in either language, with no English prefix")
+    func systemAudioTimeout() throws {
+        let english = SystemAudioDidNotStart.message()
+        for granted in [true, false] {
+            let message = AppModel.recordingFailureMessage(for: SystemAudioDidNotStart(), source: .systemAudio, screenRecordingGranted: granted)
+            #expect(message == english)
+        }
+        #expect(!english.contains("Audio capture unavailable"))
+        #expect(SystemAudioDidNotStart.message(bundle: try italian())
+            == "Parola non è riuscita ad avviare la registrazione dell'audio del Mac. Consenti a Parola la Registrazione audio di sistema in Impostazioni di Sistema → Privacy e sicurezza, poi riprova.")
+    }
+
+    @Test("the take's start throws that failure when Mac audio never comes up")
+    func throwSite() throws {
+        let path = #filePath.replacingOccurrences(of: "ParolaAppTests/TakeNitsTests.swift", with: "ParolaApp/AppModel.swift")
+        let model = try String(contentsOfFile: path, encoding: .utf8)
+        let throwsIt = model.contains("throw SystemAudioDidNotStart()")
+        let keepsTheEnglish = model.contains("system audio capture did not start")
+        #expect(throwsIt)
+        #expect(!keepsTheEnglish)
+    }
+}

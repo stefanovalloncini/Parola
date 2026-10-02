@@ -3688,9 +3688,7 @@ final class AppModel {
                         throw error
                     case nil:
                         Task { await sys.cancel() }
-                        throw ParolaError.captureUnavailable(
-                            "system audio capture did not start. Allow System Audio Recording for Parola in System Settings → Privacy & Security, then try again."
-                        )
+                        throw SystemAudioDidNotStart()
                     }
                     guard await adoptLiveSource(sys, take: take) else { return }
                     startMicTrack(for: activeTake ?? take, pairedWith: liveRecordingAudioURL)

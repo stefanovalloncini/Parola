@@ -9492,6 +9492,17 @@
         }
       }
     },
+    "Not enough free disk space to record. Free up at least 200 MB and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non c'è abbastanza spazio libero su disco per registrare. Libera almeno 200 MB e riprova."
+          }
+        }
+      }
+    },
     "Not granted": {
       "extractionState": "manual",
       "localizations": {
@@ -10357,6 +10368,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola non è riuscita a continuare a scrivere la registrazione su disco."
+          }
+        }
+      }
+    },
+    "Parola couldn't start recording your Mac's audio. Allow System Audio Recording for Parola in System Settings → Privacy & Security, then try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non è riuscita ad avviare la registrazione dell'audio del Mac. Consenti a Parola la Registrazione audio di sistema in Impostazioni di Sistema → Privacy e sicurezza, poi riprova."
           }
         }
       }
