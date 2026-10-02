@@ -4,6 +4,31 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
+/// A capture whose file comes back only when the test lets it go, and then cut short.
+actor HeldCutShortCapture: LiveAudioSource {
+    nonisolated let levelMeter = LevelMeter()
+    private let file: URL
+    private var released = false
+    private var held: CheckedContinuation<Void, Never>?
+
+    init(file: URL) { self.file = file }
+
+    func start() async throws {}
+
+    func prepare() async throws -> URL {
+        if !released { await withCheckedContinuation { held = $0 } }
+        throw CaptureInterrupted(url: file, reason: "the disk is full")
+    }
+
+    func letGo() {
+        released = true
+        held?.resume()
+        held = nil
+    }
+
+    func cancel() async {}
+}
+
 /// A capture that is already done: Stop hands back its file.
 struct StubSource: LiveAudioSource {
     let url: URL

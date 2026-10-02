@@ -7,31 +7,6 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
-/// A capture whose file comes back only when the test lets it go, and then cut short.
-private actor HeldCutShortCapture: LiveAudioSource {
-    nonisolated let levelMeter = LevelMeter()
-    private let file: URL
-    private var released = false
-    private var held: CheckedContinuation<Void, Never>?
-
-    init(file: URL) { self.file = file }
-
-    func start() async throws {}
-
-    func prepare() async throws -> URL {
-        if !released { await withCheckedContinuation { held = $0 } }
-        throw CaptureInterrupted(url: file, reason: "the disk is full")
-    }
-
-    func letGo() {
-        released = true
-        held?.resume()
-        held = nil
-    }
-
-    func cancel() async {}
-}
-
 /// A live session whose last check holds the landing until the test lets it go, so a Cancel can arrive mid-landing.
 private actor HeldLandingSession: StreamingTranscriber {
     nonisolated let levelMeter = LevelMeter()

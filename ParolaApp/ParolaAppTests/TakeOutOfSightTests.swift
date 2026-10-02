@@ -73,6 +73,25 @@ struct OutOfSightFailureTests {
         #expect(!seen)
     }
 
+    @Test("a failure after a take's stop on its own is weighed on its own: a stop seen in front doesn't hide a failure that comes once Parola is behind")
+    func failureAfterAStopWeighedAgain() {
+        var take = RecordingSession(takeID: 1, source: .systemAudio, category: .meeting, title: "R", isStreaming: false, arming: .startingCapture)
+        take.markCapturing(at: .now)
+        take.finish(at: .now)
+        var surface = OutOfSightFailure()
+        var dock = OutOfSightFailure(includesTranscription: true)
+        let surfaceSawStop = surface.holds(take, stoppedOnItsOwn: true, appActive: true)
+        let dockSawStop = dock.holds(take, stoppedOnItsOwn: true, appActive: true)
+        #expect(!surfaceSawStop && !dockSawStop)
+        var cutShort = take
+        cutShort.fail("Parola couldn't keep writing the recording to disk.")
+        let surfaceHoldsCut = surface.holds(cutShort, stoppedOnItsOwn: true, appActive: false)
+        let dockHoldsCut = dock.holds(cutShort, stoppedOnItsOwn: true, appActive: false)
+        #expect(surfaceHoldsCut && dockHoldsCut)
+        let stillHeld = surface.holds(cutShort, stoppedOnItsOwn: true, appActive: false)
+        #expect(stillHeld, "weighed once: the same ending doesn't weigh again")
+    }
+
     @Test("a running take, a dismissed failure or the next take lets the hold go")
     func letGo() {
         var failure = OutOfSightFailure()
@@ -145,6 +164,13 @@ struct StoppedStatusItemTests {
         #expect(face.controls.map(\.title) == ["Show Parola"])
         let failed = failedTake()
         #expect(TakeRemote.ending(of: failed, stopReason: nil)?.spoken == "Recording stopped: The microphone stopped.")
+        #expect(TakeRemote.ending(of: failed, stopReason: reason)?.reason == "The microphone stopped.", "the recording's own failure says more than the stop")
+        var untranscribed = RecordingSession(takeID: 2, source: .systemAudio, category: .meeting, title: "R", isStreaming: false, arming: .startingCapture)
+        untranscribed.markCapturing(at: .now)
+        untranscribed.finish(at: .now)
+        untranscribed.transcribing(progress: nil)
+        untranscribed.fail("Transcription failed: the engine stopped.")
+        #expect(TakeRemote.ending(of: untranscribed, stopReason: reason)?.reason == reason, "a transcription's failure leaves the stop to say why")
     }
 
     @Test("the stopped words read in Italian")
@@ -612,7 +638,121 @@ private func unfoldableNotice() -> ExportNotice {
     )
 }
 
+/// Whether the test's Parola is the app in front.
+@MainActor
+private final class Front {
+    var active = true
+}
+
 extension TranscriberMockSuites {
+    @MainActor
+    @Suite("A failure that follows a take's stop, out of sight", .serialized)
+    struct FailureAfterAStopTests {
+        enum Stop: String, CaseIterable, Sendable {
+            case user
+            case onItsOwnSeenInFront
+        }
+
+        enum LaterFailure: String, CaseIterable, Sendable {
+            case transcription
+            case save
+        }
+
+        @Test(
+            "a failure that comes once Parola is behind bounces the Dock once, whether the take stopped by Stop or on its own in front; a save failure holds the pill and the menu bar item too, a transcription failure doesn't",
+            arguments: Stop.allCases, LaterFailure.allCases
+        )
+        func laterFailure(stop: Stop, failure: LaterFailure) async throws {
+            let audio = try makeTakeWAV("later-failure-\(stop.rawValue)-\(failure.rawValue)", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "the engine stopped"),
+                    gate: gate
+                ))
+                let model = makeRecordingModel("later-failure-\(stop.rawValue)-\(failure.rawValue)")
+                model.useStreaming = false
+                let front = Front()
+                let pill = RecordingPill(makesPanel: false, appIsActive: { front.active })
+                pill.bind(model, appActive: true)
+                let item = RecordingStatusItem(statusBar: nil, appIsActive: { front.active })
+                item.bind(model)
+                let bounces = Calls()
+                let badge = DockBadge(show: { _ in }, appIsActive: { front.active }, requestAttention: { bounces.count += 1 })
+                badge.bind(model)
+                let capture = HeldCutShortCapture(file: audio)
+                let source: any LiveAudioSource = failure == .save ? capture : StubSource(url: audio)
+                model.installTestTake(source: .systemAudio, liveSource: source, startedAt: Date(timeIntervalSinceNow: -1))
+                let take = try #require(model.recording?.takeID)
+
+                switch stop {
+                case .user: model.stopRecordingAndTranscribe()
+                case .onItsOwnSeenInFront: model.stopTakeOnItsOwn(take, saying: AppModel.macAudioStoppedTakeMessage())
+                }
+                // The surfaces weigh the stop on the main actor's next turns, while Parola is still in front.
+                await settle(for: .milliseconds(200))
+                front.active = false
+                pill.appActiveChanged(false)
+                switch failure {
+                case .transcription: await gate.open()
+                case .save: await capture.letGo()
+                }
+
+                let failed = await waitUntil {
+                    if case .failed = model.recording?.state { return true }
+                    return false
+                }
+                #expect(failed)
+                let bounced = await waitUntil { bounces.count == 1 }
+                #expect(bounced, "a failure out of sight asks for a look")
+                if failure == .save {
+                    let held = await waitUntil { pill.isShown && item.face?.lamp == .stopped }
+                    #expect(held, "a save failure holds the pill and the menu bar item")
+                } else {
+                    await settle(for: .milliseconds(200))
+                    let pillShown = pill.isShown
+                    let itemFace = item.face
+                    #expect(!pillShown && itemFace == nil, "a transcription failure doesn't bring them back")
+                }
+                #expect(bounces.count == 1)
+                _ = await waitUntil { !model.hasPendingTakeWork }
+                withExtendedLifetime(badge) {}
+            }
+        }
+
+        @Test("a stop on its own out of sight and a save failure that follows while Parola is still behind are one ending: one bounce")
+        func oneBouncePerUnseenEnding() async throws {
+            let audio = try makeTakeWAV("later-failure-unseen", seconds: 1)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared(.transcriber) {
+                let model = makeRecordingModel("later-failure-unseen")
+                model.useStreaming = false
+                let bounces = Calls()
+                let badge = DockBadge(show: { _ in }, appIsActive: { false }, requestAttention: { bounces.count += 1 })
+                badge.bind(model)
+                let capture = HeldCutShortCapture(file: audio)
+                model.installTestTake(source: .systemAudio, liveSource: capture, startedAt: Date(timeIntervalSinceNow: -1))
+                let take = try #require(model.recording?.takeID)
+
+                model.stopTakeOnItsOwn(take, saying: AppModel.macAudioStoppedTakeMessage())
+                let bounced = await waitUntil { bounces.count == 1 }
+                #expect(bounced)
+                await capture.letGo()
+                let failed = await waitUntil {
+                    if case .failed = model.recording?.state { return true }
+                    return false
+                }
+                #expect(failed)
+                await settle(for: .milliseconds(200))
+
+                #expect(bounces.count == 1)
+                _ = await waitUntil { !model.hasPendingTakeWork }
+                withExtendedLifetime(badge) {}
+            }
+        }
+    }
+
     @MainActor
     @Suite("A failure notice a Mac-audio notice covers", .serialized)
     struct CoveredFailureNoticeTests {

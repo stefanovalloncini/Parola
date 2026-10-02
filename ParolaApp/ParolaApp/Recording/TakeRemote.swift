@@ -58,11 +58,13 @@ enum TakeRemote {
         let spoken: String
     }
 
-    /// What it recorded ending by itself, in its notice's words, once the take stops; else its failure, worded as its banner.
+    /// A failure of the recording itself, worded as its banner; else what it recorded ending by itself, in its notice's words, once the take stops; else its transcription's failure.
     nonisolated static func ending(of take: RecordingSession, stopReason: String?, bundle: Bundle = .main) -> Ending? {
-        if let stopReason, !take.isRunning { return Ending(reason: stopReason, spoken: stopReason) }
-        guard case .failed(let message) = take.state else { return nil }
-        return Ending(reason: message, spoken: failureStatus(message, failedWhile: take.failedWhile, bundle: bundle))
+        if case .failed(let message) = take.state, take.failedWhile != .transcribing || stopReason == nil {
+            return Ending(reason: message, spoken: failureStatus(message, failedWhile: take.failedWhile, bundle: bundle))
+        }
+        guard let stopReason, !take.isRunning else { return nil }
+        return Ending(reason: stopReason, spoken: stopReason)
     }
 
     /// What needs the user's eye while a take runs, on the Stage and on the surfaces outside the window.
