@@ -109,7 +109,7 @@ struct MeetingDefaultsTests {
         #expect(lane.state == .starting)
     }
 
-    @Test("the bars are drawn again when the You lane comes, goes or stops, never for a frame that only slides them")
+    @Test("the bars are built again when the You lane comes, goes or stops, and only then")
     func tapeRedrawsForTheYouLane() {
         let one = StageTape(levels: [0.1], flags: [], newest: 4, paused: false)
         let two = StageTape(levels: [0.1], micLevels: [0.2], flags: [], newest: 4, paused: false)

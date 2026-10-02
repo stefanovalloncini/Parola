@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// About fifteen seconds of the take scrolling into a red playhead at 70 % of the width, its markers standing as flags; a meeting's microphone gets a lane of its own.
@@ -14,8 +15,6 @@ struct StageBand: View {
     nonisolated static let step: CGFloat = barWidth + gap
     nonisolated static let playhead: CGFloat = 0.7
     nonisolated static let visibleSamples = 480
-    /// The bars slide at most this often; between samples nothing but their offset changes.
-    nonisolated static let glideFrame: TimeInterval = 1.0 / 30
     /// How far past the playhead a lane's name starts, in the band's empty stretch.
     nonisolated static let laneNameInset: CGFloat = 12
 
@@ -29,9 +28,36 @@ struct StageBand: View {
         reduceMotion ? .steps(every: 0.25) : .glides
     }
 
-    /// How far the bars have slid left since the newest sample came in: one step over one sample's time, then still until the next.
-    nonisolated static func glide(sinceTick elapsed: TimeInterval) -> CGFloat {
-        step * CGFloat(min(1, max(0, elapsed * TakeLevelHistory.samplesPerSecond)))
+    /// Where the bars stand between samples.
+    enum Slide: Equatable {
+        /// Against the playhead, never moving: under Reduce Motion.
+        case none
+        /// A step on from the newest sample, standing still: a take paused or out of sight.
+        case held
+        /// A step left over one sample's time from the newest sample's moment, then still until the next.
+        case from(Date)
+    }
+
+    nonisolated static let slideKey = "slide"
+
+    /// When a sample's slide begins in a layer's time: at the sample's moment, so an update that comes late starts part way through.
+    nonisolated static func slideBegin(sampledAt: Date, now: Date, layerTime: CFTimeInterval) -> CFTimeInterval {
+        layerTime - now.timeIntervalSince(sampledAt)
+    }
+
+    /// One step left over one sample's time in three frames, about thirty a second, each on the device pixel nearest the distance travelled, as the bars have always moved; until it begins they stand against the playhead.
+    static func slideAnimation(beginTime: CFTimeInterval, scale: CGFloat) -> CAKeyframeAnimation {
+        let frames = 3
+        let slide = CAKeyframeAnimation(keyPath: "transform.translation.x")
+        // Held values: a continuous slide lands between pixels, and a value for every pixel has the render server draw each one.
+        slide.calculationMode = .discrete
+        slide.values = (0..<frames).map { -(step * CGFloat($0) / CGFloat(frames) * scale).rounded() / scale }
+        slide.keyTimes = (0...frames).map { NSNumber(value: Double($0) / Double(frames)) }
+        slide.duration = 1 / TakeLevelHistory.samplesPerSecond
+        slide.beginTime = beginTime
+        slide.fillMode = .backwards
+        slide.preferredFrameRateRange = .stage
+        return slide
     }
 
     private var drawsLive: Bool { isOnScreen && take.state == .recording }
@@ -68,18 +94,10 @@ struct StageBand: View {
     private var bars: some View {
         switch Self.cadence(reduceMotion: reduceMotion) {
         case .steps(let interval):
-            TimelineView(.animation(minimumInterval: interval, paused: !drawsLive)) { _ in tape.equatable() }
+            TimelineView(.animation(minimumInterval: interval, paused: !drawsLive)) { _ in tape.drawn(.none) }
         case .glides:
             let _ = drawsLive ? model.takeLevelTick : 0
-            let tape = tape
-            // Read with the bars, not in the timeline, which can run before the bars catch up with a new sample.
-            let sampledAt = model.takeLevelTickAt
-            TimelineView(.animation(minimumInterval: Self.glideFrame, paused: !drawsLive)) { context in
-                tape.equatable()
-                    // One image, or the renderer can show new bars at the old offset for a frame, a jolt of a step or more.
-                    .drawingGroup()
-                    .offset(x: -Self.glide(sinceTick: context.date.timeIntervalSince(sampledAt)))
-            }
+            tape.drawn(drawsLive ? .from(model.takeLevelTickAt) : .held)
         }
     }
 
@@ -138,6 +156,11 @@ struct StageBand: View {
         return (0..<lanes).map { CGRect(x: 0, y: CGFloat($0) * height, width: size.width, height: height) }
     }
 
+    /// What each lane draws, top to bottom: a meeting's You lane, at `offLaneStrength` once your microphone isn't in the take, over the Mac audio; otherwise the take's levels alone.
+    nonisolated static func rows(of tape: StageTape) -> [(levels: [Float], strength: Double)] {
+        tape.micLevels.map { [($0, tape.micLost == nil ? 1 : offLaneStrength), (tape.levels, 1)] } ?? [(tape.levels, 1)]
+    }
+
     nonisolated static func playheadX(width: CGFloat) -> CGFloat {
         (width * playhead).rounded()
     }
@@ -154,40 +177,9 @@ struct StageBand: View {
         return offset < visibleSamples ? offset : nil
     }
 
-    fileprivate static func drawTape(
-        levels: [Float], micLevels: [Float]?, micLost: Bool, flags: [Int], in context: inout GraphicsContext, size: CGSize
-    ) {
-        let playheadX = playheadX(width: size.width)
-        let flagColor = DS.Color.accent
-
-        for offset in flags {
-            let poleX = barX(offset: offset, playheadX: playheadX) + barWidth / 2 - 0.75
-            let pole = CGRect(x: poleX, y: 3, width: 1.5, height: size.height - 11)
-            context.fill(Path(roundedRect: pole, cornerRadius: 0.75), with: .color(flagColor.opacity(0.5)))
-        }
-
-        let rows: [(levels: [Float], strength: Double)] = micLevels.map { [($0, micLost ? offLaneStrength : 1), (levels, 1)] }
-            ?? [(levels, 1)]
-        for (row, lane) in zip(rows, lanes(rows.count, in: size)) {
-            drawBars(row.levels, in: lane, strength: row.strength, playheadX: playheadX, context: &context)
-        }
-
-        for offset in flags {
-            let poleRight = barX(offset: offset, playheadX: playheadX) + barWidth / 2 + 0.75
-            var pennant = Path()
-            pennant.move(to: CGPoint(x: poleRight, y: 3))
-            pennant.addLine(to: CGPoint(x: poleRight + 8, y: 6.5))
-            pennant.addLine(to: CGPoint(x: poleRight, y: 10))
-            pennant.closeSubpath()
-            context.fill(pennant, with: .color(flagColor))
-        }
-    }
-
-    /// One lane's bars, mirrored about its middle inside the band's 8 pt margins, inked darker at the top than the bottom.
-    private static func drawBars(
-        _ levels: [Float], in lane: CGRect, strength: Double, playheadX: CGFloat, context: inout GraphicsContext
-    ) {
-        let mid = lane.midY
+    /// One lane's bars in the lane's own space, mirrored about its middle inside the band's 8 pt margins.
+    nonisolated static func barsPath(_ levels: [Float], lane: CGSize, playheadX: CGFloat) -> Path {
+        let mid = lane.height / 2
         let tallest = lane.height - 16
         var bars = Path()
         for (offset, level) in levels.reversed().enumerated() {
@@ -197,19 +189,35 @@ struct StageBand: View {
             let rect = CGRect(x: x, y: mid - half, width: barWidth, height: half * 2)
             bars.addRoundedRect(in: rect, cornerSize: CGSize(width: 1.5, height: 1.5), style: .continuous)
         }
-        let ink = DS.Color.primaryText
-        context.fill(
-            bars,
-            with: .linearGradient(
-                Gradient(stops: [
-                    .init(color: ink.opacity(0.55 * strength), location: 0),
-                    .init(color: ink.opacity(0.55 * strength), location: 0.5),
-                    .init(color: ink.opacity(0.26 * strength), location: 1),
-                ]),
-                startPoint: CGPoint(x: 0, y: lane.minY),
-                endPoint: CGPoint(x: 0, y: lane.maxY)
-            )
-        )
+        return bars
+    }
+
+    /// The flags' poles, from just under the band's top to just over its foot, each centred on its sample's bar.
+    nonisolated static func polesPath(_ flags: [Int], height: CGFloat, playheadX: CGFloat) -> Path {
+        var poles = Path()
+        for offset in flags {
+            let poleX = barX(offset: offset, playheadX: playheadX) + barWidth / 2 - 0.75
+            poles.addPath(Path(roundedRect: CGRect(x: poleX, y: 3, width: 1.5, height: height - 11), cornerRadius: 0.75))
+        }
+        return poles
+    }
+
+    /// The flags' pennants, each pointing right from the top of its pole.
+    nonisolated static func pennantsPath(_ flags: [Int], playheadX: CGFloat) -> Path {
+        var pennants = Path()
+        for offset in flags {
+            let poleRight = barX(offset: offset, playheadX: playheadX) + barWidth / 2 + 0.75
+            pennants.move(to: CGPoint(x: poleRight, y: 3))
+            pennants.addLine(to: CGPoint(x: poleRight + 8, y: 6.5))
+            pennants.addLine(to: CGPoint(x: poleRight, y: 10))
+            pennants.closeSubpath()
+        }
+        return pennants
+    }
+
+    /// A lane's ink at its top, its middle and its foot: as dark over its upper half, under half as dark at its foot.
+    nonisolated static func laneInk(_ ink: CGColor, strength: Double) -> [CGColor] {
+        [0.55, 0.55, 0.26].map { ink.copy(alpha: ink.alpha * $0 * strength) ?? ink }
     }
 
     private static func drawPlayhead(in context: inout GraphicsContext, size: CGSize) {
@@ -220,10 +228,156 @@ struct StageBand: View {
         context.fill(Path(ellipseIn: CGRect(x: playheadX - 3.5, y: 2, width: 7, height: 7)), with: .color(red))
         context.fill(Path(ellipseIn: CGRect(x: playheadX - 3.5, y: size.height - 9, width: 7, height: 7)), with: .color(red))
     }
+
+    /// The bars and flags on layers the render server slides between samples, so the app builds the band once a sample, not once a frame.
+    final class TapeView: NSView {
+        /// What slides, bottom to top: the flags' poles, each lane's bars, the flags' pennants.
+        let tape = CALayer()
+        let poles = CAShapeLayer()
+        let pennants = CAShapeLayer()
+        /// Each lane's ink, cut to its bars by a shape mask.
+        private(set) var lanes: [CAGradientLayer] = []
+        private(set) var drawn: StageTape?
+        private var ink: CGColor?
+        private var accent: CGColor?
+        private var slide: Slide?
+        private var builtSize: CGSize?
+
+        init() {
+            super.init(frame: .zero)
+            layer = CALayer()
+            wantsLayer = true
+            layer?.masksToBounds = true
+            // Top down, the way the band's sizes and SwiftUI's paths run.
+            tape.isGeometryFlipped = true
+            tape.anchorPoint = .zero
+            tape.addSublayer(poles)
+            tape.addSublayer(pennants)
+            layer?.addSublayer(tape)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("not used") }
+
+        // The band takes no clicks; one lands on whatever is under it.
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            nil
+        }
+
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            guard newSize != builtSize else { return }
+            withoutActions(build)
+        }
+
+        override func viewDidChangeBackingProperties() {
+            super.viewDidChangeBackingProperties()
+            withoutActions(build)
+        }
+
+        /// The bars as of `tape`, in one transaction with the slide that starts from its sample, so the two reach the screen together.
+        func show(_ tape: StageTape, slide: Slide, ink: CGColor, accent: CGColor) {
+            withoutActions {
+                let newBars = tape != drawn
+                if newBars || ink != self.ink || accent != self.accent {
+                    if newBars { drawn = tape }
+                    self.ink = ink
+                    self.accent = accent
+                    build()
+                }
+                if newBars || slide != self.slide {
+                    self.slide = slide
+                    place(slide)
+                }
+            }
+        }
+
+        private func withoutActions(_ change: () -> Void) {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            change()
+            CATransaction.commit()
+        }
+
+        private func build() {
+            guard let drawn, let ink, let accent else { return }
+            let size = bounds.size
+            builtSize = size
+            tape.bounds = CGRect(origin: .zero, size: size)
+            let playheadX = StageBand.playheadX(width: size.width)
+            let rows = StageBand.rows(of: drawn)
+            while lanes.count < rows.count {
+                let lane = CAGradientLayer()
+                lane.locations = [0, 0.5, 1]
+                lane.startPoint = CGPoint(x: 0.5, y: 0)
+                lane.endPoint = CGPoint(x: 0.5, y: 1)
+                lane.mask = CAShapeLayer()
+                tape.insertSublayer(lane, below: pennants)
+                lanes.append(lane)
+            }
+            while lanes.count > rows.count {
+                lanes.removeLast().removeFromSuperlayer()
+            }
+            for ((row, rect), lane) in zip(zip(rows, StageBand.lanes(rows.count, in: size)), lanes) {
+                lane.frame = rect
+                lane.colors = StageBand.laneInk(ink, strength: row.strength)
+                lane.mask?.frame = lane.bounds
+                (lane.mask as? CAShapeLayer)?.path = StageBand.barsPath(row.levels, lane: rect.size, playheadX: playheadX).cgPath
+            }
+            poles.frame = tape.bounds
+            poles.path = StageBand.polesPath(drawn.flags, height: size.height, playheadX: playheadX).cgPath
+            poles.fillColor = accent.copy(alpha: accent.alpha * 0.5)
+            pennants.frame = tape.bounds
+            pennants.path = StageBand.pennantsPath(drawn.flags, playheadX: playheadX).cgPath
+            pennants.fillColor = accent
+            for shape in [poles, pennants] + lanes + lanes.compactMap(\.mask) {
+                shape.contentsScale = scale
+            }
+        }
+
+        private var scale: CGFloat {
+            window?.backingScaleFactor ?? 2
+        }
+
+        private func place(_ slide: Slide) {
+            switch slide {
+            case .none:
+                tape.removeAnimation(forKey: StageBand.slideKey)
+                tape.setAffineTransform(.identity)
+            case .held:
+                tape.setAffineTransform(CGAffineTransform(translationX: -StageBand.step, y: 0))
+            case .from(let sampledAt):
+                tape.setAffineTransform(CGAffineTransform(translationX: -StageBand.step, y: 0))
+                let layerNow = tape.convertTime(CACurrentMediaTime(), from: nil)
+                let begin = StageBand.slideBegin(sampledAt: sampledAt, now: Date(), layerTime: layerNow)
+                tape.add(StageBand.slideAnimation(beginTime: begin, scale: scale), forKey: StageBand.slideKey)
+            }
+        }
+    }
 }
 
-/// The band's bars and flags as of one sample. Equal until the next sample, marker, pause or change of lanes, so the frames that slide it between samples never draw it again.
-struct StageTape: View, Equatable {
+/// The tape's layer view; its colours are read from the environment on each update, so it follows a switch to dark or a new accent.
+private struct TapeLayer: NSViewRepresentable {
+    let tape: StageTape
+    let slide: StageBand.Slide
+
+    func makeNSView(context: Context) -> StageBand.TapeView {
+        StageBand.TapeView()
+    }
+
+    func updateNSView(_ view: StageBand.TapeView, context: Context) {
+        let environment = context.environment
+        view.show(
+            tape,
+            slide: slide,
+            ink: DS.Color.primaryText.resolve(in: environment).cgColor,
+            accent: DS.Color.accent.resolve(in: environment).cgColor
+        )
+    }
+}
+
+/// The band's bars and flags as of one sample. Equal until the next sample, marker, pause or change of lanes, so the bars are built only then; between samples the render server slides them.
+struct StageTape: Equatable {
     let levels: [Float]
     /// A meeting's microphone, drawn as the You lane over `levels`; nil for a take with one lane.
     var micLevels: [Float]?
@@ -240,11 +394,11 @@ struct StageTape: View, Equatable {
             && (lhs.micLevels == nil) == (rhs.micLevels == nil) && lhs.micLost == rhs.micLost && lhs.macLost == rhs.macLost
     }
 
-    var body: some View {
-        Canvas { context, size in
-            StageBand.drawTape(levels: levels, micLevels: micLevels, micLost: micLost != nil, flags: flags, in: &context, size: size)
-        }
-        // A Canvas element carries no value; a text stand-in per lane reads its level the way the clock reads its time.
+    /// The bars on their layers, sliding as `slide` says.
+    @MainActor
+    func drawn(_ slide: StageBand.Slide) -> some View {
+        TapeLayer(tape: self, slide: slide)
+        // A layer view carries no value; a text stand-in per lane reads its level the way the clock reads its time.
         .accessibilityRepresentation {
             if let micLevels {
                 VStack {
@@ -257,6 +411,7 @@ struct StageTape: View, Equatable {
         }
     }
 
+    @MainActor
     private func level(_ levels: [Float], label: LocalizedStringKey, lost: String? = nil) -> some View {
         let reading = Text(verbatim: AppFormat.percent(Double(levels.last ?? 0)))
         return reading
