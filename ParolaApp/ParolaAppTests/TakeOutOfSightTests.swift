@@ -696,8 +696,9 @@ extension TranscriberMockSuites {
                 case .user: model.stopRecordingAndTranscribe()
                 case .onItsOwnSeenInFront: model.stopTakeOnItsOwn(take, saying: AppModel.macAudioStoppedTakeMessage())
                 }
-                // The surfaces weigh the stop on the main actor's next turns, while Parola is still in front.
-                await settle(for: .milliseconds(200))
+                // Parola is in front as the take stops: the pill and the menu bar item weigh that stop now, not on a later turn.
+                pill.appActiveChanged(true)
+                item.appBecameActive()
                 front.active = false
                 pill.appActiveChanged(false)
                 switch failure {
