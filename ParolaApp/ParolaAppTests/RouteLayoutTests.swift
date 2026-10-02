@@ -259,6 +259,71 @@ struct RouteLayoutTests {
         }
     }
 
+    /// A take saved out of sight, as its toast names it: long enough to wrap a word a line in a narrow measure.
+    private func savedElsewhereToast() -> ArrivalNotice {
+        let title = "Recording 2 Oct 2026 at 9:56"
+        let manifest = ParolaDocument.Manifest(originalAudioName: "\(title).m4a", title: title, modelName: "stub", language: "en")
+        return ArrivalNotice(landed: LibraryEntry(id: "saved", bundleURL: URL(fileURLWithPath: "/tmp/saved.parola"), manifest: manifest), origin: .take)
+    }
+
+    private func failedArrivalToast() -> ArrivalNotice {
+        ArrivalNotice(
+            failed: URL(fileURLWithPath: "/tmp/Quarterly planning with the regional sales leads.m4a"),
+            reason: "The file couldn't be decoded because its header is damaged and nothing in it plays."
+        )
+    }
+
+    /// An entry opened before it was transcribed: the page with the most it can't give up.
+    private func showUntranscribedEntry(_ model: AppModel) {
+        model.transcript = Transcript(segments: [], language: "en", modelName: "")
+        model.phase = .ready
+        model.route = .transcript
+    }
+
+    @Test(
+        "a toast waiting under the page never makes the page ask for more height than the smallest window has",
+        arguments: [false, true], [false, true]
+    )
+    func pendingToastFitsTheSmallestWindow(overAnEntry: Bool, failed: Bool) {
+        withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, jobs: 0)
+            if overAnEntry { showUntranscribedEntry(model) }
+            model.arrivalNotice = failed ? failedArrivalToast() : savedElsewhereToast()
+            // The minimum the window is held to: the page measured with nothing proposed, its texts as narrow as they go.
+            let wanted = NSHostingController(rootView: ContentRoutes().environment(model)).sizeThatFits(in: .zero)
+            #expect(wanted.height <= MainWindowLayout.minimumHeight, "the page with its toast wants \(wanted.height)pt of height")
+        }
+    }
+
+    @Test("unfolding the sidebar leaves the page and its toast where they were, in the smallest window")
+    func sidebarUnfoldKeepsThePageInPlace() async {
+        let defaults = temporaryDefaults("test-route-layout-unfold-")
+        let previous = DefaultsStore.current
+        DefaultsStore.current = defaults
+        defer { DefaultsStore.current = previous }
+        let model = makeModel(defaults, jobs: 0)
+        showUntranscribedEntry(model)
+        model.arrivalNotice = savedElsewhereToast()
+        model.mainSidebar.userSet(.detailOnly)
+        let hosted = HostedWindow(ContentView().environment(model), width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
+        defer { hosted.close() }
+        await ParolaAppTests.settle(for: .milliseconds(300))
+        func toastGap() -> CGFloat? {
+            let open = HostedAccessibility.elements(in: hosted.host).first { $0.identifier?.hasSuffix("Arrival.Button.Open") == true }
+            return open.map { $0.frame.minY - hosted.window.frame.minY }
+        }
+        let folded = toastGap()
+
+        model.mainSidebar.userSet(.all)
+        await withCheckedContinuation { (turn: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { turn.resume() } }
+        let unfolded = toastGap()
+        await ParolaAppTests.settle(for: .milliseconds(500))
+
+        #expect(folded == 20, "the toast sits off its place before the unfold")
+        #expect(unfolded == 20, "the toast moved as the sidebar unfolded")
+        #expect(toastGap() == 20)
+    }
+
     @Test(
         "an empty route asks for no more height than the smallest window has",
         arguments: [AppModel.Route.queue, .batch, .transcript, .statistics]

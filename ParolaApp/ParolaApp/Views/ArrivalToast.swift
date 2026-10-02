@@ -24,9 +24,11 @@ struct ArrivalToast: View {
                     .foregroundStyle(tint)
             }
             VStack(alignment: .leading, spacing: 2) {
+                // Unbounded, the window's minimum height counts this title wrapped a word a line, and the page outgrows the window.
                 title
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.primaryText)
+                    .lineLimit(2)
                 if let reason = notice.reason {
                     // The reason comes from the failure, and a path in it must not be read as markdown.
                     Text(verbatim: reason)
