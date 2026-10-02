@@ -1032,6 +1032,24 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.isEmpty)
     }
 
+    @Test("a file handed over again while a take records waits once, and the take answers each time")
+    func recordingDefersARepeatOnce() {
+        let model = makeModel()
+        model.installTestTake(source: .microphone)
+        let url = URL(fileURLWithPath: "/tmp/arrival.wav")
+        let other = URL(fileURLWithPath: "/tmp/other.wav")
+
+        model.transcribe(fileURL: url)
+        let first = model.exportNotice?.id
+        model.dismissExportNotice()
+        model.transcribe(fileURL: url)
+        model.startBatch(urls: [other, URL(fileURLWithPath: "/tmp/../tmp/arrival.wav")])
+
+        #expect(model.deferredArrivals == [url, other])
+        #expect(model.exportNotice?.message == "Finish the recording first.")
+        #expect(model.exportNotice?.id != first, "the repeat got no answer of its own")
+    }
+
     @Test("watched-folder arrivals wait in their own lane while a file transcription is running")
     func watchedArrivalWaitsDuringFileTranscription() async {
         let model = makeModel()

@@ -1791,7 +1791,14 @@ final class AppModel {
     @ObservationIgnored var liveSource: AudioSource? {
         didSet { if oldValue != nil, liveSource == nil { foregroundLetGo() } }
     }
-    @ObservationIgnored var deferredArrivals: [URL] = []
+    /// A file handed over again while it waits, because nothing seemed to answer the first time, still runs once.
+    @ObservationIgnored var deferredArrivals: [URL] = [] {
+        didSet {
+            var seen = Set<URL>()
+            let once = deferredArrivals.filter { seen.insert($0.standardizedFileURL).inserted }
+            if once.count != deferredArrivals.count { deferredArrivals = once }
+        }
+    }
     @ObservationIgnored var deferredLinks: [DeferredLink] = []
     @ObservationIgnored var arrivalDrain: Task<Void, Never>?
     /// Test seam: whether a parked file is still there when the drain comes for it.
