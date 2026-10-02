@@ -118,7 +118,7 @@ extension RunLanding.Kind {
             )
         case .captions:
             LandingPolicy(
-                selection: .unlessNavigated, sound: false, card: true, summary: .whenSelected,
+                selection: .unlessNavigated, sound: true, card: true, summary: .whenSelected,
                 export: .rules, autoSend: true, recents: false
             )
         case .salvagedTake:

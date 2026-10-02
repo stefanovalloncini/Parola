@@ -84,6 +84,17 @@ final class ScriptedLinkFetcher: LinkFetcher {
     }
 }
 
+/// How many times a run's completion sound played.
+@MainActor
+final class Chimes {
+    private(set) var count = 0
+
+    init(_ model: AppModel) {
+        model.playSoundWhenFinished = true
+        model.completionSoundPlayer = { [weak self] in self?.count += 1 }
+    }
+}
+
 /// Every phase the model passes through, in order; a repeat of the same case counts once.
 @MainActor
 final class PhaseRecorder {
@@ -443,9 +454,12 @@ extension TranscriberMockSuites {
             defer { try? FileManager.default.removeItem(at: chosen) }
             #expect(model.setAutoExportFolder(chosen))
 
+            let chimes = Chimes(model)
             #expect(model.fetchYouTubeSubs(urlString: Self.link) == .started)
 
             await waitUntil { model.phase == .ready && model.selectedEntryID != nil }
+            let chimed = await waitUntil { chimes.count == 1 }
+            #expect(chimed, "captions on their page landed without the sound a run makes")
             let loaded = try await model.library.load(try #require(model.selectedEntryID))
             #expect(loaded.entry.title == "A talk")
             #expect(loaded.entry.manifest.source == .web)
@@ -515,12 +529,15 @@ extension TranscriberMockSuites {
                 audioSource: nil
             )
 
+            let chimes = Chimes(model)
             #expect(model.fetchYouTubeSubs(urlString: Self.link) == .started)
             _ = try await model.openEntry(older.id)
             await gate.open()
 
             let landed = await waitUntil { model.arrivalNotice?.origin == .run }
             #expect(landed, "the captions never landed")
+            let chimed = await waitUntil { chimes.count == 1 }
+            #expect(chimed, "captions out of sight landed without the sound a run makes")
             #expect(model.selectedEntryID == older.id, "the captions took the entry the user opened")
             #expect(model.transcript?.text == "an older entry")
             let fetched = await model.library.list().filter { $0.id != older.id }
