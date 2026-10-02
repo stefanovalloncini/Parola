@@ -649,6 +649,7 @@ final class ParolaAutomationServer {
             "progress": run.fraction.map { .double($0) } ?? .null,
             "stage": run.stage.map { .string(Self.stageName($0)) } ?? .null,
             "hasPartialText": .bool(run.hasPartialText),
+            "macAudioStopped": .bool(model.takeMacAudioStopped),
         ])
     }
 

@@ -802,16 +802,23 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("a meeting whose Mac audio stops by itself goes on with your microphone, says so on its Mac lane and in a notice, and keeps your side")
+        @Test("a meeting whose Mac audio stops by itself goes on with your microphone, says so on its Mac lane and in a notice that stays, and keeps your side")
         func macStopsByItselfMidMeeting() async throws {
             try await withMocksCleared([.audioSource, .transcriber]) {
                 await installMockTranscriber(segments: [(0, 1, "Welcome, everyone.")])
                 let model = makeModel()
+                let server = try ParolaAutomationServer(model: model)
                 let files = try meetingFiles(model)
                 let mac = ScriptedTrack(file: files.mac)
                 try await startMeeting(model, mac: mac, mic: ScriptedTrack(file: files.mic))
                 let micUp = await waitForMicTrack(model)
                 #expect(micUp)
+                let take = try #require(model.recording?.takeID)
+                let older = ExportNotice.Action(title: "Transcribe", handler: .transcribeEntry("an older entry"))
+                model.exportNotice = ExportNotice(
+                    message: "Saved the previous recording without transcribing it.", failures: [], folder: nil, tone: .info,
+                    actions: [older]
+                )
 
                 await mac.endByItself()
 
@@ -819,15 +826,24 @@ extension TranscriberMockSuites {
                 #expect(said)
                 #expect(model.recording?.state == .recording)
                 #expect(model.micTrack?.capture != nil)
-                #expect(model.exportNotice?.message == AppModel.macAudioStoppedMessage())
+                #expect(!model.takeStoppedOnItsOwn)
+                let notice = try #require(model.exportNotice)
+                #expect(notice.message == AppModel.macAudioStoppedMessage(), "it outranks the older notice")
+                #expect(notice.actions.map(\.handler) == [.showTake(take)])
+                #expect(!notice.autoDismisses)
+                guard case .object(let state) = server.snapshotState(), case .object(let recording)? = state["recording"] else {
+                    throw AutomationError.precondition("getState has no recording")
+                }
+                #expect(recording["macAudioStopped"] == .bool(true))
                 model.stopRecordingAndTranscribe()
                 let entry = try #require(await landedEntry(model))
                 let audio = try #require(try await model.library.load(entry.id).document.audioURL)
                 #expect(try channels(of: audio) == 2)
+                withExtendedLifetime(server) {}
             }
         }
 
-        @Test("a Mac-audio take with nothing else recording stops when its capture ends by itself, says so, and lands")
+        @Test("a Mac-audio take with nothing else recording stops when its capture ends by itself, lands, and says so until dismissed")
         func macStopsByItselfAlone() async throws {
             try await withMocksCleared([.audioSource, .transcriber]) {
                 await installMockTranscriber(segments: [(0, 1, "the Mac side")])
@@ -840,10 +856,45 @@ extension TranscriberMockSuites {
 
                 let notice = await waitForNotice(model)
                 #expect(notice?.message == AppModel.macAudioStoppedTakeMessage())
-                #expect(!model.takeMacAudioStopped)
+                #expect(notice?.tone == .failure)
+                #expect(notice?.autoDismisses == false)
+                #expect(model.takeMacAudioStopped)
+                #expect(model.takeStoppedOnItsOwn)
                 let entry = try #require(await landedEntry(model))
                 #expect(entry.title.contains("(") == false, "it lands as Stop lands it")
                 #expect(!model.recordingActive)
+                #expect(model.exportNotice?.message == AppModel.macAudioStoppedTakeMessage(), "still up once the take has landed")
+            }
+        }
+
+        @Test("a Mac-audio take whose capture ends before it heard anything ends with nothing saved, and says why")
+        func macStopsBeforeItHeardAnything() async throws {
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                let mac = ScriptedTrack(file: files.mac)
+                await model.awaitModelListRefresh()
+                model.useStreaming = false
+                model.selectedModel = "openai_whisper-tiny"
+                model.meetingRecordsMicrophone = false
+                model.takeCaptureOverride = { _ in mac }
+                model.startRecording(source: .systemAudio)
+                let up = await waitUntil { model.liveSource != nil }
+                #expect(up)
+                let take = try #require(model.recording?.takeID)
+                model.goHome()
+
+                await mac.endByItself()
+
+                let failed = await waitUntil { model.recording?.state == .failed(message: AppModel.macAudioStoppedBeforeSoundMessage()) }
+                #expect(failed)
+                #expect(model.takeStoppedOnItsOwn)
+                #expect(model.exportNotice?.message == AppModel.macAudioStoppedBeforeSoundMessage())
+                #expect(model.exportNotice?.actions.map(\.handler) == [.showTake(take)])
+                let released = await waitUntil { !model.recordingActive }
+                #expect(released)
+                await settle()
+                #expect(await model.library.list().isEmpty)
             }
         }
 

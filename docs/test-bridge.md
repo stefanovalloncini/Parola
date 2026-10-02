@@ -123,7 +123,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 The five introduction commands and `getState.introduction` all reply `{visible, step, steps, engine, engineChoices}`.
 
 `getState.recording` is the take the window shows, from its count-in until the next take starts, or `null` when there is none:
-`{state, elapsed, startedAt, paused, markers, title, category, source, isStreaming, device, progress, stage, hasPartialText}`.
+`{state, elapsed, startedAt, paused, markers, title, category, source, isStreaming, device, progress, stage, hasPartialText, macAudioStopped}`.
 `state` is one of `arming` / `recording` / `paused` / `finishing` / `transcribing` / `done` / `failed`; `elapsed` and
 `markers` are seconds of the take; `startedAt` is seconds since 1970, `null` until the first audio; `device` names the
 input a mic take listens on. While a file take transcribes, `progress` is its 0–1 fraction (`null` until the engine
@@ -131,6 +131,8 @@ reports one), and `stage` and `hasPartialText` mirror `phaseDetail`'s for its ru
 A take cancelled while it finishes reads `transcribing` with `progress` `null` until its save lands, then `done`. Cut
 short, a file take reads `failed` with Retry and a live take reads `done`; both save under a title ending
 "(interrupted)". A take that recorded nothing reads `failed` with "Nothing was recorded."
+`macAudioStopped` turns true once the take's Mac audio capture ends by itself: a meeting recording your microphone
+goes on with it, and a take with nothing else recording stops and lands as Stop lands it.
 `phase` reads `recording` whenever that take is arming, recording or paused. Neither its capture nor its transcription
 moves the phase: a failure shows on its Stage as `recording.state` `failed` (and, when another page shows, as an
 `exportNotice`), while `phase` stays on whatever the rest of the window shows, `ready` with an older transcript

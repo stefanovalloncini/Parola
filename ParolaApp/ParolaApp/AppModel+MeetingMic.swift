@@ -734,21 +734,22 @@ extension AppModel {
         String(localized: "Me", bundle: bundle)
     }
 
-    /// The Mac audio's capture ended by itself: a meeting goes on with your microphone and its Mac lane says so; a take with nothing else recording stops, as Stop stops it. Either way a notice says the Mac audio stopped. One that ends before its take took it up is the start's to report.
+    /// The take's Mac audio capture ended by itself: a meeting records on with your microphone, and a take with nothing else recording stops.
     func macCaptureEnded(take takeID: Int) {
         guard activeTake?.id == takeID, liveSource != nil, let session = recording, session.takeID == takeID, session.isRunning,
               !takeMacAudioStopped else { return }
         ParolaLog.notice(.audioRecording, "a take's Mac audio stopped on its own")
+        takeMacAudioStopped = true
         let micRecords = micTrack?.takeID == takeID && micTrack?.capture != nil && takeMicTrackState?.isLost != true
-        if exportNotice?.actions.isEmpty ?? true {
-            let message = micRecords ? Self.macAudioStoppedMessage() : Self.macAudioStoppedTakeMessage()
-            exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .info, forTake: takeID)
+        guard micRecords else {
+            stopTakeOnItsOwn(takeID, saying: Self.macAudioStoppedTakeMessage(), unheard: Self.macAudioStoppedBeforeSoundMessage())
+            return
         }
-        if micRecords {
-            takeMacAudioStopped = true
-        } else {
-            stopTake()
-        }
+        // Over any notice already up: this one is about the recording in progress, the others about what is saved.
+        exportNotice = ExportNotice(
+            message: Self.macAudioStoppedMessage(), failures: [], folder: nil, tone: .info,
+            actions: [ExportNotice.Action(title: String(localized: "Show"), handler: .showTake(takeID))]
+        )
     }
 
     /// What a take's Mac capture calls if it ends by itself.
@@ -762,6 +763,10 @@ extension AppModel {
 
     nonisolated static func macAudioStoppedTakeMessage(bundle: Bundle = .main) -> String {
         String(localized: "The Mac audio stopped, so Parola stopped the recording.", bundle: bundle)
+    }
+
+    nonisolated static func macAudioStoppedBeforeSoundMessage(bundle: Bundle = .main) -> String {
+        String(localized: "The Mac audio stopped before anything was recorded.", bundle: bundle)
     }
 
     /// Says once per take that your microphone is not, or no longer, in the recording.
