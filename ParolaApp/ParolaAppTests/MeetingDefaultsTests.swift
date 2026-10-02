@@ -543,12 +543,39 @@ extension TranscriberMockSuites {
             model.startRecording(source: .systemAudio)
             let takeID = model.recording?.takeID ?? -1
             TakeCategoryPicker.choose(.transcription, for: takeID, model: model)
-            #expect(model.pendingRecordingCategory == .transcription)
+            #expect(model.recording?.category == .transcription)
 
             model.cancelArmingTake()
 
             #expect(model.recording == nil)
             #expect(model.pendingRecordingCategory == nil)
+            model.startRecording(source: .systemAudio)
+            #expect(model.recording?.category == .meeting)
+            model.cancelArmingTake()
+        }
+
+        @Test("a second Record turned away during a count-in changes nothing about the take: it keeps the category and the apps it was given")
+        func refusedRecordDuringCountIn() async throws {
+            let model = makeRecordingModel("count-in-second-record")
+            model.recordingCountInSeconds = 1
+            model.meetingRecordsMicrophone = false
+            model.meetingCaptureAppOnly = true
+            model.pendingCaptureBundleIDs = ["us.zoom.xos"]
+            model.pendingRecordingCategory = .meeting
+            try armMeteredTake(model, source: .systemAudio)
+            let countingIn = model.recording?.isCountingIn == true
+            #expect(countingIn)
+            let takeID = try #require(model.recording?.takeID)
+            TakeCategoryPicker.choose(.transcription, for: takeID, model: model)
+
+            model.startRecording(source: .microphone)
+            model.startMeetingRecording(appName: "Microsoft Teams")
+
+            let capturing = await waitUntil(timeoutMs: 6_000) { model.recording?.state == .recording }
+            #expect(capturing)
+            #expect(model.activeTake?.category == .transcription)
+            #expect(model.activeTake?.captureTargets == ["us.zoom.xos"])
+            await model.discardTake()
         }
     }
 

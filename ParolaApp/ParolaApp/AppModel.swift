@@ -3370,17 +3370,22 @@ final class AppModel {
         let countIn = max(0, recordingCountInSeconds)
         // The count-in shows only in a main window Parola has in front; anywhere else it would delay the take unseen.
         let overlayVisible = appIsActive() && (mode == .test || NSApp.windows.contains { $0.isVisible && $0.canBecomeMain })
-        let askedForMeeting = requestedCategory(for: source) == .meeting
+        let request = TakeRequest(category: requestedCategory(for: source), captureTargets: pendingCaptureBundleIDs ?? [])
+        forgetTakeRequest()
         if countIn > 0, overlayVisible {
-            beginCountIn(seconds: countIn, source: source) { [weak self] showsStage, counted in
-                self?.beginRecordingNow(
-                    source: source, askedForMeeting: askedForMeeting, diskCheck: diskCheck, showsStage: showsStage, countIn: counted
-                )
+            beginCountIn(seconds: countIn, source: source, category: request.category) { [weak self] showsStage, counted in
+                self?.beginRecordingNow(source: source, request: request, diskCheck: diskCheck, showsStage: showsStage, countIn: counted)
             }
             refuseDuringCountIn(diskCheck)
         } else {
-            beginRecordingNow(source: source, askedForMeeting: askedForMeeting, diskCheck: diskCheck)
+            beginRecordingNow(source: source, request: request, diskCheck: diskCheck)
         }
+    }
+
+    /// What Record asked for, kept from the moment it was pressed, so nothing asked during a count-in reaches this take.
+    private struct TakeRequest {
+        let category: EntryCategory
+        let captureTargets: Set<String>
     }
 
     /// A meeting's category and app targets belong to the request that set them, not to whatever take comes next.
@@ -3397,12 +3402,12 @@ final class AppModel {
     /// The count-in is the take's first arming, under the id the take will get.
     /// `then` learns whether the Stage is still up, so someone who left it during the count-in keeps their page, and what the count-in's session holds for the take.
     private func beginCountIn(
-        seconds: Int, source: RecordSource, then: @escaping (_ showsStage: Bool, _ countIn: RecordingSession?) -> Void
+        seconds: Int, source: RecordSource, category: EntryCategory,
+        then: @escaping (_ showsStage: Bool, _ countIn: RecordingSession?) -> Void
     ) {
         countdownTask?.cancel()
         let takeID = takeCounter &+ 1
         let stamp = Date()
-        let category = requestedCategory(for: source)
         beginSession(RecordingSession(
             takeID: takeID,
             source: source,
@@ -3635,14 +3640,13 @@ final class AppModel {
         activeTake?.id == take.id
     }
 
-    /// `countIn` is the session the take counted in under: its name, typed or generated, is the take's.
+    /// `countIn` is the session the take counted in under: its name, typed or generated, and its Note or Meeting are the take's.
     private func beginRecordingNow(
-        source: RecordSource, askedForMeeting: Bool, diskCheck: Task<Int64?, Never>, showsStage: Bool = true,
+        source: RecordSource, request: TakeRequest, diskCheck: Task<Int64?, Never>, showsStage: Bool = true,
         countIn: RecordingSession? = nil
     ) {
         // A count-in that ends after a quit began would start a take the quit can only cut off.
         guard !quitPending else {
-            forgetTakeRequest()
             resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: countIn?.takeID)
             return
         }
@@ -3650,11 +3654,10 @@ final class AppModel {
         let take = TakeContext(
             id: takeCounter,
             source: source,
-            category: requestedCategory(for: source),
-            captureTargets: pendingCaptureBundleIDs ?? [],
-            askedForMeeting: askedForMeeting
+            category: countIn?.category ?? request.category,
+            captureTargets: request.captureTargets,
+            askedForMeeting: request.category == .meeting
         )
-        forgetTakeRequest()
         activeTake = take
         // Words an earlier live take left behind would otherwise go into this take's checkpoint.
         liveSegments = []
@@ -5003,7 +5006,6 @@ final class AppModel {
     /// Note or Meeting for the take in progress: its entry is saved under it, and a generated title follows it; a count-in hands the choice to the take it becomes.
     func setTakeCategory(_ category: EntryCategory) {
         if let countIn = recording, countIn.isCountingIn {
-            pendingRecordingCategory = category
             updateSession(of: countIn.takeID) { session in
                 session.category = category
                 guard session.titleSource == nil else { return }
