@@ -93,6 +93,26 @@ extension TranscriberMockSuites {
             return await waitUntil(timeoutMs: 10_000) { model.selectedEntryID == entryID && model.transcript != nil }
         }
 
+        @Test("an entry opened before the library has listed it can be transcribed again at once")
+        func openedBeforeTheListCanRunAgain() async throws {
+            let model = makeModel("retranscribe-unlisted")
+            let wav = try makeWAV("unlisted")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            let entry = try await model.library.add(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the old take")], language: "en", modelName: "openai_whisper-tiny"
+                ),
+                audioSource: wav, category: .transcription, title: "Board meeting"
+            )
+            #expect(model.libraryEntry(id: entry.id) == nil, "the list hasn't read the library yet")
+
+            _ = try await model.openEntry(entry.id)
+
+            #expect(model.libraryEntry(id: entry.id) != nil)
+            #expect(model.canRetranscribeSelectedEntry)
+            #expect(model.retranscribeUnavailableReason == nil)
+        }
+
         @Test("the run carries the chosen model and language and keeps the entry it was asked about")
         func requestCarriesTheChoice() async throws {
             try await withMocksCleared(.transcriber) {

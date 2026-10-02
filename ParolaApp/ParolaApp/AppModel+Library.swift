@@ -629,6 +629,8 @@ extension AppModel {
                 guard generation == loadEntryGeneration else { throw CancellationError() }
                 // Recently Deleted reads trashed bundles on purpose; opening one here would send its edits into the trash.
                 guard loaded.entry.deletedAt == nil else { throw LibraryStore.LibraryError.inTrash(id) }
+                // Opened before the library's list has it, as Spotlight or Shortcuts can at launch: Transcribe Again and the header read the list.
+                if libraryEntry(id: id) == nil { landLibraryEntry(loaded.entry) }
                 installStoredTranscript(loaded.document.transcript)
                 closeFind()
                 sourceFileURL = loaded.document.audioURL
