@@ -268,7 +268,8 @@ struct NoticeIconSpeechTests {
         let success = await words(ExportNotice(message: "Exported 3 of 3", failures: [], folder: nil, tone: .success))
         #expect(!success.contains("Selected"), "a check mark that reads Selected says something untrue")
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
-        #expect(String(localized: "Error", bundle: try #require(Bundle(path: path))) == "Errore")
+        let italian = try #require(Bundle(path: path))
+        #expect(String(localized: "Error", bundle: italian) == "Errore")
     }
 }
 

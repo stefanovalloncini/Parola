@@ -600,6 +600,7 @@ struct MacAudioStoppedOutsideTests {
         take.finish(at: .now)
         #expect(TakeRemote.warning(for: take, in: model) == nil)
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
-        #expect(String(localized: "Mac audio stopped", bundle: try #require(Bundle(path: path))) == "Audio del Mac fermato")
+        let italian = try #require(Bundle(path: path))
+        #expect(String(localized: "Mac audio stopped", bundle: italian) == "Audio del Mac fermato")
     }
 }
