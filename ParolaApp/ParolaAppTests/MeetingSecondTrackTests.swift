@@ -408,9 +408,12 @@ extension TranscriberMockSuites {
                 model.freeDiskSpaceProvider = { AppModel.meetingFoldMarginBytes + 1_000 }
 
                 model.retranscribeCurrentEntry(model: "nvidia_parakeet-tdt-0.6b-v3", language: nil)
+                let started = model.retranscribeRequest != nil
+                #expect(started, "Transcribe Again started a run")
 
-                let failed = await waitUntil { runFailed(model) }
-                #expect(failed)
+                // The run loads and checks the room off the main actor, which a loaded host can hold up for seconds.
+                let over = await waitUntil(timeoutMs: 30_000) { model.retranscribeRequest == nil }
+                #expect(over)
                 #expect(model.phase == .failed(message: AppModel.meetingMixUnavailableMessage()))
                 #expect(await reads.files.isEmpty, "the engine never got the stereo")
                 #expect(model.meetingScratchInUse.isEmpty)
