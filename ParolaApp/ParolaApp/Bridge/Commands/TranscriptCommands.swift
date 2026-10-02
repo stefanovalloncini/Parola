@@ -2,6 +2,12 @@ import Foundation
 import ParolaCore
 
 extension ParolaAutomationServer {
+    /// What a drop does first: the page its run shows on comes up, so a run the bridge starts never lands out of sight.
+    static func showRunPage(_ model: AppModel) {
+        guard !model.stageHoldsTake else { return }
+        model.route = .transcript
+    }
+
     func transcriptCommands() -> [AutomationCommand] {
         [
             AutomationCommand(
@@ -21,6 +27,7 @@ extension ParolaAutomationServer {
                         throw AutomationError.notFound(kind: "file", id: path)
                     }
                     let translate = try args.optionalBool("translate")
+                    ParolaAutomationServer.showRunPage(ctx.model)
                     ctx.model.transcribe(fileURL: url, translateOverride: translate)
                     return .object(["started": .bool(true), "file": .string(url.path)])
                 }
@@ -38,6 +45,7 @@ extension ParolaAutomationServer {
                 handler: { args, ctx in
                     try ctx.require(.youtube)
                     let url = try args.string("url")
+                    ParolaAutomationServer.showRunPage(ctx.model)
                     let handoff = ctx.model.transcribeYouTube(urlString: url)
                     return .object([
                         "started": .bool(handoff == .started),

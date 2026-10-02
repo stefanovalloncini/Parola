@@ -240,6 +240,33 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("the bridge's transcribeFile, sent while another page shows, brings up the run's page as a drop does, and the run lands there")
+        func bridgeRunLandsOnItsPage() async throws {
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the run's own words")]
+                ))
+                let model = makeModel()
+                let server = try ParolaAutomationServer(model: model)
+                let commands = Dictionary(uniqueKeysWithValues: server.transcriptCommands().map { ($0.name, $0) })
+                let command = try #require(commands["transcribeFile"])
+                let wav = try makeSilentWAV(label: "bridge")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                model.openStatistics()
+
+                _ = try await command.handler(
+                    try command.validate(AutomationArgs(["path": .string(wav.path)])), AutomationContext(model: model, server: server)
+                )
+                #expect(model.route == .transcript, "a drop shows the page its run goes on")
+
+                let landed = await waitUntil { model.phase == .ready && model.selectedEntryID != nil }
+                #expect(landed, "the run never opened on its page")
+                #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
+                #expect(model.arrivalNotice == nil)
+                withExtendedLifetime(server) {}
+            }
+        }
+
         @Test("a file run started over an open entry that finishes while another page shows lets go of that entry too, whose audio it had taken")
         func fileRunOverAnEntryLeavesAnotherPage() async throws {
             try await withMocksCleared(.transcriber) {

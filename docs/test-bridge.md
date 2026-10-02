@@ -149,6 +149,8 @@ on the page after the Stage. A notice only true while the take records, like "Fi
 the take stops.
 A file, link or captions run lands the same way: with its own page up it opens there; after an entry or a document was
 opened, or another page shown, it goes to the library with a "Saved <title>" toast and Open, and loads nothing.
+`transcribeFile`, `transcribeYouTube` and `fetchYouTubeSubs` bring that page up first, as a drop does, unless the Stage
+holds a take.
 `getState.takeSavedNotice` is the toast a take that landed on its own Stage leaves, `{title, category, entryID, actions}`
 ("Saved to Meetings", `meeting`), and `getState.arrivalNotice` the toast for a take, a run or a watched file that landed
 or failed out of sight, `{title, state, origin, entryID, reason, actions}` with `state` one of `saved` / `running` /

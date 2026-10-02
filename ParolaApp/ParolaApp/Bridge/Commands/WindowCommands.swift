@@ -120,6 +120,7 @@ extension ParolaAutomationServer {
                 handler: { args, ctx in
                     try ctx.require(.youtube)
                     let url = try args.string("url")
+                    ParolaAutomationServer.showRunPage(ctx.model)
                     let handoff = ctx.model.fetchYouTubeSubs(urlString: url)
                     return .object([
                         "started": .bool(handoff == .started),
