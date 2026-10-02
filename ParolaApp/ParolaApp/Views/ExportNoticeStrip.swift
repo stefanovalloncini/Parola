@@ -11,7 +11,7 @@ struct ExportNoticeStrip: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
-            Image(systemName: iconName)
+            Image(systemName: Self.iconName(for: notice.tone))
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(iconColor)
                 .accessibilityLabel("Error")
@@ -81,8 +81,8 @@ struct ExportNoticeStrip: View {
         tone == .failure
     }
 
-    private var iconName: String {
-        switch notice.tone {
+    nonisolated static func iconName(for tone: ExportNotice.Tone) -> String {
+        switch tone {
         case .success: "checkmark.circle.fill"
         case .info: "info.circle"
         case .failure: "exclamationmark.triangle.fill"

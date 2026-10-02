@@ -254,6 +254,13 @@ struct StageFacts: View {
         }
         .font(DS.Font.secondary)
         .foregroundStyle(DS.Color.secondaryText)
+        // Hung in the gap above the band, so the line coming and going moves nothing on the Stage.
+        .overlay(alignment: .bottom) {
+            StageNoticeLine(take: take)
+                .frame(width: StageLiveText.width)
+                .alignmentGuide(.bottom) { $0[.top] - DS.Spacing.snug }
+                .allowsHitTesting(false)
+        }
     }
 
     static func modeLine(isStreaming: Bool, bundle: Bundle = .main) -> String {
@@ -326,6 +333,57 @@ struct StageFacts: View {
             String(localized: "No sound from your Mac or your microphone.", bundle: bundle)
         case .systemAudio:
             String(localized: "No sound from your Mac — check that audio is playing.", bundle: bundle)
+        }
+    }
+}
+
+/// The Stage's one line for a notice about its own take: why it stopped by itself while it finishes, else for a few seconds what it turned away.
+struct StageNoticeLine: View {
+    let take: RecordingSession
+    var shownFor: Duration = ExportNoticeStrip.dismissAfter
+    @Environment(AppModel.self) private var model
+    /// A notice with buttons outlasts its seconds here, waiting for the page after the Stage.
+    @State private var spent: ExportNotice.ID?
+
+    enum Shown: Equatable {
+        case stopReason(String)
+        case notice(ExportNotice)
+    }
+
+    nonisolated static func shown(for take: RecordingSession, stopReason: String?, notice: ExportNotice?) -> Shown? {
+        if let stopReason, take.state == .finishing || take.isTranscribing { return .stopReason(stopReason) }
+        guard let notice, notice.whileTakeRuns else { return nil }
+        return .notice(notice)
+    }
+
+    var body: some View {
+        switch Self.shown(for: take, stopReason: model.takeStopReason, notice: model.exportNotice) {
+        case .stopReason(let reason):
+            line(reason, tone: .failure)
+        case .notice(let notice) where notice.id != spent:
+            line(notice.message, tone: notice.tone)
+                .task(id: notice.id) { await expire(notice) }
+        default:
+            EmptyView()
+        }
+    }
+
+    private func line(_ text: String, tone: ExportNotice.Tone) -> some View {
+        Label(text, systemImage: ExportNoticeStrip.iconName(for: tone))
+            .font(DS.Font.secondary)
+            .foregroundStyle(tone == .failure ? DS.Color.dangerText : DS.Color.secondaryText)
+            .lineLimit(1)
+            .accessibilityElement(children: .combine)
+            .axLeaf("Stage.Notice")
+    }
+
+    private func expire(_ notice: ExportNotice) async {
+        try? await Task.sleep(for: shownFor)
+        guard !Task.isCancelled else { return }
+        if notice.autoDismisses, model.exportNotice?.id == notice.id {
+            model.dismissExportNotice()
+        } else {
+            spent = notice.id
         }
     }
 }

@@ -197,4 +197,143 @@ struct StageLayoutTests {
         await settle(for: .milliseconds(300))
         #expect(draws(strip.control, HostedAccessibility.elements(in: hosted.host)), "the strip waited for the page after the Stage")
     }
+
+    /// What the Stage says on its own line: a run turned away while the take records, or why a finishing take stopped by itself.
+    enum StageLine: String, CaseIterable, Sendable {
+        case turnedAway, stoppedOnItsOwn
+
+        var message: String {
+            switch self {
+            case .turnedAway: "Finish the recording first."
+            case .stoppedOnItsOwn: "The Mac audio stopped, so Parola stopped the recording."
+            }
+        }
+
+        @MainActor
+        func setUp(_ model: AppModel) {
+            guard self == .stoppedOnItsOwn else { return }
+            model.updateSession(of: model.recording?.takeID) { _ = $0.finish(at: Date()) }
+        }
+
+        @MainActor
+        func post(on model: AppModel) {
+            switch self {
+            case .turnedAway: model.noteRunWaitsForTake()
+            case .stoppedOnItsOwn:
+                model.takeStopReason = message
+                model.exportNotice = ExportNotice(message: message, failures: [], folder: nil, tone: .failure, forTake: model.recording?.takeID)
+            }
+        }
+    }
+
+    enum StageWindow: String, CaseIterable, Sendable {
+        case regular, smallest
+
+        var size: CGSize {
+            switch self {
+            case .regular: CGSize(width: 1180, height: 760)
+            case .smallest: CGSize(width: 920, height: 600)
+            }
+        }
+    }
+
+    private struct Placed: Equatable {
+        let name: String
+        let frame: CGRect
+    }
+
+    /// Every element but the line, where it sits.
+    @MainActor
+    private func placed(_ elements: [HostedAccessibility.Element]) -> [Placed] {
+        elements.filter { $0.identifier?.hasSuffix("Stage.Notice") != true }.map {
+            Placed(name: ($0.identifier ?? "") + "|" + ($0.label ?? ""), frame: $0.frame)
+        }
+    }
+
+    @Test("a notice about the take in progress hangs on one line in the gap under the Stage's facts, and moves nothing", arguments: StageLine.allCases, StageWindow.allCases)
+    @MainActor
+    func stageLineMovesNothing(_ line: StageLine, _ window: StageWindow) async throws {
+        let model = makeRecordingModel("stage-line-\(line.rawValue)-\(window.rawValue)")
+        let wav = try tempWAV("stage-line")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: wav), startedAt: Date(timeIntervalSinceNow: -60))
+        line.setUp(model)
+        let hosted = HostedWindow(ContentView().environment(model), width: window.size.width, height: window.size.height)
+        defer {
+            hosted.close()
+            model.endTestTake()
+        }
+        await settle(for: .milliseconds(300))
+        let clear = placed(HostedAccessibility.elements(in: hosted.host))
+
+        line.post(on: model)
+        await settle(for: .milliseconds(300))
+
+        let onStage = HostedAccessibility.elements(in: hosted.host)
+        let shown = try #require(onStage.first { $0.identifier?.hasSuffix("Stage.Notice") == true }, "the Stage has no line for it")
+        #expect(shown.value == line.message)
+        #expect(placed(onStage) == clear, "the line moved the Stage")
+        let modeLine = StageFacts.modeLine(isStreaming: false)
+        let facts = try #require(onStage.first { $0.value == modeLine }).frame
+        let band = try #require(onStage.first { $0.label == "Input level" }).frame
+        #expect(!shown.frame.intersects(facts) && !shown.frame.intersects(band), "the line overlaps the facts or the band")
+        #expect((facts.midY - shown.frame.midY) * (band.midY - shown.frame.midY) < 0, "the line is not between the facts and the band")
+        #expect(!draws("ExportNotice.Button.Dismiss", onStage), "the strip came up on the Stage too")
+    }
+
+    @Test("the Stage's line gives a finishing take's stop reason first, else a notice for the take in progress, and nothing else")
+    func stageLineChoice() {
+        var take = RecordingSession(
+            takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture
+        )
+        _ = take.markCapturing(at: Date())
+        let turnedAway = ExportNotice(message: "Finish the recording first.", failures: [], folder: nil, tone: .info, whileTakeRuns: true)
+        let other = ExportNotice(message: "Auto-export couldn't write to its folder.", failures: [], folder: nil, tone: .failure)
+        let reason = "The Mac audio stopped, so Parola stopped the recording."
+
+        #expect(StageNoticeLine.shown(for: take, stopReason: nil, notice: turnedAway) == .notice(turnedAway))
+        #expect(StageNoticeLine.shown(for: take, stopReason: nil, notice: other) == nil)
+        #expect(StageNoticeLine.shown(for: take, stopReason: nil, notice: nil) == nil)
+        _ = take.finish(at: Date())
+        #expect(StageNoticeLine.shown(for: take, stopReason: reason, notice: other) == .stopReason(reason))
+        #expect(StageNoticeLine.shown(for: take, stopReason: nil, notice: turnedAway) == .notice(turnedAway))
+        _ = take.transcribing(progress: 0.4)
+        #expect(StageNoticeLine.shown(for: take, stopReason: reason, notice: turnedAway) == .stopReason(reason))
+        take.land(entryID: "saved")
+        #expect(StageNoticeLine.shown(for: take, stopReason: reason, notice: nil) == nil)
+    }
+
+    @MainActor
+    private func drawsStageLine(_ hosted: HostedWindow) -> Bool {
+        draws("Stage.Notice", HostedAccessibility.elements(in: hosted.host))
+    }
+
+    @Test("the Stage's line lets a notice go after its seconds; one with buttons stays up for the page after the Stage")
+    @MainActor
+    func stageLineExpires() async throws {
+        let model = makeRecordingModel("stage-line-expiry")
+        var take = RecordingSession(
+            takeID: 1, source: .microphone, category: .transcription, title: "R", isStreaming: false, arming: .startingCapture
+        )
+        _ = take.markCapturing(at: Date())
+        let hosted = HostedWindow(StageNoticeLine(take: take, shownFor: .milliseconds(200)).environment(model), width: 720, height: 40)
+        defer { hosted.close() }
+
+        model.noteRunWaitsForTake()
+        let drawn = await waitUntil(timeoutMs: 1_000) { drawsStageLine(hosted) }
+        #expect(drawn)
+        let gone = await waitUntil(timeoutMs: 3_000) { model.exportNotice == nil }
+        #expect(gone, "the notice outlived its seconds on the Stage")
+
+        let withShow = ExportNotice(
+            message: "The Mac audio stopped. Your microphone is still recording.", failures: [], folder: nil, tone: .info,
+            actions: [ExportNotice.Action(title: "Show", handler: .showTake(take.takeID))], whileTakeRuns: true
+        )
+        model.exportNotice = withShow
+        let redrawn = await waitUntil(timeoutMs: 1_000) { drawsStageLine(hosted) }
+        #expect(redrawn)
+        let hidden = await waitUntil(timeoutMs: 3_000) { !drawsStageLine(hosted) }
+        #expect(hidden, "the line kept the notice past its seconds")
+        #expect(model.exportNotice?.id == withShow.id, "a notice with buttons went before the page after the Stage")
+    }
 }
