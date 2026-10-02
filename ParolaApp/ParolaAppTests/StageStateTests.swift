@@ -601,7 +601,7 @@ struct StageStateTests {
     }
 
     @MainActor
-    @Test("a take that never started says nothing beside its banner, and its clock stays where its arming Stage had it")
+    @Test("a take that never started says nothing beside its banner, VoiceOver names its page as the banner does, and its clock stays where its arming Stage had it")
     func neverStartedStageSaysNoStatus() async throws {
         let model = makeRecordingModel("stage-never-started")
         let arming = RecordingSession(
@@ -625,6 +625,9 @@ struct StageStateTests {
         let words = failed.flatMap(\.words)
         #expect(words.contains("Couldn't start the recording"))
         #expect(!words.contains("STOPPED"), "the take never ran, so nothing stopped")
+        #expect(!words.contains("The recording stopped"), "VoiceOver calls the page stopped")
+        let named = failed.contains { $0.label == "Couldn't start the recording" }
+        #expect(named, "VoiceOver calls the page something other than its banner")
         #expect(!words.contains("REC"))
         let clockStarting = starting.first { $0.label == "Recording time" }
         let clockFailed = failed.first { $0.label == "Recording time" }

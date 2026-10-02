@@ -77,7 +77,9 @@ struct StagePage: View {
         }
         .background(WindowShownReader { isOnScreen = $0 })
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text(verbatim: Self.accessibilityTitle(for: take.mode, from: take.source.label.lowercased())))
+        .accessibilityLabel(Text(verbatim: Self.accessibilityTitle(
+            for: take.mode, failedWhile: take.failedWhile, from: take.source.label.lowercased()
+        )))
         .modifier(StageSidebarFold())
         .onAppear(perform: enter)
     }
@@ -113,13 +115,16 @@ struct StagePage: View {
     }
 
     /// What VoiceOver calls the page: what the take is doing now, paused and finishing included.
-    nonisolated static func accessibilityTitle(for mode: StageMode, from: String, bundle: Bundle = .main) -> String {
+    nonisolated static func accessibilityTitle(
+        for mode: StageMode, failedWhile: RecordingSession.FailedWhile? = nil, from: String, bundle: Bundle = .main
+    ) -> String {
         switch mode {
         case .countIn, .preparing, .starting: String(localized: "Getting ready to record from \(from)", bundle: bundle)
         case .live, .landing: String(localized: "Recording from \(from)", bundle: bundle)
         case .paused: String(localized: "Recording from \(from), paused", bundle: bundle)
         case .finishing: String(localized: "Finishing the recording", bundle: bundle)
         case .transcribing: String(localized: "Transcribing the recording", bundle: bundle)
+        case .failed where failedWhile == .starting: String(localized: "Couldn't start the recording", bundle: bundle)
         case .failed: String(localized: "The recording stopped", bundle: bundle)
         }
     }

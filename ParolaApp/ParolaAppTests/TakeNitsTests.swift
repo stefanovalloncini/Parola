@@ -114,13 +114,17 @@ struct StageSpokenNamesTests {
         #expect(before.value == "12 minutes, 34 seconds")
     }
 
-    @Test("the Stage reads right while it pauses and while it finishes")
+    @Test("the Stage reads right while it pauses, while it finishes, and when it never started")
     func stageTitle() throws {
         #expect(StagePage.accessibilityTitle(for: .live, from: "microphone") == "Recording from microphone")
         #expect(StagePage.accessibilityTitle(for: .paused, from: "microphone") == "Recording from microphone, paused")
         #expect(StagePage.accessibilityTitle(for: .finishing, from: "microphone") == "Finishing the recording")
         #expect(StagePage.accessibilityTitle(for: .starting, from: "microphone") == "Getting ready to record from microphone")
+        #expect(StagePage.accessibilityTitle(for: .failed("x"), failedWhile: .starting, from: "microphone") == "Couldn't start the recording")
+        #expect(StagePage.accessibilityTitle(for: .failed("x"), failedWhile: .recording, from: "microphone") == "The recording stopped")
         let it = try italian()
+        let neverStarted = StagePage.accessibilityTitle(for: .failed("x"), failedWhile: .starting, from: "microfono", bundle: it)
+        #expect(neverStarted == "Avvio della registrazione non riuscito")
         #expect(StagePage.accessibilityTitle(for: .paused, from: "microfono", bundle: it) == "Registrazione da microfono, in pausa")
         #expect(TakeOverview.spoken(elapsed: 1, progress: 0.5, bundle: it).label == "Avanzamento della trascrizione")
         #expect(TakeOverview.spoken(elapsed: 1, progress: nil, bundle: it).label == "Durata della registrazione")
