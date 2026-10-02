@@ -407,7 +407,7 @@ extension TranscriberMockSuites {
                 #expect(model.route == .recording, "the save never takes the new take's Stage")
                 #expect(model.recording?.isCapturing == true)
 
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -492,7 +492,7 @@ extension TranscriberMockSuites {
                 #expect(model.takeArming == nil)
                 #expect(model.takeInProgress)
 
-                model.cancelCurrentWork()
+                await model.discardTake()
                 await waitUntil { model.recordingLevelMeter == nil }
                 #expect(model.recordingStartedAt == nil)
             }
@@ -582,11 +582,11 @@ extension TranscriberMockSuites {
                 #expect(model.takeInProgress)
                 await settle()
                 #expect(await model.library.list().isEmpty)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
-        @Test("a live take that lands after a cancel is saved without touching the screen the cancel left", .timeLimit(.minutes(1)))
+        @Test("a live take let go by a cancel while it finishes is saved without touching the screen the cancel left", .timeLimit(.minutes(1)))
         func lateLandingLeavesTheScreen() async throws {
             try await withMocksCleared([.audioSource, .streaming]) {
                 await MockAudioSourceRegistry.shared.clear()
@@ -594,6 +594,7 @@ extension TranscriberMockSuites {
                 await startStreamingTake(model)
                 await waitUntil { model.recordingStartedAt != nil }
                 let take = try #require(model.activeTake)
+                model.stopRecordingAndTranscribe()
                 let session = PausingSession()
                 let words = Transcript(
                     segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "late words")], language: "en", modelName: "mock"
@@ -636,7 +637,7 @@ extension TranscriberMockSuites {
                 let take = try #require(model.recording)
                 #expect(DockBadge.recordingBadge(for: take, now: startedAt.addingTimeInterval(75)) == "1:15")
 
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -713,7 +714,7 @@ extension TranscriberMockSuites {
                 await settle(for: .seconds(2))
                 #expect(!model.recordingIsSilent, "after sound, a Mac-audio pause shorter than a minute is just a pause")
 
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -1298,7 +1299,7 @@ extension TranscriberMockSuites {
                 #expect(model.exportNotice?.message == "Finish the recording first. Parola offers the recovered one again when it ends.")
                 #expect(model.exportNotice?.tone == .info)
 
-                model.cancelCurrentWork()
+                await model.discardTake()
                 await waitUntil { !model.recordingActive }
                 model.acceptPendingRecovery()
                 #expect(model.pendingRecovery == nil)
@@ -1479,7 +1480,7 @@ extension TranscriberMockSuites {
                 await settle()
                 #expect(quit.value == nil)
                 #expect(model.takeInProgress)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 

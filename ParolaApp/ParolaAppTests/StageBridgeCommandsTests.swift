@@ -107,7 +107,7 @@ extension TranscriberMockSuites {
                 _ = try await feed.handler(args, context)
                 let heard = await waitUntil { model.recordingLevelMeter?.lastSound != nil }
                 #expect(heard)
-                model.cancelCurrentWork()
+                await model.discardTake()
                 withExtendedLifetime(server) {}
             }
         }
@@ -141,7 +141,7 @@ extension TranscriberMockSuites {
                 #expect(reply == .object(["released": .bool(true)]))
                 let recording = await waitUntil { model.recording?.state == .recording }
                 #expect(recording)
-                model.cancelCurrentWork()
+                await model.discardTake()
                 withExtendedLifetime(server) {}
             }
         }

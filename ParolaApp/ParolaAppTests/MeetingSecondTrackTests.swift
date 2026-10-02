@@ -226,7 +226,7 @@ extension TranscriberMockSuites {
                 let written = try JSONDecoder().decode(RecoveryCheckpoint.self, from: try Data(contentsOf: checkpointFile))
                 #expect(written.audioURL == files.mac)
                 #expect(written.companionAudioURL == files.mic)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -243,7 +243,7 @@ extension TranscriberMockSuites {
                 try await startMeeting(plain, mac: ScriptedTrack(file: files.mac), mic: nil, category: .transcription, micOverride: counting)
                 await settle()
                 #expect(plain.micTrack == nil)
-                plain.cancelCurrentWork()
+                await plain.discardTake()
 
                 let off = makeModel()
                 off.meetingRecordsMicrophone = false
@@ -252,7 +252,7 @@ extension TranscriberMockSuites {
                 await settle()
                 #expect(off.micTrack == nil)
                 #expect(off.liveCompanionAudioURL == nil)
-                off.cancelCurrentWork()
+                await off.discardTake()
                 #expect(asked == 0)
             }
         }
@@ -280,7 +280,7 @@ extension TranscriberMockSuites {
                 let checkpointFile = model.recoveryFileURL(for: try #require(model.recoveryFileIDs[recovery]))
                 let written = try JSONDecoder().decode(RecoveryCheckpoint.self, from: try Data(contentsOf: checkpointFile))
                 #expect(written.companionStartOffset == offset)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -302,7 +302,7 @@ extension TranscriberMockSuites {
                 #expect(told)
                 #expect(await mic.pauseCalls == [true, false])
                 #expect(await mac.pauseCalls == [true, false])
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -322,7 +322,7 @@ extension TranscriberMockSuites {
                 #expect(model.resumeTake())
                 let resumed = await waitUntil { await mic.pauseCalls == [true, false] }
                 #expect(resumed)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -571,7 +571,7 @@ extension TranscriberMockSuites {
                 #expect(model.takeMicTrackState == .unavailable)
                 #expect(await mic.started == false)
                 #expect(model.recording?.state == .recording)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -615,7 +615,7 @@ extension TranscriberMockSuites {
                 let told = await waitUntil { await mac.pauseCalls == [true, false] }
                 #expect(told)
                 await mic.unwedge()
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -788,7 +788,7 @@ extension TranscriberMockSuites {
                 plain.freeDiskSpaceProvider = { AppModel.diskSpaceRefuseFloorBytes + foldBytes / 2 }
                 await plain.checkRecordingDiskSpace()
                 #expect(plain.recording?.isCapturing == true, "no fold to make room for")
-                plain.cancelCurrentWork()
+                await plain.discardTake()
             }
         }
 
@@ -806,7 +806,7 @@ extension TranscriberMockSuites {
 
                 #expect(whisper > 0)
                 #expect(parakeet == 2 * whisper)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -922,8 +922,8 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("Cancel ends your microphone's track with the take")
-        func cancelDropsTheMic() async throws {
+        @Test("Cancel leaves a meeting's microphone recording with its take")
+        func cancelKeepsTheMic() async throws {
             try await withMocksCleared(.audioSource) {
                 let model = makeModel()
                 let files = try meetingFiles(model)
@@ -933,11 +933,13 @@ extension TranscriberMockSuites {
                 #expect(micUp)
 
                 model.cancelCurrentWork()
+                await settle(for: .milliseconds(300))
 
-                let cancelled = await waitUntil { await mic.cancelled }
-                #expect(cancelled)
-                #expect(model.micTrack == nil)
-                #expect(model.liveCompanionAudioURL == nil)
+                #expect(await mic.cancelled == false)
+                #expect(model.micTrack?.capture != nil)
+                #expect(model.liveCompanionAudioURL == files.mic)
+                #expect(model.recording?.state == .recording)
+                await model.discardTake()
             }
         }
 
@@ -998,7 +1000,7 @@ extension TranscriberMockSuites {
                 #expect(model.recording?.state == .recording)
                 #expect(model.micTrack?.stalled == true)
                 #expect(model.takeMicTrackState == .stopped)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -1018,7 +1020,7 @@ extension TranscriberMockSuites {
 
                 #expect(model.micTrack == nil)
                 #expect(model.exportNotice == nil)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -1264,7 +1266,7 @@ extension TranscriberMockSuites {
                 #expect(notice?.takeID == firstTake)
                 #expect(model.pauseTake())
                 #expect(model.exportNotice?.message == AppModel.micTrackKeptMessage(), "the next take's session doesn't sweep it away")
-                model.cancelCurrentWork()
+                await model.discardTake()
                 await wedged.unwedge()
             }
         }
@@ -1672,7 +1674,7 @@ extension TranscriberMockSuites {
                 let levels = try #require(model.takeLevels)
                 let micLevels = try #require(model.takeMicLevels)
                 #expect(micLevels.sampleCount == levels.sampleCount)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -1686,7 +1688,7 @@ extension TranscriberMockSuites {
                 let refused = await waitUntil { refusedModel.takeMicTrackState == .unavailable }
                 #expect(refused)
                 #expect(refusedModel.takeMicLevels != nil, "the meter stays, flat")
-                refusedModel.cancelCurrentWork()
+                await refusedModel.discardTake()
                 #expect(refusedModel.takeMicTrackState == nil)
                 #expect(refusedModel.takeMicLevels == nil)
 
@@ -1695,7 +1697,7 @@ extension TranscriberMockSuites {
                 try await startMeeting(plain, mac: ScriptedTrack(file: plainFiles.mac), mic: nil, category: .transcription)
                 #expect(plain.takeMicTrackState == nil)
                 #expect(plain.takeMicLevels == nil)
-                plain.cancelCurrentWork()
+                await plain.discardTake()
             }
         }
 

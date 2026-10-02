@@ -732,7 +732,7 @@ extension TranscriberMockSuites {
             model.useStreaming = false
             model.selectedModel = "openai_whisper-tiny"
             model.takeCaptureOverride = { _ in StubSource(url: audio) }
-            defer { model.cancelCurrentWork() }
+            defer { Task { await model.discardTake() } }
             let window = closableWindow()
             defer { window.close() }
             model.mainWindow = window

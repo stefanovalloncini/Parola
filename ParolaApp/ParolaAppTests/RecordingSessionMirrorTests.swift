@@ -119,7 +119,7 @@ extension TranscriberMockSuites {
                 let rate = Double(after - before) / seconds(since: from)
 
                 #expect(rate >= 7 && rate <= 13, "about ten levels a second, not \(rate)")
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -195,7 +195,7 @@ extension TranscriberMockSuites {
             let startedAt = try #require(model.recording?.startedAt)
             #expect(abs(startedAt.timeIntervalSince(cameUp)) < 0.25)
             #expect(model.takeInProgress)
-            model.cancelCurrentWork()
+            await model.discardTake()
         }
 
         @Test("a capture that meters starts its clock at its first reading, not when it came up")
@@ -216,7 +216,7 @@ extension TranscriberMockSuites {
             #expect(started)
             let startedAt = try #require(model.recording?.startedAt)
             #expect(abs(startedAt.timeIntervalSince(heardAt)) < 0.05)
-            model.cancelCurrentWork()
+            await model.discardTake()
         }
 
         @Test("a buffer metered just before Stop counts: the take is kept and its clock starts at that reading")
@@ -354,7 +354,7 @@ extension TranscriberMockSuites {
                 second.levelMeter.record(0.4)
                 let started = await waitUntil { model.recording?.state == .recording }
                 #expect(started, "the second take's sampler still runs")
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -411,7 +411,7 @@ extension TranscriberMockSuites {
                 #expect(recording)
                 #expect(model.recording?.takeID == countIn)
                 #expect(model.recordingCountdown == nil)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -442,8 +442,8 @@ extension TranscriberMockSuites {
             #expect(model.route == .recording, "the refusal shows on the take's Stage")
         }
 
-        @Test("a take cancelled while it records leaves no session")
-        func cancelledTakeLeavesNoSession() async throws {
+        @Test("a take discarded while it records leaves no session")
+        func discardedTakeLeavesNoSession() async throws {
             let fixture = try makeTakeWAV("mirror-cancel", seconds: 2)
             defer { try? FileManager.default.removeItem(at: fixture) }
             try await withMocksCleared(.audioSource) {
@@ -453,7 +453,7 @@ extension TranscriberMockSuites {
                 let recording = await waitUntil { model.recording?.state == .recording }
                 #expect(recording)
 
-                model.cancelCurrentWork()
+                await model.discardTake()
 
                 #expect(model.recording == nil)
                 #expect(model.takeLevels == nil)
@@ -515,7 +515,7 @@ extension TranscriberMockSuites {
 
                 #expect(model.recording?.takeID == second)
                 #expect(model.recording?.isRunning == true)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
     }

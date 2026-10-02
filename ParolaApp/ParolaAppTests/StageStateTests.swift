@@ -1119,7 +1119,7 @@ extension TranscriberMockSuites {
                 #expect(model.recording?.state == .recording, "the first take's landing leaves the second one alone")
                 #expect(model.recordingWatchTask != nil, "the second take keeps its disk and checkpoint watch")
                 #expect(model.route == .recording)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -1340,7 +1340,7 @@ extension TranscriberMockSuites {
             #expect(after.count == 1)
             let samePage = before.first.map { page in after.first === page } ?? false
             #expect(samePage, "the take keeps its count-in's Stage, so its entrance doesn't play twice")
-            model.cancelCurrentWork()
+            await model.discardTake()
         }
 
         @Test("resetTestState waits for a let-go take's save, so the library it wipes stays empty")

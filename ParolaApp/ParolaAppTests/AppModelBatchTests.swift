@@ -1265,11 +1265,16 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.contains { $0.url == url })
     }
 
-    @Test("cancelling discards deferred arrivals")
+    @Test("cancelling discards deferred arrivals, but those waiting for a take that records wait on with it")
     func cancelDiscardsDeferredArrivals() {
         let model = makeModel()
         model.installTestTake(source: .microphone)
-        model.transcribe(fileURL: URL(fileURLWithPath: "/tmp/arrival.wav"))
+        let arrival = URL(fileURLWithPath: "/tmp/arrival.wav")
+        model.transcribe(fileURL: arrival)
+        model.cancelCurrentWork()
+        #expect(model.deferredArrivals == [arrival], "Cancel leaves the take recording, and what waits for it")
+
+        model.endTestTake()
         model.cancelCurrentWork()
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.isEmpty)

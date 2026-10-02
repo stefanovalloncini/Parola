@@ -33,7 +33,7 @@ extension TranscriberMockSuites {
                 #expect(model.recording?.isPaused == true)
                 StageControls.togglePause(model)
                 #expect(model.recording?.state == .recording)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -58,7 +58,7 @@ extension TranscriberMockSuites {
                 let resumedState = model.recording?.state == .recording
                 #expect(resumed)
                 #expect(resumedState)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -75,7 +75,7 @@ extension TranscriberMockSuites {
                 #expect(pressed)
                 #expect(repeated)
                 #expect(stillPaused)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -102,7 +102,7 @@ extension TranscriberMockSuites {
                 #expect(!used)
                 #expect(recording)
                 #expect(rate == 0)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 

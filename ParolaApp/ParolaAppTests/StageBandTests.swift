@@ -132,7 +132,7 @@ extension TranscriberMockSuites {
                 #expect(moved)
                 #expect(model.takeLevelTickAt > firstStamp)
                 #expect(model.takeLevelTickAt <= Date())
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
     }

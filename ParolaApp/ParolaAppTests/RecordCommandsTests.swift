@@ -44,7 +44,7 @@ extension TranscriberMockSuites {
                 #expect(!model.canStartTake(.microphone))
                 #expect(!model.canStartTake(.systemAudio))
 
-                model.cancelCurrentWork()
+                await model.discardTake()
                 let ended = await waitUntil { !model.recordingActive }
                 #expect(ended)
                 #expect(model.canStartTake(.microphone))

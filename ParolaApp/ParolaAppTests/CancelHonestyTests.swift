@@ -131,6 +131,45 @@ struct CancelHonestyTests {
         #expect(flag(result, "cancelled") == true)
     }
 
+    private func takeRig(_ label: String) throws -> (AppModel, ParolaAutomationServer, AutomationContext, AutomationCommand) {
+        let model = makeRecordingModel(label)
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let command = try #require(server.coreCommands().first { $0.name == "cancel" })
+        return (model, server, context, command)
+    }
+
+    @Test("cancel during a take that records leaves it recording, its audio on disk, and says it cancelled nothing")
+    func takeIsNotCancelled() async throws {
+        let (model, server, context, command) = try takeRig("cancel-honesty-take")
+        let file = try await startMeteredTake(model, source: .systemAudio)
+
+        let result = try await command.handler(AutomationArgs([:]), context)
+        withExtendedLifetime(server) {}
+
+        #expect(flag(result, "cancelled") == false)
+        #expect(model.recording?.state == .recording)
+        #expect(FileManager.default.fileExists(atPath: file.path))
+        await model.discardTake()
+    }
+
+    @Test("cancel during a take stops a model download beside it and leaves the take")
+    func downloadBesideATakeIsCancelled() async throws {
+        let (model, server, context, command) = try takeRig("cancel-honesty-download")
+        model.modelDownloadOperation = { _, _ in try await Task.sleep(for: .seconds(60)) }
+        #expect(model.downloadModel("openai_whisper-tiny"))
+        let file = try await startMeteredTake(model)
+
+        let result = try await command.handler(AutomationArgs([:]), context)
+        withExtendedLifetime(server) {}
+
+        #expect(flag(result, "cancelled") == true)
+        #expect(model.phase == .idle)
+        #expect(model.recording?.state == .recording)
+        #expect(FileManager.default.fileExists(atPath: file.path))
+        await model.discardTake()
+    }
+
     @Test("nothing in flight still reports cancelled false")
     func idleReportsNothingCancelled() async throws {
         let (model, server, context, command) = try makeRig()

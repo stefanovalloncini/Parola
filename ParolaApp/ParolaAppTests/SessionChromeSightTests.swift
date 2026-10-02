@@ -76,7 +76,7 @@ struct SessionChromeSightTests {
         model.selectedModel = "openai_whisper-tiny"
         let capture = LevelCapture(file: audio)
         model.takeCaptureOverride = { _ in capture }
-        defer { model.cancelCurrentWork() }
+        defer { Task { await model.discardTake() } }
         model.startRecording(source: .microphone)
         let up = await waitUntil { model.liveSource != nil }
         try #require(up)

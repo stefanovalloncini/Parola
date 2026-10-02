@@ -369,7 +369,7 @@ extension TranscriberMockSuites {
                 #expect(asked.count == 0, "no prompt for a permission already refused")
                 #expect(StageBand.lostMicNote(model.takeMicTrackState) == "Microphone not recorded")
                 #expect(model.recording?.source == .systemAudio)
-                model.cancelCurrentWork()
+                await model.discardTake()
                 let released = await waitUntil { !model.recordingActive }
                 #expect(released)
             }
@@ -384,7 +384,7 @@ extension TranscriberMockSuites {
                 let notice = await waitForNotice(model)
                 #expect(notice?.message == AppModel.micTrackMissingMessage())
                 #expect(asked.count == 1)
-                model.cancelCurrentWork()
+                await model.discardTake()
                 let released = await waitUntil { !model.recordingActive }
                 #expect(released)
             }
@@ -404,7 +404,7 @@ extension TranscriberMockSuites {
                 let (model, files) = try await meetingWithAQuietMic("lost-mic-never", micReadings: 0)
                 defer { for file in files { try? FileManager.default.removeItem(at: file) } }
                 #expect(model.takeMicTrackState == .unavailable)
-                model.cancelCurrentWork()
+                await model.discardTake()
                 let released = await waitUntil { !model.recordingActive }
                 #expect(released)
             }
@@ -512,7 +512,7 @@ extension TranscriberMockSuites {
                 #expect(model.activeTake?.category == .meeting)
                 #expect(model.recording?.category == .meeting)
                 #expect(model.takeMicTrackState == nil, "a microphone take has no second track")
-                model.cancelCurrentWork()
+                await model.discardTake()
                 let released = await waitUntil { !model.recordingActive }
                 #expect(released)
             }
@@ -563,7 +563,7 @@ extension TranscriberMockSuites {
                 #expect(!model.chooseTakeInput("built-in"))
                 #expect(model.inputDeviceUID == "usb", "a take past its count-in keeps the input it opened")
 
-                model.cancelCurrentWork()
+                await model.discardTake()
                 let released = await waitUntil { !model.recordingActive }
                 #expect(released)
             }
@@ -592,7 +592,7 @@ extension TranscriberMockSuites {
                 #expect(opened)
                 #expect(openedOn == [nil])
 
-                model.cancelCurrentWork()
+                await model.discardTake()
                 let released = await waitUntil { !model.recordingActive }
                 #expect(released)
             }
@@ -650,7 +650,7 @@ extension TranscriberMockSuites {
         }
 
         private func end(_ model: AppModel) async {
-            model.cancelCurrentWork()
+            await model.discardTake()
             let released = await waitUntil { !model.recordingActive }
             #expect(released)
         }

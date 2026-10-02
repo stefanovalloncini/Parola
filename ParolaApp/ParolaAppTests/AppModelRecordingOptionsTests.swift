@@ -236,7 +236,7 @@ extension TranscriberMockSuites {
                 try? await Task.sleep(for: .milliseconds(300))
                 #expect(isRecording(model))
 
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
     }
@@ -306,7 +306,7 @@ extension TranscriberMockSuites {
                 let restarted = await waitUntil { self.isRecording(model) && model.liveSource != nil }
                 #expect(restarted, "the discarded take must not latch the recording state")
 
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -416,7 +416,7 @@ extension TranscriberMockSuites {
 
                 #expect(await waitUntilRecording(model))
                 #expect(model.liveTakeIsStreaming)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -436,7 +436,7 @@ extension TranscriberMockSuites {
 
                 #expect(await waitUntilRecording(model))
                 #expect(!model.liveTakeIsStreaming)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
     }

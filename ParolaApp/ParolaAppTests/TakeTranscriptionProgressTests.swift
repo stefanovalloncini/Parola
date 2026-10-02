@@ -396,7 +396,7 @@ extension TranscriberMockSuites {
                 #expect(started)
                 let kept = try #require(await landedEntry(model))
                 #expect(kept.title.hasSuffix("(not transcribed)"))
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 

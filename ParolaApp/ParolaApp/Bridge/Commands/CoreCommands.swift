@@ -79,7 +79,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "cancel",
                 area: .core,
-                summary: "Cancels the current cancellable operation. Returns {cancelled: true} once the run has unwound, {cancelling: true} while it is still stopping, {cancelled: false} when there was nothing to cancel.",
+                summary: "Cancels the current cancellable operation, never a take that records or is paused (stopRecording ends that). Returns {cancelled: true} once the run has unwound, {cancelling: true} while it is still stopping, {cancelled: false} when there was nothing to cancel.",
                 kind: .mutating,
                 handler: { _, ctx in
                     let wasCancellable = ctx.model.canCancel

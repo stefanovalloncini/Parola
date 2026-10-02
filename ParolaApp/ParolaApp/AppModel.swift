@@ -1885,10 +1885,16 @@ final class AppModel {
         hasForegroundWork || burnTask != nil
     }
 
-    /// Everything Cancel stops ahead of a burn, which runs beside the rest and has its own Cancel.
+    /// Everything Cancel stops ahead of a burn, which runs beside the rest and has its own Cancel. A live take's stream is the take itself while it records.
     private var hasForegroundWork: Bool {
-        batchTask != nil || streamingConsumer != nil || fileTranscribeTask != nil || downloadTask != nil
+        batchTask != nil || (streamingConsumer != nil && !takeIsCapturing) || fileTranscribeTask != nil || downloadTask != nil
             || youtubeTranscribeTask != nil || youtubeSubsTask != nil
+    }
+
+    /// The take is recording or paused: only Stop or the confirmed Discard ends it, never Cancel.
+    private var takeIsCapturing: Bool {
+        guard let take = activeTake, let session = recording, session.takeID == take.id else { return false }
+        return session.isCapturing
     }
 
     private func teardownActiveCapture(exitsMedia: Bool = true) {
@@ -1944,8 +1950,11 @@ final class AppModel {
         if letGo, route == .recording { route = .transcript }
     }
 
+    /// Stops what the window shows. A take that records or is paused is left alone, with the files and links waiting for it; one still starting ends, having recorded nothing.
     func cancelCurrentWork() {
-        let hadWork = hasForegroundWork || liveSource != nil
+        catchUpFirstBuffer()
+        let keepsTake = takeIsCapturing
+        let hadWork = hasForegroundWork || (liveSource != nil && !keepsTake)
         // A new pass reports on its own runs only: one abandoned an hour ago must not make an
         // honest cancel look like it never finished.
         cancelPass &+= 1
@@ -1953,8 +1962,10 @@ final class AppModel {
         cancelAllInFlightBatchJobs()
         cancelVisibleArrival()
         sendWaitingArrivalsOutOfSight()
-        deferredArrivals = []
-        deferredLinks = []
+        if !keepsTake {
+            deferredArrivals = []
+            deferredLinks = []
+        }
         cancelAndTrack(&downloadTask)
         cancelAndTrack(&fileTranscribeTask)
         retireCurrentFileRun()
@@ -1963,8 +1974,10 @@ final class AppModel {
         cancelAndTrack(&youtubeSubsTask)
         // Cancel stops what the window shows; a burn behind a run is stopped from its own strip.
         if !hadWork { cancelBurn() }
-        teardownActiveCapture()
-        resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+        if !keepsTake {
+            teardownActiveCapture()
+            resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+        }
         if hadWork || phase != .ready { phase = .idle }
     }
 

@@ -30,7 +30,7 @@ extension TranscriberMockSuites {
                 #expect(capturing)
                 #expect(source == .microphone)
                 #expect(window == nil)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
     }

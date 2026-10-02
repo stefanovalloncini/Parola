@@ -815,7 +815,7 @@ extension TranscriberMockSuites {
                 }
                 #expect(recording)
                 #expect(model.route == .recording, "the newer take records on its Stage")
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 

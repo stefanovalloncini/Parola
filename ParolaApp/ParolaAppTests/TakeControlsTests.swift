@@ -102,7 +102,7 @@ extension TranscriberMockSuites {
                 #expect(!model.pauseTake())
                 #expect(model.resumeTake())
                 #expect(model.recording?.state == .recording)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -134,7 +134,7 @@ extension TranscriberMockSuites {
             #expect(await capture.pauseCalls == [true, false, true, false])
             let levelsMove = await waitUntil { (model.takeLevels?.sampleCount ?? 0) > levelsAtPause }
             #expect(levelsMove)
-            model.cancelCurrentWork()
+            await model.discardTake()
         }
 
         @Test("Pause and markers wait while a take arms; once it records they work")
@@ -159,7 +159,7 @@ extension TranscriberMockSuites {
                 #expect(recording)
                 #expect(model.pauseTake())
                 #expect(model.recording?.isPaused == true)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -178,7 +178,7 @@ extension TranscriberMockSuites {
 
                 let told = await waitUntil { await stream.pauseCalls == [true, false] }
                 #expect(told)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -255,7 +255,7 @@ extension TranscriberMockSuites {
             let expected = first.length - first.at.duration(to: pausedAt)
             let off = second.length - expected
             #expect(off < .milliseconds(100) && off > .milliseconds(-100), "left \(second.length), expected about \(expected)")
-            model.cancelCurrentWork()
+            await model.discardTake()
         }
 
         // MARK: - Markers
@@ -361,7 +361,7 @@ extension TranscriberMockSuites {
                 #expect(await model.library.list().isEmpty)
                 try await startFixtureTake(model)
                 #expect(model.recording?.state == .recording)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -435,6 +435,60 @@ extension TranscriberMockSuites {
             #expect(settled)
             #expect(model.recording == nil)
             #expect(model.phase == .idle)
+        }
+
+        // MARK: - Cancel
+
+        @Test("Cancel leaves a take that records, or is paused, alone; Stop still saves it")
+        func cancelLeavesACapturingTake() async throws {
+            try await withMocksCleared(.transcriber) {
+                await installMockTranscriber(segments: [(0, 1, "kept through a cancel")])
+                let model = makeRecordingModel("take-cancel-keeps")
+                let file = try await startMeteredTake(model)
+                let checkpointed = await waitUntil { model.recoveryCheckpointFiles.count == 1 }
+                #expect(checkpointed)
+                #expect(!model.canCancel)
+
+                model.cancelCurrentWork()
+                await settle(for: .milliseconds(300))
+                #expect(model.recording?.state == .recording)
+                #expect(model.liveSource != nil)
+                #expect(FileManager.default.fileExists(atPath: file.path))
+                #expect(model.recoveryCheckpointFiles.count == 1)
+
+                #expect(model.pauseTake())
+                model.cancelCurrentWork()
+                await settle(for: .milliseconds(300))
+                #expect(model.recording?.isPaused == true)
+                #expect(FileManager.default.fileExists(atPath: file.path))
+
+                model.stopRecordingAndTranscribe()
+                let saved = await landedEntry(model)
+                #expect(saved != nil)
+                await waitUntil { !model.hasPendingTakeWork }
+            }
+        }
+
+        @Test("Cancel leaves a live take that records alone, and has nothing to cancel")
+        func cancelLeavesALiveTake() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeRecordingModel("take-cancel-keeps-live")
+                startLiveTake(model, MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "said live")], partials: ["said"], delayMs: 300
+                ))
+                let recording = await waitUntil { model.recording?.state == .recording }
+                #expect(recording)
+                #expect(!model.canCancel)
+
+                model.cancelCurrentWork()
+                await settle(for: .milliseconds(300))
+                #expect(model.recording?.state == .recording)
+                #expect(model.recordingActive)
+
+                await model.discardTake()
+                await waitUntil { !model.recordingActive }
+            }
         }
 
         @Test("after Stop, Pause and Discard do nothing; the take finishes and lands")

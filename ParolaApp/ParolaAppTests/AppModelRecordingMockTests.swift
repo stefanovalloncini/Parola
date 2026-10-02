@@ -106,7 +106,7 @@ extension TranscriberMockSuites {
                 let source = try #require(model.liveSource as? FixtureAudioSource)
                 #expect(model.recordingLevelMeter === source.levelMeter)
 
-                model.cancelCurrentWork()
+                await model.discardTake()
                 await waitUntil { model.recordingLevelMeter == nil }
             }
         }
@@ -125,7 +125,7 @@ extension TranscriberMockSuites {
                 await waitUntil { model.recordingLevelMeter != nil }
                 #expect(model.liveTakeIsStreaming)
 
-                model.cancelCurrentWork()
+                await model.discardTake()
                 await waitUntil { model.recordingLevelMeter == nil }
             }
         }

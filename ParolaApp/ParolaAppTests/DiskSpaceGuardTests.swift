@@ -130,7 +130,7 @@ extension TranscriberMockSuites {
                 let started = await waitUntil { self.isRecording(model) }
                 #expect(started)
                 #expect(model.recordingDiskSpaceLow)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
@@ -151,7 +151,7 @@ extension TranscriberMockSuites {
                 let startedRecording = await waitUntil { self.isRecording(model) }
                 #expect(startedRecording)
                 #expect(!model.recordingDiskSpaceLow)
-                model.cancelCurrentWork()
+                await model.discardTake()
             }
         }
 
