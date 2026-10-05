@@ -43,7 +43,9 @@ struct ShortcutCatalogTests {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let it = try #require(Bundle(path: path))
         let sections = ShortcutCatalog.sections(features: .all, bundle: it)
-        #expect(sections.map(\.title) == ["Acquisizione", "Registrazione", "Trascrizione", "Riproduzione", "Navigazione", "Aiuto"])
+        #expect(sections.map(\.title) == [
+            "Acquisizione", "Registrazione", "Trascrizione", "Trova", "Copia ed esporta", "Riproduzione", "Navigazione", "Aiuto",
+        ])
         let italian = sections.flatMap(\.entries).map(\.label)
         let english = ShortcutCatalog.sections(features: .all).flatMap(\.entries).map(\.label)
         let untranslated = zip(english, italian).filter { $0.0 == $0.1 }.map(\.0)
@@ -75,5 +77,68 @@ struct ShortcutCatalogTests {
                 #expect(entry.keys.isEmpty == false)
             }
         }
+    }
+
+    private static func source(_ name: String) throws -> String {
+        let path = #filePath.replacingOccurrences(
+            of: "ParolaAppTests/ShortcutCatalogTests.swift",
+            with: "ParolaApp/\(name).swift"
+        )
+        return try String(contentsOfFile: path, encoding: .utf8)
+    }
+
+    /// Every `keyboardShortcut("x", modifiers: …)` in a file, written the way the sheet writes keys: "⌘ ⌥ N".
+    private static func shortcuts(in name: String) throws -> [String] {
+        let text = try source(name)
+        let pattern = #/[kK]eyboardShortcut\(\s*(?:"(?<char>[^"]+)"|\.(?<named>\w+))\s*(?:,\s*modifiers:\s*(?<mods>\[[^\]]*\]|\.\w+))?\s*\)/#
+        let glyphs = ["return": "↩", "upArrow": "↑", "downArrow": "↓", "leftArrow": "←", "rightArrow": "→"]
+        var found: [String] = []
+        for match in text.matches(of: pattern) {
+            let key: String
+            if let char = match.output.char {
+                key = char.uppercased()
+            } else if let named = match.output.named, let glyph = glyphs[String(named)] {
+                key = glyph
+            } else {
+                continue
+            }
+            let mods = match.output.mods.map(String.init) ?? ".command"
+            var parts: [String] = []
+            if mods.contains(".command") { parts.append("⌘") }
+            if mods.contains(".control") { parts.append("⌃") }
+            if mods.contains(".option") { parts.append("⌥") }
+            if mods.contains(".shift") { parts.append("⇧") }
+            found.append((parts + [key]).joined(separator: " "))
+        }
+        return found
+    }
+
+    private static let menuFiles = ["Views/AppCommands", "Views/MiniPlayerCommand", "Views/Chat/FocusChatComposerCommand"]
+
+    @Test("no two menu commands share a key")
+    func menuKeysAreUnique() throws {
+        let keys = try Self.menuFiles.flatMap { try Self.shortcuts(in: $0) }
+        let repeated = Dictionary(grouping: keys, by: { $0 }).filter { $0.value.count > 1 }.keys.sorted()
+        #expect(keys.count > 30)
+        #expect(repeated.isEmpty, "shared: \(repeated)")
+    }
+
+    @Test("the Keyboard Shortcuts window lists every menu key and the Find bar's")
+    func everyMenuKeyIsListed() throws {
+        let listed = Set(ShortcutCatalog.sections(features: .all).flatMap(\.entries).map(\.keys))
+        let keys = try (Self.menuFiles + ["Views/FindBar"]).flatMap { try Self.shortcuts(in: $0) }
+        let missing = Set(keys).subtracting(listed).sorted()
+        #expect(missing.isEmpty, "not listed: \(missing)")
+    }
+
+    @Test("⌘E is named for the preset on top of the Export As menu")
+    func commandENamesTheTopPreset() throws {
+        let srt = try #require(ExportPreset.builtIn(for: .srt))
+        let entries = ShortcutCatalog.sections(features: .all, exportPreset: srt).flatMap(\.entries)
+        let commandE = entries.filter { $0.keys == "⌘ E" }.map(\.label)
+        #expect(commandE == ["Export as Subtitles (.srt)"])
+        let none = ShortcutCatalog.sections(features: .all, exportPreset: nil).flatMap(\.entries)
+        let listsCommandE = none.contains { $0.keys == "⌘ E" }
+        #expect(!listsCommandE)
     }
 }

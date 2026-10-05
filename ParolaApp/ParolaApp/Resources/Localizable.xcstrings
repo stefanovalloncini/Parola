@@ -3852,6 +3852,17 @@
         }
       }
     },
+    "Copy and Export": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia ed esporta"
+          }
+        }
+      }
+    },
     "Copy as Markdown": {
       "extractionState": "manual",
       "localizations": {
@@ -5775,13 +5786,13 @@
         }
       }
     },
-    "Export as TXT": {
+    "Export as %@": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esporta come TXT"
+            "value": "Esporta come %@"
           }
         }
       }

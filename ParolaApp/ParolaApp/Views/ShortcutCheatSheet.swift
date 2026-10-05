@@ -22,8 +22,10 @@ struct ShortcutCatalog {
         let entries: [Entry]
     }
 
-    static func sections(features: FeatureSet, bundle: Bundle = .main) -> [Section] {
-        allSections(bundle: bundle).compactMap { section in
+    static func sections(
+        features: FeatureSet, exportPreset: ExportPreset? = ExportPreset.builtIns.first, bundle: Bundle = .main
+    ) -> [Section] {
+        allSections(exportPreset: exportPreset, bundle: bundle).compactMap { section in
             let entries = section.entries.filter { entry in
                 entry.requires.isEmpty || entry.requires.contains(where: features.isEnabled)
             }
@@ -31,9 +33,16 @@ struct ShortcutCatalog {
         }
     }
 
-    private static func allSections(bundle: Bundle) -> [Section] {
+    /// A built-in preset's name is a catalog key; a name the user typed is shown as typed.
+    private static func presetName(_ preset: ExportPreset, bundle: Bundle) -> String {
+        preset.isBuiltIn ? bundle.localizedString(forKey: preset.name, value: nil, table: nil) : preset.name
+    }
+
+    private static func allSections(exportPreset: ExportPreset?, bundle: Bundle) -> [Section] {
         func text(_ key: String.LocalizationValue) -> String { String(localized: key, bundle: bundle) }
         let space = text("Space")
+        // ⌘E runs whichever preset tops Export As, so the line is named for that one.
+        let exportOnE = exportPreset.map { Entry(label: text("Export as \(presetName($0, bundle: bundle))"), keys: "⌘ E") }
         return [
             Section(title: text("Capture"), entries: [
                 Entry(label: text("New Recording"),              keys: "⌘ N", requires: .micRecording),
@@ -49,16 +58,40 @@ struct ShortcutCatalog {
                 Entry(label: text("Cancel a Starting Recording"), keys: "Esc", requires: .micRecording, .meetings),
             ]),
             Section(title: text("Transcript"), entries: [
-                Entry(label: text("Find"),                       keys: "⌘ F"),
-                Entry(label: text("Export as TXT"),              keys: "⌘ E"),
-                Entry(label: text("Print Transcript"),           keys: "⌘ P"),
-                Entry(label: text("Focus Chat Composer"),        keys: "⌘ L", requires: .ai),
+                Entry(label: text("Show Transcript"),            keys: "⌘ 1"),
+                Entry(label: text("Show Summary"),               keys: "⌘ 2", requires: .ai),
+                Entry(label: text("Show Chat"),                  keys: "⌘ 3", requires: .ai),
+                Entry(label: text("Next Segment"),               keys: "⌘ ⌥ ↓"),
+                Entry(label: text("Previous Segment"),           keys: "⌘ ⌥ ↑"),
+                Entry(label: text("Jump to Next Speaker"),       keys: "⌘ ⇧ J"),
+                Entry(label: text("Jump to Time…"),              keys: "⌘ J"),
+                Entry(label: text("Show Outline"),               keys: "⌘ ⇧ O"),
+                Entry(label: text("Favorite Segment"),           keys: "⌘ D"),
                 Entry(label: text("Toggle Inspector"),           keys: "⌘ ⇧ I"),
+                Entry(label: text("Focus Chat Composer"),        keys: "⌘ L", requires: .ai),
+                Entry(label: text("Open in New Window"),         keys: "⌘ ⇧ N"),
+            ]),
+            Section(title: text("Find"), entries: [
+                Entry(label: text("Find"),                       keys: "⌘ F"),
+                Entry(label: text("Find Next"),                  keys: "⌘ G"),
+                Entry(label: text("Find Previous"),              keys: "⌘ ⇧ G"),
+                Entry(label: text("Replace"),                    keys: "⌘ ="),
+                Entry(label: text("Replace All"),                keys: "⌘ ⌥ E"),
+            ]),
+            Section(title: text("Copy and Export"), entries: [
+                Entry(label: text("Copy Transcript"),            keys: "⌘ ⇧ C"),
+                Entry(label: text("Copy with Timestamps"),       keys: "⌘ ⌥ C"),
+                Entry(label: text("Export…"),                    keys: "⌘ ⇧ E"),
+            ] + [exportOnE].compactMap { $0 } + [
+                Entry(label: text("Send via Mail…"),             keys: "⌘ ⇧ M"),
+                Entry(label: text("Print Transcript"),           keys: "⌘ P"),
+                Entry(label: text("Save As Parola Document…"),   keys: "⌘ S"),
             ]),
             Section(title: text("Playback"), entries: [
                 Entry(label: text("Play / Pause"),               keys: space),
                 Entry(label: text("Skip Back 5 Seconds"),        keys: "⌘ ←"),
                 Entry(label: text("Skip Forward 5 Seconds"),     keys: "⌘ →"),
+                Entry(label: text("Show Mini Player"),           keys: "⌘ ⌥ M"),
             ]),
             Section(title: text("Navigation"), entries: [
                 Entry(label: text("Back to the List"),           keys: "⌘ ["),
@@ -82,7 +115,7 @@ struct ShortcutCheatSheet: View {
         SheetFrame(icon: "command", title: "Keyboard Shortcuts", onClose: { dismiss() }) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
-                    ForEach(ShortcutCatalog.sections(features: model.features)) { section in
+                    ForEach(ShortcutCatalog.sections(features: model.features, exportPreset: model.exportPresets.first)) { section in
                         sectionView(section)
                     }
                 }
