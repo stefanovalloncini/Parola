@@ -385,6 +385,110 @@ struct StreamingModelCacheTests {
         #expect(await cache.residentModelNames().isEmpty)
     }
 
+    @Test("pressure during an unborrowed load drops it when it lands")
+    func pressureDuringAnUnborrowedLoad() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let store = Self.makeStore()
+
+        let warming = GuardedTask { await cache.warm(Self.tiny, store: store) }
+        await probe.loads.wait(atLeast: 1, "the warm's load to start")
+        #expect(await cache.unloadUnleased().isEmpty, "nothing was resident yet")
+        await gate.open(Self.tiny)
+        _ = try await warming.value("the warm to finish")
+
+        #expect(await cache.residentModelNames().isEmpty)
+    }
+
+    @Test("a borrow that joins a load after pressure marked it keeps the load")
+    func borrowJoiningAMarkedLoadKeepsIt() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let store = Self.makeStore()
+
+        let warming = GuardedTask { await cache.warm(Self.tiny, store: store) }
+        await probe.loads.wait(atLeast: 1, "the warm's load to start")
+        await cache.unloadUnleased()
+        let borrowing = GuardedTask { try await cache.borrow(Self.tiny, store: store) }
+        await pollUntil("the borrow to join the load") { await cache.leaseCount(for: Self.tiny) == 1 }
+        await gate.open(Self.tiny)
+
+        let lease = try #require(try await borrowing.value("the borrow to finish"))
+        _ = try await warming.value("the warm to finish")
+        #expect(await cache.residentModelNames() == [Self.tiny])
+        #expect(probe.loads.value == 1)
+        await lease.release()
+    }
+
+    @Test("a reload waits for the kit's pending unload")
+    func reloadWaitsForThePendingUnload() async throws {
+        let probe = CacheProbe()
+        let unloadGate = UninterruptibleGate()
+        defer { unloadGate.open() }
+        let unloaded = TestSignal()
+        let reloadsUnderAnUnload = Awaitable(0)
+        let cache = StreamingModelCache(
+            loader: { _, _ in
+                probe.loads.increment()
+                return try await StreamingModelCache.makeUnloadedKit()
+            },
+            reloader: { _ in
+                if !unloaded.fired { reloadsUnderAnUnload.increment() }
+                probe.reloads.increment()
+            },
+            unloader: { _ in
+                await unloadGate.wait()
+                unloaded.fire()
+            }
+        )
+        let store = Self.makeStore()
+
+        let first = try await cache.borrow(Self.tiny, store: store)
+        await first.release()
+        #expect(await cache.unloadUnleased() == [Self.tiny])
+        await unloadGate.arrivals.wait(atLeast: 1, "the unload to start")
+        let borrowing = GuardedTask { try await cache.borrow(Self.tiny, store: store) }
+        await pollUntil("the borrow to start its reload") { await cache.leaseCount(for: Self.tiny) == 1 }
+        #expect(probe.reloads.value == 0, "the reload is parked behind the unload")
+
+        unloadGate.open()
+        let second = try #require(try await borrowing.value("the borrow to finish"))
+        #expect(second.shared.kit === first.shared.kit)
+        #expect(probe.reloads.value == 1)
+        #expect(reloadsUnderAnUnload.value == 0)
+    }
+
+    @Test("a failed reload drops the kept kit, so the next borrow loads fresh")
+    func failedReloadDropsTheKit() async throws {
+        struct ReloadFailure: Error {}
+        let probe = CacheProbe()
+        let cache = StreamingModelCache(
+            loader: { _, _ in
+                probe.loads.increment()
+                return try await StreamingModelCache.makeUnloadedKit()
+            },
+            reloader: { _ in
+                probe.reloads.increment()
+                if probe.reloads.value == 1 { throw ReloadFailure() }
+            },
+            unloader: { _ in probe.unloads.increment() }
+        )
+        let store = Self.makeStore()
+
+        let first = try await cache.borrow(Self.tiny, store: store)
+        await first.release()
+        await cache.unloadUnleased()
+        await #expect(throws: ReloadFailure.self) { _ = try await cache.borrow(Self.tiny, store: store) }
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+
+        let second = try await cache.borrow(Self.tiny, store: store)
+        #expect(second.shared.kit !== first.shared.kit)
+        #expect(probe.loads.value == 2)
+        #expect(probe.reloads.value == 1)
+    }
+
     @Test("a lease dropped without release still comes back, and is counted")
     func droppedLeaseComesBack() async throws {
         let clock = TestClock()

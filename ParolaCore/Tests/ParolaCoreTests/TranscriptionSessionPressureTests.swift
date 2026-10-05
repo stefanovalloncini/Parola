@@ -145,6 +145,8 @@ struct TranscriptionSessionPressureTests {
         await stub.transcribeGate.arrivals.wait(atLeast: 1, "the run to park in the engine")
 
         await session.unloadUnderPressure()
+        #expect(await session.diarizer.unloadCount == 0)
+        #expect(stub.unloads.value == 0)
         stalled.cancel()
 
         await pollUntil("the deferred unload once the abandoned run lets go of the slot") {
