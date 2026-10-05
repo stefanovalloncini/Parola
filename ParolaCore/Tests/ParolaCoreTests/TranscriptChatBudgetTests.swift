@@ -165,7 +165,7 @@ struct TranscriptChatBudgetTests {
 
     @Test("on-device chat goes through the factory, so a stand-in answers it")
     func onDeviceChatIsMockable() async throws {
-        let (reply, instructions) = try await MockLanguageModelStore.shared.withLease {
+        let (reply, instructions) = await MockLanguageModelStore.shared.withLease {
             await MockLanguageModelStore.shared.clear()
             await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "from the stand-in"))
             let session = try? await TranscriptChat.makeSession(transcript: transcript, features: .all)
@@ -180,7 +180,7 @@ struct TranscriptChatBudgetTests {
 
     @Test("an unavailable on-device model reaches the chat as its own sentence")
     func onDeviceUnavailableIsOneError() async throws {
-        let thrown = try await MockLanguageModelStore.shared.withLease { () -> (any Error)? in
+        let thrown = await MockLanguageModelStore.shared.withLease { () -> (any Error)? in
             await MockLanguageModelStore.shared.clear()
             await MockLanguageModelStore.shared.install(
                 provider: .foundation,
