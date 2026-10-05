@@ -4,9 +4,7 @@ package enum ModelResidency {
     package static let idleTimeout: Duration = .seconds(600)
 }
 
-/// One pending idle unload for an actor that owns a model. A fire hands back the epoch it was
-/// armed under; the owner checks `isCurrent` before unloading, since a fire can slip past its
-/// cancel and land after a later arm or disarm.
+/// One pending idle unload; the owner checks a fire's epoch with `isCurrent`, as a fire can land after a later arm or disarm.
 package struct IdleUnloadTimer {
     private var epoch = 0
     private var task: Task<Void, Never>?

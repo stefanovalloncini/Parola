@@ -210,8 +210,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         }
     }
 
-    /// A stop that lands during the load yields nil and a cancel throws; either way capture never
-    /// starts and what was loaded goes to `discard`.
+    /// A stop during the load yields nil and a cancel throws; either way capture never starts and the load goes to `discard`.
     func loadingModel<Loaded>(
         _ load: () async throws -> Loaded,
         discarding discard: (Loaded) async -> Void = { _ in }

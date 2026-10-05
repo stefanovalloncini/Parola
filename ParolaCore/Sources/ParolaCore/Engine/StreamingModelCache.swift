@@ -94,8 +94,7 @@ actor StreamingModelCache {
     func borrow(_ modelName: String, store: ModelStore) async throws -> StreamingModelLease {
         installPressureSourceIfNeeded()
         idleUnload.disarm()
-        // Counted before the load is awaited, so an evict or pressure unload landing while the load
-        // is in flight already sees this borrower.
+        // Counted before the await, so an evict or pressure unload during the load sees this borrower.
         leases[modelName, default: 0] += 1
         do {
             let shared = try await residentKit(modelName, store: store)
