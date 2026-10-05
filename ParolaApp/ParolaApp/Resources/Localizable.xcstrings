@@ -3600,6 +3600,17 @@
         }
       }
     },
+    "Compact Text": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testo compatto"
+          }
+        }
+      }
+    },
     "Compact view": {
       "extractionState": "manual",
       "localizations": {
@@ -7328,6 +7339,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vai al prossimo speaker"
+          }
+        }
+      }
+    },
+    "Jump to Time…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salta al tempo…"
           }
         }
       }
@@ -13303,6 +13325,17 @@
         }
       }
     },
+    "Show Favorites Only": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra solo i preferiti"
+          }
+        }
+      }
+    },
     "Show Introduction": {
       "extractionState": "manual",
       "localizations": {
@@ -13321,6 +13354,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra Mini Player"
+          }
+        }
+      }
+    },
+    "Show Outline": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra outline"
           }
         }
       }
@@ -14462,6 +14506,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "QC sottotitoli"
+          }
+        }
+      }
+    },
+    "Subtitle Warnings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvisi sui sottotitoli"
           }
         }
       }

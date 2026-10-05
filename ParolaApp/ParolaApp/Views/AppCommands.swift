@@ -162,6 +162,15 @@ struct ViewCommands: View {
         Toggle("Show Translations Side by Side", isOn: $model.translationSideBySide)
             .disabled(!model.hasTranslation)
             .axLeaf("Menu.View.TranslationSideBySide")
+        Toggle("Compact Text", isOn: $model.transcriptCompact)
+            .disabled(!model.mainTranscriptCommandsEnabled)
+            .axLeaf("Menu.View.CompactText")
+        Toggle("Show Favorites Only", isOn: $model.favoritesOnly)
+            .disabled(!model.mainTranscriptCommandsEnabled || (!model.favoritesOnly && !model.selectedEntryHasFavorites))
+            .axLeaf("Menu.View.FavoritesOnly")
+        Toggle("Subtitle Warnings", isOn: $model.showSubtitleQC)
+            .disabled(!model.mainTranscriptCommandsEnabled || model.transcriptDisplayMode != .segments)
+            .axLeaf("Menu.View.SubtitleWarnings")
         Divider()
         Button("Toggle Inspector") {
             InspectorVisibility.toggle(in: DefaultsStore.current, isNarrow: model.transcriptPaneIsNarrow)
@@ -293,6 +302,14 @@ struct TranscriptCommands: View {
         Button("Jump to Next Speaker") { model.jumpToNextSpeaker() }
             .keyboardShortcut("j", modifiers: [.command, .shift])
             .disabled(!model.mainTranscriptCommandsEnabled)
+        Button("Jump to Time…") { model.jumpToTimeRequests &+= 1 }
+            .keyboardShortcut("j", modifiers: [.command])
+            .disabled(!model.mainTranscriptCommandsEnabled)
+            .axLeaf("Menu.Transcript.JumpToTime")
+        Button("Show Outline") { model.outlineRequests &+= 1 }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
+            .disabled(!model.mainTranscriptCommandsEnabled)
+            .axLeaf("Menu.Transcript.ShowOutline")
         Button("Manage People…") { model.showingPeopleSheet = true }
         Button("Favorite Segment") {
             guard let id = model.focusedSegmentIDForCommands else { return }

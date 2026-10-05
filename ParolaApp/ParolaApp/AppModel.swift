@@ -730,6 +730,9 @@ final class AppModel {
     var findFocusRequests: Int = 0
     /// Bumped by Edit › Find… while Chat shows; the chat pane opens its message filter on each.
     var chatSearchRequests: Int = 0
+    /// Bumped by the Transcript menu; the header bar opens the matching popover on each.
+    var jumpToTimeRequests: Int = 0
+    var outlineRequests: Int = 0
     /// Bumped by every replacement, so the find bar lets go of its field and the next ⌘Z reaches the transcript.
     var findReplacements: Int = 0
     var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }

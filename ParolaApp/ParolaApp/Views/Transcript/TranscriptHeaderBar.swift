@@ -46,6 +46,8 @@ struct TranscriptHeaderBar: View {
         .onAppear { rebuildShareItem() }
         .onChange(of: model.transcriptTextVersion) { _, _ in rebuildShareItem() }
         .onChange(of: title) { _, _ in rebuildShareItem() }
+        .onChange(of: model.jumpToTimeRequests) { _, _ in jumpOpen = true }
+        .onChange(of: model.outlineRequests) { _, _ in outlineOpen = true }
     }
 
     private var controls: some View {
@@ -313,6 +315,7 @@ struct TranscriptHeaderBar: View {
                     .fieldChrome(focused: jumpFocused)
                     .frame(width: 100)
                     .onSubmit { commitJump() }
+                    .onAppear { jumpFocused = true }
                     .axLeaf("HeaderBar.TextField.JumpTime")
                 Button("Go", action: commitJump)
                     .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
