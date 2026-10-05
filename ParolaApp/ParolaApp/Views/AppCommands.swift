@@ -278,6 +278,11 @@ struct CaptionsCommands: View {
 struct TranscriptCommands: View {
     let model: AppModel
 
+    private var favoriteSegmentHelp: LocalizedStringKey {
+        if model.selectedEntryID == nil { return "Save the transcript to the library first" }
+        return model.hasCurrentSegment ? "" : "Click a segment or play the audio first"
+    }
+
     var body: some View {
         Button("Back") { model.returnToOrigin() }
             .keyboardShortcut("[", modifiers: [.command])
@@ -316,8 +321,8 @@ struct TranscriptCommands: View {
             model.toggleSegmentFavorite(id)
         }
         .keyboardShortcut("d", modifiers: [.command])
-        .disabled(!model.mainTranscriptCommandsEnabled || model.selectedEntryID == nil)
-        .help(model.selectedEntryID == nil ? "Save the transcript to the library first" : "")
+        .disabled(!model.mainTranscriptCommandsEnabled || model.selectedEntryID == nil || !model.hasCurrentSegment)
+        .help(favoriteSegmentHelp)
         Button("Copy as Markdown") { model.copyTranscriptAsFormat(.md) }
             .disabled(!model.mainTranscriptCommandsEnabled)
         Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }

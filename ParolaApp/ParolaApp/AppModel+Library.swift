@@ -454,16 +454,9 @@ extension AppModel {
         favoritesOnly = false
     }
 
+    /// The highlighted segment, the one playing or last clicked; never one the user can't see chosen.
     var focusedSegmentIDForCommands: Int? {
-        guard let transcript else { return nil }
-        if let currentSegmentID { return currentSegmentID }
-        let speakerFilter = selectedEntryID.flatMap { entrySpeakerFilters[$0] }
-        return SegmentsScroll.visibleSegments(
-            from: transcript.segments,
-            speakerFilter: speakerFilter,
-            favorites: favoriteSegmentIDs,
-            favoritesOnly: favoritesOnly
-        ).first?.id
+        transcript == nil ? nil : currentSegmentID
     }
 
     func replaceFavorites(_ ids: Set<Int>) {

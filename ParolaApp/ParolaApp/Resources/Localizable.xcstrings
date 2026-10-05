@@ -3502,6 +3502,17 @@
         }
       }
     },
+    "Click a segment or play the audio first": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima fai clic su un segmento o avvia l'audio"
+          }
+        }
+      }
+    },
     "Click to reassign this speaker": {
       "extractionState": "manual",
       "localizations": {

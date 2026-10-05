@@ -218,7 +218,13 @@ final class AppModel {
     @ObservationIgnored var batchImportTask: Task<Void, Never>?
     /// A run the user stopped does not ring when its queue unwinds. Cleared when a wave starts.
     @ObservationIgnored var batchRunCancelled = false
-    var currentSegmentID: TranscriptSegment.ID?
+    var currentSegmentID: TranscriptSegment.ID? {
+        didSet {
+            if hasCurrentSegment != (currentSegmentID != nil) { hasCurrentSegment = currentSegmentID != nil }
+        }
+    }
+    /// What the menus read, so a playing transcript's segment ticks don't redraw them.
+    private(set) var hasCurrentSegment = false
     /// A segment a search result asked the transcript to open on. The write lands before the route
     /// builds the transcript view, so the view scrolls to this on appear rather than watching
     /// `currentSegmentID`; it holds the selection against the player's ticks until playback starts.

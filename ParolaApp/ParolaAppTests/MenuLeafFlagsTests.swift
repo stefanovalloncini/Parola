@@ -140,6 +140,29 @@ struct MenuLeafFlagsTests {
         #expect(model.selectedEntryHasFavorites)
     }
 
+    @Test("the playhead moving from segment to segment leaves the menus alone; losing its segment doesn't")
+    func segmentTicksSkipMenus() async {
+        let model = makeModel("leaf-segment-tick")
+        await model.libraryRefreshTask?.value
+        model.transcript = makeTranscript()
+        model.libraryEntries = [entry("a", title: "First")]
+        model.selectedEntryID = "a"
+        model.currentSegmentID = 0
+        let invalidated = MenuInvalidation()
+        withObservationTracking {
+            readMenusAndRoute(model)
+        } onChange: {
+            invalidated.fired = true
+        }
+
+        model.currentSegmentID = 1
+        model.currentSegmentID = 2
+        #expect(!invalidated.fired)
+
+        model.currentSegmentID = nil
+        #expect(invalidated.fired)
+    }
+
     @Test("recentFiles rereads after recentFilesRaw changes under it")
     func recentFilesCacheInvalidates() {
         let model = makeModel("leaf-recent")

@@ -53,6 +53,20 @@ struct FavoriteSegmentsTests {
         return (model, seeded.id)
     }
 
+    @Test("⌘D has no target until a segment is chosen, then acts on that one")
+    func favoriteCommandNeedsAChosenSegment() {
+        let model = makeModel()
+        model.transcript = threeSegmentTranscript()
+        model.currentSegmentID = nil
+
+        #expect(model.focusedSegmentIDForCommands == nil)
+        #expect(!model.hasCurrentSegment)
+
+        model.currentSegmentID = 2
+        #expect(model.focusedSegmentIDForCommands == 2)
+        #expect(model.hasCurrentSegment)
+    }
+
     @Test("toggling a favorite updates the model and persists to the manifest")
     func toggleFavoritePersists() async throws {
         let (model, entryID) = try await loadedModel()
