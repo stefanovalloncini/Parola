@@ -30,6 +30,17 @@ struct AppModelPlayerTests {
         AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("player"))
     }
 
+    @Test("a speed picked from the Playback menu reaches the player now and the next play")
+    func playbackRateReachesThePlayer() {
+        let model = makeModel()
+        let player = AVPlayer()
+        model.player = player
+
+        model.applyPlaybackRate(1.5)
+
+        #expect(player.defaultRate == 1.5)
+    }
+
     @Test("installPlayer creates a player and resets per-install state")
     func installPlayerCreatesPlayer() {
         let model = makeModel()

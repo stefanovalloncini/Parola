@@ -1,12 +1,18 @@
 import SwiftUI
 import AVKit
 
+enum PlaybackSpeed {
+    static let all: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+
+    static func label(_ value: Double) -> String {
+        value == value.rounded() ? "\(Int(value))×" : "\(value)×"
+    }
+}
+
 struct MediaBar: View {
     @Environment(AppModel.self) private var model
     @AppStorage("playbackRate", store: DefaultsStore.current) private var playbackRate: Double = 1.0
     @State private var scrubbingTo: Double?
-
-    private let speeds: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 
     var body: some View {
         VStack(spacing: DS.Spacing.small) {
@@ -80,7 +86,7 @@ struct MediaBar: View {
 
     private var speedMenu: some View {
         Menu {
-            ForEach(speeds, id: \.self) { s in
+            ForEach(PlaybackSpeed.all, id: \.self) { s in
                 Button {
                     playbackRate = s
                     applyRate()
@@ -120,18 +126,11 @@ struct MediaBar: View {
     }
 
     private func applyRate() {
-        guard let player = model.player else { return }
-        player.defaultRate = Float(playbackRate)
-        if player.timeControlStatus == .playing {
-            player.rate = Float(playbackRate)
-        }
+        model.applyPlaybackRate(playbackRate)
     }
 
     private func speedLabel(_ value: Double) -> String {
-        if value == floor(value) {
-            return "\(Int(value))×"
-        }
-        return "\(value)×"
+        PlaybackSpeed.label(value)
     }
 }
 

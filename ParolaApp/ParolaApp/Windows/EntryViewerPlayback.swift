@@ -7,8 +7,6 @@ struct EntryViewerPlaybackBar: View {
 
     @State private var scrubbingTo: Double?
 
-    private let speeds: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
-
     var body: some View {
         VStack(spacing: DS.Spacing.small) {
             ScrubberTrack(
@@ -57,8 +55,8 @@ struct EntryViewerPlaybackBar: View {
                 .axLeaf("Label.Time")
 
                 Picker("Playback speed", selection: $session.rate) {
-                    ForEach(speeds, id: \.self) { speed in
-                        Text(verbatim: Self.speedLabel(speed)).tag(speed)
+                    ForEach(PlaybackSpeed.all, id: \.self) { speed in
+                        Text(verbatim: PlaybackSpeed.label(speed)).tag(speed)
                     }
                 }
                 .labelsHidden()
@@ -72,9 +70,5 @@ struct EntryViewerPlaybackBar: View {
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
         .chromeSurface()
-    }
-
-    static func speedLabel(_ value: Double) -> String {
-        value == value.rounded() ? "\(Int(value))×" : "\(value)×"
     }
 }

@@ -10969,6 +10969,17 @@
         }
       }
     },
+    "Playback Speed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velocità di riproduzione"
+          }
+        }
+      }
+    },
     "Playback speed": {
       "extractionState": "manual",
       "localizations": {
@@ -13281,6 +13292,17 @@
         }
       }
     },
+    "Shortcut: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scorciatoia: %@"
+          }
+        }
+      }
+    },
     "Shortcuts": {
       "extractionState": "manual",
       "localizations": {
@@ -13662,6 +13684,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Avanti di 5 secondi"
+          }
+        }
+      }
+    },
+    "Skip Silences": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salta i silenzi"
           }
         }
       }

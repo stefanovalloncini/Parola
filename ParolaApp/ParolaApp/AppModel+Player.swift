@@ -123,6 +123,13 @@ extension AppModel {
         installPlayer(for: url)
     }
 
+    /// The rate the next play starts at, and the running one's if the player is going.
+    func applyPlaybackRate(_ rate: Double) {
+        guard let player else { return }
+        player.defaultRate = Float(rate)
+        if player.timeControlStatus == .playing { player.rate = Float(rate) }
+    }
+
     func updateCurrentSegment(time: Double) {
         guard let segments = transcript?.segments else { return }
         // A reveal owns the selection until playback starts: the player's first tick lands after it,

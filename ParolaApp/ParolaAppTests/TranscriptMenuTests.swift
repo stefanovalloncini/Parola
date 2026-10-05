@@ -86,4 +86,18 @@ struct TranscriptMenuTests {
         #expect(header.contains(#".help(copied ? "Copied" : "Copy Transcript")"#))
         #expect(header.contains("await model.copyTranscript()"))
     }
+
+    @Test("the Playback menu holds speed and Skip Silences, and names the keys the player owns")
+    func playbackMenuHasEveryControl() throws {
+        let commands = try source("Views/AppCommands")
+        let start = try #require(commands.range(of: "struct PlaybackCommands: View"))
+        let end = try #require(commands.range(of: "struct CaptionsCommands: View"))
+        let menu = String(commands[start.lowerBound..<end.lowerBound])
+        #expect(menu.contains(#"Picker("Playback Speed", selection: rate)"#))
+        #expect(menu.contains("ForEach(PlaybackSpeed.all, id: \\.self)"))
+        #expect(menu.contains(#"Toggle("Skip Silences", isOn: $model.skipSilences)"#))
+        #expect(menu.contains(#".help(Self.keyHelp(String(localized: "Space")))"#))
+        #expect(menu.contains(#".help(Self.keyHelp("⌘←"))"#))
+        #expect(menu.contains(#".help(Self.keyHelp("⌘→"))"#))
+    }
 }

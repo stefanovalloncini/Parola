@@ -216,15 +216,49 @@ struct EditCommands: View {
 }
 
 struct PlaybackCommands: View {
-    let model: AppModel
+    @Bindable var model: AppModel
+    @AppStorage("playbackRate", store: DefaultsStore.current) private var mainRate: Double = 1.0
 
     var body: some View {
         Button(model.keyWindowIsPlaying ? "Pause" : "Play") { model.togglePlayPauseInKeyWindow() }
             .disabled(!model.keyWindowHasPlayer)
+            .help(Self.keyHelp(String(localized: "Space")))
         Button("Skip Back 5 Seconds") { model.skipInKeyWindow(by: -5) }
             .disabled(!model.keyWindowHasPlayer)
+            .help(Self.keyHelp("⌘←"))
         Button("Skip Forward 5 Seconds") { model.skipInKeyWindow(by: 5) }
             .disabled(!model.keyWindowHasPlayer)
+            .help(Self.keyHelp("⌘→"))
+        Divider()
+        Picker("Playback Speed", selection: rate) {
+            ForEach(PlaybackSpeed.all, id: \.self) { speed in
+                Text(verbatim: PlaybackSpeed.label(speed)).tag(speed)
+            }
+        }
+        .disabled(!model.keyWindowHasPlayer)
+        .axLeaf("Menu.Playback.Speed")
+        Toggle("Skip Silences", isOn: $model.skipSilences)
+            .disabled(!model.keyWindowHasPlayer || model.keyWindowIsViewer)
+            .axLeaf("Menu.Playback.SkipSilences")
+    }
+
+    /// A key monitor owns Space and ⌘←/⌘→ so text fields keep them; a menu key equivalent would take them first.
+    static func keyHelp(_ keys: String) -> String {
+        String(localized: "Shortcut: \(keys)")
+    }
+
+    private var rate: Binding<Double> {
+        Binding(
+            get: { model.keyViewerSession?.rate ?? mainRate },
+            set: { speed in
+                if let session = model.keyViewerSession {
+                    session.rate = speed
+                } else {
+                    mainRate = speed
+                    model.applyPlaybackRate(speed)
+                }
+            }
+        )
     }
 }
 
