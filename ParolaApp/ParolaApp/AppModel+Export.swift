@@ -237,6 +237,11 @@ extension AppModel {
         pasteboard.setString(text, forType: .string)
     }
 
+    func copyTranscript(to pasteboard: NSPasteboard = .general) async {
+        guard let transcript else { return }
+        await copyTranscriptAsPlainText(transcript, to: pasteboard)
+    }
+
     func copyTranscriptToPasteboard(withTimestamps: Bool, favoritesOnly: Bool = false, pasteboard: NSPasteboard) {
         guard let transcript else { return }
         let favorites = favoriteSegmentIDs

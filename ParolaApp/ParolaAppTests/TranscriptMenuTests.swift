@@ -29,4 +29,61 @@ struct TranscriptMenuTests {
         #expect(commands.contains(#"Toggle("Show Favorites Only", isOn: $model.favoritesOnly)"#))
         #expect(commands.contains(#"Toggle("Subtitle Warnings", isOn: $model.showSubtitleQC)"#))
     }
+
+    /// The Transcript menu's body, from its first item to the end of the file.
+    private func transcriptMenu() throws -> String {
+        let commands = try source("Views/AppCommands")
+        let start = try #require(commands.range(of: "struct TranscriptCommands: View"))
+        return String(commands[start.lowerBound...])
+    }
+
+    @Test("the Transcript menu reads in groups: go, edit, copy, share, then windows")
+    func transcriptMenuIsGrouped() throws {
+        let menu = try transcriptMenu()
+        let groups = [
+            [#"Button("Back")"#, #"Button("Jump to Next Speaker")"#, #"Button("Jump to Time…")"#, #"Button("Show Outline")"#],
+            [#"Button("Favorite Segment")"#, #"Button("Manage People…")"#],
+            [
+                #"Button("Copy Transcript")"#, #"Button("Copy with Timestamps")"#, #"Button("Copy as Markdown")"#,
+                #"Button("Copy as SRT")"#, #"Button("Copy Favorites")"#,
+            ],
+            [
+                #"Button("Export…")"#, #"Menu("Export As")"#, #"Button("Export Segment Notes…")"#,
+                #"Button("Send via Mail…")"#, #"Button("Share…")"#, "SendToMenu(", #"Button("Print Transcript…")"#,
+                #"Button("Burn Subtitles into Video…")"#,
+            ],
+            [#"Button("Open in New Window")"#],
+        ]
+        var offsets: [[Int]] = []
+        for group in groups {
+            var groupOffsets: [Int] = []
+            for title in group {
+                let range = try #require(menu.range(of: title), "missing \(title)")
+                groupOffsets.append(menu.distance(from: menu.startIndex, to: range.lowerBound))
+            }
+            offsets.append(groupOffsets)
+        }
+        let flat = offsets.flatMap { $0 }
+        #expect(flat == flat.sorted(), "items out of order")
+        for (earlier, later) in zip(offsets, offsets.dropFirst()) {
+            let lo = menu.index(menu.startIndex, offsetBy: earlier.max() ?? 0)
+            let hi = menu.index(menu.startIndex, offsetBy: later.min() ?? 0)
+            #expect(menu[lo..<hi].contains("Divider()"), "no divider before \(later)")
+        }
+        for group in offsets {
+            let lo = menu.index(menu.startIndex, offsetBy: group.min() ?? 0)
+            let hi = menu.index(menu.startIndex, offsetBy: group.max() ?? 0)
+            #expect(!menu[lo..<hi].contains("Divider()"))
+        }
+    }
+
+    @Test("Copy has one name, and the menu copies what the header's Copy button copies")
+    func copyHasOneName() throws {
+        let menu = try transcriptMenu()
+        #expect(!menu.contains("Copy Plain Text"))
+        #expect(menu.contains(#"Button("Copy Transcript") { Task { await model.copyTranscript() } }"#))
+        let header = try source("Views/Transcript/TranscriptHeaderBar")
+        #expect(header.contains(#".help(copied ? "Copied" : "Copy Transcript")"#))
+        #expect(header.contains("await model.copyTranscript()"))
+    }
 }

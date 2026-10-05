@@ -287,23 +287,6 @@ struct TranscriptCommands: View {
         Button("Back") { model.returnToOrigin() }
             .keyboardShortcut("[", modifiers: [.command])
             .disabled(!model.canReturnToOrigin)
-        Divider()
-        Button("Copy Plain Text") { model.copyTranscriptToPasteboard(withTimestamps: false, pasteboard: .general) }
-            .keyboardShortcut("c", modifiers: [.command, .shift])
-            .disabled(!model.mainTranscriptCommandsEnabled)
-        Button("Copy with Timestamps") { model.copyTranscriptToPasteboard(withTimestamps: true, pasteboard: .general) }
-            .keyboardShortcut("c", modifiers: [.command, .option])
-            .disabled(!model.mainTranscriptCommandsEnabled)
-        Button("Copy as SRT") { model.copyTranscriptAsFormat(.srt) }
-            .disabled(!model.mainTranscriptCommandsEnabled)
-        Button("Copy Favorites") { model.copyTranscriptToPasteboard(withTimestamps: true, favoritesOnly: true, pasteboard: .general) }
-            .disabled(!model.selectedEntryHasFavorites || model.keyWindowIsViewer)
-        Button("Send via Mail…") { model.shareTranscriptViaMail() }
-            .keyboardShortcut("m", modifiers: [.command, .shift])
-            .disabled(!model.mainTranscriptCommandsEnabled)
-        Button("Share…") { model.shareTranscriptAsTextFile() }
-            .disabled(!model.mainTranscriptCommandsEnabled)
-        Divider()
         Button("Jump to Next Speaker") { model.jumpToNextSpeaker() }
             .keyboardShortcut("j", modifiers: [.command, .shift])
             .disabled(!model.mainTranscriptCommandsEnabled)
@@ -315,7 +298,7 @@ struct TranscriptCommands: View {
             .keyboardShortcut("o", modifiers: [.command, .shift])
             .disabled(!model.mainTranscriptCommandsEnabled)
             .axLeaf("Menu.Transcript.ShowOutline")
-        Button("Manage People…") { model.showingPeopleSheet = true }
+        Divider()
         Button("Favorite Segment") {
             guard let id = model.focusedSegmentIDForCommands else { return }
             model.toggleSegmentFavorite(id)
@@ -323,10 +306,20 @@ struct TranscriptCommands: View {
         .keyboardShortcut("d", modifiers: [.command])
         .disabled(!model.mainTranscriptCommandsEnabled || model.selectedEntryID == nil || !model.hasCurrentSegment)
         .help(favoriteSegmentHelp)
+        Button("Manage People…") { model.showingPeopleSheet = true }
+        Divider()
+        Button("Copy Transcript") { Task { await model.copyTranscript() } }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .disabled(!model.mainTranscriptCommandsEnabled)
+        Button("Copy with Timestamps") { model.copyTranscriptToPasteboard(withTimestamps: true, pasteboard: .general) }
+            .keyboardShortcut("c", modifiers: [.command, .option])
+            .disabled(!model.mainTranscriptCommandsEnabled)
         Button("Copy as Markdown") { model.copyTranscriptAsFormat(.md) }
             .disabled(!model.mainTranscriptCommandsEnabled)
-        Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }
+        Button("Copy as SRT") { model.copyTranscriptAsFormat(.srt) }
             .disabled(!model.mainTranscriptCommandsEnabled)
+        Button("Copy Favorites") { model.copyTranscriptToPasteboard(withTimestamps: true, favoritesOnly: true, pasteboard: .general) }
+            .disabled(!model.selectedEntryHasFavorites || model.keyWindowIsViewer)
         Divider()
         Button("Export…") { model.openExportSheet() }
             .keyboardShortcut("e", modifiers: [.command, .shift])
@@ -343,6 +336,21 @@ struct TranscriptCommands: View {
             }
         }
         .disabled(!model.mainTranscriptCommandsEnabled)
+        Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }
+            .disabled(!model.mainTranscriptCommandsEnabled)
+        Button("Send via Mail…") { model.shareTranscriptViaMail() }
+            .keyboardShortcut("m", modifiers: [.command, .shift])
+            .disabled(!model.mainTranscriptCommandsEnabled)
+        Button("Share…") { model.shareTranscriptAsTextFile() }
+            .disabled(!model.mainTranscriptCommandsEnabled)
+        if model.destinationsEnabled {
+            SendToMenu(model: model, entryID: model.selectedEntryID)
+        }
+        Button("Print Transcript…") { model.printTranscript() }
+            .keyboardShortcut("p", modifiers: [.command])
+            .disabled(!model.mainTranscriptCommandsEnabled)
+        Button("Burn Subtitles into Video…") { model.requestBurnSubtitles() }
+            .disabled(!model.mainTranscriptCommandsEnabled || model.burnIsRunning)
         Divider()
         Button("Open in New Window") {
             guard let id = model.selectedEntryID else { return }
@@ -351,16 +359,5 @@ struct TranscriptCommands: View {
         .keyboardShortcut("n", modifiers: [.command, .shift])
         .disabled(model.selectedEntryID == nil || model.keyWindowIsViewer)
         .help(model.selectedEntryID == nil ? "Save the transcript to the library first" : "")
-        if model.destinationsEnabled {
-            Divider()
-            SendToMenu(model: model, entryID: model.selectedEntryID)
-        }
-        Divider()
-        Button("Print Transcript…") { model.printTranscript() }
-            .keyboardShortcut("p", modifiers: [.command])
-            .disabled(!model.mainTranscriptCommandsEnabled)
-        Divider()
-        Button("Burn Subtitles into Video…") { model.requestBurnSubtitles() }
-            .disabled(!model.mainTranscriptCommandsEnabled || model.burnIsRunning)
     }
 }

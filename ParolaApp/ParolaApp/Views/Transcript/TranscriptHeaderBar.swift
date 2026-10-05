@@ -150,8 +150,8 @@ struct TranscriptHeaderBar: View {
         }
         .buttonStyle(GlyphButtonStyle(tinted: true))
         .disabled(model.transcript == nil)
-        .help(copied ? "Copied" : "Copy transcript")
-        .accessibilityLabel(copied ? "Copied" : "Copy transcript")
+        .help(copied ? "Copied" : "Copy Transcript")
+        .accessibilityLabel(copied ? "Copied" : "Copy Transcript")
         .axLeaf("HeaderBar.Button.CopyTranscript")
     }
 
@@ -276,9 +276,9 @@ struct TranscriptHeaderBar: View {
     }
 
     private func copyTranscript() {
-        guard let transcript = model.transcript else { return }
+        guard model.transcript != nil else { return }
         Task {
-            await model.copyTranscriptAsPlainText(transcript)
+            await model.copyTranscript()
             showCopied()
         }
     }
