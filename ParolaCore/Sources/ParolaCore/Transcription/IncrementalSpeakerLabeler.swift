@@ -51,7 +51,7 @@ extension IncrementalSpeakerLabeler {
     /// Builds a labeler from the models already on disk. Never downloads.
     public static func loadInstalled(store: ModelStore = .shared) async throws -> IncrementalSpeakerLabeler {
         let dir = modelsDirectory(store: store)
-        let models = try await DiarizerModels.load(
+        let models = try DiarizerModels.load(
             localSegmentationModel: dir.appendingPathComponent(ModelNames.Diarizer.segmentationFile),
             localEmbeddingModel: dir.appendingPathComponent(ModelNames.Diarizer.embeddingFile)
         )

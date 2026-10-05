@@ -4,18 +4,21 @@ import Testing
 
 @Suite("Parakeet run hints")
 struct ParakeetRunHintsTests {
-    @Test("a pinned language FluidAudio knows becomes its script hint, whatever the case")
-    func pinnedLanguageBecomesTheHint() {
-        #expect(ParakeetTranscriber.scriptHint(for: "it")?.rawValue == "it")
-        #expect(ParakeetTranscriber.scriptHint(for: "IT")?.rawValue == "it")
-        #expect(ParakeetTranscriber.scriptHint(for: "pl")?.rawValue == "pl")
-        #expect(ParakeetTranscriber.scriptHint(for: "uk")?.rawValue == "uk")
+    @Test("a pinned Latin-script language other than French runs with the English hint")
+    func pinnedLatinLanguageRunsWithTheEnglishHint() {
+        #expect(ParakeetTranscriber.scriptHint(for: "it")?.rawValue == "en")
+        #expect(ParakeetTranscriber.scriptHint(for: "IT")?.rawValue == "en")
+        #expect(ParakeetTranscriber.scriptHint(for: "pl")?.rawValue == "en")
+        #expect(ParakeetTranscriber.scriptHint(for: "da")?.rawValue == "en")
     }
 
-    @Test("auto language and languages FluidAudio doesn't list run without a hint")
-    func noHintOutsideTheList() {
+    @Test("French and non-Latin scripts keep their own hint; unknown and auto get none")
+    func frenchAndNonLatinScriptsKeepTheirOwnHint() {
+        #expect(ParakeetTranscriber.scriptHint(for: "fr")?.rawValue == "fr")
+        #expect(ParakeetTranscriber.scriptHint(for: "uk")?.rawValue == "uk")
+        #expect(ParakeetTranscriber.scriptHint(for: "ru")?.rawValue == "ru")
+        #expect(ParakeetTranscriber.scriptHint(for: "el")?.rawValue == "el")
         #expect(ParakeetTranscriber.scriptHint(for: nil) == nil)
-        #expect(ParakeetTranscriber.scriptHint(for: "da") == nil)
         #expect(ParakeetTranscriber.scriptHint(for: "ja") == nil)
     }
 

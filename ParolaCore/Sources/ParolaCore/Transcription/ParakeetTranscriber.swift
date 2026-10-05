@@ -126,9 +126,10 @@ actor ParakeetTranscriber: Transcriber {
         )
     }
 
-    /// On v3 the hint keeps a Polish run out of Cyrillic tokens; unlisted languages get none.
+    /// FluidAudio 0.14.8–0.15.5 blocklists English tokens for every non-English Latin hint (FluidInference/FluidAudio#840); .english keeps the Latin filter without it.
     nonisolated static func scriptHint(for language: String?) -> Language? {
-        language.flatMap { Language(rawValue: $0.lowercased()) }
+        guard let hint = language.flatMap({ Language(rawValue: $0.lowercased()) }) else { return nil }
+        return hint.script == .latin && hint != .french ? .english : hint
     }
 
     /// FluidAudio closes its progress session only past `maxModelSamples`; a subscriber cancelled on a shorter run strands it.
