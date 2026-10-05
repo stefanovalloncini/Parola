@@ -56,4 +56,9 @@ struct TranscriptParagraphRuleTests {
     func surroundingWhitespaceTrimmed() {
         #expect(TranscriptParagraphRule.speakerLabel(for: " Alice ") == "Alice")
     }
+
+    @Test("flattens an internal newline joining two words to a single line")
+    func internalNewlineFlattened() {
+        #expect(TranscriptParagraphRule.speakerLabel(for: "Marco\nRossi") == "Marco Rossi")
+    }
 }
