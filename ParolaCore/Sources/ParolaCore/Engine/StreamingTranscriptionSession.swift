@@ -100,7 +100,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         speakerLabeler: (any StreamingSpeakerLabeler)? = nil,
         downloadProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> AsyncStream<StreamingEvent> {
-        guard loop == nil, !isStarting else {
+        guard loop == nil, !isStarting, modelLease == nil else {
             ParolaLog.fault(.streaming, "start called while a session was already running")
             throw ParolaError.transcriptionFailed("session already started")
         }

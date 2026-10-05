@@ -85,7 +85,8 @@ private func launchTake(
     persister: StreamingAudioPersister,
     harness: TakeHarness,
     useVAD: Bool = false,
-    modelLease: StreamingModelLease? = nil
+    modelLease: StreamingModelLease? = nil,
+    decodeGate: UninterruptibleGate? = nil
 ) async -> AsyncStream<StreamingEvent> {
     var configuration = StreamingRealtimeLoop.Configuration()
     configuration.useVAD = useVAD
@@ -107,6 +108,7 @@ private func launchTake(
                 },
                 stopCapture: {},
                 transcribe: { samples, _, _ in
+                    await decodeGate?.wait()
                     harness.recordDecode(sampleCount: samples.count)
                     return TranscriptionResult(
                         text: " last words",
@@ -268,6 +270,39 @@ struct StreamingTakeEndingTests {
         for await _ in events {}
         #expect(await cache.leaseCount(for: Self.tiny) == 0)
         #expect(await cache.droppedLeases == 0, "returned by the session, not by the lease's deinit")
+    }
+
+    @Test("a start while the last take is still stopping is refused before it borrows")
+    func startDuringAStopIsRefused() async throws {
+        let probe = CacheProbe()
+        let cache = StreamingModelCache.probing(probe)
+        let store = try Self.seededStore()
+        try store.seedInstalledModel("openai_whisper-base")
+        let lease = try await cache.borrow(Self.tiny, store: store)
+        let session = StreamingTranscriptionSession(modelStore: store, persistAudio: true, modelCache: cache)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        defer { try? FileManager.default.removeItem(at: persister.url) }
+        let harness = TakeHarness()
+        let decodeGate = UninterruptibleGate()
+        defer { decodeGate.open() }
+        let events = await launchTake(
+            on: session, persister: persister, harness: harness, modelLease: lease, decodeGate: decodeGate
+        )
+        await harness.captureStarted.wait("capture to start")
+        harness.push([Float](repeating: 0.5, count: 8_000))
+        let stopping = GuardedTask { await session.stop() }
+        await decodeGate.arrivals.wait(atLeast: 1, "the stop's final decode to start")
+
+        await #expect(throws: ParolaError.self) {
+            _ = try await session.start(options: TranscriptionOptions(model: "openai_whisper-base"))
+        }
+        #expect(probe.loads.value == 1, "the refused start never borrowed")
+        #expect(await cache.leaseCount(for: Self.tiny) == 1, "the stopping take still holds its model")
+
+        decodeGate.open()
+        _ = try await stopping.value("the stop to finish")
+        for await _ in events {}
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
     }
 
     @Test("a take stopped before capture finishes with an empty transcript and nothing else")
