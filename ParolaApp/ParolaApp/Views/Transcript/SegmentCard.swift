@@ -358,12 +358,7 @@ struct SegmentCard: View {
     }
 
     nonisolated static func speakerLabel(for speaker: String?) -> String? {
-        guard let speaker else { return nil }
-        let flattened = speaker
-            .split(whereSeparator: \.isNewline)
-            .joined(separator: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return flattened.isEmpty ? nil : flattened
+        TranscriptParagraphRule.speakerLabel(for: speaker)
     }
 
     @State private var timingPopoverOpen = false

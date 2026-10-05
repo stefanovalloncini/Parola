@@ -6,7 +6,7 @@ enum TranscriptDerive {
     static let synchronousCap = 200
 
     /// Silence at least this long between two segments reads as a new paragraph in the continuous transcript.
-    static let paragraphPauseSeconds: TimeInterval = 1.5
+    static let paragraphPauseSeconds: TimeInterval = TranscriptParagraphRule.pauseSeconds
 }
 
 /// The paragraph rule shared by the continuous transcript's render and the Copy button's pasteboard write.
@@ -16,8 +16,7 @@ enum TranscriptParagraphs {
         start: Double,
         pause: TimeInterval = TranscriptDerive.paragraphPauseSeconds
     ) -> Bool {
-        guard let previousEnd else { return false }
-        return start - previousEnd >= pause
+        TranscriptParagraphRule.breaksParagraph(after: previousEnd, start: start, pause: pause)
     }
 
     /// Paragraphs separated by a blank line, speaker runs opened by their label — what a select-all of the pane copies.
