@@ -166,6 +166,17 @@
         }
       }
     },
+    "%@ of %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ di %@"
+          }
+        }
+      }
+    },
     "%@ refused the download (HTTP %lld).": {
       "extractionState": "manual",
       "localizations": {
@@ -11009,6 +11020,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Velocità di riproduzione"
+          }
+        }
+      }
+    },
+    "Playback position": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posizione di riproduzione"
           }
         }
       }

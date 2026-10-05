@@ -35,4 +35,25 @@ struct PlaybackTransportTests {
         #expect(monitor.contains("model.skip(by: PlaybackSkip.back.seconds)"))
         #expect(monitor.contains("model.skip(by: PlaybackSkip.forward.seconds)"))
     }
+
+    @Test("the scrubber steps 5 seconds and stays inside the media")
+    func scrubberStepsWithinTheMedia() {
+        #expect(ScrubberTrack.stepped(10, by: PlaybackSkip.forward.seconds, duration: 60) == 15)
+        #expect(ScrubberTrack.stepped(58, by: PlaybackSkip.forward.seconds, duration: 60) == 60)
+        #expect(ScrubberTrack.stepped(3, by: PlaybackSkip.back.seconds, duration: 60) == 0)
+    }
+
+    @Test("VoiceOver hears the playhead as a time of the whole")
+    func scrubberSpeaksItsPosition() {
+        #expect(ScrubberTrack.spokenPosition(progress: 723, duration: 2304) == "12:03 of 38:24")
+    }
+
+    @Test("the scrubber is one adjustable element that arrow keys move")
+    func scrubberIsAdjustable() throws {
+        let bar = try source("Views/Transcript/MediaBar")
+        #expect(bar.contains(".accessibilityAdjustableAction { direction in"))
+        #expect(bar.contains(#".accessibilityLabel(Text("Playback position"))"#))
+        #expect(bar.contains(".onKeyPress(.leftArrow) { step(by: PlaybackSkip.back.seconds) }"))
+        #expect(bar.contains(".onKeyPress(.rightArrow) { step(by: PlaybackSkip.forward.seconds) }"))
+    }
 }

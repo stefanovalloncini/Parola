@@ -271,6 +271,14 @@ struct ScrubberTrack: View {
 
     @State private var isDragging: Bool = false
 
+    static func stepped(_ progress: Double, by delta: Double, duration: Double) -> Double {
+        min(max(0, progress + delta), duration)
+    }
+
+    static func spokenPosition(progress: Double, duration: Double) -> String {
+        String(localized: "\(PlaybackProgressView.format(progress)) of \(PlaybackProgressView.format(duration))")
+    }
+
     var body: some View {
         GeometryReader { geo in
             let width = geo.size.width
@@ -314,5 +322,24 @@ struct ScrubberTrack: View {
             )
         }
         .disabled(duration <= 0)
+        .accessibilityElement()
+        .accessibilityLabel(Text("Playback position"))
+        .accessibilityValue(Text(verbatim: Self.spokenPosition(progress: progress, duration: duration)))
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: _ = step(by: PlaybackSkip.forward.seconds)
+            case .decrement: _ = step(by: PlaybackSkip.back.seconds)
+            @unknown default: break
+            }
+        }
+        .focusable(duration > 0, interactions: .activate)
+        .onKeyPress(.leftArrow) { step(by: PlaybackSkip.back.seconds) }
+        .onKeyPress(.rightArrow) { step(by: PlaybackSkip.forward.seconds) }
+    }
+
+    private func step(by delta: Double) -> KeyPress.Result {
+        guard duration > 0 else { return .ignored }
+        onCommit(Self.stepped(progress, by: delta, duration: duration))
+        return .handled
     }
 }
