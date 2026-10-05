@@ -59,8 +59,8 @@ final class PlaybackKeyMonitor {
         ) else { return false }
         switch action {
         case .togglePlayPause: model.togglePlayPause()
-        case .skipBack: model.skip(by: -5)
-        case .skipForward: model.skip(by: 5)
+        case .skipBack: model.skip(by: PlaybackSkip.back.seconds)
+        case .skipForward: model.skip(by: PlaybackSkip.forward.seconds)
         case .toggleTakePause: StageControls.togglePause(model)
         case .swallowRepeat: break
         }

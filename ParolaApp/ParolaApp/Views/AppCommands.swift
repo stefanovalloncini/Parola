@@ -223,10 +223,10 @@ struct PlaybackCommands: View {
         Button(model.keyWindowIsPlaying ? "Pause" : "Play") { model.togglePlayPauseInKeyWindow() }
             .disabled(!model.keyWindowHasPlayer)
             .help(Self.keyHelp(String(localized: "Space")))
-        Button("Skip Back 5 Seconds") { model.skipInKeyWindow(by: -5) }
+        Button("Skip Back 5 Seconds") { model.skipInKeyWindow(by: PlaybackSkip.back.seconds) }
             .disabled(!model.keyWindowHasPlayer)
             .help(Self.keyHelp("⌘←"))
-        Button("Skip Forward 5 Seconds") { model.skipInKeyWindow(by: 5) }
+        Button("Skip Forward 5 Seconds") { model.skipInKeyWindow(by: PlaybackSkip.forward.seconds) }
             .disabled(!model.keyWindowHasPlayer)
             .help(Self.keyHelp("⌘→"))
         Divider()

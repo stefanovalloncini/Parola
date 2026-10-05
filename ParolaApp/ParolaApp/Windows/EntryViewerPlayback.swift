@@ -22,15 +22,8 @@ struct EntryViewerPlaybackBar: View {
             .axLeaf("Slider.Scrub")
 
             HStack(spacing: DS.Spacing.regular) {
-                Button { session.skip(by: -15) } label: {
-                    Image(systemName: "gobackward.15")
-                        .font(DS.Font.heading)
-                        .foregroundStyle(DS.Color.primaryText)
-                }
-                .buttonStyle(GlyphButtonStyle(side: 30))
-                .help("Back 15 seconds")
-                .accessibilityLabel("Back 15 seconds")
-                .axLeaf("Button.SkipBack")
+                PlaybackSkipButton(skip: .back) { session.skip(by: PlaybackSkip.back.seconds) }
+                    .axLeaf("Button.SkipBack")
 
                 Button { session.togglePlayPause() } label: {
                     Image(systemName: session.isPlaying ? "pause.fill" : "play.fill")
@@ -43,6 +36,9 @@ struct EntryViewerPlaybackBar: View {
                 .help(session.isPlaying ? "Pause" : "Play")
                 .accessibilityLabel(session.isPlaying ? "Pause" : "Play")
                 .axLeaf("Button.Play")
+
+                PlaybackSkipButton(skip: .forward) { session.skip(by: PlaybackSkip.forward.seconds) }
+                    .axLeaf("Button.SkipForward")
 
                 Spacer(minLength: DS.Spacing.small)
 

@@ -9,6 +9,39 @@ enum PlaybackSpeed {
     }
 }
 
+/// One skip step wherever a transport shows, the same the Playback menu and ⌘←/⌘→ take.
+enum PlaybackSkip {
+    case back, forward
+
+    var seconds: Double { self == .back ? -5 : 5 }
+
+    var symbol: String { self == .back ? "gobackward.5" : "goforward.5" }
+
+    var label: String {
+        self == .back ? String(localized: "Back 5 seconds") : String(localized: "Forward 5 seconds")
+    }
+
+    var help: String {
+        self == .back ? String(localized: "Back 5 seconds (⌘←)") : String(localized: "Forward 5 seconds (⌘→)")
+    }
+}
+
+struct PlaybackSkipButton: View {
+    let skip: PlaybackSkip
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: skip.symbol)
+                .font(DS.Font.heading)
+                .foregroundStyle(DS.Color.primaryText)
+        }
+        .buttonStyle(GlyphButtonStyle(side: 30))
+        .help(skip.help)
+        .accessibilityLabel(skip.label)
+    }
+}
+
 struct MediaBar: View {
     @Environment(AppModel.self) private var model
     @AppStorage("playbackRate", store: DefaultsStore.current) private var playbackRate: Double = 1.0
@@ -36,16 +69,9 @@ struct MediaBar: View {
 
     private var transport: some View {
         HStack(spacing: DS.Spacing.regular) {
-            Button { model.skip(by: -15) } label: {
-                Image(systemName: "gobackward.15")
-                    .font(DS.Font.heading)
-                    .foregroundStyle(DS.Color.primaryText)
-            }
-            .buttonStyle(GlyphButtonStyle(side: 30))
-            .help("Back 15 seconds")
-            .accessibilityLabel("Back 15 seconds")
-            .accessibilityIdentifier("transcript.player.skipBack")
-            .axLeaf("MediaBar.Button.SkipBack")
+            PlaybackSkipButton(skip: .back) { model.skip(by: PlaybackSkip.back.seconds) }
+                .accessibilityIdentifier("transcript.player.skipBack")
+                .axLeaf("MediaBar.Button.SkipBack")
 
             Button(action: togglePlayPause) {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
@@ -59,6 +85,10 @@ struct MediaBar: View {
             .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
             .accessibilityIdentifier("transcript.player.playPause")
             .axLeaf("MediaBar.Button.PlayPause")
+
+            PlaybackSkipButton(skip: .forward) { model.skip(by: PlaybackSkip.forward.seconds) }
+                .accessibilityIdentifier("transcript.player.skipForward")
+                .axLeaf("MediaBar.Button.SkipForward")
         }
     }
 

@@ -2486,13 +2486,24 @@
         }
       }
     },
-    "Back 15 seconds": {
+    "Back 5 seconds": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Indietro di 15 secondi"
+            "value": "Indietro di 5 secondi"
+          }
+        }
+      }
+    },
+    "Back 5 seconds (⌘←)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indietro di 5 secondi (⌘←)"
           }
         }
       }
@@ -6370,6 +6381,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Formato"
+          }
+        }
+      }
+    },
+    "Forward 5 seconds": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avanti di 5 secondi"
+          }
+        }
+      }
+    },
+    "Forward 5 seconds (⌘→)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avanti di 5 secondi (⌘→)"
           }
         }
       }
