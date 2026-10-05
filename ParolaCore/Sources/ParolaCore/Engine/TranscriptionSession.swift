@@ -18,9 +18,8 @@ public actor TranscriptionSession {
     private var transcriber: (any Transcriber)?
     private var transcriberEngineID: EngineID?
     private var transcriberIsMock = false
-    private var idleTask: Task<Void, Never>?
-    private var diarizerIdleTask: Task<Void, Never>?
-    private var idleEpoch: Int = 0
+    private var modelIdle = IdleUnloadTimer()
+    private var diarizerIdle = IdleUnloadTimer()
     private var pressureSource: (any DispatchSourceMemoryPressure)?
     private var activeRun: Int?
     private var lastRunID = 0
@@ -518,43 +517,28 @@ public actor TranscriptionSession {
     }
 
     private func scheduleIdleUnload() {
-        cancelIdleTimer()
-        let modelTimeout = idleTimeout
-        let diarizerTimeout = min(diarizerIdleTimeout, idleTimeout)
-        let clock = clock
-        idleEpoch &+= 1
-        let myEpoch = idleEpoch
-        diarizerIdleTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(diarizerTimeout), clock: clock)
-            if Task.isCancelled { return }
-            await self?.unloadDiarizerIfIdle(epoch: myEpoch)
+        diarizerIdle.arm(after: .seconds(min(diarizerIdleTimeout, idleTimeout)), clock: clock) { [weak self] epoch in
+            await self?.unloadDiarizerIfIdle(epoch: epoch)
         }
-        idleTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(modelTimeout), clock: clock)
-            if Task.isCancelled { return }
-            await self?.unloadIfIdle(epoch: myEpoch)
+        modelIdle.arm(after: .seconds(idleTimeout), clock: clock) { [weak self] epoch in
+            await self?.unloadIfIdle(epoch: epoch)
         }
     }
 
     private func unloadDiarizerIfIdle(epoch: Int) async {
-        guard epoch == idleEpoch else { return }
+        guard diarizerIdle.isCurrent(epoch) else { return }
         await diarizer.unload()
     }
 
     private func unloadIfIdle(epoch: Int) async {
-        guard epoch == idleEpoch else { return }
+        guard modelIdle.isCurrent(epoch) else { return }
         await unloadModel()
         ParolaLog.info(.models, "model unloaded after idle", [.elapsed: .seconds(idleTimeout)])
     }
 
     private func cancelIdleTimer() {
-        idleTask?.cancel()
-        idleTask = nil
-        diarizerIdleTask?.cancel()
-        diarizerIdleTask = nil
-        // Invalidate any timer that already slipped past its isCancelled check, so it can't
-        // unload mid-transcribe (cancel() alone doesn't bump the epoch its guard compares).
-        idleEpoch &+= 1
+        modelIdle.disarm()
+        diarizerIdle.disarm()
     }
 
     private func installPressureSourceIfNeeded() {
