@@ -321,6 +321,34 @@ struct MainWindowTitleTests {
         #expect(window.title == "Recording — Parola")
     }
 
+    @Test("an open transcript names the window, a take outranks it, and nothing open reads Parola")
+    func titleNamesTheOpenTranscript() {
+        #expect(MainWindowTitle.title(takeRunning: false, transcriptTitle: "Board review") == "Board review")
+        #expect(MainWindowTitle.title(takeRunning: true, transcriptTitle: "Board review") == "Recording — Parola")
+        #expect(MainWindowTitle.title(takeRunning: false, transcriptTitle: nil) == "Parola")
+    }
+
+    @Test("the window takes the open entry's name, and Parola again once another page shows")
+    func windowFollowsTheOpenEntry() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("window-title-entry"))
+        let store = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello there.")], language: "en", modelName: "stub"
+        )
+        let seeded = try await store.add(transcript: transcript, audioSource: nil, category: .transcription, title: "Board review")
+        let window = reportedWindow(model)
+        defer { window.close() }
+
+        model.loadEntry(seeded.id)
+        let named = await waitUntil { window.title == "Board review" }
+        #expect(named)
+        #expect(model.shownTranscriptTitle == "Board review")
+
+        model.route = .statistics
+        let rested = await waitUntil { window.title == "Parola" }
+        #expect(rested)
+    }
+
     @Test("the take's title trips no window filter: not the Mini Player's, not Settings', in either language")
     func titleTripsNoFilter() throws {
         let it = try italianBundle()

@@ -195,6 +195,22 @@ extension AppModel {
     }
 
     /// A take still playing from its working file goes by its own title, never the file's name.
+    /// The name the transcript header shows.
+    var transcriptHeaderTitle: String {
+        recordedTakeTitle(playing: sourceFileURL) ?? Self.transcriptDisplayTitle(
+            sourceFileURL: sourceFileURL,
+            entry: selectedEntryID.flatMap { libraryEntry(id: $0) },
+            showsAITitle: showAITitles,
+            fallback: String(localized: "Untitled")
+        )
+    }
+
+    /// The header's name while the main window shows a transcript; nil on any other page.
+    var shownTranscriptTitle: String? {
+        guard route == .transcript, hasTranscript, !isBrowsingLibrary, case .ready = transcriptRoutePhase else { return nil }
+        return transcriptHeaderTitle
+    }
+
     var currentTranscriptTitle: String {
         recordedTakeTitle(playing: sourceFileURL) ?? Self.transcriptDisplayTitle(
             sourceFileURL: sourceFileURL,

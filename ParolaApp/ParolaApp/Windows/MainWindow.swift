@@ -25,16 +25,17 @@ extension View {
     }
 }
 
-/// The main window's title: the app's name, or "Recording — Parola" while a take runs, for the Window menu, Mission Control and VoiceOver.
+/// The main window's title for the Window menu, Mission Control and VoiceOver: a running take's, else the open transcript's, else the app's.
 enum MainWindowTitle {
     nonisolated static let resting = "Parola"
 
-    nonisolated static func title(takeRunning: Bool, bundle: Bundle = .main) -> String {
-        takeRunning ? String(localized: "Recording — Parola", bundle: bundle) : resting
+    nonisolated static func title(takeRunning: Bool, transcriptTitle: String? = nil, bundle: Bundle = .main) -> String {
+        if takeRunning { return String(localized: "Recording — Parola", bundle: bundle) }
+        return transcriptTitle ?? resting
     }
 }
 
-/// Keeps `AppModel.mainWindow` on the window this content sits in, and lets go of it as that window closes; the title follows the take, and closing it mid-take asks first.
+/// Keeps `AppModel.mainWindow` on the window this content sits in, and lets go of it as that window closes; the title follows the take and the open transcript, and closing it mid-take asks first.
 struct MainWindowReporter: NSViewRepresentable {
     let model: AppModel
 
@@ -99,7 +100,7 @@ struct MainWindowReporter: NSViewRepresentable {
 
         private func nameWindow() {
             guard let model, let window else { return }
-            let title = MainWindowTitle.title(takeRunning: model.takeIsRunning)
+            let title = MainWindowTitle.title(takeRunning: model.takeIsRunning, transcriptTitle: model.shownTranscriptTitle)
             if window.title != title { window.title = title }
         }
 

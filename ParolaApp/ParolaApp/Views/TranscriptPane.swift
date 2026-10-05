@@ -77,7 +77,7 @@ struct TranscriptPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TranscriptHeaderBar(title: headerTitle)
+            TranscriptHeaderBar(title: model.transcriptHeaderTitle)
             Divider()
 
             if model.transcriptFindBarShows {
@@ -107,15 +107,6 @@ struct TranscriptPane: View {
         }
         .task { model.refreshAIAvailability() }
         .axBranch("Transcript")
-    }
-
-    private var headerTitle: String {
-        model.recordedTakeTitle(playing: model.sourceFileURL) ?? AppModel.transcriptDisplayTitle(
-            sourceFileURL: model.sourceFileURL,
-            entry: model.selectedEntryID.flatMap { model.libraryEntry(id: $0) },
-            showsAITitle: model.showAITitles,
-            fallback: String(localized: "Untitled")
-        )
     }
 
     private var transcriptColumn: some View {

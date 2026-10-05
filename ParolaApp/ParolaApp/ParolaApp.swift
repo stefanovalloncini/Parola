@@ -15,7 +15,8 @@ private func applyAppAppearance(_ theme: String) {
 
 @MainActor
 private func applyAlwaysOnTop(_ on: Bool) {
-    for window in NSApp.windows where window.canBecomeMain && !window.title.contains("Mini") {
+    // Main and viewer windows carry their transcript's name, so the Mini Player is told apart by its own titles.
+    for window in NSApp.windows where window.canBecomeMain && !["Mini Player", "Parola Mini Player"].contains(window.title) {
         window.level = on ? .floating : .normal
     }
 }
