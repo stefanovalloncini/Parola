@@ -4,8 +4,8 @@ import Foundation
 /// shared `EngineRegistry`, manages model loading, and emits transcription events.
 ///
 /// Idle-unload: the diarizer is released after a short fixed idle; the active transcriber
-/// stays warm until `idleTimeout` seconds of inactivity or critical memory pressure, then
-/// the next transcribe call transparently reloads.
+/// stays warm until `idleTimeout` seconds of inactivity or memory pressure, then the next
+/// transcribe call transparently reloads. Pressure during a run unloads when the run ends.
 public actor TranscriptionSession {
     public let modelStore: ModelStore
     public var idleTimeout: TimeInterval
@@ -22,6 +22,7 @@ public actor TranscriptionSession {
     private var diarizerIdle = IdleUnloadTimer()
     private var pressureSource: (any DispatchSourceMemoryPressure)?
     private var activeRun: Int?
+    private var unloadWhenRunEnds = false
     private var lastRunID = 0
     private var transcribeWaiters: [CheckedContinuation<Void, Never>] = []
     private var diarizeStep: DiarizeStep?
@@ -312,6 +313,12 @@ public actor TranscriptionSession {
     private func releaseTranscribeSlot(_ runID: Int) {
         guard activeRun == runID else { return }
         activeRun = nil
+        if unloadWhenRunEnds, transcribeWaiters.isEmpty {
+            unloadWhenRunEnds = false
+            cancelIdleTimer()
+            let unloadRun = claimTranscribeSlot()
+            Task { await self.unloadModel(holding: unloadRun) }
+        }
         wakeTranscribeWaiters()
     }
 
@@ -326,10 +333,10 @@ public actor TranscriptionSession {
         // The zombie's engine keeps its weights resident until its parked read finally returns —
         // unload() would itself block, so the next run just loads a second copy.
         let zombieModel = await transcriber?.loadedModelName() ?? "unknown"
-        activeRun = nil
-        wakeTranscribeWaiters()
+        guard activeRun == runID else { return }
         transcriber = nil
         transcriberEngineID = nil
+        releaseTranscribeSlot(runID)
         ParolaLog.notice(
             .models, "abandoned a cancelled run that never unwound",
             [.model: .safe(ModelToken(zombieModel))]
@@ -363,6 +370,28 @@ public actor TranscriptionSession {
                 .models, "prewarm failed for \(ModelToken(modelName))", [.error: .error(error)]
             )
         }
+    }
+
+    /// Unloads `name` if it is the loaded model and no run is active or queued.
+    public func unloadModel(ifLoaded name: String) async {
+        guard let slot = tryAcquireTranscribeSlot() else { return }
+        defer { releaseTranscribeSlot(slot) }
+        guard await transcriber?.loadedModelName() == name else { return }
+        await unloadModel()
+    }
+
+    /// A run in flight keeps its model: unloading under it frees nothing and breaks what it still reads.
+    func unloadUnderPressure() async {
+        guard let slot = tryAcquireTranscribeSlot() else {
+            unloadWhenRunEnds = true
+            return
+        }
+        await unloadModel(holding: slot)
+    }
+
+    private func unloadModel(holding slot: Int) async {
+        await unloadModel()
+        releaseTranscribeSlot(slot)
     }
 
     public func unloadModel() async {
@@ -543,10 +572,10 @@ public actor TranscriptionSession {
 
     private func installPressureSourceIfNeeded() {
         guard pressureSource == nil else { return }
-        let source = DispatchSource.makeMemoryPressureSource(eventMask: .critical, queue: .global())
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .global())
         source.setEventHandler { [weak self] in
             guard let self else { return }
-            Task { await self.unloadModel() }
+            Task { await self.unloadUnderPressure() }
         }
         source.activate()
         pressureSource = source
