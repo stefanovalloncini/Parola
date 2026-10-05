@@ -47,9 +47,11 @@ private final class TakeHarness: Sendable {
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
+    let captureStarted = TestSignal()
 
     func install(_ ingest: @escaping @Sendable ([Float]) -> Void) {
         state.withLock { $0.ingest = ingest }
+        captureStarted.fire()
     }
 
     func recordDecode(sampleCount: Int) {
@@ -82,12 +84,15 @@ private func launchTake(
     on session: StreamingTranscriptionSession,
     persister: StreamingAudioPersister,
     harness: TakeHarness,
-    useVAD: Bool = false
+    useVAD: Bool = false,
+    modelLease: StreamingModelLease? = nil
 ) async -> AsyncStream<StreamingEvent> {
     var configuration = StreamingRealtimeLoop.Configuration()
     configuration.useVAD = useVAD
     let loopConfiguration = configuration
-    return await session.launch(options: TranscriptionOptions(), speakerLabeler: nil, persister: persister) { sink, confirmed in
+    return await session.launch(
+        options: TranscriptionOptions(), speakerLabeler: nil, persister: persister, modelLease: modelLease
+    ) { sink, confirmed in
         StreamingRealtimeLoop(
             configuration: loopConfiguration,
             decodingOptions: DecodingOptions(),
@@ -178,6 +183,91 @@ struct StreamingTakeEndingTests {
         await loader.finish()
 
         #expect(try await starting.value == "kit")
+    }
+
+    private static let tiny = "openai_whisper-tiny"
+
+    private static func seededStore() throws -> ModelStore {
+        let store = ModelStore(modelsDirectory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-streaming-lease-\(UUID().uuidString)"))
+        try store.seedInstalledModel(tiny)
+        return store
+    }
+
+    @Test("a take stopped during the model load returns its lease")
+    func stopDuringLoadReturnsTheLease() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let session = StreamingTranscriptionSession(modelStore: try Self.seededStore(), modelCache: cache)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+
+        await session.stop()
+        await gate.open(Self.tiny)
+
+        let events = try #require(try await starting.value("the start to return"))
+        var finished = false
+        for await event in events {
+            if case .finished = event { finished = true }
+        }
+        #expect(finished)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        #expect(await cache.droppedLeases == 0, "returned by the session, not by the lease's deinit")
+    }
+
+    @Test("a take cancelled during the model load returns its lease")
+    func cancelDuringLoadReturnsTheLease() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let session = StreamingTranscriptionSession(modelStore: try Self.seededStore(), modelCache: cache)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+
+        await session.cancel()
+        await gate.open(Self.tiny)
+
+        await #expect(throws: CancellationError.self) { _ = try await starting.value("the start to return") }
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        #expect(await cache.droppedLeases == 0, "returned by the session, not by the lease's deinit")
+    }
+
+    @Test("a start that fails after the borrow returns its lease")
+    func failedStartReturnsTheLease() async throws {
+        let probe = CacheProbe()
+        let cache = StreamingModelCache.probing(probe)
+        let session = StreamingTranscriptionSession(modelStore: try Self.seededStore(), modelCache: cache)
+
+        await #expect(throws: ParolaError.self) {
+            _ = try await session.start(options: TranscriptionOptions(model: Self.tiny))
+        }
+        #expect(probe.loads.value == 1, "the borrow happened before the tokenizer check failed")
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        #expect(await cache.droppedLeases == 0, "returned by the session, not by the lease's deinit")
+    }
+
+    @Test("teardown releases the lease", arguments: [true, false])
+    func teardownReleasesTheLease(stopping: Bool) async throws {
+        let cache = StreamingModelCache.probing(CacheProbe())
+        let lease = try await cache.borrow(Self.tiny, store: try Self.seededStore())
+        let session = StreamingTranscriptionSession(persistAudio: true)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        defer { try? FileManager.default.removeItem(at: persister.url) }
+        let harness = TakeHarness()
+        let events = await launchTake(on: session, persister: persister, harness: harness, modelLease: lease)
+        await harness.captureStarted.wait("capture to start")
+        #expect(await cache.leaseCount(for: Self.tiny) == 1, "the running take holds the model")
+
+        if stopping {
+            await session.stop()
+        } else {
+            await session.cancel()
+        }
+
+        for await _ in events {}
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        #expect(await cache.droppedLeases == 0, "returned by the session, not by the lease's deinit")
     }
 
     @Test("a take stopped before capture finishes with an empty transcript and nothing else")

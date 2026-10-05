@@ -291,13 +291,16 @@ struct StreamingLoggingTests {
         #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 3)
     }
 
-    @Test("the model cache reports a swallowed load failure and only that")
+    @Test("the model cache reports a swallowed load failure, each unload and a dropped lease with the model and nothing else")
     func cacheSites() throws {
         let source = try streamingSource("StreamingModelCache")
         expectCalls([
             #"if !isCancellation(error) { ParolaLog.error( .streaming, "model load failed", [.model: .safe(ModelToken(modelName)), .error: .error(error)]"#,
+            #"ParolaLog.info( .streaming, "model unloaded after idle", [.model: .safe(ModelToken(name)), .elapsed: .duration(idleTimeout)]"#,
+            #"ParolaLog.notice(.streaming, "model unloaded under memory pressure", [.model: .safe(ModelToken(name))])"#,
+            #"ParolaLog.fault(.streaming, "a model lease was dropped without release", [.model: .safe(ModelToken(modelName))])"#,
         ], in: source)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 1)
+        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 4)
     }
 
     private func callArguments(startingAt text: String) -> String {

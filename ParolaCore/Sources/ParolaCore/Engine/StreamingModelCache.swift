@@ -2,52 +2,192 @@ import Foundation
 import os
 @preconcurrency import WhisperKit
 
-// Safe because borrowers only read model components off the kit — a session that needs per-run
-// decoder state builds its own TextDecoder over the borrowed model rather than writing to this
-// one; concurrent reads match what WhisperKit's own transcribe TaskGroup does when
-// concurrentWorkerCount > 1.
+// Safe because borrowers only read the kit (a session decodes with a TextDecoder of its own) and the cache unloads or reloads its models only while no lease on it is out.
 struct SharedWhisperKit: @unchecked Sendable {
     let kit: WhisperKit
 }
 
+/// A model borrowed from the streaming cache. The model stays loaded while any lease on it is
+/// out, so release it once nothing decodes with it; a lease dropped unreleased is returned late.
+public final class StreamingModelLease: Sendable {
+    let shared: SharedWhisperKit
+    public let modelName: String
+    private let cache: StreamingModelCache
+    private let isReleased = OSAllocatedUnfairLock(initialState: false)
+
+    init(shared: SharedWhisperKit, modelName: String, cache: StreamingModelCache) {
+        self.shared = shared
+        self.modelName = modelName
+        self.cache = cache
+    }
+
+    public func release() async {
+        guard markReleased() else { return }
+        await cache.returnLease(modelName)
+    }
+
+    private func markReleased() -> Bool {
+        isReleased.withLock { released in
+            defer { released = true }
+            return !released
+        }
+    }
+
+    deinit {
+        guard markReleased() else { return }
+        Task { [cache, modelName] in await cache.returnDroppedLease(modelName) }
+    }
+}
+
 /// Keeps loaded streaming WhisperKit instances alive across sessions so a dictation press
 /// or live-captions start doesn't pay the model load again. Borrowers share one instance
-/// per model name; loads are single-flight. Eviction is explicit (`unloadAll`) or driven
-/// by the critical memory-pressure hook; sessions never unload on stop.
+/// per model name and hold a lease while they decode; loads are single-flight. A model with
+/// no lease out unloads after `idleTimeout` or on memory pressure and keeps its kit, so the
+/// next borrow reloads only the CoreML models.
 actor StreamingModelCache {
     static let shared = StreamingModelCache()
 
     typealias Loader = @Sendable (_ modelName: String, _ store: ModelStore) async throws -> SharedWhisperKit
+    typealias Reloader = @Sendable (SharedWhisperKit) async throws -> Void
+    typealias Unloader = @Sendable (SharedWhisperKit) async -> Void
 
-    private let loader: Loader
-    private var loaded: [String: SharedWhisperKit] = [:]
-    private var inFlight: [String: Task<SharedWhisperKit, Error>] = [:]
-    private var currentModelName: String?
-    private var evictionEpoch = 0
-    private var pressureSource: (any DispatchSourceMemoryPressure)?
-
-    init(loader: @escaping Loader = StreamingModelCache.loadKit) {
-        self.loader = loader
+    private struct Entry {
+        let shared: SharedWhisperKit
+        var isResident = true
+        var unloading: Task<Void, Never>?
     }
 
-    func borrow(_ modelName: String, store: ModelStore) async throws -> SharedWhisperKit {
+    private struct Load {
+        let id: Int
+        let task: Task<SharedWhisperKit, Error>
+        var dropUnlessLeased = false
+    }
+
+    private let loader: Loader
+    private let reloader: Reloader
+    private let unloader: Unloader
+    private let idleTimeout: Duration
+    private let clock: any Clock<Duration>
+    private var entries: [String: Entry] = [:]
+    private var inFlight: [String: Load] = [:]
+    private var leases: [String: Int] = [:]
+    private var currentModelName: String?
+    private var lastLoadID = 0
+    private(set) var droppedLeases = 0
+    private var idleUnload = IdleUnloadTimer()
+    private var pressureSource: (any DispatchSourceMemoryPressure)?
+
+    init(
+        loader: @escaping Loader = StreamingModelCache.loadKit,
+        reloader: @escaping Reloader = StreamingModelCache.reloadKit,
+        unloader: @escaping Unloader = StreamingModelCache.unloadKit,
+        idleTimeout: Duration = ModelResidency.idleTimeout,
+        clock: any Clock<Duration> = ContinuousClock()
+    ) {
+        self.loader = loader
+        self.reloader = reloader
+        self.unloader = unloader
+        self.idleTimeout = idleTimeout
+        self.clock = clock
+    }
+
+    func borrow(_ modelName: String, store: ModelStore) async throws -> StreamingModelLease {
         installPressureSourceIfNeeded()
+        idleUnload.disarm()
+        // Counted before the load is awaited, so an evict or pressure unload landing while the load
+        // is in flight already sees this borrower.
+        leases[modelName, default: 0] += 1
+        do {
+            let shared = try await residentKit(modelName, store: store)
+            return StreamingModelLease(shared: shared, modelName: modelName, cache: self)
+        } catch {
+            returnLease(modelName)
+            throw error
+        }
+    }
+
+    /// Loads the model without holding it: it idles out unless a borrow comes first.
+    func warm(_ modelName: String, store: ModelStore) async {
+        installPressureSourceIfNeeded()
+        _ = try? await residentKit(modelName, store: store)
+        armIdleUnloadIfUnleased()
+    }
+
+    func returnLease(_ modelName: String) {
+        let remaining = max(leaseCount(for: modelName) - 1, 0)
+        leases[modelName] = remaining == 0 ? nil : remaining
+        if remaining == 0 { armIdleUnloadIfUnleased() }
+    }
+
+    func returnDroppedLease(_ modelName: String) {
+        droppedLeases += 1
+        ParolaLog.fault(.streaming, "a model lease was dropped without release", [.model: .safe(ModelToken(modelName))])
+        returnLease(modelName)
+    }
+
+    func leaseCount(for modelName: String) -> Int {
+        leases[modelName, default: 0]
+    }
+
+    func residentModelNames() -> [String] {
+        entries.filter(\.value.isResident).keys.sorted()
+    }
+
+    /// Unloads every model no lease holds; a load nobody has borrowed is dropped when it lands.
+    @discardableResult
+    func unloadUnleased() -> [String] {
+        for name in inFlight.keys where leaseCount(for: name) == 0 {
+            inFlight[name]?.dropUnlessLeased = true
+        }
+        return unloadIdleModels()
+    }
+
+    /// Drops the model and its kit unless a lease holds it, so deleting its files frees the disk.
+    func evict(_ modelName: String) {
+        guard leaseCount(for: modelName) == 0 else { return }
+        inFlight[modelName]?.dropUnlessLeased = true
+        entries[modelName] = nil
+    }
+
+    func unloadAll() {
+        idleUnload.disarm()
+        for load in inFlight.values { load.task.cancel() }
+        entries.removeAll()
+        inFlight.removeAll()
+    }
+
+    private func residentKit(_ modelName: String, store: ModelStore) async throws -> SharedWhisperKit {
         // Borrowing a new name is a model switch: dropping the other entries frees their
         // multi-GB kits once running sessions release theirs.
         currentModelName = modelName
-        loaded = loaded.filter { $0.key == modelName }
-        if let shared = loaded[modelName] { return shared }
+        entries = entries.filter { $0.key == modelName }
+        if let entry = entries[modelName], entry.isResident { return entry.shared }
         if let pending = inFlight[modelName] {
-            return try await Self.awaitCancellable(pending)
+            return try await Self.awaitCancellable(pending.task)
         }
+        return try await Self.awaitCancellable(startLoad(modelName, store: store))
+    }
 
-        let loader = loader
-        let myEpoch = evictionEpoch
+    private func startLoad(_ modelName: String, store: ModelStore) -> Task<SharedWhisperKit, Error> {
+        lastLoadID &+= 1
+        let loadID = lastLoadID
+        let load: @Sendable () async throws -> SharedWhisperKit
+        if let kept = entries[modelName] {
+            let reloader = reloader
+            load = { [shared = kept.shared, unloading = kept.unloading] in
+                await unloading?.value
+                try await reloader(shared)
+                return shared
+            }
+        } else {
+            let loader = loader
+            load = { try await loader(modelName, store) }
+        }
         // Books its own result before any borrower resumes; Task {}, not detached, so the log scope follows the load.
         let task = Task { [weak self] in
             let kit: SharedWhisperKit
             do {
-                kit = try await loader(modelName, store)
+                kit = try await load()
             } catch {
                 if !isCancellation(error) {
                     ParolaLog.error(
@@ -55,23 +195,65 @@ actor StreamingModelCache {
                         [.model: .safe(ModelToken(modelName)), .error: .error(error)]
                     )
                 }
-                await self?.finishLoad(modelName, epoch: myEpoch, kit: nil)
+                await self?.finishLoad(modelName, loadID: loadID, kit: nil)
                 throw error
             }
-            await self?.finishLoad(modelName, epoch: myEpoch, kit: kit)
+            await self?.finishLoad(modelName, loadID: loadID, kit: kit)
             return kit
         }
-        inFlight[modelName] = task
-        return try await Self.awaitCancellable(task)
+        inFlight[modelName] = Load(id: loadID, task: task)
+        return task
     }
 
-    private func finishLoad(_ modelName: String, epoch: Int, kit: SharedWhisperKit?) {
-        guard evictionEpoch == epoch else { return }
+    private func finishLoad(_ modelName: String, loadID: Int, kit: SharedWhisperKit?) {
+        guard let load = inFlight[modelName], load.id == loadID else { return }
         inFlight[modelName] = nil
+        let unleased = leaseCount(for: modelName) == 0
         // Cache only the latest requested name: a switch may have superseded this load
         // while it ran, and caching both would leave two multi-GB kits resident.
-        if let kit, currentModelName == modelName {
-            loaded[modelName] = kit
+        guard let kit, currentModelName == modelName, !(load.dropUnlessLeased && unleased) else {
+            entries[modelName] = nil
+            return
+        }
+        entries[modelName] = Entry(shared: kit)
+        if unleased { armIdleUnloadIfUnleased() }
+    }
+
+    private func unloadIdleModels() -> [String] {
+        let idle = residentModelNames().filter { leaseCount(for: $0) == 0 }
+        idle.forEach(unloadModels(of:))
+        return idle
+    }
+
+    private func unloadModels(of modelName: String) {
+        guard var entry = entries[modelName], entry.isResident, leaseCount(for: modelName) == 0 else { return }
+        let unloader = unloader
+        let shared = entry.shared
+        entry.isResident = false
+        entry.unloading = Task { await unloader(shared) }
+        entries[modelName] = entry
+    }
+
+    private func armIdleUnloadIfUnleased() {
+        guard residentModelNames().contains(where: { leaseCount(for: $0) == 0 }) else { return }
+        idleUnload.arm(after: idleTimeout, clock: clock) { [weak self] epoch in
+            await self?.unloadAfterIdle(epoch: epoch)
+        }
+    }
+
+    private func unloadAfterIdle(epoch: Int) {
+        guard idleUnload.isCurrent(epoch) else { return }
+        for name in unloadIdleModels() {
+            ParolaLog.info(
+                .streaming, "model unloaded after idle",
+                [.model: .safe(ModelToken(name)), .elapsed: .duration(idleTimeout)]
+            )
+        }
+    }
+
+    private func unloadUnderPressure() {
+        for name in unloadUnleased() {
+            ParolaLog.notice(.streaming, "model unloaded under memory pressure", [.model: .safe(ModelToken(name))])
         }
     }
 
@@ -106,19 +288,12 @@ actor StreamingModelCache {
         }
     }
 
-    func unloadAll() {
-        evictionEpoch += 1
-        for task in inFlight.values { task.cancel() }
-        loaded.removeAll()
-        inFlight.removeAll()
-    }
-
     private func installPressureSourceIfNeeded() {
         guard pressureSource == nil else { return }
-        let source = DispatchSource.makeMemoryPressureSource(eventMask: .critical, queue: .global())
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .global())
         source.setEventHandler { [weak self] in
             guard let self else { return }
-            Task { await self.unloadAll() }
+            Task { await self.unloadUnderPressure() }
         }
         source.activate()
         pressureSource = source
@@ -136,5 +311,13 @@ actor StreamingModelCache {
             download: false
         )
         return SharedWhisperKit(kit: kit)
+    }
+
+    private static func reloadKit(_ shared: SharedWhisperKit) async throws {
+        try await shared.kit.loadModels()
+    }
+
+    private static func unloadKit(_ shared: SharedWhisperKit) async {
+        await shared.kit.unloadModels()
     }
 }

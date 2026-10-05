@@ -42,12 +42,13 @@ public enum StreamingTranscriberFactory {
         return StreamingTranscriptionSession(modelStore: modelStore, persistAudio: persistAudio, deviceUID: deviceUID)
     }
 
-    /// Loads the model into the shared streaming cache so the next session start skips the load.
+    /// Loads the model into the shared streaming cache so the next session start skips the load;
+    /// it unloads again after `ModelResidency.idleTimeout` unless a session borrows it.
     /// Opportunistic: no-ops when a mock transcriber is installed or the model isn't downloaded,
     /// and swallows load failures.
     public static func prewarm(modelName: String, modelStore: ModelStore = .shared) async {
         guard MockStreamingTranscriberRegistry.shared.resolve() == nil else { return }
         guard modelStore.isInstalled(modelName) else { return }
-        _ = try? await StreamingModelCache.shared.borrow(modelName, store: modelStore)
+        await StreamingModelCache.shared.warm(modelName, store: modelStore)
     }
 }
