@@ -51,4 +51,18 @@ public enum StreamingTranscriberFactory {
         guard modelStore.isInstalled(modelName) else { return }
         await StreamingModelCache.shared.warm(modelName, store: modelStore)
     }
+
+    /// Unloads every streaming model no running session holds.
+    public static func releaseIdleModels() async {
+        await StreamingModelCache.shared.unloadUnleased()
+    }
+
+    /// Drops the model from the streaming cache unless a running session holds it.
+    public static func evict(modelName: String) async {
+        await StreamingModelCache.shared.evict(modelName)
+    }
+
+    public static func residentModelNames() async -> [String] {
+        await StreamingModelCache.shared.residentModelNames()
+    }
 }
