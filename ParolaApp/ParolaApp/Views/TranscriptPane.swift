@@ -83,7 +83,7 @@ struct TranscriptPane: View {
             )
             Divider()
 
-            if model.findIsOpen {
+            if model.transcriptFindBarShows {
                 FindBar()
             }
 

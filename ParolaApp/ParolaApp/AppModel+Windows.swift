@@ -104,7 +104,13 @@ extension AppModel {
     func beginFind() {
         if let session = keyViewerSession {
             session.beginSearch()
-        } else {
+            return
+        }
+        switch transcriptPaneMode {
+        case .chat:
+            chatSearchRequests &+= 1
+        case .summary, .transcript:
+            setTranscriptPaneMode(.transcript)
             if !findIsOpen { toggleFind() }
             findFocusRequests &+= 1
         }
@@ -123,9 +129,12 @@ extension AppModel {
         return hasMatches
     }
 
+    /// Find stays open behind Summary and Chat, so coming back finds the query where it was.
+    var transcriptFindBarShows: Bool { findIsOpen && transcriptPaneMode == .transcript }
+
     var keyWindowFindIsOpen: Bool {
         if let session = keyViewerSession { return session.searchIsOpen }
-        return findIsOpen
+        return transcriptFindBarShows
     }
 
     var keyWindowHasPlayer: Bool {

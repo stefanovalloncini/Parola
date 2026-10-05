@@ -51,6 +51,7 @@ struct ChatPane: View {
         .task { await refreshUserPrompts() }
         .onAppear { isSearching = isSearchingPersisted }
         .onChange(of: isSearching) { _, value in isSearchingPersisted = value }
+        .onChange(of: model.chatSearchRequests) { _, _ in beginSearch() }
         .focusedSceneValue(\.focusChatComposer, FocusChatComposerAction { composerFocused = true })
         .onChange(of: composerFocused) { _, focused in noteComposerFocus(focused) }
         .onDisappear { noteComposerFocus(false) }
@@ -138,7 +139,6 @@ struct ChatPane: View {
                 }
                 .buttonStyle(GlyphButtonStyle())
                 .help("Search chat (⌘F)")
-                .keyboardShortcut("f", modifiers: [.command])
                 .accessibilityLabel(isSearching ? "Hide search" : "Search messages")
                 .axLeaf("Header.Button.ToggleSearch")
 
@@ -291,6 +291,13 @@ struct ChatPane: View {
 
     private var sessionKey: ChatSessionKey {
         ChatSessionKey(entryID: model.selectedEntryID, hasTranscript: model.transcript != nil)
+    }
+
+    private func beginSearch() {
+        if !isSearching {
+            withAnimation(.easeOut(duration: 0.18)) { isSearching = true }
+        }
+        searchFocused = true
     }
 
     private func toggleSearch() {

@@ -728,6 +728,8 @@ final class AppModel {
     var findIsOpen: Bool = false
     /// Bumped by Edit › Find…; the find bar watches the count, so a second ⌘F puts the caret back too.
     var findFocusRequests: Int = 0
+    /// Bumped by Edit › Find… while Chat shows; the chat pane opens its message filter on each.
+    var chatSearchRequests: Int = 0
     /// Bumped by every replacement, so the find bar lets go of its field and the next ⌘Z reaches the transcript.
     var findReplacements: Int = 0
     var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }

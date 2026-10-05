@@ -192,7 +192,7 @@ struct EditCommands: View {
             .disabled(!model.keyWindowFindIsOpen || !model.keyWindowHasMatches)
         Button("Replace All") { model.replaceAllMatches() }
             .keyboardShortcut("e", modifiers: [.command, .option])
-            .disabled(!model.findIsOpen || !model.hasMatches || model.keyWindowIsViewer)
+            .disabled(!model.transcriptFindBarShows || !model.hasMatches || model.keyWindowIsViewer)
         Divider()
         let searchTitle = model.route.searchTitle()
         Button(searchTitle ?? String(localized: "Search Library")) { model.focusLibrarySearch() }

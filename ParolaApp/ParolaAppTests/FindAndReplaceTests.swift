@@ -186,6 +186,41 @@ struct FindAndReplaceTests {
         #expect(model.findFocusRequests == before &+ 2)
     }
 
+    @Test("Find… in Summary shows the transcript and opens its bar there")
+    func findInSummaryShowsTheTranscript() {
+        model.transcriptPaneMode = .summary
+
+        model.beginFind()
+
+        #expect(model.transcriptPaneMode == .transcript)
+        #expect(model.findIsOpen)
+    }
+
+    @Test("Find… in Chat opens the chat's message filter, not the transcript's bar")
+    func findInChatFiltersMessages() {
+        model.transcriptPaneMode = .chat
+        let before = model.chatSearchRequests
+
+        model.beginFind()
+
+        #expect(model.transcriptPaneMode == .chat)
+        #expect(!model.findIsOpen)
+        #expect(model.chatSearchRequests == before &+ 1)
+    }
+
+    @Test("a Find left open in the transcript can't step or replace while another pane shows")
+    func findHiddenOutsideTheTranscript() {
+        openFind(query: "world")
+        #expect(model.keyWindowFindIsOpen)
+
+        model.transcriptPaneMode = .summary
+        #expect(!model.keyWindowFindIsOpen)
+        #expect(!model.transcriptFindBarShows)
+
+        model.transcriptPaneMode = .transcript
+        #expect(model.transcriptFindBarShows)
+    }
+
     @Test("every replacement asks the find bar for a fresh editing session")
     func replacementsAreCounted() {
         openFind(query: "world")
