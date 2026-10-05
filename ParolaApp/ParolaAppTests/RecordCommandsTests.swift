@@ -116,6 +116,29 @@ extension TranscriberMockSuites {
     }
 }
 
+@MainActor
+@Suite("Record button chrome")
+struct RecordButtonChromeTests {
+    @Test("the record button wears the plain glass style, not the prominent one")
+    func plainGlass() {
+        let button = RecordControl.styledButton(action: {}, showsModes: false)
+        let typeName = String(describing: type(of: button))
+        #expect(typeName.contains("GlassButtonStyle"))
+        #expect(!typeName.contains("Prominent"))
+    }
+
+    @Test("the dot is the recording red")
+    func dotColor() {
+        #expect(RecordButtonLabel.dotColor == DS.Color.recordingFill)
+    }
+
+    @Test("the dot dims along with the label and chevron when disabled")
+    func dimsTogether() {
+        #expect(RecordButtonLabel.contentOpacity(isEnabled: true) == 1)
+        #expect(RecordButtonLabel.contentOpacity(isEnabled: false) == DS.Opacity.disabled)
+    }
+}
+
 @Suite("Record commands in Italian")
 struct RecordCommandsItalianTests {
     @Test("the recording commands and the New menu read in Italian")

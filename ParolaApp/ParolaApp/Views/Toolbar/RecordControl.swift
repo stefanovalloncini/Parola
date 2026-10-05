@@ -36,33 +36,24 @@ struct RecordControl: View {
     }
 
     private func recordButton(_ source: AppModel.RecordSource) -> some View {
-        Button {
-            model.startRecording(source: source)
-        } label: {
-            HStack(spacing: DS.Spacing.snug) {
-                Image(systemName: "circle.fill")
-                    .font(.system(size: 9, weight: .bold))
-                    .accessibilityHidden(true)
-                Text("Record")
+        Self.styledButton(action: { model.startRecording(source: source) }, showsModes: showsModes)
+            .disabled(!model.canStartTake(source))
+            .help(source == .microphone ? "Record from the microphone" : "Record system audio")
+            .accessibilityLabel("Record")
+            .axLeaf("Toolbar.Button.Record")
+            .overlay(alignment: .trailing) {
                 if showsModes {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .semibold))
-                        .padding(.leading, DS.Spacing.hair)
-                        .accessibilityHidden(true)
+                    modesMenu
                 }
             }
+    }
+
+    /// The plain glass the other toolbar buttons wear; only the dot inside stays red.
+    static func styledButton(action: @escaping () -> Void, showsModes: Bool) -> some View {
+        Button(action: action) {
+            RecordButtonLabel(showsModes: showsModes)
         }
-        .buttonStyle(.glassProminent)
-        .tint(DS.Color.recordingFill)
-        .disabled(!model.canStartTake(source))
-        .help(source == .microphone ? "Record from the microphone" : "Record system audio")
-        .accessibilityLabel("Record")
-        .axLeaf("Toolbar.Button.Record")
-        .overlay(alignment: .trailing) {
-            if showsModes {
-                modesMenu
-            }
-        }
+        .buttonStyle(.glass)
     }
 
     /// Invisible and laid over the chevron: a Menu ignores the glass styles, and a Button can't open a menu.
@@ -130,5 +121,35 @@ struct RecordControl: View {
         .disabled(!active && reason != nil)
         .help(active ? "" : reason ?? "")
         .axLeaf("Toolbar.MenuItem.LiveCaptions")
+    }
+}
+
+/// The dot, "Record", and the chevron: the only red in the toolbar is the dot.
+struct RecordButtonLabel: View {
+    var showsModes: Bool
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    static let dotColor = DS.Color.recordingFill
+
+    static func contentOpacity(isEnabled: Bool) -> Double {
+        isEnabled ? 1 : DS.Opacity.disabled
+    }
+
+    var body: some View {
+        HStack(spacing: DS.Spacing.snug) {
+            Image(systemName: "circle.fill")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Self.dotColor)
+                .accessibilityHidden(true)
+            Text("Record")
+            if showsModes {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .padding(.leading, DS.Spacing.hair)
+                    .accessibilityHidden(true)
+            }
+        }
+        .opacity(Self.contentOpacity(isEnabled: isEnabled))
     }
 }
