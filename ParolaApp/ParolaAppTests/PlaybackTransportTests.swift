@@ -56,4 +56,24 @@ struct PlaybackTransportTests {
         #expect(bar.contains(".onKeyPress(.leftArrow) { step(by: PlaybackSkip.back.seconds) }"))
         #expect(bar.contains(".onKeyPress(.rightArrow) { step(by: PlaybackSkip.forward.seconds) }"))
     }
+
+    @Test("following the playhead or a search hit jumps under Reduce Motion")
+    func followRespectsReduceMotion() {
+        #expect(DS.Motion.follow(reduceMotion: true) == nil)
+        #expect(DS.Motion.follow(reduceMotion: false) == DS.Motion.followSegment)
+    }
+
+    @Test("every transcript scroll that follows the playhead or a hit asks Reduce Motion first, in both windows")
+    func everyFollowAsksReduceMotion() throws {
+        let files = [
+            "Views/Transcript/ContinuousTranscript", "Views/Transcript/SegmentsScroll",
+            "Windows/EntryViewerContinuous", "Windows/EntryViewerTranscript",
+        ]
+        for file in files {
+            let view = try source(file)
+            #expect(view.contains("@Environment(\\.accessibilityReduceMotion) private var reduceMotion"), "\(file)")
+            #expect(view.contains("withAnimation(DS.Motion.follow(reduceMotion: reduceMotion))"), "\(file)")
+            #expect(!view.contains("withAnimation(.easeInOut(duration: 0.2))"), "\(file)")
+        }
+    }
 }

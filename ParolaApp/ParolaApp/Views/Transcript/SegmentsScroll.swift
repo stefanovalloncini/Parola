@@ -24,6 +24,7 @@ struct SegmentsScroll: View {
     }
 
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoveredSpeaker: String?
     @State private var derived = Derived()
     @State private var qcByID: [Int: [SubtitleQC.Issue]] = [:]
@@ -84,7 +85,7 @@ struct SegmentsScroll: View {
             }
             .onChange(of: model.currentSegmentID) { _, id in
                 guard let id, model.player?.timeControlStatus == .playing || model.findIsOpen else { return }
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) {
                     proxy.scrollTo(id, anchor: .center)
                 }
             }
@@ -141,7 +142,7 @@ struct SegmentsScroll: View {
             if derived.visible.contains(where: { $0.id == id }) { break }
         }
         guard derived.visible.contains(where: { $0.id == id }) else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) {
             proxy.scrollTo(id, anchor: .center)
         }
     }

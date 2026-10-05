@@ -55,11 +55,7 @@ struct EntryViewerSegments: View {
             // a transient view of that pane, not of a transcript opened in its own window.
             .onChange(of: session.currentSegmentID) { _, id in
                 guard let id else { return }
-                if reduceMotion {
-                    proxy.scrollTo(id, anchor: .center)
-                } else {
-                    withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
-                }
+                withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) { proxy.scrollTo(id, anchor: .center) }
             }
         }
     }

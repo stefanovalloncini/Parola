@@ -57,6 +57,7 @@ struct ContinuousChunks: View {
     let scrollProxy: ScrollViewProxy
 
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var chunks: [Chunk] = []
     @State private var chunkIndexBySegment: [TranscriptSegment.ID: Int] = [:]
     @State private var highlightedSegmentID: TranscriptSegment.ID?
@@ -163,7 +164,7 @@ struct ContinuousChunks: View {
             if chunkIndexBySegment[id] != nil { break }
         }
         guard let chunkID = chunkIndexBySegment[id] else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) {
             scrollProxy.scrollTo(chunkID, anchor: .center)
         }
     }
@@ -299,7 +300,7 @@ struct ContinuousChunks: View {
         guard let id = model.currentSegmentID,
               model.player?.timeControlStatus == .playing || model.findIsOpen,
               let chunkID = chunkIndexBySegment[id] else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) {
             scrollProxy.scrollTo(chunkID, anchor: .center)
         }
     }

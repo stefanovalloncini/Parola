@@ -48,11 +48,7 @@ struct EntryViewerContinuous: View {
             .onChange(of: session.currentSegmentID) { _, id in
                 applyHighlight()
                 guard let id, let chunkID = chunkIndexBySegment[id] else { return }
-                if reduceMotion {
-                    proxy.scrollTo(chunkID, anchor: .center)
-                } else {
-                    withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(chunkID, anchor: .center) }
-                }
+                withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) { proxy.scrollTo(chunkID, anchor: .center) }
             }
         }
     }

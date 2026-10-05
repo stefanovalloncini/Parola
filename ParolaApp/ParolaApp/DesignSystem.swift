@@ -31,6 +31,10 @@ enum DS {
         static let listRows = SwiftUI.Animation.easeOut(duration: 0.22)
         static let progress = SwiftUI.Animation.easeOut(duration: 0.5)
         static let resize = SwiftUI.Animation.easeOut(duration: 0.25)
+        static let followSegment = SwiftUI.Animation.easeInOut(duration: 0.2)
+
+        /// The transcript scrolling to the playing segment or a search hit; under Reduce Motion it jumps.
+        static func follow(reduceMotion: Bool) -> SwiftUI.Animation? { reduceMotion ? nil : followSegment }
     }
 
     /// One reading of "you can't press this", so two disabled controls never sit side by side at different weights.
