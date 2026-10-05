@@ -246,6 +246,20 @@ struct StreamingLoggingTests {
         }
     }
 
+    @Test("a lease returned with none out is reported as a fault and changes nothing")
+    func strayLeaseReturnReported() async throws {
+        try await withSink { sink in
+            let cache = StreamingModelCache { _, _ in throw StreamingLogFailure() }
+            await cache.returnLease("openai_whisper-tiny")
+            let record = try #require(
+                streamingRecords(sink, message: "a model lease came back with none out").first
+            )
+            #expect(record.level == .fault)
+            #expect(record.fields[.model]?.text == "openai_whisper-tiny")
+            #expect(await cache.leaseCount(for: "openai_whisper-tiny") == 0)
+        }
+    }
+
     // MARK: - Source pins
 
     // The live-session seams need a loaded WhisperKit model and a running mic, so they are pinned in source.
@@ -291,7 +305,7 @@ struct StreamingLoggingTests {
         #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 3)
     }
 
-    @Test("the model cache reports a swallowed load failure, each unload and a dropped lease with the model and nothing else")
+    @Test("the model cache reports a swallowed load failure, each unload and a stray lease with the model and nothing else")
     func cacheSites() throws {
         let source = try streamingSource("StreamingModelCache")
         expectCalls([
@@ -299,8 +313,9 @@ struct StreamingLoggingTests {
             #"ParolaLog.info( .streaming, "model unloaded after idle", [.model: .safe(ModelToken(name)), .elapsed: .duration(idleTimeout)]"#,
             #"ParolaLog.notice(.streaming, "model unloaded under memory pressure", [.model: .safe(ModelToken(name))])"#,
             #"ParolaLog.fault(.streaming, "a model lease was dropped without release", [.model: .safe(ModelToken(modelName))])"#,
+            #"ParolaLog.fault(.streaming, "a model lease came back with none out", [.model: .safe(ModelToken(modelName))])"#,
         ], in: source)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 4)
+        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 5)
     }
 
     private func callArguments(startingAt text: String) -> String {

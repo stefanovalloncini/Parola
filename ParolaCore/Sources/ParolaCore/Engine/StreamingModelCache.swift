@@ -114,9 +114,13 @@ actor StreamingModelCache {
     }
 
     func returnLease(_ modelName: String) {
-        let remaining = max(leaseCount(for: modelName) - 1, 0)
-        leases[modelName] = remaining == 0 ? nil : remaining
-        if remaining == 0 { armIdleUnloadIfUnleased() }
+        let held = leaseCount(for: modelName)
+        guard held > 0 else {
+            ParolaLog.fault(.streaming, "a model lease came back with none out", [.model: .safe(ModelToken(modelName))])
+            return
+        }
+        leases[modelName] = held == 1 ? nil : held - 1
+        if held == 1 { armIdleUnloadIfUnleased() }
     }
 
     func returnDroppedLease(_ modelName: String) {
