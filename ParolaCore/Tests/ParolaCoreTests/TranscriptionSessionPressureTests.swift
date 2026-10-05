@@ -153,6 +153,25 @@ struct TranscriptionSessionPressureTests {
         #expect(await session.currentModel() == nil)
     }
 
+    @Test("an unload during the run answers its pressure, so the run's end arms the idle timers")
+    func anUnloadDuringTheRunAnswersThePressure() async throws {
+        let stub = GatedTranscriber()
+        let clock = TestClock()
+        let (session, audioURL) = try await makeSession(clock: clock, transcriber: stub)
+        let run = GuardedTask { try await transcribe(session, audioURL) }
+        defer { stub.transcribeGate.open() }
+        await stub.transcribeGate.arrivals.wait(atLeast: 1, "the run to reach the engine")
+
+        await session.unloadUnderPressure()
+        await session.unloadModel()
+        #expect(await session.diarizer.unloadCount == 1)
+
+        stub.transcribeGate.open()
+        _ = try await run.value("the run to finish")
+        await clock.waitForSleeper(count: 2, timeout: .seconds(5))
+        #expect(await session.diarizer.unloadCount == 1, "no second unload at the run's end")
+    }
+
     @Test("unloadModel(ifLoaded:) skips a running run")
     func unloadIfLoadedSkipsARunningRun() async throws {
         let stub = GatedTranscriber()

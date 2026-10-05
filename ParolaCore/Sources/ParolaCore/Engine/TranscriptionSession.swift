@@ -396,6 +396,7 @@ public actor TranscriptionSession {
 
     public func unloadModel() async {
         cancelIdleTimer()
+        unloadWhenRunEnds = false
         if let transcriber {
             await transcriber.unload()
         }
