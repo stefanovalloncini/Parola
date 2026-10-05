@@ -21,6 +21,9 @@ actor WhisperKitTranscriber: Transcriber {
         let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
         defer { signposter.endInterval("load", interval) }
         let startedAt = ContinuousClock.now
+        // A switch lets the old model go first, so the two are never resident together.
+        whisperKit = nil
+        loadedModel = nil
         do {
             let folder = modelStore.installedURL(for: model).path
             let kit = try await WhisperKit(

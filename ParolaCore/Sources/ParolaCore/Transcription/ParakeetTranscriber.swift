@@ -52,6 +52,9 @@ actor ParakeetTranscriber: Transcriber {
         let version = try Self.modelVersion(for: model)
         let targetDir = modelStore.installedURL(for: model)
         try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+        // A switch lets the old model go first, so the two are never resident together.
+        manager = nil
+        loadedModel = nil
 
         do {
             let models = try await AsrModels.downloadAndLoad(to: targetDir, version: version)
