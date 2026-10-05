@@ -35,7 +35,6 @@ final class EntryWindowSession {
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var statusObserver: NSKeyValueObservation?
     @ObservationIgnored private var matchesBySegment: [TranscriptSegment.ID: [TranscriptMatch]] = [:]
-    @ObservationIgnored private var segmentsByID: [TranscriptSegment.ID: TranscriptSegment] = [:]
     @ObservationIgnored private var searchDebounceTask: Task<Void, Never>?
     @ObservationIgnored private(set) var matchesTask: Task<Void, Never>?
     /// Runs the search off the main actor; a test swaps it to hold one scan open.
@@ -67,8 +66,6 @@ final class EntryWindowSession {
 
     /// The rows the window draws: every segment that has something to say, built once per load.
     private(set) var visibleSegments: [TranscriptSegment] = []
-
-    func segment(_ id: TranscriptSegment.ID) -> TranscriptSegment? { segmentsByID[id] }
 
     var entry: LibraryEntry? { model.libraryEntry(id: entryID) }
 
@@ -208,7 +205,6 @@ final class EntryWindowSession {
         visibleSegments = segments.filter {
             !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
-        segmentsByID = Dictionary(segments.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Frees the window's player and its observers. The registry calls this when the window closes.

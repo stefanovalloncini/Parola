@@ -75,23 +75,9 @@ struct EntryViewerContinuous: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded { onEditAttempt() })
     }
 
-    /// Painted per row, not in the stored chunks: only the paragraphs on screen pay, and the playhead's tint survives.
     private func searched(_ chunk: ContinuousChunks.Chunk) -> AttributedString {
         guard !session.matches.isEmpty else { return chunk.text }
-        var text = chunk.text
-        let currentMatchID = session.currentMatch?.id
-        for (segmentID, run) in chunk.runs {
-            let matches = session.matches(in: segmentID)
-            guard !matches.isEmpty, let segment = session.segment(segmentID) else { continue }
-            TranscriptSearchHighlight.paint(
-                in: &text,
-                runOffsets: run.offsets,
-                rawText: segment.text,
-                matches: matches,
-                currentMatchID: currentMatchID
-            )
-        }
-        return text
+        return ContinuousChunks.searched(chunk, matches: session.matches(in:), currentMatchID: session.currentMatch?.id)
     }
 
     private func chunkText(_ text: AttributedString) -> some View {

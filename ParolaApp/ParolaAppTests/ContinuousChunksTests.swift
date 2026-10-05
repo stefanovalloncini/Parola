@@ -3,6 +3,7 @@ import SwiftUI
 import Testing
 import ParolaCore
 @testable import Parola
+import ParolaTestSupport
 
 @MainActor
 @Suite("Continuous transcript chunking")
@@ -510,6 +511,38 @@ struct ContinuousChunksTests {
         move(&chunks, from: nil, to: 99)
         move(&chunks, from: 99, to: nil)
         #expect(chunks[0].text == pristine[0].text)
+    }
+
+    // MARK: - Find
+
+    private func painted(_ text: AttributedString) -> [(String, Color?)] {
+        text.runs.filter { $0.backgroundColor != nil }.map { (String(text[$0.range].characters), $0.backgroundColor) }
+    }
+
+    @Test("Find marks the matched words in the flowing text, the current one in accent")
+    func findMarksMatchedWords() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("chunkfind"))
+        let segments = [segment(0, " Hello world."), segment(1, "Hello again, world.", speaker: "Ada")]
+        model.transcript = Transcript(segments: segments, language: "en", modelName: "tiny")
+        model.findIsOpen = true
+        model.findQuery = "world"
+        model.recomputeMatches()
+        let chunks = build(segments)
+
+        let text = ContinuousChunks.searched(chunks[0], matches: model.match(in:), currentMatchID: model.currentMatch?.id)
+
+        let marks = painted(text)
+        #expect(marks.map(\.0) == ["world", "world"])
+        #expect(marks.map(\.1) == [TranscriptSearchHighlight.background(isCurrent: true), TranscriptSearchHighlight.background(isCurrent: false)])
+    }
+
+    @Test("with no matches the flowing text is left as built")
+    func noMatchesLeavesChunkAlone() {
+        let chunks = build([segment(0, "Hello world.")])
+
+        let text = ContinuousChunks.searched(chunks[0], matches: { _ in [] }, currentMatchID: nil)
+
+        #expect(text == chunks[0].text)
     }
 
     // MARK: - Build gate

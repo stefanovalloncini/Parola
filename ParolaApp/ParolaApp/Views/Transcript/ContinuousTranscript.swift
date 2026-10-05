@@ -22,6 +22,7 @@ struct ContinuousChunks: View {
     struct SegmentRun {
         let offsets: Range<Int>
         let baseColor: Color?
+        let rawText: String
     }
 
     struct Chunk: Identifiable {
@@ -115,15 +116,18 @@ struct ContinuousChunks: View {
 
     @ViewBuilder
     private func chunkRow(_ chunk: Chunk) -> some View {
+        let text = model.matches.isEmpty
+            ? chunk.text
+            : Self.searched(chunk, matches: model.match(in:), currentMatchID: model.currentMatch?.id)
         Group {
             if let translation = chunk.translation, model.translationSideBySide {
                 HStack(alignment: .top, spacing: DS.Spacing.regular) {
-                    chunkText(chunk.text)
+                    chunkText(text)
                     chunkText(translation)
                 }
             } else {
                 VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                    chunkText(chunk.text)
+                    chunkText(text)
                     if let translation = chunk.translation {
                         chunkText(translation)
                     }
@@ -393,7 +397,7 @@ struct ContinuousChunks: View {
             piece.link = URL(string: "parola-seek://\(seg.id)")
             piece.underlineStyle = nil
             let length = piece.characters.count
-            runs[seg.id] = SegmentRun(offsets: offset..<offset + length, baseColor: primaryText)
+            runs[seg.id] = SegmentRun(offsets: offset..<offset + length, baseColor: primaryText, rawText: seg.text)
             offset += length
             text.append(piece)
             if let translation = translations[seg.id]?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -411,6 +415,27 @@ struct ContinuousChunks: View {
         }
         closeChunk()
         return chunks
+    }
+
+    /// Painted per row, not in the stored chunks: only the paragraphs on screen pay, and the playhead's tint survives.
+    static func searched(
+        _ chunk: Chunk,
+        matches: (TranscriptSegment.ID) -> [TranscriptMatch],
+        currentMatchID: TranscriptMatch.ID?
+    ) -> AttributedString {
+        var text = chunk.text
+        for (segmentID, run) in chunk.runs {
+            let segmentMatches = matches(segmentID)
+            guard !segmentMatches.isEmpty else { continue }
+            TranscriptSearchHighlight.paint(
+                in: &text,
+                runOffsets: run.offsets,
+                rawText: run.rawText,
+                matches: segmentMatches,
+                currentMatchID: currentMatchID
+            )
+        }
+        return text
     }
 
     nonisolated static func chunkIndexBySegment(for chunks: [Chunk]) -> [TranscriptSegment.ID: Int] {
