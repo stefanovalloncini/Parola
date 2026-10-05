@@ -132,8 +132,8 @@ struct RecordButtonChromeTests {
         #expect(RecordButtonLabel.dotColor == DS.Color.recordingFill)
     }
 
-    @Test("the dot dims along with the label and chevron when disabled")
-    func dimsTogether() {
+    @Test("the dot dims when disabled")
+    func dotDims() {
         #expect(RecordButtonLabel.contentOpacity(isEnabled: true) == 1)
         #expect(RecordButtonLabel.contentOpacity(isEnabled: false) == DS.Opacity.disabled)
     }

@@ -132,6 +132,7 @@ struct RecordButtonLabel: View {
 
     static let dotColor = DS.Color.recordingFill
 
+    /// `.glass` dims inherited-colour content on its own; the dot's explicit colour needs this by hand.
     static func contentOpacity(isEnabled: Bool) -> Double {
         isEnabled ? 1 : DS.Opacity.disabled
     }
@@ -141,6 +142,7 @@ struct RecordButtonLabel: View {
             Image(systemName: "circle.fill")
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(Self.dotColor)
+                .opacity(Self.contentOpacity(isEnabled: isEnabled))
                 .accessibilityHidden(true)
             Text("Record")
             if showsModes {
@@ -150,6 +152,5 @@ struct RecordButtonLabel: View {
                     .accessibilityHidden(true)
             }
         }
-        .opacity(Self.contentOpacity(isEnabled: isEnabled))
     }
 }
