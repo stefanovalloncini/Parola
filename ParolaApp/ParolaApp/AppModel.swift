@@ -238,6 +238,8 @@ final class AppModel {
             refreshStageHoldsTake()
             if oldValue?.isRunning == true, !takeIsRunning {
                 foregroundLetGo()
+                // First: clearing the strip below brings back what waits under it.
+                if coveredNotice?.whileTakeRuns == true { coveredNotice = nil }
                 if exportNotice?.whileTakeRuns == true { exportNotice = nil }
             }
             if route == .recording, !Self.stageHasSomethingToShow(recording) { route = .transcript }

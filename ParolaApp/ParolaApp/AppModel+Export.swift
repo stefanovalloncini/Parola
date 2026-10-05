@@ -105,7 +105,9 @@ extension AppModel {
 
     /// Keeps what a newer notice went over, to come back once the strip is clear: one that waits to be dismissed, about something other than `takeID`, the newer one's take.
     func keepCovered(_ covered: ExportNotice?, take takeID: Int?) {
-        guard let covered, covered.id != exportNotice?.id, !covered.autoDismisses, !covered.whileTakeRuns else { return }
+        guard let covered, covered.id != exportNotice?.id, !covered.autoDismisses else { return }
+        // One that lasts only while a take runs comes back only for the take it names, and only while that take still runs.
+        guard !covered.whileTakeRuns || (covered.takeID != nil && covered.takeID == recording?.takeID && takeIsRunning) else { return }
         guard takeID == nil || covered.takeID != takeID else { return }
         coveredNotice = covered
     }

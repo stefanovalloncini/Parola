@@ -838,6 +838,59 @@ extension TranscriberMockSuites {
             #expect(model.coveredNotice == nil, "a notice whose buttons act on a take that is gone would come back")
         }
 
+        @Test("a notice for the take still recording, like the Mac audio stopping, comes back once a run failure over it is dismissed, and goes with the take's run")
+        func takeNoticeComesBackWhileTheTakeRuns() throws {
+            let model = makeRecordingModel("covered-take-notice")
+            model.installTestTake(source: .microphone)
+            defer { model.endTestTake() }
+            let take = try #require(model.recording?.takeID)
+            let macAudio = ExportNotice(
+                message: AppModel.macAudioStoppedMessage(), failures: [], folder: nil, tone: .info,
+                actions: [ExportNotice.Action(title: "Show", handler: .showTake(take))], whileTakeRuns: true
+            )
+            let failure = ExportNotice(message: "Couldn't transcribe A talk. The site refused the download.", failures: [], folder: nil, tone: .failure)
+
+            model.exportNotice = macAudio
+            model.exportNotice = failure
+            model.keepCovered(macAudio, take: nil)
+            model.dismissExportNotice()
+
+            #expect(model.exportNotice?.id == macAudio.id, "the take's notice went under the failure and never came back")
+            model.exportNotice = failure
+            model.keepCovered(macAudio, take: nil)
+            model.updateSession(of: take) { session in
+                _ = session.finish(at: Date())
+                _ = session.transcribing(progress: nil)
+            }
+            #expect(model.coveredNotice == nil, "the take's notice would come back after the take it speaks of")
+            model.dismissExportNotice()
+            #expect(model.exportNotice == nil)
+        }
+
+        @Test("a notice that lasts only while a take runs and names none, or names a take that isn't running, is not kept under another")
+        func namelessTakeNoticeIsNotKept() throws {
+            let model = makeRecordingModel("covered-nameless-notice")
+            model.installTestTake(source: .microphone)
+            defer { model.endTestTake() }
+            let take = try #require(model.recording?.takeID)
+            let finishFirst = ExportNotice(message: "Finish the recording first.", failures: [], folder: nil, tone: .info, whileTakeRuns: true)
+            // With a button it doesn't go on its own, so only the take rule keeps it from waiting.
+            let namelessWithButton = ExportNotice(
+                message: "Finish the recording first. Parola offers the recovered one again when it ends.", failures: [], folder: nil,
+                tone: .info, actions: [ExportNotice.Action(title: "Show Recently Deleted", handler: .openRecentlyDeleted)], whileTakeRuns: true
+            )
+            let otherTake = ExportNotice(
+                message: AppModel.macAudioStoppedMessage(), failures: [], folder: nil, tone: .info,
+                actions: [ExportNotice.Action(title: "Show", handler: .showTake(take + 1))], whileTakeRuns: true
+            )
+            model.exportNotice = ExportNotice(message: "Auto-export couldn't write to its folder.", failures: [], folder: nil, tone: .failure)
+
+            for covered in [finishFirst, namelessWithButton, otherTake] {
+                model.keepCovered(covered, take: nil)
+                #expect(model.coveredNotice == nil, "\(covered.message) would come back after its take")
+            }
+        }
+
         @Test("resetTestState forgets a notice waiting under a Mac-audio notice, so nothing from before the reset comes back")
         func resetForgetsIt() async throws {
             let model = makeRecordingModel("covered-notice-reset")
