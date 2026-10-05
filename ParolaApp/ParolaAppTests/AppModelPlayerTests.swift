@@ -41,6 +41,25 @@ struct AppModelPlayerTests {
         #expect(player.defaultRate == 1.5)
     }
 
+    @Test("next and previous segment step from the playing one, and start over from the first")
+    func segmentStepsFollowTheTranscript() {
+        let model = makeModel()
+        model.transcript = Self.makeTranscript([(0, 0, 1), (1, 2, 3), (2, 4, 5)])
+        model.player = AVPlayer()
+        model.currentSegmentID = 1
+
+        model.stepSegment(forward: true)
+        #expect(model.currentSegmentID == 2)
+        model.stepSegment(forward: true)
+        #expect(model.currentSegmentID == 0)
+        model.stepSegment(forward: false)
+        #expect(model.currentSegmentID == 0)
+
+        model.currentSegmentID = 2
+        model.stepSegment(forward: false)
+        #expect(model.currentSegmentID == 1)
+    }
+
     @Test("installPlayer creates a player and resets per-install state")
     func installPlayerCreatesPlayer() {
         let model = makeModel()

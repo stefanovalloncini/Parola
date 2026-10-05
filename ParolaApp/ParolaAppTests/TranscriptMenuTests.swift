@@ -100,4 +100,17 @@ struct TranscriptMenuTests {
         #expect(menu.contains(#".help(Self.keyHelp("⌘←"))"#))
         #expect(menu.contains(#".help(Self.keyHelp("⌘→"))"#))
     }
+
+    @Test("next and previous segment have menu keys and one glyph pair in the header and the mini player")
+    func segmentStepsShareOneGlyph() throws {
+        let menu = try transcriptMenu()
+        #expect(menu.contains(#"Button("Next Segment") { model.stepSegment(forward: true) } .keyboardShortcut(.downArrow, modifiers: [.command, .option])"#))
+        #expect(menu.contains(#"Button("Previous Segment") { model.stepSegment(forward: false) } .keyboardShortcut(.upArrow, modifiers: [.command, .option])"#))
+        let header = try source("Views/Transcript/TranscriptHeaderBar")
+        #expect(header.contains("Image(systemName: SegmentStep.next.symbol)"))
+        #expect(!header.contains("chevron.right.2"))
+        let mini = try source("Views/MiniPlayerWindow")
+        #expect(mini.contains("Image(systemName: SegmentStep.previous.symbol)"))
+        #expect(mini.contains("Image(systemName: SegmentStep.next.symbol)"))
+    }
 }

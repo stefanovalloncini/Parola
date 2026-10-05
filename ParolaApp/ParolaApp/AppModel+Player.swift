@@ -289,6 +289,17 @@ extension AppModel {
         seekPlayer(to: Self.skipTarget(current: current, by: seconds))
     }
 
+    /// Next or previous from the playing segment; past either end, or with none playing, it starts from the first.
+    func stepSegment(forward: Bool) {
+        guard let segments = transcript?.segments, let first = segments.first else { return }
+        guard let current = currentSegmentID, let index = segments.firstIndex(where: { $0.id == current }) else {
+            seek(to: first)
+            return
+        }
+        let target = index + (forward ? 1 : -1)
+        seek(to: segments.indices.contains(target) ? segments[target] : first)
+    }
+
     func seekToSegment(id: TranscriptSegment.ID) {
         guard player != nil, let seg = transcript?.segments.first(where: { $0.id == id }) else { return }
         seek(to: seg)

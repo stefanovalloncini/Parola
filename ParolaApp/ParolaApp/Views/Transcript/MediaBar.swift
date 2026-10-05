@@ -26,6 +26,13 @@ enum PlaybackSkip {
     }
 }
 
+/// Next and previous segment wear one glyph pair wherever they show.
+enum SegmentStep {
+    case previous, next
+
+    var symbol: String { self == .next ? "forward.fill" : "backward.fill" }
+}
+
 struct PlaybackSkipButton: View {
     let skip: PlaybackSkip
     let action: () -> Void

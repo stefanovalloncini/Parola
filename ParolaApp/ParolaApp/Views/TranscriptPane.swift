@@ -77,10 +77,7 @@ struct TranscriptPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TranscriptHeaderBar(
-                title: headerTitle,
-                onAdvance: advanceToNext
-            )
+            TranscriptHeaderBar(title: headerTitle)
             Divider()
 
             if model.transcriptFindBarShows {
@@ -119,17 +116,6 @@ struct TranscriptPane: View {
             showsAITitle: model.showAITitles,
             fallback: String(localized: "Untitled")
         )
-    }
-
-    private func advanceToNext() {
-        guard let segments = model.transcript?.segments, !segments.isEmpty else { return }
-        if let current = model.currentSegmentID,
-           let idx = segments.firstIndex(where: { $0.id == current }),
-           idx + 1 < segments.count {
-            model.seek(to: segments[idx + 1])
-        } else if let first = segments.first {
-            model.seek(to: first)
-        }
     }
 
     private var transcriptColumn: some View {

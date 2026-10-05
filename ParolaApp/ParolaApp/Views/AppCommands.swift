@@ -321,6 +321,14 @@ struct TranscriptCommands: View {
         Button("Back") { model.returnToOrigin() }
             .keyboardShortcut("[", modifiers: [.command])
             .disabled(!model.canReturnToOrigin)
+        Button("Next Segment") { model.stepSegment(forward: true) }
+            .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+            .disabled(!model.mainTranscriptCommandsEnabled || !model.keyWindowHasPlayer)
+            .axLeaf("Menu.Transcript.NextSegment")
+        Button("Previous Segment") { model.stepSegment(forward: false) }
+            .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+            .disabled(!model.mainTranscriptCommandsEnabled || !model.keyWindowHasPlayer)
+            .axLeaf("Menu.Transcript.PreviousSegment")
         Button("Jump to Next Speaker") { model.jumpToNextSpeaker() }
             .keyboardShortcut("j", modifiers: [.command, .shift])
             .disabled(!model.mainTranscriptCommandsEnabled)

@@ -46,8 +46,8 @@ struct MiniPlayerWindow: View {
 
     private var controls: some View {
         HStack(spacing: 10) {
-            Button(action: previous) {
-                Image(systemName: "backward.fill")
+            Button { model.stepSegment(forward: false) } label: {
+                Image(systemName: SegmentStep.previous.symbol)
             }
             .buttonStyle(.borderless)
             .disabled(model.transcript == nil)
@@ -68,8 +68,8 @@ struct MiniPlayerWindow: View {
             .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
             .axLeaf("MiniPlayer.Button.PlayPause")
 
-            Button(action: next) {
-                Image(systemName: "forward.fill")
+            Button { model.stepSegment(forward: true) } label: {
+                Image(systemName: SegmentStep.next.symbol)
             }
             .buttonStyle(.borderless)
             .disabled(model.transcript == nil)
@@ -80,28 +80,6 @@ struct MiniPlayerWindow: View {
             Spacer()
 
             MiniPlayerTimeLabel()
-        }
-    }
-
-    private func previous() {
-        guard let transcript = model.transcript, !transcript.segments.isEmpty else { return }
-        if let current = model.currentSegmentID,
-           let idx = transcript.segments.firstIndex(where: { $0.id == current }),
-           idx > 0 {
-            model.seek(to: transcript.segments[idx - 1])
-        } else if let first = transcript.segments.first {
-            model.seek(to: first)
-        }
-    }
-
-    private func next() {
-        guard let transcript = model.transcript, !transcript.segments.isEmpty else { return }
-        if let current = model.currentSegmentID,
-           let idx = transcript.segments.firstIndex(where: { $0.id == current }),
-           idx + 1 < transcript.segments.count {
-            model.seek(to: transcript.segments[idx + 1])
-        } else if let first = transcript.segments.first {
-            model.seek(to: first)
         }
     }
 }

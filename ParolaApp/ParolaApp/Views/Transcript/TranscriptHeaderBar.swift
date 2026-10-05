@@ -5,7 +5,6 @@ struct TranscriptHeaderBar: View {
     @Environment(AppModel.self) private var model
     @State private var speaker = TranscriptSpeaker()
     let title: String
-    let onAdvance: () -> Void
 
     @State private var outlineOpen = false
     @State private var jumpOpen = false
@@ -169,8 +168,8 @@ struct TranscriptHeaderBar: View {
     }
 
     private var advanceButton: some View {
-        Button(action: onAdvance) {
-            Image(systemName: "chevron.right.2")
+        Button { model.stepSegment(forward: true) } label: {
+            Image(systemName: SegmentStep.next.symbol)
                 .font(DS.Font.heading)
                 .frame(width: 28, height: 22)
                 .background(
@@ -179,8 +178,8 @@ struct TranscriptHeaderBar: View {
                 )
         }
         .buttonStyle(.plain)
-        .help("Jump to next segment")
-        .accessibilityLabel("Jump to next segment")
+        .help("Next segment")
+        .accessibilityLabel("Next segment")
         .axLeaf("HeaderBar.Button.Advance")
     }
 

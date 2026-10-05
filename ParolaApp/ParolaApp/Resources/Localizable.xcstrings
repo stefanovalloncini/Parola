@@ -7387,17 +7387,6 @@
         }
       }
     },
-    "Jump to next segment": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vai al segmento successivo"
-          }
-        }
-      }
-    },
     "Jump to time": {
       "extractionState": "manual",
       "localizations": {
@@ -8999,6 +8988,17 @@
         }
       }
     },
+    "Next Segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segmento successivo"
+          }
+        }
+      }
+    },
     "Next match": {
       "extractionState": "manual",
       "localizations": {
@@ -9006,6 +9006,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Match successivo"
+          }
+        }
+      }
+    },
+    "Next segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segmento successivo"
           }
         }
       }
@@ -11206,6 +11217,17 @@
         }
       }
     },
+    "Previous Segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segmento precedente"
+          }
+        }
+      }
+    },
     "Previous match": {
       "extractionState": "manual",
       "localizations": {
@@ -11213,6 +11235,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Match precedente"
+          }
+        }
+      }
+    },
+    "Previous segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segmento precedente"
           }
         }
       }
