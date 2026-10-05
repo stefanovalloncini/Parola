@@ -123,7 +123,6 @@ extension AppModel {
         installPlayer(for: url)
     }
 
-    /// The rate the next play starts at, and the running one's if the player is going.
     func applyPlaybackRate(_ rate: Double) {
         guard let player else { return }
         player.defaultRate = Float(rate)

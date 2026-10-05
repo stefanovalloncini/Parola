@@ -195,7 +195,6 @@ extension AppModel {
     }
 
     /// A take still playing from its working file goes by its own title, never the file's name.
-    /// The name the transcript header shows.
     var transcriptHeaderTitle: String {
         recordedTakeTitle(playing: sourceFileURL) ?? Self.transcriptDisplayTitle(
             sourceFileURL: sourceFileURL,

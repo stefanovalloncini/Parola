@@ -33,7 +33,6 @@ enum DS {
         static let resize = SwiftUI.Animation.easeOut(duration: 0.25)
         static let followSegment = SwiftUI.Animation.easeInOut(duration: 0.2)
 
-        /// The transcript scrolling to the playing segment or a search hit; under Reduce Motion it jumps.
         static func follow(reduceMotion: Bool) -> SwiftUI.Animation? { reduceMotion ? nil : followSegment }
     }
 
