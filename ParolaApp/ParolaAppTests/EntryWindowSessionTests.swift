@@ -191,7 +191,7 @@ struct EntryWindowSessionTests {
         let player = try #require(session.player)
         let revisionBefore = model.themeRevision
 
-        defaults.set("dark", forKey: "appTheme")
+        defaults.set(AppAccent.allCases.first { $0 != model.appAccent }?.rawValue, forKey: AppAccent.storageKey)
         model.reloadSettings()
 
         #expect(model.themeRevision != revisionBefore)

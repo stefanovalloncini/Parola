@@ -1157,8 +1157,9 @@ final class AppModel {
     @ObservationIgnored let features: FeatureSet
     @ObservationIgnored let introduction: IntroductionController
 
+    /// The palette's keys only: Light and Dark are NSApp.appearance's, and need no repaint.
     private func themeKeySnapshot() -> [String] {
-        [appTheme, appAccentRaw, String(themeIsCustom), themeCustomPaletteJSON]
+        [appAccentRaw, String(themeIsCustom), themeCustomPaletteJSON]
     }
 
     /// Re-reads every persisted setting into its observed property after a Reset or Import, suppressing the
