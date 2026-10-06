@@ -108,4 +108,11 @@ struct SettingsAccessoryAlignmentTests {
             expectFlush(MicrophonePane().environment(makeModel(defaults)), count: 2, "microphone")
         }
     }
+
+    @Test("the Microphone pane's level preview opens the real microphone in the app, never in the test host")
+    func microphonePreviewStaysShutInTheTestHost() {
+        #expect(MicrophonePane.opensPreview(environment: [:]))
+        #expect(!MicrophonePane.opensPreview(environment: ["XCTestConfigurationFilePath": ""]))
+        #expect(!MicrophonePane.opensPreview(), "this process is a test host")
+    }
 }

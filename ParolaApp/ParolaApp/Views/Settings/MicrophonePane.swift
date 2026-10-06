@@ -118,6 +118,11 @@ struct MicrophonePane: View {
         }
     }
 
+    /// A test host never opens the real microphone: an engine left waiting on CoreAudio there stalls every later CoreAudio call in the host.
+    static func opensPreview(environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        !TestHostSandbox.isTestHost(environment)
+    }
+
     private var savedDeviceDisconnected: Bool {
         !model.inputDeviceUID.isEmpty && !devices.contains { $0.uid == model.inputDeviceUID }
     }
@@ -125,6 +130,7 @@ struct MicrophonePane: View {
     private func startPreview() {
         stopPreview()
         startError = nil
+        guard Self.opensPreview() else { return }
         let controller = MicPreviewController(deviceUID: model.preferredInputDeviceUID)
         preview = controller
         Task {
