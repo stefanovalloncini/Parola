@@ -4,7 +4,7 @@ import SwiftUI
 /// The take while Parola is in the background: "● 12:34 ▂▅▇ ■" floating over other apps, dragged wherever the user likes.
 @MainActor
 final class RecordingPill {
-    static let originKey = "recordingPillOrigin"
+    nonisolated static let originKey = "recordingPillOrigin"
 
     private weak var model: AppModel?
     private let makesPanel: Bool

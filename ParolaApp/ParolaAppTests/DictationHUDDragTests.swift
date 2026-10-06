@@ -102,6 +102,47 @@ struct DictationHUDDragTests {
         #expect(next.frame == dragged)
     }
 
+    @Test("the Dictation pane's Reset and Reset all settings put a dragged HUD back in its style's place")
+    func resetForgetsTheDrag() {
+        let previous = DefaultsStore.current
+        let defaults = temporaryDefaults()
+        DefaultsStore.current = defaults
+        defer { DefaultsStore.current = previous }
+        let resets: [@MainActor () -> Void] = [
+            { SettingsResetService.reset(scope: .dictation) },
+            { SettingsResetService.resetAll() },
+        ]
+        for reset in resets {
+            let panel = makePanel()
+            let first = positioner(defaults)
+            first.place(panel, context(.overlay))
+            withExtendedLifetime(first) { panel.setFrameOrigin(NSPoint(x: 200, y: 600)) }
+            reset()
+
+            let next = makePanel()
+            positioner(defaults).place(next, context(.overlay))
+            #expect(next.frame == DictationHUDPlacement.frame(context(.overlay)))
+        }
+    }
+
+    @Test("a backup leaves out where the HUD and the recording pill were dragged, and Reset all settings clears both")
+    func dragSpotsStayOnThisMac() {
+        let previous = DefaultsStore.current
+        let defaults = temporaryDefaults()
+        DefaultsStore.current = defaults
+        defer { DefaultsStore.current = previous }
+        defaults.set(["overlay": [200.0, 600.0]], forKey: DictationHUDPositioner.spotsKey)
+        defaults.set([40.0, 80.0], forKey: RecordingPill.originKey)
+
+        let backup = SettingsExportService.exportPayload(defaults: defaults)
+        #expect(backup[DictationHUDPositioner.spotsKey] == nil)
+        #expect(backup[RecordingPill.originKey] == nil)
+
+        SettingsResetService.resetAll()
+        #expect(defaults.object(forKey: DictationHUDPositioner.spotsKey) == nil)
+        #expect(defaults.object(forKey: RecordingPill.originKey) == nil)
+    }
+
     @Test("a spot on a screen that's gone falls back to the style's place")
     func lostScreenFallsBack() {
         let defaults = temporaryDefaults()

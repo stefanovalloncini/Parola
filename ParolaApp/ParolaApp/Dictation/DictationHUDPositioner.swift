@@ -4,7 +4,7 @@ import Foundation
 /// Puts the dictation HUD where its style places it, or where the user dragged it, per style, as the recording pill remembers its spot.
 @MainActor
 final class DictationHUDPositioner {
-    static let spotsKey = "dictationHUDSpots"
+    nonisolated static let spotsKey = "dictationHUDSpots"
 
     private let defaults: UserDefaults
     private let screens: @MainActor () -> [NSRect]

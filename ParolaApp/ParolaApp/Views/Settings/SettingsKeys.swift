@@ -137,9 +137,14 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         "exportPresets", "destinations", "aiServices", "autoExportRules", "autoExportFolder", "dictationPerAppOverridesJSON",
     ]
 
-    /// What the pane's Reset to Defaults clears: its settings, never its lists.
+    /// What the pane's Reset to Defaults clears: its settings and where its panel was dragged, never its lists.
     func resetKeys(features: FeatureSet) -> [String] {
-        defaultsKeys(features: features).filter { !Self.userListKeys.contains($0) }
+        defaultsKeys(features: features).filter { !Self.userListKeys.contains($0) } + dragSpotKeys
+    }
+
+    /// A backup leaves these out, since they name this Mac's screens.
+    private var dragSpotKeys: [String] {
+        self == .dictation ? [DictationHUDPositioner.spotsKey] : []
     }
 
     func searchKeywords(features: FeatureSet) -> [String] {
@@ -256,6 +261,9 @@ enum UnscopedSettingsKeys {
         "summaryOptions", "autostartSummary",
         "libraryGroupsByDate", "lastRecordSource",
     ]
+
+    /// Where the recording pill and the dictation HUD were dragged: a full reset clears them, a backup leaves them out.
+    static let dragSpots = [RecordingPill.originKey, DictationHUDPositioner.spotsKey]
 }
 
 struct ResetPaneButton: View {
@@ -309,7 +317,7 @@ enum SettingsResetService {
                 defaults.removeObject(forKey: key)
             }
         }
-        for key in UnscopedSettingsKeys.all {
+        for key in UnscopedSettingsKeys.all + UnscopedSettingsKeys.dragSpots {
             defaults.removeObject(forKey: key)
         }
         NotificationCenter.default.post(name: .parolaSettingsReset, object: nil)
