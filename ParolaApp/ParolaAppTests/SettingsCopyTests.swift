@@ -78,6 +78,21 @@ struct SettingsCopyTests {
         #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
     }
 
+    @Test("the service editor's Test is off while Keep AI on this Mac pauses the service, and the editor says why")
+    func pausedServiceEditor() throws {
+        let model = makeModel("settings-copy-paused-editor")
+        let cloud = AIServiceConfig(kind: .openAI, name: "Work OpenAI", endpoint: nil, model: "gpt-4o-mini")
+        model.setAIServices([cloud])
+        model.userPrivacyMode = true
+        let editor = elements(
+            AIServiceEditor(draft: AIServiceDraft(service: cloud, isNew: false), onSave: { _, _ in }, onCancel: {}),
+            model: model
+        )
+        let test = try #require(editor.first { $0.identifier?.hasSuffix("AIServices.Button.Test") == true })
+        #expect(test.object.value(forKey: "accessibilityEnabled") as? Bool == false)
+        #expect(editor.flatMap(\.words).contains("Not used while AI stays on this Mac."))
+    }
+
     @Test("Customization's summary names what the pane holds")
     func customizationSummary() {
         #expect(SettingsRoute.customization.summary == "Appearance, theme colors and timestamp font.")

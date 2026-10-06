@@ -120,9 +120,15 @@ struct AIServiceEditor: View {
             HStack(spacing: 8) {
                 Button("Test", action: runTest)
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                    .disabled(!canSave || isTesting)
+                    .disabled(!canSave || isTesting || isPaused)
                     .axLeaf("AIServices.Button.Test")
                 if isTesting { ProgressView().controlSize(.small) }
+            }
+            if isPaused {
+                Text("Not used while AI stays on this Mac.")
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .axLeaf("AIServices.Label.Paused")
             }
             if let result {
                 AIServiceTestLabel(result: result)
@@ -149,6 +155,10 @@ struct AIServiceEditor: View {
     private var keyHelp: String {
         guard service.hasKey else { return String(localized: "Stored in your keychain, never in the settings file.") }
         return String(localized: "Key saved. Type a new one to replace it.")
+    }
+
+    private var isPaused: Bool {
+        model.aiServicePaused(saved())
     }
 
     private var canSave: Bool {

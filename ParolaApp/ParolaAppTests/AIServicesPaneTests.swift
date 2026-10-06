@@ -209,6 +209,17 @@ struct AIServicesPaneTests {
         #expect(model.addableAIServiceKinds == [.ollama])
     }
 
+    @Test("testing a service Keep AI on this Mac has paused says so, and blames no organization")
+    func pausedServiceTestSaysWhy() async {
+        let model = makeModel(defaults: temporaryDefaults())
+        let cloud = openAI()
+        model.setAIServices([cloud])
+        model.userPrivacyMode = true
+        let result = await model.testAIService(cloud, apiKey: "sk-test")
+        #expect(result.ok == false)
+        #expect(result.message == "Not used while AI stays on this Mac.")
+    }
+
     @Test("managed policy hides the remote rows, tiles and picker options")
     func managedPolicyHidesRemote() throws {
         let model = makeModel(

@@ -425,6 +425,9 @@ extension AppModel {
     /// Asks the service one short question. `apiKey` tests a key the editor hasn't saved yet; it is
     /// handed to the model for this call only and never written anywhere.
     func testAIService(_ service: AIServiceConfig, apiKey: String?) async -> AIServiceTestResult {
+        guard !aiServicePaused(service) else {
+            return AIServiceTestResult(ok: false, message: String(localized: "Not used while AI stays on this Mac."), milliseconds: 0)
+        }
         let trimmedKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
         let keyStore: (any APIKeyStore)? = {
             guard let trimmedKey, !trimmedKey.isEmpty, let provider = service.kind.keyProviderID else { return nil }
