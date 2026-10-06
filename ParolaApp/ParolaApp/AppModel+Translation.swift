@@ -33,10 +33,21 @@ extension AppModel {
 
     /// The one entry point for dropping a translation.
     func removeTranslation() async {
-        guard let entryID = selectedEntryID, transcript?.translation != nil else { return }
+        guard let entryID = selectedEntryID, let removed = transcript?.translation else { return }
         translationCoordinator.remove(entryID: entryID)
         transcript?.translation = nil
+        registerTranslationUndo(String(localized: "Remove Translation"), restoring: removed, for: entryID)
         await persistTranslation(nil, for: entryID)
+    }
+
+    private func registerTranslationUndo(_ actionName: String, restoring old: TranscriptTranslation?, for entryID: LibraryEntry.ID) {
+        registerUndoStep(actionName: actionName) { model in
+            guard model.selectedEntryID == entryID, model.transcript != nil else { return }
+            let current = model.transcript?.translation
+            model.transcript?.translation = old
+            model.registerTranslationUndo(actionName, restoring: current, for: entryID)
+            Task { await model.persistTranslation(old, for: entryID) }
+        }
     }
 
     func cancelTranslation() {

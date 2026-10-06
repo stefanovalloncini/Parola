@@ -64,8 +64,12 @@ extension AppModel {
             }
         }
         guard isOnScreen(entryID, askedAt: artifacts) else { return }
+        let before = aiResultsSnapshot
         transcript?.install(summary: summary, keepingChapters: keepingChapters)
         adoptSavedChapters()
+        if let before, let replaced = before.summary, !replaced.text.isEmpty {
+            registerAIResultsUndo(String(localized: "Regenerate Summary"), fields: [.summary, .chapters], before: before)
+        }
     }
 
     /// Whether a run's transcript is on screen: the same entry, or for an unsaved one the same install.
@@ -128,8 +132,9 @@ extension AppModel {
 
     func clearSummary() {
         aiJobs.cancel(.summary, for: selectedEntryID)
-        guard transcript?.summary != nil else { return }
+        guard let before = aiResultsSnapshot, before.summary != nil else { return }
         transcript?.removeSummary()
+        registerAIResultsUndo(String(localized: "Clear Summary"), fields: [.summary], before: before)
         adoptSavedChapters()
         summaryError = nil
         if let entryID = selectedEntryID {

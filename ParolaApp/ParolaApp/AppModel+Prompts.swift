@@ -118,15 +118,22 @@ extension AppModel {
             }
         }
         guard isOnScreen(entryID, askedAt: artifacts) else { return }
+        let before = aiResultsSnapshot
         actionItems = items
         transcript?.actionItems = items
+        if let before, !(before.actionItems ?? []).isEmpty {
+            registerAIResultsUndo(String(localized: "Find Action Items"), fields: [.actionItems], before: before)
+        }
     }
 
     func clearActionItems() {
         aiJobs.cancel(.actionItems, for: selectedEntryID)
         actionItems = []
-        guard transcript?.actionItems != nil else { return }
+        guard let before = aiResultsSnapshot, before.actionItems != nil else { return }
         transcript?.actionItems = nil
+        if !(before.actionItems ?? []).isEmpty {
+            registerAIResultsUndo(String(localized: "Clear Action Items"), fields: [.actionItems], before: before)
+        }
         guard let entryID = selectedEntryID else { return }
         Task { [library] in
             try? await library.setActionItems(nil, for: entryID)
@@ -234,14 +241,22 @@ extension AppModel {
             }
         }
         guard isOnScreen(entryID, askedAt: artifacts) else { return }
+        let before = aiResultsSnapshot
         smartChapters = chapters
         installChapters(chapters)
+        if let before, !(before.chapters ?? []).isEmpty {
+            registerAIResultsUndo(String(localized: "Regenerate Chapters"), fields: [.chapters], before: before)
+        }
     }
 
     func clearSmartChapters() {
         aiJobs.cancel(.chapters, for: selectedEntryID)
+        let before = aiResultsSnapshot
         smartChapters = []
         persistChapters([])
+        if let before, !(before.chapters ?? []).isEmpty {
+            registerAIResultsUndo(String(localized: "Clear Chapters"), fields: [.chapters], before: before)
+        }
     }
 
     /// Writes the card title and one-line summary for a saved entry, honoring the generation toggle.

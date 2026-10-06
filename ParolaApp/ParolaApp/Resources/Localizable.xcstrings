@@ -3457,6 +3457,39 @@
         }
       }
     },
+    "Clear Action Items": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Svuota azioni"
+          }
+        }
+      }
+    },
+    "Clear Chapters": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Svuota capitoli"
+          }
+        }
+      }
+    },
+    "Clear Conversation": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Svuota conversazione"
+          }
+        }
+      }
+    },
     "Clear Filters": {
       "extractionState": "manual",
       "localizations": {
@@ -3502,6 +3535,17 @@
         }
       }
     },
+    "Clear Summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Svuota riassunto"
+          }
+        }
+      }
+    },
     "Clear conversation": {
       "extractionState": "manual",
       "localizations": {
@@ -3520,6 +3564,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancella ricerca"
+          }
+        }
+      }
+    },
+    "Clear this conversation?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Svuotare questa conversazione?"
           }
         }
       }
@@ -12187,6 +12242,28 @@
         }
       }
     },
+    "Regenerate Chapters": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rigenera capitoli"
+          }
+        }
+      }
+    },
+    "Regenerate Summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rigenera riassunto"
+          }
+        }
+      }
+    },
     "Regenerate summary": {
       "extractionState": "manual",
       "localizations": {
@@ -12282,6 +12359,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rimuovi %@"
+          }
+        }
+      }
+    },
+    "Remove Translation": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi traduzione"
           }
         }
       }
@@ -15432,6 +15520,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La voce nella barra dei menu contiene azioni rapide e trascrizioni recenti. Senza icona nel Dock, Parola resta fuori da ⌘-Tab."
+          }
+        }
+      }
+    },
+    "The messages can't be brought back.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I messaggi non si potranno recuperare."
           }
         }
       }

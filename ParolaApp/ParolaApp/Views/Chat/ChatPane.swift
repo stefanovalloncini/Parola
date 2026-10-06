@@ -36,6 +36,7 @@ struct ChatPane: View {
     @State private var senderFilter: ChatSenderFilter = .all
     @State private var sendTask: Task<Void, Never>?
     @State private var userPrompts: [Prompt] = []
+    @State private var confirmingClear = false
     @FocusState private var composerFocused: Bool
     @FocusState private var searchFocused: Bool
 
@@ -142,8 +143,8 @@ struct ChatPane: View {
                 .accessibilityLabel(isSearching ? "Hide search" : "Search messages")
                 .axLeaf("Header.Button.ToggleSearch")
 
-                Button(role: .destructive, action: resetConversation) {
-                    Image(systemName: "arrow.counterclockwise")
+                Button(role: .destructive) { confirmingClear = true } label: {
+                    Image(systemName: "trash")
                         .font(DS.Font.bodyStrong)
                 }
                 .buttonStyle(GlyphButtonStyle())
@@ -152,6 +153,12 @@ struct ChatPane: View {
                 .disabled(displayedHistory.isEmpty || isSending)
                 .accessibilityLabel("Clear conversation")
                 .axLeaf("Header.Button.Reset")
+                .confirmationDialog("Clear this conversation?", isPresented: $confirmingClear) {
+                    Button("Clear Conversation", role: .destructive) { resetConversation() }
+                        .axLeaf("Header.Button.ConfirmReset")
+                } message: {
+                    Text("The messages can't be brought back.")
+                }
             }
             .padding(.vertical, -3)
         }
