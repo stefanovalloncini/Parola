@@ -15948,13 +15948,13 @@
         }
       }
     },
-    "These apply to the Transcript menu's copy commands, the library's bulk export and the subtitle warnings. Auto-export writes what each preset says.": {
+    "These apply to the Transcript menu's copy commands, the library's bulk export and the subtitle warnings. Presets keep their own settings.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Valgono per i comandi di copia del menu Trascrizione, per l'esportazione in blocco della libreria e per gli avvisi sui sottotitoli. L'esportazione automatica scrive quello che dice ogni preset."
+            "value": "Valgono per i comandi di copia del menu Trascrizione, per l'esportazione in blocco della libreria e per gli avvisi sui sottotitoli. I preset mantengono le proprie impostazioni."
           }
         }
       }
