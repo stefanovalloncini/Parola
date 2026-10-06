@@ -6,10 +6,11 @@ import Foundation
 /// progress aggregate, and writes to `destination/<filename>`. Cancellation tears down
 /// the current request; partial state lives in a `.parola-download.json` sidecar so
 /// the next attempt can resume.
-enum HuggingFaceDownloader {
-    static let sidecarFilename = ".parola-download.json"
+package enum HuggingFaceDownloader {
+    package static let sidecarFilename = ".parola-download.json"
+    static let revisionFilename = ".parola-revision"
 
-    static func snapshot(
+    package static func snapshot(
         repo: String,
         subpath: String?,
         destination: URL,
@@ -25,12 +26,102 @@ enum HuggingFaceDownloader {
 
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         let sidecarURL = destination.appendingPathComponent(sidecarFilename)
-        var sidecar = (try? DownloadSidecar.read(at: sidecarURL)) ?? DownloadSidecar(
+        try await fetch(
+            files,
             repo: repo,
             revision: revision,
-            files: [:]
+            into: destination,
+            sidecar: resumableSidecar(at: sidecarURL, in: destination, repo: repo, revision: revision),
+            urlSession: urlSession,
+            progress: progress
         )
+        try? FileManager.default.removeItem(at: sidecarURL)
+    }
 
+    /// Downloads the files of `repo` at commit `revision` that `include` names (a subtree when an entry ends in "/", else one file) to their repo paths under `destination`, then marks it with the revision.
+    package static func snapshot(
+        repo: String,
+        revision: String,
+        include: [String],
+        to destination: URL,
+        urlSession: URLSession = .shared,
+        progress: (@Sendable (Double) -> Void)?
+    ) async throws {
+        guard isCommitHash(revision) else {
+            throw ParolaError.modelDownloadFailed(repo, underlying: "Revision \(revision) is not a commit hash")
+        }
+        guard !include.isEmpty else {
+            throw ParolaError.modelDownloadFailed(repo, underlying: "Nothing to include")
+        }
+        if let bad = include.first(where: { !isPlainRepoPath($0) }) {
+            throw ParolaError.modelDownloadFailed(repo, underlying: "Bad include path \(bad)")
+        }
+        let progress = progress.map(DownloadProgressGate.gating)
+        do {
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            let sidecarURL = destination.appendingPathComponent(sidecarFilename)
+            let sidecar = resumableSidecar(at: sidecarURL, in: destination, repo: repo, revision: revision)
+            try sidecar.write(to: sidecarURL)
+            let markerURL = destination.appendingPathComponent(revisionFilename)
+            if FileManager.default.fileExists(atPath: markerURL.path) {
+                try FileManager.default.removeItem(at: markerURL)
+            }
+            let listed = try await listFiles(repo: repo, path: nil, revision: revision, urlSession: urlSession)
+            try await fetch(
+                included(listed, by: include, repo: repo, revision: revision),
+                repo: repo,
+                revision: revision,
+                into: destination,
+                sidecar: sidecar,
+                urlSession: urlSession,
+                progress: progress
+            )
+            try Data(revision.utf8).write(to: markerURL, options: .atomic)
+            try? FileManager.default.removeItem(at: sidecarURL)
+            progress?(1.0)
+        } catch let error where isCancellation(error) {
+            throw CancellationError()
+        }
+    }
+
+    /// The revision a finished include-list download left at `destination`; nil while one is unfinished or none ever finished.
+    package static func installedRevision(at destination: URL) -> String? {
+        let fm = FileManager.default
+        guard !fm.fileExists(atPath: destination.appendingPathComponent(sidecarFilename).path),
+              let data = fm.contents(atPath: destination.appendingPathComponent(revisionFilename).path),
+              let revision = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !revision.isEmpty
+        else { return nil }
+        return revision
+    }
+
+    /// A sidecar left by another revision is dropped with the files it recorded, so a pin bump never resumes into a mixed install.
+    private static func resumableSidecar(
+        at url: URL,
+        in destination: URL,
+        repo: String,
+        revision: String
+    ) -> DownloadSidecar {
+        let fresh = DownloadSidecar(repo: repo, revision: revision, files: [:])
+        guard let existing = try? DownloadSidecar.read(at: url) else { return fresh }
+        guard existing.revision != revision else { return existing }
+        for name in existing.files.keys where isPlainRepoPath(name) {
+            try? FileManager.default.removeItem(at: destination.appendingPathComponent(name))
+        }
+        return fresh
+    }
+
+    private static func fetch(
+        _ files: [ListedFile],
+        repo: String,
+        revision: String,
+        into destination: URL,
+        sidecar: DownloadSidecar,
+        urlSession: URLSession,
+        progress: (@Sendable (Double) -> Void)?
+    ) async throws {
+        var sidecar = sidecar
+        let sidecarURL = destination.appendingPathComponent(sidecarFilename)
         let totalBytes = files.reduce(Int64(0)) { $0 + ($1.size ?? 0) }
         var downloadedBytes = files.reduce(Int64(0)) { acc, entry in
             sidecar.files[entry.relativeName]?.complete == true ? acc + (entry.size ?? 0) : acc
@@ -131,8 +222,35 @@ enum HuggingFaceDownloader {
                 progress?(min(1.0, Double(downloadedBytes) / Double(totalBytes)))
             }
         }
+    }
 
-        try? FileManager.default.removeItem(at: sidecarURL)
+    private static func included(
+        _ files: [ListedFile],
+        by include: [String],
+        repo: String,
+        revision: String
+    ) throws -> [ListedFile] {
+        let candidates = files.filter { isPlainRepoPath($0.path) }
+        for item in include where !candidates.contains(where: { matches($0.path, item) }) {
+            ParolaLog.error(.models, "include path matched no file in the listing")
+            throw ParolaError.modelDownloadFailed(repo, underlying: "No \(item) at revision \(revision)")
+        }
+        return candidates.filter { file in include.contains { matches(file.path, $0) } }
+    }
+
+    private static func matches(_ path: String, _ item: String) -> Bool {
+        item.hasSuffix("/") ? path.hasPrefix(item) : path == item
+    }
+
+    private static func isPlainRepoPath(_ path: String) -> Bool {
+        let trimmed = path.hasSuffix("/") ? path.dropLast() : Substring(path)
+        guard !trimmed.isEmpty else { return false }
+        return trimmed.split(separator: "/", omittingEmptySubsequences: false)
+            .allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }
+    }
+
+    private static func isCommitHash(_ revision: String) -> Bool {
+        revision.count == 40 && revision.allSatisfy { $0.isASCII && $0.isHexDigit }
     }
 
     private static func fileSize(at url: URL) -> Int64 {
@@ -163,18 +281,30 @@ enum HuggingFaceDownloader {
         revision: String,
         urlSession: URLSession = .shared
     ) async throws -> [ListedFile] {
-        try Task.checkCancellation()
         let basePath = path.map { $0.hasSuffix("/") ? String($0.dropLast()) : $0 } ?? ""
         let endpoint = makeTreeURL(repo: repo, path: basePath, revision: revision)
 
-        var request = URLRequest(url: endpoint)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        let (data, response) = try await urlSession.data(for: request)
-        let httpStatus = (response as? HTTPURLResponse)?.statusCode
-        guard let httpStatus, (200..<300).contains(httpStatus) else {
-            throw ParolaError.modelDownloadFailed(repo, underlying: "Tree HTTP \(httpStatus ?? -1)")
-        }
-        let entries = try JSONDecoder().decode([TreeEntry].self, from: data)
+        var entries: [TreeEntry] = []
+        var cursor: String?
+        var seenCursors: Set<String> = []
+        repeat {
+            try Task.checkCancellation()
+            guard let page = treePageURL(endpoint, cursor: cursor) else {
+                throw ParolaError.modelDownloadFailed(repo, underlying: "Bad tree page cursor")
+            }
+            var request = URLRequest(url: page)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            let (data, response) = try await urlSession.data(for: request)
+            let httpStatus = (response as? HTTPURLResponse)?.statusCode
+            guard let httpStatus, (200..<300).contains(httpStatus) else {
+                throw ParolaError.modelDownloadFailed(repo, underlying: "Tree HTTP \(httpStatus ?? -1)")
+            }
+            entries += try JSONDecoder().decode([TreeEntry].self, from: data)
+            cursor = try nextPageCursor(of: response, repo: repo)
+            if let cursor, !seenCursors.insert(cursor).inserted {
+                throw ParolaError.modelDownloadFailed(repo, underlying: "Tree listing repeats a page")
+            }
+        } while cursor != nil
 
         // The tree request is recursive=true, so nested files are already in this listing;
         // recursing into "directory" entries would double-count every nested file.
@@ -204,6 +334,28 @@ enum HuggingFaceDownloader {
         }
         components.queryItems = [URLQueryItem(name: "recursive", value: "true")]
         return components.url!
+    }
+
+    private static func treePageURL(_ endpoint: URL, cursor: String?) -> URL? {
+        guard let cursor else { return endpoint }
+        return URL(string: endpoint.absoluteString + "&cursor=" + cursor)
+    }
+
+    /// The tree API pages a long listing through a `Link: <…&cursor=…>; rel="next"` header.
+    private static func nextPageCursor(of response: URLResponse, repo: String) throws -> String? {
+        guard let links = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Link"),
+              let next = links.split(separator: ",").first(where: {
+                  $0.replacingOccurrences(of: "\"", with: "").contains("rel=next")
+              })
+        else { return nil }
+        let target = next.drop { $0 != "<" }.dropFirst().prefix { $0 != ">" }
+        guard let cursor = URLComponents(string: String(target))?
+            .percentEncodedQueryItems?.first(where: { $0.name == "cursor" })?.value,
+            !cursor.isEmpty
+        else {
+            throw ParolaError.modelDownloadFailed(repo, underlying: "Tree listing has a next page without a cursor")
+        }
+        return cursor
     }
 
     private static func resolveURL(repo: String, path: String, revision: String) throws -> URL {
@@ -245,23 +397,35 @@ enum HuggingFaceDownloader {
     }
 }
 
-struct DownloadSidecar: Codable, Equatable {
-    struct FileRecord: Codable, Equatable {
-        var size: Int64
-        var sha256: String?
-        var complete: Bool
+package struct DownloadSidecar: Codable, Equatable, Sendable {
+    package struct FileRecord: Codable, Equatable, Sendable {
+        package var size: Int64
+        package var sha256: String?
+        package var complete: Bool
+
+        package init(size: Int64, sha256: String?, complete: Bool) {
+            self.size = size
+            self.sha256 = sha256
+            self.complete = complete
+        }
     }
 
-    var repo: String
-    var revision: String
-    var files: [String: FileRecord]
+    package var repo: String
+    package var revision: String
+    package var files: [String: FileRecord]
 
-    static func read(at url: URL) throws -> DownloadSidecar {
+    package init(repo: String, revision: String, files: [String: FileRecord]) {
+        self.repo = repo
+        self.revision = revision
+        self.files = files
+    }
+
+    package static func read(at url: URL) throws -> DownloadSidecar {
         let data = try Data(contentsOf: url)
         return try JSONDecoder().decode(DownloadSidecar.self, from: data)
     }
 
-    func write(to url: URL) throws {
+    package func write(to url: URL) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(self)
