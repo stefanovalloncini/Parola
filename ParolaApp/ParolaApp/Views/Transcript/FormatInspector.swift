@@ -27,7 +27,7 @@ struct FormatInspector: View {
                     .fieldChrome(focused: personFieldFocused)
                     .onSubmit { commitPerson() }
                     .axLeaf("Inspector.TextField.AddSpeaker")
-                HStack(spacing: DS.Spacing.snug) {
+                VStack(alignment: .leading, spacing: DS.Spacing.snug) {
                     Button("Rename Speakers…") { model.showingSpeakersSheet = true }
                         .axLeaf("Inspector.Button.RenameSpeakers")
                     Button("Manage People…") { model.showingPeopleSheet = true }
