@@ -656,8 +656,8 @@ struct StreamingCaptureFirstTests {
         await gate.open(Self.tiny)
     }
 
-    @Test("a take stopped during the model load keeps the audio it captured")
-    func stoppedTakeKeepsItsAudio() async throws {
+    @Test("a take stopped during the model load waits for the model and lands with the words it buffered")
+    func stoppedTakeWaitsForItsModel() async throws {
         let probe = CacheProbe()
         let gate = LoadGate()
         let cache = StreamingModelCache.probing(probe, gate: gate)
@@ -665,18 +665,49 @@ struct StreamingCaptureFirstTests {
         let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
         let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
         await probe.loads.wait(atLeast: 1, "the model load to start")
-        mic.speak(seconds: 1)
+        mic.speak(seconds: 2)
 
         let stopping = GuardedTask { await session.stop() }
-        _ = try await stopping.value("the stop to return without the model")
+        await mic.captureStopped.wait("capture to stop at once")
+        #expect(!stopping.isFinished, "the stop waits for the model")
+        #expect(mic.decodes.value == 0)
         await gate.open(Self.tiny)
+        _ = try await stopping.value("the stop to finish once the model is in")
 
         let events = try #require(try await starting.value("the start to return"))
         let finished = await finishedTranscript(of: events)
+        #expect(finished?.segments.map(\.text) == ["early words"])
+        #expect(mic.decodedSampleCounts == [33_600], "one flush decodes everything said before the stop")
         let audio = try #require(finished?.sourceURL)
         defer { try? FileManager.default.removeItem(at: audio) }
-        #expect(try AVAudioFile(forReading: audio).length == 17_600, "the file holds the take from its first buffer")
-        #expect(finished?.segments.isEmpty == true)
+        #expect(try AVAudioFile(forReading: audio).length == 33_600)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        #expect(await cache.droppedLeases == 0)
+    }
+
+    @Test("a take cancelled during the model load still ends at once and deletes its audio")
+    func cancelledTakeEndsAtOnce() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
+        let transcriber: any StreamingTranscriber = session
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+        mic.speak(seconds: 1)
+        let audio = try #require(await transcriber.recordingAudioURL())
+
+        let cancelling = GuardedTask { await session.cancel() }
+        _ = try await cancelling.value("the cancel to return without the model")
+
+        await #expect(throws: CancellationError.self) { _ = try await starting.value("the start to return") }
+        #expect(mic.captureStopped.fired)
+        #expect(mic.decodes.value == 0)
+        #expect(!FileManager.default.fileExists(atPath: audio.path))
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        #expect(await cache.droppedLeases == 0)
+        await gate.open(Self.tiny)
     }
 
     @Test("a start cancelled during the model load stops capture and returns its lease")

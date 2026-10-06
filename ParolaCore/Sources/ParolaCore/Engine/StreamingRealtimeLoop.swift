@@ -19,6 +19,8 @@ actor StreamingRealtimeLoop {
         var maxWindowSeconds: Double = 60
         var sampleRate = WhisperKit.sampleRate
         var wantsConfirmedAudio = false
+        /// A stop during the model load waits for the model and decodes what was captured; without it the stop drops that audio.
+        var finishesLoadOnStop = false
         /// How far held audio may run past `maxWindowSeconds` during the model load before it's cut back, so the cut isn't paid per buffer.
         var preModelSlackSeconds: Double = 5
     }
@@ -180,7 +182,9 @@ actor StreamingRealtimeLoop {
         case .loading(let load):
             markWaitingForSpeech()
             let loaded = await loadedModel(load)
-            guard isRunning else { return flushesOnStop ? .stopped : .cancelled }
+            guard isRunning || (flushesOnStop && config.finishesLoadOnStop) else {
+                return flushesOnStop ? .stopped : .cancelled
+            }
             switch loaded {
             case .success(let ready):
                 decoder = ready
@@ -291,7 +295,7 @@ actor StreamingRealtimeLoop {
     func stop() {
         stopRequested = true
         isRunning = false
-        modelLoad?.cancel()
+        if !(flushesOnStop && config.finishesLoadOnStop) { modelLoad?.cancel() }
         stopCapture()
         answerPermission(nil)
     }

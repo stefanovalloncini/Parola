@@ -818,6 +818,7 @@ struct StreamingRealtimeLoopTests {
     private func loadingLoop(
         maxWindowSeconds: Double = 60,
         preModelSlackSeconds: Double = 5,
+        finishesLoadOnStop: Bool = false,
         load: @escaping @Sendable () async throws -> Void
     ) -> (loop: StreamingRealtimeLoop, capture: FakeCapture, decodedSampleCounts: Awaitable<[Int]>) {
         let capture = FakeCapture()
@@ -826,6 +827,7 @@ struct StreamingRealtimeLoopTests {
         config.useVAD = false
         config.maxWindowSeconds = maxWindowSeconds
         config.preModelSlackSeconds = preModelSlackSeconds
+        config.finishesLoadOnStop = finishesLoadOnStop
         let loop = StreamingRealtimeLoop(
             configuration: config,
             dependencies: .init(
@@ -892,6 +894,27 @@ struct StreamingRealtimeLoopTests {
         }
         #expect(capture.stopCount == 1)
         #expect(decoded.value.isEmpty)
+    }
+
+    @Test("a stop that finishes the load waits for the model and decodes what was held")
+    func finishingStopDecodesHeldAudio() async throws {
+        let loadGate = UninterruptibleGate()
+        let (loop, capture, decoded) = loadingLoop(finishesLoadOnStop: true) { await loadGate.wait() }
+        let runTask = LoopRun(loop)
+        await loadGate.arrivals.wait(atLeast: 1, "the model load to start")
+        capture.push(seconds: 2, value: 0.5)
+
+        await loop.stop()
+        #expect(capture.stopCount == 1, "the mic stops at once")
+        #expect(decoded.value.isEmpty)
+        loadGate.open()
+
+        let outcome = await runTask.outcome()
+        guard case .stopped = outcome else {
+            Issue.record("expected .stopped, got \(String(describing: outcome))")
+            return
+        }
+        #expect(decoded.value == [2 * sampleRate])
     }
 
     @Test("a model that fails to load ends the run and stops capture")

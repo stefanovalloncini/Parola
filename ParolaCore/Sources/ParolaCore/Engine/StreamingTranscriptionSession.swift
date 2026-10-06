@@ -170,7 +170,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             options: options, speakerLabeler: speakerLabeler, persister: persister
         ) { [modelCache, modelStore] sink, confirmed in
             StreamingRealtimeLoop(
-                configuration: .init(wantsConfirmedAudio: speakerLabeler != nil),
+                configuration: .init(wantsConfirmedAudio: speakerLabeler != nil, finishesLoadOnStop: persistAudio),
                 dependencies: .init(
                     requestPermission: microphone.requestPermission,
                     startCapture: { ingest in
