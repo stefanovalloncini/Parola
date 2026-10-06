@@ -8,8 +8,7 @@ struct AutoExportPane: View {
     @State private var sort: AutoExportSort = .originalOrder
 
     var body: some View {
-        @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 SearchPill(text: $searchText, placeholder: "Search rules…", leaf: "AutoExport.TextField.Search")
                     .frame(maxWidth: 240)
@@ -55,7 +54,7 @@ struct AutoExportPane: View {
             }
             .axLeaf("AutoExport.Button.AddRule")
 
-            SettingHelper(text: "Auto-export writes additional files next to the source when transcription completes. Recordings and links have no folder of their own, so theirs go to the auto-export folder you choose, named after the entry. Leave a rule's extension field empty to match every file.")
+            SettingHelper(text: "When a transcription finishes, each rule writes its presets next to the source file, or into the auto-export folder for recordings and links.")
 
             SettingsSection {
                 SettingRow(
@@ -68,46 +67,6 @@ struct AutoExportPane: View {
                         .axLeaf("AutoExport.Button.ChooseFolder")
                 }
             }
-
-            SettingsSection("Export options") {
-                SettingRow("Subtitle line length",
-                           description: "Applied to SRT and VTT exports and to the subtitle length warnings in the transcript view.",
-                           isFirst: true) {
-                    Picker("", selection: $model.subtitleCaptionLengthRaw) {
-                        ForEach(CaptionLength.allCases) { preset in
-                            Text(preset.displayName).tag(preset.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 200, alignment: .trailing)
-                    .axLeaf("AutoExport.Picker.SubtitleLength")
-                }
-                SettingRow("Markdown timestamps",
-                           description: "Prefix each Markdown paragraph with its start time.") {
-                    Toggle("", isOn: $model.markdownTimestamps).labelsHidden()
-                        .axLeaf("AutoExport.Toggle.MarkdownTimestamps")
-                }
-                SettingRow("Plain text timestamps",
-                           description: "Prefix each TXT line with its start time.") {
-                    Toggle("", isOn: $model.txtExportTimestamps).labelsHidden()
-                        .axLeaf("AutoExport.Toggle.TxtTimestamps")
-                }
-                SettingRow("HTML theme",
-                           description: "Color scheme used by the HTML export.") {
-                    Picker("", selection: $model.htmlExportThemeRaw) {
-                        ForEach(HtmlExportTheme.allCases) { theme in
-                            Text(theme.displayName).tag(theme.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 160, alignment: .trailing)
-                    .axLeaf("AutoExport.Picker.HtmlTheme")
-                }
-            }
-
-            SettingHelper(text: "These apply to the Transcript menu's copy commands, the library's bulk export and the subtitle warnings. Auto-export writes what each preset says.")
 
             ResetPaneButton(scope: .autoExport)
         }
@@ -240,7 +199,7 @@ private struct AutoExportRuleRow: View {
                 }
                 HStack {
                     Text("When source is").font(DS.Font.secondary).foregroundStyle(DS.Color.secondaryText)
-                    TextField("mp4, mov", text: $extensionsText)
+                    TextField("Any file", text: $extensionsText)
                         .textFieldStyle(.roundedBorder)
                         .axLeaf("AutoExport.TextField.Extensions")
                         .onChange(of: extensionsText) { _, new in

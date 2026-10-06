@@ -9,7 +9,8 @@ struct ExportFormatsPane: View {
     @State private var pendingDelete: ExportPreset?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 ForEach(Array(model.exportPresets.enumerated()), id: \.element.id) { index, preset in
                     ExportPresetRow(
@@ -55,6 +56,47 @@ struct ExportFormatsPane: View {
             }
 
             SettingHelper(text: "Presets are what the Export As menu, the auto-export rules and the batch runs write. Add one from the Export sheet with Save as Preset.")
+
+            SettingsSection("Export options") {
+                SettingRow("Subtitle line length",
+                           description: "Applied to SRT and VTT exports and to the subtitle length warnings in the transcript view.",
+                           isFirst: true) {
+                    Picker("", selection: $model.subtitleCaptionLengthRaw) {
+                        ForEach(CaptionLength.allCases) { preset in
+                            Text(preset.displayName).tag(preset.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 200, alignment: .trailing)
+                    .axLeaf("ExportFormats.Picker.SubtitleLength")
+                }
+                SettingRow("Markdown timestamps",
+                           description: "Prefix each Markdown paragraph with its start time.") {
+                    Toggle("", isOn: $model.markdownTimestamps).labelsHidden()
+                        .axLeaf("ExportFormats.Toggle.MarkdownTimestamps")
+                }
+                SettingRow("Plain text timestamps",
+                           description: "Prefix each TXT line with its start time.") {
+                    Toggle("", isOn: $model.txtExportTimestamps).labelsHidden()
+                        .axLeaf("ExportFormats.Toggle.TxtTimestamps")
+                }
+                SettingRow("HTML theme",
+                           description: "Color scheme used by the HTML export.") {
+                    Picker("", selection: $model.htmlExportThemeRaw) {
+                        ForEach(HtmlExportTheme.allCases) { theme in
+                            Text(theme.displayName).tag(theme.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 160, alignment: .trailing)
+                    .axLeaf("ExportFormats.Picker.HtmlTheme")
+                }
+            }
+
+            SettingHelper(text: "These apply to the Transcript menu's copy commands, the library's bulk export and the subtitle warnings. Auto-export writes what each preset says.")
+
             ResetPaneButton(scope: .exportFormats)
         }
     }

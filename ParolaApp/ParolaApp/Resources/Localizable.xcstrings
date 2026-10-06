@@ -2019,6 +2019,17 @@
         }
       }
     },
+    "Any file": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualsiasi file"
+          }
+        }
+      }
+    },
     "Appearance": {
       "extractionState": "manual",
       "localizations": {
@@ -2438,17 +2449,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "L'auto-export scrive file aggiuntivi accanto al file sorgente al termine della trascrizione."
-          }
-        }
-      }
-    },
-    "Auto-export writes additional files next to the source when transcription completes. Recordings and links have no folder of their own, so theirs go to the auto-export folder you choose, named after the entry. Leave a rule's extension field empty to match every file.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "L'esportazione automatica scrive file aggiuntivi accanto al file sorgente al termine della trascrizione. Registrazioni e link non hanno una cartella propria, quindi i loro file vanno nella cartella di esportazione automatica che scegli tu, con il nome della voce. Lascia vuoto il campo delle estensioni di una regola per applicarla a ogni file."
           }
         }
       }
@@ -17673,6 +17673,17 @@
         }
       }
     },
+    "When a transcription finishes, each rule writes its presets next to the source file, or into the auto-export folder for recordings and links.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando una trascrizione finisce, ogni regola scrive i suoi preset accanto al file sorgente, o nella cartella di esportazione automatica per registrazioni e link."
+          }
+        }
+      }
+    },
     "When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.": {
       "extractionState": "manual",
       "localizations": {
@@ -18393,17 +18404,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "mm:ss"
-          }
-        }
-      }
-    },
-    "mp4, mov": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "mp4, mov"
           }
         }
       }

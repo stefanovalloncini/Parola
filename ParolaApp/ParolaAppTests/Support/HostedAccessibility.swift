@@ -71,6 +71,8 @@ enum HostedAccessibility {
         let isSelected: Bool
         /// False for a control VoiceOver reads as dimmed.
         let isEnabled: Bool
+        /// The grey hint an empty text field shows.
+        let placeholder: String?
 
         var words: [String] { [label, value].compactMap { $0 }.filter { !$0.isEmpty } }
         /// What VoiceOver calls the element: its label, or else its title element's.
@@ -137,7 +139,8 @@ enum HostedAccessibility {
                     frame: (read("accessibilityFrame", of: child) as? NSValue)?.rectValue ?? .zero,
                     actions: (read("accessibilityCustomActions", of: child) as? [NSAccessibilityCustomAction])?.map(\.name) ?? [],
                     isSelected: (read("isAccessibilitySelected", of: child) as? Bool) ?? false,
-                    isEnabled: (read("isAccessibilityEnabled", of: child) as? Bool) ?? true
+                    isEnabled: (read("isAccessibilityEnabled", of: child) as? Bool) ?? true,
+                    placeholder: read("accessibilityPlaceholderValue", of: child) as? String
                 ))
                 visit(child, depth: depth + 1)
             }
