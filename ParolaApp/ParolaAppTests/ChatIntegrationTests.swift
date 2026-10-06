@@ -66,6 +66,30 @@ struct ChatIntegrationTests {
         #expect(stored == ["what is this?", "A test."])
     }
 
+    @Test("a chat recorded after moving to another entry still saves into its own entry")
+    func recordChatSavesAfterSwitch() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let left = try await seedStore.add(transcript: makeTranscript(), audioSource: nil, category: .transcription)
+        let shown = try await seedStore.add(transcript: makeTranscript(), audioSource: nil, category: .transcription)
+        model.transcript = makeTranscript()
+        model.selectedEntryID = shown.id
+        let history = [ChatMessage(role: .user, text: "What was decided?"), ChatMessage(role: .assistant, text: "We ship on Fri")]
+
+        model.recordChat(history: history, for: left.id)
+
+        var stored: [String]?
+        let deadline = ContinuousClock().now.advanced(by: .seconds(2))
+        while stored != history.map(\.text), ContinuousClock().now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+            stored = try await model.library.load(left.id).document.transcript.chatHistory?.map(\.text)
+        }
+        #expect(stored == history.map(\.text))
+        #expect(model.transcript?.chatHistory == nil)
+        let shownHistory = try await model.library.load(shown.id).document.transcript.chatHistory
+        #expect(shownHistory == nil)
+    }
+
     @Test("recordChat replaces prior history on subsequent calls")
     func recordChatReplaces() {
         let entryID: LibraryEntry.ID = "entry-2"
@@ -93,7 +117,7 @@ struct ChatIntegrationTests {
         #expect(model.transcript?.chatHistory == before)
     }
 
-    @Test("recordChat ignores writes for a non-selected entry")
+    @Test("recordChat for another entry leaves the shown transcript alone")
     func recordChatRequiresMatchingSelection() {
         let model = makeModel(entryID: "entry-A", transcript: makeTranscript())
 

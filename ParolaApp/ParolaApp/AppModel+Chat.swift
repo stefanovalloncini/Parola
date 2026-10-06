@@ -5,9 +5,11 @@ import ParolaCore
 extension AppModel {
 
     func recordChat(history: [ChatMessage], for entryID: LibraryEntry.ID?) {
-        guard let entryID, entryID == selectedEntryID, var transcript = self.transcript else { return }
-        transcript.chatHistory = history
-        self.transcript = transcript
+        guard let entryID else { return }
+        if entryID == selectedEntryID, var transcript = self.transcript {
+            transcript.chatHistory = history
+            self.transcript = transcript
+        }
         Task { [library] in
             try? await library.setChatHistory(history, for: entryID)
         }
