@@ -589,6 +589,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "OK" } },
         "it" : { "stringUnit" : { "state" : "translated", "value" : "OK" } }
       }
+    },
+    "This transcript has no speakers." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This transcript has no speakers." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Questa trascrizione non ha speaker." } }
+      }
     }
   }
 }

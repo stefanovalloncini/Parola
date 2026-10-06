@@ -11,12 +11,14 @@ struct SpeakersSheet: View {
     @State private var suggestions: [Person] = []
     @State private var isApplying: Bool = false
 
+    static let noSpeakersHint = String(localized: "This transcript has no speakers.")
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     if transcript.uniqueSpeakers.isEmpty {
-                        Text("This transcript wasn't diarized — turn on Identify speakers in Settings before transcribing.")
+                        Text(Self.noSpeakersHint)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
