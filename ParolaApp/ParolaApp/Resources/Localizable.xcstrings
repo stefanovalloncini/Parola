@@ -1205,6 +1205,17 @@
         }
       }
     },
+    "A segment is removed when its entire text equals a pattern (case-insensitive, trimmed). Catches filler-only segments like “uh” — not words inside sentences. Applies to new transcriptions; saved transcripts don't change.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un segmento viene rimosso quando tutto il suo testo è uguale a un pattern (senza distinguere maiuscole e minuscole, spazi esclusi). Toglie i segmenti fatti solo di riempitivi come “uh”, non le parole dentro le frasi. Vale per le nuove trascrizioni; quelle salvate non cambiano."
+          }
+        }
+      }
+    },
     "A short list of names or jargon helps Whisper get unusual words right.": {
       "localizations": {
         "it": {
@@ -2090,13 +2101,13 @@
         }
       }
     },
-    "Applied to SRT and VTT exports.": {
+    "Applied to SRT and VTT exports and to the subtitle length warnings in the transcript view.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Applicata agli export SRT e VTT."
+            "value": "Applicata agli export SRT e VTT e agli avvisi sulla lunghezza dei sottotitoli nella trascrizione."
           }
         }
       }
@@ -3170,6 +3181,17 @@
         }
       }
     },
+    "Captures your voice while dictating.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cattura la tua voce mentre detti."
+          }
+        }
+      }
+    },
     "Card and row titles use the generated title when one exists.": {
       "extractionState": "manual",
       "localizations": {
@@ -3562,6 +3584,17 @@
         }
       }
     },
+    "Cleanup style": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stile di pulizia"
+          }
+        }
+      }
+    },
     "Clear": {
       "extractionState": "manual",
       "localizations": {
@@ -3925,13 +3958,13 @@
         }
       }
     },
-    "Context is used only for proper nouns and technical terms — the model never echoes or responds to it. All three are off by default.": {
+    "Context reaches the cleanup model only when a style other than Voice runs, to help spell proper nouns and technical terms. All three are off by default.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il contesto serve solo per nomi propri e termini tecnici — il modello non lo ripete né ci risponde. Tutti e tre sono disattivi di default."
+            "value": "Il contesto arriva al modello di pulizia solo con uno stile diverso da Voice, per scrivere bene nomi propri e termini tecnici. Tutti e tre sono disattivi di default."
           }
         }
       }
@@ -8009,6 +8042,17 @@
         }
       }
     },
+    "Lets Parola watch the hotkey outside the app and insert text. The near-field indicator also uses it to find your text field.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permette a Parola di sentire il tasto di attivazione fuori dall'app e di inserire il testo. Serve anche all'indicatore accanto al campo per trovare dove stai scrivendo."
+          }
+        }
+      }
+    },
     "Lets parola-mcp drive this app (transcribe, switch model, control recording…). Listens on 127.0.0.1 only.": {
       "extractionState": "manual",
       "localizations": {
@@ -10311,6 +10355,17 @@
         }
       }
     },
+    "Open Batch": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri Batch"
+          }
+        }
+      }
+    },
     "Open Existing": {
       "extractionState": "manual",
       "localizations": {
@@ -11162,6 +11217,17 @@
         }
       }
     },
+    "Permissions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permessi"
+          }
+        }
+      }
+    },
     "Pick a different device or reconnect the current one.": {
       "extractionState": "manual",
       "localizations": {
@@ -11228,17 +11294,6 @@
         }
       }
     },
-    "Placeholders: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Placeholder: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}"
-          }
-        }
-      }
-    },
     "Plain Text": {
       "extractionState": "manual",
       "localizations": {
@@ -11257,6 +11312,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Testo (.txt)"
+          }
+        }
+      }
+    },
+    "Plain text timestamps": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timestamp nel testo semplice"
           }
         }
       }
@@ -11395,6 +11461,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Antepone a ogni paragrafo Markdown il suo tempo di inizio."
+          }
+        }
+      }
+    },
+    "Prefix each TXT line with its start time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antepone a ogni riga TXT il suo tempo di inizio."
           }
         }
       }
@@ -13463,17 +13540,6 @@
         }
       }
     },
-    "Segments matching a pattern (case-insensitive, trimmed) are removed before saving.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I segmenti che corrispondono a un pattern (case-insensitive, ripuliti) sono rimossi prima del salvataggio."
-          }
-        }
-      }
-    },
     "Send (⌘↩)": {
       "extractionState": "manual",
       "localizations": {
@@ -14273,6 +14339,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Così la riproduzione non finisce nella trascrizione. L'audio torna quando la registrazione si ferma."
+          }
+        }
+      }
+    },
+    "Some features are managed by your deployment.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alcune funzioni sono gestite dalla tua organizzazione."
           }
         }
       }
@@ -15882,6 +15959,17 @@
         }
       }
     },
+    "These placeholders expand in the replacement text: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nel testo sostitutivo questi placeholder vengono espansi: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}"
+          }
+        }
+      }
+    },
     "They go into the queue and are transcribed one at a time.": {
       "extractionState": "manual",
       "localizations": {
@@ -15955,6 +16043,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questa settimana"
+          }
+        }
+      }
+    },
+    "This build doesn't include parola-mcp. Reinstall from the official DMG, or build it from the Parola source.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa build non include parola-mcp. Reinstalla Parola dal DMG ufficiale oppure compilalo dai sorgenti di Parola."
           }
         }
       }
@@ -17497,6 +17596,17 @@
         }
       }
     },
+    "Voice inserts the transcript as spoken; the other styles rewrite it with the on-device model.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice inserisce la trascrizione così come l'hai detta; gli altri stili la riscrivono con il modello sul dispositivo."
+          }
+        }
+      }
+    },
     "Wait this long after dictation ends before pasting. Useful when the target app needs a beat to refocus.": {
       "extractionState": "manual",
       "localizations": {
@@ -17711,13 +17821,13 @@
         }
       }
     },
-    "When the frontmost app matches, dictation uses these overrides. Prompt cleans up the text after transcription; language hints the engine before it. URL rules take precedence over the bundle default for supported browsers.": {
+    "When the frontmost app matches, dictation uses these overrides. Prompt cleans up the text after transcription; language hints the engine before it. In supported browsers, URL rules win over the app's own row.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quando l'app in primo piano corrisponde, la dettatura usa queste regole. Il prompt pulisce il testo dopo la trascrizione; la lingua suggerisce al motore prima della trascrizione. Le regole URL hanno la precedenza sul predefinito dell'app per i browser supportati."
+            "value": "Quando l'app in primo piano corrisponde, la dettatura usa queste regole. Il prompt pulisce il testo dopo la trascrizione; la lingua orienta il motore prima. Nei browser supportati, le regole URL hanno la precedenza sulla riga dell'app."
           }
         }
       }
@@ -18315,13 +18425,13 @@
         }
       }
     },
-    "e.g. uh, um, hmm": {
+    "e.g. uh": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "es. uh, um, hmm"
+            "value": "es. uh"
           }
         }
       }
@@ -18480,13 +18590,13 @@
         }
       }
     },
-    "parola-mcp can now connect over loopback and expose Parola actions to MCP clients. Anyone on this Mac can connect — turn it off if you're sharing the machine.": {
+    "parola-mcp can now connect over loopback and expose Parola actions to MCP clients. Clients authenticate with a token file in ~/Library/Caches/Parola that only your macOS user can read.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "parola-mcp può ora connettersi via loopback e esporre le azioni di Parola ai client MCP. Chiunque su questo Mac può connettersi — disattivalo se condividi il computer."
+            "value": "parola-mcp ora può connettersi via loopback ed esporre le azioni di Parola ai client MCP. I client si autenticano con un file token in ~/Library/Caches/Parola che solo il tuo utente macOS può leggere."
           }
         }
       }
