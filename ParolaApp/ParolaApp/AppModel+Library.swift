@@ -554,7 +554,9 @@ extension AppModel {
 
     private func setDeleted(_ deleted: Bool, _ ids: [LibraryEntry.ID], actionName: String) {
         guard !ids.isEmpty else { return }
-        registerUndoStep(actionName: actionName) { $0.setDeleted(!deleted, ids, actionName: actionName) }
+        // Closing the loaded transcript empties the undo stack, so a delete that closes it registers afterwards.
+        let closesLoadedEntry = deleted && selectedEntryID.map { ids.contains($0) } == true
+        if !closesLoadedEntry { registerSetDeletedUndo(deleted, ids, actionName: actionName) }
         Task { [weak self] in
             guard let self else { return }
             for id in ids {
@@ -568,8 +570,13 @@ extension AppModel {
                     }
                 }
             }
+            if closesLoadedEntry { registerSetDeletedUndo(deleted, ids, actionName: actionName) }
             refreshLibrary()
         }
+    }
+
+    private func registerSetDeletedUndo(_ deleted: Bool, _ ids: [LibraryEntry.ID], actionName: String) {
+        registerUndoStep(actionName: actionName) { $0.setDeleted(!deleted, ids, actionName: actionName) }
     }
 
     private func moveToRecentlyDeleted(_ id: LibraryEntry.ID) async {

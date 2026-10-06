@@ -47,6 +47,22 @@ struct LibraryUndoTests {
         await waitUntil { model.libraryEntries.isEmpty && model.deletedEntries.count == 2 }
     }
 
+    @Test("Deleting the transcript loaded behind search results still leaves its Undo")
+    func deleteLoadedEntryUndoes() async throws {
+        let model = makeModel("undo-delete-loaded")
+        let entry = try await add("loaded", to: model)
+        await model.refreshLibraryAndWait()
+        try await model.openEntry(entry.id)
+        model.searchRanking = []
+
+        model.deleteEntries([entry.id])
+        await waitUntil { model.selectedEntryID == nil && model.libraryEntries.isEmpty }
+        #expect(undo.undoActionName == "Delete")
+
+        undo.undo()
+        await waitUntil { model.libraryEntry(id: entry.id) != nil }
+    }
+
     @Test("Undo Restore sends the row back to Recently Deleted")
     func restoreUndoes() async throws {
         let model = makeModel("undo-restore")
