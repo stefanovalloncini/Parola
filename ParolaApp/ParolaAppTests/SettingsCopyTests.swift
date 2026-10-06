@@ -57,6 +57,27 @@ struct SettingsCopyTests {
         }
     }
 
+    @Test("the speaker switch is Detect speakers on the Library page, in the Speakers sheet and in its warning")
+    func detectSpeakersEverywhere() throws {
+        let model = makeModel("settings-copy-detect-speakers")
+        model.diarize = true
+        let intake = words(IntakeSettingsPopover(), model: model)
+        #expect(intake.contains("Detect speakers"), "\(intake)")
+        #expect(!intake.contains { $0.localizedCaseInsensitiveContains("identify speakers") || $0.contains("diariz") }, "\(intake)")
+
+        let sheet = words(SpeakersSheet(transcript: Transcript(segments: [], language: "en", modelName: "mock")), model: model)
+        let hint = "This transcript has no speakers. Turn on Detect speakers in Settings › Transcription Defaults, then choose Transcript ▸ Transcribe Again."
+        #expect(sheet.contains(hint), "\(sheet)")
+
+        model.selectedModel = "apple-speech-analyzer"
+        let warning = try #require(model.diarizeMismatchWarning)
+        #expect(warning.hasSuffix(" can't detect speakers, so speaker detection is skipped."), "\(warning)")
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        let key = "%@ can't detect speakers, so speaker detection is skipped."
+        #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
+    }
+
     @Test("Customization's summary names what the pane holds")
     func customizationSummary() {
         #expect(SettingsRoute.customization.summary == "Appearance, theme colors and timestamp font.")

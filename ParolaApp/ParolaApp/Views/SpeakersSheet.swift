@@ -32,7 +32,7 @@ struct SpeakersSheet: View {
                     SearchPill(text: $searchText, placeholder: "Search speakers…", leaf: "Speakers.TextField.Search")
                 }
                 if transcript.uniqueSpeakers.isEmpty {
-                    Text("This transcript has no speakers. Turn on Identify speakers in Settings, then choose Transcript ▸ Transcribe Again.")
+                    Text("This transcript has no speakers. Turn on Detect speakers in Settings › Transcription Defaults, then choose Transcript ▸ Transcribe Again.")
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)

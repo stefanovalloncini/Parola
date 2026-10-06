@@ -72,7 +72,7 @@ extension AppModel {
         ModelCatalog.staticCapabilities(forID: transcribeAgainModel(among: variants))?.supportedLanguages ?? .all
     }
 
-    /// The same model and language as before; the run still reads today's Settings, such as Identify speakers.
+    /// The same model and language as before; the run still reads today's Settings, such as Detect speakers.
     func askToTranscribeAgain() {
         guard canTranscribeAgain else { return }
         let runs = transcribeAgainModel(among: transcribeAgainModels)

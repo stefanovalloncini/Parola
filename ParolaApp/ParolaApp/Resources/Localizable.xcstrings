@@ -56,6 +56,17 @@
         }
       }
     },
+    "%@ can't detect speakers, so speaker detection is skipped.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ non sa distinguere gli speaker, quindi l'identificazione degli speaker viene saltata."
+          }
+        }
+      }
+    },
     "%@ can't transcribe %@. Pick a multilingual model (like Whisper) to transcribe other languages.": {
       "extractionState": "manual",
       "localizations": {
@@ -6922,13 +6933,13 @@
         }
       }
     },
-    "How many speakers to expect. Auto lets the diarizer decide.": {
+    "How many speakers to expect. Auto lets Parola decide.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quanti speaker aspettarsi. Con Auto decide la diarizzazione."
+            "value": "Quanti speaker aspettarsi. Con Auto decide Parola."
           }
         }
       }
@@ -6984,17 +6995,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Identificativo: %@"
-          }
-        }
-      }
-    },
-    "Identify speakers": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Identifica gli speaker"
           }
         }
       }
@@ -15878,13 +15878,13 @@
         }
       }
     },
-    "This transcript has no speakers. Turn on Identify speakers in Settings, then choose Transcript ▸ Transcribe Again.": {
+    "This transcript has no speakers. Turn on Detect speakers in Settings › Transcription Defaults, then choose Transcript ▸ Transcribe Again.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Questa trascrizione non ha speaker. Attiva Identifica gli speaker nelle Impostazioni, poi scegli Trascrizione ▸ Trascrivi di nuovo."
+            "value": "Questa trascrizione non ha speaker. Attiva Identifica gli speaker in Impostazioni › Predefiniti trascrizione, poi scegli Trascrizione ▸ Trascrivi di nuovo."
           }
         }
       }

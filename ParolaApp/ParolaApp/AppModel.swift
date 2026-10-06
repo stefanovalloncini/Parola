@@ -836,7 +836,7 @@ final class AppModel {
 
     var diarizeMismatchWarning: String? {
         guard diarize, !selectedModelCapabilities.supportsDiarization else { return nil }
-        return "\(AppModel.modelLabel(selectedModel)) can't identify speakers, so Diarize is skipped."
+        return String(localized: "\(AppModel.modelLabel(selectedModel)) can't detect speakers, so speaker detection is skipped.")
     }
 
     var translateMismatchWarning: String? {

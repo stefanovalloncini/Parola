@@ -205,7 +205,7 @@ struct IntakeSettingsPopover: View {
                 )
             }
             switchRow(
-                "Identify speakers",
+                "Detect speakers",
                 detail: "Labels who is talking. Takes longer.",
                 isOn: $model.diarize,
                 leaf: "Intake.Toggle.IdentifySpeakers"
@@ -219,7 +219,7 @@ struct IntakeSettingsPopover: View {
                 }
                 .font(DS.Font.body)
                 .fixedSize()
-                .help("How many speakers to expect. Auto lets the diarizer decide.")
+                .help("How many speakers to expect. Auto lets Parola decide.")
                 .axLeaf("Intake.Menu.ExpectedSpeakers")
             }
             if let notice = IntakeSummary.languageNotice(for: model) {
