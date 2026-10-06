@@ -285,11 +285,13 @@ struct TranscriptHeaderBar: View {
                 .accessibilityIdentifier("ai.chat")
                 .axLeaf("HeaderBar.Button.OpenChat")
             Divider()
-            Button("Chapters") { runInInspector(model.extractSmartChapters) }
+            Button(model.smartChapters.isEmpty ? String(localized: "Generate Chapters") : String(localized: "Regenerate Chapters")) {
+                runInInspector(model.extractSmartChapters)
+            }
                 .accessibilityIdentifier("ai.chapters")
                 .axLeaf("HeaderBar.MenuItem.Chapters")
                 .disabled(!model.isAIAvailable(for: .summary))
-            Button("Action Items") { runInInspector(model.extractActionItems) }
+            Button("Find Action Items") { runInInspector(model.extractActionItems) }
                 .accessibilityIdentifier("ai.action_items")
                 .axLeaf("HeaderBar.MenuItem.ActionItems")
                 .disabled(!model.isAIAvailable(for: .prompts))

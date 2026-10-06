@@ -89,11 +89,7 @@ struct SummaryPane: View {
         } else if !model.isAIAvailable(for: .summary), let reason = model.aiUnavailableReason {
             SummaryUnavailable(reason: reason)
         } else {
-            SummaryEmpty(
-                isWorking: model.isSummarising,
-                onGenerate: { model.summariseTranscript() },
-                onStop: { model.stopAIRun(.summary) }
-            )
+            SummaryEmpty(isWorking: model.isSummarising) { model.stopAIRun(.summary) }
         }
     }
 }

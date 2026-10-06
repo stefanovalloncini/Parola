@@ -27,7 +27,7 @@ struct ActionItemsSection: View {
     private var progressRow: some View {
         HStack(spacing: DS.Spacing.small) {
             ProgressView().controlSize(.small)
-            Text("Extracting…")
+            Text("Finding action items…")
                 .font(DS.Font.body)
                 .foregroundStyle(DS.Color.secondaryText)
             Spacer()
@@ -59,7 +59,7 @@ struct ActionItemsSection: View {
 
     private var actionsRow: some View {
         HStack(spacing: DS.Spacing.small) {
-            Button("Re-Extract") { model.extractActionItems() }
+            Button("Find Again") { model.extractActionItems() }
                 .controlSize(.small)
                 .disabled(!model.isAIAvailable(for: .prompts))
                 .axLeaf("ActionItems.Button.Reextract")

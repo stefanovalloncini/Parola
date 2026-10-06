@@ -163,4 +163,32 @@ struct AIPaneActionsTests {
         let menu = try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
         #expect(menu.contains(#"Text(verbatim: reason) OpenAISettingsButton(leaf: "HeaderBar.MenuItem.OpenAISettings")"#))
     }
+
+    private func source(_ name: String) throws -> String {
+        let path = #filePath.replacingOccurrences(of: "ParolaAppTests/AIPaneActionsTests.swift", with: "ParolaApp/\(name).swift")
+        return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    @Test("each AI action keeps one verb: the first run's, then Regenerate or Again, in the panes and the ✨ menu")
+    func aiActionsShareOneVerb() throws {
+        let empty = try source("Views/Summary/SummaryEmpty")
+        #expect(!empty.contains("onGenerate"))
+        #expect(empty.contains("Choose Summarize"))
+        let column = try source("Views/Summary/SummaryOptionsColumn")
+        #expect(column.contains(#"String(localized: "Summarize") : String(localized: "Regenerate")"#))
+        let header = try source("Views/Transcript/TranscriptHeaderBar")
+        #expect(header.contains(#"model.smartChapters.isEmpty ? String(localized: "Generate Chapters") : String(localized: "Regenerate Chapters")"#))
+        #expect(header.contains(#"Button("Find Action Items") { runInInspector(model.extractActionItems) }"#))
+        #expect(!header.contains(#"Button("Chapters")"#))
+        #expect(!header.contains(#"Button("Action Items")"#))
+        let chapters = try source("Views/Transcript/ChaptersSection")
+        #expect(chapters.contains(#"Button("Generate Chapters")"#))
+        #expect(chapters.contains(#"Button("Regenerate")"#))
+        let items = try source("Views/Transcript/ActionItemsSection")
+        #expect(items.contains(#"Button("Find Action Items")"#))
+        #expect(items.contains(#"Button("Find Again")"#))
+        #expect(items.contains(#"Text("Finding action items…")"#))
+        #expect(!items.contains("Re-Extract"))
+        #expect(!items.contains("Extracting…"))
+    }
 }

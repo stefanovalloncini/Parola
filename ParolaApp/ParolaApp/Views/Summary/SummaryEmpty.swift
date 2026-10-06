@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SummaryEmpty: View {
     let isWorking: Bool
-    let onGenerate: () -> Void
     let onStop: () -> Void
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 32
 
@@ -24,7 +23,7 @@ struct SummaryEmpty: View {
             .foregroundStyle(DS.Color.primaryText)
 
             if !isWorking {
-                Text("Generate a short overview with chapter markers you can jump to.")
+                Text("Choose Summarize to get a short overview with chapter markers you can jump to.")
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.secondaryText)
                     .multilineTextAlignment(.center)
@@ -36,13 +35,6 @@ struct SummaryEmpty: View {
                 Button("Stop", action: onStop)
                     .buttonStyle(DSPillButtonStyle(kind: .secondary))
                     .axLeaf("Summary.Button.Stop")
-            }
-
-            if !isWorking {
-                Button("Generate", action: onGenerate)
-                    .buttonStyle(DSPillButtonStyle(kind: .primary))
-                    .padding(.top, DS.Spacing.small)
-                    .axLeaf("Summary.Button.Generate")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
