@@ -783,6 +783,9 @@ final class AppModel {
     private var selectedLanguageRaw: String = "" { didSet { defaults.set(selectedLanguageRaw, forKey: "selectedLanguageRaw"); if !isReloadingSettings { restartDictation() } } }
     var translate: Bool = false { didSet { defaults.set(translate, forKey: "translate") } }
 
+    /// What Apple Speech says it can transcribe; nil until its language list is first opened.
+    var appleSpeechLanguageCodes: Set<String>?
+
     @ObservationIgnored private var cachedSelectedModel: String = ""
     @ObservationIgnored private var cachedCapabilities: EngineCapabilities = .whisperKitDefaults
 
@@ -792,6 +795,12 @@ final class AppModel {
             cachedCapabilities = ModelCatalog.staticCapabilities(forID: selectedModel) ?? .whisperKitDefaults
         }
         return cachedCapabilities
+    }
+
+    func loadAppleSpeechLanguages() async {
+        guard appleSpeechLanguageCodes == nil else { return }
+        let codes = await AppleSpeechLanguages.shared.codes()
+        if !codes.isEmpty { appleSpeechLanguageCodes = codes }
     }
 
     nonisolated static func modelLabel(_ id: String) -> String {

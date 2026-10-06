@@ -72,6 +72,10 @@ struct LanguagePickerPopover: View {
             }
         }
         .padding(.horizontal, DS.Spacing.snug)
+        .task(id: model.selectedModel) {
+            guard LanguageChoices.engine(of: model.selectedModel) == .appleSpeech else { return }
+            await model.loadAppleSpeechLanguages()
+        }
     }
 
     private func row(_ code: String) -> some View {
@@ -94,7 +98,7 @@ struct LanguagePickerPopover: View {
     }
 
     private var scope: ParolaCore.SupportedLanguages {
-        model.selectedModelCapabilities.supportedLanguages
+        LanguageChoices.scope(model: model)
     }
 
     private var modelName: String {
@@ -105,7 +109,29 @@ struct LanguagePickerPopover: View {
 
 /// What a language picker lists for the model in use, and in what order.
 enum LanguageChoices {
-    /// A model that takes any language is offered every one Whisper was trained on.
+    static func engine(of modelID: String) -> EngineID {
+        ModelCatalog.variant(id: modelID)?.engineID ?? .whisperKit
+    }
+
+    /// Only Whisper takes Whisper's whole list; Apple Speech takes the locales it reports, and the short list until then.
+    static func scope(
+        _ scope: ParolaCore.SupportedLanguages, engine: EngineID, appleSpeech: Set<String>?
+    ) -> ParolaCore.SupportedLanguages {
+        guard case .all = scope, engine != .whisperKit else { return scope }
+        if engine == .appleSpeech, let appleSpeech, !appleSpeech.isEmpty { return .only(appleSpeech) }
+        return .only(Set(SupportedLanguages.codes))
+    }
+
+    @MainActor
+    static func scope(model: AppModel) -> ParolaCore.SupportedLanguages {
+        scope(
+            model.selectedModelCapabilities.supportedLanguages,
+            engine: engine(of: model.selectedModel),
+            appleSpeech: model.appleSpeechLanguageCodes
+        )
+    }
+
+    /// A Whisper model, which takes any language, is offered every one Whisper was trained on.
     static func supported(by scope: ParolaCore.SupportedLanguages) -> Set<String> {
         switch scope {
         case .all: WhisperLanguages.codes

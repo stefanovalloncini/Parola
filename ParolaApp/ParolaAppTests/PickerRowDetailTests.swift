@@ -74,6 +74,56 @@ struct LanguageChoicesTests {
 }
 
 @MainActor
+@Suite("Apple Speech languages")
+struct AppleSpeechLanguageChoicesTests {
+    private func makeModel() -> AppModel {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("apple-speech-languages"))
+        model.selectedModel = "apple-speech-analyzer"
+        return model
+    }
+
+    private func offers(_ name: String, in model: AppModel) -> Bool {
+        let popover = HostedWindow(LanguagePickerPopover(searchText: .constant(name.lowercased())).environment(model), width: 320, height: 600)
+        defer { popover.close() }
+        return HostedAccessibility.words(in: popover.host).contains { $0.contains(name) }
+    }
+
+    @Test("Apple Speech is never offered a language it can't run")
+    func appleSpeechOffersOnlyItsOwn() {
+        let model = makeModel()
+        model.appleSpeechLanguageCodes = ["en", "it", "fr"]
+
+        #expect(!offers("Yoruba", in: model))
+        #expect(!offers("Hindi", in: model))
+        #expect(offers("Italian", in: model))
+    }
+
+    @Test("until Apple Speech says what it takes, it is offered the short list; Whisper keeps its whole one")
+    func shortListUntilAppleSpeechAnswers() {
+        let appleSpeech = LanguageChoices.supported(by: LanguageChoices.scope(.all, engine: .appleSpeech, appleSpeech: nil))
+        let emptyAnswer = LanguageChoices.supported(by: LanguageChoices.scope(.all, engine: .appleSpeech, appleSpeech: []))
+        let whisper = LanguageChoices.supported(by: LanguageChoices.scope(.all, engine: .whisperKit, appleSpeech: ["en"]))
+        let parakeet = LanguageChoices.scope(.only(ParakeetLanguages.v3), engine: .parakeet, appleSpeech: nil)
+
+        #expect(appleSpeech == Set(SupportedLanguages.codes))
+        #expect(emptyAnswer == Set(SupportedLanguages.codes))
+        #expect(!appleSpeech.contains("yo"))
+        #expect(whisper.contains("yo"))
+        #expect(parakeet == .only(ParakeetLanguages.v3))
+    }
+
+    @Test("a language Apple Speech can't run says so even where it leads the list")
+    func leadingPickSaysAppleSpeechCantRunIt() {
+        let model = makeModel()
+        model.appleSpeechLanguageCodes = ["en", "it"]
+        let scope = LanguageChoices.scope(model: model)
+
+        #expect(LanguagePickerPopover.supportNote(for: "yo", scope: scope, modelName: "Apple Speech") != nil)
+        #expect(LanguagePickerPopover.supportNote(for: "it", scope: scope, modelName: "Apple Speech") == nil)
+    }
+}
+
+@MainActor
 @Suite("Model row detail")
 struct ModelRowDetailTests {
     private let turbo = ModelCatalog.variant(id: "openai_whisper-large-v3_turbo")!
