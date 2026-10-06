@@ -27,9 +27,13 @@ struct FormatInspector: View {
                     .fieldChrome(focused: personFieldFocused)
                     .onSubmit { commitPerson() }
                     .axLeaf("Inspector.TextField.AddSpeaker")
-                Button("Manage People…") { model.showingPeopleSheet = true }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                    .axLeaf("Inspector.Button.ManagePeople")
+                HStack(spacing: DS.Spacing.snug) {
+                    Button("Rename Speakers…") { model.showingSpeakersSheet = true }
+                        .axLeaf("Inspector.Button.RenameSpeakers")
+                    Button("Manage People…") { model.showingPeopleSheet = true }
+                        .axLeaf("Inspector.Button.ManagePeople")
+                }
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
             }
         }
         // Counting walks every segment; the body re-runs on the favourites toggle and on translation

@@ -19,7 +19,7 @@ struct PromptsMenu: View {
                     Divider()
                 }
                 Group {
-                    ForEach(Prompt.builtIns) { prompt in
+                    ForEach(Self.transcriptPrompts) { prompt in
                         Button(prompt.name) { model.runPrompt(prompt) }
                             .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
                             .axLeaf("HeaderBar.MenuItem.BuiltinPrompt.\(Self.identifierSlug(prompt.name))")
@@ -30,9 +30,6 @@ struct PromptsMenu: View {
                         .axLeaf("HeaderBar.MenuItem.YouTubeChapters")
                 }
                 .disabled(!model.isAIAvailable(for: .prompts) || model.isRunningPrompt)
-                Button("Speakers…") { model.showingSpeakersSheet = true }
-                    .accessibilityIdentifier("prompts.speakers")
-                    .axLeaf("HeaderBar.MenuItem.Speakers")
                 if !userPrompts.isEmpty {
                     Divider()
                     ForEach(userPrompts) { prompt in
@@ -42,6 +39,9 @@ struct PromptsMenu: View {
                     }
                     .disabled(!model.isAIAvailable(for: .prompts) || model.isRunningPrompt)
                 }
+                Divider()
+                Button("Manage Prompts…") { model.openSettings(route: .prompts) }
+                    .axLeaf("HeaderBar.MenuItem.ManagePrompts")
             }
             // The toolbar keeps this view alive, so .task runs once; re-read on every
             // open or prompts added/renamed/deleted in Settings never show up here.
@@ -69,6 +69,9 @@ struct PromptsMenu: View {
             model.refreshAIAvailability()
         }
     }
+
+    /// The built-ins that shape a dictation rather than read a transcript stay out, as in Chat.
+    private static let transcriptPrompts = Prompt.builtIns.filter { !ChatPane.excludedBuiltInIDs.contains($0.id) }
 
     private static func identifierSlug(_ name: String) -> String {
         name

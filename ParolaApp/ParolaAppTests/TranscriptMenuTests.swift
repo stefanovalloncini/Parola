@@ -116,7 +116,8 @@ struct TranscriptMenuTests {
             [
                 #"Button("Rename…")"#, "TranscribeAgainMenu(model: model)", #"Button("Edit Segment") { model.editFocusedSegment() }"#,
                 #"Button("Add Note…") { model.noteFocusedSegment() }"#, #"Button("Favorite Segment")"#,
-                #"Button("Delete Segment") { model.deleteFocusedSegment() }"#, #"Button("Manage People…")"#,
+                #"Button("Delete Segment") { model.deleteFocusedSegment() }"#, #"Button("Rename Speakers…")"#,
+                #"Button("Manage People…")"#,
             ],
             [
                 #"Button("Copy Transcript")"#, #"Button("Copy with Timestamps")"#, #"Button("Copy as Markdown")"#,
@@ -183,6 +184,21 @@ struct TranscriptMenuTests {
         }
         #expect(offsets == offsets.sorted(), "items out of order")
         #expect(header.contains(#".help("Export and share")"#))
+    }
+
+    @Test("the Prompts menu lists transcript prompts and ends with Manage Prompts…; Rename Speakers… sits with the transcript")
+    func promptsMenuHoldsTranscriptPrompts() throws {
+        let menu = try source("Views/PromptsMenu")
+        #expect(!menu.contains("Speakers…"))
+        #expect(!menu.contains("ForEach(Prompt.builtIns)"))
+        #expect(menu.contains("Prompt.builtIns.filter { !ChatPane.excludedBuiltInIDs.contains($0.id) }"))
+        #expect(menu.contains(#"Divider() Button("Manage Prompts…") { model.openSettings(route: .prompts) }"#))
+        let commands = try transcriptMenu()
+        #expect(commands.contains(#"Button("Rename Speakers…") { model.showingSpeakersSheet = true }"#))
+        let inspector = try source("Views/Transcript/FormatInspector")
+        #expect(inspector.contains(#"Button("Rename Speakers…") { model.showingSpeakersSheet = true }"#))
+        let chat = try source("Views/Chat/ChatPane")
+        #expect(chat.contains(#"Button("Manage Prompts…") { model.openSettings(route: .prompts) }"#))
     }
 
     @Test("the Playback menu holds speed and Skip Silences, and names the keys the player owns")

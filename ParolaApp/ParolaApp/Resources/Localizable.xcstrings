@@ -8350,6 +8350,17 @@
         }
       }
     },
+    "Manage Prompts…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestisci i prompt…"
+          }
+        }
+      }
+    },
     "Manage models…": {
       "extractionState": "manual",
       "localizations": {
@@ -8357,17 +8368,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gestisci modelli…"
-          }
-        }
-      }
-    },
-    "Manage prompts": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gestisci prompt"
           }
         }
       }
@@ -12462,6 +12462,17 @@
         }
       }
     },
+    "Rename Speakers…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rinomina gli speaker…"
+          }
+        }
+      }
+    },
     "Rename entry": {
       "extractionState": "manual",
       "localizations": {
@@ -14449,17 +14460,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Persone · %lld"
-          }
-        }
-      }
-    },
-    "Speakers…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Persone…"
           }
         }
       }

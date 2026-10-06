@@ -88,7 +88,7 @@ struct ChatPane: View {
                     }
                 }
                 Divider().opacity(0.4)
-                Button("Manage prompts") { model.openSettings(route: .prompts) }
+                Button("Manage Prompts…") { model.openSettings(route: .prompts) }
                     .buttonStyle(.plain)
                     .foregroundStyle(DS.Color.accentInk)
                     .accessibilityIdentifier("chat.manage_prompts")
