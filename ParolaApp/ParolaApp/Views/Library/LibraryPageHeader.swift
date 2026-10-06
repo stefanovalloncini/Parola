@@ -30,18 +30,15 @@ struct LibraryPageHeader: View {
 
     /// The subtitle as VoiceOver reads it, with the length in words.
     static func spokenSubtitle(
-        count: Int, totalSeconds: Double, filteredOut: Bool = false, loaded: Bool = true,
-        bundle: Bundle = .main, locale: Locale = AppFormat.locale
+        count: Int, totalSeconds: Double, bundle: Bundle = .main, locale: Locale = AppFormat.locale
     ) -> String {
-        guard count > 0 else { return subtitle(count: count, totalSeconds: totalSeconds, filteredOut: filteredOut, loaded: loaded, bundle: bundle) }
+        guard count > 0 else { return "" }
         return LibraryRowFormat.spokenSubtitle(count: count, totalSeconds: totalSeconds, bundle: bundle, locale: locale)
     }
 
-    /// Counts the rows on screen; empty while the first scan is out, or when the filters left none for No Matches to say.
-    static func subtitle(
-        count: Int, totalSeconds: Double, filteredOut: Bool = false, loaded: Bool = true, bundle: Bundle = .main
-    ) -> String {
-        guard count > 0 else { return filteredOut || !loaded ? "" : String(localized: "No transcripts yet", bundle: bundle) }
+    /// Counts the rows on screen; with none, the empty state, the hero or No Results under it says so instead.
+    static func subtitle(count: Int, totalSeconds: Double, bundle: Bundle = .main) -> String {
+        guard count > 0 else { return "" }
         return LibraryRowFormat.subtitle(count: count, totalSeconds: totalSeconds, bundle: bundle)
     }
 

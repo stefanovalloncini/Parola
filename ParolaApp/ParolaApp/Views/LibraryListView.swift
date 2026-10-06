@@ -3,7 +3,6 @@ import SwiftUI
 import ParolaCore
 
 enum LibraryEmptyAction {
-    case openFile
     case recordMicrophone
     case recordSystemAudio
     case startDictation
@@ -15,7 +14,7 @@ enum LibraryEmptyAction {
         switch self {
         case .recordMicrophone: .microphone
         case .recordSystemAudio: .systemAudio
-        case .openFile, .startDictation, .meetingSettings, .dictationSettings: nil
+        case .startDictation, .meetingSettings, .dictationSettings: nil
         }
     }
 }
@@ -41,11 +40,6 @@ enum LibraryEmptyState {
         return entries.count(where: { $0.category == category })
     }
 
-    /// True when filters hid every row of a page that holds transcripts, so the subtitle leaves the line to No Matches.
-    static func filtersEmptied(_ kind: Kind, pageCount: Int) -> Bool {
-        kind == .noMatches && pageCount > 0
-    }
-
     /// The hero belongs to the Library page itself; a category or a person over an empty library keeps its own empty state.
     static func showsHero(_ kind: Kind, category: EntryCategory?, person: UUID?) -> Bool {
         kind == .emptyLibrary && category == nil && person == nil
@@ -59,12 +53,11 @@ enum LibraryListContent {
         action.recordSource.map { model.canStartTake($0) } ?? true
     }
 
-    /// Leads with the action that produces the kind of entry the category holds, then the fallbacks.
+    /// Leads with the action that produces the kind of entry the category holds; Open Files is the intake strip's, above it.
     static func emptyActions(for category: EntryCategory, features: FeatureSet) -> [LibraryEmptyAction] {
         var actions: [LibraryEmptyAction] = []
         if category == .meeting, features.isEnabled(.meetings) { actions.append(.recordSystemAudio) }
         if category == .dictation, features.isEnabled(.dictation) { actions.append(.startDictation) }
-        actions.append(.openFile)
         if category == .transcription, features.isEnabled(.micRecording) { actions.append(.recordMicrophone) }
         if category == .meeting, features.isEnabled(.meetings) { actions.append(.meetingSettings) }
         if category == .dictation, features.isEnabled(.dictation) { actions.append(.dictationSettings) }
@@ -79,9 +72,6 @@ enum LibraryListContent {
         case .dictation: return "No Dictations Yet"
         }
     }
-
-    /// Shown instead of `emptyTitle` when the category has rows and the filters are what hid them.
-    static let filteredEmptyTitle = "No Matches for This Filter"
 
     struct PageTotals: Equatable {
         var count = 0
@@ -535,18 +525,8 @@ private struct LibraryBrowseList: View, Equatable {
         return VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             LibraryPageHeader(
                 title: LibraryPageHeader.title(category: category, personName: selectedPerson?.name),
-                subtitle: LibraryPageHeader.subtitle(
-                    count: shownTotals.count,
-                    totalSeconds: shownTotals.seconds,
-                    filteredOut: LibraryEmptyState.filtersEmptied(emptyKind, pageCount: pageCount),
-                    loaded: libraryLoaded
-                ),
-                spokenSubtitle: LibraryPageHeader.spokenSubtitle(
-                    count: shownTotals.count,
-                    totalSeconds: shownTotals.seconds,
-                    filteredOut: LibraryEmptyState.filtersEmptied(emptyKind, pageCount: pageCount),
-                    loaded: libraryLoaded
-                ),
+                subtitle: LibraryPageHeader.subtitle(count: shownTotals.count, totalSeconds: shownTotals.seconds),
+                spokenSubtitle: LibraryPageHeader.spokenSubtitle(count: shownTotals.count, totalSeconds: shownTotals.seconds),
                 subtitleHelp: shownTotals.bytes > 0
                     ? String(localized: "Total size: \(AppFormat.byteSize(shownTotals.bytes))") : nil,
                 filters: LibraryFilterBar(
@@ -602,22 +582,13 @@ private struct LibraryBrowseList: View, Equatable {
 
     /// The filters (a person's page counts) are what emptied it. Offering "Record" here would be a lie.
     private var noMatchesState: some View {
-        EmptyStateView(
-            systemImage: "line.3.horizontal.decrease.circle",
-            title: LocalizedStringKey(LibraryListContent.filteredEmptyTitle)
-        ) {
-            Button {
-                LibraryListContent.clearFilters(
-                    labelFilter: &model.labelFilter,
-                    languageFilter: &model.languageFilter,
-                    dateRangeFilter: &model.dateRangeFilter,
-                    personFilter: &model.personFilter
-                )
-            } label: {
-                Label("Clear Filters", systemImage: "xmark.circle")
-            }
-            .buttonStyle(DSPillButtonStyle(kind: .primary))
-            .axLeaf("ClearFilters")
+        NoResultsView(systemImage: "line.3.horizontal.decrease.circle") {
+            LibraryListContent.clearFilters(
+                labelFilter: &model.labelFilter,
+                languageFilter: &model.languageFilter,
+                dateRangeFilter: &model.dateRangeFilter,
+                personFilter: &model.personFilter
+            )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .axBranch("Empty")
@@ -625,7 +596,6 @@ private struct LibraryBrowseList: View, Equatable {
 
     private func perform(_ action: LibraryEmptyAction) {
         switch action {
-        case .openFile: model.presentOpenPanel()
         case .recordMicrophone: model.startRecording(source: .microphone)
         case .recordSystemAudio: model.startRecording(source: .systemAudio)
         case .startDictation: model.startDictationFromIntent()
@@ -675,7 +645,6 @@ private struct FailureScroll: View {
 extension LibraryEmptyAction {
     var title: LocalizedStringKey {
         switch self {
-        case .openFile: return "Open Files…"
         case .recordMicrophone: return "Record"
         case .recordSystemAudio: return "Record System Audio"
         case .startDictation: return "Start Dictation"
@@ -686,7 +655,6 @@ extension LibraryEmptyAction {
 
     var systemImage: String {
         switch self {
-        case .openFile: return DS.Symbol.openFiles
         case .recordMicrophone: return DS.Symbol.microphone
         case .recordSystemAudio: return DS.Symbol.systemAudio
         case .startDictation: return DS.categorySymbol(for: .dictation)
@@ -696,7 +664,6 @@ extension LibraryEmptyAction {
 
     var axLeaf: String {
         switch self {
-        case .openFile: return "OpenFiles"
         case .recordMicrophone: return "Record"
         case .recordSystemAudio: return "RecordSystemAudio"
         case .startDictation: return "StartDictation"

@@ -35,9 +35,7 @@ struct LibraryPageHeaderTests {
     func subtitle() {
         #expect(LibraryPageHeader.subtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60) == "14 transcripts · 7 h 25 min")
         #expect(LibraryPageHeader.subtitle(count: 1, totalSeconds: 0) == "1 transcript")
-        #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0) == "No transcripts yet")
-        #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0, filteredOut: true) == "", "No Matches below says it")
-        #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0, loaded: false) == "", "the first scan hasn't landed")
+        #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0) == "", "the empty state below says it")
     }
 
     @Test("VoiceOver hears the subtitle's length in words, in Italian too")
@@ -45,8 +43,7 @@ struct LibraryPageHeaderTests {
         let english = Locale(identifier: "en_US")
         #expect(LibraryPageHeader.spokenSubtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60, locale: english) == "14 transcripts, 7 hours, 25 minutes")
         #expect(LibraryPageHeader.spokenSubtitle(count: 1, totalSeconds: 0, locale: english) == "1 transcript")
-        #expect(LibraryPageHeader.spokenSubtitle(count: 0, totalSeconds: 0, locale: english) == "No transcripts yet")
-        #expect(LibraryPageHeader.spokenSubtitle(count: 0, totalSeconds: 0, loaded: false, locale: english) == "")
+        #expect(LibraryPageHeader.spokenSubtitle(count: 0, totalSeconds: 0, locale: english) == "")
         let italian = try italianBundle()
         #expect(LibraryPageHeader.spokenSubtitle(count: 14, totalSeconds: 7 * 3600 + 25 * 60, bundle: italian, locale: Self.italian)
             == "14 trascrizioni, 7 ore e 25 minuti")
@@ -55,7 +52,6 @@ struct LibraryPageHeaderTests {
     @Test("the subtitle reads naturally in Italian")
     func italianSubtitle() throws {
         let italian = try italianBundle()
-        #expect(LibraryPageHeader.subtitle(count: 0, totalSeconds: 0, bundle: italian) == "Ancora nessuna trascrizione")
         #expect(LibraryPageHeader.subtitle(count: 2, totalSeconds: 90, bundle: italian) == "2 trascrizioni · 1 min")
     }
 
@@ -110,7 +106,7 @@ struct LibraryPageHeaderTests {
         #expect(LibraryPageHeader.subtitle(count: totals.count, totalSeconds: totals.seconds) == "2 transcripts · 1 h 29 min")
     }
 
-    @Test("a person with no transcripts keeps No transcripts yet; filters that empty a page with some leave the line blank")
+    @Test("a page with nothing on show leaves the line to its empty state, a person's page too")
     func emptyPersonPageSubtitle() {
         let entries = [
             entry("a", seconds: 60, labels: ["Work"]),
@@ -121,21 +117,10 @@ struct LibraryPageHeaderTests {
             let shown = LibraryListContent.rows(
                 from: entries, category: category, labelFilter: label, languageFilter: nil, dateRange: .all, personFilter: person
             )
-            let filters = LibraryListContent.ActiveFilters(label: label, person: person)
-            let kind = LibraryEmptyState.kind(
-                entryCount: LibraryEmptyState.entryCount(in: entries, category: category),
-                visibleCount: shown.count,
-                filtersActive: !filters.isEmpty
-            )
-            let pageCount = LibraryListContent.pageCount(of: entries, category: category, person: person)
             let totals = LibraryListContent.totals(of: shown, sizes: [:])
-            return LibraryPageHeader.subtitle(
-                count: totals.count,
-                totalSeconds: totals.seconds,
-                filteredOut: LibraryEmptyState.filtersEmptied(kind, pageCount: pageCount)
-            )
+            return LibraryPageHeader.subtitle(count: totals.count, totalSeconds: totals.seconds)
         }
-        #expect(subtitle(category: nil, label: nil, person: nobody) == "No transcripts yet")
+        #expect(subtitle(category: nil, label: nil, person: nobody) == "")
         #expect(subtitle(category: nil, label: "Missing", person: nil) == "")
         #expect(subtitle(category: .meeting, label: nil, person: giulia) == "1 transcript · 30 min")
     }

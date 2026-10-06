@@ -158,11 +158,7 @@ struct LibrarySearchResults: View {
     }
 
     private var emptyState: some View {
-        EmptyStateView(
-            systemImage: "magnifyingglass",
-            title: "No results for “\(queryText)”",
-            message: "Search looks in titles and transcript text"
-        )
+        NoResultsView(message: "Search looks in titles and transcript text")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

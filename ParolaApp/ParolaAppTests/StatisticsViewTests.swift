@@ -120,6 +120,21 @@ struct StatisticsViewTests {
         #expect(shown == stats)
     }
 
+    @Test("an empty library's page says so once and offers the library's first step")
+    func emptyPageOffersOpenFiles() {
+        withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, entries: [])
+            let page = HostedWindow(StatisticsView(stats: LibraryStatistics.compute(entries: [])).environment(model))
+            defer { page.close() }
+
+            let words = HostedAccessibility.words(in: page.host)
+
+            #expect(words.contains("Open Files…"), "\(words)")
+            #expect(words.contains("Transcripts you record or open appear here."), "\(words)")
+            #expect(!words.contains { $0.contains("0 transcripts") }, "\(words)")
+        }
+    }
+
     @Test("an empty library renders the page without asking for more room than the smallest window")
     func emptyPageFitsTheSmallestWindow() {
         withIsolatedDefaults { defaults in

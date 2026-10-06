@@ -21,8 +21,12 @@ struct StatisticsView: View {
                 EmptyStateView(
                     systemImage: "chart.bar",
                     title: "No Statistics Yet",
-                    message: "Transcribe a file and its timing appears here."
-                )
+                    message: "Transcripts you record or open appear here."
+                ) {
+                    Button("Open Files…") { model.presentOpenPanel() }
+                        .buttonStyle(DSPillButtonStyle(kind: .primary))
+                        .axLeaf("Empty.Button.OpenFiles")
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .summary(let stats):
                 summary(stats)
@@ -41,8 +45,9 @@ struct StatisticsView: View {
     private var header: some View {
         PageHeader(
             title: "Statistics",
-            subtitle: stats.map {
-                StatisticsCopy.subtitle(entries: $0.totals.entries, audioSeconds: $0.totals.audioSeconds)
+            subtitle: stats.flatMap { stats in
+                stats.totals.entries == 0
+                    ? nil : StatisticsCopy.subtitle(entries: stats.totals.entries, audioSeconds: stats.totals.audioSeconds)
             }
         ) {
             EmptyView()

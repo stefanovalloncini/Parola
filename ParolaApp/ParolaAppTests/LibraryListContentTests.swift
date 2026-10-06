@@ -281,16 +281,16 @@ struct LibraryListContentTests {
     func emptyActionsMatchTheCategory() {
         #expect(LibraryListContent.emptyActions(for: .dictation, features: .all).first == .startDictation)
         #expect(LibraryListContent.emptyActions(for: .meeting, features: .all).first == .recordSystemAudio)
-        #expect(LibraryListContent.emptyActions(for: .transcription, features: .all).first == .openFile)
+        #expect(LibraryListContent.emptyActions(for: .transcription, features: .all).first == .recordMicrophone)
     }
 
-    @Test("empty-state actions drop the ones their feature is gated off")
+    @Test("empty-state actions drop the ones their feature is gated off, and leave Open Files to the intake strip")
     func emptyActionsRespectFeatures() {
         let noCapture = FeatureSet(enabled: [.batch])
-        #expect(LibraryListContent.emptyActions(for: .transcription, features: noCapture) == [.openFile])
-        #expect(LibraryListContent.emptyActions(for: .transcription, features: .all) == [.openFile, .recordMicrophone])
-        #expect(LibraryListContent.emptyActions(for: .meeting, features: noCapture) == [.openFile])
-        #expect(LibraryListContent.emptyActions(for: .dictation, features: noCapture) == [.openFile])
+        #expect(LibraryListContent.emptyActions(for: .transcription, features: noCapture) == [])
+        #expect(LibraryListContent.emptyActions(for: .transcription, features: .all) == [.recordMicrophone])
+        #expect(LibraryListContent.emptyActions(for: .meeting, features: noCapture) == [])
+        #expect(LibraryListContent.emptyActions(for: .dictation, features: noCapture) == [])
     }
 
     @Test("the meeting and dictation empty states end on a way into their settings")
@@ -303,7 +303,6 @@ struct LibraryListContentTests {
 
     @Test("an empty state's actions wear the outline glyphs the + and Record menus use")
     func emptyActionsMatchTheMenus() {
-        #expect(LibraryEmptyAction.openFile.systemImage == DS.Symbol.openFiles)
         #expect(LibraryEmptyAction.recordMicrophone.systemImage == DS.Symbol.microphone)
         #expect(LibraryEmptyAction.recordSystemAudio.systemImage == DS.Symbol.systemAudio)
         #expect([DS.Symbol.openFiles, DS.Symbol.microphone, DS.Symbol.systemAudio] == ["folder", "mic", "speaker.wave.2"])

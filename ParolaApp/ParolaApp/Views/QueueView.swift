@@ -98,7 +98,7 @@ struct QueueView: View {
         } else {
             let sections = visibleSections
             if sections.isEmpty {
-                ContentUnavailableView.search(text: searchText)
+                ContentUnavailableView.search
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 list(sections)

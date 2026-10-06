@@ -9266,39 +9266,6 @@
         }
       }
     },
-    "No Items Match These Filters": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessun elemento corrisponde ai filtri"
-          }
-        }
-      }
-    },
-    "No Matches": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessuna corrispondenza"
-          }
-        }
-      }
-    },
-    "No Matches for This Filter": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessun risultato per questo filtro"
-          }
-        }
-      }
-    },
     "No Meetings Yet": {
       "extractionState": "manual",
       "localizations": {
@@ -9328,6 +9295,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun file recente"
+          }
+        }
+      }
+    },
+    "No Results": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun risultato"
           }
         }
       }
@@ -9592,17 +9570,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun prompt corrisponde."
-          }
-        }
-      }
-    },
-    "No results for “%@”": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessun risultato per “%@”"
           }
         }
       }
@@ -16533,17 +16500,6 @@
         }
       }
     },
-    "Transcribe a file and its timing appears here.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trascrivi un file e qui comparirà il tempo impiegato."
-          }
-        }
-      }
-    },
     "Transcribe again with %@?": {
       "extractionState": "manual",
       "localizations": {
@@ -16931,6 +16887,17 @@
         }
       }
     },
+    "Transcripts you record or open appear here.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le trascrizioni che registri o apri compaiono qui."
+          }
+        }
+      }
+    },
     "Translate": {
       "extractionState": "manual",
       "localizations": {
@@ -17111,17 +17078,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riprova più tardi."
-          }
-        }
-      }
-    },
-    "Try another kind of transcript.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prova con un altro tipo di trascrizione."
           }
         }
       }

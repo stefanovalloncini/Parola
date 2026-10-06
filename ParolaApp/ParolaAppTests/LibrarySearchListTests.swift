@@ -256,6 +256,20 @@ struct LibrarySearchListTests {
         #expect(firstResponderWait)
     }
 
+    @Test("a search that finds nothing names the query once, in the page title")
+    func emptyResultsSayTheQueryOnce() async throws {
+        let hosted = await host(3)
+        defer { close(hosted) }
+        search([], in: hosted.model)
+        _ = await settled(hosted)
+
+        let words = HostedAccessibility.words(in: hosted.host)
+
+        #expect(words.filter { $0.contains("“take”") }.count == 1, "\(words)")
+        #expect(words.contains("No Results"), "\(words)")
+        #expect(words.contains("Search looks in titles and transcript text"), "\(words)")
+    }
+
     @Test("a click on a results page with nothing in it never reaches the list under it")
     func emptyResultsTakeTheClick() async throws {
         let hosted = await host(20)

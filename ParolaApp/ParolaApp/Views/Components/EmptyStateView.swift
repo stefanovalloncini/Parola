@@ -1,14 +1,12 @@
 import SwiftUI
 
-/// The one empty-state layout every route uses: symbol, title, optional message, pill actions.
+/// The one empty-state layout every route uses: the system's, with pill actions.
 struct EmptyStateView<Actions: View>: View {
     let systemImage: String
     let title: LocalizedStringKey
     var message: LocalizedStringKey?
     @ViewBuilder let actions: Actions
     private let hasActions: Bool
-
-    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 44
 
     init(
         systemImage: String,
@@ -24,40 +22,45 @@ struct EmptyStateView<Actions: View>: View {
     }
 
     var body: some View {
-        VStack(spacing: DS.Spacing.small) {
-            VStack(spacing: DS.Spacing.small) {
-                Image(systemName: systemImage)
-                    .font(.system(size: iconSize, weight: .light))
-                    .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
-                    .padding(.bottom, DS.Spacing.tight)
-                // A tier under the page title above it: the empty state answers the page, it doesn't restate it.
-                Text(title)
-                    .font(DS.Font.heading)
-                    .foregroundStyle(DS.Color.primaryText)
-                if let message {
-                    Text(message)
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage)
+        } description: {
+            if let message {
+                Text(message)
             }
-            // A floor too: proposed no width the message wraps per character, and the route's minimum height explodes.
-            .frame(minWidth: MainWindowLayout.narrowestPaneWidth - 2 * DS.Spacing.large, maxWidth: 420)
+        } actions: {
             if hasActions {
-                // Outside the reading width, and wrapping rather than squeezing: three pills overrun a narrow pane in Italian.
+                // Wrapping rather than squeezing: two pills can overrun a narrow pane in Italian.
                 CentredFlow(spacing: DS.Spacing.small) {
                     actions
                 }
-                .padding(.top, DS.Spacing.small)
             }
         }
-        .padding(DS.Spacing.large)
     }
 }
 
 extension EmptyStateView where Actions == EmptyView {
     init(systemImage: String, title: LocalizedStringKey, message: LocalizedStringKey? = nil) {
         self.init(systemImage: systemImage, title: title, message: message) { EmptyView() }
+    }
+}
+
+/// What a list says when its search or its filters leave nothing: one title, and a quiet way back when filters did it.
+struct NoResultsView: View {
+    /// The source key, so the casing rule can be asserted over it.
+    static let title = "No Results"
+
+    var systemImage = "magnifyingglass"
+    var message: LocalizedStringKey?
+    var clearFilters: (() -> Void)?
+
+    var body: some View {
+        EmptyStateView(systemImage: systemImage, title: LocalizedStringKey(Self.title), message: message) {
+            if let clearFilters {
+                Button("Clear Filters", action: clearFilters)
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .axLeaf("Button.ClearFilters")
+            }
+        }
     }
 }

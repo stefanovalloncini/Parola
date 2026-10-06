@@ -186,23 +186,11 @@ struct MacRecentlyDeletedView: View {
     }
 
     private var noMatches: some View {
-        EmptyStateView(
-            systemImage: searchText.isEmpty ? "line.3.horizontal.decrease.circle" : "magnifyingglass",
-            title: noMatchesTitle,
-            message: searchText.isEmpty ? "Try another kind of transcript." : nil
-        ) {
-            Button("Clear Filters") {
-                searchText = ""
-                categoryFilter = .all
-            }
-            .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-            .axLeaf("NoMatches.Button.ClearFilters")
+        NoResultsView(systemImage: searchText.isEmpty ? "line.3.horizontal.decrease.circle" : "magnifyingglass") {
+            searchText = ""
+            categoryFilter = .all
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var noMatchesTitle: LocalizedStringKey {
-        searchText.isEmpty ? "No Items Match These Filters" : "No Matches"
     }
 
     private var filtered: [LibraryRowDisplay] {

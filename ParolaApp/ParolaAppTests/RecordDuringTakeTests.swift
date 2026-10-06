@@ -89,7 +89,7 @@ struct RecordDuringTakeTests {
         let wav = try tempWAV("record-during-take-empty")
         defer { try? FileManager.default.removeItem(at: wav) }
         let model = makeRecordingModel("record-during-take-empty")
-        let actions: [LibraryEmptyAction] = [.recordMicrophone, .recordSystemAudio, .openFile, .meetingSettings]
+        let actions: [LibraryEmptyAction] = [.recordMicrophone, .recordSystemAudio, .startDictation, .meetingSettings]
         #expect(actions.map { LibraryListContent.isAvailable($0, in: model) } == [true, true, true, true])
 
         model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
