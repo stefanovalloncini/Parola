@@ -249,10 +249,18 @@ struct ExportSheet: View {
         detail: LocalizedStringKey,
         @ViewBuilder control: () -> some View
     ) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            ExportOptionLabel(title: title, detail: detail)
-            Spacer(minLength: DS.Spacing.small)
-            control()
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(DS.Font.body)
+                    .foregroundStyle(DS.Color.primaryText)
+                Spacer(minLength: DS.Spacing.small)
+                control()
+            }
+            Text(detail)
+                .font(DS.Font.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

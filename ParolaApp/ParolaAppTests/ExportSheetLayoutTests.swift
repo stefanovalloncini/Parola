@@ -54,6 +54,9 @@ struct ExportSheetLayoutTests {
             let toggle = try #require(found, "no \(leaf)")
             #expect(toggle.frame.minX - heading.frame.minX < 40, "\(leaf) sits \(toggle.frame.minX - heading.frame.minX) pt in")
         }
+        let groupingDetail = elements.first { $0.words.contains("Merge a speaker's consecutive segments into one.") }
+        let detail = try #require(groupingDetail)
+        #expect(detail.frame.height < 20, "the picker's detail wraps to \(detail.frame.height) pt")
         let sheet = try source()
         #expect(sheet.contains(".toggleStyle(.checkbox)"))
         #expect(sheet.contains("@Environment(\\.isEnabled) private var isEnabled"))
