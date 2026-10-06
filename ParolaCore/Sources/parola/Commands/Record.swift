@@ -154,19 +154,24 @@ struct Record: AsyncParsableCommand {
         stderr("Streaming from mic. Press Ctrl-C to stop." + (seconds.map { " (or wait \($0)s)" } ?? ""))
 
         // The mic is up while the model loads, so Ctrl-C or --seconds can stop the take before start returns; it then waits for the model.
-        let stop = AsyncSignalStream(signal: SIGINT)
-        let meter = session.levelMeter
-        let timer = seconds.map { seconds in
-            Task {
-                await meter.waitForAudio(seconds: seconds)
-                if !Task.isCancelled { stop.fire() }
-            }
+        let (stopRequests, requestStop) = AsyncStream<Void>.makeStream()
+        let interrupts = StopThenInterrupt {
+            stderr("\nStopping. Press Ctrl-C again to quit now.")
+            requestStop.yield()
         }
         let stopping = Task {
-            await stop.wait()
+            for await _ in stopRequests { break }
             await session.stop()
         }
-        defer { timer?.cancel() }
+        let meter = session.levelMeter
+        var timers: [Task<Void, Never>] = []
+        if let seconds {
+            timers.append(Self.stopTimer(requestStop) { await meter.waitForAudio(seconds: seconds) })
+        }
+        defer {
+            for timer in timers { timer.cancel() }
+            interrupts.end()
+        }
 
         let progress = ProgressReporter(label: "downloading \(streamModel)")
         let events: AsyncStream<StreamingEvent>
@@ -177,18 +182,39 @@ struct Record: AsyncParsableCommand {
                 downloadProgress: { p in progress.update(p) }
             )
         } catch {
-            stop.fire()
+            requestStop.finish()
             await stopping.value
             throw error
         }
         progress.finish()
 
-        var lines = LiveLineTidier(language: language)
-        for await event in events {
-            handle(event, lines: &lines, sink: .standard)
-        }
-        stop.fire()
+        let endedByInterrupt = await play(events, interrupted: { interrupts.wasInterrupted }, sink: .standard)
+        requestStop.finish()
         await stopping.value
+        if endedByInterrupt { throw ExitCode(130) }
+    }
+
+    private static func stopTimer(
+        _ requestStop: AsyncStream<Void>.Continuation, after wait: @escaping @Sendable () async -> Void
+    ) -> Task<Void, Never> {
+        Task {
+            await wait()
+            if !Task.isCancelled { requestStop.yield() }
+        }
+    }
+
+    /// Prints the take as its events come. A take an interrupt left without words writes nothing and returns true, so the run ends as interrupted.
+    func play(_ events: AsyncStream<StreamingEvent>, interrupted: () -> Bool, sink: RecordSink) async -> Bool {
+        var lines = LiveLineTidier(language: language)
+        var endedByInterrupt = false
+        for await event in events {
+            if case .finished(let transcript) = event, transcript.segments.isEmpty, interrupted() {
+                endedByInterrupt = true
+                continue
+            }
+            handle(event, lines: &lines, sink: sink)
+        }
+        return endedByInterrupt
     }
 }
 

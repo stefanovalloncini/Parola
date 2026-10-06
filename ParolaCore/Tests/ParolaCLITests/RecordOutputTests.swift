@@ -47,6 +47,41 @@ struct RecordOutputTests {
         #expect(!written.contains("perchè"))
     }
 
+    private func takeEvents(_ segments: [TranscriptSegment]) -> AsyncStream<StreamingEvent> {
+        let (events, continuation) = AsyncStream<StreamingEvent>.makeStream()
+        for segment in segments { continuation.yield(.confirmed(segment)) }
+        continuation.yield(.finished(Transcript(segments: segments, language: "en", modelName: "openai_whisper-tiny")))
+        continuation.finish()
+        return events
+    }
+
+    @Test("a take an interrupt left without words writes nothing and ends as interrupted")
+    func interruptedTakeWithoutWordsWritesNothing() async throws {
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-record-\(UUID().uuidString).srt").path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let record = try Record.parse(["--stream", "--format", "srt", "--output", path])
+
+        let endedByInterrupt = await record.play(takeEvents([]), interrupted: { true }, sink: CapturedOutput().sink)
+
+        #expect(endedByInterrupt)
+        #expect(!FileManager.default.fileExists(atPath: path))
+    }
+
+    @Test("a take Ctrl-C stopped after words came, or an empty one nobody interrupted, is written as before", arguments: [true, false])
+    func otherTakesAreWritten(interrupted: Bool) async throws {
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-record-\(UUID().uuidString).srt").path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let record = try Record.parse(["--stream", "--format", "srt", "--output", path])
+        let words = interrupted ? [TranscriptSegment(id: 0, start: 0, end: 1, text: "kept words")] : []
+
+        let endedByInterrupt = await record.play(takeEvents(words), interrupted: { interrupted }, sink: CapturedOutput().sink)
+
+        #expect(!endedByInterrupt)
+        #expect(FileManager.default.fileExists(atPath: path))
+    }
+
     @Test("a streamed txt take prints each confirmed line tidied, and nothing more at the end")
     func streamedLinesAreTidied() throws {
         let record = try Record.parse(["--stream", "--language", "it"])

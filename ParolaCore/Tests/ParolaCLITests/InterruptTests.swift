@@ -55,6 +55,22 @@ struct InterruptTests {
         #expect(calls.withLock { $0 } == ["cleanup", "end 130"])
     }
 
+    @Test("during a live take the first Ctrl-C asks it to stop and a second ends the process with 130")
+    func secondInterruptEndsTheTake() async throws {
+        let (calls, record) = AsyncStream<String>.makeStream()
+        let interrupts = StopThenInterrupt(stop: { record.yield("stop") }, ending: { status in record.yield("end \(status)") })
+        defer { interrupts.end() }
+        var heard = calls.makeAsyncIterator()
+        #expect(!interrupts.wasInterrupted)
+
+        kill(getpid(), SIGINT)
+        #expect(await heard.next() == "stop")
+        #expect(interrupts.wasInterrupted)
+
+        kill(getpid(), SIGINT)
+        #expect(await heard.next() == "end 130")
+    }
+
     @Test("Ctrl-C during a download ends yt-dlp, removes its folder and reports the interrupt")
     func interruptEndsTheDownload() async throws {
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("parola-cli-interrupt-\(UUID().uuidString)")

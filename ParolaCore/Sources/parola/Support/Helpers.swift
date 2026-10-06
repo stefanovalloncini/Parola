@@ -158,6 +158,38 @@ final class InterruptCleanup: Sendable {
     }
 }
 
+/// While alive, a first SIGINT runs `stop` and a second ends the process with 130, as `InterruptCleanup` does.
+final class StopThenInterrupt: Sendable {
+    private let stream: AsyncSignalStream
+    private let watcher: Task<Void, Never>
+    private let interrupted: OSAllocatedUnfairLock<Bool>
+
+    init(stop: @escaping @Sendable () -> Void, ending: @escaping @Sendable (Int32) -> Void = { _exit($0) }) {
+        let stream = AsyncSignalStream(signal: SIGINT)
+        let interrupted = OSAllocatedUnfairLock(initialState: false)
+        self.stream = stream
+        self.interrupted = interrupted
+        watcher = Task.detached {
+            await stream.wait()
+            guard !Task.isCancelled else { return }
+            interrupted.withLock { $0 = true }
+            stop()
+            await stream.wait()
+            guard !Task.isCancelled else { return }
+            ending(130)
+        }
+    }
+
+    var wasInterrupted: Bool { interrupted.withLock { $0 } }
+
+    /// Lets go of SIGINT; whichever wait the watcher is parked in is woken so it can see the cancel.
+    func end() {
+        watcher.cancel()
+        stream.fire()
+        stream.fire()
+    }
+}
+
 /// Unchecked Sendable: `semaphore` is its own synchronization; `source` is `let` and `DispatchSourceSignal` is thread-safe.
 final class AsyncSignalStream: @unchecked Sendable {
     private let semaphore = DispatchSemaphore(value: 0)
