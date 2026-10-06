@@ -27,8 +27,8 @@ public final class ReadAloudOutput: ReadAloudOutputSink {
     public static let speedRange: ClosedRange<Double> = 0.75...2.0
 
     static let maximumFrameCount: AVAudioFrameCount = 4096
-    // The mixer ramps a volume change over ~27 ms on its own, so a fade is one write and this wait.
-    static let fadeOutDuration: Duration = .milliseconds(30)
+    // The mixer ramps a volume change over ~27 ms from its next I/O cycle; this also covers a Bluetooth-sized cycle.
+    static let fadeOutDuration: Duration = .milliseconds(60)
 
     private static let peakLimiter = AudioComponentDescription(
         componentType: kAudioUnitType_Effect,
@@ -41,6 +41,7 @@ public final class ReadAloudOutput: ReadAloudOutputSink {
     public private(set) var speed: Double = 1
     public private(set) var state: State = .idle
     public var onOutputChanged: (@MainActor () -> Void)?
+    var onCompletion: (@MainActor () -> Void)?
 
     private(set) var generation = 0
     private(set) var level = SpeechLevel()
@@ -60,6 +61,7 @@ public final class ReadAloudOutput: ReadAloudOutputSink {
     private var inFlight: [ScheduledBuffer] = []
     private var nextSequence = 0
     private var holdsStaleAudio = false
+    private var isHoldingEngine = true
     private var isFadedOut = false
     private var boundDevice: AudioDeviceID?
     private var configurationObserver: EngineConfigurationObserver?
@@ -119,6 +121,7 @@ public final class ReadAloudOutput: ReadAloudOutputSink {
     }
 
     public func unitFinishedEvents() -> AsyncStream<UnitFinished> {
+        level = SpeechLevel()
         clear()
         listener?.finish()
         let (stream, continuation) = AsyncStream.makeStream(of: UnitFinished.self)
@@ -182,6 +185,8 @@ public final class ReadAloudOutput: ReadAloudOutputSink {
         }
         player.play()
         state = .playing
+        isHoldingEngine = false
+        retirePlayed()
     }
 
     public func stop() {
@@ -210,6 +215,7 @@ public final class ReadAloudOutput: ReadAloudOutputSink {
         cancelFade()
         player.pause()
         engine.pause()
+        isHoldingEngine = true
         holdsStaleAudio = true
         state = .paused
         monitor?.stop()
@@ -257,11 +263,26 @@ public final class ReadAloudOutput: ReadAloudOutputSink {
         }
     }
 
+    func stopEngineAsTheSystemWould() {
+        engine.stop()
+    }
+
     private func bufferPlayed(sequence: Int, generation: Int) {
+        defer { onCompletion?() }
         guard generation == self.generation,
               let index = inFlight.firstIndex(where: { $0.sequence == sequence })
         else { return }
+        guard engine.isRunning || isHoldingEngine else {
+            // The engine stopped on its own and flushed the queue: nothing after this point played.
+            ParolaLog.notice(.readAloud, "the audio engine stopped on its own")
+            outputChanged()
+            return
+        }
         inFlight[index].played = true
+        if !isHoldingEngine { retirePlayed() }
+    }
+
+    private func retirePlayed() {
         while let head = inFlight.first, head.played {
             inFlight.removeFirst()
             level.absorb(head.measure)
@@ -280,6 +301,7 @@ public final class ReadAloudOutput: ReadAloudOutputSink {
         engine.stop()
         timePitch.auAudioUnit.reset()
         limiter.auAudioUnit.reset()
+        isHoldingEngine = true
         openUnit = nil
         inFlight.removeAll()
         holdsStaleAudio = false
@@ -303,6 +325,7 @@ public final class ReadAloudOutput: ReadAloudOutputSink {
         cancelFade()
         // Not player.pause(): after it, play() makes the time-pitch unit replay the current buffer from its start.
         engine.pause()
+        isHoldingEngine = true
     }
 
     private func cancelFade() {

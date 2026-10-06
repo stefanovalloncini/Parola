@@ -204,6 +204,25 @@ struct ReadAloudOutputTests {
         output.finishUnit(2, epoch: 0, pauseAfter: 0)
         let levelled = try render(output, seconds: 0.5)
         #expect(abs(peak(levelled[12_000..<24_000]) - expected) < 0.005)
+
+        let pulledDown = output.level
+        output.stop()
+        #expect(output.level == pulledDown)
+        _ = output.unitFinishedEvents()
+        #expect(output.level == SpeechLevel())
+    }
+
+    @Test("the limiter holds a hot voice under full scale")
+    func limiterHoldsPeaks() throws {
+        let output = try ReadAloudOutput(offline: true, monitor: nil)
+        _ = output.unitFinishedEvents()
+        output.schedule(PCMChunk(unitID: 0, samples: harmonics(seconds: 1, rate: 24_000, peak: 0.9), sampleRate: 24_000), epoch: 0, gainDB: 12)
+        output.finishUnit(0, epoch: 0, pauseAfter: 0)
+        try output.resume()
+
+        let rendered = try render(output, seconds: 1)
+        #expect(peak(rendered) <= 1)
+        #expect(peak(rendered[24_000..<36_000]) > 0.8)
     }
 
     @Test("an output change pauses without a fade, ends the stream and calls back once")
@@ -271,6 +290,89 @@ struct ReadAloudOutputTests {
         output.engineConfigurationChanged()
         #expect(output.state == .idle)
         #expect(changes == 0)
+    }
+
+    enum SelfStopMoment: String, CaseIterable, Sendable {
+        case playing
+        case fading
+    }
+
+    @Test("an engine that stops on its own reports no unit and takes the output-change path once", arguments: SelfStopMoment.allCases)
+    func engineStopsOnItsOwn(_ moment: SelfStopMoment) async throws {
+        let clock = TestClock()
+        let output = try ReadAloudOutput(offline: true, monitor: nil, clock: clock)
+        let changed = Awaitable(0)
+        output.onOutputChanged = { changed.increment() }
+        let events = EventLog(output.unitFinishedEvents())
+        for unit in 0..<3 {
+            output.schedule(PCMChunk(unitID: unit, samples: sine(seconds: 0.5, rate: 48_000), sampleRate: 48_000), epoch: 0, gainDB: 0)
+            output.finishUnit(unit, epoch: 0, pauseAfter: 0.1)
+        }
+        try output.resume()
+        _ = try render(output, seconds: 0.2)
+        if moment == .fading { output.pause(fade: true) }
+
+        output.stopEngineAsTheSystemWould()
+        await changed.wait(atLeast: 1, "the output-change path")
+        await events.ended.wait("the stream to end")
+        #expect(events.received == [])
+        #expect(output.state == .paused)
+        #expect(output.fadeTask == nil)
+
+        output.engineConfigurationChanged()
+        #expect(changed.value == 1)
+        try output.resume()
+        #expect(peak(try render(output, seconds: 2)) == 0)
+    }
+
+    @Test("an engine that stops on its own while paused reports no unit, before or after the change notice")
+    func engineStopsWhilePaused() async throws {
+        let output = try ReadAloudOutput(offline: true, monitor: nil)
+        var changes = 0
+        output.onOutputChanged = { changes += 1 }
+        let completions = Awaitable(0)
+        output.onCompletion = { completions.increment() }
+        let events = EventLog(output.unitFinishedEvents())
+        for unit in 0..<3 {
+            output.schedule(PCMChunk(unitID: unit, samples: sine(seconds: 0.5, rate: 48_000), sampleRate: 48_000), epoch: 0, gainDB: 0)
+            output.finishUnit(unit, epoch: 0, pauseAfter: 0.1)
+        }
+        try output.resume()
+        _ = try render(output, seconds: 0.2)
+        output.pause(fade: false)
+
+        output.stopEngineAsTheSystemWould()
+        await completions.wait(atLeast: 6, "every buffer's completion")
+        #expect(changes == 0)
+        #expect(events.received == [])
+
+        output.engineConfigurationChanged()
+        await events.ended.wait("the stream to end")
+        #expect(changes == 1)
+        #expect(events.received == [])
+        try output.resume()
+        #expect(peak(try render(output, seconds: 2)) == 0)
+    }
+
+    @Test("completions that land while the output holds the engine paused are reported on resume")
+    func completionsHeldWhilePaused() async throws {
+        let output = try ReadAloudOutput(offline: true, monitor: nil)
+        let completions = Awaitable(0)
+        output.onCompletion = { completions.increment() }
+        let events = EventLog(output.unitFinishedEvents())
+        output.schedule(PCMChunk(unitID: 0, samples: sine(seconds: 0.1, rate: 48_000), sampleRate: 48_000), epoch: 0, gainDB: 0)
+        output.finishUnit(0, epoch: 0, pauseAfter: 0)
+        output.schedule(PCMChunk(unitID: 1, samples: sine(seconds: 1, rate: 48_000), sampleRate: 48_000), epoch: 0, gainDB: 0)
+        output.finishUnit(1, epoch: 0, pauseAfter: 0)
+        try output.resume()
+        _ = try render(output, seconds: 0.2)
+        output.pause(fade: false)
+
+        await completions.wait(atLeast: 2, "unit 0's completions")
+        #expect(events.received == [])
+        try output.resume()
+        await events.wait(count: 1)
+        #expect(events.received == [UnitFinished(epoch: 0, unitID: 0)])
     }
 
     @Test("an engine configuration change while reading takes the output-change path")
@@ -412,6 +514,16 @@ private final class EventLog {
     func wait(count: Int, sourceLocation: SourceLocation = #_sourceLocation) async {
         await log.wait(until: { $0.count >= count }, "\(count) unit-finished event(s)", sourceLocation: sourceLocation)
     }
+}
+
+private func harmonics(seconds: Double, rate: Double, peak target: Float) -> [Float] {
+    let raw = (0..<Int(seconds * rate)).map { index in
+        (1...4).reduce(Float(0)) { sum, harmonic in
+            sum + Float(sin(2 * Double.pi * 220 * Double(harmonic) * Double(index) / rate)) / Float(harmonic)
+        }
+    }
+    let scale = target / peak(raw)
+    return raw.map { $0 * scale }
 }
 
 private func sine(seconds: Double, rate: Double, amplitude: Float = 0.1, frequency: Double = 440) -> [Float] {
