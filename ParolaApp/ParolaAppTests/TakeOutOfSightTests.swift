@@ -116,10 +116,10 @@ struct StoppedStatusItemTests {
         #expect(face.lamp == .stopped)
         #expect(face.spoken == "Recording stopped: The microphone stopped.")
         #expect(face.notice == "The microphone stopped.")
-        #expect(face.controls.map(\.title) == ["Show Parola"])
+        #expect(face.controls.map(\.title) == ["Show Recording"])
 
         let menu = RecordingStatusItem.menu(face.controls, notice: face.notice, target: nil)
-        #expect(menu.items.map { $0.isSeparatorItem ? "—" : $0.title } == ["The microphone stopped.", "—", "Show Parola"])
+        #expect(menu.items.map { $0.isSeparatorItem ? "—" : $0.title } == ["The microphone stopped.", "—", "Show Recording"])
         #expect(menu.items.first?.isEnabled == false)
     }
 
@@ -156,7 +156,7 @@ struct StoppedStatusItemTests {
         #expect(face.clock == "Stopped")
         #expect(face.notice == reason)
         #expect(face.spoken == reason)
-        #expect(face.controls.map(\.title) == ["Show Parola"])
+        #expect(face.controls.map(\.title) == ["Show Recording"])
         let failed = failedTake()
         #expect(TakeRemote.ending(of: failed, stopReason: nil)?.spoken == "Recording stopped: The microphone stopped.")
         #expect(TakeRemote.ending(of: failed, stopReason: reason)?.reason == "The microphone stopped.", "the recording's own failure says more than the stop")
@@ -492,7 +492,7 @@ struct TakeWarningsOutsideTests {
         let face = try #require(item.face)
         let menu = RecordingStatusItem.menu(face.controls, notice: face.notice, target: nil)
         #expect(menu.items.map { $0.isSeparatorItem ? "—" : $0.title }
-            == ["No voice detected — check your microphone.", "Stop Recording", "Pause", "Add Marker", "Discard…", "—", "Show Parola"])
+            == ["No voice detected — check your microphone.", "Stop Recording", "Pause", "Add Marker", "Discard…", "—", "Show Recording"])
         #expect(menu.items.first?.isEnabled == false)
 
         model.recordingIsSilent = false

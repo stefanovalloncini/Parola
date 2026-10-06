@@ -94,7 +94,7 @@ struct RecordingStatusItemTests {
         var take = capturingTake()
         _ = take.markCapturing(at: .now)
         #expect(RecordingStatusItem.menuTitles(for: take)
-            == ["Stop Recording", "Pause", "Add Marker", "Discard…", "Show Parola"])
+            == ["Stop Recording", "Pause", "Add Marker", "Discard…", "Show Recording"])
         _ = take.pause(at: .now)
         #expect(RecordingStatusItem.menuTitles(for: take)[1] == "Resume")
     }
@@ -106,7 +106,7 @@ struct RecordingStatusItemTests {
         _ = take.markCapturing(at: .now)
         let menu = RecordingStatusItem.menu(RecordingStatusItem.controls(for: take), target: nil)
         #expect(menu.items.map { $0.isSeparatorItem ? "—" : $0.title }
-            == ["Stop Recording", "Pause", "Add Marker", "Discard…", "—", "Show Parola"])
+            == ["Stop Recording", "Pause", "Add Marker", "Discard…", "—", "Show Recording"])
         #expect(!menu.autoenablesItems)
     }
 
@@ -208,7 +208,7 @@ struct RecordingStatusItemTests {
     func italian() throws {
         let it = try italianBundle()
         let italian = Locale(identifier: "it_IT")
-        #expect(String(localized: "Show Parola", bundle: it) == "Mostra Parola")
+        #expect(RecordingStatusItem.showParolaControl(bundle: it).title == "Mostra registrazione")
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
         var take = capturingTake()
         #expect(TakeRemote.spokenStatus(for: take, at: start, bundle: it, locale: italian) == "Preparazione della registrazione")
@@ -273,7 +273,7 @@ struct RecordingSurfaceTests {
         let shown = await waitUntil { item.face?.clock.hasPrefix("12:3") == true }
         #expect(shown)
         #expect(item.face?.lamp == .recording)
-        #expect(item.face?.controls.map(\.title) == ["Stop Recording", "Pause", "Add Marker", "Discard…", "Show Parola"])
+        #expect(item.face?.controls.map(\.title) == ["Stop Recording", "Pause", "Add Marker", "Discard…", "Show Recording"])
         #expect(item.isTicking)
 
         #expect(model.pauseTake())

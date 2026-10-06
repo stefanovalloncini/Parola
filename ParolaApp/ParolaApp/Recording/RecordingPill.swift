@@ -195,7 +195,7 @@ struct RecordingPillFace: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: ending.spoken))
             .axLeaf("Label.Stopped")
-            Button("Show Parola", action: onShowParola)
+            Button("Show Recording", action: onShowParola)
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf("Button.ShowParola")
         }
@@ -235,10 +235,10 @@ struct RecordingPillFace: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(warning.map { Text(verbatim: $0.message) } ?? Text("Show Parola"))
+            .help(warning.map { Text(verbatim: $0.message) } ?? Text("Show Recording"))
             .accessibilityLabel(Text(verbatim: TakeRemote.spokenStatus(for: take, at: now)))
             .accessibilityValue(Text(verbatim: warning?.message ?? ""))
-            .accessibilityHint("Show Parola")
+            .accessibilityHint("Show Recording")
             .axLeaf("Button.ShowParola")
             PillMeter(model: model, paused: take.isPaused, isOnScreen: isOnScreen)
             let cancels = take.isArming

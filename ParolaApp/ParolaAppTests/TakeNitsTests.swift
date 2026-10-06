@@ -16,7 +16,7 @@ struct CancelRecordingWordsTests {
     func words() {
         var take = armingTake(.countIn(remaining: 3))
         #expect(TakeRemote.endTitle(for: take) == "Cancel Recording")
-        #expect(RecordingStatusItem.menuTitles(for: take) == ["Cancel Recording", "Pause", "Add Marker", "Discard…", "Show Parola"])
+        #expect(RecordingStatusItem.menuTitles(for: take) == ["Cancel Recording", "Pause", "Add Marker", "Discard…", "Show Recording"])
         #expect(RecordingMenuState(take: take, showsRecording: true, composerFocused: false).cancels)
         _ = take.markCapturing(at: .now)
         #expect(TakeRemote.endTitle(for: take) == "Stop Recording")

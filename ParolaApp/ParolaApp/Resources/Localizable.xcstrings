@@ -13743,17 +13743,6 @@
         }
       }
     },
-    "Show Parola": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostra Parola"
-          }
-        }
-      }
-    },
     "Show Parola in": {
       "extractionState": "manual",
       "localizations": {

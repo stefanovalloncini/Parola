@@ -67,7 +67,7 @@ final class RecordingStatusItem: NSObject {
     }
 
     nonisolated static func showParolaControl(bundle: Bundle = .main) -> Control {
-        Control(title: String(localized: "Show Parola", bundle: bundle), isEnabled: true, action: #selector(showParola))
+        Control(title: String(localized: "Show Recording", bundle: bundle), isEnabled: true, action: #selector(showParola))
     }
 
     /// The dot in the take's colour, the clock in digits that hold their width as they turn over; a failed take shows a warning sign and the word for it.
