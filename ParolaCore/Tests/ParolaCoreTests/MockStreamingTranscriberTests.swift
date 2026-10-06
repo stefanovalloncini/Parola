@@ -137,6 +137,34 @@ struct MockStreamingTranscriberTests {
         #expect(transcript.sourceURL == nil)
     }
 
+    @Test("a mock that waits for its model on stop finishes with its segments once the gate opens")
+    func stopWaitsForTheGate() async throws {
+        let gate = MockTranscriberGate()
+        let response = MockTranscriberResponse(
+            segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "early words")],
+            downloadFractions: [0.5],
+            modelName: "mock",
+            gate: gate,
+            waitsForModelOnStop: true
+        )
+        let mock = MockStreamingTranscriber(response: response, clock: ContinuousClock())
+        let starting = await startHeldAtGate(mock)
+        let stopping = GuardedTask { await mock.stop() }
+        await pollUntil("the stop to wait at the gate") { await mock.stopsWaitingForModelCount == 1 }
+
+        await gate.open()
+
+        _ = try await stopping.value("the stop to finish once the gate opens")
+        var confirmed: [String] = []
+        var finished: Transcript?
+        for await event in try await starting.value {
+            if case .confirmed(let segment) = event { confirmed.append(segment.text) }
+            if case .finished(let transcript) = event { finished = transcript }
+        }
+        #expect(confirmed == ["early words"])
+        #expect(finished?.segments.map(\.text) == ["early words"])
+    }
+
     @Test("a cancel during the gated start throws instead of starting")
     func cancelDuringGatedStartThrows() async throws {
         let response = MockTranscriberResponse(

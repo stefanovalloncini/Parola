@@ -7,11 +7,13 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
     private var emitTask: Task<Void, Never>?
     private var isStarting = false
     private var endedWhileStarting: EndedWhileStarting?
+    private var stopsWaitingForModel: [CheckedContinuation<Void, Never>] = []
     public nonisolated let levelMeter = LevelMeter()
     public private(set) var pauseCalls: [Bool] = []
 
     private enum EndedWhileStarting {
         case stop
+        case stopAfterModel
         case cancel
     }
 
@@ -29,11 +31,15 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
         if let gate = response.gate {
             // The gate stands in for the model load, so a stop or cancel landing now ends the take as a real one would.
             isStarting = true
-            defer { isStarting = false }
+            defer {
+                isStarting = false
+                releaseStopsWaitingForModel()
+            }
             try await gate.wait()
             switch endedWhileStarting {
             case .cancel?: throw CancellationError()
             case .stop?: return Self.endedBeforeCapture(response)
+            case .stopAfterModel?: return Self.finishedAfterModel(response)
             case nil: break
             }
         }
@@ -64,6 +70,15 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
         return stream
     }
 
+    private static func finishedAfterModel(_ response: MockTranscriberResponse) -> AsyncStream<StreamingEvent> {
+        let (stream, continuation) = AsyncStream<StreamingEvent>.makeStream()
+        let finished = response.materialise(sourceURL: response.recordedAudio)
+        for segment in finished.segments { continuation.yield(.confirmed(segment)) }
+        continuation.yield(.finished(finished))
+        continuation.finish()
+        return stream
+    }
+
     private static func endedBeforeCapture(_ response: MockTranscriberResponse) -> AsyncStream<StreamingEvent> {
         let (stream, continuation) = AsyncStream<StreamingEvent>.makeStream()
         continuation.yield(.finished(Transcript(segments: [], language: response.language, modelName: response.modelName)))
@@ -76,6 +91,11 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
     }
 
     public func stop() async {
+        if isStarting, response.waitsForModelOnStop {
+            endedWhileStarting = .stopAfterModel
+            await withCheckedContinuation { stopsWaitingForModel.append($0) }
+            return
+        }
         if isStarting {
             endedWhileStarting = .stop
             await response.gate?.open()
@@ -90,6 +110,7 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
 
     public func cancel() async {
         if isStarting {
+            releaseStopsWaitingForModel()
             endedWhileStarting = .cancel
             await response.gate?.open()
             return
@@ -98,6 +119,15 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
         emitTask = nil
         continuation?.finish()
         continuation = nil
+    }
+
+    /// How many stops wait for the gate, so a test can tell one has parked there.
+    public var stopsWaitingForModelCount: Int { stopsWaitingForModel.count }
+
+    private func releaseStopsWaitingForModel() {
+        let waiting = stopsWaitingForModel
+        stopsWaitingForModel = []
+        for stop in waiting { stop.resume() }
     }
 
     public func currentModel() async -> String? { response.modelName }

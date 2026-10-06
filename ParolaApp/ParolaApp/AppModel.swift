@@ -4355,6 +4355,11 @@ final class AppModel {
         do {
             let events = try await s.start(options: options, speakerLabeler: labeler, downloadProgress: downloadProgress)
             guard takeIsCurrent(take) else {
+                // A take let go while its stop waited for the model lands from its stream.
+                if liveTakesFinishingAlone[take.id] != nil {
+                    for await event in events { await handleStreamingEvent(event, take: take, session: s) }
+                    return
+                }
                 // The take ended while its model loaded; the model stays loaded for the next one.
                 await s.cancel()
                 return

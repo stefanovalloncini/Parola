@@ -124,6 +124,8 @@ public struct MockTranscriberResponse: Sendable {
     public var gate: MockTranscriberGate?
     /// The file a streaming mock says it records to: named while it runs, and carried by its final transcript.
     public var recordedAudio: URL?
+    /// A streaming mock stopped while its gate holds the start waits for the gate and then finishes with its segments, as a take does.
+    public var waitsForModelOnStop: Bool
 
     public init(
         segments: [TranscriptSegmentSeed] = [],
@@ -136,7 +138,8 @@ public struct MockTranscriberResponse: Sendable {
         delayMs: Int = 0,
         failure: MockTranscriberFailure? = nil,
         gate: MockTranscriberGate? = nil,
-        recordedAudio: URL? = nil
+        recordedAudio: URL? = nil,
+        waitsForModelOnStop: Bool = false
     ) {
         self.segments = segments
         self.partials = partials
@@ -149,6 +152,7 @@ public struct MockTranscriberResponse: Sendable {
         self.failure = failure
         self.gate = gate
         self.recordedAudio = recordedAudio
+        self.waitsForModelOnStop = waitsForModelOnStop
     }
 
     func materialise(sourceURL: URL?) -> Transcript {
