@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Foundation
 import Testing
 @testable import Parola
@@ -255,6 +256,26 @@ struct DictationControllerLifecycleTests {
         #expect(store.all().isEmpty)
         #expect(controller.isRunning, "dictation stays armed for the next press")
         controller.stop()
+    }
+
+    @Test("a modified or repeated Escape does not cancel dictation")
+    func modifiedOrRepeatedEscapeIsIgnored() throws {
+        let escape = UInt16(kVK_Escape)
+        let plain = try #require(Self.keyEvent(keyCode: escape, modifierFlags: [], isARepeat: false))
+        let withCommand = try #require(Self.keyEvent(keyCode: escape, modifierFlags: .command, isARepeat: false))
+        let repeated = try #require(Self.keyEvent(keyCode: escape, modifierFlags: [], isARepeat: true))
+
+        #expect(DictationController.isPlainEscape(plain))
+        #expect(!DictationController.isPlainEscape(withCommand))
+        #expect(!DictationController.isPlainEscape(repeated))
+    }
+
+    private static func keyEvent(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, isARepeat: Bool) -> NSEvent? {
+        NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: modifierFlags, timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "",
+            isARepeat: isARepeat, keyCode: keyCode
+        )
     }
 
     @Test("the HUD reads the listening take's meter and lets go of it when listening ends")

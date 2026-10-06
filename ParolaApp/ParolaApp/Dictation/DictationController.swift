@@ -298,20 +298,25 @@ final class DictationController {
     /// Only while a dictation runs, and only for a launch that owns the keyboard: Escape anywhere cancels it.
     private func watchEscape() {
         guard escapeMonitors.isEmpty, configuration?.listensForHotkey == true else { return }
-        let escape = UInt16(kVK_Escape)
         if let global = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
-            guard event.keyCode == escape else { return }
+            guard Self.isPlainEscape(event) else { return }
             MainActor.assumeIsolated { self?.cancelDictation() }
         }) {
             escapeMonitors.append(global)
         }
         if let local = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
-            guard event.keyCode == escape else { return event }
+            guard Self.isPlainEscape(event) else { return event }
             MainActor.assumeIsolated { self?.cancelDictation() }
             return nil
         }) {
             escapeMonitors.append(local)
         }
+    }
+
+    static func isPlainEscape(_ event: NSEvent) -> Bool {
+        event.keyCode == UInt16(kVK_Escape)
+            && event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty
+            && !event.isARepeat
     }
 
     private func stopWatchingEscape() {
