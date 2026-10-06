@@ -3474,6 +3474,17 @@
         }
       }
     },
+    "Choose a folder to watch for new audio and video files.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli una cartella da monitorare per nuovi file audio e video."
+          }
+        }
+      }
+    },
     "Choose how it listens.": {
       "extractionState": "manual",
       "localizations": {
@@ -6063,6 +6074,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esportazione non riuscita: %@"
+          }
+        }
+      }
+    },
+    "Export here": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta qui"
           }
         }
       }
@@ -11294,6 +11316,28 @@
         }
       }
     },
+    "Pick %@ again to refresh permissions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli di nuovo %@ per rinnovare i permessi."
+          }
+        }
+      }
+    },
+    "Pick a .parola-settings file": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli un file .parola-settings"
+          }
+        }
+      }
+    },
     "Pick a different device or reconnect the current one.": {
       "extractionState": "manual",
       "localizations": {
@@ -11301,6 +11345,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scegli un altro dispositivo o riconnetti quello attuale."
+          }
+        }
+      }
+    },
+    "Pick an app to give it a custom dictation workflow.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli un'app per darle un workflow di dettatura personalizzato."
           }
         }
       }
@@ -13184,6 +13239,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salva sottotitoli…"
+          }
+        }
+      }
+    },
+    "Save Parola settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva le impostazioni di Parola"
           }
         }
       }

@@ -626,7 +626,7 @@ extension AppModel {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.prompt = "Export here"
+        panel.prompt = String(localized: "Export here")
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         let entriesByID = Dictionary(uniqueKeysWithValues: libraryEntries.map { ($0.id, $0) })
         let targets = ids.compactMap { entriesByID[$0] }

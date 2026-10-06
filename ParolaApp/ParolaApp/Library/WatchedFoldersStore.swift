@@ -75,7 +75,7 @@ final class WatchedFoldersStore {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.message = "Choose a folder to watch for new audio and video files."
+        panel.message = String(localized: "Choose a folder to watch for new audio and video files.")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         // The panel can still hand back a file via the go-to-folder field despite canChooseFiles=false.
         guard url.hasDirectoryPath else {
@@ -117,7 +117,7 @@ final class WatchedFoldersStore {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: folder.displayPath)
-        panel.message = "Pick \(folder.displayName) again to refresh permissions."
+        panel.message = String(localized: "Pick \(folder.displayName) again to refresh permissions.")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         adopt(url, for: id)
     }

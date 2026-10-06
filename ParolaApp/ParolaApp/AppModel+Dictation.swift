@@ -161,7 +161,7 @@ extension AppModel {
         panel.allowedContentTypes = [.application]
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.message = "Pick an app to give it a custom dictation workflow."
+        panel.message = String(localized: "Pick an app to give it a custom dictation workflow.")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard let bundle = Bundle(url: url), let bundleID = bundle.bundleIdentifier else { return }
         registerDictationOverrideApp(bundleID)

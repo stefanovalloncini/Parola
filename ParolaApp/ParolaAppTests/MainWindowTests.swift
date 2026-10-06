@@ -102,4 +102,26 @@ struct MainWindowTests {
         let key = "Select audio or video files to transcribe."
         #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
     }
+
+    @Test("export blurbs, dictation style names and panel messages have Italian")
+    func fx2StringsHaveItalian() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        let keys = [
+            "Final Cut Pro project with the transcript as captions.",
+            "Tab-separated rows, same columns as CSV.",
+            "Voice",
+            "Near field",
+            "Compact pill next to the field you're dictating into.",
+            "Pick an app to give it a custom dictation workflow.",
+            "Choose a folder to watch for new audio and video files.",
+            "Pick %@ again to refresh permissions.",
+            "Save Parola settings",
+            "Pick a .parola-settings file",
+            "Export here",
+        ]
+        for key in keys {
+            #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING", "\(key)")
+        }
+    }
 }

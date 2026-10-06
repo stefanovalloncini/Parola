@@ -29,7 +29,7 @@ enum SettingsExportService {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "parola.parola-settings"
         panel.allowedContentTypes = []
-        panel.message = "Save Parola settings"
+        panel.message = String(localized: "Save Parola settings")
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
         let payload = exportPayload()
         do {
@@ -47,7 +47,7 @@ enum SettingsExportService {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.message = "Pick a .parola-settings file"
+        panel.message = String(localized: "Pick a .parola-settings file")
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
         do {
             let data = try Data(contentsOf: url)
