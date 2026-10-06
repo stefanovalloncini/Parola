@@ -392,20 +392,45 @@ extension AppModel {
     }
 
     func retryBatchJob(_ id: BatchJob.ID) {
-        guard let idx = batchJobs.firstIndex(where: { $0.id == id }) else { return }
-        batchJobs[idx].status = .pending
-        batchJobs[idx].error = nil
-        batchJobs[idx].transcript = nil
-        batchJobs[idx].entryID = nil
-        batchJobs[idx].segmentCount = nil
-        // The file may have changed since it was hashed; the add takes its own digest.
-        batchJobs[idx].sourceDigest = nil
-        batchProgress.reset(id)
-        // Don't tear down a live batch to retry one file — runBatchTask cancels the running queue and
-        // strands the in-flight job. Reset to .pending; the running batch's .finished resume picks it up.
-        if !batchIsRunning {
-            runBatchTask(jobs: [batchJobs[idx]])
+        retryBatchJobs([id])
+    }
+
+    /// One run for all of them: a run per job would cancel the one before it.
+    func retryBatchJobs(_ ids: Set<BatchJob.ID>) {
+        var retried: [BatchJob] = []
+        for idx in batchJobs.indices where ids.contains(batchJobs[idx].id) {
+            batchJobs[idx].status = .pending
+            batchJobs[idx].error = nil
+            batchJobs[idx].transcript = nil
+            batchJobs[idx].entryID = nil
+            batchJobs[idx].segmentCount = nil
+            // The file may have changed since it was hashed; the add takes its own digest.
+            batchJobs[idx].sourceDigest = nil
+            batchProgress.reset(batchJobs[idx].id)
+            retried.append(batchJobs[idx])
         }
+        // Don't tear down a live batch to retry — runBatchTask cancels the running queue and
+        // strands the in-flight job. Reset to .pending; the running batch's .finished resume picks them up.
+        if !batchIsRunning, !retried.isEmpty {
+            runBatchTask(jobs: retried)
+        }
+    }
+
+    /// Return or a double-click: one finished job opens; the failed and cancelled ones run again.
+    func openOrRetryBatchJobs(_ ids: Set<BatchJob.ID>) {
+        let jobs = batchJobs.filter { ids.contains($0.id) }
+        if jobs.count == 1, let job = jobs.first, job.status == .done {
+            openBatchJobTranscript(job.id)
+            return
+        }
+        retryBatchJobs(Set(jobs.filter { $0.status == .failed || $0.status == .cancelled }.map(\.id)))
+    }
+
+    /// The running job goes last: cancelling it starts the jobs still waiting, and the ones going too must be gone by then.
+    func deleteBatchJobs(_ ids: Set<BatchJob.ID>) {
+        let jobs = batchJobs.filter { ids.contains($0.id) }
+        for job in jobs where job.status != .transcribing { cancelBatchJob(job.id) }
+        for job in jobs where job.status == .transcribing { cancelBatchJob(job.id) }
     }
 
     func clearFinishedBatchJobs() {

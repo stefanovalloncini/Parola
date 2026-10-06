@@ -2925,13 +2925,46 @@
         }
       }
     },
-    "Cancel Batch": {
+    "Cancel %lld transcriptions?": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Annulla batch"
+            "value": "Annullare %lld trascrizioni?"
+          }
+        }
+      }
+    },
+    "Cancel 1 transcription?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annullare 1 trascrizione?"
+          }
+        }
+      }
+    },
+    "Cancel All": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla tutto"
+          }
+        }
+      }
+    },
+    "Cancel All…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annulla tutto…"
           }
         }
       }
@@ -7540,6 +7573,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Continua a registrare"
+          }
+        }
+      }
+    },
+    "Keep Transcribing": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continua a trascrivere"
           }
         }
       }
@@ -15765,6 +15809,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Finiscono in coda e vengono trascritti uno alla volta."
+          }
+        }
+      }
+    },
+    "They stay in the list, and Retry starts them again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restano nell'elenco e Riprova le fa ripartire."
           }
         }
       }

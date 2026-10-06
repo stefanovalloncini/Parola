@@ -47,38 +47,19 @@ enum BatchJobStatus {
     }
 }
 
-/// What a row's ✕ means: the Queue cancels the run, the Batch page cancels the one file.
+/// What a row's ✕ means: a running file is cancelled, a waiting one is removed.
 struct JobCancelAction: Equatable {
-    enum Scope: Equatable {
-        case wholeBatch
-        case oneJob
-    }
-
-    let scope: Scope
     /// A localization key, kept as a String so the action stays Sendable and the row's `==` can read it.
     let help: String
     let axID: String
 
-    /// The Queue page's ✕, as `QueueRow` had it: one control for the whole run.
-    static var wholeBatch: JobCancelAction {
-        JobCancelAction(scope: .wholeBatch, help: "Cancel Batch", axID: "Row.Button.CancelBatch")
-    }
-
-    /// The Batch page's ✕, as `BatchJobRow` had it: a running file is cancelled, a waiting one is removed.
     static func oneJob(status: BatchJob.Status) -> JobCancelAction {
-        JobCancelAction(
-            scope: .oneJob,
-            help: status == .transcribing ? "Cancel" : "Remove",
-            axID: "Row.Button.Cancel"
-        )
+        JobCancelAction(help: status == .transcribing ? "Cancel" : "Remove", axID: "Row.Button.Cancel")
     }
 
     @MainActor
     func run(for id: BatchJob.ID, in model: AppModel) {
-        switch scope {
-        case .wholeBatch: model.cancelAllInFlightBatchJobs()
-        case .oneJob: model.cancelBatchJob(id)
-        }
+        model.cancelBatchJob(id)
     }
 }
 
@@ -92,12 +73,21 @@ struct JobRow: View, Equatable {
     let isSelected: Bool
     /// The sidebar's column is narrow: no progress bar and no trailing action, the status text alone.
     let compact: Bool
+    /// In a `List`, which paints the selection itself.
+    let listed: Bool
     let cancel: JobCancelAction?
 
     @Environment(AppModel.self) private var model
+    @Environment(\.backgroundProminence) private var backgroundProminence
     @State private var isHovering = false
 
-    init(job: BatchJob, isSelected: Bool = false, compact: Bool = false, cancel: JobCancelAction? = nil) {
+    init(
+        job: BatchJob,
+        isSelected: Bool = false,
+        compact: Bool = false,
+        listed: Bool = false,
+        cancel: JobCancelAction? = nil
+    ) {
         self.id = job.id
         self.url = job.url
         self.status = job.status
@@ -105,17 +95,20 @@ struct JobRow: View, Equatable {
         self.segmentCount = job.segmentCount ?? job.transcript?.segments.count ?? 0
         self.isSelected = isSelected
         self.compact = compact
+        self.listed = listed
         self.cancel = cancel
     }
 
     nonisolated static func == (lhs: JobRow, rhs: JobRow) -> Bool {
         lhs.id == rhs.id && lhs.url == rhs.url && lhs.status == rhs.status && lhs.error == rhs.error
             && lhs.segmentCount == rhs.segmentCount && lhs.isSelected == rhs.isSelected
-            && lhs.compact == rhs.compact && lhs.cancel == rhs.cancel
+            && lhs.compact == rhs.compact && lhs.listed == rhs.listed && lhs.cancel == rhs.cancel
     }
 
-    /// Only the sidebar's selection is a solid accent fill; the pages wash theirs, where onAccent would vanish.
-    private var onAccent: Bool { isSelected && compact }
+    /// The sidebar's selection is a solid accent fill, and a List's is while it has focus; the Batch page washes its own.
+    private var onAccent: Bool {
+        listed ? DS.onAccent(isSelected: isSelected, prominence: backgroundProminence) : isSelected && compact
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
@@ -198,7 +191,7 @@ struct JobRow: View, Equatable {
     }
 
     private var selection: RowSelectionStyle {
-        compact
+        compact || listed
             ? .native
             : .wash(fill: DS.Color.selectionWash, border: DS.Color.accent.opacity(0.35))
     }

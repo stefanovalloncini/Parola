@@ -5,7 +5,8 @@ struct QueueView: View {
     @Environment(AppModel.self) private var model
     @State private var searchText: String = ""
     @State private var sortOption: SortOption = .newestFirst
-    @FocusState private var focusedJob: BatchJob.ID?
+    @State private var selection: Set<BatchJob.ID> = []
+    @State private var confirmingCancelAll = false
 
     enum SortOption: String, CaseIterable, Identifiable {
         case newestFirst = "Newest first"
@@ -29,6 +30,12 @@ struct QueueView: View {
         .background(DS.Color.surface)
         .toolbarSearch(text: $searchText, for: .queue)
         .focusedSceneValue(\.pageListMenus, .queue(sort: $sortOption))
+        .confirmationDialog(QueueCopy.cancelAllTitle(QueueCount.count(for: model.batchJobs)), isPresented: $confirmingCancelAll) {
+            Button("Cancel All", role: .destructive) { model.cancelAllInFlightBatchJobs() }
+            Button("Keep Transcribing", role: .cancel) {}
+        } message: {
+            Text("They stay in the list, and Retry starts them again.")
+        }
         .axBranch("Queue")
     }
 
@@ -94,26 +101,36 @@ struct QueueView: View {
                 ContentUnavailableView.search(text: searchText)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(sections) { section in
-                            SectionCaption(section.title)
-                                .padding(.top, section.id == sections.first?.id ? 0 : DS.Spacing.large)
-                                .padding(.bottom, DS.Spacing.small)
-                            ForEach(section.jobs) { job in
-                                jobRow(job)
-                                if job.id != section.jobs.last?.id {
-                                    Divider()
-                                        .padding(.leading, DS.Spacing.small + EntryRowMetrics.textInset)
-                                }
-                            }
-                        }
+                list(sections)
+            }
+        }
+    }
+
+    private func list(_ sections: [JobSection]) -> some View {
+        List(selection: $selection) {
+            ForEach(sections) { section in
+                Section {
+                    ForEach(section.jobs) { job in
+                        jobRow(job)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, DS.Spacing.large)
-                    .padding(.vertical, DS.Spacing.medium)
+                } header: {
+                    SectionCaption(section.title)
+                        .listRowInsets(EdgeInsets(
+                            top: section.id == sections.first?.id ? 0 : DS.Spacing.regular,
+                            leading: DS.Spacing.small,
+                            bottom: DS.Spacing.tight,
+                            trailing: DS.Spacing.small
+                        ))
                 }
             }
+        }
+        .listStyle(.inset)
+        .tint(DS.Color.accentFill)
+        .onDeleteCommand { model.deleteBatchJobs(selection) }
+        .contextMenu(forSelectionType: BatchJob.ID.self) { ids in
+            QueueRowMenu(model: model, ids: ids) { confirmingCancelAll = true }
+        } primaryAction: { ids in
+            model.openOrRetryBatchJobs(ids)
         }
     }
 
@@ -190,33 +207,9 @@ struct QueueView: View {
     }
 
     private func jobRow(_ job: BatchJob) -> some View {
-        JobRow(job: job, isSelected: focusedJob == job.id, cancel: .wholeBatch)
-            .focusable(true)
-            .focusEffectDisabled()
-            .focused($focusedJob, equals: job.id)
-            .onKeyPress(.return) {
-                handleReturn(job: job); return .handled
-            }
-            .onKeyPress(.delete) {
-                handleDelete(job: job); return .handled
-            }
-            .contextMenu {
-                switch job.status {
-                case .pending, .transcribing:
-                    Button("Cancel Batch") { model.cancelAllInFlightBatchJobs() }
-                        .axLeaf("Row.ContextMenuItem.CancelBatch")
-                case .failed, .cancelled:
-                    Button("Retry") { model.retryBatchJob(job.id) }
-                        .axLeaf("Row.ContextMenuItem.Retry")
-                case .done:
-                    Button("Open") { model.openBatchJobTranscript(job.id) }
-                        .axLeaf("Row.ContextMenuItem.Open")
-                    Button("Reveal in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([job.url])
-                    }
-                    .axLeaf("Row.ContextMenuItem.RevealInFinder")
-                }
-            }
+        JobRow(job: job, isSelected: selection.contains(job.id), listed: true, cancel: .oneJob(status: job.status))
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
             .onDrag {
                 guard case .done = job.status else { return NSItemProvider() }
                 let exports = (model.batchSidecars[job.id] ?? [])
@@ -241,5 +234,48 @@ struct QueueView: View {
 
     private func handleDelete(job: BatchJob) {
         model.cancelBatchJob(job.id)
+    }
+}
+
+/// The right-click menu for the rows it was opened on: the selection when the clicked row is in it.
+struct QueueRowMenu: View {
+    let model: AppModel
+    let ids: Set<BatchJob.ID>
+    let cancelAll: () -> Void
+
+    var body: some View {
+        let jobs = model.batchJobs.filter { ids.contains($0.id) }
+        let done = jobs.filter { $0.status == .done }
+        let retryable = jobs.filter { $0.status == .failed || $0.status == .cancelled }
+        let inFlight = jobs.filter { $0.status == .pending || $0.status == .transcribing }
+        if jobs.count == 1, let job = done.first {
+            Button("Open") { model.openBatchJobTranscript(job.id) }
+                .axLeaf("Row.ContextMenuItem.Open")
+        }
+        if !done.isEmpty {
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(done.map(\.url)) }
+                .axLeaf("Row.ContextMenuItem.RevealInFinder")
+        }
+        if !retryable.isEmpty {
+            Button("Retry") { model.retryBatchJobs(Set(retryable.map(\.id))) }
+                .axLeaf("Row.ContextMenuItem.Retry")
+        }
+        if !inFlight.isEmpty {
+            Button("Cancel") { model.deleteBatchJobs(Set(inFlight.map(\.id))) }
+                .axLeaf("Row.ContextMenuItem.Cancel")
+        }
+        if model.batchJobs.contains(where: { $0.status == .pending || $0.status == .transcribing }) {
+            Divider()
+            Button("Cancel All…", action: cancelAll)
+                .axLeaf("Row.ContextMenuItem.CancelAll")
+        }
+    }
+}
+
+enum QueueCopy {
+    static func cancelAllTitle(_ count: Int, bundle: Bundle = .main) -> String {
+        count == 1
+            ? String(localized: "Cancel 1 transcription?", bundle: bundle)
+            : String(localized: "Cancel \(count) transcriptions?", bundle: bundle)
     }
 }

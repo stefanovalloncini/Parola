@@ -243,9 +243,8 @@ struct JobRowTests {
         #expect(!BatchJobStatus.showsProgress(.cancelled))
     }
 
-    /// The Queue's ✕ cancels the run; the Batch page's ✕ must stay the per-file control it was.
-    @Test("each page's cancel keeps its own meaning and its own ax id")
-    func cancelActionsDifferPerPage() {
+    @Test("a row's ✕ cancels or removes that file alone")
+    func cancelActsOnOneJob() {
         let model = AppModel(
             skipBootstrap: true,
             defaults: temporaryDefaults(),
@@ -261,22 +260,19 @@ struct JobRowTests {
         model.batchJobs = [running, waiting, spare]
         oneJob.run(for: waiting.id, in: model)
         #expect(model.batchJobs.map(\.id) == [running.id, spare.id])
-
-        let queue = JobCancelAction.wholeBatch
-        #expect(queue.axID == "Row.Button.CancelBatch")
-        queue.run(for: spare.id, in: model)
-        #expect(model.batchJobs.map(\.status) == [.cancelled, .cancelled])
+        #expect(model.batchJobs.map(\.status) == [.transcribing, .pending])
     }
 
     @Test("a row compares equal while what it draws is unchanged")
     func rowEqualityFollowsWhatItDraws() {
         var job = BatchJob(url: URL(fileURLWithPath: "/tmp/JobRowTests/take.wav"), status: .transcribing)
-        let row = JobRow(job: job, cancel: .wholeBatch)
-        #expect(JobRow(job: job, cancel: .wholeBatch) == row)
-        #expect(JobRow(job: job, isSelected: true, cancel: .wholeBatch) != row)
-        #expect(JobRow(job: job, cancel: .oneJob(status: .transcribing)) != row)
+        let row = JobRow(job: job, cancel: .oneJob(status: .transcribing))
+        #expect(JobRow(job: job, cancel: .oneJob(status: .transcribing)) == row)
+        #expect(JobRow(job: job, isSelected: true, cancel: .oneJob(status: .transcribing)) != row)
+        #expect(JobRow(job: job, listed: true, cancel: .oneJob(status: .transcribing)) != row)
+        #expect(JobRow(job: job, cancel: .oneJob(status: .pending)) != row)
         job.status = .done
-        #expect(JobRow(job: job, cancel: .wholeBatch) != row)
+        #expect(JobRow(job: job, cancel: .oneJob(status: .transcribing)) != row)
     }
 
     @Test("a running job has no glyph, since its bar is the indicator")
