@@ -174,7 +174,7 @@ or failed out of sight, `{title, state, origin, entryID, reason, actions}` with 
 `getState.retranscribing` is true while a re-run started by `retranscribeEntry` or the Info inspector's menus is going; poll it to wait one out, since a second `retranscribeEntry` is refused until it settles.
 `getState.appVisibilityMode` is where Parola shows itself — `dockAndMenuBar` (the default), `menuBarOnly` (no Dock icon, no ⌘-Tab) or `dockOnly` (no menu bar item); `setSetting appVisibilityMode menuBarOnly` applies it live, and `showMenuBarExtra` follows it rather than being set on its own.
 `getState.playSoundWhenFinished` says whether a finished transcription rings the system Glass sound — once per single-file run, once per batch run, once per re-run, and never for an import.
-A running take shows in the menu bar (● and its time, with Stop, Pause, Add Marker, Discard… and Show Parola) and, while Parola isn't the active app, in a floating pill; `setSetting showRecordingStatusItem false` and `setSetting showRecordingPill false` turn each one off live, and `getSettings` reads both.
+A running take shows in the menu bar (● and its time, with Stop, Pause, Add Marker, Discard… and Show Recording) and, while Parola isn't the active app, in a floating pill; `setSetting showRecordingStatusItem false` and `setSetting showRecordingPill false` turn each one off live, and `getSettings` reads both.
 `getState.destinations` lists the Send To destinations in order (`id`, `kind`, `name`, `isEnabled`, `autoSend`, `categories`); a
 kind this build cannot run comes back with the kind it was stored as and `isEnabled: false`.
 `visible` says whether the introduction is on screen; `step` is the scene showing now and `steps` the order this
