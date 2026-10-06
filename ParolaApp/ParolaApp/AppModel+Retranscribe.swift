@@ -9,6 +9,15 @@ struct RetranscribeRequest: Equatable, Sendable {
     let language: String?
 }
 
+/// A re-run the user picked, waiting on the "Transcribe again?" alert.
+struct RetranscribeAsk: Equatable, Sendable {
+    let modelName: String
+    let language: String?
+    let choiceLabel: String
+    /// Set when the run has to fall back off the entry's own model, so the alert can name it.
+    let substituteModelLabel: String?
+}
+
 extension AppModel {
 
     /// Imported subtitles and fetched captions carry no audio, so there is nothing to run again.
@@ -32,6 +41,79 @@ extension AppModel {
     var retranscribeUnavailableReason: String? {
         guard selectedEntryID != nil, !canRetranscribeSelectedEntry else { return nil }
         return String(localized: "This transcript came in without its audio, so there is nothing to transcribe again.")
+    }
+
+    /// A transcribed entry with its audio and no re-run going: what Transcribe Again needs.
+    var canTranscribeAgain: Bool {
+        transcript != nil && !transcriptIsUntranscribed && canRetranscribeSelectedEntry && retranscribeRequest == nil
+    }
+
+    /// The models a re-run can use without a download.
+    var transcribeAgainModels: [ModelVariant] {
+        Self.selectableModels(availableModels)
+            .filter(\.isInstalled)
+            .compactMap { ModelCatalog.variant(id: $0.name) }
+    }
+
+    /// Auto and "no language recorded" are the same answer, and the menus offer it once.
+    var transcriptLanguageCode: String? {
+        let code = transcript?.language ?? ""
+        return code.isEmpty ? nil : code
+    }
+
+    /// The model a re-run keeps: the entry's own, or the selected one when that one is gone.
+    func transcribeAgainModel(among variants: [ModelVariant]) -> String {
+        let current = transcript?.modelName ?? ""
+        return variants.contains { $0.id == current } ? current : selectedModel
+    }
+
+    /// What that model can transcribe, so the language menus can shut the codes it would refuse.
+    func transcribeAgainLanguages(among variants: [ModelVariant]) -> ParolaCore.SupportedLanguages {
+        ModelCatalog.staticCapabilities(forID: transcribeAgainModel(among: variants))?.supportedLanguages ?? .all
+    }
+
+    /// The same model and language as before; the run still reads today's Settings, such as Identify speakers.
+    func askToTranscribeAgain() {
+        guard canTranscribeAgain else { return }
+        let runs = transcribeAgainModel(among: transcribeAgainModels)
+        pendingRetranscribe = RetranscribeAsk(
+            modelName: runs,
+            language: transcriptLanguageCode,
+            choiceLabel: Self.modelLabel(runs),
+            substituteModelLabel: substituteModelLabel(for: runs)
+        )
+    }
+
+    /// Picking the model the entry already carries asks nothing: the value menus are for changing it.
+    func askToTranscribeAgain(model modelName: String, label: String) {
+        guard modelName != transcript?.modelName else { return }
+        pendingRetranscribe = RetranscribeAsk(
+            modelName: modelName,
+            language: transcriptLanguageCode,
+            choiceLabel: label,
+            substituteModelLabel: nil
+        )
+    }
+
+    func askToTranscribeAgain(language code: String?, label: String) {
+        guard code != transcriptLanguageCode else { return }
+        let runs = transcribeAgainModel(among: transcribeAgainModels)
+        pendingRetranscribe = RetranscribeAsk(
+            modelName: runs,
+            language: code,
+            choiceLabel: label,
+            substituteModelLabel: substituteModelLabel(for: runs)
+        )
+    }
+
+    func confirmTranscribeAgain() {
+        guard let ask = pendingRetranscribe else { return }
+        pendingRetranscribe = nil
+        retranscribeCurrentEntry(model: ask.modelName, language: ask.language)
+    }
+
+    private func substituteModelLabel(for runs: String) -> String? {
+        runs == transcript?.modelName ? nil : Self.modelLabel(runs)
     }
 
     /// Runs the loaded entry's own audio again and replaces what the entry holds; the one entry point. A take's Retry lands as the take would have.

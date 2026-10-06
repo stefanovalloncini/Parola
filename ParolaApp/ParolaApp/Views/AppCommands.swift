@@ -381,6 +381,7 @@ struct TranscriptCommands: View {
         Button("Rename…") { model.renameRequests &+= 1 }
             .disabled(!model.canRenameOpenTranscript)
             .axLeaf("Menu.Transcript.Rename")
+        TranscribeAgainMenu(model: model)
         Button("Edit Segment") { model.editFocusedSegment() }
             .disabled(segmentCommandsDisabled)
             .help(segmentHelp)

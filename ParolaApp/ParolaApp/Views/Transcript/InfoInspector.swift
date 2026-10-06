@@ -12,18 +12,8 @@ struct InfoInspector: View {
         var speechRate: [SpeechRateBin] = []
     }
 
-    /// A pick waiting on the "Transcribe again?" alert.
-    private struct PendingRetranscribe: Equatable {
-        let modelName: String
-        let language: String?
-        let choiceLabel: String
-        /// Set when the run has to fall back off the entry's own model, so the alert can name it.
-        let substituteModelLabel: String?
-    }
-
     @Environment(AppModel.self) private var model
     @State private var derived = Derived()
-    @State private var pendingRetranscribe: PendingRetranscribe?
 
     private var entry: LibraryEntry? {
         guard let id = model.selectedEntryID else { return nil }
@@ -32,7 +22,7 @@ struct InfoInspector: View {
 
     var body: some View {
         // Built once per pass: the three menu rows below all read it.
-        let variants = installedVariants
+        let variants = model.transcribeAgainModels
         return VStack(alignment: .leading, spacing: DS.Spacing.large) {
             InspectorSection(title: "Properties") {
                 InfoRow(icon: "clock", label: "Audio duration", value: durationLabel, numeric: true)
@@ -72,6 +62,11 @@ struct InfoInspector: View {
                 if fillerCount > 0 {
                     InfoRow(icon: "exclamationmark.bubble", label: "Filler words", value: AppFormat.integer(fillerCount), numeric: true)
                 }
+                Button("Transcribe Again") { model.askToTranscribeAgain() }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary))
+                    .disabled(!model.canTranscribeAgain)
+                    .help(model.retranscribeUnavailableReason ?? String(localized: "Runs the same model and language again, with your current Settings"))
+                    .axLeaf("Info.Button.TranscribeAgain")
             }
 
             if model.transcript != nil {
@@ -85,41 +80,10 @@ struct InfoInspector: View {
             }
         }
         .task(id: model.transcriptVersion) { await recomputeDerived() }
-        .alert(
-            alertTitle,
-            isPresented: Binding(
-                get: { pendingRetranscribe != nil },
-                set: { if !$0 { pendingRetranscribe = nil } }
-            ),
-            presenting: pendingRetranscribe
-        ) { pending in
-            Button("Cancel", role: .cancel) { pendingRetranscribe = nil }
-                .axLeaf("Info.Button.RetranscribeCancel")
-            Button("Transcribe Again") {
-                model.retranscribeCurrentEntry(model: pending.modelName, language: pending.language)
-                pendingRetranscribe = nil
-            }
-            .axLeaf("Info.Button.RetranscribeConfirm")
-        } message: { pending in
-            Text(verbatim: alertMessage(for: pending))
-        }
-    }
-
-    private func alertMessage(for pending: PendingRetranscribe) -> String {
-        let replaced = String(localized: "The current transcript, its favorites, notes, summary and translation will be replaced.")
-        guard let substitute = pending.substituteModelLabel else { return replaced }
-        let fallback = String(localized: "This transcript's own model isn't available, so Parola will run \(substitute).")
-        return replaced + "\n\n" + fallback
-    }
-
-    private var alertTitle: String {
-        guard let pending = pendingRetranscribe else { return "" }
-        return String(localized: "Transcribe again with \(pending.choiceLabel)?")
     }
 
     private func languageRow(variants: [ModelVariant]) -> some View {
-        let scope = runScope(variants: variants)
-        return InfoMenuRow(
+        InfoMenuRow(
             icon: "globe",
             label: "Language",
             value: languageLabel,
@@ -127,16 +91,7 @@ struct InfoInspector: View {
             isEnabled: menusAreOpen,
             leaf: "Info.Menu.Language"
         ) {
-            menuChoice(LanguagePickerPopover.autoLabel, isCurrent: currentLanguageCode == nil, isAllowed: true) {
-                ask(language: nil, label: LanguagePickerPopover.autoLabel)
-            }
-            Divider()
-            ForEach(SupportedLanguages.codes, id: \.self) { code in
-                let name = SupportedLanguages.displayName(for: code)
-                menuChoice(name, isCurrent: code == currentLanguageCode, isAllowed: scope.allows(code)) {
-                    ask(language: code, label: name)
-                }
-            }
+            TranscribeAgainLanguageChoices(model: model, variants: variants)
         }
     }
 
@@ -149,79 +104,12 @@ struct InfoInspector: View {
             isEnabled: menusAreOpen,
             leaf: "Info.Menu.Model"
         ) {
-            ForEach(variants, id: \.id) { variant in
-                menuChoice(
-                    "\(variant.displayName) — \(variant.engineID.displayName)",
-                    isCurrent: variant.id == current,
-                    isAllowed: true
-                ) {
-                    ask(model: variant.id, label: variant.displayName)
-                }
-            }
+            TranscribeAgainModelChoices(model: model, variants: variants)
         }
-    }
-
-    /// A menu row that marks the value the entry already carries and shuts the ones it can't run.
-    private func menuChoice(
-        _ title: String,
-        isCurrent: Bool,
-        isAllowed: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Toggle(isOn: Binding(get: { isCurrent }, set: { _ in action() })) {
-            Text(verbatim: title)
-        }
-        .disabled(!isAllowed)
     }
 
     private var menusAreOpen: Bool {
         model.canRetranscribeSelectedEntry && model.retranscribeRequest == nil
-    }
-
-    private var installedVariants: [ModelVariant] {
-        AppModel.selectableModels(model.availableModels)
-            .filter(\.isInstalled)
-            .compactMap { ModelCatalog.variant(id: $0.name) }
-    }
-
-    /// Auto and "no language recorded" are the same answer, and the menu offers it once.
-    private var currentLanguageCode: String? {
-        let code = model.transcript?.language ?? ""
-        return code.isEmpty ? nil : code
-    }
-
-    /// The model a language pick runs: the entry's own, or the selected one when that one is gone.
-    private func runModel(variants: [ModelVariant]) -> String {
-        let current = model.transcript?.modelName ?? ""
-        return variants.contains { $0.id == current } ? current : model.selectedModel
-    }
-
-    /// What that model can transcribe, so the menu can shut the codes it would refuse.
-    private func runScope(variants: [ModelVariant]) -> ParolaCore.SupportedLanguages {
-        ModelCatalog.staticCapabilities(forID: runModel(variants: variants))?.supportedLanguages ?? .all
-    }
-
-    /// Picking the value the entry already carries asks nothing: there is no re-run to confirm.
-    private func ask(model modelName: String, label: String) {
-        guard modelName != model.transcript?.modelName else { return }
-        pendingRetranscribe = PendingRetranscribe(
-            modelName: modelName,
-            language: currentLanguageCode,
-            choiceLabel: label,
-            substituteModelLabel: nil
-        )
-    }
-
-    private func ask(language code: String?, label: String) {
-        guard code != currentLanguageCode else { return }
-        let runs = runModel(variants: installedVariants)
-        let substitute = runs == model.transcript?.modelName ? nil : AppModel.modelLabel(runs)
-        pendingRetranscribe = PendingRetranscribe(
-            modelName: runs,
-            language: code,
-            choiceLabel: label,
-            substituteModelLabel: substitute
-        )
     }
 
     private func recomputeDerived() async {

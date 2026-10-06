@@ -32,6 +32,24 @@ struct TranscriptMenuTests {
         #expect(header.contains("model.renameOpenTranscript(to: renameDraft)"))
     }
 
+    @Test("Transcribe Again runs the same settings from the Transcript menu and the Info tab, through one alert")
+    func transcribeAgainHasMenuAndInfoDoors() throws {
+        let menu = try source("Views/Transcript/TranscribeAgainMenus")
+        let same = try #require(menu.range(of: #"Menu("Transcribe Again") { Button("Same Model and Language") { model.askToTranscribeAgain() }"#))
+        let models = try #require(menu.range(of: "TranscribeAgainModelChoices(model: model, variants: variants)"))
+        let languages = try #require(menu.range(of: #"Menu("Language") { TranscribeAgainLanguageChoices("#))
+        #expect(same.lowerBound < models.lowerBound && models.lowerBound < languages.lowerBound)
+        let info = try source("Views/Transcript/InfoInspector")
+        #expect(info.contains(#"Button("Transcribe Again") { model.askToTranscribeAgain() }"#))
+        #expect(info.contains("TranscribeAgainModelChoices(model: model, variants: variants)"))
+        #expect(info.contains("TranscribeAgainLanguageChoices(model: model, variants: variants)"))
+        #expect(!info.contains(".alert("), "the alert lives with the window, so the menu reaches it with the inspector hidden")
+        let sheets = try source("Views/ContentSheets")
+        #expect(sheets.contains(#"Button("Transcribe Again") { model.confirmTranscribeAgain() }"#))
+        let speakers = try source("Views/SpeakersSheet")
+        #expect(speakers.contains("Transcript ▸ Transcribe Again"))
+    }
+
     @Test("the layouts are a checked pair in the View menu, with keys, named as the inspector names them")
     func layoutsAreViewCommands() throws {
         let commands = try source("Views/AppCommands")
@@ -96,7 +114,7 @@ struct TranscriptMenuTests {
         let groups = [
             [#"Button("Back")"#, #"Button("Jump to Next Speaker")"#, #"Button("Jump to Time…")"#, #"Button("Show Outline")"#],
             [
-                #"Button("Rename…")"#, #"Button("Edit Segment") { model.editFocusedSegment() }"#,
+                #"Button("Rename…")"#, "TranscribeAgainMenu(model: model)", #"Button("Edit Segment") { model.editFocusedSegment() }"#,
                 #"Button("Add Note…") { model.noteFocusedSegment() }"#, #"Button("Favorite Segment")"#,
                 #"Button("Delete Segment") { model.deleteFocusedSegment() }"#, #"Button("Manage People…")"#,
             ],

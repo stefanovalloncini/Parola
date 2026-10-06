@@ -208,6 +208,8 @@ final class AppModel {
     }
     /// The re-transcription in flight. Nil the rest of the time; the inspector menus watch it.
     var retranscribeRequest: RetranscribeRequest?
+    /// The re-run waiting on the "Transcribe again?" alert.
+    var pendingRetranscribe: RetranscribeAsk?
     /// How many files the last batch import dropped because the library already had them.
     var batchDuplicatesSkipped: Int = 0
     /// Dropped files still being hashed against the library before they join the batch.

@@ -64,6 +64,21 @@ struct ContentSheetsModifier: ViewModifier {
                     Text("Parola quit while transcribing \(checkpoint.sourceName ?? "this file").")
                 }
             }
+            .alert(
+                retranscribeTitle,
+                isPresented: Binding(
+                    get: { model.pendingRetranscribe != nil },
+                    set: { if !$0 { model.pendingRetranscribe = nil } }
+                ),
+                presenting: model.pendingRetranscribe
+            ) { _ in
+                Button("Cancel", role: .cancel) { model.pendingRetranscribe = nil }
+                    .axLeaf("Alert.Button.RetranscribeCancel")
+                Button("Transcribe Again") { model.confirmTranscribeAgain() }
+                    .axLeaf("Alert.Button.RetranscribeConfirm")
+            } message: { ask in
+                Text(verbatim: Self.retranscribeMessage(for: ask))
+            }
             .alert("Discard this recording?", isPresented: $confirmingRecoveryDiscard) {
                 // Return keeps the take: only a deliberate click deletes it.
                 Button("Cancel", role: .cancel) {}
@@ -89,6 +104,18 @@ struct ContentSheetsModifier: ViewModifier {
         case .fileTranscription: String(localized: "Transcribe \(model.pendingRecovery?.sourceName ?? "the file") again?")
         case nil: ""
         }
+    }
+
+    private var retranscribeTitle: String {
+        guard let ask = model.pendingRetranscribe else { return "" }
+        return String(localized: "Transcribe again with \(ask.choiceLabel)?")
+    }
+
+    static func retranscribeMessage(for ask: RetranscribeAsk) -> String {
+        let replaced = String(localized: "The current transcript, its favorites, notes, summary and translation will be replaced.")
+        guard let substitute = ask.substituteModelLabel else { return replaced }
+        let fallback = String(localized: "This transcript's own model isn't available, so Parola will run \(substitute).")
+        return replaced + "\n\n" + fallback
     }
 
     // Every answer is a button of its own; a prompt closed without one stays on offer and deletes nothing. It waits out a take.

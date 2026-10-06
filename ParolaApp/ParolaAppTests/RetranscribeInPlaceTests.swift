@@ -446,6 +446,91 @@ extension TranscriberMockSuites {
             }
         }
 
+        private func appleSpeechInfo() -> ModelInfo {
+            ModelInfo(
+                name: Self.appleSpeech, label: AppModel.modelLabel(Self.appleSpeech), approximateSizeBytes: nil,
+                isMultilingual: true, isInstalled: true, installedURL: nil
+            )
+        }
+
+        @Test("Transcribe Again asks first, then runs the entry's own model and language")
+        func transcribeAgainKeepsTheSettings() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the new take")],
+                    language: "it", gate: gate
+                ))
+                let model = makeModel("retranscribe-same")
+                model.availableModels = [appleSpeechInfo()]
+                let wav = try makeWAV("same")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                let entry = try await model.library.add(
+                    transcript: Transcript(
+                        segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "the old take")],
+                        language: "it", modelName: Self.appleSpeech
+                    ),
+                    audioSource: wav, category: .transcription, title: "Board meeting"
+                )
+                model.refreshLibrary()
+                #expect(await load(model, entry.id))
+                #expect(model.canTranscribeAgain)
+
+                model.askToTranscribeAgain(model: Self.appleSpeech, label: "Apple")
+                #expect(model.pendingRetranscribe == nil, "the value menus only change things")
+
+                model.askToTranscribeAgain()
+
+                let ask = try #require(model.pendingRetranscribe)
+                #expect(ask.modelName == Self.appleSpeech)
+                #expect(ask.language == "it")
+                #expect(ask.substituteModelLabel == nil)
+                #expect(model.retranscribeRequest == nil, "nothing runs before the alert is answered")
+
+                model.confirmTranscribeAgain()
+
+                #expect(model.pendingRetranscribe == nil)
+                let request = try #require(model.retranscribeRequest)
+                #expect(request.entryID == entry.id)
+                #expect(request.modelName == Self.appleSpeech)
+                #expect(request.language == "it")
+                #expect(!model.canTranscribeAgain)
+
+                await gate.open()
+                let firstSegmentIsTheNewTake = await waitUntil(timeoutMs: 10_000) { model.transcript?.segments.first?.text == "the new take" }
+                #expect(firstSegmentIsTheNewTake)
+            }
+        }
+
+        @Test("Transcribe Again names the stand-in when the entry's own model is gone, and skips a take never transcribed")
+        func transcribeAgainFallsBackOrSkips() async throws {
+            let model = makeModel("retranscribe-same-fallback")
+            model.availableModels = [appleSpeechInfo()]
+            model.selectedModel = Self.appleSpeech
+            let wav = try makeWAV("same-fallback")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            let entry = try await seed(model, audio: wav)
+            #expect(await load(model, entry.id))
+
+            model.askToTranscribeAgain()
+
+            let ask = try #require(model.pendingRetranscribe)
+            #expect(ask.modelName == Self.appleSpeech)
+            #expect(ask.language == "en")
+            #expect(ask.substituteModelLabel == AppModel.modelLabel(Self.appleSpeech))
+
+            model.pendingRetranscribe = nil
+            let bare = try await model.library.add(
+                transcript: Transcript(segments: [], language: "", modelName: ""),
+                audioSource: wav, category: .transcription, title: "Untranscribed"
+            )
+            model.refreshLibrary()
+            #expect(await load(model, bare.id))
+            #expect(!model.canTranscribeAgain)
+            model.askToTranscribeAgain()
+            #expect(model.pendingRetranscribe == nil)
+        }
+
         @Test("an entry that came in without audio is refused")
         func subtitleOnlyEntryIsRefused() async throws {
             let model = makeModel("retranscribe-noaudio")
