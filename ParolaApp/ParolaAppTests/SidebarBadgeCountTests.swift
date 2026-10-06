@@ -117,6 +117,19 @@ struct SidebarBadgeCountTests {
         #expect(model.personFilter == ada.id)
     }
 
+    @Test("a rename the directory never took is dropped when it closes, so Manage People… opens plain")
+    func untakenRequestGoesWithTheSheet() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("person-request"))
+        let ada = Person(name: "Ada")
+        model.people = [ada]
+
+        model.managePerson(.rename(ada.id))
+        model.showingPeopleSheet = false
+        model.showingPeopleSheet = true
+
+        #expect(model.peopleSheetRequest == nil)
+    }
+
     @Test("the queue badge follows a status changed in place")
     func queueBadgeFollowsInPlaceStatus() async {
         let model = await makeModel()

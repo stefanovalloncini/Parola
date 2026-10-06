@@ -937,7 +937,9 @@ final class AppModel {
 
     @ObservationIgnored let peopleStore: PeopleStore
     var showingSpeakersSheet: Bool = false
-    var showingPeopleSheet: Bool = false
+    var showingPeopleSheet: Bool = false {
+        didSet { if !showingPeopleSheet { peopleSheetRequest = nil } }
+    }
     /// What the directory asks first when it opens: set from a sidebar person's menu, taken by the sheet.
     var peopleSheetRequest: PeopleSheetRequest?
     /// The people directory, mirrored from the store so views read it without awaiting the actor.
