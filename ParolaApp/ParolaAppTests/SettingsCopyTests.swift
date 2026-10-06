@@ -223,4 +223,13 @@ struct SettingsCopyTests {
         #expect(!advanced.contains("Model storage"), "\(advanced)")
         #expect(!advanced.contains(model.cacheDirectoryDisplayPath), "\(advanced)")
     }
+
+    @Test("the Live Captions panel's title is translated")
+    func liveCaptionsTitleIsTranslated() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let it = try #require(Bundle(path: path))
+        #expect(LiveCaptionsWindow.title(bundle: it) == "Sottotitoli in tempo reale")
+        let panel = LiveCaptionsWindow.make { EmptyView() }
+        #expect(panel.title == LiveCaptionsWindow.title())
+    }
 }

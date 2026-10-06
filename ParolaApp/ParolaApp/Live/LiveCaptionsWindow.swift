@@ -2,6 +2,10 @@ import AppKit
 import SwiftUI
 
 enum LiveCaptionsWindow {
+    nonisolated static func title(bundle: Bundle = .main) -> String {
+        String(localized: "Live Captions", bundle: bundle)
+    }
+
     @MainActor
     static func make<Content: View>(@ViewBuilder content: @escaping () -> Content) -> NSPanel {
         let panel = NSPanel(
@@ -10,7 +14,7 @@ enum LiveCaptionsWindow {
             backing: .buffered,
             defer: false
         )
-        panel.title = "Live Captions"
+        panel.title = title()
         panel.isReleasedWhenClosed = false
         panel.isFloatingPanel = true
         panel.level = .floating
