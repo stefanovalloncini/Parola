@@ -330,8 +330,10 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             switch outcome {
             case .stopped, .permissionDenied:
                 await self.handleStreamerEndedWithoutStop()
-            case .cancelled, .modelFailed:
+            case .cancelled:
                 await self.finishStream(failure: nil)
+            case .modelFailed:
+                await self.finishStream(failure: nil, keepingAudio: true)
             case .failed(let error):
                 await self.handleStreamerFailure(error)
             }
@@ -357,9 +359,16 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         // The run task performs the final tail flush after its loop exits; cancelling
         // it here would kill that decode. Confirmed batches from the flush must drain
         // through the consumer before the stream finishes.
-        _ = await streamerTask?.value
+        let outcome = await streamerTask?.value
         segmentContinuation?.finish()
         await consumerTask?.value
+        if case .modelFailed = outcome {
+            // start() throws the load failure, so the audio waits in recordingAudioURL() rather than in a .finished nobody reads.
+            failureAudioURL = await persister?.finish()
+            continuation?.finish()
+            await teardown()
+            return
+        }
 
         let recordedURL = await persister?.finish()
         if persister?.droppedAudio == true {
@@ -449,9 +458,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         await finishStream(failure: "Couldn't start the microphone. Check Microphone access in System Settings › Privacy & Security › Microphone.")
     }
 
-    private func finishStream(failure: String?) async {
+    private func finishStream(failure: String?, keepingAudio: Bool = false) async {
         guard loop != nil else { return }
-        if failure != nil {
+        if failure != nil || keepingAudio {
             // Keep the take on disk and publish its URL before the .failed event lands,
             // so a consumer reacting to the event can't read it mid-finish (actor reentrancy).
             failureAudioURL = await persister?.finish()

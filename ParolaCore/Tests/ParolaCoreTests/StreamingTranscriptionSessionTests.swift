@@ -728,15 +728,19 @@ struct StreamingCaptureFirstTests {
         await gate.open(Self.tiny)
     }
 
-    @Test("a model load failure after capture started stops capture and reports the failure")
-    func loadFailureStopsCapture() async throws {
-        let gate = LoadGate()
-        let loads = Awaitable(0)
-        let cache = StreamingModelCache(loader: { name, _ in
+    private static func failingCache(gate: LoadGate, loads: Awaitable<Int>) -> StreamingModelCache {
+        StreamingModelCache(loader: { name, _ in
             loads.increment()
             await gate.wait(name)
             throw ModelLoadFailure()
         })
+    }
+
+    @Test("a model load failure after capture started stops capture, reports the failure and keeps the take's audio")
+    func loadFailureStopsCapture() async throws {
+        let gate = LoadGate()
+        let loads = Awaitable(0)
+        let cache = Self.failingCache(gate: gate, loads: loads)
         let mic = StandInMic()
         let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
         // Through the protocol, as the app asks: on the concrete actor an async call picks the extension's nil default.
@@ -745,6 +749,7 @@ struct StreamingCaptureFirstTests {
         await loads.wait(atLeast: 1, "the model load to start")
         mic.speak(seconds: 1)
         let audio = try #require(await transcriber.recordingAudioURL())
+        defer { try? FileManager.default.removeItem(at: audio) }
 
         await gate.open(Self.tiny)
 
@@ -752,8 +757,33 @@ struct StreamingCaptureFirstTests {
         #expect(mic.captureStopped.fired)
         #expect(mic.decodes.value == 0)
         #expect(await cache.leaseCount(for: Self.tiny) == 0)
-        #expect(!FileManager.default.fileExists(atPath: audio.path), "a take that never had a model keeps no audio")
-        #expect(await transcriber.recordingAudioURL() == nil)
+        #expect(await transcriber.recordingAudioURL() == audio, "the failure leaves the file where the caller can find it")
+        #expect(try AVAudioFile(forReading: audio).length == 17_600)
+    }
+
+    @Test("a take stopped while its model then fails to load keeps its audio and still reports the failure")
+    func stopThenLoadFailureKeepsAudio() async throws {
+        let gate = LoadGate()
+        let loads = Awaitable(0)
+        let cache = Self.failingCache(gate: gate, loads: loads)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
+        let transcriber: any StreamingTranscriber = session
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await loads.wait(atLeast: 1, "the model load to start")
+        mic.speak(seconds: 1)
+        let audio = try #require(await transcriber.recordingAudioURL())
+        defer { try? FileManager.default.removeItem(at: audio) }
+
+        let stopping = GuardedTask { await session.stop() }
+        await mic.captureStopped.wait("capture to stop at once")
+        await gate.open(Self.tiny)
+        _ = try await stopping.value("the stop to finish once the load fails")
+
+        await #expect(throws: ModelLoadFailure.self) { _ = try await starting.value("the start to fail") }
+        #expect(await transcriber.recordingAudioURL() == audio)
+        #expect(try AVAudioFile(forReading: audio).length == 17_600)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
     }
 
     @Test("the pre-model buffer keeps at most 60 s")
