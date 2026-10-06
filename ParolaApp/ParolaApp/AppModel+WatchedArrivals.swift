@@ -614,9 +614,38 @@ extension AppModel {
         }
     }
 
+    enum ArrivalReveal: Equatable {
+        case file(URL)
+        case folder(URL)
+        case gone
+    }
+
+    /// The failed file while it is there; once it moved, the folder it was in, or else its watched folder.
+    nonisolated static func arrivalReveal(file: URL, folderPath: String?) -> ArrivalReveal {
+        let manager = FileManager.default
+        if manager.fileExists(atPath: file.path) { return .file(file) }
+        var folders = [file.deletingLastPathComponent()]
+        if let folderPath { folders.append(URL(fileURLWithPath: folderPath, isDirectory: true)) }
+        for folder in folders {
+            var isDirectory: ObjCBool = false
+            if manager.fileExists(atPath: folder.path, isDirectory: &isDirectory), isDirectory.boolValue { return .folder(folder) }
+        }
+        return .gone
+    }
+
     func revealFailedArrival() {
-        guard case .failed = arrivalNotice?.state, let file = arrivalNotice?.file else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([file])
+        guard let notice = arrivalNotice, case .failed = notice.state, let file = notice.file else { return }
+        switch Self.arrivalReveal(file: file, folderPath: notice.folderPath) {
+        case .file(let url):
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        case .folder(let url):
+            NSWorkspace.shared.open(url)
+        case .gone:
+            arrivalNotice = ArrivalNotice(
+                failed: file, reason: String(localized: "The file was moved or deleted."),
+                folderID: notice.folderID, folderPath: notice.folderPath
+            )
+        }
     }
 
     /// The toast's countdown; its view starts it only while its window is on screen.

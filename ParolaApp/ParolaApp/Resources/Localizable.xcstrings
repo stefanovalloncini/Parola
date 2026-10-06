@@ -15574,6 +15574,17 @@
         }
       }
     },
+    "The file was moved or deleted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il file è stato spostato o eliminato."
+          }
+        }
+      }
+    },
     "The hotkey that turns speech into text in any app.": {
       "extractionState": "manual",
       "localizations": {
