@@ -98,7 +98,7 @@ struct DropRoutingTests {
         )
         let toolbar = try String(contentsOfFile: path, encoding: .utf8)
         let newMenu = try #require(toolbar.range(of: "private var newMenu: some View {"))
-        let end = try #require(toolbar.range(of: "private var newMenuItems", range: newMenu.upperBound..<toolbar.endIndex))
+        let end = try #require(toolbar.range(of: "struct NewMenuItems", range: newMenu.upperBound..<toolbar.endIndex))
         #expect(!toolbar[newMenu.upperBound..<end.lowerBound].contains(".disabled("))
     }
 

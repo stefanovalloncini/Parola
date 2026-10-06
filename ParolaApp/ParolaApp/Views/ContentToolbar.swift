@@ -26,29 +26,54 @@ struct ContentToolbar: ToolbarContent {
 
     private var newMenu: some View {
         Menu {
-            newMenuItems
+            NewMenuItems()
         } label: {
             Label("New", systemImage: "plus")
         }
         .help("Start a new transcription.")
         .axLeaf("Toolbar.Menu.New")
     }
+}
+
+/// The + menu's ways in; File repeats them under these same names.
+enum NewMenuCommand {
+    case openFiles
+    case transcribeLink
+    case batchTranscribe
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .openFiles: "Open Files…"
+        case .transcribeLink: "Transcribe Link…"
+        case .batchTranscribe: "Batch Transcribe…"
+        }
+    }
+
+    var label: Label<Text, Image> {
+        switch self {
+        case .openFiles: Label(title, systemImage: "folder")
+        case .transcribeLink: Label(title, systemImage: "link")
+        case .batchTranscribe: Label(title, systemImage: "square.stack.3d.up")
+        }
+    }
+}
+
+struct NewMenuItems: View {
+    @Environment(AppModel.self) private var model
 
     /// Menus drop a Label's icon unless told otherwise; the toolbar button keeps its plain plus.
-    private var newMenuItems: some View {
+    var body: some View {
         Group {
-            Button { model.presentOpenPanel() } label: { Label("Open Files…", systemImage: "folder") }
+            Button { model.presentOpenPanel() } label: { NewMenuCommand.openFiles.label }
                 .keyboardShortcut("o", modifiers: .command)
                 .axLeaf("Toolbar.MenuItem.NewOpenFile")
             if model.features.isEnabled(.youtube) {
-                Button { model.openLinkSheet(prefill: nil) } label: { Label("Transcribe Link…", systemImage: "link") }
+                Button { model.openLinkSheet(prefill: nil) } label: { NewMenuCommand.transcribeLink.label }
                     .axLeaf("Toolbar.MenuItem.NewLink")
             }
             if model.features.isEnabled(.batch) {
-                Button { model.presentBatchOpenPanel() } label: {
-                    Label("Batch Transcribe…", systemImage: "square.stack.3d.up")
-                }
-                .axLeaf("Toolbar.MenuItem.NewBatch")
+                Button { model.presentBatchOpenPanel() } label: { NewMenuCommand.batchTranscribe.label }
+                    .axLeaf("Toolbar.MenuItem.NewBatch")
             }
         }
         .labelStyle(.titleAndIcon)

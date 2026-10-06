@@ -34,13 +34,17 @@ struct AppMenusTests {
 
     @Test("File holds the + menu's ways in, under the + menu's names")
     func fileMenuMatchesTheNewMenu() {
-        let everything = titles(FileCommands(model: makeModel("file-menu")))
-        #expect(everything == [
-            "New Recording", "New System Audio Recording", "—",
-            "Open Files…", "Transcribe Link…", "Batch Transcribe…", "Open Recent", "Save As Parola Document…",
-        ])
-        let plain = titles(FileCommands(model: makeModel("file-menu-plain", features: [])))
-        #expect(plain == ["Open Files…", "Open Recent", "Save As Parola Document…"])
+        let model = makeModel("file-menu")
+        let newMenu = titles(NewMenuItems().environment(model))
+        #expect(newMenu.count == 3, "\(newMenu)")
+        let everything = titles(FileCommands(model: model))
+        #expect(everything == ["New Recording", "New System Audio Recording", "—"] + newMenu + ["Open Recent", "Save As Parola Document…"])
+
+        let plainModel = makeModel("file-menu-plain", features: [])
+        let plainNewMenu = titles(NewMenuItems().environment(plainModel))
+        #expect(plainNewMenu.count == 1, "\(plainNewMenu)")
+        let plain = titles(FileCommands(model: plainModel))
+        #expect(plain == plainNewMenu + ["Open Recent", "Save As Parola Document…"])
     }
 
     @Test("Check for Updates… sits under About Parola, off in a build with no update feed")

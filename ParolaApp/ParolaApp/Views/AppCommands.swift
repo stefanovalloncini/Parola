@@ -66,12 +66,12 @@ struct FileCommands: View {
         if RecordControl.primarySource(features: model.features) != nil {
             Divider()
         }
-        Button("Open Files…") { model.presentOpenPanel() }
+        Button(NewMenuCommand.openFiles.title) { model.presentOpenPanel() }
             .keyboardShortcut("o")
             .disabled(model.introduction.isPresented)
             .axLeaf("Menu.File.OpenFiles")
         if model.features.isEnabled(.youtube) {
-            Button("Transcribe Link…") {
+            Button(NewMenuCommand.transcribeLink.title) {
                 model.showMainWindow { openWindow(id: MainWindowScene.id) }
                 model.openLinkSheet(prefill: nil)
             }
@@ -79,7 +79,7 @@ struct FileCommands: View {
             .axLeaf("Menu.File.TranscribeLink")
         }
         if model.features.isEnabled(.batch) {
-            Button("Batch Transcribe…") { model.presentBatchOpenPanel() }
+            Button(NewMenuCommand.batchTranscribe.title) { model.presentBatchOpenPanel() }
                 .disabled(model.introduction.isPresented)
                 .axLeaf("Menu.File.BatchTranscribe")
         }
