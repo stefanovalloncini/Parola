@@ -62,31 +62,37 @@ struct ExportSheet: View {
     private var styleSection: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             sectionTitle("Style")
-            LeadingFlow(spacing: DS.Spacing.tight) {
+            Picker("Style", selection: styleBinding) {
                 ForEach(ExportStyle.allCases) { style in
-                    Button(LocalizedStringKey(style.displayName)) {
-                        model.setExportSpec(spec.changing(style: style))
-                    }
-                    .buttonStyle(DSPillButtonStyle(kind: spec.style == style ? .primary : .secondary, size: .compact))
-                    .axLeaf("Export.Button.Style.\(style.rawValue)")
+                    Text(LocalizedStringKey(style.displayName)).tag(style)
                 }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .axLeaf("Export.Picker.Style")
         }
     }
 
     private var formatSection: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             sectionTitle("Format")
-            LeadingFlow(spacing: DS.Spacing.tight) {
+            Picker("Format", selection: formatBinding) {
                 ForEach(spec.style.formats, id: \.self) { format in
-                    Button(LocalizedStringKey(format.displayName)) {
-                        model.setExportSpec(spec.changing(format: format))
-                    }
-                    .buttonStyle(DSPillButtonStyle(kind: spec.format == format ? .primary : .secondary, size: .compact))
-                    .axLeaf("Export.Button.Format.\(format.fileExtension)")
+                    Text(LocalizedStringKey(format.displayName)).tag(format)
                 }
             }
+            .pickerStyle(.radioGroup)
+            .labelsHidden()
+            .axLeaf("Export.Picker.Format")
         }
+    }
+
+    private var styleBinding: Binding<ExportStyle> {
+        Binding(get: { spec.style }, set: { model.setExportSpec(spec.changing(style: $0)) })
+    }
+
+    private var formatBinding: Binding<ExportFormat> {
+        Binding(get: { spec.format }, set: { model.setExportSpec(spec.changing(format: $0)) })
     }
 
     private var optionsSection: some View {

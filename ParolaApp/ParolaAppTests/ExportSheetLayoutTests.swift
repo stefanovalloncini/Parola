@@ -47,7 +47,7 @@ struct ExportSheetLayoutTests {
         let hosted = host(model)
         defer { hosted.close() }
         let elements = HostedAccessibility.elements(in: hosted.host)
-        let firstStyle = elements.first { $0.identifier?.hasSuffix("Export.Button.Style.transcript") == true }
+        let firstStyle = elements.first { $0.identifier?.hasSuffix("Export.Picker.Style") == true }
         let heading = try #require(firstStyle)
         for leaf in ["Timestamps", "EndTimestamps", "Milliseconds", "Speakers"] {
             let found = elements.first { $0.identifier?.hasSuffix("Export.Toggle.\(leaf)") == true }
@@ -58,5 +58,27 @@ struct ExportSheetLayoutTests {
         #expect(sheet.contains(".toggleStyle(.checkbox)"))
         #expect(sheet.contains("@Environment(\\.isEnabled) private var isEnabled"))
         #expect(!sheet.contains(".frame(width: 180"))
+    }
+
+    @Test("Style and Format are pickers VoiceOver reads as one choice each: segmented, then radio buttons")
+    func styleAndFormatArePickers() throws {
+        let sheet = try source()
+        let style = try #require(sheet.range(of: "private var styleSection: some View"))
+        let options = try #require(sheet.range(of: "private var optionsSection: some View"))
+        let pickers = String(sheet[style.lowerBound..<options.lowerBound])
+        #expect(!pickers.contains("DSPillButtonStyle"))
+        #expect(pickers.contains(#"Picker("Style", selection: styleBinding)"#))
+        #expect(pickers.contains(".pickerStyle(.segmented)"))
+        #expect(pickers.contains(#"Picker("Format", selection: formatBinding)"#))
+        #expect(pickers.contains(".pickerStyle(.radioGroup)"))
+
+        let model = makeModel()
+        let hosted = host(model)
+        defer { hosted.close() }
+        let ids = HostedAccessibility.elements(in: hosted.host).compactMap(\.identifier)
+        let hasStyle = ids.contains { $0.hasSuffix("Export.Picker.Style") }
+        let hasFormat = ids.contains { $0.hasSuffix("Export.Picker.Format") }
+        #expect(hasStyle)
+        #expect(hasFormat)
     }
 }
