@@ -162,6 +162,29 @@ struct TranscriptMenuTests {
         #expect(header.contains("await model.copyTranscript()"))
     }
 
+    @Test("the header's share glyph opens a menu that starts with Export…, not a share sheet of a .txt")
+    func headerShareGlyphLeadsToExport() throws {
+        let header = try source("Views/Transcript/TranscriptHeaderBar")
+        #expect(!header.contains("ShareLink("))
+        let start = try #require(header.range(of: "private var shareMenu: some View"))
+        let menu = String(header[start.lowerBound...])
+        let items = [
+            #"Button("Export…") { model.openExportSheet() }"#, #"Menu("Export As")"#, "model.exportWithPreset(preset.id)",
+            #"Button("Copy Transcript") { copyTranscript() }"#, #"Button("Copy with Timestamps")"#,
+            #"Button("Share…") { model.shareTranscriptAsTextFile() }"#,
+            #"Button("Send via Mail…") { model.shareTranscriptViaMail() }"#,
+            #"Button("Print Transcript…") { model.printTranscript() }"#,
+            #"Image(systemName: "square.and.arrow.up")"#,
+        ]
+        var offsets: [Int] = []
+        for item in items {
+            let range = try #require(menu.range(of: item), "missing \(item)")
+            offsets.append(menu.distance(from: menu.startIndex, to: range.lowerBound))
+        }
+        #expect(offsets == offsets.sorted(), "items out of order")
+        #expect(header.contains(#".help("Export and share")"#))
+    }
+
     @Test("the Playback menu holds speed and Skip Silences, and names the keys the player owns")
     func playbackMenuHasEveryControl() throws {
         let commands = try source("Views/AppCommands")

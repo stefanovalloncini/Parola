@@ -3,16 +3,7 @@ import Foundation
 import ParolaCore
 import UniformTypeIdentifiers
 
-struct TranscriptShareFile: Transferable {
-    let title: String
-    let text: String
-
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .plainText) { file in
-            SentTransferredFile(try write(title: file.title, text: file.text), allowAccessingOriginalFile: false)
-        }
-    }
-
+enum TranscriptShareFile {
     static func write(title: String, text: String) throws -> URL {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ParolaShare-\(UUID().uuidString)", isDirectory: true)

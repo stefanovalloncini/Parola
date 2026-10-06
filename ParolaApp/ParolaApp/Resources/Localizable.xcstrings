@@ -5841,6 +5841,17 @@
         }
       }
     },
+    "Export and share": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta e condividi"
+          }
+        }
+      }
+    },
     "Export as": {
       "extractionState": "manual",
       "localizations": {
@@ -13574,6 +13585,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impostazioni…"
+          }
+        }
+      }
+    },
+    "Share…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Condividi…"
           }
         }
       }

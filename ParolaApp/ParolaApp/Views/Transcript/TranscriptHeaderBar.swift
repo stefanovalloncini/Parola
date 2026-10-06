@@ -15,8 +15,6 @@ struct TranscriptHeaderBar: View {
     @State private var renameDraft = ""
     @State private var copied = false
     @State private var copiedReset: Task<Void, Never>?
-    // Cached so the header doesn't rebuild `transcript.text`, a full-segment join, on every re-render.
-    @State private var shareItem: TranscriptShareFile?
 
     var body: some View {
         HStack(spacing: DS.Spacing.small) {
@@ -50,9 +48,6 @@ struct TranscriptHeaderBar: View {
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
-        .onAppear { rebuildShareItem() }
-        .onChange(of: model.transcriptTextVersion) { _, _ in rebuildShareItem() }
-        .onChange(of: title) { _, _ in rebuildShareItem() }
         .onChange(of: model.jumpToTimeRequests) { _, _ in jumpOpen = true }
         .onChange(of: model.outlineRequests) { _, _ in outlineOpen = true }
         .onChange(of: model.renameRequests) { _, _ in beginRename() }
@@ -90,7 +85,7 @@ struct TranscriptHeaderBar: View {
             glyphGroup {
                 speakButton
                 copyButton
-                shareButton
+                shareMenu
             }
 
             if model.features.isEnabled(.ai) {
@@ -178,17 +173,38 @@ struct TranscriptHeaderBar: View {
         .axLeaf("HeaderBar.Button.CopyTranscript")
     }
 
-    @ViewBuilder
-    private var shareButton: some View {
-        if let shareItem {
-            ShareLink(item: shareItem, preview: SharePreview(title)) {
-                Image(systemName: "square.and.arrow.up")
+    private var shareMenu: some View {
+        Menu {
+            Button("Export…") { model.openExportSheet() }
+                .axLeaf("HeaderBar.MenuItem.Export")
+            Menu("Export As") {
+                ForEach(model.exportPresets) { preset in
+                    Button { model.exportWithPreset(preset.id) } label: {
+                        ExportPresetChecks.label(preset)
+                    }
+                }
             }
-            .buttonStyle(GlyphButtonStyle(tinted: true))
-            .help("Share transcript")
-            .accessibilityLabel("Share transcript")
-            .axLeaf("HeaderBar.Button.Share")
+            Divider()
+            Button("Copy Transcript") { copyTranscript() }
+            Button("Copy with Timestamps") {
+                model.copyTranscriptToPasteboard(withTimestamps: true, pasteboard: .general)
+                showCopied()
+            }
+            Divider()
+            Button("Share…") { model.shareTranscriptAsTextFile() }
+            Button("Send via Mail…") { model.shareTranscriptViaMail() }
+            Button("Print Transcript…") { model.printTranscript() }
+        } label: {
+            Image(systemName: "square.and.arrow.up")
         }
+        .menuStyle(.button)
+        .buttonStyle(GlyphButtonStyle(tinted: true))
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .disabled(model.transcript == nil)
+        .help("Export and share")
+        .accessibilityLabel("Export and share")
+        .axLeaf("HeaderBar.Menu.Share")
     }
 
     private var advanceButton: some View {
@@ -301,11 +317,6 @@ struct TranscriptHeaderBar: View {
         Divider()
             .frame(height: 14)
             .padding(.horizontal, DS.Spacing.hair)
-    }
-
-    private func rebuildShareItem() {
-        guard model.transcript != nil else { shareItem = nil; return }
-        shareItem = TranscriptShareFile(title: title, text: model.transcriptText)
     }
 
     private func copyTranscript() {
