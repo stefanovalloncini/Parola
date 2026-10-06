@@ -80,8 +80,10 @@ struct SegmentsScroll: View {
                         }
                     }
                 }
+                .frame(maxWidth: DS.Size.readingWidth, alignment: .leading)
                 .padding(.horizontal, DS.Spacing.large)
                 .padding(.vertical, DS.Spacing.regular)
+                .frame(maxWidth: .infinity)
             }
             .onChange(of: model.currentSegmentID) { _, id in
                 guard let id, model.player?.timeControlStatus == .playing || model.findIsOpen else { return }

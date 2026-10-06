@@ -8,7 +8,7 @@ struct ContinuousTranscriptView: View {
                 HStack(spacing: 0) {
                     Spacer(minLength: 0)
                     ContinuousChunks(scrollProxy: proxy)
-                        .frame(maxWidth: 720, alignment: .leading)
+                        .frame(maxWidth: DS.Size.readingWidth, alignment: .leading)
                         .padding(.horizontal, DS.Spacing.large)
                         .padding(.vertical, DS.Spacing.large)
                     Spacer(minLength: 0)

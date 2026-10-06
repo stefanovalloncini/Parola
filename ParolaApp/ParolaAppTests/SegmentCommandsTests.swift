@@ -90,6 +90,19 @@ struct SegmentCommandsTests {
         }
     }
 
+    @Test("on a wide window the cards keep the reading width Paragraphs keeps, centred")
+    func cardsKeepTheReadingWidth() {
+        let hosted = HostedWindow(SegmentsScroll().environment(model), width: 1400, height: 600)
+        defer { hosted.close() }
+        let cards = HostedAccessibility.elements(in: hosted.host).filter { $0.actions.contains("Edit Segment") }
+        #expect(cards.count == 3)
+        let window = hosted.window.frame
+        for card in cards {
+            #expect(card.frame.width <= DS.Size.readingWidth + 0.5, "card is \(card.frame.width)pt wide")
+            #expect(abs(card.frame.midX - window.midX) < 1, "card is off centre")
+        }
+    }
+
     @Test("the card for a pending edit opens its field and clears the request")
     func cardTakesThePendingEdit() throws {
         model.pendingSegmentEditID = 1

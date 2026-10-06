@@ -45,6 +45,7 @@ enum DS {
         static let progressBarHeight: CGFloat = 6
         static let liveTranscriptMinHeight: CGFloat = 180
         static let demoTranscriptMinHeight: CGFloat = 220
+        static let readingWidth: CGFloat = 720
     }
 
     /// Letter-spacing for the display tiers; SwiftUI takes tracking as a view modifier, so the call site pairs the two.

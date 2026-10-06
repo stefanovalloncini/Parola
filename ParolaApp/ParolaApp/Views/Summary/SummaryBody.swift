@@ -33,7 +33,7 @@ struct SummaryBody: View {
                         actionItemsSection
                     }
                 }
-                .frame(maxWidth: 720, alignment: .leading)
+                .frame(maxWidth: DS.Size.readingWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, DS.Spacing.large)
                 .padding(.vertical, DS.Spacing.large)
