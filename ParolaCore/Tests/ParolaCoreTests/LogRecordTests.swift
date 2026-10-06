@@ -62,4 +62,10 @@ struct LogRecordTests {
         #expect(LogCategory.engineWhisperKit.rawValue == "engine.whisperkit")
         #expect(LogCategory.librarySpotlight.rawValue == "library.spotlight")
     }
+
+    @Test("readAloud is a Core category")
+    func readAloudIsCore() {
+        #expect(LogCategory.readAloud.rawValue == "readAloud")
+        #expect(LogCategory.readAloud.subsystem == .core)
+    }
 }

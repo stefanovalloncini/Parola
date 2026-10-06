@@ -49,6 +49,7 @@ public enum LogCategory: String, Sendable, CaseIterable {
     case batch
     case export
     case dictation
+    case readAloud
     case youtube
     case ai
     case appLifecycle = "app.lifecycle"
