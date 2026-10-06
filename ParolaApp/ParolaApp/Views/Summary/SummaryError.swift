@@ -2,17 +2,18 @@ import SwiftUI
 
 struct SummaryError: View {
     let message: String
+    let onTryAgain: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+        ContentUnavailableView {
             Label("Couldn't Generate a Summary", systemImage: "exclamationmark.triangle")
-                .font(DS.Font.heading)
-                .foregroundStyle(DS.Color.dangerText)
+        } description: {
             Text(message)
-                .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.secondaryText)
+        } actions: {
+            Button("Try Again", action: onTryAgain)
+                .buttonStyle(DSPillButtonStyle(kind: .primary))
+                .axLeaf("Summary.Button.TryAgain")
         }
-        .padding(DS.Spacing.large)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

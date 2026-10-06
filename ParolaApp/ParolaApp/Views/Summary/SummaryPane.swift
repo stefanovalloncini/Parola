@@ -74,7 +74,7 @@ struct SummaryPane: View {
     @ViewBuilder
     private var content: some View {
         if let error = model.summaryError {
-            SummaryError(message: error)
+            SummaryError(message: error) { model.summariseTranscript() }
         } else if let summary = model.transcript?.summary {
             SummaryBody(summary: summary)
         } else if model.transcript == nil {
