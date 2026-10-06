@@ -24,6 +24,9 @@ struct ChatUnavailable: View {
             Label("Chat Unavailable", systemImage: "bubble.left.and.exclamationmark.bubble.right")
         } description: {
             Text(message)
+        } actions: {
+            OpenAISettingsButton(leaf: "Chat.Button.OpenAISettings")
+                .buttonStyle(DSPillButtonStyle(kind: .secondary))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -74,7 +74,9 @@ struct SummaryPane: View {
     @ViewBuilder
     private var content: some View {
         if let error = model.summaryError {
-            SummaryError(message: error) { model.summariseTranscript() }
+            SummaryError(message: error, offersSettings: model.resolvedLanguageModelChoice(for: .summary).isRemote) {
+                model.summariseTranscript()
+            }
         } else if let summary = model.transcript?.summary {
             SummaryBody(summary: summary)
         } else if model.transcript == nil {
@@ -85,12 +87,7 @@ struct SummaryPane: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !model.isAIAvailable(for: .summary), let reason = model.aiUnavailableReason {
-            ContentUnavailableView {
-                Label("Summaries Need Apple Intelligence", systemImage: "sparkles")
-            } description: {
-                Text(verbatim: reason)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            SummaryUnavailable(reason: reason)
         } else {
             SummaryEmpty(
                 isWorking: model.isSummarising,

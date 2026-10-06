@@ -132,4 +132,35 @@ struct AIPaneActionsTests {
         #expect(pane.contains("guard !text.isEmpty, let session, !isReplying else { return }"))
         #expect(!pane.contains("sendTask?.cancel() displayedHistory.append"))
     }
+
+    @Test("every AI-unavailable state offers Open AI Settings…, and a plain failure note doesn't")
+    func unavailableStatesOfferSettings() throws {
+        let model = makeModel()
+        let reason = "Apple Intelligence is turned off."
+        let states: [(AnyView, String)] = [
+            (AnyView(SummaryUnavailable(reason: reason)), "Summary.Button.OpenAISettings"),
+            (AnyView(SummaryError(message: "The service refused the key.", offersSettings: true) {}), "Summary.Button.OpenAISettings"),
+            (AnyView(ChatUnavailable(message: reason)), "Chat.Button.OpenAISettings"),
+            (AnyView(AIStatusNote(message: reason)), "AIStatusNote.Button.OpenAISettings"),
+        ]
+        for (view, leaf) in states {
+            let hosted = HostedWindow(view.environment(model), width: 480, height: 360)
+            let ids = identifiers(in: hosted)
+            hosted.close()
+            let offered = ids.contains { $0.hasSuffix(leaf) }
+            #expect(offered, "no \(leaf)")
+        }
+        let failure = HostedWindow(AIStatusNote(message: "Timed out.", kind: .failure).environment(model), width: 480, height: 200)
+        let failureIDs = identifiers(in: failure)
+        failure.close()
+        let offeredOnFailure = failureIDs.contains { $0.hasSuffix("OpenAISettings") }
+        #expect(!offeredOnFailure)
+
+        let path = #filePath.replacingOccurrences(
+            of: "ParolaAppTests/AIPaneActionsTests.swift",
+            with: "ParolaApp/Views/PromptsMenu.swift"
+        )
+        let menu = try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        #expect(menu.contains(#"Text(verbatim: reason) OpenAISettingsButton(leaf: "HeaderBar.MenuItem.OpenAISettings")"#))
+    }
 }

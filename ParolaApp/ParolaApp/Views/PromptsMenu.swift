@@ -15,6 +15,7 @@ struct PromptsMenu: View {
                 }
                 if !model.isAIAvailable(for: .prompts), let reason = model.aiUnavailableReason {
                     Text(verbatim: reason)
+                    OpenAISettingsButton(leaf: "HeaderBar.MenuItem.OpenAISettings")
                     Divider()
                 }
                 Group {

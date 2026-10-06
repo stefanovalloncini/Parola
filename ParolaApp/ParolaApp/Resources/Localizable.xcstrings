@@ -10217,6 +10217,17 @@
         }
       }
     },
+    "Open AI Settings…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri Impostazioni AI…"
+          }
+        }
+      }
+    },
     "Open Existing": {
       "extractionState": "manual",
       "localizations": {
