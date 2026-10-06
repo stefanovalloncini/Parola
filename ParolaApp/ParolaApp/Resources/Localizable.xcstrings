@@ -14576,6 +14576,17 @@
         }
       }
     },
+    "Starts when the current transcription ends.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parte quando finisce la trascrizione in corso."
+          }
+        }
+      }
+    },
     "Startup": {
       "extractionState": "manual",
       "localizations": {

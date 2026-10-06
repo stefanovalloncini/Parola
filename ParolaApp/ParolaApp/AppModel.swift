@@ -2646,6 +2646,8 @@ final class AppModel {
         }
         if batchIsRunning {
             importBatchFiles(files.media)
+        } else if parkBehindRun(files.media) {
+            return
         } else if files.media.count > 1, features.isEnabled(.batch) {
             importBatchFiles(files.media)
         } else {
@@ -2669,10 +2671,22 @@ final class AppModel {
         showRunPage()
     }
 
-    /// Open Recent, as ⌘O: the file's page comes up, unless a batch takes the file in.
+    /// Open Recent, as ⌘O: the file's page comes up, unless a batch takes the file in or a run makes it wait.
     func openRecentFile(_ url: URL) {
+        guard !parkBehindRun([url]) else { return }
         if !batchIsRunning { showRunPage() }
         transcribe(fileURL: url)
+    }
+
+    /// A file opened while a single file or a take's recording transcribes waits its turn, as a dropped one does, rather than cancelling that run.
+    private func parkBehindRun(_ urls: [URL]) -> Bool {
+        guard !takeIsRunning, takeRun != nil || transcribeTaskRunning else { return false }
+        deferredArrivals.append(contentsOf: urls)
+        guard exportNotice.map({ $0.actions.isEmpty && $0.tone != .failure }) ?? true else { return true }
+        exportNotice = ExportNotice(
+            message: String(localized: "Starts when the current transcription ends."), failures: [], folder: nil, tone: .info
+        )
+        return true
     }
 
     // MARK: - Subtitle import

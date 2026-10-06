@@ -57,6 +57,51 @@ struct DropRoutingTests {
         model.fileTranscribeTask = nil
     }
 
+    @Test("⌘O mid-transcription waits its turn instead of cancelling the run, and says so")
+    func openDuringTranscriptionDefers() async {
+        let model = makeModel()
+        model.phase = .transcribing(file: Self.media("running.wav"))
+        let run = Task {}
+        model.fileTranscribeTask = run
+
+        model.handleIncomingFiles([Self.media("later.wav")])
+        await settle()
+
+        #expect(!run.isCancelled)
+        #expect(model.phase == .transcribing(file: Self.media("running.wav")))
+        #expect(model.deferredArrivals.map(\.lastPathComponent) == ["later.wav"])
+        #expect(model.exportNotice?.message == "Starts when the current transcription ends.")
+        model.fileTranscribeTask = nil
+    }
+
+    @Test("Open Recent mid-transcription waits too, and leaves the page where it is")
+    func openRecentDuringTranscriptionDefers() async {
+        let model = makeModel()
+        model.route = .queue
+        model.phase = .transcribing(file: Self.media("running.wav"))
+        let run = Task {}
+        model.fileTranscribeTask = run
+
+        model.openRecentFile(Self.media("recent.m4a"))
+        await settle()
+
+        #expect(!run.isCancelled)
+        #expect(model.route == .queue)
+        #expect(model.deferredArrivals.map(\.lastPathComponent) == ["recent.m4a"])
+        model.fileTranscribeTask = nil
+    }
+
+    @Test("the toolbar's + stays enabled during a run, since what it opens waits its turn")
+    func newMenuStaysEnabled() throws {
+        let path = #filePath.replacingOccurrences(
+            of: "ParolaAppTests/DropRoutingTests.swift", with: "ParolaApp/Views/ContentToolbar.swift"
+        )
+        let toolbar = try String(contentsOfFile: path, encoding: .utf8)
+        let newMenu = try #require(toolbar.range(of: "private var newMenu: some View {"))
+        let end = try #require(toolbar.range(of: "private var newMenuItems", range: newMenu.upperBound..<toolbar.endIndex))
+        #expect(!toolbar[newMenu.upperBound..<end.lowerBound].contains(".disabled("))
+    }
+
     @Test("a drop while recording goes to the deferred pile rather than stomping the take")
     func dropWhileRecordingDefers() {
         let model = makeModel()

@@ -30,7 +30,6 @@ struct ContentToolbar: ToolbarContent {
         } label: {
             Label("New", systemImage: "plus")
         }
-        .disabled(Self.isBusy(for: model))
         .help("Start a new transcription.")
         .axLeaf("Toolbar.Menu.New")
     }
@@ -53,13 +52,5 @@ struct ContentToolbar: ToolbarContent {
             }
         }
         .labelStyle(.titleAndIcon)
-    }
-
-    /// A batch job's run keeps the menu enabled: ⌘O and drops still work while it runs.
-    static func isBusy(for model: AppModel) -> Bool {
-        switch model.transcriptRoutePhase {
-        case .idle, .ready, .failed: return false
-        default: return true
-        }
     }
 }

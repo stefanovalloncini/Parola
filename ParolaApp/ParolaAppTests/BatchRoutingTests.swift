@@ -243,18 +243,6 @@ extension TranscriberMockSuites {
             #expect(sidebar(model) == .library)
         }
 
-        @Test("the New menu stays available while a batch runs, and waits for a file's own run")
-        func newMenuDuringARun() async {
-            let model = makeModel()
-            let job = Self.job("running")
-            model.batchJobs = [job]
-            await model.handleBatchEvent(.started(jobID: job.id))
-            #expect(!ContentToolbar.isBusy(for: model))
-
-            model.phase = .transcribing(file: URL(fileURLWithPath: "/tmp/BatchRoutingTests/single.m4a"))
-            #expect(ContentToolbar.isBusy(for: model))
-        }
-
         @Test("a running job keeps the pane under it, and a file's own run gets its own")
         func phaseViewDuringARun() async throws {
             let model = makeModel()

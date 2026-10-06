@@ -95,7 +95,6 @@ struct LinkPasteResponderTests {
             model.phase = .transcribing(file: file)
 
             #expect(model.batchOwnsPhase)
-            #expect(!ContentToolbar.isBusy(for: model), "the + menu's Transcribe Link… is on")
             #expect(offers(model))
         }
     }
