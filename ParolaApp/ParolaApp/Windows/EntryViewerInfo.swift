@@ -58,9 +58,14 @@ struct EntryViewerInfo: View {
                     }
                 }
 
-                Text("Edit in the main window.")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
+                VStack(alignment: .leading, spacing: DS.Spacing.small) {
+                    Text("Edit in the main window.")
+                        .font(DS.Font.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
+                    Button("Open in Main Window") { model.openInMainWindow(session.entryID) }
+                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                        .axLeaf("Button.OpenInMainWindow")
+                }
             }
             .padding(DS.Spacing.regular)
             .frame(maxWidth: .infinity, alignment: .leading)

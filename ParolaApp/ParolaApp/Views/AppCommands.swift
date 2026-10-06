@@ -454,5 +454,8 @@ struct TranscriptCommands: View {
         .keyboardShortcut("n", modifiers: [.command, .shift])
         .disabled(model.selectedEntryID == nil || model.keyWindowIsViewer)
         .help(model.selectedEntryID == nil ? "Save the transcript to the library first" : "")
+        Button("Open in Main Window") { model.openKeyViewerInMainWindow() }
+            .disabled(!model.keyWindowIsViewer)
+            .axLeaf("Menu.Transcript.OpenInMainWindow")
     }
 }

@@ -65,6 +65,18 @@ extension AppModel {
         return true
     }
 
+    /// A viewer is read-only: this brings its entry up in the main window, where it can be edited.
+    func openInMainWindow(_ id: LibraryEntry.ID, activate: () -> Void = { NSApp.activate(ignoringOtherApps: true) }) {
+        bringMainWindowForward(activate: activate)
+        guard selectedEntryID != id || transcript == nil else { return }
+        _ = loadEntry(id)
+    }
+
+    func openKeyViewerInMainWindow() {
+        guard let id = keyViewerSession?.entryID else { return }
+        openInMainWindow(id)
+    }
+
     func entryWindowSession(for id: LibraryEntry.ID) -> EntryWindowSession {
         entryWindows.session(for: id, model: self)
     }

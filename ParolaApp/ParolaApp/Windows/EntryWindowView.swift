@@ -66,13 +66,18 @@ struct EntryWindowView: View {
             }
             if showsEditHint {
                 Divider()
-                Text("Edit in the main window.")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, DS.Spacing.small)
-                    .transition(.opacity)
-                    .axLeaf("Label.EditHint")
+                HStack(spacing: DS.Spacing.small) {
+                    Text("Edit in the main window.")
+                        .font(DS.Font.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .axLeaf("Label.EditHint")
+                    Button("Open in Main Window") { model.openInMainWindow(entryID) }
+                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                        .axLeaf("Button.EditHintOpenInMainWindow")
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, DS.Spacing.small)
+                .transition(.opacity)
             }
             if session.player != nil {
                 Divider()

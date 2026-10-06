@@ -255,4 +255,26 @@ struct EntryWindowViewerTests {
 
         #expect(session.title == "Kickoff call")
     }
+
+    @Test("the viewer leads to the main window to edit: its hint, its Info panel and the Transcript menu")
+    func viewerOpensTheEntryInTheMainWindow() async throws {
+        let model = EntryWindowTestSupport.makeModel("viewer-edit")
+        let entry = try await EntryWindowTestSupport.seed(model, texts: ["alpha"], speakers: [nil], audio: nil)
+        var activations = 0
+        model.openInMainWindow(entry.id) { activations += 1 }
+        let opened = await waitUntil { model.selectedEntryID == entry.id && model.transcript?.segments.first?.text == "alpha" }
+        #expect(opened)
+        #expect(activations == 1)
+
+        func source(_ name: String) throws -> String {
+            let path = #filePath.replacingOccurrences(of: "ParolaAppTests/EntryWindowViewerTests.swift", with: "ParolaApp/\(name).swift")
+            return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        }
+        let window = try source("Windows/EntryWindowView")
+        #expect(window.contains(#"Button("Open in Main Window") { model.openInMainWindow(entryID) }"#))
+        let info = try source("Windows/EntryViewerInfo")
+        #expect(info.contains(#"Button("Open in Main Window") { model.openInMainWindow(session.entryID) }"#))
+        let commands = try source("Views/AppCommands")
+        #expect(commands.contains(#"Button("Open in Main Window") { model.openKeyViewerInMainWindow() } .disabled(!model.keyWindowIsViewer)"#))
+    }
 }

@@ -10395,6 +10395,17 @@
         }
       }
     },
+    "Open in Main Window": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri nella finestra principale"
+          }
+        }
+      }
+    },
     "Open in New Window": {
       "extractionState": "manual",
       "localizations": {
