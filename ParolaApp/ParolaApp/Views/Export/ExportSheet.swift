@@ -5,6 +5,8 @@ struct ExportSheet: View {
     @Environment(AppModel.self) private var model
     @State private var namingPreset = false
     @State private var presetName = ""
+    @State private var copied = false
+    @State private var copiedReset: Task<Void, Never>?
 
     var body: some View {
         SheetFrame(
@@ -185,23 +187,44 @@ struct ExportSheet: View {
 
     private var footerBody: some View {
         HStack(spacing: DS.Spacing.small) {
+            Button(action: copyToClipboard) {
+                ZStack {
+                    Text("Copy to Clipboard").hidden()
+                    Text(copied ? "Copied" : "Copy to Clipboard")
+                }
+            }
+            .sheetSecondaryAction()
+            .disabled(!model.hasTranscript)
+            .axLeaf("Export.Button.Copy")
+
+            Spacer()
+
             Button("Close") { model.closeExportSheet() }
                 .sheetSecondaryAction()
                 .keyboardShortcut(.cancelAction)
                 .axLeaf("Export.Button.Close")
-
-            Spacer()
-
-            Button("Copy to Clipboard") { model.copyExportToPasteboard(pasteboard: .general) }
-                .sheetSecondaryAction()
-                .disabled(!model.hasTranscript)
-                .axLeaf("Export.Button.Copy")
 
             Button("Export…") { model.exportFromSheet() }
                 .sheetPrimaryAction()
                 .keyboardShortcut(.defaultAction)
                 .disabled(!model.hasTranscript)
                 .axLeaf("Export.Button.Export")
+        }
+    }
+
+    private func copyToClipboard() {
+        Task {
+            if await model.copyExportToPasteboard(pasteboard: .general)?.value == true { showCopied() }
+        }
+    }
+
+    private func showCopied() {
+        copied = true
+        copiedReset?.cancel()
+        copiedReset = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            copied = false
         }
     }
 

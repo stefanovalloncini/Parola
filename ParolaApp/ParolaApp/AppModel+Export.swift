@@ -52,19 +52,22 @@ extension AppModel {
 
     /// The pasteboard is a parameter, not `.general` reached for inside: a test that wants to read
     /// back what was copied must not have to take the user's clipboard to do it.
-    func copyExportToPasteboard(pasteboard: NSPasteboard) {
-        guard let transcript else { return }
+    /// The task answers whether the text reached the pasteboard, so the sheet can say Copied.
+    @discardableResult
+    func copyExportToPasteboard(pasteboard: NSPasteboard) -> Task<Bool, Never>? {
+        guard let transcript else { return nil }
         // docx and pdf have no text to paste; the clipboard gets what the preview shows.
         let spec = exportSheetSpec.textRendering
-        Task { [weak self] in
-            guard let self else { return }
+        return Task { [weak self] in
             do {
                 let text = try await AppModel.offMainIO { try Exporters.exporter(for: spec).renderText(transcript) }
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
+                return true
             } catch {
                 ParolaLog.error(.export, "copy failed as \(spec.format)", [.error: .error(error)])
-                self.exportNotice = .failed(error)
+                self?.exportNotice = .failed(error)
+                return false
             }
         }
     }

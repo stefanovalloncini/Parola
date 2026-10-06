@@ -84,4 +84,35 @@ struct ExportSheetLayoutTests {
         #expect(hasStyle)
         #expect(hasFormat)
     }
+
+    @Test("Close sits beside Export on the trailing side, and Copy to Clipboard leads")
+    func closeSitsBesideTheDefaultButton() throws {
+        let model = makeModel()
+        let hosted = host(model)
+        defer { hosted.close() }
+        let elements = HostedAccessibility.elements(in: hosted.host)
+        func frame(_ leaf: String) throws -> CGRect {
+            let found = elements.first { $0.identifier?.hasSuffix(leaf) == true }
+            return try #require(found, "no \(leaf)").frame
+        }
+        let copy = try frame("Export.Button.Copy")
+        let close = try frame("Export.Button.Close")
+        let export = try frame("Export.Button.Export")
+        #expect(copy.minX < close.minX)
+        #expect(close.maxX <= export.minX)
+        #expect(export.minX - close.maxX < 24)
+    }
+
+    @Test("Copy to Clipboard says Copied once the text is on the pasteboard")
+    func copyConfirms() async throws {
+        let model = makeModel()
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("export-layout-\(UUID())"))
+        let run = model.copyExportToPasteboard(pasteboard: pasteboard)
+        let landed = await run?.value
+        #expect(landed == true)
+        #expect(pasteboard.string(forType: .string)?.isEmpty == false)
+        let sheet = try source()
+        #expect(sheet.contains(#"Text(copied ? "Copied" : "Copy to Clipboard")"#))
+        #expect(sheet.contains("if await model.copyExportToPasteboard(pasteboard: .general)?.value == true { showCopied() }"))
+    }
 }
