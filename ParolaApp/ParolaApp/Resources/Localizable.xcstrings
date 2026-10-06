@@ -14774,6 +14774,17 @@
         }
       }
     },
+    "Stop Prompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferma prompt"
+          }
+        }
+      }
+    },
     "Stop Recording": {
       "extractionState": "manual",
       "localizations": {
@@ -14869,6 +14880,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ferma la registrazione per cambiare microfono"
+          }
+        }
+      }
+    },
+    "Stop the reply": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ferma la risposta"
           }
         }
       }

@@ -42,23 +42,39 @@ struct SummaryOptionsColumn: View {
                 .disabled(model.transcript?.summary == nil)
                 .axLeaf("Summary.Button.Copy")
 
-            Button(action: { model.summariseTranscript() }) {
-                HStack(spacing: 4) {
-                    if model.isSummarising {
+            if stopsHere {
+                Button(action: { model.stopAIRun(.summary) }) {
+                    HStack(spacing: 4) {
                         ProgressView().controlSize(.small)
+                        Text("Stop")
                     }
-                    Text(summarizeButtonTitle)
                 }
+                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                .axLeaf("Summary.Button.Stop")
+            } else {
+                Button(action: { model.summariseTranscript() }) {
+                    HStack(spacing: 4) {
+                        if model.isSummarising {
+                            ProgressView().controlSize(.small)
+                        }
+                        Text(summarizeButtonTitle)
+                    }
+                }
+                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                .disabled(model.transcript == nil || model.isSummarising || !model.isAIAvailable(for: .summary))
+                .axLeaf("Summary.Button.Regenerate")
             }
-            .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
-            .disabled(model.transcript == nil || model.isSummarising || !model.isAIAvailable(for: .summary))
-            .axLeaf("Summary.Button.Regenerate")
 
             Button("Clear") { model.clearSummary() }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .disabled(model.transcript?.summary == nil)
                 .axLeaf("Summary.Button.Clear")
         }
+    }
+
+    /// With no summary yet, the pane's progress line carries the Stop; with one shown, this button is the only progress there is.
+    private var stopsHere: Bool {
+        model.isSummarising && model.transcript?.summary != nil
     }
 
     private var summarizeButtonTitle: String {

@@ -44,4 +44,92 @@ struct AIPaneActionsTests {
         #expect(landed)
         #expect(model.summaryError == nil)
     }
+
+    private func blockedRun(_ kind: AIJobRegistry.Kind, on model: AppModel) {
+        model.aiJobs.start(
+            kind,
+            for: model.selectedEntryID,
+            work: { try await Task.sleep(for: .seconds(60)) },
+            land: { _, _ in },
+            fail: { _, _ in }
+        )
+    }
+
+    @Test("a summary being written can be stopped where its progress shows, with or without an older summary")
+    func summaryRunStops() async {
+        let model = makeModel()
+        model.summariseOperation = { _, _ in
+            try await Task.sleep(for: .seconds(60))
+            return Summary(text: "late")
+        }
+        let hosted = HostedWindow(SummaryPane().environment(model))
+        defer { hosted.close() }
+
+        model.summariseTranscript()
+        #expect(model.isSummarising)
+        let shownEmpty = await waitUntil { identifiers(in: hosted).contains { $0.hasSuffix("Summary.Button.Stop") } }
+        #expect(shownEmpty)
+        #expect(HostedAccessibility.press(endingWith: "Summary.Button.Stop", in: hosted.host))
+        #expect(!model.isSummarising)
+
+        model.transcript?.summary = Summary(text: "older")
+        model.summariseTranscript()
+        let shown = await waitUntil {
+            identifiers(in: hosted).filter { $0.hasSuffix("Summary.Button.Stop") }.count == 1
+        }
+        #expect(shown)
+        #expect(HostedAccessibility.press(endingWith: "Summary.Button.Stop", in: hosted.host))
+        #expect(!model.isSummarising)
+        #expect(model.transcript?.summary?.text == "older")
+    }
+
+    @Test("chapters and action items being found can be stopped beside their progress line")
+    func inspectorRunsStop() async {
+        let model = makeModel()
+        let hosted = HostedWindow(VStack {
+            ChaptersSection()
+            ActionItemsSection()
+        }.environment(model), width: 320)
+        defer { hosted.close() }
+
+        blockedRun(.chapters, on: model)
+        blockedRun(.actionItems, on: model)
+        let shown = await waitUntil {
+            let ids = identifiers(in: hosted)
+            return ids.contains { $0.hasSuffix("Chapters.Button.Stop") } && ids.contains { $0.hasSuffix("ActionItems.Button.Stop") }
+        }
+        #expect(shown)
+        #expect(HostedAccessibility.press(endingWith: "Chapters.Button.Stop", in: hosted.host))
+        #expect(!model.isExtractingChapters)
+        #expect(model.isExtractingActionItems)
+        #expect(HostedAccessibility.press(endingWith: "ActionItems.Button.Stop", in: hosted.host))
+        #expect(!model.isExtractingActionItems)
+    }
+
+    @Test("a running prompt can be stopped from the Prompts menu, which stays open to it")
+    func promptRunStops() throws {
+        let path = #filePath.replacingOccurrences(
+            of: "ParolaAppTests/AIPaneActionsTests.swift",
+            with: "ParolaApp/Views/PromptsMenu.swift"
+        )
+        let menu = try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        #expect(menu.contains(#"Button("Stop Prompt") { model.stopAIRun(.prompt) }"#))
+        let header = try String(contentsOfFile: path.replacingOccurrences(of: "PromptsMenu", with: "Transcript/TranscriptHeaderBar"), encoding: .utf8)
+        #expect(!header.contains(".disabled(model.isRunningPrompt)"))
+    }
+
+    @Test("a chat reply can be stopped, and a new message waits until the reply ends")
+    func chatReplyStopsAndWaits() throws {
+        #expect(ChatPane.isSendDisabled(input: "next question", isReplying: true))
+        #expect(!ChatPane.isSendDisabled(input: "next question", isReplying: false))
+        let path = #filePath.replacingOccurrences(
+            of: "ParolaAppTests/AIPaneActionsTests.swift",
+            with: "ParolaApp/Views/Chat/ChatPane.swift"
+        )
+        let pane = try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        #expect(pane.contains(#"composerGlyph("stop.fill", dimmed: false)"#))
+        #expect(pane.contains(#".axLeaf("Composer.Button.Stop")"#))
+        #expect(pane.contains("guard !text.isEmpty, let session, !isReplying else { return }"))
+        #expect(!pane.contains("sendTask?.cancel() displayedHistory.append"))
+    }
 }

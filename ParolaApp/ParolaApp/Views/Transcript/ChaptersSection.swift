@@ -30,6 +30,10 @@ struct ChaptersSection: View {
             Text("Generating chapters…")
                 .font(DS.Font.body)
                 .foregroundStyle(DS.Color.secondaryText)
+            Spacer()
+            Button("Stop") { model.stopAIRun(.chapters) }
+                .controlSize(.small)
+                .axLeaf("Chapters.Button.Stop")
         }
     }
 

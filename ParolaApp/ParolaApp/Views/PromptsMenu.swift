@@ -8,6 +8,11 @@ struct PromptsMenu: View {
     var body: some View {
         Menu {
             Group {
+                if model.isRunningPrompt {
+                    Button("Stop Prompt") { model.stopAIRun(.prompt) }
+                        .axLeaf("HeaderBar.MenuItem.StopPrompt")
+                    Divider()
+                }
                 if !model.isAIAvailable(for: .prompts), let reason = model.aiUnavailableReason {
                     Text(verbatim: reason)
                     Divider()
@@ -23,7 +28,7 @@ struct PromptsMenu: View {
                         .accessibilityIdentifier("prompts.youtube_chapters")
                         .axLeaf("HeaderBar.MenuItem.YouTubeChapters")
                 }
-                .disabled(!model.isAIAvailable(for: .prompts))
+                .disabled(!model.isAIAvailable(for: .prompts) || model.isRunningPrompt)
                 Button("Speakers…") { model.showingSpeakersSheet = true }
                     .accessibilityIdentifier("prompts.speakers")
                     .axLeaf("HeaderBar.MenuItem.Speakers")
@@ -34,7 +39,7 @@ struct PromptsMenu: View {
                             .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
                             .axLeaf("HeaderBar.MenuItem.UserPrompt.\(Self.identifierSlug(prompt.name))")
                     }
-                    .disabled(!model.isAIAvailable(for: .prompts))
+                    .disabled(!model.isAIAvailable(for: .prompts) || model.isRunningPrompt)
                 }
             }
             // The toolbar keeps this view alive, so .task runs once; re-read on every

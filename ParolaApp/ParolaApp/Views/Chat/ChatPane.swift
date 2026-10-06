@@ -30,6 +30,7 @@ struct ChatPane: View {
     @State private var turnError: String?
     @State private var input: String = ""
     @State private var isSending: Bool = false
+    @State private var isReplying: Bool = false
     @State private var displayedHistory: [ChatMessage] = []
     @State private var isSearching: Bool = false
     @State private var searchQuery: String = ""
@@ -98,7 +99,7 @@ struct ChatPane: View {
     }
 
     private var presetsDisabled: Bool {
-        session == nil || isSending
+        session == nil || isReplying
     }
 
     private func sendPreset(_ instructions: String) {
@@ -150,7 +151,7 @@ struct ChatPane: View {
                 .buttonStyle(GlyphButtonStyle())
                 .foregroundStyle(DS.Color.secondaryText)
                 .help("Clear conversation")
-                .disabled(displayedHistory.isEmpty || isSending)
+                .disabled(displayedHistory.isEmpty || isReplying)
                 .accessibilityLabel("Clear conversation")
                 .axLeaf("Header.Button.Reset")
                 .confirmationDialog("Clear this conversation?", isPresented: $confirmingClear) {
@@ -251,24 +252,38 @@ struct ChatPane: View {
                     model.dragOverComposer = targeted
                 }
 
-            Button(action: send) {
-                Image(systemName: "paperplane.fill")
-                    .font(DS.Font.bodyStrong)
-                    .foregroundStyle(DS.Color.onAccent)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        Circle().fill(isSendDisabled ? DS.Color.accentFill.opacity(0.4) : DS.Color.accentFill)
-                    )
+            if isReplying {
+                Button(action: stopReply) {
+                    composerGlyph("stop.fill", dimmed: false)
+                }
+                .buttonStyle(.plain)
+                .help("Stop the reply")
+                .accessibilityLabel("Stop the reply")
+                .axLeaf("Composer.Button.Stop")
+            } else {
+                Button(action: send) {
+                    composerGlyph("paperplane.fill", dimmed: isSendDisabled)
+                }
+                .buttonStyle(.plain)
+                .disabled(isSendDisabled)
+                .modifier(ChatSendShortcut(composerFocused: composerFocused))
+                .help("Send (⌘↩)")
+                .axLeaf("Composer.Button.Send")
             }
-            .buttonStyle(.plain)
-            .disabled(isSendDisabled)
-            .modifier(ChatSendShortcut(composerFocused: composerFocused))
-            .help("Send (⌘↩)")
-            .axLeaf("Composer.Button.Send")
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.bottom, DS.Spacing.medium)
         .padding(.top, DS.Spacing.small)
+    }
+
+    private func composerGlyph(_ symbol: String, dimmed: Bool) -> some View {
+        Image(systemName: symbol)
+            .font(DS.Font.bodyStrong)
+            .foregroundStyle(DS.Color.onAccent)
+            .frame(width: 32, height: 32)
+            .background(
+                Circle().fill(dimmed ? DS.Color.accentFill.opacity(0.4) : DS.Color.accentFill)
+            )
     }
 
     private func noteComposerFocus(_ focused: Bool) {
@@ -276,11 +291,12 @@ struct ChatPane: View {
     }
 
     private var isSendDisabled: Bool {
-        Self.isSendDisabled(input: input, isSending: isSending)
+        Self.isSendDisabled(input: input, isReplying: isReplying)
     }
 
-    static func isSendDisabled(input: String, isSending: Bool) -> Bool {
-        input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending
+    /// A message sent while a reply streams would cut that reply off, so the draft waits until it ends.
+    static func isSendDisabled(input: String, isReplying: Bool) -> Bool {
+        input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isReplying
     }
 
     /// Updates the in-flight assistant bubble by id; positional indexing crashed when the
@@ -324,6 +340,7 @@ struct ChatPane: View {
         sendTask?.cancel()
         sendTask = nil
         isSending = false
+        isReplying = false
         sessionError = nil
         turnError = nil
         session = nil
@@ -372,6 +389,7 @@ struct ChatPane: View {
         sendTask?.cancel()
         sendTask = nil
         isSending = false
+        isReplying = false
         turnError = nil
         let entryID = model.selectedEntryID
         Task {
@@ -407,24 +425,32 @@ struct ChatPane: View {
 
     private func send() {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, session != nil, !isSending else { return }
+        guard !text.isEmpty, session != nil, !isReplying else { return }
         input = ""
         send(text: text)
+    }
+
+    private func stopReply() {
+        sendTask?.cancel()
+        sendTask = nil
+        isSending = false
+        isReplying = false
     }
 
     /// Leaves the composer draft untouched — a preset send must not clobber what the user was typing.
     private func send(text raw: String) {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, let session, !isSending else { return }
+        guard !text.isEmpty, let session, !isReplying else { return }
         isSending = true
+        isReplying = true
         turnError = nil
         let entryID = model.selectedEntryID
-        sendTask?.cancel()
         displayedHistory.append(ChatMessage(role: .user, text: text))
         sendTask = Task {
             defer {
                 if !Task.isCancelled, entryID == model.selectedEntryID {
                     isSending = false
+                    isReplying = false
                 }
             }
             let liveID = UUID()

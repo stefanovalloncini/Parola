@@ -92,9 +92,11 @@ struct SummaryPane: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            SummaryEmpty(isWorking: model.isSummarising) {
-                model.summariseTranscript()
-            }
+            SummaryEmpty(
+                isWorking: model.isSummarising,
+                onGenerate: { model.summariseTranscript() },
+                onStop: { model.stopAIRun(.summary) }
+            )
         }
     }
 }

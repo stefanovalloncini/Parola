@@ -30,6 +30,10 @@ struct ActionItemsSection: View {
             Text("Extracting…")
                 .font(DS.Font.body)
                 .foregroundStyle(DS.Color.secondaryText)
+            Spacer()
+            Button("Stop") { model.stopAIRun(.actionItems) }
+                .controlSize(.small)
+                .axLeaf("ActionItems.Button.Stop")
         }
     }
 

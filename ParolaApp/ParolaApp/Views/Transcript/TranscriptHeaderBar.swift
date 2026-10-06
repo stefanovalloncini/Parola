@@ -94,7 +94,6 @@ struct TranscriptHeaderBar: View {
                     .menuStyle(.button)
                     .buttonStyle(GlyphButtonStyle(tinted: true))
                     .fixedSize()
-                    .disabled(model.isRunningPrompt)
             }
 
             advanceButton

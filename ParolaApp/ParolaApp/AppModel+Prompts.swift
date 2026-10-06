@@ -29,6 +29,11 @@ extension AppModel {
     var isExtractingActionItems: Bool { aiJobs.isRunning(.actionItems, for: selectedEntryID) }
     var isExtractingChapters: Bool { aiJobs.isRunning(.chapters, for: selectedEntryID) }
 
+    /// Stops the run of `kind` for the transcript on screen; what it would have written never lands.
+    func stopAIRun(_ kind: AIJobRegistry.Kind) {
+        aiJobs.cancel(kind, for: selectedEntryID)
+    }
+
     func runPrompt(_ prompt: Prompt) {
         guard features.isEnabled(.ai), let transcript else { return }
         let budget = tokenBudget(for: .prompts)

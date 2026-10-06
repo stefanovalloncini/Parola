@@ -3,6 +3,7 @@ import SwiftUI
 struct SummaryEmpty: View {
     let isWorking: Bool
     let onGenerate: () -> Void
+    let onStop: () -> Void
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 32
 
     var body: some View {
@@ -32,6 +33,9 @@ struct SummaryEmpty: View {
             } else {
                 ProgressView()
                     .controlSize(.small)
+                Button("Stop", action: onStop)
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary))
+                    .axLeaf("Summary.Button.Stop")
             }
 
             if !isWorking {
