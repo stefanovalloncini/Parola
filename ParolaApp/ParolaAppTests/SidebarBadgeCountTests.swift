@@ -50,6 +50,73 @@ struct SidebarBadgeCountTests {
         BatchJob(url: URL(fileURLWithPath: "/tmp/SidebarBadgeCountTests/\(name).wav"), status: status)
     }
 
+    private func entry(_ id: String, assigning map: [String: UUID]) -> LibraryEntry {
+        var built = entry(id)
+        var manifest = built.manifest
+        manifest.speakerAssignments = map
+        built = LibraryEntry(id: built.id, bundleURL: built.bundleURL, manifest: manifest)
+        return built
+    }
+
+    private func titles(_ menu: NSMenu) -> [String] {
+        menu.items.map { $0.isSeparatorItem ? "|" : $0.title }
+    }
+
+    @Test("a person's badge counts the transcripts they are in, not their labels")
+    func personBadgeCountsTranscripts() async {
+        let model = await makeModel()
+        let ada = Person(name: "Ada")
+        model.people = [ada]
+        model.libraryEntries = [
+            entry("a", assigning: ["SPEAKER_00": ada.id, "SPEAKER_01": ada.id]),
+            entry("b", assigning: ["SPEAKER_00": ada.id]),
+            entry("c"),
+        ]
+
+        #expect(model.transcriptCount(of: ada) == 2)
+    }
+
+    @Test("past five people the section ends on All People…, which opens the directory")
+    func allPeopleRow() async {
+        let model = await makeModel()
+        model.people = (0..<6).map { Person(name: "Person \($0)") }
+        let sidebar = HostedWindow(LibrarySidebar().environment(model), width: 240, height: 760)
+        defer { sidebar.close() }
+        _ = await waitUntil { sidebar.rowCount > 8 }
+
+        let words = HostedAccessibility.words(in: sidebar.host)
+        #expect(words.contains("All People…"), "\(words)")
+        let pressed = HostedAccessibility.press(endingWith: "Row.AllPeople", in: sidebar.host)
+        #expect(pressed)
+        #expect(model.showingPeopleSheet)
+
+        model.showingPeopleSheet = false
+        model.people = Array(model.people.prefix(5))
+        _ = await waitUntil { !HostedAccessibility.words(in: sidebar.host).contains("All People…") }
+        #expect(!HostedAccessibility.words(in: sidebar.host).contains("All People…"), "five fit, so nothing is left out")
+    }
+
+    @Test("a person's right-click acts on them, then offers the directory")
+    func personMenu() throws {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("person-menu"))
+        let ada = Person(name: "Ada")
+        model.people = [ada]
+        let menu = NSHostingMenu(rootView: PersonRowMenu(model: model, person: ada))
+        menu.update()
+
+        #expect(titles(menu) == ["Show Transcripts", "Rename…", "This Is Me", "Delete…", "|", "Manage People…"])
+
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Rename…" }))
+        #expect(model.peopleSheetRequest == .rename(ada.id))
+        #expect(model.showingPeopleSheet)
+
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Delete…" }))
+        #expect(model.peopleSheetRequest == .delete(ada.id))
+
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Show Transcripts" }))
+        #expect(model.personFilter == ada.id)
+    }
+
     @Test("the queue badge follows a status changed in place")
     func queueBadgeFollowsInPlaceStatus() async {
         let model = await makeModel()

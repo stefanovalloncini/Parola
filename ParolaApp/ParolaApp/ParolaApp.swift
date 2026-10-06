@@ -169,6 +169,9 @@ struct ParolaApp: App {
             CommandMenu("Transcript") {
                 TranscriptCommands(model: model)
             }
+            CommandGroup(after: .windowArrangement) {
+                Button("Manage People…") { model.showingPeopleSheet = true }
+            }
         }
 
         Settings {

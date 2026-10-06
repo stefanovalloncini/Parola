@@ -929,6 +929,8 @@ final class AppModel {
     @ObservationIgnored let peopleStore: PeopleStore
     var showingSpeakersSheet: Bool = false
     var showingPeopleSheet: Bool = false
+    /// What the directory asks first when it opens: set from a sidebar person's menu, taken by the sheet.
+    var peopleSheetRequest: PeopleSheetRequest?
     /// The people directory, mirrored from the store so views read it without awaiting the actor.
     var people: [Person] = []
     /// Which person the library list is filtered to, set from the sidebar, the filter bar or the bridge.
@@ -1564,6 +1566,8 @@ final class AppModel {
             libraryVersion &+= 1
             let counts = Self.personUsageCounts(in: libraryEntries)
             if counts != personUsageCounts { personUsageCounts = counts }
+            let transcripts = Self.personTranscriptCounts(in: libraryEntries)
+            if transcripts != personTranscriptCounts { personTranscriptCounts = transcripts }
             let badges = LibraryCounts(libraryEntries)
             if badges != libraryCounts { libraryCounts = badges }
             let usual = LibraryRowFormat.usualLanguage(codes: libraryEntries.compactMap { LanguageDisplay.code(for: $0.language) })
@@ -1575,6 +1579,8 @@ final class AppModel {
     private(set) var usualLanguage: String?
     /// How many speaker labels across the library stand for each person. Read off the maps, so an assignment an undo takes back stops counting.
     private(set) var personUsageCounts: [UUID: Int] = [:]
+    /// How many transcripts stand for each person, for the sidebar's badges.
+    private(set) var personTranscriptCounts: [UUID: Int] = [:]
     /// The sidebar's counts, set only when one moves, so a rename or an open repaints no badge.
     private(set) var libraryCounts = LibraryCounts()
     private(set) var libraryVersion: Int = 0

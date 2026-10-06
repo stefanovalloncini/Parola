@@ -12,7 +12,7 @@ struct ManagePeopleSheet: View {
             onClose: { dismiss() },
             content: {
                 ScrollView {
-                    PeopleDirectoryList()
+                    PeopleDirectoryList(takesRequests: true)
                         .padding(DS.Spacing.regular)
                 }
             },
@@ -33,6 +33,8 @@ struct ManagePeopleSheet: View {
 
 /// The directory itself: add, rename, merge and delete. Shown in the sheet and in the People pane.
 struct PeopleDirectoryList: View {
+    /// Only the sheet asks what a sidebar person's menu wanted; the People pane in Settings leaves it.
+    var takesRequests = false
     @Environment(AppModel.self) private var model
     @State private var newName: String = ""
     @FocusState private var addFocused: Bool
@@ -65,6 +67,7 @@ struct PeopleDirectoryList: View {
             }
             addRow
         }
+        .onAppear { if takesRequests { takeRequest() } }
         .alert("Rename person", isPresented: isRenaming, presenting: renaming) { person in
             TextField("Name", text: $renameDraft)
             Button("Cancel", role: .cancel) { renaming = nil }
@@ -170,6 +173,19 @@ struct PeopleDirectoryList: View {
             return
         }
         Task { await model.renamePerson(person.id, to: draft) }
+    }
+
+    private func takeRequest() {
+        guard let request = model.peopleSheetRequest else { return }
+        model.peopleSheetRequest = nil
+        switch request {
+        case .rename(let id):
+            guard let person = model.person(id: id) else { return }
+            renameDraft = person.name
+            renaming = person
+        case .delete(let id):
+            deleting = model.person(id: id)
+        }
     }
 
     private func add() {

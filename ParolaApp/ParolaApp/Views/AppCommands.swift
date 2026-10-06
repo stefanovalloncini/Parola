@@ -435,7 +435,6 @@ struct TranscriptCommands: View {
         Button("Rename Speakers…") { model.showingSpeakersSheet = true }
             .disabled(!model.mainTranscriptCommandsEnabled)
             .axLeaf("Menu.Transcript.RenameSpeakers")
-        Button("Manage People…") { model.showingPeopleSheet = true }
         Divider()
         Button("Copy Transcript") { Task { await model.copyTranscript() } }
             .keyboardShortcut("c", modifiers: [.command, .shift])

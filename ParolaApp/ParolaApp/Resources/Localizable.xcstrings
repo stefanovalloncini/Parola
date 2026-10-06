@@ -1847,6 +1847,17 @@
         }
       }
     },
+    "All People…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutte le persone…"
+          }
+        }
+      }
+    },
     "Allow…": {
       "extractionState": "manual",
       "localizations": {
@@ -4913,6 +4924,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le trascrizioni eliminate restano qui per %lld giorni, poi vengono rimosse definitivamente."
+          }
+        }
+      }
+    },
+    "Delete…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina…"
           }
         }
       }
@@ -13819,6 +13841,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra trascrizione"
+          }
+        }
+      }
+    },
+    "Show Transcripts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra le trascrizioni"
           }
         }
       }

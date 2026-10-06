@@ -119,7 +119,6 @@ struct TranscriptMenuTests {
                 #"Button("Add Note…") { model.noteFocusedSegment() }"#, #"Button("Favorite Segment")"#,
                 #"Button("Split Segment") { model.splitFocusedSegment() }"#, "MergeSegmentMenuItem(model: model",
                 #"Button("Delete Segment") { model.deleteFocusedSegment() }"#, #"Button("Rename Speakers…")"#,
-                #"Button("Manage People…")"#,
             ],
             [
                 #"Button("Copy Transcript")"#, #"Button("Copy with Timestamps")"#, #"Button("Copy as Markdown")"#,

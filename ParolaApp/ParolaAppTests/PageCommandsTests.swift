@@ -120,6 +120,16 @@ struct PageCommandsTests {
         #expect(sidebar)
     }
 
+    @Test("Manage People… sits in the Window menu, not the Transcript menu")
+    func managePeopleInTheWindowMenu() async throws {
+        _ = await waitUntil { NSApp.mainMenu?.items.first { $0.title == "Window" }?.submenu != nil }
+        let window = try #require(NSApp.mainMenu?.items.first { $0.title == "Window" }?.submenu)
+        let transcript = try #require(NSApp.mainMenu?.items.first { $0.title == "Transcript" }?.submenu)
+
+        #expect(window.items.contains { $0.title == "Manage People…" })
+        #expect(!transcript.items.contains { $0.title == "Manage People…" })
+    }
+
     private func goItem(_ title: String) -> NSMenuItem? {
         let menu = NSHostingMenu(rootView: GoCommands(model: model))
         menu.update()

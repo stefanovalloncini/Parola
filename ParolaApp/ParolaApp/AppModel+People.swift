@@ -80,6 +80,25 @@ extension AppModel {
         personUsageCounts[person.id] ?? 0
     }
 
+    /// The transcripts that stand for this person, the number their own page counts.
+    func transcriptCount(of person: Person) -> Int {
+        personTranscriptCounts[person.id] ?? 0
+    }
+
+    static func personTranscriptCounts(in entries: [LibraryEntry]) -> [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for entry in entries {
+            for id in entry.personIDs { counts[id, default: 0] += 1 }
+        }
+        return counts
+    }
+
+    /// Opens the directory with the rename or the delete already asked, for a person picked outside it.
+    func managePerson(_ request: PeopleSheetRequest) {
+        peopleSheetRequest = request
+        showingPeopleSheet = true
+    }
+
     static func personUsageCounts(in entries: [LibraryEntry]) -> [UUID: Int] {
         var counts: [UUID: Int] = [:]
         for entry in entries {
