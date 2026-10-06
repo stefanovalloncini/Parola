@@ -247,7 +247,8 @@ struct QueueRowMenu: View {
         let jobs = model.batchJobs.filter { ids.contains($0.id) }
         let done = jobs.filter { $0.status == .done }
         let retryable = jobs.filter { $0.status == .failed || $0.status == .cancelled }
-        let inFlight = jobs.filter { $0.status == .pending || $0.status == .transcribing }
+        let waiting = jobs.filter { $0.status == .pending }
+        let running = jobs.filter { $0.status == .transcribing }
         if jobs.count == 1, let job = done.first {
             Button("Open") { model.openBatchJobTranscript(job.id) }
                 .axLeaf("Row.ContextMenuItem.Open")
@@ -260,8 +261,12 @@ struct QueueRowMenu: View {
             Button("Retry") { model.retryBatchJobs(Set(retryable.map(\.id))) }
                 .axLeaf("Row.ContextMenuItem.Retry")
         }
-        if !inFlight.isEmpty {
-            Button("Cancel") { model.deleteBatchJobs(Set(inFlight.map(\.id))) }
+        if !waiting.isEmpty {
+            Button("Remove") { model.deleteBatchJobs(Set(waiting.map(\.id))) }
+                .axLeaf("Row.ContextMenuItem.Remove")
+        }
+        if !running.isEmpty {
+            Button("Cancel") { model.deleteBatchJobs(Set(running.map(\.id))) }
                 .axLeaf("Row.ContextMenuItem.Cancel")
         }
         if model.batchJobs.contains(where: { $0.status == .pending || $0.status == .transcribing }) {

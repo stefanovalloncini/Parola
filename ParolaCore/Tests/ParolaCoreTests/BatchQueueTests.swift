@@ -192,6 +192,33 @@ struct BatchQueueTests {
         #expect(ordered.count == jobs.count * 2 + 1)
     }
 
+    @Test("a job the caller no longer holds when its turn comes is skipped without an event")
+    func jobNoLongerQueuedIsSkipped() async throws {
+        let setup = try await makeQueue(behavior: .succeed)
+        let jobs = (0..<3).map { _ in BatchJob(url: setup.audioURL) }
+        let removed = jobs[1].id
+        let events = await setup.queue.process(
+            jobs: jobs,
+            options: TranscriptionOptions(model: "openai_whisper-tiny"),
+            stillQueued: { $0 != removed }
+        )
+
+        var started: [UUID] = []
+        var completed: [UUID] = []
+        var mentioned: Set<UUID> = []
+        for await event in events {
+            switch event {
+            case .started(let id): started.append(id)
+            case .completed(let id, _): completed.append(id)
+            case .failed(let id, _), .cancelled(let id), .progress(let id, _): mentioned.insert(id)
+            case .finished: break
+            }
+        }
+        #expect(started == [jobs[0].id, jobs[2].id])
+        #expect(completed == [jobs[0].id, jobs[2].id])
+        #expect(!mentioned.contains(removed))
+    }
+
     @Test("a wave that finishes cleanly does not cancel the shared session's in-flight work")
     func finishedWaveDoesNotCancelSharedSession() async throws {
         let setup = try await makeQueue(behavior: .succeed)

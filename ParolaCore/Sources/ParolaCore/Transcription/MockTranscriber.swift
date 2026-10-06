@@ -111,6 +111,17 @@ public actor MockTranscriberGate {
     }
 }
 
+/// The files a mock run was asked to transcribe, in the order it was asked.
+public actor MockTranscriberLog {
+    public private(set) var urls: [URL] = []
+
+    public init() {}
+
+    func record(_ url: URL) {
+        urls.append(url)
+    }
+}
+
 public struct MockTranscriberResponse: Sendable {
     public var segments: [TranscriptSegmentSeed]
     public var partials: [String]
@@ -122,6 +133,7 @@ public struct MockTranscriberResponse: Sendable {
     public var delayMs: Int
     public var failure: MockTranscriberFailure?
     public var gate: MockTranscriberGate?
+    public var log: MockTranscriberLog?
     /// The file a streaming mock says it records to: named while it runs, and carried by its final transcript.
     public var recordedAudio: URL?
     /// A streaming mock stopped while its gate holds the start waits for the gate and then finishes with its segments, as a take does.
@@ -139,7 +151,8 @@ public struct MockTranscriberResponse: Sendable {
         failure: MockTranscriberFailure? = nil,
         gate: MockTranscriberGate? = nil,
         recordedAudio: URL? = nil,
-        waitsForModelOnStop: Bool = false
+        waitsForModelOnStop: Bool = false,
+        log: MockTranscriberLog? = nil
     ) {
         self.segments = segments
         self.partials = partials
@@ -153,6 +166,7 @@ public struct MockTranscriberResponse: Sendable {
         self.gate = gate
         self.recordedAudio = recordedAudio
         self.waitsForModelOnStop = waitsForModelOnStop
+        self.log = log
     }
 
     func materialise(sourceURL: URL?) -> Transcript {
@@ -227,6 +241,7 @@ public actor MockTranscriber: Transcriber {
         options: TranscriptionOptions,
         handlers: TranscribeHandlers
     ) async throws -> Transcript {
+        await response.log?.record(url)
         if let failure = response.failure {
             if response.delayMs > 0 {
                 try? await sleeper(response.delayMs)

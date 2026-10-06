@@ -51,7 +51,11 @@ extension AppModel {
     func handleBatchEvent(_ event: BatchEvent) async {
         switch event {
         case .started(let id):
-            guard !isCancelled(id) else { return }
+            guard batchJobIsStillQueued(id) else {
+                stopBatchRun()
+                resumeWaitingBatchJobs()
+                return
+            }
             mutateBatchJob(id) { $0.status = .transcribing }
             let file = batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/")
             batchPhaseFile = file
@@ -173,13 +177,26 @@ extension AppModel {
         runBatchTask(jobs: pendingJobs)
     }
 
+    private func resumeWaitingBatchJobs() {
+        let remaining = batchJobs.filter { $0.status == .pending }
+        if !remaining.isEmpty { resumeBatch(pendingJobs: remaining) }
+    }
+
+    /// The run holds its own copy of the jobs: one taken off the list or cancelled since must not start.
+    func batchJobIsStillQueued(_ id: BatchJob.ID) -> Bool {
+        guard let job = batchJobs.first(where: { $0.id == id }) else { return false }
+        return job.status != .cancelled
+    }
+
     private func runBatchTask(jobs: [BatchJob]) {
         batchRunCancelled = false
         batchTask?.cancel()
         let queue = BatchQueue(session: session, features: features)
         let opts = currentOptions
         batchTask = Task { @MainActor [weak self] in
-            let events = await queue.process(jobs: jobs, options: opts)
+            let events = await queue.process(jobs: jobs, options: opts) { [weak self] id in
+                await self?.batchJobIsStillQueued(id) ?? false
+            }
             for await event in events {
                 if Task.isCancelled { break }
                 await self?.handleBatchEvent(event)
@@ -329,10 +346,7 @@ extension AppModel {
         case .transcribing:
             stopBatchRun()
             mutateBatchJob(id) { $0.status = .cancelled }
-            let remaining = batchJobs.filter { $0.status == .pending }
-            if !remaining.isEmpty {
-                resumeBatch(pendingJobs: remaining)
-            }
+            resumeWaitingBatchJobs()
         case .pending, .done, .failed, .cancelled:
             batchJobs.remove(at: idx)
             if selectedBatchJobID == id { selectedBatchJobID = batchJobs.first?.id }

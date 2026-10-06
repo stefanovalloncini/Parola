@@ -89,9 +89,11 @@ public actor BatchQueue {
         self.durationProbe = durationProbe
     }
 
+    /// `stillQueued` is asked as each job's turn comes; a job it turns down is skipped without an event.
     public func process(
         jobs: [BatchJob],
-        options: TranscriptionOptions
+        options: TranscriptionOptions,
+        stillQueued: @escaping @Sendable (UUID) async -> Bool = { _ in true }
     ) -> AsyncStream<BatchEvent> {
         guard features.isEnabled(.batch) else {
             ParolaLog.notice(
@@ -107,7 +109,7 @@ public actor BatchQueue {
         }
         return AsyncStream { continuation in
             let processingTask = Task {
-                await self.run(jobs: jobs, options: options, continuation: continuation)
+                await self.run(jobs: jobs, options: options, stillQueued: stillQueued, continuation: continuation)
             }
             continuation.onTermination = { _ in
                 processingTask.cancel()
@@ -119,6 +121,7 @@ public actor BatchQueue {
     private func run(
         jobs: [BatchJob],
         options: TranscriptionOptions,
+        stillQueued: @Sendable (UUID) async -> Bool,
         continuation: AsyncStream<BatchEvent>.Continuation
     ) async {
         ParolaLog.info(.batch, "batch starting", [.count: .int(jobs.count)])
@@ -129,6 +132,10 @@ public actor BatchQueue {
             if Task.isCancelled {
                 cancelled += 1
                 continuation.yield(.cancelled(jobID: job.id))
+                continue
+            }
+            guard await stillQueued(job.id) else {
+                ParolaLog.info(.batch, "job skipped: no longer queued", [.job: .id(job.id)])
                 continue
             }
             continuation.yield(.started(jobID: job.id))
