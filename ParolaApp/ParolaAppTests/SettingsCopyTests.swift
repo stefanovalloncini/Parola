@@ -56,4 +56,9 @@ struct SettingsCopyTests {
             #expect(!scope.defaultsKeys.contains("wordTimestamps"), "\(scope)")
         }
     }
+
+    @Test("Customization's summary names what the pane holds")
+    func customizationSummary() {
+        #expect(SettingsRoute.customization.summary == "Appearance, theme colors and timestamp font.")
+    }
 }

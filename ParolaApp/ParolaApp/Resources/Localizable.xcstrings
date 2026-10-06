@@ -1997,6 +1997,17 @@
         }
       }
     },
+    "Appearance, theme colors and timestamp font.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aspetto, colori del tema e carattere dei timestamp."
+          }
+        }
+      }
+    },
     "Apple Intelligence": {
       "extractionState": "manual",
       "localizations": {
@@ -15729,17 +15740,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tema e colori"
-          }
-        }
-      }
-    },
-    "Theme colors and how dense the interface is.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I colori del tema e quanto è compatta l'interfaccia."
           }
         }
       }

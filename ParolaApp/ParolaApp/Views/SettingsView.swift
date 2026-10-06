@@ -103,7 +103,7 @@ private struct SettingsRouteMeta {
 
     static let table: [SettingsRoute: SettingsRouteMeta] = [
         .general: SettingsRouteMeta(titleKey: "General", summaryKey: "How Parola starts up, plus defaults that apply to every transcript.", symbol: "gearshape", scope: .general),
-        .customization: SettingsRouteMeta(titleKey: "Customization", summaryKey: "Theme colors and how dense the interface is.", symbol: "paintbrush", scope: .customization),
+        .customization: SettingsRouteMeta(titleKey: "Customization", summaryKey: "Appearance, theme colors and timestamp font.", symbol: "paintbrush", scope: .customization),
         .watchedFolders: SettingsRouteMeta(titleKey: "Watched Folders", summaryKey: "Folders Parola watches, so anything dropped in is transcribed on its own.", symbol: "folder.badge.gearshape", scope: .watchedFolders),
         .recordMeetings: SettingsRouteMeta(titleKey: "Record Meetings", summaryKey: "Recording meeting audio, and what Parola does when a meeting app starts.", symbol: "video.bubble", scope: .recordMeetings),
         .shortcuts: SettingsRouteMeta(titleKey: "Shortcuts", summaryKey: "Keyboard shortcuts for the main window commands.", symbol: "command", scope: .shortcuts),
