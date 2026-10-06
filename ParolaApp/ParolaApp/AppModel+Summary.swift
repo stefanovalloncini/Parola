@@ -160,6 +160,8 @@ extension AppModel {
         transcriptPaneMode = mode
     }
 
+    var compactTextApplies: Bool { transcriptDisplayMode == .transcript }
+
     /// A layout only shows on the Transcript pane, so picking one from Summary or Chat goes there too.
     func showTranscriptLayout(_ layout: TranscriptDisplayMode) {
         transcriptDisplayMode = layout

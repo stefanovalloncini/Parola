@@ -184,7 +184,7 @@ struct ViewCommands: View {
             .disabled(!model.hasTranslation)
             .axLeaf("Menu.View.TranslationSideBySide")
         Toggle("Compact Text", isOn: $model.transcriptCompact)
-            .disabled(!model.mainTranscriptCommandsEnabled)
+            .disabled(!model.mainTranscriptCommandsEnabled || !model.compactTextApplies)
             .axLeaf("Menu.View.CompactText")
         Toggle("Show Favorites Only", isOn: $model.favoritesOnly)
             .disabled(!model.mainTranscriptCommandsEnabled || (!model.favoritesOnly && !model.selectedEntryHasFavorites))

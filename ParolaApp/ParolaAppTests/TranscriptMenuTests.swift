@@ -45,7 +45,7 @@ struct TranscriptMenuTests {
     @Test("the display options are checked View menu items")
     func displayOptionsAreViewToggles() throws {
         let commands = try source("Views/AppCommands")
-        #expect(commands.contains(#"Toggle("Compact Text", isOn: $model.transcriptCompact)"#))
+        #expect(commands.contains(#"Toggle("Compact Text", isOn: $model.transcriptCompact) .disabled(!model.mainTranscriptCommandsEnabled || !model.compactTextApplies)"#))
         #expect(commands.contains(#"Toggle("Show Favorites Only", isOn: $model.favoritesOnly)"#))
         #expect(commands.contains(#"Toggle("Subtitle Warnings", isOn: $model.showSubtitleQC)"#))
     }

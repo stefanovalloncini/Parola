@@ -153,7 +153,8 @@ struct TranscriptHeaderBar: View {
             Image(systemName: model.transcriptCompact ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
         }
         .buttonStyle(GlyphButtonStyle(tinted: true))
-        .modifier(CompactHelpModifier(isCompact: model.transcriptCompact))
+        .disabled(!model.compactTextApplies)
+        .modifier(CompactHelpModifier(isCompact: model.transcriptCompact, applies: model.compactTextApplies))
         .axLeaf("HeaderBar.Button.ToggleCompact")
     }
 
@@ -383,8 +384,9 @@ private struct SpeakHelpModifier: ViewModifier {
 
 private struct CompactHelpModifier: ViewModifier {
     let isCompact: Bool
+    let applies: Bool
     func body(content: Content) -> some View {
-        let text = isCompact ? "Expanded view" : "Compact view"
-        content.help(text).accessibilityLabel(text)
+        let text: LocalizedStringKey = isCompact ? "Expanded view" : "Compact view"
+        content.help(applies ? text : "Compact view works in Paragraphs only").accessibilityLabel(text)
     }
 }

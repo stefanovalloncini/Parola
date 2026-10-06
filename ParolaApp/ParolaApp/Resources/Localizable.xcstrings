@@ -3666,6 +3666,17 @@
         }
       }
     },
+    "Compact view works in Paragraphs only": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La vista compatta funziona solo in Paragrafi"
+          }
+        }
+      }
+    },
     "Complete": {
       "extractionState": "manual",
       "localizations": {
