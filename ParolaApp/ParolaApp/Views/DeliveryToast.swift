@@ -30,6 +30,7 @@ struct DeliveryToast: View {
             }
             .buttonStyle(GlyphButtonStyle(side: 20))
             .help("Dismiss")
+            .accessibilityLabel("Dismiss")
             .axLeaf("Delivery.Button.Dismiss")
         }
         .padding(.horizontal, DS.Spacing.regular)
@@ -80,14 +81,18 @@ struct DeliveryToast: View {
     }
 
     private var messageText: Text {
+        // The reason comes from the failure, not the catalog, and a path in it must not be read as markdown.
+        Text(verbatim: Self.message(for: notice))
+    }
+
+    nonisolated static func message(for notice: DeliveryNotice, bundle: Bundle = .main) -> String {
         switch notice.state {
         case .sent:
-            return Text("Sent to \(notice.destinationName)")
+            String(localized: "Sent to \(notice.destinationName)", bundle: bundle)
         case .queued(let nextAt):
-            return Text("Couldn't send to \(notice.destinationName), retrying \(Self.retryText(for: nextAt))")
+            String(localized: "Couldn't send to \(notice.destinationName), retrying \(retryText(for: nextAt))", bundle: bundle)
         case .failed(let message):
-            // The reason comes from the failure, not the catalog, and a path in it must not be read as markdown.
-            return Text(verbatim: message)
+            message
         }
     }
 
@@ -107,7 +112,7 @@ struct DeliveryToast: View {
         }
     }
 
-    static func retryText(for date: Date) -> String {
+    nonisolated static func retryText(for date: Date) -> String {
         date.formatted(.relative(presentation: .numeric, unitsStyle: .wide))
     }
 

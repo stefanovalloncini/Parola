@@ -61,6 +61,7 @@ struct ExportNoticeStrip: View {
             }
             .buttonStyle(GlyphButtonStyle(side: 20))
             .help("Dismiss")
+            .accessibilityLabel("Dismiss")
             .axLeaf("ExportNotice.Button.Dismiss")
         }
         .padding(.horizontal, DS.Spacing.regular)

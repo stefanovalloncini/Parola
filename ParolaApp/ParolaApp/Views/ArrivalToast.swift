@@ -74,6 +74,7 @@ struct ArrivalToast: View {
             }
             .buttonStyle(GlyphButtonStyle(side: 20))
             .help("Dismiss")
+            .accessibilityLabel("Dismiss")
             .axLeaf("Arrival.Button.Dismiss")
         }
         .padding(.horizontal, DS.Spacing.regular)

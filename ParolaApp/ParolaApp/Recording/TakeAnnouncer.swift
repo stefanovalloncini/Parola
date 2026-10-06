@@ -11,7 +11,7 @@ nonisolated func announcementInfo(_ text: String, priority: NSAccessibilityPrior
     [.announcement: text, .priority: priority.rawValue]
 }
 
-/// Tells VoiceOver what a take does that no focus change shows: capture starting, a pause or a resume from anywhere, a failure, where a saved take went, and a notice.
+/// Tells VoiceOver what a take does that no focus change shows: capture starting, a pause or a resume from anywhere, a failure, where a saved take went; and every notice or toast as it appears.
 @MainActor
 final class TakeAnnouncer {
     /// The part of the model the announcements follow.
@@ -29,6 +29,8 @@ final class TakeAnnouncer {
         var take: Take?
         var saved: TakeSavedNotice?
         var notice: ExportNotice?
+        var arrival: ArrivalNotice?
+        var delivery: DeliveryNotice?
     }
 
     struct Line: Equatable {
@@ -68,7 +70,9 @@ final class TakeAnnouncer {
             takeID: model.recording?.takeID,
             take: model.recording.map { kind(of: $0) },
             saved: model.takeSavedNotice,
-            notice: model.exportNotice
+            notice: model.exportNotice,
+            arrival: model.arrivalNotice,
+            delivery: model.deliveryNotice
         )
     }
 
@@ -100,9 +104,18 @@ final class TakeAnnouncer {
         if let saved = new.saved, saved.id != old.saved?.id {
             lines.append(Line(text: TakeSavedToast.message(category: saved.category, bundle: bundle)))
         }
-        if let notice = new.notice, notice.id != old.notice?.id, notice.tone != .success {
+        if let notice = new.notice, notice.id != old.notice?.id {
             let saysTheTakeFailure = notice.takeID != nil && notice.takeID == new.takeID && isFailure(new.take)
             if !saysTheTakeFailure { lines.append(Line(text: notice.message, priority: notice.tone == .failure ? .high : .medium)) }
+        }
+        // A running file is progress, not news: its landing or its failure is said.
+        if let arrival = new.arrival, arrival.id != old.arrival?.id, arrival.state != .running {
+            let text = [arrival.title(bundle: bundle), arrival.reason].compactMap { $0 }.joined(separator: ". ")
+            lines.append(Line(text: text, priority: arrival.reason == nil ? .medium : .high))
+        }
+        if let delivery = new.delivery, delivery != old.delivery {
+            let failed = if case .failed = delivery.state { true } else { false }
+            lines.append(Line(text: DeliveryToast.message(for: delivery, bundle: bundle), priority: failed ? .high : .medium))
         }
         return lines
     }

@@ -48,7 +48,7 @@ struct TakeAnnouncementLineTests {
         #expect(TakeAnnouncer.lines(from: windingDown, to: liveEngine).map(\.text) == ["The engine stopped."])
     }
 
-    @Test("a notice about the failure just said isn't said again; any other failure or info notice is")
+    @Test("a notice about the failure just said isn't said again; any other notice is")
     func notices() {
         let failure = ExportNotice(
             message: "The microphone stopped.", failures: [], folder: nil, tone: .failure,
@@ -62,9 +62,32 @@ struct TakeAnnouncementLineTests {
         let info = ExportNotice(message: "Finish the recording first.", failures: [], folder: nil, tone: .info)
         #expect(TakeAnnouncer.lines(from: recording, to: Moment(takeID: 1, take: .recording, notice: info)).map(\.text) == ["Finish the recording first."])
         let exported = ExportNotice(message: "Exported 3 of 3", failures: [], folder: nil, tone: .success)
-        #expect(TakeAnnouncer.lines(from: Moment(), to: Moment(notice: exported)).isEmpty)
+        #expect(TakeAnnouncer.lines(from: Moment(), to: Moment(notice: exported)).map(\.text) == ["Exported 3 of 3"])
         let other = ExportNotice(message: "Export failed: disk full", failures: [], folder: nil, tone: .failure)
         #expect(TakeAnnouncer.lines(from: Moment(), to: Moment(notice: other)).map(\.text) == ["Export failed: disk full"])
+    }
+
+    @Test("a watched file's toast is said when it lands or fails, a failure cutting in; one still running isn't")
+    func arrivalToasts() {
+        let file = URL(fileURLWithPath: "/tmp/watched/interview.m4a")
+        let failed = ArrivalNotice(failed: file, reason: "The file is damaged.")
+        let failedLines = TakeAnnouncer.lines(from: Moment(), to: Moment(arrival: failed))
+        #expect(failedLines.map(\.text) == ["Couldn't transcribe interview. The file is damaged."])
+        #expect(failedLines.map(\.priority) == [.high])
+        #expect(TakeAnnouncer.lines(from: Moment(arrival: failed), to: Moment(arrival: failed)).isEmpty)
+        #expect(TakeAnnouncer.lines(from: Moment(), to: Moment(arrival: ArrivalNotice(running: file))).isEmpty)
+    }
+
+    @Test("a send's toast is said, a failure cutting in")
+    func deliveryToasts() {
+        let sent = DeliveryNotice(entryID: "E", destinationID: UUID(), destinationName: "Vault", state: .sent(nil))
+        let sentLines = TakeAnnouncer.lines(from: Moment(), to: Moment(delivery: sent))
+        #expect(sentLines.map(\.text) == ["Sent to Vault"])
+        #expect(sentLines.map(\.priority) == [.medium])
+        let failed = DeliveryNotice(entryID: "E", destinationID: UUID(), destinationName: "Vault", state: .failed("The vault folder is gone."))
+        let failedLines = TakeAnnouncer.lines(from: Moment(delivery: sent), to: Moment(delivery: failed))
+        #expect(failedLines.map(\.text) == ["The vault folder is gone."])
+        #expect(failedLines.map(\.priority) == [.high])
     }
 
     @Test("the saved toast says where the take went, once")
