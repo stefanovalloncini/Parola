@@ -96,14 +96,25 @@ extension AppModel {
     /// Off while a viewer holds focus, where these would edit or export something the user can't see.
     var mainTranscriptCommandsEnabled: Bool { hasTranscript && !keyWindowIsViewer }
 
+    /// The main window shows the loaded transcript, with no list, results or other page over it.
+    var transcriptIsOnScreen: Bool {
+        route == .transcript && hasTranscript && !isBrowsingLibrary
+    }
+
+    /// With no transcript in front, ⌘F goes to the page's search field, as in Finder and Mail.
     var findCommandEnabled: Bool {
         if let session = keyViewerSession { return session.transcript != nil }
-        return hasTranscript
+        if transcriptIsOnScreen { return true }
+        return !introduction.isPresented && route.searchTitle() != nil
     }
 
     func beginFind() {
         if let session = keyViewerSession {
             session.beginSearch()
+            return
+        }
+        guard transcriptIsOnScreen else {
+            focusLibrarySearch()
             return
         }
         switch transcriptPaneMode {
