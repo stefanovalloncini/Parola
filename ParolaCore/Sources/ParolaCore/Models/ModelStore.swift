@@ -522,11 +522,15 @@ public final class ModelStore: Sendable {
         return [.bytes: .bytes(size)]
     }
 
-    private func checkDownloadPolicy(variant: String) throws {
+    package func checkDownloadsAllowed() throws {
         if managedConfiguration.disableModelDownloads {
             ParolaLog.notice(.models, "download blocked by policy")
             throw ParolaError.policyRestricted("Model downloads are disabled by a managed policy.")
         }
+    }
+
+    private func checkDownloadPolicy(variant: String) throws {
+        try checkDownloadsAllowed()
         if let entry = ModelCatalog.variant(id: variant),
            let allowed = managedConfiguration.allowedEngines,
            !allowed.contains(entry.engineID) {
@@ -746,11 +750,13 @@ public final class ModelStore: Sendable {
 
 /// Serializes downloads per model id so two callers (say, the Settings download button and a
 /// transcribe-triggered auto-download) never write the same model directory at once.
-actor DownloadGate {
+package actor DownloadGate {
     private var busy: Set<String> = []
     private var waiters: [String: [CheckedContinuation<Void, Never>]] = [:]
 
-    func serialized<T: Sendable>(
+    package init() {}
+
+    package func serialized<T: Sendable>(
         _ key: String,
         _ body: @Sendable () async throws -> T
     ) async throws -> T {

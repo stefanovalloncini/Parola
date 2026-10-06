@@ -36,6 +36,41 @@ struct ModelStorePolicyTests {
         #expect(url == store.installedURL(for: "openai_whisper-tiny"))
     }
 
+    @Test("checkDownloadsAllowed refuses with the same policyRestricted error download gives")
+    func downloadsAllowedFollowsPolicy() async {
+        let store = makeStore(["disableModelDownloads": true])
+        var direct: ParolaError?
+        do {
+            try store.checkDownloadsAllowed()
+        } catch {
+            direct = error as? ParolaError
+        }
+        var viaDownload: ParolaError?
+        do {
+            _ = try await store.download(variant: "openai_whisper-tiny")
+        } catch {
+            viaDownload = error as? ParolaError
+        }
+
+        guard case .policyRestricted(let detail)? = direct else {
+            Issue.record("expected policyRestricted, got \(String(describing: direct))")
+            return
+        }
+        guard case .policyRestricted(let downloadDetail)? = viaDownload else {
+            Issue.record("expected policyRestricted from download, got \(String(describing: viaDownload))")
+            return
+        }
+        #expect(detail == downloadDetail)
+    }
+
+    @Test("checkDownloadsAllowed passes when only the engine allowlist is managed, or nothing is")
+    func downloadsAllowedIgnoresEngineAllowlist() throws {
+        try makeStore(["allowedEngines": [String]()]).checkDownloadsAllowed()
+        try makeStore(["allowedEngines": ["parakeet"]]).checkDownloadsAllowed()
+        try makeStore(["disableModelDownloads": false]).checkDownloadsAllowed()
+        try makeStore().checkDownloadsAllowed()
+    }
+
     @Test("download throws for an engine outside the allowlist")
     func downloadBlockedByAllowlist() async {
         let store = makeStore(["allowedEngines": ["whisperkit"]])

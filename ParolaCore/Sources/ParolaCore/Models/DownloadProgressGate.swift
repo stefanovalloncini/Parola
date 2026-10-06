@@ -1,13 +1,13 @@
 import os
 
 /// Passes a download's progress on once per whole percent, never going backwards.
-enum DownloadProgressGate {
+package enum DownloadProgressGate {
     private struct State {
         var highest = 0.0
         var percent = -1
     }
 
-    static func gating(_ report: @escaping @Sendable (Double) -> Void) -> @Sendable (Double) -> Void {
+    package static func gating(_ report: @escaping @Sendable (Double) -> Void) -> @Sendable (Double) -> Void {
         let state = OSAllocatedUnfairLock(initialState: State())
         return { fraction in
             let reading = state.withLock { state -> Double? in
