@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
@@ -295,8 +296,8 @@ struct EntryWindowViewerTests {
         #expect(widest <= DS.Size.readingWidth, "the text runs \(widest) pt wide")
     }
 
-    @Test("both windows show the language and the speed with the same controls")
-    func windowsShareLanguageAndSpeed() throws {
+    @Test("both windows show the language with the same pill")
+    func windowsShareTheLanguagePill() throws {
         func source(_ name: String) throws -> String {
             let path = #filePath.replacingOccurrences(of: "ParolaAppTests/EntryWindowViewerTests.swift", with: "ParolaApp/\(name).swift")
             return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
@@ -306,11 +307,18 @@ struct EntryWindowViewerTests {
         #expect(mainHeader.contains("LanguagePill(language: model.transcript?.language)"))
         #expect(viewerHeader.contains("LanguagePill(language: session.transcript?.language)"))
         #expect(!viewerHeader.contains("Text(verbatim: language)"))
-        let mainBar = try source("Views/Transcript/MediaBar")
-        let viewerBar = try source("Windows/EntryViewerPlayback")
-        #expect(mainBar.contains("PlaybackSpeedMenu(rate: playbackRate)"))
-        #expect(viewerBar.contains("PlaybackSpeedMenu(rate: session.rate)"))
-        #expect(!viewerBar.contains(#"Picker("Playback speed""#))
+    }
+
+    @Test("the viewer keeps its own pop-up for the speed")
+    func viewerKeepsItsSpeedPopUp() async throws {
+        let model = EntryWindowTestSupport.makeModel("viewer-speed")
+        let entry = try await EntryWindowTestSupport.seed(model, texts: ["alpha"], speakers: [nil], audio: nil)
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        let hosted = HostedWindow(EntryViewerPlaybackBar(session: session).environment(model), width: 600, height: 120)
+        defer { hosted.close() }
+        let found = HostedAccessibility.elements(in: hosted.host).first { $0.identifier?.hasSuffix("Picker.Rate") == true }
+        let speed = try #require(found)
+        #expect(speed.role == NSAccessibility.Role.popUpButton.rawValue, "the speed reads as \(speed.role ?? "nothing")")
     }
 
     @Test("a long title is cut at its end and reads whole on hover, in both windows")
