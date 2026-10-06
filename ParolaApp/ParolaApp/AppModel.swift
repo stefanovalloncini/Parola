@@ -141,7 +141,10 @@ final class AppModel {
         didSet {
             if oldValue == .recentlyDeleted { recentlyDeletedSelection = [] }
             if routeLandsTake { routeLandsTake = false }
-            if route != oldValue { holdSavedToastBehindStage() }
+            if route != oldValue {
+                holdSavedToastBehindStage()
+                dropTakeSavedOnceLeft()
+            }
         }
     }
     /// Set as a take's own landing replaces its Stage with its transcript, so the window plays that change as a landing; the next route change clears it.
@@ -1681,6 +1684,7 @@ final class AppModel {
             guard oldValue != selectedEntryID else { return }
             transcriptPaneMode = .transcript
             updateSelectedEntryHasFavorites()
+            dropTakeSavedOnceLeft()
         }
     }
     /// The menus read this rather than `favoriteSegmentIDs`, which would tie them to every library write.
@@ -5186,7 +5190,7 @@ final class AppModel {
             }
             self?.updateSession(of: take) { $0.land(entryID: entry?.id) }
             if kind == .recording, take != nil, let entry {
-                self?.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: category)
+                self?.takeSavedNotice = TakeSavedNotice(entryID: entry.id, title: LibraryEntryDisplay.title(for: entry), category: category)
             }
             var entryAudio: URL?
             if let entry, audio != nil { entryAudio = try? await library.load(entry.id).document.audioURL }
@@ -5638,6 +5642,18 @@ final class AppModel {
         guard takeSavedNotice != nil, !takeSavedSeen else { return }
         takeSavedSeen = true
         restartTakeSavedExpiry()
+    }
+
+    /// The saved take's toast belongs under that take's transcript; on any other page its Summarize and Copy would read as acting there.
+    var takeSavedToastIsOnItsTake: Bool {
+        guard let notice = takeSavedNotice else { return false }
+        return transcriptIsOnScreen && selectedEntryID == notice.entryID
+    }
+
+    /// Once seen, the toast goes when the user moves on; a landing still on its way to the take's transcript leaves it.
+    private func dropTakeSavedOnceLeft() {
+        guard takeSavedSeen, takeSavedNotice != nil, !noticesWaitForStage, !takeSavedToastIsOnItsTake else { return }
+        takeSavedNotice = nil
     }
 
     /// A saved take's toast the Stage covers keeps its Summarize and Copy: its time starts again once it is back in view.

@@ -149,10 +149,21 @@ struct StageLayoutTests {
                     failures: [], folder: nil, tone: .failure
                 )
             case .takeSavedOnItsStage:
-                model.takeSavedNotice = TakeSavedNotice(entryID: "saved", category: .transcription)
+                model.takeSavedNotice = TakeSavedNotice(entryID: "saved", title: "Weekly sync", category: .transcription)
             case .watchedFileRunning:
                 model.runningArrivalNotice = ArrivalNotice(running: URL(fileURLWithPath: "/tmp/\(title).m4a"))
             }
+        }
+
+        /// The page after the Stage: a saved take's toast shows under that take's own transcript.
+        @MainActor
+        func showPageAfterStage(on model: AppModel) {
+            if self == .takeSavedOnItsStage {
+                model.transcript = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Saved words.")], language: "en", modelName: "stub")
+                model.selectedEntryID = "saved"
+                model.phase = .ready
+            }
+            model.route = .transcript
         }
     }
 
@@ -202,7 +213,7 @@ struct StageLayoutTests {
         #expect(pending == clear, "the clock, band and controls moved for the \(strip.rawValue) strip")
         #expect(!draws(strip.control, onStage), "the Stage has no room for the strip")
 
-        model.route = .transcript
+        strip.showPageAfterStage(on: model)
         let shows = await waitUntil { draws(strip.control, HostedAccessibility.elements(in: hosted.host)) }
         #expect(shows, "the strip waited for the page after the Stage")
     }

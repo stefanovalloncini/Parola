@@ -264,7 +264,7 @@ struct TakeRoutingTests {
         #expect(announced)
         let notice = try #require(model.arrivalNotice)
         #expect(notice.origin == .take)
-        #expect(notice.savedTitle() == "Saved \(notice.name)")
+        #expect(notice.savedTitle() == "Saved “\(notice.name)” to Transcriptions")
         #expect(notice.name.hasPrefix("Recording "))
     }
 
@@ -272,7 +272,7 @@ struct TakeRoutingTests {
     func backgroundToastInItalian() throws {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let italian = try #require(Bundle(path: path))
-        #expect(ArrivalNotice.savedTitle(name: "Riunione", origin: .take, bundle: italian) == "Salvato Riunione")
+        #expect(ArrivalNotice.savedTitle(name: "Riunione", origin: .take, category: .meeting, bundle: italian) == "“Riunione” salvata in Riunioni")
     }
 
     // MARK: - Where the main window is

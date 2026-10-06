@@ -133,7 +133,7 @@ extension TranscriberMockSuites {
             model.aiUnavailableReason = nil
             model.summariseOperation = { _, _ in Summary(text: "the gist") }
 
-            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, title: "Weekly sync", category: .meeting)
             let saved = try buttons("takeSavedNotice")
             #expect(Set(saved.keys) == ["Summarize", "Copy", "Dismiss"])
             let copied = try await pressing(try #require(saved["Copy"]))
@@ -141,7 +141,7 @@ extension TranscriberMockSuites {
             #expect(copied["copied"] == .string("a take worth a summary"))
             #expect(copied["takeSavedNotice"] == .null)
 
-            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, title: "Weekly sync", category: .meeting)
             let dismiss = try #require(try buttons("takeSavedNotice")["Dismiss"])
             let dismissed = try await pressing(dismiss)
             #expect(dismissed["pressed"] == .bool(true))
@@ -149,7 +149,7 @@ extension TranscriberMockSuites {
             let again = try await pressing(dismiss)
             #expect(again["pressed"] == .bool(false), "a toast that went takes its buttons with it")
 
-            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, title: "Weekly sync", category: .meeting)
             model.route = .statistics
             _ = try await pressing(try #require(try buttons("takeSavedNotice")["Summarize"]))
             let summarized = await waitUntil { model.transcript?.summary?.text == "the gist" }
@@ -168,7 +168,7 @@ extension TranscriberMockSuites {
             let open = await waitUntil { model.selectedEntryID == entry.id && model.route == .transcript }
             #expect(open)
 
-            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, title: "Weekly sync", category: .meeting)
             model.installTestTake(source: .microphone)
             #expect(model.noticesWaitForStage)
             let covered = try await pressing(try #require(try buttons("takeSavedNotice")["Dismiss"]))
@@ -288,7 +288,7 @@ extension TranscriberMockSuites {
                 let reset = try #require(lifecycle["resetTestState"])
                 _ = try await install.handler(try install.validate(AutomationArgs(["holdStart": .bool(true)])), context)
                 #expect(server.heldStreamingStart != nil)
-                model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+                model.takeSavedNotice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .transcription)
 
                 _ = try await reset.handler(try reset.validate(AutomationArgs([:])), context)
 

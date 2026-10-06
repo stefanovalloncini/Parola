@@ -144,12 +144,12 @@ struct BridgeStateDetailTests {
     func toastsCarryTheirWordsAndButtons() throws {
         let (model, server) = try makeRig()
         model.aiUnavailableReason = "Apple Intelligence is turned off."
-        let saved = TakeSavedNotice(entryID: "entry", category: .meeting)
+        let saved = TakeSavedNotice(entryID: "entry", title: "Weekly sync", category: .meeting)
         model.takeSavedNotice = saved
 
         let toast = try object(server.snapshotState(), "takeSavedNotice")
 
-        #expect(toast["title"] == .string("Saved to Meetings"))
+        #expect(toast["title"] == .string("Saved “Weekly sync” to Meetings"))
         #expect(toast["category"] == .string("meeting"))
         #expect(toast["entryID"] == .string("entry"))
         #expect(toast["actions"] == .array([
@@ -163,7 +163,7 @@ struct BridgeStateDetailTests {
 
         let arrival = try object(server.snapshotState(), "arrivalNotice")
 
-        #expect(arrival["title"] == .string("Saved Budget review"))
+        #expect(arrival["title"] == .string("Saved “Budget review” to Transcriptions"))
         #expect(arrival["state"] == .string("saved"))
         #expect(arrival["origin"] == .string("run"))
         #expect(arrival["entryID"] == .string("landed"))

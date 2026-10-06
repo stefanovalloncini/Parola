@@ -92,9 +92,9 @@ struct TakeAnnouncementLineTests {
 
     @Test("the saved toast says where the take went, once")
     func savedToast() {
-        let saved = TakeSavedNotice(entryID: "E", category: .meeting)
+        let saved = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .meeting)
         let landed = Moment(takeID: 1, take: .over, saved: saved)
-        #expect(TakeAnnouncer.lines(from: Moment(takeID: 1, take: .windingDown), to: landed).map(\.text) == ["Saved to Meetings"])
+        #expect(TakeAnnouncer.lines(from: Moment(takeID: 1, take: .windingDown), to: landed).map(\.text) == ["Saved “Weekly sync” to Meetings"])
         #expect(TakeAnnouncer.lines(from: landed, to: landed).isEmpty)
     }
 
@@ -107,7 +107,7 @@ struct TakeAnnouncementLineTests {
         #expect(paused.map(\.priority) == [.medium])
         let started = TakeAnnouncer.lines(from: Moment(takeID: 1, take: .arming), to: recording)
         #expect(started.map(\.priority) == [.medium])
-        let saved = TakeAnnouncer.lines(from: Moment(), to: Moment(saved: TakeSavedNotice(entryID: "E", category: .meeting)))
+        let saved = TakeAnnouncer.lines(from: Moment(), to: Moment(saved: TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .meeting)))
         #expect(saved.map(\.priority) == [.medium])
         let info = ExportNotice(message: "Finish the recording first.", failures: [], folder: nil, tone: .info)
         #expect(TakeAnnouncer.lines(from: Moment(), to: Moment(notice: info)).map(\.priority) == [.medium])
@@ -161,8 +161,8 @@ struct TakeAnnouncerTests {
         #expect(noticed)
         model.endTestTake()
 
-        model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
-        let saved = await waitUntil { heard.lines.last == "Saved to Transcriptions" }
+        model.takeSavedNotice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .transcription)
+        let saved = await waitUntil { heard.lines.last == "Saved “Weekly sync” to Transcriptions" }
         #expect(saved)
         withExtendedLifetime(announcer) {}
     }
@@ -192,7 +192,7 @@ struct TakeAnnouncerTests {
         model.voiceOverIsRunning = true
         model.takeSavedLifetime = .milliseconds(50)
 
-        model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+        model.takeSavedNotice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .transcription)
         model.takeSavedCameOnScreen()
 
         await settle(for: .milliseconds(400))
@@ -206,7 +206,7 @@ struct TakeAnnouncerTests {
         let model = makeRecordingModel("announcer-toast-off")
         model.voiceOverIsRunning = true
         model.takeSavedLifetime = .milliseconds(50)
-        model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+        model.takeSavedNotice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .transcription)
         model.takeSavedCameOnScreen()
         await settle(for: .milliseconds(300))
         #expect(model.takeSavedNotice != nil)

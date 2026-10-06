@@ -102,7 +102,7 @@ final class TakeAnnouncer {
             break
         }
         if let saved = new.saved, saved.id != old.saved?.id {
-            lines.append(Line(text: TakeSavedToast.message(category: saved.category, bundle: bundle)))
+            lines.append(Line(text: TakeSavedToast.message(title: saved.title, category: saved.category, bundle: bundle)))
         }
         if let notice = new.notice, notice.id != old.notice?.id {
             let saysTheTakeFailure = notice.takeID != nil && notice.takeID == new.takeID && isFailure(new.take)

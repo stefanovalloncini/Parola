@@ -28,7 +28,7 @@ extension ParolaAutomationServer {
     static func takeSavedState(_ model: AppModel) -> AutomationValue {
         guard let notice = model.takeSavedNotice else { return .null }
         return .object([
-            "title": .string(TakeSavedToast.message(category: notice.category)),
+            "title": .string(TakeSavedToast.message(title: notice.title, category: notice.category)),
             "category": .string(notice.category.rawValue),
             "entryID": .string(notice.entryID),
             "actions": toastActions(notice.id, takeSavedButtons(model)),

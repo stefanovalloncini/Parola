@@ -148,11 +148,12 @@ While the Stage holds a take the window draws no notice or toast under it: `getS
 on the page after the Stage. A notice only true while the take records, like "Finish the recording first.", goes when
 the take stops.
 A file, link or captions run lands the same way: with its own page up it opens there; after an entry or a document was
-opened, or another page shown, it goes to the library with a "Saved <title>" toast and Open, and loads nothing.
+opened, or another page shown, it goes to the library with a "Saved “<title>” to <page>" toast and Open, and loads nothing.
 `transcribeFile`, `transcribeYouTube` and `fetchYouTubeSubs` bring that page up first, as a drop does, unless the Stage
 holds a take.
 `getState.takeSavedNotice` is the toast a take that landed on its own Stage leaves, `{title, category, entryID, actions}`
-("Saved to Meetings", `meeting`), and `getState.arrivalNotice` the toast for a take, a run or a watched file that landed
+("Saved “Weekly sync” to Meetings", `meeting`); the window draws it only under that take's transcript, and once seen it goes
+when another page or entry opens. `getState.arrivalNotice` is the toast for a take, a run or a watched file that landed
 or failed out of sight, `{title, state, origin, entryID, reason, actions}` with `state` one of `saved` / `running` /
 `failed` / `paused` / `unsaved` and `origin` one of `take` / `run` / `watchedFolder`; each is `null` when it isn't up.
 `getState.noticesWaitForStage` is true while the Stage holds a take and so draws none of them.

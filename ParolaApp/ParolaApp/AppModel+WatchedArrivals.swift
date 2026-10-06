@@ -81,6 +81,8 @@ struct ArrivalNotice: Equatable, Identifiable {
     let name: String
     let state: State
     var origin: Origin = .watchedFolder
+    /// The page a saved entry went to; nil for a file that never became one.
+    var category: EntryCategory?
 
     var reason: String? {
         switch state {
@@ -101,18 +103,19 @@ struct ArrivalNotice: Equatable, Identifiable {
         name = LibraryEntryDisplay.title(for: entry)
         state = .saved(entry.id)
         self.origin = origin
+        category = entry.category
     }
 
-    /// A take or a run only says it was saved; a watched file also says where it came from.
-    static func savedTitle(name: String, origin: Origin, bundle: Bundle = .main) -> String {
+    /// A take or a run says it as the saved take's toast does; a watched file also says where it came from.
+    static func savedTitle(name: String, origin: Origin, category: EntryCategory, bundle: Bundle = .main) -> String {
         switch origin {
-        case .take, .run: String(localized: "Saved \(name)", bundle: bundle)
+        case .take, .run: TakeSavedToast.message(title: name, category: category, bundle: bundle)
         case .watchedFolder: String(localized: "Transcribed \(name) from a watched folder", bundle: bundle)
         }
     }
 
     func savedTitle(bundle: Bundle = .main) -> String {
-        Self.savedTitle(name: name, origin: origin, bundle: bundle)
+        Self.savedTitle(name: name, origin: origin, category: category ?? .transcription, bundle: bundle)
     }
 
     /// What the toast says, by where the file stands.

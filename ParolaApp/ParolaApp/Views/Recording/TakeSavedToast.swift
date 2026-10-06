@@ -5,13 +5,15 @@ import ParolaCore
 struct TakeSavedNotice: Equatable, Identifiable {
     let id = UUID()
     let entryID: LibraryEntry.ID
+    /// The entry's title as the library shows it.
+    let title: String
     let category: EntryCategory
 
     /// Long enough to reach for Summarize or Copy; the pointer resting on the toast holds it longer.
     static let lifetime: Duration = .seconds(5)
 }
 
-/// "Saved to Meetings" under the transcript a take just became, with Summarize and Copy; it goes a few seconds after its window shows it.
+/// "Saved “Weekly sync” to Meetings" under the transcript a take just became, with Summarize and Copy; it goes a few seconds after its window shows it.
 struct TakeSavedToast: View {
     @Environment(AppModel.self) private var model
     let notice: TakeSavedNotice
@@ -22,7 +24,7 @@ struct TakeSavedToast: View {
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Palette.success)
                 .accessibilityHidden(true)
-            Text(verbatim: Self.message(category: notice.category))
+            Text(verbatim: Self.message(title: notice.title, category: notice.category))
                 .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.primaryText)
                 .lineLimit(1)
@@ -67,12 +69,12 @@ struct TakeSavedToast: View {
         .axBranch("TakeSavedToast")
     }
 
-    /// The library page the take went to, named as the sidebar names it.
-    nonisolated static func message(category: EntryCategory, bundle: Bundle = .main) -> String {
+    /// The take, and the library page it went to, named as the sidebar names it.
+    nonisolated static func message(title: String, category: EntryCategory, bundle: Bundle = .main) -> String {
         switch category {
-        case .transcription: String(localized: "Saved to Transcriptions", bundle: bundle)
-        case .meeting: String(localized: "Saved to Meetings", bundle: bundle)
-        case .dictation: String(localized: "Saved to Dictations", bundle: bundle)
+        case .transcription: String(localized: "Saved “\(title)” to Transcriptions", bundle: bundle)
+        case .meeting: String(localized: "Saved “\(title)” to Meetings", bundle: bundle)
+        case .dictation: String(localized: "Saved “\(title)” to Dictations", bundle: bundle)
         }
     }
 

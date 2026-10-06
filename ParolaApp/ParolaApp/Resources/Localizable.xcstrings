@@ -13111,17 +13111,6 @@
         }
       }
     },
-    "Saved %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salvato %@"
-          }
-        }
-      }
-    },
     "Saved the previous recording without transcribing it.": {
       "extractionState": "manual",
       "localizations": {
@@ -13133,39 +13122,6 @@
         }
       }
     },
-    "Saved to Dictations": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salvata in Dettature"
-          }
-        }
-      }
-    },
-    "Saved to Meetings": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salvata in Riunioni"
-          }
-        }
-      }
-    },
-    "Saved to Transcriptions": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salvata in Trascrizioni"
-          }
-        }
-      }
-    },
     "Saved without a transcript.": {
       "extractionState": "manual",
       "localizations": {
@@ -13173,6 +13129,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salvata senza trascrizione."
+          }
+        }
+      }
+    },
+    "Saved “%@” to Dictations": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” salvata in Dettature"
+          }
+        }
+      }
+    },
+    "Saved “%@” to Meetings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” salvata in Riunioni"
+          }
+        }
+      }
+    },
+    "Saved “%@” to Transcriptions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” salvata in Trascrizioni"
           }
         }
       }

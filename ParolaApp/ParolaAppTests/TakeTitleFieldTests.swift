@@ -48,7 +48,7 @@ extension TranscriberMockSuites {
         func pickerNamesMatchTheSidebar() throws {
             let titles = TakeCategoryPicker.choices.map { TakeCategoryPicker.title(for: $0) }
             #expect(titles == ["Transcription", "Meeting"])
-            #expect(TakeSavedToast.message(category: .transcription) == "Saved to Transcriptions")
+            #expect(TakeSavedToast.message(title: "Sync", category: .transcription) == "Saved “Sync” to Transcriptions")
             let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
             let it = try #require(Bundle(path: path))
             #expect(TakeCategoryPicker.title(for: .transcription, bundle: it) == "Trascrizione")

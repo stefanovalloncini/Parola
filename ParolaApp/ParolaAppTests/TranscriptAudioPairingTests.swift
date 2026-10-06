@@ -106,7 +106,7 @@ extension TranscriberMockSuites {
             )
             #expect(model.arrivalNotice?.state == .saved(run.id))
             let title = model.arrivalNotice?.savedTitle()
-            #expect(title == "Saved \(LibraryEntryDisplay.title(for: run))")
+            #expect(title == "Saved “\(LibraryEntryDisplay.title(for: run))” to Transcriptions")
             return run
         }
 

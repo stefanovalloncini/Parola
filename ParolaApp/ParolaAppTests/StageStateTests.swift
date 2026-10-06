@@ -675,8 +675,8 @@ struct StageStateTests {
     @MainActor
     @Test("the saved toast names the place the take went, and stays five seconds")
     func toast() {
-        #expect(TakeSavedToast.message(category: .meeting) == "Saved to Meetings")
-        #expect(TakeSavedToast.message(category: .transcription) == "Saved to Transcriptions")
+        #expect(TakeSavedToast.message(title: "Weekly sync", category: .meeting) == "Saved “Weekly sync” to Meetings")
+        #expect(TakeSavedToast.message(title: "Weekly sync", category: .transcription) == "Saved “Weekly sync” to Transcriptions")
         #expect(TakeSavedNotice.lifetime == .seconds(5))
     }
 
@@ -688,8 +688,8 @@ struct StageStateTests {
         #expect(StageTimeSlot.preparingText(name: "openai_whisper-large-v3_turbo", download: 0.42, bundle: it)
             == "Preparazione di Whisper Turbo · 42%")
         #expect(StageFacts.transcribingLine(stage: .preparingAudio, progress: nil, bundle: it) == "Preparazione dell'audio…")
-        #expect(TakeSavedToast.message(category: .meeting, bundle: it) == "Salvata in Riunioni")
-        #expect(TakeSavedToast.message(category: .transcription, bundle: it) == "Salvata in Trascrizioni")
+        #expect(TakeSavedToast.message(title: "Sync", category: .meeting, bundle: it) == "“Sync” salvata in Riunioni")
+        #expect(TakeSavedToast.message(title: "Sync", category: .transcription, bundle: it) == "“Sync” salvata in Trascrizioni")
         #expect(String(localized: "PAUSED", bundle: it) == "IN PAUSA")
         #expect(String(localized: "Finishing…", bundle: it) == "Chiusura in corso…")
         #expect(String(localized: "Finishing the recording", bundle: it) == "Chiusura della registrazione in corso")
@@ -1020,7 +1020,7 @@ extension TranscriberMockSuites {
             model.selectedEntryID = entry.id
             model.transcript = words
             model.summariseOperation = { _, _ in Summary(text: "the gist") }
-            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, category: .meeting)
+            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, title: "Weekly sync", category: .meeting)
             model.route = .statistics
 
             model.summarizeSavedTake(entry.id)
@@ -1279,7 +1279,7 @@ extension TranscriberMockSuites {
             model.takeSavedLifetime = .milliseconds(50)
             model.mainWindowPresenceOverride = .hidden
 
-            model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .meeting)
+            model.takeSavedNotice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .meeting)
             await settle(for: .milliseconds(500))
             #expect(model.takeSavedNotice != nil, "the toast went while its window was out of sight")
 
@@ -1292,7 +1292,7 @@ extension TranscriberMockSuites {
         func savedToastStartsWhenShown() async throws {
             let model = makeModel("stage-saved-shown")
             model.takeSavedLifetime = .milliseconds(50)
-            let notice = TakeSavedNotice(entryID: "E", category: .transcription)
+            let notice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .transcription)
             model.takeSavedNotice = notice
             let hosted = HostedWindow(TakeSavedToast(notice: notice).environment(model), width: 600, height: 120)
             defer { hosted.close() }
@@ -1316,12 +1316,12 @@ extension TranscriberMockSuites {
         func savedToastHoldEndsWithIt() async {
             let model = makeModel("stage-saved-hold-ends")
             model.takeSavedLifetime = .milliseconds(50)
-            model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+            model.takeSavedNotice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .transcription)
             model.takeSavedCameOnScreen()
             model.holdTakeSaved(true)
             model.dismissTakeSaved()
 
-            model.takeSavedNotice = TakeSavedNotice(entryID: "F", category: .transcription)
+            model.takeSavedNotice = TakeSavedNotice(entryID: "F", title: "Weekly sync", category: .transcription)
             model.takeSavedCameOnScreen()
 
             let gone = await waitUntil { model.takeSavedNotice == nil }
@@ -1332,7 +1332,7 @@ extension TranscriberMockSuites {
         func savedToastHoldsUnderThePointer() async {
             let model = makeModel("stage-saved-hover")
             model.takeSavedLifetime = .milliseconds(100)
-            model.takeSavedNotice = TakeSavedNotice(entryID: "E", category: .transcription)
+            model.takeSavedNotice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .transcription)
             model.takeSavedCameOnScreen()
 
             model.holdTakeSaved(true)
@@ -1348,7 +1348,7 @@ extension TranscriberMockSuites {
         func newTakeKeepsTheSavedToastWaiting() async {
             let model = makeModel("stage-saved-new-take")
             model.takeSavedLifetime = .milliseconds(50)
-            let notice = TakeSavedNotice(entryID: "E", category: .transcription)
+            let notice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .transcription)
             model.takeSavedNotice = notice
             model.takeSavedCameOnScreen()
 

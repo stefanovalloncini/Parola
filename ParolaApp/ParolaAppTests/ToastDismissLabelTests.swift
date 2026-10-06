@@ -28,6 +28,6 @@ struct ToastDismissLabelTests {
         #expect(dismissLabel(of: ExportNoticeStrip(notice: export), model: model) == "Dismiss")
         #expect(dismissLabel(of: ArrivalToast(notice: arrival), model: model) == "Dismiss")
         #expect(dismissLabel(of: DeliveryToast(notice: delivery), model: model) == "Dismiss")
-        #expect(dismissLabel(of: TakeSavedToast(notice: TakeSavedNotice(entryID: "E", category: .meeting)), model: model) == "Dismiss")
+        #expect(dismissLabel(of: TakeSavedToast(notice: TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .meeting)), model: model) == "Dismiss")
     }
 }

@@ -242,7 +242,7 @@ private struct PageNotices: View {
                     ArrivalToast(notice: notice)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                if let saved = model.takeSavedNotice {
+                if let saved = model.takeSavedNotice, model.takeSavedToastIsOnItsTake {
                     TakeSavedToast(notice: saved)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
