@@ -97,6 +97,35 @@ struct AppMenusTests {
         #expect(letterPassedOn === letter)
     }
 
+    @Test("with nothing loaded, ⌘← and Space still go straight to the text view, past the disabled Playback items")
+    func menuKeysReachAFieldWithoutAPlayer() throws {
+        let model = makeModel("playback-keys-no-player")
+        #expect(model.player == nil)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: true)
+        let field = NSTextView(frame: NSRect(x: 0, y: 0, width: 200, height: 100))
+        window.contentView = field
+        window.makeFirstResponder(field)
+        field.string = "hello"
+        field.setSelectedRange(NSRange(location: 5, length: 0))
+        let left = String(UnicodeScalar(NSLeftArrowFunctionKey)!)
+        let lineStart = try #require(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [.command, .function, .numericPad], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: left, charactersIgnoringModifiers: left,
+            isARepeat: false, keyCode: 123
+        ))
+        let lineStartPassedOn = PlaybackKeyMonitor.route(lineStart, window: window, model: model)
+        #expect(lineStartPassedOn == nil)
+        #expect(field.selectedRange() == NSRange(location: 0, length: 0))
+
+        let space = try #require(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+            context: nil, characters: " ", charactersIgnoringModifiers: " ", isARepeat: false, keyCode: 49
+        ))
+        let spacePassedOn = PlaybackKeyMonitor.route(space, window: window, model: model)
+        #expect(spacePassedOn == nil)
+        #expect(field.string == " hello")
+    }
+
     @Test("the releases page is the repository's")
     func releasesPage() {
         #expect(SupportLinks.releases.absoluteString == "https://github.com/stefanovalloncini/Parola/releases")

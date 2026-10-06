@@ -86,7 +86,7 @@ final class PlaybackKeyMonitor {
             model: model
         )
         if used { return nil }
-        guard let window, model.keyWindowHasPlayer, isMenuKey(keyCode: event.keyCode, modifiers: event.modifierFlags) else {
+        guard let window, isMenuKey(keyCode: event.keyCode, modifiers: event.modifierFlags) else {
             return event
         }
         window.sendEvent(event)
