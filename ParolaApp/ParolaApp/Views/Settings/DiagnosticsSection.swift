@@ -4,6 +4,7 @@ import ParolaCore
 
 struct DiagnosticsSection: View {
     @Environment(AppModel.self) private var model
+    var directory: URL = AppModel.diagnosticsDirectory
     @State private var hasDiagnostics = false
     @State private var diagnosticsFailure: String?
 
@@ -19,14 +20,14 @@ struct DiagnosticsSection: View {
                         .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                         .axLeaf("Advanced.Button.ExportDiagnostics")
                     Button("Reveal in Finder") {
-                        Task { await model.revealDiagnostics() }
+                        Task { await model.revealDiagnostics(directory: directory) }
                     }
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("Advanced.Button.RevealDiagnostics")
                     Button("Delete Diagnostics", role: .destructive) {
                         Task {
-                            await model.deleteDiagnostics()
-                            hasDiagnostics = await model.diagnosticsRecordsExist()
+                            await model.deleteDiagnostics(directory: directory)
+                            hasDiagnostics = await model.diagnosticsRecordsExist(directory: directory)
                         }
                     }
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
@@ -50,9 +51,9 @@ struct DiagnosticsSection: View {
             .padding(DS.Spacing.medium)
         }
         .task {
-            hasDiagnostics = await model.diagnosticsRecordsExist()
+            hasDiagnostics = await model.diagnosticsRecordsExist(directory: directory)
             for await _ in NotificationCenter.default.notifications(named: NSApplication.didBecomeActiveNotification) {
-                hasDiagnostics = await model.diagnosticsRecordsExist()
+                hasDiagnostics = await model.diagnosticsRecordsExist(directory: directory)
             }
         }
     }
@@ -60,11 +61,11 @@ struct DiagnosticsSection: View {
     private func exportDiagnostics() {
         Task {
             do {
-                try await model.exportDiagnostics()
+                try await model.exportDiagnostics(directory: directory)
             } catch {
                 diagnosticsFailure = error.localizedDescription
             }
-            hasDiagnostics = await model.diagnosticsRecordsExist()
+            hasDiagnostics = await model.diagnosticsRecordsExist(directory: directory)
         }
     }
 }

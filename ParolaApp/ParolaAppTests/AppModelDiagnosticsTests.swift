@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
@@ -230,43 +232,30 @@ struct AppModelDiagnosticsTests {
         #expect(known[.parakeet] == true)
     }
 
-    private func diagnosticsSectionSource() throws -> String {
-        let source = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("ParolaApp/Views/Settings/DiagnosticsSection.swift")
-        return try String(contentsOf: source, encoding: .utf8)
-    }
-
-    /// From an opening brace to the brace that closes it.
-    private func matchingBraceRange(from openBrace: String.Index, in text: String) -> Range<String.Index> {
-        var depth = 0
-        var cursor = openBrace
-        while cursor < text.endIndex {
-            switch text[cursor] {
-            case "{": depth += 1
-            case "}":
-                depth -= 1
-                if depth == 0 { return openBrace..<text.index(after: cursor) }
-            default: break
-            }
-            cursor = text.index(after: cursor)
+    /// A record written or removed while the card is open must not leave "Delete Diagnostics" stale until it remounts.
+    @Test("the diagnostics card checks again when the app comes back to the front")
+    func diagnosticsCardRefreshesOnActivation() async throws {
+        let model = makeModel()
+        let directory = scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try seedRecord(in: directory, message: "there when the card opened")
+        let hosted = HostedWindow(DiagnosticsSection(directory: directory).environment(model), width: 620, height: 300)
+        defer { hosted.close() }
+        func deleteIsEnabled() -> Bool? {
+            HostedAccessibility.elements(in: hosted.host)
+                .first { $0.identifier?.hasSuffix("Advanced.Button.DeleteDiagnostics") == true }?.isEnabled
         }
-        return openBrace..<text.endIndex
-    }
+        let enabledOnOpen = await waitUntil { deleteIsEnabled() == true }
+        #expect(enabledOnOpen)
 
-    /// A record written while the pane is open must not leave "Delete Diagnostics" stale until it remounts — pin the refresh, not just the initial read.
-    @Test("the diagnostics card's check re-runs on app activation, not only on appear")
-    func diagnosticsCardRefreshesOnActivation() throws {
-        let text = try diagnosticsSectionSource()
-        let task = try #require(text.range(of: ".task {"))
-        let openBrace = try #require(text.range(of: "{", range: task.lowerBound..<text.endIndex)).lowerBound
-        let body = matchingBraceRange(from: openBrace, in: text)
-        let taskBody = text[body]
-        #expect(taskBody.contains("diagnosticsRecordsExist()"))
-        #expect(
-            taskBody.contains("NSApplication.didBecomeActiveNotification"),
-            "the diagnostics check should re-run when the app becomes active, not just once on appear"
-        )
+        try FileManager.default.removeItem(at: directory)
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApp)
+        let disabledOnReturn = await waitUntil { deleteIsEnabled() == false }
+        #expect(disabledOnReturn)
+
+        try seedRecord(in: directory, message: "written while the card was open")
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApp)
+        let enabledOnReturn = await waitUntil { deleteIsEnabled() == true }
+        #expect(enabledOnReturn)
     }
 }
