@@ -1348,6 +1348,11 @@ extension TranscriberMockSuites {
         func newTakeKeepsTheSavedToastWaiting() async {
             let model = makeModel("stage-saved-new-take")
             model.takeSavedLifetime = .milliseconds(50)
+            model.transcript = Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Weekly numbers.")], language: "en", modelName: "stub"
+            )
+            model.selectedEntryID = "E"
+            model.phase = .ready
             let notice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .transcription)
             model.takeSavedNotice = notice
             model.takeSavedCameOnScreen()
@@ -1359,6 +1364,7 @@ extension TranscriberMockSuites {
 
             model.route = .transcript
             #expect(!model.noticesWaitForStage)
+            #expect(model.takeSavedToastIsOnItsTake)
             await settle(for: .milliseconds(300))
             #expect(model.takeSavedNotice == notice, "its time waits until it is back in view")
 

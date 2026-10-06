@@ -355,6 +355,7 @@ final class AppModel {
             if takeSavedNotice == nil { takeSavedHeld = false }
             if takeSavedNotice != oldValue {
                 takeSavedSeen = false
+                takeSavedWasSeen = false
                 restartTakeSavedExpiry()
             }
         }
@@ -368,6 +369,8 @@ final class AppModel {
     @ObservationIgnored private var takeSavedExpiry: Task<Void, Never>?
     @ObservationIgnored private var takeSavedHeld = false
     @ObservationIgnored private var takeSavedSeen = false
+    /// Seen at least once: a Stage covering the toast clears `takeSavedSeen` to stop its time, never this.
+    @ObservationIgnored private var takeSavedWasSeen = false
     /// True while a quit waits for takes to reach the library; the window says so.
     private(set) var savingTakesBeforeQuit = false
     /// A quit already winding the takes down; the app delegate answers any other quit with a no.
@@ -5641,6 +5644,7 @@ final class AppModel {
     func takeSavedCameOnScreen() {
         guard takeSavedNotice != nil, !takeSavedSeen else { return }
         takeSavedSeen = true
+        takeSavedWasSeen = true
         restartTakeSavedExpiry()
     }
 
@@ -5652,7 +5656,7 @@ final class AppModel {
 
     /// Once seen, the toast goes when the user moves on; a landing still on its way to the take's transcript leaves it.
     private func dropTakeSavedOnceLeft() {
-        guard takeSavedSeen, takeSavedNotice != nil, !noticesWaitForStage, !takeSavedToastIsOnItsTake else { return }
+        guard takeSavedWasSeen, takeSavedNotice != nil, !noticesWaitForStage, !takeSavedToastIsOnItsTake else { return }
         takeSavedNotice = nil
     }
 

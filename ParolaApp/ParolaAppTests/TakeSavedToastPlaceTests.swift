@@ -97,6 +97,20 @@ struct TakeSavedToastPlaceTests {
         #expect(model.takeSavedNotice == nil)
     }
 
+    @Test("a toast seen once, then covered by a new take's Stage, goes when you open another page")
+    func seenThenCoveredGoesWhenYouLeave() {
+        let model = makeModel()
+        show("E", on: model)
+        model.takeSavedNotice = TakeSavedNotice(entryID: "E", title: "Weekly sync", category: .meeting)
+        model.takeSavedCameOnScreen()
+        model.installTestTake(source: .microphone)
+        defer { model.endTestTake() }
+        #expect(model.noticesWaitForStage)
+
+        model.route = .statistics
+        #expect(model.takeSavedNotice == nil)
+    }
+
     @Test("before it has been seen, a landing's own moves don't take it down")
     func landingKeepsIt() {
         let model = makeModel()
