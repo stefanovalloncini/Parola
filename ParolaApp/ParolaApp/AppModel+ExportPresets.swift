@@ -2,6 +2,23 @@ import Foundation
 import SwiftUI
 import ParolaCore
 
+/// What still writes a preset, so deleting it can say what stops.
+struct ExportPresetUse: Equatable {
+    let ruleCount: Int
+    let inBatch: Bool
+
+    var isUsed: Bool { ruleCount > 0 || inBatch }
+
+    var deleteMessage: String {
+        let batch = ruleCount > 0 ? String(localized: "Batch runs use it too.") : String(localized: "Batch runs use it.")
+        let parts = [
+            ruleCount > 0 ? String(localized: "\(ruleCount) auto-export rules use it.") : nil,
+            inBatch ? batch : nil,
+        ]
+        return parts.compactMap { $0 }.joined(separator: " ")
+    }
+}
+
 /// Per-format batch options as they were stored before presets. Read once, to migrate.
 private struct LegacyBatchFormatOptions: Codable {
     var writeToSourceFolder: Bool
@@ -75,6 +92,13 @@ extension AppModel {
         var presets = exportPresets
         presets[index].name = name
         setExportPresets(presets)
+    }
+
+    func exportPresetUse(id: UUID) -> ExportPresetUse {
+        ExportPresetUse(
+            ruleCount: autoExportRules.count { $0.presetIDs.contains(id) },
+            inBatch: batchExportPresetIDs.contains(id)
+        )
     }
 
     func deleteExportPreset(id: UUID) {

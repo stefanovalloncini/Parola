@@ -6,6 +6,7 @@ struct ExportFormatsPane: View {
     @Environment(AppModel.self) private var model
     @State private var renaming: UUID?
     @State private var draftName: String = ""
+    @State private var pendingDelete: ExportPreset?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -24,16 +25,46 @@ struct ExportFormatsPane: View {
                             model.renameExportPreset(id: preset.id, to: draftName)
                             renaming = nil
                         },
+                        canMoveUp: index > 0,
+                        canMoveDown: index < model.exportPresets.count - 1,
                         onMoveUp: { model.moveExportPreset(id: preset.id, by: -1) },
                         onMoveDown: { model.moveExportPreset(id: preset.id, by: 1) },
-                        onDelete: { model.deleteExportPreset(id: preset.id) }
+                        onDelete: {
+                            if model.exportPresetUse(id: preset.id).isUsed {
+                                pendingDelete = preset
+                            } else {
+                                model.deleteExportPreset(id: preset.id)
+                            }
+                        }
                     )
                 }
+            }
+            .confirmationDialog(
+                pendingDeleteTitle,
+                isPresented: isConfirmingDelete,
+                titleVisibility: .visible,
+                presenting: pendingDelete
+            ) { preset in
+                Button("Delete", role: .destructive) {
+                    model.deleteExportPreset(id: preset.id)
+                    pendingDelete = nil
+                }
+                Button("Cancel", role: .cancel) { pendingDelete = nil }
+            } message: { preset in
+                Text(verbatim: model.exportPresetUse(id: preset.id).deleteMessage)
             }
 
             SettingHelper(text: "Presets are what the Export As menu, the auto-export rules and the batch runs write. Add one from the Export sheet with Save as Preset.")
             ResetPaneButton(scope: .exportFormats)
         }
+    }
+
+    private var isConfirmingDelete: Binding<Bool> {
+        Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
+    }
+
+    private var pendingDeleteTitle: String {
+        String(localized: "Delete “\(pendingDelete?.name ?? "")”?")
     }
 
     static func blurb(for format: ExportFormat) -> LocalizedStringKey {
@@ -62,6 +93,8 @@ private struct ExportPresetRow: View {
     @Binding var draftName: String
     let onStartRename: () -> Void
     let onCommitRename: () -> Void
+    let canMoveUp: Bool
+    let canMoveDown: Bool
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
     let onDelete: () -> Void
@@ -102,10 +135,12 @@ private struct ExportPresetRow: View {
         HStack(spacing: DS.Spacing.tight) {
             Button(action: onMoveUp) { Image(systemName: "chevron.up") }
                 .buttonStyle(DSIconChipButtonStyle(side: 24))
+                .disabled(!canMoveUp)
                 .help("Move up")
                 .axLeaf("ExportFormats.Button.MoveUp.\(ExportPresetChecks.slug(preset))")
             Button(action: onMoveDown) { Image(systemName: "chevron.down") }
                 .buttonStyle(DSIconChipButtonStyle(side: 24))
+                .disabled(!canMoveDown)
                 .help("Move down")
                 .axLeaf("ExportFormats.Button.MoveDown.\(ExportPresetChecks.slug(preset))")
             Button(action: isRenaming ? onCommitRename : onStartRename) {

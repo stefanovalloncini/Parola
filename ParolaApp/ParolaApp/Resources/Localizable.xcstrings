@@ -369,6 +369,47 @@
         }
       }
     },
+    "%lld auto-export rules use it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld auto-export rule uses it."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld auto-export rules use it."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld regola di esportazione automatica lo usa."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld regole di esportazione automatica lo usano."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld days left": {
       "extractionState": "manual",
       "localizations": {
@@ -2655,6 +2696,28 @@
         }
       }
     },
+    "Batch runs use it too.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo usano anche i batch."
+          }
+        }
+      }
+    },
+    "Batch runs use it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo usano i batch."
+          }
+        }
+      }
+    },
     "Batch view": {
       "extractionState": "manual",
       "localizations": {
@@ -4845,6 +4908,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Elimina questo preset"
+          }
+        }
+      }
+    },
+    "Delete “%@”?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare “%@”?"
           }
         }
       }
