@@ -298,6 +298,8 @@ final class AppModel {
         let devices = AudioDevices.inputDevices()
         return AudioDevices.name(forUID: uid, in: devices) ?? AudioDevices.name(forUID: nil, in: devices)
     }
+    /// Test seam: the input devices CoreAudio reports to the menu bar's and Settings' microphone pickers.
+    @ObservationIgnored var inputDevicesLookup: @Sendable () -> [AudioInputDevice] = { AudioDevices.inputDevices() }
     /// Test seam: when set, answers the microphone permission prompt in its place, for any capture.
     @ObservationIgnored var micAccessRequest: (@MainActor () async -> Bool)?
     /// Test seam: when set, stands in for the microphone permission as it stood before a meeting's take asked.

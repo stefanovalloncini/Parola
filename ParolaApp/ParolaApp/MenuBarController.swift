@@ -441,7 +441,8 @@ extension MenuBarController: NSMenuDelegate {
         installMicrophoneSubmenu(devices: lastInputDevices, into: menu, selectedUID: model.inputDeviceUID)
         Task { @MainActor [weak self] in
             guard let self, let model = self.model else { return }
-            let devices = AudioDevices.inputDevices()
+            let lookup = model.inputDevicesLookup
+            let devices = await AppModel.askCoreAudio { lookup() }
             guard devices != self.lastInputDevices else { return }
             self.lastInputDevices = devices
             self.installMicrophoneSubmenu(devices: devices, into: menu, selectedUID: model.inputDeviceUID)

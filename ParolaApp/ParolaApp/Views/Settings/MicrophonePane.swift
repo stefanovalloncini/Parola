@@ -108,8 +108,11 @@ struct MicrophonePane: View {
         }
         .onAppear {
             micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-            devices = AudioDevices.inputDevices()
             startPreview()
+        }
+        .task {
+            let lookup = model.inputDevicesLookup
+            devices = await AppModel.askCoreAudio { lookup() }
         }
         .onDisappear { stopPreview() }
         .onChange(of: model.inputDeviceUID) { _, _ in
