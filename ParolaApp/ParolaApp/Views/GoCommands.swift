@@ -25,6 +25,7 @@ struct GoCommands: View {
             }
             Button("Activity") { model.openQueue() }
                 .keyboardShortcut("5", modifiers: [.command, .option])
+                .disabled(!model.sidebarShowsActivity)
                 .axLeaf("Menu.View.Go.Activity")
             Button("Recently Deleted") { model.openRecentlyDeleted() }
                 .keyboardShortcut("6", modifiers: [.command, .option])

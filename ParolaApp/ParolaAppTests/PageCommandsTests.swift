@@ -120,6 +120,26 @@ struct PageCommandsTests {
         #expect(sidebar)
     }
 
+    private func goItem(_ title: String) -> NSMenuItem? {
+        let menu = NSHostingMenu(rootView: GoCommands(model: model))
+        menu.update()
+        return menu.items.first { $0.title == title }
+    }
+
+    @Test("Go ▸ Activity is on only while the sidebar has an Activity row")
+    func activityFollowsTheSidebarRow() {
+        let library = goItem("Library")
+        let idle = goItem("Activity")
+        #expect(!model.sidebarShowsActivity)
+        #expect(library?.isEnabled == true)
+        #expect(idle?.isEnabled == false)
+
+        model.batchJobs = [BatchJob(url: URL(fileURLWithPath: "/tmp/PageCommandsTests/a.wav"), status: .pending)]
+        let waiting = goItem("Activity")
+        #expect(model.sidebarShowsActivity)
+        #expect(waiting?.isEnabled == true)
+    }
+
     private static func source(_ name: String) throws -> String {
         let path = #filePath.replacingOccurrences(
             of: "ParolaAppTests/PageCommandsTests.swift",
