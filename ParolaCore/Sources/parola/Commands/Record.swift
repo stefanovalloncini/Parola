@@ -141,7 +141,7 @@ struct Record: AsyncParsableCommand {
     }
 
     private func runStreaming() async throws {
-        let session = StreamingTranscriberFactory.make()
+        let session = StreamingTranscriberFactory.make(waitsForModelOnStop: true)
         let streamModel = model ?? ModelCatalog.fallbackModelID
         let opts = TranscriptionOptions(
             model: streamModel,
@@ -153,32 +153,42 @@ struct Record: AsyncParsableCommand {
 
         stderr("Streaming from mic. Press Ctrl-C to stop." + (seconds.map { " (or wait \($0)s)" } ?? ""))
 
-        let progress = ProgressReporter(label: "downloading \(streamModel)")
-        let events = try await session.start(
-            options: opts,
-            speakerLabeler: nil,
-            downloadProgress: { p in progress.update(p) }
-        )
-        progress.finish()
-
-        let consumer = Task {
-            var lines = LiveLineTidier(language: language)
-            for await event in events {
-                handle(event, lines: &lines, sink: .standard)
+        // The mic is up while the model loads, so Ctrl-C or --seconds can stop the take before start returns; it then waits for the model.
+        let stop = AsyncSignalStream(signal: SIGINT)
+        let meter = session.levelMeter
+        let timer = seconds.map { seconds in
+            Task {
+                await meter.waitForAudio(seconds: seconds)
+                if !Task.isCancelled { stop.fire() }
             }
         }
+        let stopping = Task {
+            await stop.wait()
+            await session.stop()
+        }
+        defer { timer?.cancel() }
 
-        await awaitStop(seconds: Self.secondsLeft(of: seconds, capturingSince: session.levelMeter.firstReadingAt))
-        await session.stop()
-        await consumer.value
-    }
+        let progress = ProgressReporter(label: "downloading \(streamModel)")
+        let events: AsyncStream<StreamingEvent>
+        do {
+            events = try await session.start(
+                options: opts,
+                speakerLabeler: nil,
+                downloadProgress: { p in progress.update(p) }
+            )
+        } catch {
+            stop.fire()
+            await stopping.value
+            throw error
+        }
+        progress.finish()
 
-    /// The mic is up while the model loads, so `--seconds` counts from its first buffer, not from when `start` returns.
-    static func secondsLeft(
-        of seconds: Double?, capturingSince firstBuffer: ContinuousClock.Instant?, now: ContinuousClock.Instant = .now
-    ) -> Double? {
-        guard let seconds, let firstBuffer else { return seconds }
-        return max(0, seconds - firstBuffer.duration(to: now) / .seconds(1))
+        var lines = LiveLineTidier(language: language)
+        for await event in events {
+            handle(event, lines: &lines, sink: .standard)
+        }
+        stop.fire()
+        await stopping.value
     }
 }
 

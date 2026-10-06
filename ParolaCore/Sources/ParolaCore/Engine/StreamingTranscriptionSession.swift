@@ -84,17 +84,26 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var isStarting = false
     private var pendingEnd: PendingEnd?
     nonisolated let persistAudio: Bool
+    nonisolated let waitsForModelOnStop: Bool
 
     enum PendingEnd { case stop, cancel }
 
-    public init(modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil) {
-        self.init(modelStore: modelStore, persistAudio: persistAudio, deviceUID: deviceUID, modelCache: .shared)
+    /// A take that persists audio, or one that asks to, keeps what it captured while the model loads: a stop then waits
+    /// for the model and decodes it. Otherwise a stop during the load drops that audio.
+    public init(
+        modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil, waitsForModelOnStop: Bool = false
+    ) {
+        self.init(
+            modelStore: modelStore, persistAudio: persistAudio, deviceUID: deviceUID,
+            waitsForModelOnStop: waitsForModelOnStop, modelCache: .shared
+        )
     }
 
     init(
         modelStore: ModelStore = .shared,
         persistAudio: Bool = false,
         deviceUID: String? = nil,
+        waitsForModelOnStop: Bool = false,
         modelCache: StreamingModelCache,
         microphone: @escaping @Sendable (DeviceID?) -> Microphone = Microphone.input,
         makeDecoder: @escaping MakeDecoder = StreamingTranscriptionSession.whisperDecoder,
@@ -103,6 +112,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         self.modelStore = modelStore
         self.persistAudio = persistAudio
         self.deviceUID = deviceUID
+        self.waitsForModelOnStop = persistAudio || waitsForModelOnStop
         self.modelCache = modelCache
         self.microphone = microphone
         self.makeDecoder = makeDecoder
@@ -176,7 +186,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             options: options, speakerLabeler: speakerLabeler, persister: persister
         ) { [modelCache, modelStore] sink, confirmed in
             StreamingRealtimeLoop(
-                configuration: .init(wantsConfirmedAudio: speakerLabeler != nil, waitsForModelOnStop: persistAudio),
+                configuration: .init(wantsConfirmedAudio: speakerLabeler != nil, waitsForModelOnStop: waitsForModelOnStop),
                 dependencies: .init(
                     requestPermission: microphone.requestPermission,
                     startCapture: { ingest in

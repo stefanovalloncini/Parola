@@ -569,13 +569,14 @@ struct StreamingCaptureFirstTests {
         cache: StreamingModelCache,
         mic: StandInMic,
         persistAudio: Bool = false,
+        waitsForModelOnStop: Bool = false,
         clock: any Clock<Duration> = ContinuousClock()
     ) throws -> StreamingTranscriptionSession {
         let store = ModelStore(modelsDirectory: FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-capture-first-\(UUID().uuidString)"))
         try store.seedInstalledModel(tiny)
         return StreamingTranscriptionSession(
-            modelStore: store, persistAudio: persistAudio, modelCache: cache,
+            modelStore: store, persistAudio: persistAudio, waitsForModelOnStop: waitsForModelOnStop, modelCache: cache,
             microphone: mic.microphone, makeDecoder: mic.decoder, clock: clock
         )
     }
@@ -887,6 +888,29 @@ struct StreamingCaptureFirstTests {
         #expect(await cache.leaseCount(for: Self.tiny) == 0)
         #expect(await cache.droppedLeases == 0)
         await gate.open(Self.tiny)
+    }
+
+    @Test("a session asked to wait for its model on stop keeps every word without keeping audio")
+    func waitingStopWithoutAudio() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic, waitsForModelOnStop: true)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+        mic.speak(seconds: 2)
+
+        let stopping = GuardedTask { await session.stop() }
+        await mic.captureStopped.wait("capture to stop at once")
+        await gate.open(Self.tiny)
+        _ = try await stopping.value("the stop to finish once the model is in")
+
+        let events = try #require(try await starting.value("the start to return"))
+        let finished = await finishedTranscript(of: events)
+        #expect(finished?.segments.map(\.text) == ["early words"])
+        #expect(finished?.sourceURL == nil)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
     }
 
     @Test("a start cancelled during the model load stops capture and returns its lease")

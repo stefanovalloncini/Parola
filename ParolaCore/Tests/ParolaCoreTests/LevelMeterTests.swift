@@ -22,6 +22,27 @@ struct LevelMeterTests {
         #expect(meter.lastSound != nil)
     }
 
+    @Test("waiting for seconds of audio counts from the first reading, however late it comes")
+    func waitForAudioCountsFromTheFirstReading() async throws {
+        let clock = TestClock()
+        let meter = LevelMeter()
+        let waiting = GuardedTask { await meter.waitForAudio(seconds: 5, clock: clock) }
+        await clock.waitForSleeper()
+        clock.advance(by: .seconds(30))
+        await clock.waitForSleeper()
+        #expect(!waiting.isFinished, "no audio has come in yet")
+
+        meter.record(0.5)
+        clock.advance(by: .milliseconds(50))
+        await clock.waitForSleeper()
+        clock.advance(by: .seconds(4))
+        await clock.waitForSleeper()
+        #expect(!waiting.isFinished, "four seconds of audio so far")
+        clock.advance(by: .seconds(1))
+
+        _ = try await waiting.value("the wait to end five seconds after the first reading")
+    }
+
     @Test("a reading outside 0...1 is clamped and a NaN reads as silence")
     func clampsItsInput() {
         let meter = LevelMeter()

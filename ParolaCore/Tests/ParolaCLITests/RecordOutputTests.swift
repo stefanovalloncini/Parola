@@ -92,15 +92,3 @@ struct RecordOutputTests {
         #expect(captured.out.last == "Non so perché il magazzino è vuoto.")
     }
 }
-
-@Suite("Record --seconds")
-struct RecordSecondsTests {
-    @Test("a streaming take's seconds count from the mic's first buffer, not from when the model was in")
-    func secondsCountFromTheFirstBuffer() {
-        let now = ContinuousClock.now
-        #expect(Record.secondsLeft(of: 5, capturingSince: now - .seconds(2), now: now) == 3)
-        #expect(Record.secondsLeft(of: 5, capturingSince: now - .seconds(7), now: now) == 0)
-        #expect(Record.secondsLeft(of: 5, capturingSince: nil, now: now) == 5)
-        #expect(Record.secondsLeft(of: nil, capturingSince: now - .seconds(2), now: now) == nil)
-    }
-}
