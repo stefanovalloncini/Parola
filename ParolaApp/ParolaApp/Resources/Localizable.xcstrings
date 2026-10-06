@@ -9142,6 +9142,17 @@
         }
       }
     },
+    "New versions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuove versioni"
+          }
+        }
+      }
+    },
     "Newer versions of these models replaced them, and Parola no longer uses them.": {
       "extractionState": "manual",
       "localizations": {
@@ -10268,6 +10279,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apri registrazione"
+          }
+        }
+      }
+    },
+    "Open Releases Page": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri la pagina delle versioni"
           }
         }
       }
@@ -17163,17 +17185,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Senza titolo"
-          }
-        }
-      }
-    },
-    "Update feed": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Feed aggiornamenti"
           }
         }
       }

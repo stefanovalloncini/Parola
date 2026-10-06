@@ -41,4 +41,17 @@ struct AppMenusTests {
         let plain = titles(FileCommands(model: makeModel("file-menu-plain", features: [])))
         #expect(plain == ["Open Files…", "Open Recent", "Save As Parola Document…"])
     }
+
+    @Test("Check for Updates… sits under About Parola, off in a build with no update feed")
+    func checkForUpdatesInTheAppMenu() throws {
+        let appInfo = items(AppInfoCommands(showAbout: {}))
+        #expect(appInfo.map(\.title) == ["About Parola", "Check for Updates…"])
+        let check = try #require(appInfo.last)
+        #expect(check.isEnabled == SparkleUpdater.feedURLConfigured)
+    }
+
+    @Test("the releases page is the repository's")
+    func releasesPage() {
+        #expect(SupportLinks.releases.absoluteString == "https://github.com/stefanovalloncini/Parola/releases")
+    }
 }

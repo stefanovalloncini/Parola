@@ -124,7 +124,7 @@ struct ParolaApp: App {
         .defaultSize(width: 1180, height: 760)
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button("About Parola") { aboutSheetOpen = true }
+                AppInfoCommands { aboutSheetOpen = true }
             }
             CommandGroup(replacing: .help) {
                 HelpCommands(model: model) { shortcutSheetOpen = true }

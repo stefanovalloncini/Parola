@@ -4,6 +4,17 @@ import ParolaCore
 
 // One view per menu: a predicate read inline in `.commands` makes the whole App scene depend on it.
 
+struct AppInfoCommands: View {
+    let showAbout: () -> Void
+
+    var body: some View {
+        Button("About Parola", action: showAbout)
+        Button("Check for Updates…") { SparkleUpdater.shared.checkForUpdates() }
+            .disabled(!SparkleUpdater.feedURLConfigured)
+            .axLeaf("Menu.App.CheckForUpdates")
+    }
+}
+
 struct HelpCommands: View {
     let model: AppModel
     let showShortcuts: () -> Void
