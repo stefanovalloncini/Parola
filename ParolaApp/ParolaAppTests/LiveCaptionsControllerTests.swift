@@ -30,6 +30,45 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a failure keeps the panel up with its reason, and Try Again starts over", .timeLimit(.minutes(1)))
+        func failureStaysOnThePanel() async throws {
+            try await withMocksCleared(.streaming) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "The microphone stopped.")
+                ))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions())
+                await waitUntil { controller.state.error != nil }
+
+                #expect(controller.state.error == "The microphone stopped.")
+                #expect(controller.isPanelShown, "the panel went away without a word")
+                #expect(!controller.state.isActive)
+
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["again"], delayMs: 300))
+                await controller.tryAgain()
+                #expect(controller.state.isActive)
+                #expect(controller.state.error == nil)
+                await controller.stop()
+                #expect(!controller.isPanelShown)
+            }
+        }
+
+        @Test("closing a failed panel hides it", .timeLimit(.minutes(1)))
+        func closingAFailedPanel() async throws {
+            try await withMocksCleared(.streaming) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "The microphone stopped.")
+                ))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions())
+                await waitUntil { controller.state.error != nil }
+
+                controller.closeFailure()
+
+                #expect(!controller.isPanelShown)
+            }
+        }
+
         @Test("closing the panel stops the microphone", .timeLimit(.minutes(1)))
         func closingThePanelStops() async throws {
             try await withMocksCleared(.streaming) {

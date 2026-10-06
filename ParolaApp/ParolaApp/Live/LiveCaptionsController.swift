@@ -7,6 +7,7 @@ import SwiftUI
 @Observable
 final class LiveCaptionsController {
     @ObservationIgnored private static let timestampFormatter = ISO8601DateFormatter()
+    private static let frameName = "LiveCaptions"
 
     var state: LiveCaptionsState = LiveCaptionsState() {
         didSet {
@@ -18,6 +19,7 @@ final class LiveCaptionsController {
     /// Mirrors of `state` the Captions menu reads, so a streaming partial doesn't rebuild the command tree.
     private(set) var isActive: Bool = false
     private(set) var hasHistory: Bool = false
+    private(set) var isPanelShown = false
     var translateToEnglish: Bool = false
 
     private(set) var panel: NSPanel?
@@ -113,7 +115,6 @@ final class LiveCaptionsController {
     private func handle(_ event: StreamingEvent) {
         state.apply(event)
         if case .failed = event {
-            hideWindow()
             session = nil
             consumer?.cancel()
             consumer = nil
@@ -124,14 +125,24 @@ final class LiveCaptionsController {
         state.error = message
         state.isActive = false
         state.isLoading = false
-        hideWindow()
         session = nil
     }
 
+    /// A failed session stays on its panel with the reason; Retry starts it again where it was.
+    func tryAgain() async {
+        guard !state.isActive, let lastOptions else { return }
+        await start(options: lastOptions, deviceUID: lastDeviceUID)
+    }
+
+    func closeFailure() {
+        guard !state.isActive else { return }
+        hideWindow()
+    }
+
     private func showWindow() {
+        isPanelShown = true
         let panel = panel ?? makePanel()
         guard showsPanel else { return }
-        panel.center()
         panel.orderFrontRegardless()
     }
 
@@ -148,14 +159,20 @@ final class LiveCaptionsController {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
+                self.isPanelShown = false
                 Task { await self.stop() }
             }
+        }
+        if showsPanel {
+            if !made.setFrameUsingName(Self.frameName) { made.center() }
+            made.setFrameAutosaveName(Self.frameName)
         }
         panel = made
         return made
     }
 
     private func hideWindow() {
+        isPanelShown = false
         panel?.orderOut(nil)
     }
 

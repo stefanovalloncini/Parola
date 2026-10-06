@@ -30,11 +30,23 @@ struct LiveCaptionsView: View {
     @ViewBuilder
     private var content: some View {
         if let error = controller.state.error {
-            Text(error)
-                .font(DS.Font.secondary)
-                // This overlay paints its own dark scrim, so surface-derived colours read too dark here.
-                .foregroundStyle(DS.Color.dangerOnDark.opacity(0.9))
-                .multilineTextAlignment(.center)
+            VStack(spacing: DS.Spacing.small) {
+                Text(error)
+                    .font(DS.Font.secondary)
+                    // This overlay paints its own dark scrim, so surface-derived colours read too dark here.
+                    .foregroundStyle(DS.Color.dangerOnDark.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                if !controller.state.isActive {
+                    HStack(spacing: DS.Spacing.small) {
+                        Button("Retry") { Task { await controller.tryAgain() } }
+                            .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                            .axLeaf("Button.Retry")
+                        Button("Close") { controller.closeFailure() }
+                            .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                            .axLeaf("Button.Close")
+                    }
+                }
+            }
         } else if caption.isEmpty {
             HStack(spacing: 8) {
                 Image(systemName: controller.state.isLoading ? "arrow.down.circle" : "waveform")
