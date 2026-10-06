@@ -471,7 +471,6 @@ struct AppModelLibraryTests {
         #expect(sorted == ["c", "a", "b"])
     }
 
-    /// The length every row shows, not the audio's bytes: a short video outweighs a long voice memo.
     private static func timedFixture() -> [LibraryEntry] {
         Self.fixture().map { entry in
             var manifest = entry.manifest
