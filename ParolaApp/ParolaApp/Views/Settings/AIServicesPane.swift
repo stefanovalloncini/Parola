@@ -35,7 +35,6 @@ struct AIServicesPane: View {
             privacySection
             onDeviceSection
             servicesSection
-            addSection
             useForSection
             SettingHelper(text: "Apple Intelligence answers on this Mac. Anything else sends the text of the transcript to that service.")
             ResetPaneButton(scope: .aiServices)
@@ -78,7 +77,7 @@ struct AIServicesPane: View {
     // MARK: - On device
 
     private var onDeviceSection: some View {
-        SettingsSection("On device") {
+        SettingsSection {
             SettingRow("Apple Intelligence", descriptionVerbatim: onDeviceStatus, isFirst: true) {
                 Image(systemName: onDevice?.isAvailable == true ? "checkmark.circle.fill" : "exclamationmark.circle")
                     .foregroundStyle(onDevice?.isAvailable == true ? DS.Palette.success : DS.Color.secondaryText)
@@ -95,6 +94,13 @@ struct AIServicesPane: View {
     // MARK: - Configured services
 
     private var servicesSection: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            servicesList
+            addMenu
+        }
+    }
+
+    private var servicesList: some View {
         SettingsSection("Your services") {
             let services = model.listedAIServices
             if services.isEmpty {
@@ -121,14 +127,20 @@ struct AIServicesPane: View {
 
     // MARK: - Add
 
-    private var addSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionCaption("ADD A SERVICE")
-            LeadingFlow(spacing: 8) {
-                ForEach(model.addableAIServiceKinds, id: \.self) { kind in
-                    AIServiceTile(kind: kind, isConfigured: configured(kind) != nil) { add(kind) }
-                }
+    private var addMenu: some View {
+        Menu("Add Service") { addMenuItems }
+            .fixedSize()
+            .accessibilityRepresentation { Menu("Add Service") { addMenuItems } }
+            .axLeaf("AIServices.Menu.Add")
+    }
+
+    private var addMenuItems: some View {
+        ForEach(model.addableAIServiceKinds, id: \.self) { kind in
+            Button { add(kind) } label: {
+                Label(kind.displayName, systemImage: configured(kind) == nil ? kind.symbol : "checkmark")
+                    .labelStyle(.titleAndIcon)
             }
+            .axLeaf("AIServices.Add.\(kind.rawValue)")
         }
     }
 
@@ -161,7 +173,7 @@ struct AIServicesPane: View {
             ForEach(Array(LanguageModelTask.allCases.enumerated()), id: \.element) { position, task in
                 SettingRow(AIServicesPane.taskTitle(task), isFirst: position == 0) {
                     Picker("", selection: binding(for: task)) {
-                        Text("On device").tag(LanguageModelProviderChoice.onDevice)
+                        Text("Apple Intelligence").tag(LanguageModelProviderChoice.onDevice)
                         ForEach(model.visibleAIServices) { service in
                             Text(verbatim: service.name).tag(service.choice)
                         }
@@ -179,7 +191,7 @@ struct AIServicesPane: View {
         switch task {
         case .summary: return "Summary"
         case .chat: return "Chat"
-        case .prompts: return "Prompts"
+        case .prompts: return "Transcript menu prompts"
         case .dictationCleanup: return "Dictation cleanup"
         }
     }
@@ -340,38 +352,5 @@ struct AIServiceTestLabel: View {
     private var text: String {
         guard result.ok else { return result.message }
         return "\(result.message) · \(result.milliseconds) ms"
-    }
-}
-
-// MARK: - Tile
-
-private struct AIServiceTile: View {
-    let kind: AIServiceConfig.Kind
-    let isConfigured: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: kind.symbol)
-                    .foregroundStyle(DS.Color.accent)
-                Text(verbatim: kind.displayName)
-                    .font(DS.Font.body)
-                    .foregroundStyle(DS.Color.primaryText)
-                    .lineLimit(1)
-                    .fixedSize()
-                Image(systemName: isConfigured ? "checkmark" : "plus")
-                    .font(.caption)
-                    .foregroundStyle(DS.Color.secondaryText)
-            }
-            .padding(.horizontal, DS.Spacing.regular)
-            .padding(.vertical, DS.Spacing.small)
-            .background(
-                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                    .fill(DS.Color.surfaceElevated)
-            )
-        }
-        .buttonStyle(.plain)
-        .axLeaf("AIServices.Add.\(kind.rawValue)")
     }
 }

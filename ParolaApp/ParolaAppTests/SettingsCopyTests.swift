@@ -198,4 +198,17 @@ struct SettingsCopyTests {
         #expect(sidecar.isEmpty, "\(sidecar)")
         #expect(!batch.contains("Drag & Drop"), "\(batch)")
     }
+
+    @Test("AI Services calls the on-device model Apple Intelligence everywhere and adds a service from one menu")
+    func aiServicesNamesAppleIntelligenceOnce() {
+        let model = makeModel("settings-copy-ai-names")
+        let pane = elements(AIServicesPane(), model: model)
+        let words = pane.flatMap(\.words)
+        #expect(!words.contains("On device"), "\(words)")
+        #expect(!words.contains("ADD A SERVICE"), "\(words)")
+        let names = pane.compactMap(\.name)
+        #expect(names.contains("Transcript menu prompts"), "\(names)")
+        #expect(!names.contains("Prompts"), "\(names)")
+        #expect(names.contains("Add Service"), "\(names)")
+    }
 }

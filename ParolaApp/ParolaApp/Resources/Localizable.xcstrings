@@ -1141,17 +1141,6 @@
         }
       }
     },
-    "ADD A SERVICE": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AGGIUNGI UN SERVIZIO"
-          }
-        }
-      }
-    },
     "AI": {
       "extractionState": "manual",
       "localizations": {
@@ -1557,6 +1546,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi regola"
+          }
+        }
+      }
+    },
+    "Add Service": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi servizio"
           }
         }
       }
@@ -10012,17 +10012,6 @@
         }
       }
     },
-    "On device": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In locale"
-          }
-        }
-      }
-    },
     "On-device speech recognition built into macOS. Nothing to download.": {
       "extractionState": "manual",
       "localizations": {
@@ -16558,6 +16547,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lingua della trascrizione"
+          }
+        }
+      }
+    },
+    "Transcript menu prompts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt del menu Trascrizione"
           }
         }
       }
