@@ -93,7 +93,7 @@ struct LinkFailureMessageTests {
     func missingToolPointsAtSettings() {
         let message = AppModel.linkFailureMessage(LinkDownloadFailure(reason: .toolMissing, site: "YouTube"))
 
-        #expect(message == "yt-dlp isn't installed. Install it in Settings › Integrations.")
+        #expect(message == "yt-dlp isn't installed. Install it in Settings › Links.")
     }
 
     @Test("every reason has Italian copy", arguments: everyReason + [LinkDownloadFailure(reason: .toolMissing)])

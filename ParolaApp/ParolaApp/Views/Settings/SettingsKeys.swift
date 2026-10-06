@@ -51,7 +51,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .batchExport: return "Batch Export"
         case .autoExport: return "Auto-Export"
         case .sendTo: return "Send To"
-        case .integrations: return "Integrations"
+        case .integrations: return "Links"
         case .aiServices: return "AI Services"
         case .prompts: return "Prompts"
         case .automation: return "MCP & Automation"
@@ -81,7 +81,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .batchExport: return String(localized: "Batch Export")
         case .autoExport: return String(localized: "Auto-Export")
         case .sendTo: return String(localized: "Send To")
-        case .integrations: return String(localized: "Integrations")
+        case .integrations: return String(localized: "Links")
         case .aiServices: return String(localized: "AI Services")
         case .prompts: return String(localized: "Prompts")
         case .automation: return String(localized: "MCP & Automation")
@@ -112,7 +112,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .batchExport: return ["batch", "multiple files", "drag drop", "queue", "sidecar", "folder", "preset"]
         case .autoExport: return ["auto export", "rule", "line length", "qc", "timestamps", "html theme", "preset", "folder"]
         case .sendTo: return ["obsidian", "vault", "send", "destination", "note", "markdown", "frontmatter", "wikilink"]
-        case .integrations: return ["yt-dlp", "youtube", "homebrew", "install"]
+        case .integrations: return ["yt-dlp", "youtube", "homebrew", "install", "link", "video", "integrations"]
         case .aiServices: return ["openai", "anthropic", "claude", "groq", "cerebras", "ollama", "local model", "api key", "endpoint", "llm", "summary", "chat", "cleanup", "apple intelligence", "privacy", "cloud", "on this mac", "online"]
         case .prompts: return ["prompt", "cleanup", "translate", "bullet", "action", "trigger words", "assistant", "rewrite"]
         case .automation: return ["mcp", "bridge", "claude code", "codex", "loopback"]

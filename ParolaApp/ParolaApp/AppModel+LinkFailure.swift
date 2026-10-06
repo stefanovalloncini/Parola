@@ -89,7 +89,7 @@ extension AppModel {
         case .unsupportedLink:
             return String(localized: "yt-dlp can't download from this site.", bundle: bundle)
         case .toolMissing:
-            return String(localized: "yt-dlp isn't installed. Install it in Settings › Integrations.", bundle: bundle)
+            return String(localized: "yt-dlp isn't installed. Install it in Settings › Links.", bundle: bundle)
         case .toolFailedToStart:
             return String(localized: "Parola couldn't start yt-dlp.", bundle: bundle)
         case .toolError(let detail):

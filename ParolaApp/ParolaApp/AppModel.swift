@@ -3129,6 +3129,8 @@ final class AppModel {
     @ObservationIgnored var ytDlpUpdateTask: Task<Void, Never>?
     @ObservationIgnored var ytDlpUpdateDeadline: Duration = YtDlpInstaller.upgradeDeadline
     @ObservationIgnored var ytDlpLocator: () -> String? = { YtDlpLocator.locate() }
+    @ObservationIgnored var brewLocator: () -> String? = { YtDlpLocator.locateBrew() }
+    var homebrewAvailable: Bool = true
     @ObservationIgnored var linkFetcher: any LinkFetcher
 
     var ytDlpIsStale: Bool {
@@ -3155,9 +3157,11 @@ final class AppModel {
         let route = path.map { YtDlpUpdateRoute(ytDlpPath: $0) }
         if route != ytDlpUpdateRoute { ytDlpUpdateRoute = route }
         if path == nil, ytDlpVersion != nil { ytDlpVersion = nil }
+        let brew = path != nil || brewLocator() != nil
+        if brew != homebrewAvailable { homebrewAvailable = brew }
     }
 
-    /// Availability plus `yt-dlp --version`, which costs a Python start-up, so only the Integrations pane asks for it.
+    /// Availability plus `yt-dlp --version`, which costs a Python start-up, so only the Links pane asks for it.
     func refreshYtDlpStatus() {
         refreshYtDlpAvailability()
         guard let path = ytDlpPath, !ytDlpUpdating else { return }

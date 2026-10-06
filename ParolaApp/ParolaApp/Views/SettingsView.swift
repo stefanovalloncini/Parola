@@ -122,7 +122,7 @@ private struct SettingsRouteMeta {
         .batchExport: SettingsRouteMeta(titleKey: "Batch Export", summaryKey: "What happens to files exported from a batch run.", symbol: "rectangle.stack.badge.play", scope: .batchExport),
         .autoExport: SettingsRouteMeta(titleKey: "Auto-Export", summaryKey: "Rules that write a transcript to disk as soon as it's ready.", symbol: "arrow.up.doc", scope: .autoExport),
         .sendTo: SettingsRouteMeta(titleKey: "Send To", summaryKey: "Where a finished transcript is sent, starting with a folder in your Obsidian vault.", symbol: "paperplane", scope: .sendTo),
-        .integrations: SettingsRouteMeta(titleKey: "Integrations", summaryKey: "Helper tools Parola uses to fetch audio from links.", symbol: "puzzlepiece.extension", scope: .integrations),
+        .integrations: SettingsRouteMeta(titleKey: "Links", summaryKey: "The yt-dlp tool Parola uses to download the audio of a link.", symbol: "link", scope: .integrations),
         .aiServices: SettingsRouteMeta(titleKey: "AI Services", summaryKey: "Which model answers each AI task: Apple Intelligence on this Mac, or a service you configure.", symbol: "sparkles", scope: .aiServices),
         .prompts: SettingsRouteMeta(titleKey: "Prompts", summaryKey: "The prompt library behind dictation cleanup and the Transcript menu.", symbol: "text.cursor", scope: .prompts),
         .automation: SettingsRouteMeta(titleKey: "MCP & Automation", summaryKey: "The MCP server other apps and agents use to drive Parola.", symbol: "bolt.horizontal.circle", scope: .automation),

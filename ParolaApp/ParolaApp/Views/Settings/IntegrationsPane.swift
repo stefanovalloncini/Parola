@@ -4,6 +4,17 @@ import ParolaCore
 struct IntegrationsPane: View {
     @Environment(AppModel.self) private var model
 
+    enum InstallChoice: Equatable {
+        case homebrew
+        case download
+    }
+
+    /// Homebrew installs and updates yt-dlp in place; without it the only way is the download page.
+    nonisolated static func installChoice(available: Bool, homebrewAvailable: Bool) -> InstallChoice? {
+        guard !available else { return nil }
+        return homebrewAvailable ? .homebrew : .download
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
@@ -11,6 +22,7 @@ struct IntegrationsPane: View {
                     name: "yt-dlp",
                     description: "Required to transcribe YouTube and other video links. Audio downloads locally; no upload happens.",
                     available: model.ytDlpAvailable,
+                    installChoice: Self.installChoice(available: model.ytDlpAvailable, homebrewAvailable: model.homebrewAvailable),
                     version: model.ytDlpVersion?.text,
                     isStale: model.ytDlpIsStale,
                     updateRoute: model.ytDlpUpdateRoute,
@@ -33,6 +45,7 @@ private struct ToolStatusRow: View {
     let name: String
     let description: LocalizedStringKey
     let available: Bool
+    let installChoice: IntegrationsPane.InstallChoice?
     let version: String?
     let isStale: Bool
     let updateRoute: YtDlpUpdateRoute?
@@ -57,8 +70,12 @@ private struct ToolStatusRow: View {
                         .foregroundStyle(DS.Color.secondaryText)
                         .axLeaf("Integrations.Text.Status.\(name)")
                     Spacer()
-                    if !available {
+                    if installChoice == .homebrew {
                         installButton
+                    } else if installChoice == .download {
+                        Button("Get yt-dlp…") { NSWorkspace.shared.open(SupportLinks.ytDlpReleases) }
+                            .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                            .axLeaf("Integrations.Button.Download.\(name)")
                     } else if isStale, case .homebrew? = updateRoute {
                         updateButton
                         if updating {
@@ -72,6 +89,15 @@ private struct ToolStatusRow: View {
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+                if installChoice == .download {
+                    HStack(spacing: DS.Spacing.snug) {
+                        Text("With Homebrew, Parola installs and updates it for you:")
+                            .foregroundStyle(DS.Color.secondaryText)
+                        Link(destination: SupportLinks.homebrew) { Text(verbatim: "brew.sh") }
+                            .axLeaf("Integrations.Link.Homebrew")
+                    }
+                    .font(DS.Font.secondary)
+                }
                 if available && isStale {
                     Label(
                         "This version is more than 90 days old. Downloads from YouTube and other sites may fail until you update it.",

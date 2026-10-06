@@ -6633,6 +6633,17 @@
         }
       }
     },
+    "Get yt-dlp…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica yt-dlp…"
+          }
+        }
+      }
+    },
     "Getting ready to record": {
       "extractionState": "manual",
       "localizations": {
@@ -6761,17 +6772,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aiuto"
-          }
-        }
-      }
-    },
-    "Helper tools Parola uses to fetch audio from links.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gli strumenti che Parola usa per scaricare l'audio dai link."
           }
         }
       }
@@ -7385,17 +7385,6 @@
         }
       }
     },
-    "Integrations": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Integrazioni"
-          }
-        }
-      }
-    },
     "It listens and writes.": {
       "extractionState": "manual",
       "localizations": {
@@ -7962,6 +7951,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Collega i nomi di chi parla"
+          }
+        }
+      }
+    },
+    "Links": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link"
           }
         }
       }
@@ -15689,6 +15689,17 @@
         }
       }
     },
+    "The yt-dlp tool Parola uses to download the audio of a link.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo strumento yt-dlp che Parola usa per scaricare l'audio di un link."
+          }
+        }
+      }
+    },
     "Theme": {
       "extractionState": "manual",
       "localizations": {
@@ -17694,6 +17705,17 @@
         }
       }
     },
+    "With Homebrew, Parola installs and updates it for you:": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Con Homebrew, Parola lo installa e lo aggiorna per te:"
+          }
+        }
+      }
+    },
     "Word": {
       "extractionState": "manual",
       "localizations": {
@@ -18486,13 +18508,13 @@
         }
       }
     },
-    "yt-dlp isn't installed. Install it in Settings › Integrations.": {
+    "yt-dlp isn't installed. Install it in Settings › Links.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "yt-dlp non è installato. Installalo da Impostazioni › Integrazioni."
+            "value": "yt-dlp non è installato. Installalo da Impostazioni › Link."
           }
         }
       }

@@ -141,4 +141,23 @@ struct SettingsCopyTests {
         let words = pane.flatMap(\.words)
         #expect(!words.contains("Status"), "\(words)")
     }
+
+    @Test("the yt-dlp pane is named for the job, and without Homebrew it offers the download instead of a dead install")
+    func linksPane() {
+        #expect(SettingsRoute.integrations.label == "Links")
+        #expect(SettingsRoute.integrations.symbol == "link")
+        #expect(SettingsPaneScope.integrations.localizedLabel == "Links")
+        #expect(IntegrationsPane.installChoice(available: false, homebrewAvailable: true) == .homebrew)
+        #expect(IntegrationsPane.installChoice(available: false, homebrewAvailable: false) == .download)
+        #expect(IntegrationsPane.installChoice(available: true, homebrewAvailable: false) == nil)
+
+        let model = makeModel("settings-copy-links")
+        model.ytDlpLocator = { nil }
+        model.brewLocator = { nil }
+        model.refreshYtDlpAvailability()
+        #expect(model.homebrewAvailable == false)
+        model.brewLocator = { "/opt/homebrew/bin/brew" }
+        model.refreshYtDlpAvailability()
+        #expect(model.homebrewAvailable)
+    }
 }
