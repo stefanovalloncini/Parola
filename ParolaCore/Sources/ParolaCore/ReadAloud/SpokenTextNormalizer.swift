@@ -40,9 +40,13 @@ public enum SpokenTextNormalizer {
         let locale = Locale(identifier: "en_US")
         let numberPattern = "\\d[\\d,]*(?:\\.\\d+)?"
         var result = replacingAbbreviations(text, table: englishAbbreviations)
+        result = replacingDigitByDigitRuns(result, locale: locale)
+        result = replacingRanges(result, language: "en", locale: locale)
+        result = replacingNegativeNumbers(result, language: "en", locale: locale, numberPattern: numberPattern)
         result = replacingCurrencySymbols(result, language: "en", locale: locale, numberPattern: numberPattern)
         result = replacingCurrencyWords(result, language: "en", locale: locale, numberPattern: numberPattern)
         result = replacingPercent(result, suffix: "percent", locale: locale, numberPattern: numberPattern)
+        result = replacingVersionStrings(result, locale: locale, joiner: "point")
         result = replacingTimes(result, language: "en", locale: locale)
         result = replacingEnglishDates(result, locale: locale)
         result = replacingEnglishYears(result, locale: locale)
@@ -111,16 +115,47 @@ public enum SpokenTextNormalizer {
         ("es.", "per esempio"),
     ]
 
+    private static let italianMonths = [
+        "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
+        "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
+    ]
+
+    private static let italianMasculineNouns = ["minuto", "secondo", "giorno", "anno", "mese"]
+
     private static func normalizingItalian(_ text: String) -> String {
         let locale = Locale(identifier: "it_IT")
         let numberPattern = "\\d[\\d.]*(?:,\\d+)?"
         var result = replacingAbbreviations(text, table: italianAbbreviations)
+        result = replacingDigitByDigitRuns(result, locale: locale)
+        result = replacingRanges(result, language: "it", locale: locale)
+        result = replacingNegativeNumbers(result, language: "it", locale: locale, numberPattern: numberPattern)
         result = replacingCurrencySymbols(result, language: "it", locale: locale, numberPattern: numberPattern)
         result = replacingCurrencyWords(result, language: "it", locale: locale, numberPattern: numberPattern)
+        result = replacingItalianMasculineOne(result)
         result = replacingPercent(result, suffix: "per cento", locale: locale, numberPattern: numberPattern)
+        result = replacingVersionStrings(result, locale: locale, joiner: "punto")
         result = replacingTimes(result, language: "it", locale: locale)
+        result = replacingItalianDates(result)
         result = replacingPlainNumbers(result, locale: locale, numberPattern: numberPattern)
         return finish(result)
+    }
+
+    /// Italian elides "uno" to "un" before any of these masculine nouns, standing alone (not as the
+    /// last digit of a larger number: "ventuno euro" keeps `NumberFormatter`'s own form).
+    private static func replacingItalianMasculineOne(_ text: String) -> String {
+        let wordPattern = italianMasculineNouns.joined(separator: "|")
+        return replaceMatches(pattern: "\\b1\\s+(\(wordPattern))\\b", in: text) { match, ns in
+            "un " + ns.substring(with: match.range(at: 1))
+        }
+    }
+
+    /// The first of the month is always "primo" in Italian, never the cardinal "uno"; every other day
+    /// stays a plain cardinal, handled by the generic number pass.
+    private static func replacingItalianDates(_ text: String) -> String {
+        let monthPattern = italianMonths.joined(separator: "|")
+        return replaceMatches(pattern: "\\b1°?\\s+(\(monthPattern))\\b", options: [.caseInsensitive], in: text) { match, ns in
+            "primo " + ns.substring(with: match.range(at: 1))
+        }
     }
 
     // MARK: - Shared: abbreviations
@@ -131,6 +166,68 @@ public enum SpokenTextNormalizer {
         let pattern = "\\b(?:" + alternatives.joined(separator: "|") + ")"
         return replaceMatches(pattern: pattern, in: text) { match, ns in
             lookup[ns.substring(with: match.range)]
+        }
+    }
+
+    // MARK: - Shared: digit-by-digit runs (phone numbers and IDs)
+
+    /// A "+" country-code prefix, a run of space/dash-separated digit groups totalling 7+ digits, or a
+    /// bare 7+ digit run with no thousands separator reads as a phone number or an ID, not a cardinal:
+    /// each digit spelled on its own, groups paused with a comma.
+    private static func replacingDigitByDigitRuns(_ text: String, locale: Locale) -> String {
+        var result = replaceMatches(pattern: "\\+\\d(?:[\\d \\-]*\\d)?", in: text) { match, ns in
+            let raw = ns.substring(with: match.range).dropFirst()
+            return spellingDigitGroups(raw, locale: locale)
+        }
+        result = replaceMatches(pattern: "\\b\\d+(?:[ -]\\d+)+\\b", in: result) { match, ns in
+            let raw = ns.substring(with: match.range)
+            guard raw.filter(\.isNumber).count >= 7 else { return nil }
+            return spellingDigitGroups(Substring(raw), locale: locale)
+        }
+        result = replaceMatches(pattern: "(?<![\\d.,])\\d{7,}(?![\\d.,])", in: result) { match, ns in
+            spellingDigitGroups(Substring(ns.substring(with: match.range)), locale: locale)
+        }
+        return result
+    }
+
+    private static func spellingDigitGroups(_ raw: Substring, locale: Locale) -> String {
+        raw.split(whereSeparator: { $0 == " " || $0 == "-" })
+            .map { spellingDigits($0, locale: locale) }
+            .joined(separator: ", ")
+    }
+
+    private static func spellingDigits(_ digits: Substring, locale: Locale) -> String {
+        digits.compactMap { character -> String? in
+            guard let value = character.wholeNumberValue else { return nil }
+            return spellOut(NSNumber(value: value), locale: locale)
+        }.joined(separator: " ")
+    }
+
+    // MARK: - Shared: ranges
+
+    /// "10-12" reads as "ten to twelve"/"dieci a dodici", not a bare spelled hyphen. Declines when
+    /// the earlier digit-by-digit pass has already claimed the span (phone-shaped, 7+ digits).
+    private static func replacingRanges(_ text: String, language: String, locale: Locale) -> String {
+        let connector = language == "it" ? "a" : "to"
+        return replaceMatches(pattern: "\\b(\\d+)-(\\d+)\\b", in: text) { match, ns in
+            guard let first = parseNumber(ns.substring(with: match.range(at: 1)), locale: locale),
+                  let second = parseNumber(ns.substring(with: match.range(at: 2)), locale: locale) else { return nil }
+            return spellOut(first, locale: locale) + " " + connector + " " + spellOut(second, locale: locale)
+        }
+    }
+
+    // MARK: - Shared: negative numbers
+
+    /// A "-"/"−" right at a word start (not glued after a letter, as in "COVID-19", and not the dash
+    /// of a range) reads as "minus"/"meno".
+    private static func replacingNegativeNumbers(
+        _ text: String, language: String, locale: Locale, numberPattern: String
+    ) -> String {
+        let word = language == "it" ? "meno" : "minus"
+        return replaceMatches(pattern: "(?<![\\w.,])[-\u{2212}](\(numberPattern))", in: text) { match, ns in
+            let raw = ns.substring(with: match.range(at: 1))
+            guard let amount = parseNumber(raw, locale: locale) else { return nil }
+            return word + " " + spellOut(amount, locale: locale)
         }
     }
 
@@ -146,6 +243,11 @@ public enum SpokenTextNormalizer {
     private static let euroWords = ["en": CurrencyWords(singular: "euro", plural: "euros"),
                                      "it": CurrencyWords(singular: "euro", plural: "euro")]
 
+    /// Italian elides "uno" to "un" before a masculine currency noun ("un euro", not "uno euro").
+    private static func numeralWords(_ amount: NSNumber, language: String, locale: Locale) -> String {
+        language == "it" && amount.doubleValue == 1 ? "un" : spellOut(amount, locale: locale)
+    }
+
     private static func replacingCurrencySymbols(
         _ text: String, language: String, locale: Locale, numberPattern: String
     ) -> String {
@@ -155,7 +257,8 @@ public enum SpokenTextNormalizer {
             guard let amount = parseNumber(raw, locale: locale) else { return nil }
             let words = symbol == "$" ? dollarWords[language] : euroWords[language]
             guard let words else { return nil }
-            return spellOut(amount, locale: locale) + " " + (amount.doubleValue == 1 ? words.singular : words.plural)
+            let unit = amount.doubleValue == 1 ? words.singular : words.plural
+            return numeralWords(amount, language: language, locale: locale) + " " + unit
         }
     }
 
@@ -169,7 +272,8 @@ public enum SpokenTextNormalizer {
             guard let amount = parseNumber(raw, locale: locale) else { return nil }
             let words = word.hasPrefix("dollar") ? dollarWords[language] : euroWords[language]
             guard let words else { return nil }
-            return spellOut(amount, locale: locale) + " " + (amount.doubleValue == 1 ? words.singular : words.plural)
+            let unit = amount.doubleValue == 1 ? words.singular : words.plural
+            return numeralWords(amount, language: language, locale: locale) + " " + unit
         }
     }
 
@@ -185,14 +289,39 @@ public enum SpokenTextNormalizer {
         }
     }
 
+    // MARK: - Shared: version strings
+
+    /// "2.0.1" is a version, not a decimal with a dropped segment: each dot-separated part is spelled
+    /// on its own and joined with "point"/"punto".
+    private static func replacingVersionStrings(_ text: String, locale: Locale, joiner: String) -> String {
+        replaceMatches(pattern: "\\b\\d+(?:\\.\\d+){2,}\\b", in: text) { match, ns in
+            let raw = ns.substring(with: match.range)
+            let segments = raw.split(separator: ".", omittingEmptySubsequences: false)
+            var words: [String] = []
+            for segment in segments {
+                guard let value = Int(segment) else { return nil }
+                words.append(spellOut(NSNumber(value: value), locale: locale))
+            }
+            return words.joined(separator: " \(joiner) ")
+        }
+    }
+
     // MARK: - Shared: times
 
     private static func replacingTimes(_ text: String, language: String, locale: Locale) -> String {
-        replaceMatches(pattern: "\\b(2[0-3]|[01]?\\d):([0-5]\\d)\\b", in: text) { match, ns in
+        var result = replaceMatches(pattern: "\\b(2[0-4]|[01]?\\d):([0-5]\\d)\\b", in: text) { match, ns in
             guard let hour = Int(ns.substring(with: match.range(at: 1))),
                   let minute = Int(ns.substring(with: match.range(at: 2))) else { return nil }
             return spokenTime(hour: hour, minute: minute, language: language, locale: locale)
         }
+        // Anything else shaped like "number:number" (an out-of-range hour, a one-digit minute, …)
+        // isn't a valid time; decline the time reading but never leave the literal colon behind.
+        result = replaceMatches(pattern: "\\b(\\d+):(\\d+)\\b", in: result) { match, ns in
+            guard let first = parseNumber(ns.substring(with: match.range(at: 1)), locale: locale),
+                  let second = parseNumber(ns.substring(with: match.range(at: 2)), locale: locale) else { return nil }
+            return spellOut(first, locale: locale) + " " + spellOut(second, locale: locale)
+        }
+        return result
     }
 
     private static func spokenTime(hour: Int, minute: Int, language: String, locale: Locale) -> String {
@@ -208,8 +337,9 @@ public enum SpokenTextNormalizer {
 
     // MARK: - Shared: plain numbers
 
+    /// A digit run glued right after a letter-dash, as in "COVID-19", is a token, not a number.
     private static func replacingPlainNumbers(_ text: String, locale: Locale, numberPattern: String) -> String {
-        replaceMatches(pattern: "\\b(\(numberPattern))\\b", in: text) { match, ns in
+        replaceMatches(pattern: "(?<![A-Za-z-])\\b(\(numberPattern))\\b", in: text) { match, ns in
             let raw = ns.substring(with: match.range(at: 1))
             guard let amount = parseNumber(raw, locale: locale) else { return nil }
             return spellOut(amount, locale: locale)
@@ -217,9 +347,10 @@ public enum SpokenTextNormalizer {
     }
 
     /// A digit run next to "." or "," could be a decimal or a grouped number in some other locale's
-    /// convention, so only a run with no separator on either side counts as a plain integer.
+    /// convention, and one glued after a letter-dash is a token, so only a separator-free, letter-free
+    /// run counts as a plain integer.
     private static func normalizingPlainIntegers(_ text: String, locale: Locale) -> String {
-        finish(replaceMatches(pattern: "(?<![\\d.,])\\d+(?![\\d.,])", in: text) { match, ns in
+        finish(replaceMatches(pattern: "(?<![\\d.,A-Za-z-])\\d+(?![\\d.,])", in: text) { match, ns in
             guard let value = Int(ns.substring(with: match.range)) else { return nil }
             return spellOut(NSNumber(value: value), locale: locale)
         })
@@ -233,10 +364,18 @@ public enum SpokenTextNormalizer {
         "ride", "ridendo", "risata", "risate", "applausi", "sospira", "tossisce", "silenzio", "pausa",
     ]
 
+    private static let urlWrapperPairs: [(open: String, close: String)] = [
+        ("(", ")"), ("[", "]"), ("<", ">"), ("\"", "\""),
+    ]
+
+    private static let urlTrailingPunctuation = CharacterSet(charactersIn: ".,;:!?)]}\"'")
+
     private static func strippingNonSpeech(_ text: String) -> String {
-        var result = replaceMatches(pattern: "\\bhttps?://\\S+|\\bwww\\.\\S+", in: text) { _, _ in "" }
+        var result = strippingURLs(text)
         result = String(result.filter { character in
-            !character.unicodeScalars.contains { $0.properties.isEmojiPresentation }
+            let isEmoji = character.unicodeScalars.contains { $0.properties.isEmojiPresentation }
+                || character.unicodeScalars.last?.value == 0x20E3
+            return !isEmoji
         })
         result = replaceMatches(pattern: "\\[[^\\]]*\\]", in: result) { _, _ in "" }
         result = replaceMatches(pattern: "\\(([^()]*)\\)", options: [.caseInsensitive], in: result) { match, ns in
@@ -246,8 +385,35 @@ public enum SpokenTextNormalizer {
         return result
     }
 
+    /// A URL wrapped in `() [] <> ""` disappears along with its wrapper; an unwrapped one keeps any
+    /// sentence punctuation that follows it (the greedy match swallows it, so the transform hands it
+    /// back as the replacement instead of discarding it).
+    private static func strippingURLs(_ text: String) -> String {
+        var result = text
+        for (open, close) in urlWrapperPairs {
+            let openPattern = NSRegularExpression.escapedPattern(for: open)
+            let closePattern = NSRegularExpression.escapedPattern(for: close)
+            let excluded = open == close ? "\\s\(openPattern)" : "\\s\(openPattern)\(closePattern)"
+            let pattern = "\(openPattern)(?:https?://|www\\.)[^\(excluded)]+\(closePattern)"
+            result = replaceMatches(pattern: pattern, in: result) { _, _ in "" }
+        }
+        return replaceMatches(pattern: "\\bhttps?://\\S+|\\bwww\\.\\S+", in: result) { match, ns in
+            var trimmed = Substring(ns.substring(with: match.range))
+            var trailing = ""
+            while let last = trimmed.unicodeScalars.last, urlTrailingPunctuation.contains(last) {
+                trailing = String(last) + trailing
+                trimmed = trimmed.dropLast()
+            }
+            return trailing
+        }
+    }
+
+    /// Collapses whitespace and drops every Unicode format character (category Cf — soft hyphens from
+    /// `NumberFormatter`'s Italian spell-out, zero-width spaces, BOM, …), which a TTS engine would
+    /// otherwise tokenize as a stray click or pause.
     private static func finish(_ text: String) -> String {
-        text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.joined(separator: " ")
+        let withoutFormatCharacters = String(text.unicodeScalars.filter { $0.properties.generalCategory != .format })
+        return withoutFormatCharacters.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     // MARK: - NumberFormatter
