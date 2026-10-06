@@ -44,9 +44,9 @@ public struct SpeechRendererCapabilities: Sendable, Hashable {
 }
 
 /// Turns text into audio for one voice. A render runs from the call until its stream finishes, throws or
-/// is cancelled, and `cancel()` returns once it has stopped. Callers never pass empty or whitespace-only
-/// text and never start a second render while one runs. The requirements are async so actor and
-/// main-actor renderers conform alike.
+/// is cancelled (dropping the stream cancels it), and `cancel()` returns once it has stopped; a prewarm
+/// runs until it returns. Callers never pass empty or whitespace-only text and never start a render or a
+/// prewarm while either runs. The requirements are async so actor and main-actor renderers conform alike.
 public protocol SpeechRenderer: Sendable {
     var engine: SpeechEngineKind { get }
     var capabilities: SpeechRendererCapabilities { get }

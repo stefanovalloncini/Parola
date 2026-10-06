@@ -26,13 +26,17 @@ struct MockSpeechRendererTests {
     private final class Events: Sendable {
         let held = Awaitable(0)
         let ended = Awaitable(0)
+        let prewarmHeld = Awaitable(0)
+        let prewarmEnded = Awaitable(0)
 
         var observer: MockSpeechRenderer.Observer {
-            { [held, ended] event in
+            { [held, ended, prewarmHeld, prewarmEnded] event in
                 switch event {
                 case .started: break
                 case .held: held.increment()
                 case .ended: ended.increment()
+                case .prewarmHeld: prewarmHeld.increment()
+                case .prewarmEnded: prewarmEnded.increment()
                 }
             }
         }
@@ -172,11 +176,56 @@ struct MockSpeechRendererTests {
         let violations = await renderer.violations
         let peak = await renderer.peakConcurrentRenders
         #expect(prewarmed == [voice, voice])
-        #expect(violations == [.prewarmDuringRender])
+        #expect(violations == [.concurrentPrewarm])
         #expect(peak == 2)
 
         await renderer.releaseStart()
         try await collector.task.value("the render to finish")
+    }
+
+    @Test("a held prewarm counts as running work, so a render during it is recorded")
+    func renderDuringHeldPrewarm() async throws {
+        let events = Events()
+        let renderer = MockSpeechRenderer(observer: events.observer)
+        await renderer.holdPrewarm()
+        let prewarm = GuardedTask { try await renderer.prewarm(voice: VoiceID.appleAutomatic, language: "en") }
+        try #require(await events.prewarmHeld.wait(atLeast: 1, "the prewarm to park"))
+        #expect(!prewarm.isFinished)
+
+        let collector = Collector(try await renderer.render(text: "During", unitID: 0, voice: voice, language: "en"))
+        let violations = await renderer.violations
+        let peak = await renderer.peakConcurrentRenders
+        #expect(violations == [.concurrentRender(unitID: 0)])
+        #expect(peak == 2)
+
+        await renderer.releasePrewarm()
+        try await prewarm.value("the released prewarm to return")
+        try await collector.task.value("the render to finish")
+        try #require(await events.prewarmEnded.wait(atLeast: 1, "the prewarm to end"))
+
+        let after = Collector(try await renderer.render(text: "After", unitID: 1, voice: voice, language: "en"))
+        try await after.task.value("the render after the prewarm to finish")
+        let violationsAfter = await renderer.violations
+        #expect(violationsAfter == [.concurrentRender(unitID: 0)])
+    }
+
+    @Test("cancelling a held prewarm throws and frees the renderer")
+    func cancelHeldPrewarm() async throws {
+        let events = Events()
+        let renderer = MockSpeechRenderer(observer: events.observer)
+        await renderer.holdPrewarm()
+        let prewarm = GuardedTask { try await renderer.prewarm(voice: VoiceID.appleAutomatic, language: "en") }
+        try #require(await events.prewarmHeld.wait(atLeast: 1, "the prewarm to park"))
+
+        prewarm.cancel()
+        await #expect(throws: CancellationError.self) {
+            try await prewarm.value("the cancelled prewarm to return")
+        }
+        try #require(await events.prewarmEnded.wait(atLeast: 1, "the cancelled prewarm to end"))
+        let collector = Collector(try await renderer.render(text: "Next", unitID: 0, voice: voice, language: "en"))
+        try await collector.task.value("the next render to finish")
+        let violations = await renderer.violations
+        #expect(violations.isEmpty)
     }
 
     @Test("cancel ends a held render, returns once it has stopped, and frees the renderer")

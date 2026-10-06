@@ -2,9 +2,10 @@ import Foundation
 import ParolaCore
 
 /// A renderer for tests and the `--test-mode` sandbox. It emits silence, or a sine tone, sized from the
-/// text length and paced by an injected clock; `holdStart()` parks later renders before their first chunk
-/// until `releaseStart()`. It records misuse (empty text, overlapping work) instead of trapping, so a test
-/// can assert its caller never breaks the `SpeechRenderer` preconditions.
+/// text length and paced by an injected clock. `holdStart()` parks later renders before their first chunk
+/// until `releaseStart()`, and `holdPrewarm()` keeps later prewarms running until `releasePrewarm()`. It
+/// records misuse (empty text, overlapping work) instead of trapping, so a test can assert its caller
+/// never breaks the `SpeechRenderer` preconditions.
 public actor MockSpeechRenderer: SpeechRenderer {
     public struct Rendered: Hashable, Sendable {
         public let unitID: Int
@@ -23,13 +24,15 @@ public actor MockSpeechRenderer: SpeechRenderer {
     public enum Violation: Hashable, Sendable {
         case emptyText(unitID: Int)
         case concurrentRender(unitID: Int)
-        case prewarmDuringRender
+        case concurrentPrewarm
     }
 
     public enum Event: Hashable, Sendable {
         case started(unitID: Int)
         case held(unitID: Int)
         case ended(unitID: Int)
+        case prewarmHeld
+        case prewarmEnded
     }
 
     public typealias Observer = @Sendable (Event) -> Void
@@ -62,9 +65,19 @@ public actor MockSpeechRenderer: SpeechRenderer {
     private let toneFrequency: Double?
     private let observer: Observer?
 
+    private enum Gate {
+        case start
+        case prewarm
+    }
+
+    private struct Parked {
+        let gate: Gate
+        let continuation: CheckedContinuation<Void, Never>
+    }
+
     private var activeRenders = 0
-    private var holdsStart = false
-    private var heldStarts: [UUID: CheckedContinuation<Void, Never>] = [:]
+    private var holding: Set<Gate> = []
+    private var parked: [UUID: Parked] = [:]
     private var running: [UUID: Task<Void, Never>] = [:]
 
     public init(
@@ -98,14 +111,19 @@ public actor MockSpeechRenderer: SpeechRenderer {
     }
 
     public func holdStart() {
-        holdsStart = true
+        holding.insert(.start)
     }
 
     public func releaseStart() {
-        holdsStart = false
-        let held = heldStarts.values
-        heldStarts.removeAll()
-        for continuation in held { continuation.resume() }
+        release(.start)
+    }
+
+    public func holdPrewarm() {
+        holding.insert(.prewarm)
+    }
+
+    public func releasePrewarm() {
+        release(.prewarm)
     }
 
     public func render(
@@ -146,9 +164,18 @@ public actor MockSpeechRenderer: SpeechRenderer {
     public func prewarm(voice: VoiceID, language: String) async throws {
         prewarmed.append(voice)
         if activeRenders > 0 {
-            violations.append(.prewarmDuringRender)
+            violations.append(.concurrentPrewarm)
         }
-        peakConcurrentRenders = max(peakConcurrentRenders, activeRenders + 1)
+        activeRenders += 1
+        peakConcurrentRenders = max(peakConcurrentRenders, activeRenders)
+        defer {
+            activeRenders -= 1
+            observer?(.prewarmEnded)
+        }
+        if holding.contains(.prewarm) {
+            await park(at: .prewarm, id: UUID(), announcing: .prewarmHeld)
+        }
+        try Task.checkCancellation()
     }
 
     private func produce(
@@ -162,8 +189,8 @@ public actor MockSpeechRenderer: SpeechRenderer {
             activeRenders -= 1
             observer?(.ended(unitID: unitID))
         }
-        if holdsStart {
-            await waitForRelease(id: id, unitID: unitID)
+        if holding.contains(.start) {
+            await park(at: .start, id: id, announcing: .held(unitID: unitID))
         }
         guard !Task.isCancelled else {
             continuation.finish(throwing: CancellationError())
@@ -192,23 +219,29 @@ public actor MockSpeechRenderer: SpeechRenderer {
         continuation.finish()
     }
 
-    private func waitForRelease(id: UUID, unitID: Int) async {
+    private func park(at gate: Gate, id: UUID, announcing event: Event) async {
         await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                guard holdsStart, !Task.isCancelled else {
+                guard holding.contains(gate), !Task.isCancelled else {
                     continuation.resume()
                     return
                 }
-                heldStarts[id] = continuation
-                observer?(.held(unitID: unitID))
+                parked[id] = Parked(gate: gate, continuation: continuation)
+                observer?(event)
             }
         } onCancel: {
-            Task { await self.resumeHeld(id) }
+            Task { await self.unpark(id) }
         }
     }
 
-    private func resumeHeld(_ id: UUID) {
-        heldStarts.removeValue(forKey: id)?.resume()
+    private func unpark(_ id: UUID) {
+        parked.removeValue(forKey: id)?.continuation.resume()
+    }
+
+    private func release(_ gate: Gate) {
+        holding.remove(gate)
+        let ids = parked.filter { $0.value.gate == gate }.map(\.key)
+        for id in ids { unpark(id) }
     }
 
     private func samples(from offset: Int, count: Int) -> [Float] {
