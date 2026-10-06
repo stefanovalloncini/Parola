@@ -130,6 +130,17 @@ struct LibraryRowFormatTests {
         #expect(LibraryRowFormat.spokenDuration(8, locale: italian) == "8 secondi")
     }
 
+    @Test("VoiceOver says a row shown as <1 s is less than a second")
+    func spokenSubSecond() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italianBundle = try #require(Bundle(path: path))
+
+        #expect(LibraryRowFormat.duration(0.4) == "<1 s")
+        #expect(LibraryRowFormat.spokenDuration(0.4, locale: Locale(identifier: "en_US")) == "less than a second")
+        #expect(LibraryRowFormat.spokenDuration(0.4, bundle: italianBundle, locale: Locale(identifier: "it_IT")) == "meno di un secondo")
+        #expect(LibraryRowFormat.spokenDuration(1.2, locale: Locale(identifier: "en_US")) == "1 second")
+    }
+
     @Test("a row reads as one sentence: title, marks, what it says, when and how long")
     func spokenRow() throws {
         let manifest = ParolaDocument.Manifest(

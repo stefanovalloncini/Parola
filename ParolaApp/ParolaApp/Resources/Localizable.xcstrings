@@ -18356,6 +18356,17 @@
         }
       }
     },
+    "less than a second": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "meno di un secondo"
+          }
+        }
+      }
+    },
     "min": {
       "extractionState": "manual",
       "localizations": {

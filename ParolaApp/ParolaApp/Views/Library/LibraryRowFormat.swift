@@ -9,7 +9,8 @@ enum LibraryRowFormat {
     }
 
     /// The same length as VoiceOver says it, to the unit the row shows: "1 hour, 12 minutes", "1 ora e 12 minuti".
-    static func spokenDuration(_ seconds: Double?, locale: Locale = AppFormat.locale) -> String? {
+    static func spokenDuration(_ seconds: Double?, bundle: Bundle = .main, locale: Locale = AppFormat.locale) -> String? {
+        if let seconds, seconds > 0, seconds < 1 { return String(localized: "less than a second", bundle: bundle) }
         guard let total = wholeSeconds(seconds) else { return nil }
         let shown: Duration = .seconds(total < 60 ? total : total / 60 * 60)
         let units: Set<Duration.UnitsFormatStyle.Unit> = total < 60 ? [.seconds] : [.hours, .minutes]
@@ -95,7 +96,7 @@ enum LibraryRowFormat {
 
     static func spokenSubtitle(count: Int, totalSeconds: Double, bundle: Bundle = .main, locale: Locale = AppFormat.locale) -> String {
         let transcripts = String(localized: "\(count) transcripts", bundle: bundle)
-        guard let length = spokenDuration(totalSeconds, locale: locale) else { return transcripts }
+        guard let length = spokenDuration(totalSeconds, bundle: bundle, locale: locale) else { return transcripts }
         return "\(transcripts), \(length)"
     }
 }
