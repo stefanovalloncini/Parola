@@ -65,7 +65,7 @@ struct LogRecordTests {
 
     @Test("readAloud is a Core category")
     func readAloudIsCore() {
-        #expect(LogCategory.readAloud.rawValue == "readAloud")
+        #expect(LogCategory.readAloud.rawValue == "read-aloud")
         #expect(LogCategory.readAloud.subsystem == .core)
     }
 }
