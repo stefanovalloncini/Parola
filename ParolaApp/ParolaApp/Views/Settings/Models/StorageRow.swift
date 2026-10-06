@@ -4,8 +4,12 @@ import AppKit
 
 struct StorageRow: View {
     @Environment(AppModel.self) private var model
-    @State private var overridePath: String? = Self.currentOverride()
-    @State private var pendingPath: String?
+    /// ModelStore reads its folder from UserDefaults.standard itself, not from the app's defaults suite.
+    var defaults: UserDefaults = .standard
+    var sharedOverrideFile: URL = ModelStore.sharedOverrideFileURL
+    /// A launch with `--models=` keeps that folder across restarts, whatever is saved.
+    var launchFolder: URL? = ModelStore.sharedDirectoryOverride
+    @State private var overridePath: String?
     @State private var showingRestartAlert = false
 
     var body: some View {
@@ -42,7 +46,7 @@ struct StorageRow: View {
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.vertical, DS.Spacing.small)
-        .onAppear { overridePath = Self.currentOverride() }
+        .onAppear { overridePath = currentOverride() }
         .alert("Restart required", isPresented: $showingRestartAlert) {
             Button("OK") {}
         } message: {
@@ -50,18 +54,18 @@ struct StorageRow: View {
         }
     }
 
-    // ModelStore reads this key from UserDefaults.standard itself, so this row matches it
-    // instead of the app's defaults suite.
-    private static func currentOverride() -> String? {
-        let custom = UserDefaults.standard.string(forKey: ModelStore.storageOverrideKey)?
+    private func currentOverride() -> String? {
+        let custom = defaults.string(forKey: ModelStore.storageOverrideKey)?
             .trimmingCharacters(in: .whitespaces)
         return (custom?.isEmpty == false) ? custom : nil
     }
 
     /// The folder Parola moves to on its next launch, unless it's the one already in use.
-    private static func pending(_ folder: URL) -> String? {
-        guard folder.standardizedFileURL != ModelStore.shared.directory.standardizedFileURL else { return nil }
-        return (folder.path as NSString).abbreviatingWithTildeInPath
+    private var pendingPath: String? {
+        guard launchFolder == nil else { return nil }
+        let next = ModelStore.configuredDirectory(defaults: defaults, sharedOverrideFile: sharedOverrideFile)
+        guard next.standardizedFileURL != ModelStore.shared.directory.standardizedFileURL else { return nil }
+        return (next.path as NSString).abbreviatingWithTildeInPath
     }
 
     private func chooseStorage() {
@@ -71,18 +75,16 @@ struct StorageRow: View {
         panel.allowsMultipleSelection = false
         panel.title = String(localized: "Choose models folder")
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        UserDefaults.standard.set(url.path, forKey: ModelStore.storageOverrideKey)
-        ModelStore.writeSharedOverride(url.path)
-        overridePath = Self.currentOverride()
-        pendingPath = Self.pending(url)
+        defaults.set(url.path, forKey: ModelStore.storageOverrideKey)
+        ModelStore.writeSharedOverride(url.path, to: sharedOverrideFile)
+        overridePath = currentOverride()
         showingRestartAlert = true
     }
 
     private func resetStorage() {
-        UserDefaults.standard.removeObject(forKey: ModelStore.storageOverrideKey)
-        ModelStore.writeSharedOverride(nil)
-        overridePath = Self.currentOverride()
-        pendingPath = Self.pending(ModelStore.defaultDirectory)
+        defaults.removeObject(forKey: ModelStore.storageOverrideKey)
+        ModelStore.writeSharedOverride(nil, to: sharedOverrideFile)
+        overridePath = currentOverride()
         showingRestartAlert = true
     }
 }

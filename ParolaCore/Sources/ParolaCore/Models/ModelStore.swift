@@ -84,16 +84,8 @@ public final class ModelStore: Sendable {
         managedConfiguration: ManagedConfiguration = .shared
     ) {
         self.managedConfiguration = managedConfiguration
-        if let modelsDirectory {
-            self.modelsDirectory = modelsDirectory
-        } else if let raw = defaults.string(forKey: Self.storageOverrideKey),
-                  !raw.trimmingCharacters(in: .whitespaces).isEmpty {
-            self.modelsDirectory = URL(fileURLWithPath: (raw as NSString).expandingTildeInPath, isDirectory: true)
-        } else if let shared = Self.sharedOverridePath(at: sharedOverrideFile) {
-            self.modelsDirectory = URL(fileURLWithPath: (shared as NSString).expandingTildeInPath, isDirectory: true)
-        } else {
-            self.modelsDirectory = Self.defaultDirectory
-        }
+        self.modelsDirectory = modelsDirectory
+            ?? Self.configuredDirectory(defaults: defaults, sharedOverrideFile: sharedOverrideFile)
         do {
             try FileManager.default.createDirectory(
                 at: self.modelsDirectory,
@@ -132,6 +124,20 @@ public final class ModelStore: Sendable {
         guard let raw = try? String(contentsOf: file, encoding: .utf8) else { return nil }
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// The folder a store made without an explicit directory uses: the defaults override, then the shared file, then the default.
+    public static func configuredDirectory(
+        defaults: UserDefaults = .standard,
+        sharedOverrideFile: URL = sharedOverrideFileURL
+    ) -> URL {
+        if let raw = defaults.string(forKey: storageOverrideKey), !raw.trimmingCharacters(in: .whitespaces).isEmpty {
+            return URL(fileURLWithPath: (raw as NSString).expandingTildeInPath, isDirectory: true)
+        }
+        if let shared = sharedOverridePath(at: sharedOverrideFile) {
+            return URL(fileURLWithPath: (shared as NSString).expandingTildeInPath, isDirectory: true)
+        }
+        return defaultDirectory
     }
 
     public static var defaultDirectory: URL {

@@ -276,6 +276,24 @@ struct SettingsCopyTests {
         #expect(!advanced.contains(model.cacheDirectoryDisplayPath), "\(advanced)")
     }
 
+    @Test("the After a restart line comes from the saved folder, so it is still there when Settings opens again")
+    func pendingModelsFolderSurvivesReopening() {
+        let model = makeModel("settings-copy-models-pending")
+        let defaults = temporaryDefaults()
+        let noSharedFile = FileManager.default.temporaryDirectory.appendingPathComponent("models-path-\(UUID().uuidString).txt")
+        let chosen = FileManager.default.temporaryDirectory.appendingPathComponent("chosen-models-\(UUID().uuidString)", isDirectory: true)
+        defaults.set(chosen.path, forKey: ModelStore.storageOverrideKey)
+        let reopened = words(StorageRow(defaults: defaults, sharedOverrideFile: noSharedFile, launchFolder: nil), model: model)
+        #expect(reopened.contains("After a restart: \((chosen.path as NSString).abbreviatingWithTildeInPath)"), "\(reopened)")
+
+        let flagged = words(StorageRow(defaults: defaults, sharedOverrideFile: noSharedFile, launchFolder: ModelStore.shared.directory), model: model)
+        #expect(!flagged.contains { $0.hasPrefix("After a restart") }, "\(flagged)")
+
+        defaults.set(ModelStore.shared.directory.path, forKey: ModelStore.storageOverrideKey)
+        let inUse = words(StorageRow(defaults: defaults, sharedOverrideFile: noSharedFile, launchFolder: nil), model: model)
+        #expect(!inUse.contains { $0.hasPrefix("After a restart") }, "\(inUse)")
+    }
+
     @Test("the Live Captions panel's title is translated")
     func liveCaptionsTitleIsTranslated() throws {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
