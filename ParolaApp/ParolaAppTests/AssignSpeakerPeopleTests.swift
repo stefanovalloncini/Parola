@@ -164,6 +164,22 @@ struct AssignSpeakerPeopleTests {
         #expect(model.speakerColor(for: "Grace") == DS.speakerPalette[grace.colorIndex])
     }
 
+    @Test("no transcript surface colours a speaker by its label alone")
+    func transcriptSurfacesColourByPerson() throws {
+        let folder = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("ParolaApp/Views/Transcript")
+        let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "swift" }
+        #expect(files.count > 10)
+        let labelOnly = try Regex(#"DS\.speakerColor\(for: [^,()]+\)"#)
+        for file in files {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            let hits = text.matches(of: labelOnly).count
+            #expect(hits == 0, "\(file.lastPathComponent) uses the label hash; use model.speakerColor(for:)")
+        }
+    }
+
     @Test("the palette has a colour for every index the store hands out")
     func paletteCoversTheStore() {
         #expect(DS.speakerPalette.count == PeopleStore.colorCount)

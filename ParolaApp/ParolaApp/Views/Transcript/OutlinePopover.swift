@@ -68,6 +68,8 @@ private struct OutlineRow: View {
     let entry: TranscriptOutline.Entry
     let onJump: () -> Void
 
+    @Environment(AppModel.self) private var model
+
     @State private var hovering = false
 
     var body: some View {
@@ -85,7 +87,7 @@ private struct OutlineRow: View {
                     if let rawSpeaker = entry.speaker, let speaker = SegmentCard.speakerLabel(for: rawSpeaker) {
                         HStack(spacing: 4) {
                             Circle()
-                                .fill(DS.speakerColor(for: rawSpeaker))
+                                .fill(model.speakerColor(for: rawSpeaker))
                                 .frame(width: 5, height: 5)
                             Text(speaker)
                                 .font(DS.Font.caption)

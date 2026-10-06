@@ -18,11 +18,13 @@ struct SpeakerStatsSection: View {
 private struct StatRow: View {
     let stats: SpeakerStats
 
+    @Environment(AppModel.self) private var model
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Circle()
-                    .fill(DS.speakerColor(for: stats.speaker))
+                    .fill(model.speakerColor(for: stats.speaker))
                     .frame(width: 8, height: 8)
                 Text(stats.speaker)
                     .font(DS.Font.body.weight(.medium))
