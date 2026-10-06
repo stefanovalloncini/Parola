@@ -461,8 +461,7 @@ enum ProcessTapSampleCopy {
     }
 }
 
-/// Raw enumeration of `kAudioHardwarePropertyProcessObjectList`, shared by every caller that
-/// needs the system's audio process objects — matching by bundle ID or by PID.
+/// Raw enumeration of `kAudioHardwarePropertyProcessObjectList`, shared by callers matching by bundle ID or by PID.
 enum AudioProcessObjectList {
     static func current() -> [AudioObjectID] {
         var address = AudioObjectPropertyAddress(
@@ -477,7 +476,7 @@ enum AudioProcessObjectList {
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &dataSize, &objects) == noErr else {
             return []
         }
-        return objects
+        return Array(objects.prefix(Int(dataSize) / MemoryLayout<AudioObjectID>.size))
     }
 }
 
