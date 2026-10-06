@@ -62,9 +62,13 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private let modelCache: StreamingModelCache
     private let microphone: @Sendable (DeviceID?) -> Microphone
     private let makeDecoder: MakeDecoder
+    private let clock: any Clock<Duration>
     private var modelLease: StreamingModelLease?
     private var persister: StreamingAudioPersister?
     private var loop: StreamingRealtimeLoop?
+    /// The loop a stop still waits on for the model, so a cancel can reach it.
+    private var stoppingLoop: StreamingRealtimeLoop?
+    private var stopWaiters: [CheckedContinuation<Void, Never>] = []
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
     private var segmentContinuation: AsyncStream<ConfirmedAudioBatch>.Continuation?
     private var consumerTask: Task<Void, Never>?
@@ -93,7 +97,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         deviceUID: String? = nil,
         modelCache: StreamingModelCache,
         microphone: @escaping @Sendable (DeviceID?) -> Microphone = Microphone.input,
-        makeDecoder: @escaping MakeDecoder = StreamingTranscriptionSession.whisperDecoder
+        makeDecoder: @escaping MakeDecoder = StreamingTranscriptionSession.whisperDecoder,
+        clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.modelStore = modelStore
         self.persistAudio = persistAudio
@@ -101,6 +106,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         self.modelCache = modelCache
         self.microphone = microphone
         self.makeDecoder = makeDecoder
+        self.clock = clock
     }
 
     /// A decoder of our own over the borrowed model, so this session's logits filters never land on
@@ -170,7 +176,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             options: options, speakerLabeler: speakerLabeler, persister: persister
         ) { [modelCache, modelStore] sink, confirmed in
             StreamingRealtimeLoop(
-                configuration: .init(wantsConfirmedAudio: speakerLabeler != nil, finishesLoadOnStop: persistAudio),
+                configuration: .init(wantsConfirmedAudio: speakerLabeler != nil, waitsForModelOnStop: persistAudio),
                 dependencies: .init(
                     requestPermission: microphone.requestPermission,
                     startCapture: { ingest in
@@ -192,6 +198,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
                     tick: { try await Task.sleep(nanoseconds: 100_000_000) }
                 ),
                 levelMeter: levelMeter,
+                clock: clock,
                 onPartial: { sink.handlePartial(text: $0) },
                 onEnergy: { sink.handleEnergy(last: $0) },
                 onConfirmed: { confirmed.yield($0) }
@@ -354,6 +361,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             return
         }
         self.loop = nil
+        stoppingLoop = loop
+        defer { endStopping() }
         await loop.stop()
         // The run task performs the final tail flush after its loop exits; cancelling
         // it here would kill that decode. Confirmed batches from the flush must drain
@@ -361,12 +370,20 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         let outcome = await streamerTask?.value
         segmentContinuation?.finish()
         await consumerTask?.value
-        if case .modelFailed = outcome {
+        switch outcome {
+        case .modelFailed?:
             // start() throws the load failure, so the audio waits in recordingAudioURL() rather than in a .finished nobody reads.
             if let kept = await persister?.finish() { failureAudioURL = kept }
             continuation?.finish()
             await teardown()
             return
+        case .cancelled?:
+            await persister?.discard()
+            continuation?.finish()
+            await teardown()
+            return
+        default:
+            break
         }
 
         let recordedURL = await persister?.finish()
@@ -409,7 +426,11 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     /// Ends the take without the final decode and deletes its audio; no `.finished` is sent.
     public func cancel() async {
         guard let loop else {
-            if isStarting { pendingEnd = .cancel }
+            if let stopping = stoppingLoop {
+                await cancelWaitingStop(of: stopping)
+            } else if isStarting {
+                pendingEnd = .cancel
+            }
             return
         }
         self.loop = nil
@@ -422,6 +443,26 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         await persister?.discard()
         continuation?.finish()
         await teardown()
+    }
+
+    /// A stop still waiting for the model ends as a cancel would: its audio goes and no `.finished` is sent.
+    private func cancelWaitingStop(of stopping: StreamingRealtimeLoop) async {
+        await stopping.cancel()
+        streamerTask?.cancel()
+        await withCheckedContinuation { (waiter: CheckedContinuation<Void, Never>) in
+            if stoppingLoop === stopping {
+                stopWaiters.append(waiter)
+            } else {
+                waiter.resume()
+            }
+        }
+    }
+
+    private func endStopping() {
+        stoppingLoop = nil
+        let waiters = stopWaiters
+        stopWaiters = []
+        for waiter in waiters { waiter.resume() }
     }
 
     /// What a finished take is stamped with: the language the run was pinned to, else what the

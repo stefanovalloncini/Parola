@@ -818,7 +818,7 @@ struct StreamingRealtimeLoopTests {
     private func loadingLoop(
         maxWindowSeconds: Double = 60,
         preModelSlackSeconds: Double = 5,
-        finishesLoadOnStop: Bool = false,
+        waitsForModelOnStop: Bool = false,
         load: @escaping @Sendable () async throws -> Void
     ) -> (loop: StreamingRealtimeLoop, capture: FakeCapture, decodedSampleCounts: Awaitable<[Int]>) {
         let capture = FakeCapture()
@@ -827,7 +827,7 @@ struct StreamingRealtimeLoopTests {
         config.useVAD = false
         config.maxWindowSeconds = maxWindowSeconds
         config.preModelSlackSeconds = preModelSlackSeconds
-        config.finishesLoadOnStop = finishesLoadOnStop
+        config.waitsForModelOnStop = waitsForModelOnStop
         let loop = StreamingRealtimeLoop(
             configuration: config,
             dependencies: .init(
@@ -899,7 +899,7 @@ struct StreamingRealtimeLoopTests {
     @Test("a stop that finishes the load waits for the model and decodes what was held")
     func finishingStopDecodesHeldAudio() async throws {
         let loadGate = UninterruptibleGate()
-        let (loop, capture, decoded) = loadingLoop(finishesLoadOnStop: true) { await loadGate.wait() }
+        let (loop, capture, decoded) = loadingLoop(waitsForModelOnStop: true) { await loadGate.wait() }
         let runTask = LoopRun(loop)
         await loadGate.arrivals.wait(atLeast: 1, "the model load to start")
         capture.push(seconds: 2, value: 0.5)

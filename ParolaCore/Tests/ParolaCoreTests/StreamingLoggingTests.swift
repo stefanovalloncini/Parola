@@ -240,6 +240,55 @@ struct StreamingLoggingTests {
         }
     }
 
+    @Test("a stop that gives up waiting for the model is reported once, with how long it waited")
+    func modelWaitGiveUpReported() async throws {
+        try await withSink { sink in
+            let capture = FakeStreamingCapture()
+            let clock = TestClock()
+            let loadStarted = TestSignal()
+            var config = StreamingRealtimeLoop.Configuration()
+            config.useVAD = false
+            config.waitsForModelOnStop = true
+            let loop = StreamingRealtimeLoop(
+                configuration: config,
+                dependencies: .init(
+                    requestPermission: { true },
+                    startCapture: { capture.install($0) },
+                    stopCapture: {},
+                    model: .loading {
+                        loadStarted.fire()
+                        try await Task.sleep(for: .seconds(3600))
+                        return .init(options: DecodingOptions()) { _, _, _ in
+                            TranscriptionResult(text: "", segments: [], language: "en", timings: TranscriptionTimings())
+                        }
+                    },
+                    tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+                ),
+                clock: clock,
+                onPartial: { _ in },
+                onEnergy: { _ in },
+                onConfirmed: { _ in }
+            )
+            let run = GuardedTask { await loop.run() }
+            await loadStarted.wait("the model load to start")
+            capture.push(seconds: 1, value: 0.5)
+
+            await loop.stop()
+            await clock.waitForSleeper()
+            clock.advance(by: .seconds(120))
+
+            let outcome = try await run.value("the run to end")
+            guard case .stopped? = outcome else {
+                Issue.record("expected .stopped, got \(String(describing: outcome))")
+                return
+            }
+            let records = streamingRecords(sink, message: "a stopped take gave up waiting for its model")
+            #expect(records.count == 1)
+            #expect(records.first?.level == .notice)
+            #expect(records.first?.fields[.elapsed] == .duration(.seconds(120)))
+        }
+    }
+
     @Test("polling the capture leaves its callback one frame deep")
     func pollingDoesNotNestTheCallback() {
         let capture = FakeStreamingCapture()
@@ -344,7 +393,7 @@ struct StreamingLoggingTests {
         #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 7)
     }
 
-    @Test("the realtime loop logs the three run outcomes, a cut model-load buffer, and nothing per-iteration")
+    @Test("the realtime loop logs the three run outcomes, a cut model-load buffer, a model it gave up on, and nothing per-iteration")
     func loopSites() throws {
         let source = try streamingSource("StreamingRealtimeLoop")
         expectCalls([
@@ -352,8 +401,9 @@ struct StreamingLoggingTests {
             #"ParolaLog.error(.streaming, "streaming capture failed to start", [.error: .error(error)])"#,
             #"ParolaLog.error( .streaming, "streaming iteration failed", [.elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error)]"#,
             #"ParolaLog.notice( .streaming, "the model load outlasted the audio buffer, so its oldest audio was dropped", [.audioSeconds: .seconds(Double(dropped) / Double(config.sampleRate))]"#,
+            #"ParolaLog.notice( .streaming, "a stopped take gave up waiting for its model", [.elapsed: .duration(config.maxModelWaitOnStop)]"#,
         ], in: source)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 4)
+        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 5)
     }
 
     @Test("the model cache reports a swallowed load failure, each unload and a stray lease with the model and nothing else")

@@ -20,7 +20,9 @@ actor StreamingRealtimeLoop {
         var sampleRate = WhisperKit.sampleRate
         var wantsConfirmedAudio = false
         /// A stop during the model load waits for the model and decodes what was captured; without it the stop drops that audio.
-        var finishesLoadOnStop = false
+        var waitsForModelOnStop = false
+        /// How long such a stop waits before it gives up on the words; the take keeps its audio.
+        var maxModelWaitOnStop: Duration = .seconds(120)
         /// How far held audio may run past `maxWindowSeconds` during the model load before it's cut back, so the cut isn't paid per buffer.
         var preModelSlackSeconds: Double = 5
     }
@@ -113,6 +115,7 @@ actor StreamingRealtimeLoop {
     private let inbox: OSAllocatedUnfairLock<Inbox>
     private let paused = OSAllocatedUnfairLock(initialState: false)
     private let decoderReadySignal: AsyncStream<Void>.Continuation
+    private let clock: any Clock<Duration>
 
     private var window: [Float] = []
     private var windowStartSample = 0
@@ -126,6 +129,8 @@ actor StreamingRealtimeLoop {
     private var flushesOnStop = true
     private var permissionWait: CheckedContinuation<Bool?, Never>?
     private var modelLoad: Task<Decoder, any Error>?
+    private var modelWaitLimit: Task<Void, Never>?
+    private var gaveUpOnModel = false
 
     /// `decodingOptions` go with a ready `transcribe`; a model that loads brings its own.
     init(
@@ -133,11 +138,13 @@ actor StreamingRealtimeLoop {
         decodingOptions: DecodingOptions = DecodingOptions(),
         dependencies: Dependencies,
         levelMeter: LevelMeter = LevelMeter(),
+        clock: any Clock<Duration> = ContinuousClock(),
         onPartial: @escaping @Sendable (String) -> Void,
         onEnergy: @escaping @Sendable (Float) -> Void,
         onConfirmed: @escaping @Sendable (ConfirmedAudioBatch) -> Void
     ) {
         self.config = configuration
+        self.clock = clock
         self.baseDecodingOptions = decodingOptions
         self.deps = dependencies
         self.onPartial = onPartial
@@ -182,7 +189,7 @@ actor StreamingRealtimeLoop {
         case .loading(let load):
             markWaitingForSpeech()
             let loaded = await loadedModel(load)
-            guard isRunning || (flushesOnStop && config.finishesLoadOnStop) else {
+            guard isRunning || (flushesOnStop && config.waitsForModelOnStop) else {
                 return flushesOnStop ? .stopped : .cancelled
             }
             switch loaded {
@@ -191,7 +198,8 @@ actor StreamingRealtimeLoop {
             case .failure(let error):
                 isRunning = false
                 stopCapture()
-                return Task.isCancelled ? .cancelled : .modelFailed(error)
+                if Task.isCancelled { return .cancelled }
+                return gaveUpOnModel ? .stopped : .modelFailed(error)
             }
         }
         decoderReadySignal.yield()
@@ -230,8 +238,29 @@ actor StreamingRealtimeLoop {
             loading.cancel()
         }
         modelLoad = nil
+        modelWaitLimit?.cancel()
+        modelWaitLimit = nil
         takeAudioHeldForModel()
         return result
+    }
+
+    private func limitModelWait() {
+        guard modelLoad != nil, modelWaitLimit == nil else { return }
+        let limit = config.maxModelWaitOnStop
+        modelWaitLimit = Task { [clock] in
+            try? await Task.sleep(for: limit, clock: clock)
+            if Task.isCancelled { return }
+            self.giveUpOnModel()
+        }
+    }
+
+    private func giveUpOnModel() {
+        guard let modelLoad else { return }
+        gaveUpOnModel = true
+        ParolaLog.notice(
+            .streaming, "a stopped take gave up waiting for its model", [.elapsed: .duration(config.maxModelWaitOnStop)]
+        )
+        modelLoad.cancel()
     }
 
     /// Moves what capture held during the load into the window and lets go of the room it took.
@@ -295,7 +324,11 @@ actor StreamingRealtimeLoop {
     func stop() {
         stopRequested = true
         isRunning = false
-        if !(flushesOnStop && config.finishesLoadOnStop) { modelLoad?.cancel() }
+        if flushesOnStop && config.waitsForModelOnStop {
+            limitModelWait()
+        } else {
+            modelLoad?.cancel()
+        }
         stopCapture()
         answerPermission(nil)
     }

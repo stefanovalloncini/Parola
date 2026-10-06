@@ -566,14 +566,17 @@ struct StreamingCaptureFirstTests {
     private static let tiny = "openai_whisper-tiny"
 
     private static func session(
-        cache: StreamingModelCache, mic: StandInMic, persistAudio: Bool = false
+        cache: StreamingModelCache,
+        mic: StandInMic,
+        persistAudio: Bool = false,
+        clock: any Clock<Duration> = ContinuousClock()
     ) throws -> StreamingTranscriptionSession {
         let store = ModelStore(modelsDirectory: FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-capture-first-\(UUID().uuidString)"))
         try store.seedInstalledModel(tiny)
         return StreamingTranscriptionSession(
             modelStore: store, persistAudio: persistAudio, modelCache: cache,
-            microphone: mic.microphone, makeDecoder: mic.decoder
+            microphone: mic.microphone, makeDecoder: mic.decoder, clock: clock
         )
     }
 
@@ -803,6 +806,87 @@ struct StreamingCaptureFirstTests {
         let stopping = GuardedTask { await session.stop() }
         _ = try await stopping.value("the stop to finish")
         for await _ in events {}
+    }
+
+    @Test("a cancel while a stopped take waits for its model discards the take and returns at once")
+    func cancelReachesAWaitingStop() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
+        let transcriber: any StreamingTranscriber = session
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+        mic.speak(seconds: 1)
+        let audio = try #require(await transcriber.recordingAudioURL())
+        let stopping = GuardedTask { await session.stop() }
+        await mic.captureStopped.wait("capture to stop at once")
+
+        let cancelling = GuardedTask { await session.cancel() }
+        _ = try await cancelling.value("the cancel to return without the model")
+
+        _ = try await stopping.value("the stop to end with the cancel")
+        await #expect(throws: CancellationError.self) { _ = try await starting.value("the start to return") }
+        #expect(!FileManager.default.fileExists(atPath: audio.path), "a cancel after a stop discards, as a plain cancel does")
+        #expect(mic.decodes.value == 0)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        await gate.open(Self.tiny)
+    }
+
+    @Test("a start cancelled while its stopped take waits for the model discards the take")
+    func cancelledStartReachesAWaitingStop() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
+        let transcriber: any StreamingTranscriber = session
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+        mic.speak(seconds: 1)
+        let audio = try #require(await transcriber.recordingAudioURL())
+        let stopping = GuardedTask { await session.stop() }
+        await mic.captureStopped.wait("capture to stop at once")
+
+        starting.cancel()
+
+        await #expect(throws: CancellationError.self) { _ = try await starting.value("the start to return") }
+        _ = try await stopping.value("the stop to end with the cancelled start")
+        #expect(!FileManager.default.fileExists(atPath: audio.path))
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        await gate.open(Self.tiny)
+    }
+
+    @Test("a stopped take whose model never loads ends at the limit with its audio and no words")
+    func stoppedTakeGivesUpOnAStalledModel() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let clock = TestClock()
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true, clock: clock)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+        mic.speak(seconds: 1)
+        let stopping = GuardedTask { await session.stop() }
+        await clock.waitForSleeper()
+
+        clock.advance(by: .seconds(119))
+        #expect(!stopping.isFinished, "still within the wait")
+        clock.advance(by: .seconds(1))
+        _ = try await stopping.value("the stop to give up on the model")
+
+        let events = try #require(try await starting.value("the start to return"))
+        let finished = await finishedTranscript(of: events)
+        #expect(finished?.segments.isEmpty == true)
+        let audio = try #require(finished?.sourceURL, "the take keeps its audio")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        #expect(try AVAudioFile(forReading: audio).length == 17_600)
+        #expect(mic.decodes.value == 0)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        #expect(await cache.droppedLeases == 0)
+        await gate.open(Self.tiny)
     }
 
     @Test("a start cancelled during the model load stops capture and returns its lease")
