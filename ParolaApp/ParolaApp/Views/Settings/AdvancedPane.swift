@@ -8,19 +8,6 @@ struct AdvancedPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SettingsSection("Model storage") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(model.cacheDirectoryDisplayPath)
-                        .font(DS.Font.mono)
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                        .foregroundStyle(DS.Color.secondaryText)
-                    Button("Reveal in Finder") { model.revealCacheDirectory() }
-                        .axLeaf("Advanced.Button.RevealCache")
-                }
-                .padding(DS.Spacing.medium)
-            }
-
             SettingsSection("Backup & restore") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Save your settings to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.")

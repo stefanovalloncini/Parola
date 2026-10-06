@@ -1726,6 +1726,17 @@
         }
       }
     },
+    "After a restart: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dopo il riavvio: %@"
+          }
+        }
+      }
+    },
     "After transcribing": {
       "extractionState": "manual",
       "localizations": {
@@ -2566,6 +2577,17 @@
         }
       }
     },
+    "Backup, restore and reset for your settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backup, ripristino e azzeramento delle impostazioni."
+          }
+        }
+      }
+    },
     "Bare F-keys need Fn unless “standard function keys” is on in Keyboard settings.": {
       "extractionState": "manual",
       "localizations": {
@@ -3302,6 +3324,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scegli come ascolta."
+          }
+        }
+      }
+    },
+    "Choose models folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli la cartella dei modelli"
           }
         }
       }
@@ -8545,17 +8578,6 @@
         }
       }
     },
-    "Model storage": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Storage modelli"
-          }
-        }
-      }
-    },
     "Model: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -8580,6 +8602,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modelli"
+          }
+        }
+      }
+    },
+    "Models folder:": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartella dei modelli:"
           }
         }
       }
@@ -14678,17 +14711,6 @@
         }
       }
     },
-    "Storage:": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cartella:"
-          }
-        }
-      }
-    },
     "Stored in your keychain, never in the settings file.": {
       "extractionState": "manual",
       "localizations": {
@@ -17517,17 +17539,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dove finisce una trascrizione pronta, a partire da una cartella del tuo vault Obsidian."
-          }
-        }
-      }
-    },
-    "Where models are stored, plus backup and reset.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dove sono archiviati i modelli, più backup e ripristino."
           }
         }
       }

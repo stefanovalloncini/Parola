@@ -79,7 +79,7 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     /// Search terms for routes without a pane scope; scoped routes get theirs from the scope.
     var extraSearchKeywords: [String] {
         switch self {
-        case .localModels: return ["model", "whisper", "parakeet", "apple speech", "download", "storage", "delete", "activate", "default"]
+        case .localModels: return ["model", "whisper", "parakeet", "apple speech", "download", "storage", "delete", "activate", "default", "models folder", "model storage", "cache", "reveal"]
         case .about: return ["version", "repository", "diagnostics"]
         default: return []
         }
@@ -127,7 +127,7 @@ private struct SettingsRouteMeta {
         .prompts: SettingsRouteMeta(titleKey: "Prompts", summaryKey: "The prompt library behind dictation cleanup and the Transcript menu.", symbol: "text.cursor", scope: .prompts),
         .automation: SettingsRouteMeta(titleKey: "MCP & Automation", summaryKey: "The MCP server other apps and agents use to drive Parola.", symbol: "bolt.horizontal.circle", scope: .automation),
         .updates: SettingsRouteMeta(titleKey: "Updates", summaryKey: "How Parola checks for new versions.", symbol: "arrow.down.circle", scope: .updates),
-        .advanced: SettingsRouteMeta(titleKey: "Advanced", summaryKey: "Where models are stored, plus backup and reset.", symbol: "wrench.and.screwdriver", scope: .advanced),
+        .advanced: SettingsRouteMeta(titleKey: "Advanced", summaryKey: "Backup, restore and reset for your settings.", symbol: "wrench.and.screwdriver", scope: .advanced),
         .about: SettingsRouteMeta(titleKey: "About", summaryKey: "Version and project links.", symbol: "info.circle", scope: nil)
     ]
 }

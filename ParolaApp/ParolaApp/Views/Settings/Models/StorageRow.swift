@@ -3,27 +3,41 @@ import ParolaCore
 import AppKit
 
 struct StorageRow: View {
+    @Environment(AppModel.self) private var model
     @State private var overridePath: String? = Self.currentOverride()
+    @State private var pendingPath: String?
     @State private var showingRestartAlert = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "folder")
-                .foregroundStyle(DS.Color.secondaryText)
-            Text("Storage:")
-                .font(DS.Font.bodyStrong)
-                .foregroundStyle(DS.Color.secondaryText)
-            Text(displayPath)
-                .font(DS.Font.mono)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer()
-            Button("Choose…") { chooseStorage() }
-                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-            if overridePath != nil {
-                Button("Use Default") { resetStorage() }
+        VStack(alignment: .leading, spacing: DS.Spacing.hair) {
+            HStack(spacing: 8) {
+                Image(systemName: "folder")
+                    .foregroundStyle(DS.Color.secondaryText)
+                Text("Models folder:")
+                    .font(DS.Font.bodyStrong)
+                    .foregroundStyle(DS.Color.secondaryText)
+                Text(verbatim: model.cacheDirectoryDisplayPath)
+                    .font(DS.Font.body)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                Button("Reveal in Finder") { model.revealCacheDirectory() }
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .axLeaf("LocalModels.Button.RevealFolder")
+                Button("Choose…") { chooseStorage() }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                if overridePath != nil {
+                    Button("Use Default") { resetStorage() }
+                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                }
+            }
+            if let pendingPath {
+                Text("After a restart: \(pendingPath)")
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
         }
         .padding(.horizontal, DS.Spacing.medium)
@@ -44,11 +58,10 @@ struct StorageRow: View {
         return (custom?.isEmpty == false) ? custom : nil
     }
 
-    private var displayPath: String {
-        if let overridePath {
-            return (overridePath as NSString).abbreviatingWithTildeInPath
-        }
-        return (ModelStore.defaultDirectory.path as NSString).abbreviatingWithTildeInPath
+    /// The folder Parola moves to on its next launch, unless it's the one already in use.
+    private static func pending(_ folder: URL) -> String? {
+        guard folder.standardizedFileURL != ModelStore.shared.directory.standardizedFileURL else { return nil }
+        return (folder.path as NSString).abbreviatingWithTildeInPath
     }
 
     private func chooseStorage() {
@@ -56,11 +69,12 @@ struct StorageRow: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.title = "Choose models folder"
+        panel.title = String(localized: "Choose models folder")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         UserDefaults.standard.set(url.path, forKey: ModelStore.storageOverrideKey)
         ModelStore.writeSharedOverride(url.path)
         overridePath = Self.currentOverride()
+        pendingPath = Self.pending(url)
         showingRestartAlert = true
     }
 
@@ -68,6 +82,7 @@ struct StorageRow: View {
         UserDefaults.standard.removeObject(forKey: ModelStore.storageOverrideKey)
         ModelStore.writeSharedOverride(nil)
         overridePath = Self.currentOverride()
+        pendingPath = Self.pending(ModelStore.defaultDirectory)
         showingRestartAlert = true
     }
 }

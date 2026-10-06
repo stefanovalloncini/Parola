@@ -211,4 +211,16 @@ struct SettingsCopyTests {
         #expect(!names.contains("Prompts"), "\(names)")
         #expect(names.contains("Add Service"), "\(names)")
     }
+
+    @Test("the models folder has one row, on Local Models, showing the folder in use, and Advanced no longer repeats it")
+    func oneModelsFolderRow() {
+        let model = makeModel("settings-copy-models-folder")
+        let row = words(StorageRow(), model: model)
+        #expect(row.contains("Models folder:"), "\(row)")
+        #expect(row.contains(model.cacheDirectoryDisplayPath), "\(row)")
+        #expect(row.contains("Reveal in Finder"), "\(row)")
+        let advanced = words(AdvancedPane(), model: model)
+        #expect(!advanced.contains("Model storage"), "\(advanced)")
+        #expect(!advanced.contains(model.cacheDirectoryDisplayPath), "\(advanced)")
+    }
 }
