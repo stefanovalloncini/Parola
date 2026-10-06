@@ -4,32 +4,31 @@ import ParolaCore
 struct PromptsPane: View {
     @Environment(AppModel.self) private var model
     @State private var searchText: String = ""
-    @State private var sortOption: SortOption = .builtInFirst
+    @State private var sortOption: SortOption = .original
     @State private var userPrompts: [Prompt] = []
     @State private var editing: PromptEditDraft?
+    @State private var pendingDelete: Prompt?
     @State private var saveFailed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SearchPill(text: $searchText, placeholder: "Search prompts…", leaf: "Prompts.TextField.Search")
-            sortRow
+            HStack(spacing: 8) {
+                SearchPill(text: $searchText, placeholder: "Search prompts…", leaf: "Prompts.TextField.Search")
+                sortMenu
+            }
             if saveFailed { saveErrorBanner }
 
-            SettingsSection {
-                let visible = visiblePrompts
-                if visible.isEmpty {
-                    HStack {
-                        Text("No prompts match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
-                        Spacer()
-                    }
-                    .padding(DS.Spacing.medium)
+            SettingsSection("Custom prompts") {
+                let custom = visible(userPrompts)
+                if custom.isEmpty {
+                    InlineEmptyText(isSearching ? "No prompts match." : "No custom prompts yet")
                 } else {
-                    ForEach(Array(visible.enumerated()), id: \.element.id) { idx, prompt in
+                    ForEach(Array(custom.enumerated()), id: \.element.id) { idx, prompt in
                         PromptRow(
                             prompt: prompt,
                             isFirst: idx == 0,
                             onEdit: { editing = PromptEditDraft(prompt: prompt) },
-                            onDelete: { delete(prompt) }
+                            onDelete: { pendingDelete = prompt }
                         )
                     }
                 }
@@ -45,6 +44,22 @@ struct PromptsPane: View {
                 Spacer()
             }
 
+            SettingsSection("Built-in prompts") {
+                let builtIns = visible(Prompt.builtIns)
+                if builtIns.isEmpty {
+                    InlineEmptyText("No prompts match.")
+                } else {
+                    ForEach(Array(builtIns.enumerated()), id: \.element.id) { idx, prompt in
+                        PromptRow(
+                            prompt: prompt,
+                            isFirst: idx == 0,
+                            onEdit: { editing = PromptEditDraft(viewing: prompt) },
+                            onDelete: {}
+                        )
+                    }
+                }
+            }
+
             SettingHelper(text: "Built-in prompts are read-only. Add your own to get a new entry in the Transcript menu.")
         }
         .task { await reload() }
@@ -57,27 +72,41 @@ struct PromptsPane: View {
                         editing = nil
                     }
                 },
+                onDuplicate: { editing = $0.duplicate() },
                 onCancel: { editing = nil }
             )
         }
+        .confirmationDialog(
+            String(localized: "Delete “\(pendingDelete?.name ?? "")”?"),
+            isPresented: isConfirmingDelete,
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { prompt in
+            Button("Delete", role: .destructive) {
+                delete(prompt)
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        }
     }
 
-    private var allPrompts: [Prompt] {
-        Prompt.builtIns + userPrompts
+    private var isConfirmingDelete: Binding<Bool> {
+        Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
     }
 
-    private var visiblePrompts: [Prompt] {
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private func visible(_ prompts: [Prompt]) -> [Prompt] {
         let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
-        var prompts = allPrompts
+        var prompts = prompts
         if !query.isEmpty {
             prompts = prompts.filter { $0.name.lowercased().contains(query) }
         }
         switch sortOption {
-        case .builtInFirst:
-            prompts.sort { lhs, rhs in
-                if lhs.isBuiltIn == rhs.isBuiltIn { return false }
-                return lhs.isBuiltIn
-            }
+        case .original:
+            break
         case .nameAZ:
             prompts.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         case .nameZA:
@@ -105,24 +134,21 @@ struct PromptsPane: View {
         .axLeaf("Prompts.Text.SaveError")
     }
 
-    private var sortRow: some View {
-        HStack {
-            Spacer()
-            Menu {
-                sortOptions
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
-            }
-            .menuStyle(.button)
-            .buttonStyle(DSIconChipButtonStyle(side: 28))
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Sort prompts")
-            .accessibilityRepresentation {
-                Menu("Sort prompts") { sortOptions }
-            }
-            .axLeaf("Prompts.Menu.Sort")
+    private var sortMenu: some View {
+        Menu {
+            sortOptions
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
         }
+        .menuStyle(.button)
+        .buttonStyle(DSIconChipButtonStyle(side: 28))
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Sort prompts")
+        .accessibilityRepresentation {
+            Menu("Sort prompts") { sortOptions }
+        }
+        .axLeaf("Prompts.Menu.Sort")
     }
 
     @ViewBuilder private var sortOptions: some View {
@@ -182,11 +208,11 @@ struct PromptsPane: View {
     }
 
     enum SortOption: CaseIterable {
-        case builtInFirst, nameAZ, nameZA
+        case original, nameAZ, nameZA
 
         var label: LocalizedStringKey {
             switch self {
-            case .builtInFirst: return "Built-in first"
+            case .original: return "Original order"
             case .nameAZ: return "Name A→Z"
             case .nameZA: return "Name Z→A"
             }
@@ -203,10 +229,17 @@ private struct PromptRow: View {
     var body: some View {
         SettingRow(titleVerbatim: prompt.name, isFirst: isFirst) {
             HStack(spacing: 6) {
-                Text(prompt.isBuiltIn ? "Built-in" : "Custom")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
-                if !prompt.isBuiltIn {
+                if prompt.isBuiltIn {
+                    Button {
+                        onEdit()
+                    } label: {
+                        Image(systemName: "eye")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Show prompt")
+                    .accessibilityLabel("Show prompt")
+                    .axLeaf("Prompts.Button.View")
+                } else {
                     Button {
                         onEdit()
                     } label: {
@@ -235,18 +268,42 @@ private struct PromptRow: View {
 final class PromptEditDraft: Identifiable {
     let id: UUID
     let isExisting: Bool
+    /// A built-in shown for reading; its one way forward is a copy.
+    let isReadOnly: Bool
     var name: String
     var instructions: String
     var triggerWordsText: String
     var assistantMode: Bool
 
-    init(prompt: Prompt) {
+    convenience init(prompt: Prompt) {
+        self.init(prompt: prompt, isExisting: !prompt.name.isEmpty, isReadOnly: false)
+    }
+
+    convenience init(viewing builtIn: Prompt) {
+        self.init(prompt: builtIn, isExisting: true, isReadOnly: true)
+    }
+
+    private init(prompt: Prompt, isExisting: Bool, isReadOnly: Bool) {
         self.id = prompt.id
-        self.isExisting = !prompt.name.isEmpty
+        self.isExisting = isExisting
+        self.isReadOnly = isReadOnly
         self.name = prompt.name
         self.instructions = prompt.instructions
         self.triggerWordsText = prompt.triggerWords.joined(separator: ", ")
         self.assistantMode = !prompt.useSystemInstructions
+    }
+
+    /// Trigger words stay behind: two prompts can't answer to the same word.
+    func duplicate() -> PromptEditDraft {
+        PromptEditDraft(
+            prompt: Prompt(
+                name: String(localized: "\(name) copy"),
+                instructions: instructions,
+                useSystemInstructions: !assistantMode
+            ),
+            isExisting: false,
+            isReadOnly: false
+        )
     }
 
     var parsedTriggerWords: [String] {
@@ -260,66 +317,83 @@ final class PromptEditDraft: Identifiable {
 private struct PromptEditor: View {
     @Bindable var draft: PromptEditDraft
     let onCommit: (PromptEditDraft) -> Void
+    let onDuplicate: (PromptEditDraft) -> Void
     let onCancel: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if draft.isExisting {
+            if draft.isReadOnly {
+                Text("Built-in Prompt").font(DS.Font.heading)
+            } else if draft.isExisting {
                 Text("Edit Prompt").font(DS.Font.heading)
             } else {
                 Text("New Prompt").font(DS.Font.heading)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Name").font(DS.Font.secondary).foregroundStyle(DS.Color.secondaryText)
-                TextField("Name", text: $draft.name)
-                    .textFieldStyle(.roundedBorder)
-                    .axLeaf("PromptEditor.TextField.Name")
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Instructions").font(DS.Font.secondary).foregroundStyle(DS.Color.secondaryText)
-                TextEditor(text: $draft.instructions)
-                    .font(DS.Font.body)
-                    .frame(minHeight: 160)
-                    .padding(DS.Spacing.tight)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                            .strokeBorder(Color.secondary.opacity(0.3))
-                    )
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Trigger words").font(DS.Font.secondary).foregroundStyle(DS.Color.secondaryText)
-                TextField("summary, recap", text: $draft.triggerWordsText)
-                    .textFieldStyle(.roundedBorder)
-                    .axLeaf("PromptEditor.TextField.TriggerWords")
-                Text("Words that switch to this prompt for one dictation. Separate with commas.")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Toggle("Assistant mode", isOn: $draft.assistantMode)
-                    .axLeaf("PromptEditor.Toggle.AssistantMode")
-                Text("When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
-            }
+            fields
+                .disabled(draft.isReadOnly)
 
             HStack {
                 Spacer()
-                Button("Cancel", role: .cancel, action: onCancel)
-                    .axLeaf("PromptEditor.Button.Cancel")
-                Button("Save") { onCommit(draft) }
-                    .sheetPrimaryAction()
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .axLeaf("PromptEditor.Button.Save")
+                if draft.isReadOnly {
+                    Button("Close", role: .cancel, action: onCancel)
+                        .axLeaf("PromptEditor.Button.Close")
+                    Button("Duplicate") { onDuplicate(draft) }
+                        .sheetPrimaryAction()
+                        .keyboardShortcut(.defaultAction)
+                        .axLeaf("PromptEditor.Button.Duplicate")
+                } else {
+                    Button("Cancel", role: .cancel, action: onCancel)
+                        .axLeaf("PromptEditor.Button.Cancel")
+                    Button("Save") { onCommit(draft) }
+                        .sheetPrimaryAction()
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .axLeaf("PromptEditor.Button.Save")
+                }
             }
         }
         .padding(DS.Spacing.medium)
         .frame(width: 480)
         .tint(DS.Color.accent)
+    }
+
+    @ViewBuilder private var fields: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Name").font(DS.Font.secondary).foregroundStyle(DS.Color.secondaryText)
+            TextField("Name", text: $draft.name)
+                .textFieldStyle(.roundedBorder)
+                .axLeaf("PromptEditor.TextField.Name")
+        }
+
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Instructions").font(DS.Font.secondary).foregroundStyle(DS.Color.secondaryText)
+            TextEditor(text: $draft.instructions)
+                .font(DS.Font.body)
+                .frame(minHeight: 160)
+                .padding(DS.Spacing.tight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                        .strokeBorder(Color.secondary.opacity(0.3))
+                )
+        }
+
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Trigger words").font(DS.Font.secondary).foregroundStyle(DS.Color.secondaryText)
+            TextField("summary, recap", text: $draft.triggerWordsText)
+                .textFieldStyle(.roundedBorder)
+                .axLeaf("PromptEditor.TextField.TriggerWords")
+            Text("Words that switch to this prompt for one dictation. Separate with commas.")
+                .font(DS.Font.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
+        }
+
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("Assistant mode", isOn: $draft.assistantMode)
+                .axLeaf("PromptEditor.Toggle.AssistantMode")
+            Text("When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.")
+                .font(DS.Font.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
+        }
     }
 }

@@ -100,6 +100,17 @@
         }
       }
     },
+    "%@ copy": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ copia"
+          }
+        }
+      }
+    },
     "%@ dictation mode": {
       "extractionState": "manual",
       "localizations": {
@@ -2818,23 +2829,24 @@
         }
       }
     },
-    "Built-in": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Integrato"
-          }
-        }
-      }
-    },
-    "Built-in first": {
+    "Built-in Prompt": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Prima i predefiniti"
+            "value": "Prompt integrato"
+          }
+        }
+      }
+    },
+    "Built-in prompts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt integrati"
           }
         }
       }
@@ -4456,17 +4468,6 @@
         }
       }
     },
-    "Custom": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Personalizzato"
-          }
-        }
-      }
-    },
     "Custom endpoint": {
       "extractionState": "manual",
       "localizations": {
@@ -4485,6 +4486,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Istruzioni personalizzate"
+          }
+        }
+      }
+    },
+    "Custom prompts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt personalizzati"
           }
         }
       }
@@ -5418,6 +5430,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rimuove “scratch that”, “wait, no” e collassa esitazioni come “, I mean,”."
+          }
+        }
+      }
+    },
+    "Duplicate": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplica"
           }
         }
       }
@@ -9434,6 +9457,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ancora nessuna correzione"
+          }
+        }
+      }
+    },
+    "No custom prompts yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessun prompt personalizzato"
           }
         }
       }
@@ -14003,6 +14037,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra o nascondi la barra laterale"
+          }
+        }
+      }
+    },
+    "Show prompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra prompt"
           }
         }
       }
