@@ -6636,13 +6636,13 @@
         }
       }
     },
-    "Get yt-dlp…": {
+    "Get yt-dlp": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scarica yt-dlp…"
+            "value": "Scarica yt-dlp"
           }
         }
       }

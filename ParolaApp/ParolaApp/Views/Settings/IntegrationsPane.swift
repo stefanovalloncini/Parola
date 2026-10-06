@@ -73,7 +73,7 @@ private struct ToolStatusRow: View {
                     if installChoice == .homebrew {
                         installButton
                     } else if installChoice == .download {
-                        Button("Get yt-dlp…") { NSWorkspace.shared.open(SupportLinks.ytDlpReleases) }
+                        Button("Get yt-dlp") { NSWorkspace.shared.open(SupportLinks.ytDlpReleases) }
                             .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                             .axLeaf("Integrations.Button.Download.\(name)")
                     } else if isStale, case .homebrew? = updateRoute {

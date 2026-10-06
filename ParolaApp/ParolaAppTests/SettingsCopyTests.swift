@@ -208,6 +208,10 @@ struct SettingsCopyTests {
         model.brewLocator = { nil }
         model.refreshYtDlpAvailability()
         #expect(model.homebrewAvailable == false)
+        let buttons = elements(IntegrationsPane(), model: model)
+            .filter { $0.role == NSAccessibility.Role.button.rawValue }
+            .compactMap(\.name)
+        #expect(buttons.contains("Get yt-dlp"), "a web link, so no ellipsis: \(buttons)")
         model.brewLocator = { "/opt/homebrew/bin/brew" }
         model.refreshYtDlpAvailability()
         #expect(model.homebrewAvailable)
