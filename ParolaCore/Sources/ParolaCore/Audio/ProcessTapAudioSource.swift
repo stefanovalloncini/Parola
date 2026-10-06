@@ -45,19 +45,7 @@ public actor ProcessTapAudioSource: LiveAudioSource, TargetsGoneReporting {
     }
 
     private static func allAudioProcessObjects() -> [AudioObjectID] {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyProcessObjectList,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var dataSize: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &dataSize) == noErr,
-              dataSize > 0 else { return [] }
-        var objects = [AudioObjectID](repeating: 0, count: Int(dataSize) / MemoryLayout<AudioObjectID>.size)
-        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &dataSize, &objects) == noErr else {
-            return []
-        }
-        return objects
+        AudioProcessObjectList.current()
     }
 
     /// A target bundle ID matches the app itself and its helper bundles (`id` or `id.*`),
@@ -470,6 +458,26 @@ enum ProcessTapSampleCopy {
             memcpy(to, from, Int(bytes))
         }
         return copy
+    }
+}
+
+/// Raw enumeration of `kAudioHardwarePropertyProcessObjectList`, shared by every caller that
+/// needs the system's audio process objects — matching by bundle ID or by PID.
+enum AudioProcessObjectList {
+    static func current() -> [AudioObjectID] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyProcessObjectList,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var dataSize: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &dataSize) == noErr,
+              dataSize > 0 else { return [] }
+        var objects = [AudioObjectID](repeating: 0, count: Int(dataSize) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &dataSize, &objects) == noErr else {
+            return []
+        }
+        return objects
     }
 }
 

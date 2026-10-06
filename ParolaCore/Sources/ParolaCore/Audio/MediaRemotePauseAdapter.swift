@@ -6,8 +6,22 @@ import CoreAudio
 import Darwin
 #endif
 
+/// One process the audio hardware knows about, as reported by `kAudioHardwarePropertyProcessObjectList`.
+struct OutputProcess: Sendable, Equatable {
+    let pid: pid_t
+    let isRunningOutput: Bool
+}
+
+/// Supplies the processes currently known to the audio hardware. Tests inject a fixture;
+/// the default reads `kAudioHardwarePropertyProcessObjectList` and never runs off the main test suite.
+typealias OutputActivityProbe = @Sendable () -> [OutputProcess]
+
 struct MediaRemotePauseAdapter: MediaPlaybackToggler {
-    init() {}
+    private let outputActivityProbe: OutputActivityProbe
+
+    init(outputActivityProbe: @escaping OutputActivityProbe = Self.liveOutputActivityProbe) {
+        self.outputActivityProbe = outputActivityProbe
+    }
 
     func pause() async {
         #if canImport(Darwin) && os(macOS)
@@ -22,34 +36,56 @@ struct MediaRemotePauseAdapter: MediaPlaybackToggler {
     }
 
     /// MediaRemote's now-playing query answers false to unentitled GUI apps on modern
-    /// macOS even while media plays (send still works), so an audibly rendering output
-    /// device also counts as playing.
+    /// macOS even while media plays (send still works), so a process other than Parola's
+    /// own that is actively rendering output also counts as playing.
     func isPlaying() async -> Bool {
         #if canImport(Darwin) && os(macOS)
-        if await MediaRemoteBridge.shared.isPlaying() { return true }
-        return Self.defaultOutputDeviceRunningSomewhere()
+        let mediaRemoteSaysPlaying = await MediaRemoteBridge.shared.isPlaying()
+        return Self.decide(mediaRemoteSaysPlaying: mediaRemoteSaysPlaying, processes: outputActivityProbe())
         #else
         return true
         #endif
     }
 
+    static func decide(mediaRemoteSaysPlaying: Bool, processes: [OutputProcess]) -> Bool {
+        if mediaRemoteSaysPlaying { return true }
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        return processes.contains { $0.pid != ownPID && $0.isRunningOutput }
+    }
+
     #if canImport(Darwin) && os(macOS)
-    private static func defaultOutputDeviceRunningSomewhere() -> Bool {
+    static func liveOutputActivityProbe() -> [OutputProcess] {
+        AudioProcessObjectList.current().compactMap { object in
+            guard let pid = pid(of: object), let isRunningOutput = isRunningOutput(of: object) else { return nil }
+            return OutputProcess(pid: pid, isRunningOutput: isRunningOutput)
+        }
+    }
+
+    private static func pid(of processObject: AudioObjectID) -> pid_t? {
         var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mSelector: kAudioProcessPropertyPID,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var device = AudioObjectID(kAudioObjectUnknown)
-        var size = UInt32(MemoryLayout<AudioObjectID>.size)
-        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr,
-              device != kAudioObjectUnknown else { return false }
-        address.mSelector = kAudioDevicePropertyDeviceIsRunningSomewhere
-        var running: UInt32 = 0
-        size = UInt32(MemoryLayout<UInt32>.size)
-        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &running) == noErr else { return false }
-        return running != 0
+        var value: pid_t = 0
+        var size = UInt32(MemoryLayout<pid_t>.size)
+        guard AudioObjectGetPropertyData(processObject, &address, 0, nil, &size, &value) == noErr else { return nil }
+        return value
     }
+
+    private static func isRunningOutput(of processObject: AudioObjectID) -> Bool? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioProcessPropertyIsRunningOutput,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(processObject, &address, 0, nil, &size, &value) == noErr else { return nil }
+        return value != 0
+    }
+    #else
+    static func liveOutputActivityProbe() -> [OutputProcess] { [] }
     #endif
 }
 
