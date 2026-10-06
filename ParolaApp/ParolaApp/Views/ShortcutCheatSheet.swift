@@ -107,7 +107,7 @@ struct ShortcutCatalog {
                 Entry(label: text("Transcriptions"),             keys: "⌘ ⌥ 2"),
                 Entry(label: text("Meetings"),                   keys: "⌘ ⌥ 3", requires: .meetings),
                 Entry(label: text("Dictations"),                 keys: "⌘ ⌥ 4", requires: .dictation),
-                Entry(label: text("Activity"),                   keys: "⌘ ⌥ 5"),
+                Entry(label: text("Queue"),                      keys: "⌘ ⌥ 5"),
                 Entry(label: text("Recently Deleted"),           keys: "⌘ ⌥ 6"),
                 Entry(label: text("Statistics"),                 keys: "⌘ ⌥ 7"),
                 Entry(label: text("Show or Hide Sidebar"),       keys: "⌘ ⌃ S"),

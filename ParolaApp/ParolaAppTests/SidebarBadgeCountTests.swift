@@ -91,7 +91,20 @@ struct SidebarBadgeCountTests {
         #expect(!model.sidebarShowsActivity)
     }
 
-    @Test("the Activity row reads Failed once only failures remain")
+    @Test("the Queue row is named Queue while jobs wait")
+    func activityRowReadsQueue() async {
+        let model = await makeModel()
+        model.batchJobs = [job("a", status: .transcribing), job("b", status: .pending)]
+        let sidebar = HostedWindow(LibrarySidebar().environment(model), width: 240, height: 600)
+        defer { sidebar.close() }
+        _ = await waitUntil { sidebar.rowCount > 4 }
+        let words = HostedAccessibility.words(in: sidebar.host)
+        #expect(words.contains("Queue"), "\(words)")
+        #expect(!words.contains("In Progress"), "\(words)")
+        #expect(!words.contains("Failed"), "\(words)")
+    }
+
+    @Test("the Queue row says Failed once only failures remain")
     func activityRowReadsFailed() async {
         let model = await makeModel()
         model.batchJobs = [job("a", status: .failed), job("b", status: .failed), job("c", status: .done)]
@@ -99,6 +112,7 @@ struct SidebarBadgeCountTests {
         defer { sidebar.close() }
         _ = await waitUntil { sidebar.rowCount > 4 }
         let words = HostedAccessibility.words(in: sidebar.host)
+        #expect(words.contains("Queue"), "\(words)")
         #expect(words.contains("Failed"), "\(words)")
         #expect(!words.contains("In Progress"), "\(words)")
     }

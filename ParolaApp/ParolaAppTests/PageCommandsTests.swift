@@ -108,7 +108,7 @@ struct PageCommandsTests {
         let view = try #require(await viewMenu())
         let titles = view.items.map(\.title)
         let go = try #require(titles.firstIndex(of: "Go"))
-        let pages = ["Library", "Transcriptions", "Meetings", "Dictations", "Activity", "Recently Deleted", "Statistics"]
+        let pages = ["Library", "Transcriptions", "Meetings", "Dictations", "Queue", "Recently Deleted", "Statistics"]
 
         for (offset, page) in pages.enumerated() {
             let item = view.items[go + 1 + offset]
@@ -126,16 +126,16 @@ struct PageCommandsTests {
         return menu.items.first { $0.title == title }
     }
 
-    @Test("Go ▸ Activity is on only while the sidebar has an Activity row")
+    @Test("Go ▸ Queue is on only while the sidebar has a Queue row")
     func activityFollowsTheSidebarRow() {
         let library = goItem("Library")
-        let idle = goItem("Activity")
+        let idle = goItem("Queue")
         #expect(!model.sidebarShowsActivity)
         #expect(library?.isEnabled == true)
         #expect(idle?.isEnabled == false)
 
         model.batchJobs = [BatchJob(url: URL(fileURLWithPath: "/tmp/PageCommandsTests/a.wav"), status: .pending)]
-        let waiting = goItem("Activity")
+        let waiting = goItem("Queue")
         #expect(model.sidebarShowsActivity)
         #expect(waiting?.isEnabled == true)
     }

@@ -58,7 +58,7 @@ struct CopyCasingTests {
 
     @Test("the casing rule itself rejects sentence case")
     func ruleRejectsSentenceCase() {
-        #expect(isTitleCase("No Jobs Yet"))
+        #expect(isTitleCase("Nothing Queued"))
         #expect(isTitleCase("Export as TXT"))
         #expect(!isTitleCase("No jobs yet"))
         #expect(!isTitleCase("mic recording hotkey"))

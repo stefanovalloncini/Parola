@@ -1,7 +1,7 @@
 import Foundation
 import ParolaCore
 
-/// The Activity row: the work still to run, or once none is left, the jobs that failed in the last day.
+/// The Queue row: the work still to run, or once none is left, the jobs that failed in the last day.
 enum SidebarActivity: Equatable {
     case inProgress(count: Int)
     case failed(count: Int)
@@ -29,12 +29,8 @@ enum SidebarActivity: Equatable {
         }
     }
 
-    /// The source key, so the casing and the Italian can be read back.
-    var title: String {
-        switch self {
-        case .inProgress: "In Progress"
-        case .failed: "Activity.Failed"
-        }
+    var isFailed: Bool {
+        if case .failed = self { true } else { false }
     }
 
     var systemImage: String {

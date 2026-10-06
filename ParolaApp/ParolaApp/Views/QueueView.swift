@@ -120,7 +120,7 @@ struct QueueView: View {
     private var empty: some View {
         EmptyStateView(
             systemImage: "list.bullet.indent",
-            title: "No Jobs Yet",
+            title: "Nothing Queued",
             message: "Queued transcriptions appear here. They stay until you clear them."
         ) {
             Button {

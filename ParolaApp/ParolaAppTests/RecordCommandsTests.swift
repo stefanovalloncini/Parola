@@ -151,6 +151,6 @@ struct RecordCommandsItalianTests {
         #expect(String(localized: "Record \("Zoom") Meeting", bundle: italian) == "Registra riunione Zoom")
         #expect(String(localized: "Recording options", bundle: italian) == "Opzioni di registrazione")
         #expect(String(localized: "Transcribe Link…", bundle: italian) == "Trascrivi link…")
-        #expect(String(localized: "Batch Transcribe…", bundle: italian) == "Trascrivi in batch…")
+        #expect(String(localized: "Add to Queue…", bundle: italian) == "Aggiungi alla coda…")
     }
 }

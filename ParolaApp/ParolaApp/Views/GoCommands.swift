@@ -23,7 +23,7 @@ struct GoCommands: View {
                     .keyboardShortcut("4", modifiers: [.command, .option])
                     .axLeaf("Menu.View.Go.Dictations")
             }
-            Button("Activity") { model.openQueue() }
+            Button("Queue") { model.openQueue() }
                 .keyboardShortcut("5", modifiers: [.command, .option])
                 .disabled(!model.sidebarShowsActivity)
                 .axLeaf("Menu.View.Go.Activity")

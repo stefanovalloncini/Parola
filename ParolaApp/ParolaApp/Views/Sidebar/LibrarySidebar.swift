@@ -31,8 +31,10 @@ struct LibrarySidebar: View {
             }
             if let activity = model.sidebarActivity {
                 Section("Activity") {
-                    Label(LocalizedStringKey(activity.title), systemImage: activity.systemImage)
+                    Label("Queue", systemImage: activity.systemImage)
                         .badge(activity.count)
+                        .badgeProminence(activity.isFailed ? .increased : .standard)
+                        .accessibilityValue(activity.isFailed ? Text("Activity.Failed") : Text(verbatim: ""))
                         .tag(SidebarItem.activity)
                         .axLeaf("Row.Activity")
                 }
