@@ -29,18 +29,46 @@ public protocol StreamingSpeakerLabeler: Sendable {
 ///
 /// One session = one mic capture. Construct a new one to record again.
 public actor StreamingTranscriptionSession: StreamingTranscriber {
+    /// What a take records from; tests stand in for the hardware.
+    struct Microphone: Sendable {
+        var requestPermission: @Sendable () async -> Bool
+        var start: @Sendable (_ onBuffer: @escaping @Sendable ([Float]) -> Void) throws -> Void
+        var stop: @Sendable () -> Void
+
+        static func input(_ deviceID: DeviceID?) -> Microphone {
+            // Capture must not share the cached kit's AudioProcessor: its AVAudioEngine and sample
+            // buffer are per-recording state, and another session could be borrowing the same kit.
+            nonisolated(unsafe) let processor = AudioProcessor()
+            return Microphone(
+                requestPermission: { await AudioProcessor.requestRecordPermission() },
+                start: { onBuffer in
+                    try processor.startRecordingLive(inputDeviceID: deviceID) { buffer in
+                        onBuffer(buffer)
+                        // Runs on the tap thread, serialized with processBuffer's appends, so this purge can't race them.
+                        processor.purgeAudioSamples(keepingLast: 0)
+                    }
+                },
+                stop: { processor.stopRecording() }
+            )
+        }
+    }
+
+    typealias MakeDecoder = @Sendable (StreamingModelLease, TranscriptionOptions) throws -> StreamingRealtimeLoop.Decoder
+
     public let modelStore: ModelStore
     nonisolated let deviceUID: String?
     public nonisolated let levelMeter = LevelMeter()
 
     private let modelCache: StreamingModelCache
+    private let microphone: @Sendable (DeviceID?) -> Microphone
+    private let makeDecoder: MakeDecoder
     private var modelLease: StreamingModelLease?
     private var persister: StreamingAudioPersister?
     private var loop: StreamingRealtimeLoop?
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
     private var segmentContinuation: AsyncStream<ConfirmedAudioBatch>.Continuation?
     private var consumerTask: Task<Void, Never>?
-    private var streamerTask: Task<Void, Never>?
+    private var streamerTask: Task<StreamingRealtimeLoop.Outcome, Never>?
     private var allConfirmed: [TranscriptSegment] = []
     private var nextSegmentID: Int = 0
     private var loadedModel: String?
@@ -63,12 +91,16 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         modelStore: ModelStore = .shared,
         persistAudio: Bool = false,
         deviceUID: String? = nil,
-        modelCache: StreamingModelCache
+        modelCache: StreamingModelCache,
+        microphone: @escaping @Sendable (DeviceID?) -> Microphone = Microphone.input,
+        makeDecoder: @escaping MakeDecoder = StreamingTranscriptionSession.whisperDecoder
     ) {
         self.modelStore = modelStore
         self.persistAudio = persistAudio
         self.deviceUID = deviceUID
         self.modelCache = modelCache
+        self.microphone = microphone
+        self.makeDecoder = makeDecoder
     }
 
     /// A decoder of our own over the borrowed model, so this session's logits filters never land on
@@ -91,7 +123,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         #endif
     }
 
-    /// Loads the model, starts the mic stream, and returns an `AsyncStream` of events.
+    /// Starts the mic stream and loads the model while it captures; returns an `AsyncStream` of
+    /// events once the model is in, and what was said meanwhile is decoded first.
     ///
     /// Downloads the model first if it isn't cached yet. The microphone TCC prompt
     /// is shown on first run; if the user denies, the stream closes with `.failed`.
@@ -100,7 +133,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         speakerLabeler: (any StreamingSpeakerLabeler)? = nil,
         downloadProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> AsyncStream<StreamingEvent> {
-        guard loop == nil, !isStarting, modelLease == nil else {
+        guard loop == nil, !isStarting, modelLease == nil, streamerTask == nil else {
             ParolaLog.fault(.streaming, "start called while a session was already running")
             throw ParolaError.transcriptionFailed("session already started")
         }
@@ -118,26 +151,91 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             .streaming, "streaming session starting on whisperkit",
             [.model: .safe(ModelToken(modelName))]
         )
-        let loaded = try await loadingModel { [modelStore, modelCache] in
-            if !modelStore.isInstalled(modelName) {
-                if await EngineRegistry.shared.registeredEngines().isEmpty {
-                    await ParolaCoreBootstrap.registerBuiltInEngines()
-                }
-                _ = try await modelStore.download(variant: modelName, progress: downloadProgress)
+        let downloaded: Void? = try await loadingModel { [modelStore] in
+            guard !modelStore.isInstalled(modelName) else { return }
+            if await EngineRegistry.shared.registeredEngines().isEmpty {
+                await ParolaCoreBootstrap.registerBuiltInEngines()
             }
-            return try await modelCache.borrow(modelName, store: modelStore)
-        } discarding: { await $0.release() }
-        guard let lease = loaded else {
+            _ = try await modelStore.download(variant: modelName, progress: downloadProgress)
+        }
+        guard downloaded != nil else {
             ParolaLog.info(.streaming, "take stopped before capture started")
             return Self.takeEndedBeforeCapture(modelName: modelName, options: options)
         }
+
+        let microphone = microphone(Self.resolveInputDeviceID(uid: deviceUID))
+        let persister = persistAudio ? StreamingAudioPersister(sampleRate: Double(WhisperKit.sampleRate)) : nil
+        self.loadedModel = modelName
+        let stream = launch(
+            options: options, speakerLabeler: speakerLabeler, persister: persister
+        ) { [modelCache, modelStore] sink, confirmed in
+            StreamingRealtimeLoop(
+                configuration: .init(wantsConfirmedAudio: speakerLabeler != nil),
+                dependencies: .init(
+                    requestPermission: microphone.requestPermission,
+                    startCapture: { ingest in
+                        try microphone.start { buffer in
+                            if ingest(buffer) {
+                                persister?.append(buffer)
+                            }
+                        }
+                    },
+                    stopCapture: microphone.stop,
+                    model: .loading { [weak self] in
+                        let lease = try await modelCache.borrow(modelName, store: modelStore)
+                        guard let self else {
+                            await lease.release()
+                            throw CancellationError()
+                        }
+                        return try await self.decoder(holding: lease, options: options)
+                    },
+                    tick: { try await Task.sleep(nanoseconds: 100_000_000) }
+                ),
+                levelMeter: levelMeter,
+                onPartial: { sink.handlePartial(text: $0) },
+                onEnergy: { sink.handleEnergy(last: $0) },
+                onConfirmed: { confirmed.yield($0) }
+            )
+        }
+        return try await streamOnceDecoding(stream)
+    }
+
+    /// Hands the stream over once decodes can run, or once the take ends before that; a cancel and
+    /// a model that failed to load throw instead.
+    private func streamOnceDecoding(_ stream: AsyncStream<StreamingEvent>) async throws -> AsyncStream<StreamingEvent> {
+        guard let loop, let streamerTask else { return stream }
+        var decoding = false
+        for await _ in loop.decoderReady { decoding = true }
+        if Task.isCancelled {
+            await cancel()
+            throw CancellationError()
+        }
+        if decoding { return stream }
+        switch await streamerTask.value {
+        case .cancelled: throw CancellationError()
+        case .modelFailed(let error): throw error
+        case .stopped, .permissionDenied, .failed: return stream
+        }
+    }
+
+    /// Keeps the borrowed model with the take, so teardown returns it however the take ends.
+    private func decoder(
+        holding lease: StreamingModelLease, options: TranscriptionOptions
+    ) throws -> StreamingRealtimeLoop.Decoder {
+        modelLease = lease
+        return try makeDecoder(lease, options)
+    }
+
+    static func whisperDecoder(
+        over lease: StreamingModelLease, options: TranscriptionOptions
+    ) throws -> StreamingRealtimeLoop.Decoder {
+        let modelName = lease.modelName
         let kit = lease.shared.kit
         guard let tokenizer = kit.tokenizer else {
             ParolaLog.error(
                 .streaming, "tokenizer was nil after model load",
                 [.model: .safe(ModelToken(modelName))]
             )
-            await lease.release()
             throw ParolaError.transcriptionFailed("WhisperKit tokenizer was nil after model load")
         }
 
@@ -152,75 +250,36 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         )
         // Decoding for this session only: logits filters are per-run state and the cached kit's
         // decoder is shared with every other session borrowing the same model.
-        var textDecoder = Self.ownDecoder(borrowing: kit.textDecoder, tokenizer: tokenizer)
+        var textDecoder = ownDecoder(borrowing: kit.textDecoder, tokenizer: tokenizer)
         textDecoder.logitsFilters = applyInitialPrompt(
             options.initialPrompt,
             to: &decoding,
             tokenizer: tokenizer,
             isModelMultilingual: textDecoder.isModelMultilingual
         )
-
-        // Capture must not share the cached kit's AudioProcessor: its AVAudioEngine and sample
-        // buffer are per-recording state, and another session could be borrowing the same kit.
-        nonisolated(unsafe) let processor = AudioProcessor()
         nonisolated(unsafe) let transcriber = TranscribeTask(
             currentTimings: TranscriptionTimings(),
             progress: Progress(),
-            audioProcessor: processor,
             audioEncoder: kit.audioEncoder,
             featureExtractor: kit.featureExtractor,
             segmentSeeker: kit.segmentSeeker,
             textDecoder: textDecoder,
             tokenizer: tokenizer
         )
-        let persister = persistAudio ? StreamingAudioPersister(sampleRate: Double(WhisperKit.sampleRate)) : nil
-        let inputDeviceID = Self.resolveInputDeviceID(uid: deviceUID)
-
-        self.loadedModel = modelName
-        return launch(
-            options: options, speakerLabeler: speakerLabeler, persister: persister, modelLease: lease
-        ) { sink, confirmed in
-            StreamingRealtimeLoop(
-                configuration: .init(wantsConfirmedAudio: speakerLabeler != nil),
-                decodingOptions: decoding,
-                dependencies: .init(
-                    requestPermission: { await AudioProcessor.requestRecordPermission() },
-                    startCapture: { ingest in
-                        try processor.startRecordingLive(inputDeviceID: inputDeviceID) { buffer in
-                            if ingest(buffer) {
-                                persister?.append(buffer)
-                            }
-                            // Runs on the tap thread, serialized with processBuffer's appends, so this purge can't race them.
-                            processor.purgeAudioSamples(keepingLast: 0)
-                        }
-                    },
-                    stopCapture: { processor.stopRecording() },
-                    // The loop holds the lease too, so a session dropped mid-take can't let the shared encoder unload under a decode.
-                    transcribe: { samples, decodeOptions, progress in
-                        defer { withExtendedLifetime(lease) {} }
-                        return try await transcriber.run(audioArray: samples, decodeOptions: decodeOptions, callback: progress)
-                    },
-                    tick: { try await Task.sleep(nanoseconds: 100_000_000) }
-                ),
-                levelMeter: levelMeter,
-                onPartial: { sink.handlePartial(text: $0) },
-                onEnergy: { sink.handleEnergy(last: $0) },
-                onConfirmed: { confirmed.yield($0) }
-            )
+        return StreamingRealtimeLoop.Decoder(options: decoding) { samples, decodeOptions, progress in
+            // The decoder holds the lease too, so a session dropped mid-take can't let the shared encoder unload under a decode.
+            defer { withExtendedLifetime(lease) {} }
+            return try await transcriber.run(audioArray: samples, decodeOptions: decodeOptions, callback: progress)
         }
     }
 
-    /// A stop during the load yields nil and a cancel throws; either way capture never starts and the load goes to `discard`.
-    func loadingModel<Loaded>(
-        _ load: () async throws -> Loaded,
-        discarding discard: (Loaded) async -> Void = { _ in }
-    ) async throws -> Loaded? {
+    /// A stop during the download yields nil and a cancel throws; either way capture never starts.
+    func loadingModel<Loaded>(_ load: () async throws -> Loaded) async throws -> Loaded? {
         isStarting = true
         pendingEnd = nil
         defer { isStarting = false }
         let loaded = try await load()
         guard let end = Task.isCancelled ? .cancel : pendingEnd else { return loaded }
-        await discard(loaded)
         switch end {
         case .cancel: throw CancellationError()
         case .stop: return nil
@@ -267,7 +326,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
         streamerTask = Task { [weak self] in
             let outcome = await loop.run()
-            guard let self else { cont.finish(); return }
+            guard let self else { cont.finish(); return outcome }
             switch outcome {
             case .stopped, .permissionDenied:
                 await self.handleStreamerEndedWithoutStop()
@@ -276,6 +335,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             case .failed(let error):
                 await self.handleStreamerFailure(error)
             }
+            return outcome
         }
 
         return stream
@@ -297,7 +357,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         // The run task performs the final tail flush after its loop exits; cancelling
         // it here would kill that decode. Confirmed batches from the flush must drain
         // through the consumer before the stream finishes.
-        await streamerTask?.value
+        _ = await streamerTask?.value
         segmentContinuation?.finish()
         await consumerTask?.value
 
@@ -348,7 +408,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         await loop.cancel()
         // A decode already in flight would otherwise run to the end before the loop sees the cancel.
         streamerTask?.cancel()
-        await streamerTask?.value
+        _ = await streamerTask?.value
         segmentContinuation?.finish()
         await consumerTask?.value
         await persister?.discard()

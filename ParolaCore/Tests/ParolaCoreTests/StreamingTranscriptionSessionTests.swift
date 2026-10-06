@@ -143,6 +143,69 @@ private actor SuspendingLoader {
     }
 }
 
+/// Stands in for the microphone and the decoder behind `start`, so a take runs the session's own wiring without hardware or weights.
+private final class StandInMic: Sendable {
+    private struct State {
+        var onBuffer: (@Sendable ([Float]) -> Void)?
+        var decodedSampleCounts: [Int] = []
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let granted: Bool
+    let captureStarted = TestSignal()
+    let captureStopped = TestSignal()
+    let decodes = Awaitable(0)
+
+    init(granted: Bool = true) {
+        self.granted = granted
+    }
+
+    func microphone(_ deviceID: DeviceID?) -> StreamingTranscriptionSession.Microphone {
+        .init(
+            requestPermission: { [granted] in granted },
+            start: { [self] onBuffer in
+                state.withLock { $0.onBuffer = onBuffer }
+                captureStarted.fire()
+            },
+            stop: { [self] in captureStopped.fire() }
+        )
+    }
+
+    func decoder(_ lease: StreamingModelLease, _ options: TranscriptionOptions) -> StreamingRealtimeLoop.Decoder {
+        .init(options: DecodingOptions()) { [self] samples, _, _ in
+            state.withLock { $0.decodedSampleCounts.append(samples.count) }
+            decodes.increment()
+            return TranscriptionResult(
+                text: " early words",
+                segments: [TranscriptionSegment(start: 0, end: 0.5, text: " early words")],
+                language: "en",
+                timings: TranscriptionTimings()
+            )
+        }
+    }
+
+    var decodedSampleCounts: [Int] { state.withLock { $0.decodedSampleCounts } }
+
+    func push(seconds: Double, value: Float) {
+        let onBuffer = state.withLock { $0.onBuffer }
+        onBuffer?([Float](repeating: value, count: Int(seconds * 16_000)))
+    }
+
+    /// A breath of silence first: VAD hears voice against the quietest recent buffer.
+    func speak(seconds: Double) {
+        push(seconds: 0.1, value: 0)
+        push(seconds: seconds, value: 0.5)
+    }
+}
+
+private func finishedTranscript(of events: AsyncStream<StreamingEvent>) async -> Transcript? {
+    var finished: Transcript?
+    for await event in events {
+        if case .finished(let transcript) = event { finished = transcript }
+    }
+    return finished
+}
+
 @Suite("Ending a live take")
 struct StreamingTakeEndingTests {
     @Test("a stop while the model loads ends the take before capture: the load yields nothing to launch")
@@ -201,7 +264,9 @@ struct StreamingTakeEndingTests {
         let probe = CacheProbe()
         let gate = LoadGate()
         let cache = StreamingModelCache.probing(probe, gate: gate)
-        let session = StreamingTranscriptionSession(modelStore: try Self.seededStore(), modelCache: cache)
+        let session = StreamingTranscriptionSession(
+            modelStore: try Self.seededStore(), modelCache: cache, microphone: StandInMic().microphone
+        )
         let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
         await probe.loads.wait(atLeast: 1, "the model load to start")
 
@@ -223,7 +288,9 @@ struct StreamingTakeEndingTests {
         let probe = CacheProbe()
         let gate = LoadGate()
         let cache = StreamingModelCache.probing(probe, gate: gate)
-        let session = StreamingTranscriptionSession(modelStore: try Self.seededStore(), modelCache: cache)
+        let session = StreamingTranscriptionSession(
+            modelStore: try Self.seededStore(), modelCache: cache, microphone: StandInMic().microphone
+        )
         let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
         await probe.loads.wait(atLeast: 1, "the model load to start")
 
@@ -239,7 +306,9 @@ struct StreamingTakeEndingTests {
     func failedStartReturnsTheLease() async throws {
         let probe = CacheProbe()
         let cache = StreamingModelCache.probing(probe)
-        let session = StreamingTranscriptionSession(modelStore: try Self.seededStore(), modelCache: cache)
+        let session = StreamingTranscriptionSession(
+            modelStore: try Self.seededStore(), modelCache: cache, microphone: StandInMic().microphone
+        )
 
         await #expect(throws: ParolaError.self) {
             _ = try await session.start(options: TranscriptionOptions(model: Self.tiny))
@@ -468,6 +537,216 @@ struct StreamingTakeEndingTests {
 
         for await _ in events {}
         #expect(try AVAudioFile(forReading: audio).length == 33_600)
+    }
+}
+
+@Suite("Capturing while the model loads")
+struct StreamingCaptureFirstTests {
+    private struct ModelLoadFailure: Error {}
+
+    private static let tiny = "openai_whisper-tiny"
+
+    private static func session(
+        cache: StreamingModelCache, mic: StandInMic, persistAudio: Bool = false
+    ) throws -> StreamingTranscriptionSession {
+        let store = ModelStore(modelsDirectory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-capture-first-\(UUID().uuidString)"))
+        try store.seedInstalledModel(tiny)
+        return StreamingTranscriptionSession(
+            modelStore: store, persistAudio: persistAudio, modelCache: cache,
+            microphone: mic.microphone, makeDecoder: mic.decoder
+        )
+    }
+
+    @Test("audio captured before the model is ready is transcribed once it loads")
+    func earlyAudioIsTranscribed() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+
+        mic.speak(seconds: 2)
+        #expect(mic.decodes.value == 0, "nothing decodes before the model is in")
+        await gate.open(Self.tiny)
+
+        let events = try #require(try await starting.value("the start to return"))
+        await mic.decodes.wait(atLeast: 1, "the early audio to decode")
+        #expect(mic.decodedSampleCounts.first == 33_600, "the first decode gets everything said during the load")
+        await session.stop()
+
+        let finished = await finishedTranscript(of: events)
+        #expect(finished?.segments.map(\.text) == ["early words"])
+        #expect(finished?.segments.first?.start == 0)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+    }
+
+    @Test("capture starts before the model finishes loading")
+    func captureStartsFirst() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let mic = StandInMic()
+        let captureUpAtLoad = Awaitable<Bool?>(nil)
+        let cache = StreamingModelCache(loader: { name, _ in
+            captureUpAtLoad.update { $0 = mic.captureStarted.fired }
+            probe.loads.increment()
+            await gate.wait(name)
+            return try await StreamingModelCache.makeUnloadedKit()
+        })
+        let session = try Self.session(cache: cache, mic: mic)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+
+        #expect(captureUpAtLoad.value == true, "the microphone was up before the load began")
+        #expect(mic.captureStarted.fired)
+        #expect(!mic.captureStopped.fired)
+        #expect(!starting.isFinished, "the start waits for the model")
+
+        await gate.open(Self.tiny)
+        let events = try #require(try await starting.value("the start to return"))
+        await session.stop()
+        for await _ in events {}
+        #expect(mic.captureStopped.fired)
+    }
+
+    @Test("a denied microphone never loads a model")
+    func deniedMicrophoneLoadsNothing() async throws {
+        let probe = CacheProbe()
+        let cache = StreamingModelCache.probing(probe)
+        let mic = StandInMic(granted: false)
+        let session = try Self.session(cache: cache, mic: mic)
+
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        let events = try #require(try await starting.value("the start to return"))
+        var failed = false
+        for await event in events {
+            if case .failed = event { failed = true }
+        }
+
+        #expect(failed, "the denial still reaches the stream")
+        #expect(probe.loads.value == 0)
+        #expect(!mic.captureStarted.fired)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+    }
+
+    @Test("stop during the model load releases the lease and stops capture")
+    func stopDuringLoadReleasesAndStops() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+        mic.speak(seconds: 1)
+
+        let stopping = GuardedTask { await session.stop() }
+        _ = try await stopping.value("the stop to return without the model")
+
+        #expect(mic.captureStopped.fired)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0, "the borrow in flight was given back by the time stop returned")
+        let events = try #require(try await starting.value("the start to return"))
+        let finished = await finishedTranscript(of: events)
+        #expect(finished?.segments.isEmpty == true, "what was buffered is dropped, not decoded")
+        #expect(mic.decodes.value == 0)
+
+        #expect(await cache.droppedLeases == 0)
+        await gate.open(Self.tiny)
+    }
+
+    @Test("a take stopped during the model load keeps the audio it captured")
+    func stoppedTakeKeepsItsAudio() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+        mic.speak(seconds: 1)
+
+        let stopping = GuardedTask { await session.stop() }
+        _ = try await stopping.value("the stop to return without the model")
+        await gate.open(Self.tiny)
+
+        let events = try #require(try await starting.value("the start to return"))
+        let finished = await finishedTranscript(of: events)
+        let audio = try #require(finished?.sourceURL)
+        defer { try? FileManager.default.removeItem(at: audio) }
+        #expect(try AVAudioFile(forReading: audio).length == 17_600, "the file holds the take from its first buffer")
+        #expect(finished?.segments.isEmpty == true)
+    }
+
+    @Test("a start cancelled during the model load stops capture and returns its lease")
+    func cancelledStartStopsCapture() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+
+        starting.cancel()
+
+        await #expect(throws: CancellationError.self) { _ = try await starting.value("the start to return") }
+        #expect(mic.captureStopped.fired)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        await gate.open(Self.tiny)
+    }
+
+    @Test("a model load failure after capture started stops capture and reports the failure")
+    func loadFailureStopsCapture() async throws {
+        let gate = LoadGate()
+        let loads = Awaitable(0)
+        let cache = StreamingModelCache(loader: { name, _ in
+            loads.increment()
+            await gate.wait(name)
+            throw ModelLoadFailure()
+        })
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
+        // Through the protocol, as the app asks: on the concrete actor an async call picks the extension's nil default.
+        let transcriber: any StreamingTranscriber = session
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await loads.wait(atLeast: 1, "the model load to start")
+        mic.speak(seconds: 1)
+        let audio = try #require(await transcriber.recordingAudioURL())
+
+        await gate.open(Self.tiny)
+
+        await #expect(throws: ModelLoadFailure.self) { _ = try await starting.value("the start to fail") }
+        #expect(mic.captureStopped.fired)
+        #expect(mic.decodes.value == 0)
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
+        #expect(!FileManager.default.fileExists(atPath: audio.path), "a take that never had a model keeps no audio")
+        #expect(await transcriber.recordingAudioURL() == nil)
+    }
+
+    @Test("the pre-model buffer keeps at most 60 s")
+    func preModelBufferIsBounded() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+
+        mic.push(seconds: 0.1, value: 0)
+        for _ in 0..<70 { mic.push(seconds: 1, value: 0.5) }
+        await gate.open(Self.tiny)
+
+        let events = try #require(try await starting.value("the start to return"))
+        await mic.decodes.wait(atLeast: 1, "the held audio to decode")
+        #expect(mic.decodedSampleCounts.first == 60 * 16_000)
+        await session.stop()
+
+        let finished = await finishedTranscript(of: events)
+        let start = try #require(finished?.segments.first?.start)
+        #expect(abs(start - 10.1) < 0.001, "timestamps still count from the first buffer the microphone gave")
     }
 }
 

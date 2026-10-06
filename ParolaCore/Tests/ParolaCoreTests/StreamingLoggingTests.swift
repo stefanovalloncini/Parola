@@ -88,7 +88,10 @@ struct StreamingLoggingTests {
             let (store, directory) = temporaryStore()
             defer { try? FileManager.default.removeItem(at: directory) }
             try store.seedInstalledModel("openai_whisper-tiny")
-            let session = StreamingTranscriptionSession(modelStore: store)
+            let session = StreamingTranscriptionSession(
+                modelStore: store, modelCache: .shared,
+                microphone: { _ in .init(requestPermission: { true }, start: { _ in }, stop: {}) }
+            )
             // The seeded directory holds no weights, so the model load fails offline right after.
             do {
                 _ = try await session.start(options: TranscriptionOptions(model: "openai_whisper-tiny"))
