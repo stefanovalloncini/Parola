@@ -81,6 +81,44 @@ struct RowDragTests {
         #expect(FileManager.default.fileExists(atPath: bundle.path))
     }
 
+    @Test("a row whose title runs past a file name's limit still lands, under a shorter name")
+    func longTitleStillLands() throws {
+        let dir = try Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let bundle = try Self.makeBundle(in: dir)
+        let title = String(repeating: "La riunione è andata così ", count: 16)
+        let item = LibraryEntryDragItem(id: "20261005T101502-3f2a", title: title, bundleURL: bundle)
+
+        let copy = try item.writeCopy()
+        defer { try? FileManager.default.removeItem(at: copy.deletingLastPathComponent()) }
+
+        #expect(copy.lastPathComponent.utf8.count <= 255)
+        #expect(copy.lastPathComponent.hasPrefix("La riunione è andata così"))
+        #expect(copy.pathExtension == "parola")
+    }
+
+    @Test("copies left by earlier drags are swept; a fresh one and anything else stay")
+    func staleCopiesAreSwept() throws {
+        let dir = try Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let twoHoursAgo = Date().addingTimeInterval(-7_200)
+        let stale = dir.appendingPathComponent("ParolaDrag-old")
+        let fresh = dir.appendingPathComponent("ParolaDrag-new")
+        let other = dir.appendingPathComponent("Other-old")
+        for folder in [stale, fresh, other] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        for folder in [stale, other] {
+            try FileManager.default.setAttributes([.creationDate: twoHoursAgo], ofItemAtPath: folder.path)
+        }
+
+        LibraryEntryDragItem.sweepStaleCopies(in: dir)
+
+        #expect(!FileManager.default.fileExists(atPath: stale.path))
+        #expect(FileManager.default.fileExists(atPath: fresh.path))
+        #expect(FileManager.default.fileExists(atPath: other.path))
+    }
+
     @Test("a row dropped on a text target gives the transcript")
     func textTargetsGetTheTranscript() async throws {
         let dir = try Self.temporaryDirectory()

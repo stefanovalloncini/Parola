@@ -55,12 +55,36 @@ struct LibraryEntryDragItem: Transferable, Identifiable {
     }
 
     var fileName: String {
-        TranscriptShareFile.safeName(for: title) + ".parola"
+        Self.capped(TranscriptShareFile.safeName(for: title)) + ".parola"
+    }
+
+    /// A file name stops at 255 bytes, and past it the copy fails and the drop lands nothing.
+    private static func capped(_ name: String, maxBytes: Int = 200) -> String {
+        var kept = ""
+        for character in name {
+            guard kept.utf8.count + character.utf8.count <= maxBytes else { break }
+            kept.append(character)
+        }
+        return kept.trimmingCharacters(in: .whitespaces)
+    }
+
+    private static let copyFolderPrefix = "ParolaDrag-"
+
+    /// The receiver got its own copy at the drop, so a copy an hour old is read by nothing.
+    static func sweepStaleCopies(in folder: URL = FileManager.default.temporaryDirectory, now: Date = .now) {
+        let files = FileManager.default
+        guard let items = try? files.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.creationDateKey]) else { return }
+        for item in items where item.lastPathComponent.hasPrefix(copyFolderPrefix) {
+            guard let created = try? item.resourceValues(forKeys: [.creationDateKey]).creationDate,
+                  now.timeIntervalSince(created) > 3_600 else { continue }
+            try? files.removeItem(at: item)
+        }
     }
 
     func writeCopy() throws -> URL {
+        Self.sweepStaleCopies()
         let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ParolaDrag-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent(Self.copyFolderPrefix + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let copy = dir.appendingPathComponent(fileName, isDirectory: true)
         try FileManager.default.copyItem(at: bundleURL, to: copy)
