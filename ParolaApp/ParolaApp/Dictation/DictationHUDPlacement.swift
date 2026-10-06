@@ -57,6 +57,31 @@ enum DictationHUDPlacement {
         return NSRect(origin: origin, size: size)
     }
 
+    /// The point a dragged HUD keeps while its size changes: the edge its style grows away from.
+    static func spot(of frame: NSRect, style: DictationIndicatorStyle) -> NSPoint {
+        switch style {
+        case .notch: NSPoint(x: frame.midX, y: frame.maxY)
+        case .minimal: NSPoint(x: frame.maxX, y: frame.minY)
+        case .nearField, .overlay: NSPoint(x: frame.midX, y: frame.minY)
+        }
+    }
+
+    /// Where the user dragged the HUD, at the size its state needs and kept on that screen; the style's place when there is no spot, or its screen is gone.
+    static func frame(_ context: Context, spot: NSPoint?, screens: [NSRect]) -> NSRect {
+        let placed = frame(context)
+        guard context.style != .nearField, let spot,
+              let screen = screens.first(where: { $0.insetBy(dx: -1, dy: -1).contains(spot) }) else { return placed }
+        let size = placed.size
+        var origin = switch context.style {
+        case .notch: NSPoint(x: spot.x - size.width / 2, y: spot.y - size.height)
+        case .minimal: NSPoint(x: spot.x - size.width, y: spot.y)
+        case .nearField, .overlay: NSPoint(x: spot.x - size.width / 2, y: spot.y)
+        }
+        origin.x = min(max(origin.x, screen.minX), screen.maxX - size.width)
+        origin.y = min(max(origin.y, screen.minY), screen.maxY - size.height)
+        return NSRect(origin: origin, size: size)
+    }
+
     /// Bottom centre of the visible screen, 100 pt up: the overlay's spot.
     static func overlayOrigin(for size: NSSize, in visible: NSRect) -> NSPoint {
         NSPoint(x: visible.midX - size.width / 2, y: visible.minY + 100)

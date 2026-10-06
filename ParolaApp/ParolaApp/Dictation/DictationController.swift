@@ -23,8 +23,8 @@ final class DictationController {
 
     private(set) var modelDownloadProgress: Double? {
         didSet {
-            guard (oldValue == nil) != (modelDownloadProgress == nil), let panel = hud else { return }
-            panel.setFrame(preferredHUDFrame(), display: true, animate: false)
+            guard (oldValue == nil) != (modelDownloadProgress == nil) else { return }
+            placeHUD()
         }
     }
 
@@ -43,7 +43,7 @@ final class DictationController {
         didSet {
             guard oldValue != indicatorStyle, let panel = hud else { return }
             refreshAnchor()
-            panel.setFrame(preferredHUDFrame(), display: true, animate: true)
+            placeHUD(animate: true)
             if panel.isVisible { startRepositionLoop() }
         }
     }
@@ -85,6 +85,7 @@ final class DictationController {
     /// coordinator's trailing state callbacks can't overwrite the live session's state.
     @ObservationIgnored private var coordinatorGeneration = 0
     private var hud: NSPanel?
+    private var hudPositioner: DictationHUDPositioner?
     private var levelTask: Task<Void, Never>?
     private var partialTask: Task<Void, Never>?
     private var repositionTask: Task<Void, Never>?
@@ -440,6 +441,7 @@ final class DictationController {
         hudIsUp = true
         guard let model = appModel else { return }
         if hud == nil {
+            hudPositioner = DictationHUDPositioner(defaults: model.defaults)
             hud = DictationHUD.make { [self] in
                 DictationView(
                     model: model,
@@ -452,7 +454,7 @@ final class DictationController {
         }
         guard let panel = hud else { return }
         refreshAnchor()
-        panel.setFrame(preferredHUDFrame(), display: true, animate: false)
+        placeHUD()
         panel.orderFrontRegardless()
         startRepositionLoop()
     }
@@ -478,28 +480,27 @@ final class DictationController {
                 guard let self else { return }
                 guard let panel = self.hud, panel.isVisible else { continue }
                 guard self.refreshAnchor() else { continue }
-                let target = self.preferredHUDFrame()
-                if panel.frame != target {
-                    panel.setFrame(target, display: true, animate: false)
-                }
+                self.placeHUD()
             }
         }
     }
 
     private func resizeHUDForPartial() {
-        guard let panel = hud else { return }
-        let target = preferredHUDFrame()
-        guard panel.frame != target else { return }
-        panel.setFrame(target, display: true, animate: false)
+        placeHUD()
     }
 
-    private func preferredHUDFrame() -> NSRect {
+    private func placeHUD(animate: Bool = false) {
+        guard let panel = hud else { return }
+        hudPositioner?.place(panel, hudContext(), animate: animate)
+    }
+
+    private func hudContext() -> DictationHUDPlacement.Context {
         let listeningCompact: Bool
         if case .listening = state { listeningCompact = true } else { listeningCompact = modelDownloadProgress != nil }
         let failedMessageVisible: Bool
         if case .failed(let message) = state { failedMessageVisible = !message.isEmpty } else { failedMessageVisible = false }
         let screen = NSScreen.main
-        return DictationHUDPlacement.frame(DictationHUDPlacement.Context(
+        return DictationHUDPlacement.Context(
             style: indicatorStyle,
             hasPartial: !partialText.isEmpty,
             failedMessageVisible: failedMessageVisible,
@@ -507,7 +508,7 @@ final class DictationController {
             anchor: currentAnchor,
             screenFrame: screen?.frame ?? .zero,
             screenVisibleFrame: screen?.visibleFrame ?? .zero
-        ))
+        )
     }
 
     private func hideHUD() {
