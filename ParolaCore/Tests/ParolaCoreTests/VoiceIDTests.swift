@@ -15,9 +15,18 @@ struct VoiceIDFormsTests {
     @Test("apple identifier round-trips through rawValue")
     func appleIdentifierRoundTrip() {
         let id = VoiceID.apple(identifier: "com.apple.voice.premium.en-US.Ava")
-        #expect(id.rawValue == "apple:com.apple.voice.premium.en-US.Ava")
-        #expect(id.kind == .apple(identifier: "com.apple.voice.premium.en-US.Ava"))
-        #expect(VoiceID(rawValue: id.rawValue) == id)
+        #expect(id?.rawValue == "apple:com.apple.voice.premium.en-US.Ava")
+        #expect(id?.kind == .apple(identifier: "com.apple.voice.premium.en-US.Ava"))
+        #expect(VoiceID(rawValue: id!.rawValue) == id)
+    }
+
+    @Test("apple identifier rejects empty and whitespace-padded input")
+    func appleIdentifierValidation() {
+        #expect(VoiceID.apple(identifier: "") == nil)
+        #expect(VoiceID.apple(identifier: " ") == nil)
+        #expect(VoiceID.apple(identifier: " x") == nil)
+        #expect(VoiceID.apple(identifier: "x ") == nil)
+        #expect(VoiceID.apple(identifier: "com.apple.voice.premium.en-US.Ava") != nil)
     }
 
     @Test("neural voice round-trips through rawValue")
@@ -32,7 +41,7 @@ struct VoiceIDFormsTests {
     func jsonRoundTrip() throws {
         let ids: [VoiceID] = [
             .appleAutomatic,
-            .apple(identifier: "com.apple.voice.compact.it-IT.Alice"),
+            VoiceID.apple(identifier: "com.apple.voice.compact.it-IT.Alice")!,
             VoiceID.neural(pack: "supertonic-3", voice: "F1")!,
         ]
         let encoder = JSONEncoder()
@@ -52,6 +61,9 @@ struct VoiceIDFormsTests {
         "Pocket/x",
         "a/b/c",
         "bad pack/x",
+        "apple:auto ",
+        "apple: x",
+        "apple:AUTO",
     ])
     func rejectsMalformed(_ rawValue: String) {
         #expect(VoiceID(rawValue: rawValue) == nil)

@@ -21,8 +21,8 @@ public struct VoiceID: Hashable, Codable, Sendable, RawRepresentable {
 
     public static let appleAutomatic = VoiceID(validRawValue: "apple:auto")
 
-    public static func apple(identifier: String) -> VoiceID {
-        precondition(!identifier.isEmpty, "an Apple voice identifier must not be empty")
+    public static func apple(identifier: String) -> VoiceID? {
+        guard isValidAppleIdentifier(identifier) else { return nil }
         return VoiceID(validRawValue: "apple:\(identifier)")
     }
 
@@ -58,7 +58,7 @@ public struct VoiceID: Hashable, Codable, Sendable, RawRepresentable {
         }
         if rawValue.hasPrefix("apple:") {
             let identifier = String(rawValue.dropFirst("apple:".count))
-            guard !identifier.isEmpty else { return nil }
+            guard isValidAppleIdentifier(identifier) else { return nil }
             return .apple(identifier: identifier)
         }
         guard let slash = rawValue.firstIndex(of: "/") else { return nil }
@@ -66,6 +66,13 @@ public struct VoiceID: Hashable, Codable, Sendable, RawRepresentable {
         let voice = String(rawValue[rawValue.index(after: slash)...])
         guard isValidPack(pack), isValidVoice(voice) else { return nil }
         return .neural(pack: pack, voice: voice)
+    }
+
+    private static func isValidAppleIdentifier(_ identifier: String) -> Bool {
+        guard !identifier.isEmpty, identifier.trimmingCharacters(in: .whitespaces) == identifier else {
+            return false
+        }
+        return identifier.lowercased() != "auto"
     }
 
     private static func isValidPack(_ pack: String) -> Bool {

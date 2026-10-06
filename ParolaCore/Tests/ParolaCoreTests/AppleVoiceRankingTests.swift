@@ -78,6 +78,22 @@ struct AppleVoiceRankingTests {
         #expect(ranked.map(\.name) == ["Daniel", "Samantha"])
     }
 
+    @Test("a multi-entry region preference is honoured in order")
+    func multiEntryRegionPreferenceOrder() {
+        let swiss = voice("com.apple.voice.compact.it-CH.Viola", name: "Viola", language: "it-CH")
+        let italian = voice("com.apple.voice.compact.it-IT.Alice", name: "Alice", language: "it-IT")
+        let chFirst = AppleVoiceRanking.rank([italian, swiss], forLanguage: "it", preferredRegions: ["CH", "IT"])
+        #expect(chFirst.map(\.name) == ["Viola", "Alice"])
+        let itFirst = AppleVoiceRanking.rank([swiss, italian], forLanguage: "it", preferredRegions: ["IT", "CH"])
+        #expect(itFirst.map(\.name) == ["Alice", "Viola"])
+    }
+
+    @Test("best returns nil when the only match is a Personal voice")
+    func bestIsNilWhenOnlyPersonalMatches() {
+        let personal = voice("com.apple.voice.personal.it-IT.Aaron", name: "Aaron", language: "it-IT", isPersonal: true)
+        #expect(AppleVoiceRanking.best([personal], forLanguage: "it", preferredRegions: []) == nil)
+    }
+
     @Test("yue matches a zh-HK voice")
     func cantoneseMatchesZhHK() {
         let sinji = voice("com.apple.voice.compact.zh-HK.Sinji", name: "Sin-ji", language: "zh-HK")
