@@ -739,6 +739,7 @@ final class AppModel {
     /// Bumped by the Transcript menu; the header bar opens the matching popover on each.
     var jumpToTimeRequests: Int = 0
     var outlineRequests: Int = 0
+    var renameRequests: Int = 0
     /// Bumped by every replacement, so the find bar lets go of its field and the next ⌘Z reaches the transcript.
     var findReplacements: Int = 0
     var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }

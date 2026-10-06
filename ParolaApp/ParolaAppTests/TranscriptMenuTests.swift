@@ -22,6 +22,16 @@ struct TranscriptMenuTests {
         #expect(header.contains(".onChange(of: model.outlineRequests) { _, _ in outlineOpen = true }"))
     }
 
+    @Test("Rename… sits in the Transcript menu and on the header title, and both raise the header's rename alert")
+    func renameHasMenuAndTitleDoors() throws {
+        let commands = try source("Views/AppCommands")
+        #expect(commands.contains(#"Button("Rename…") { model.renameRequests &+= 1 } .disabled(!model.canRenameOpenTranscript)"#))
+        let header = try source("Views/Transcript/TranscriptHeaderBar")
+        #expect(header.contains(".onChange(of: model.renameRequests) { _, _ in beginRename() }"))
+        #expect(header.contains(#".contextMenu { Button("Rename…") { beginRename() }"#))
+        #expect(header.contains("model.renameOpenTranscript(to: renameDraft)"))
+    }
+
     @Test("the display options are checked View menu items")
     func displayOptionsAreViewToggles() throws {
         let commands = try source("Views/AppCommands")
@@ -42,7 +52,7 @@ struct TranscriptMenuTests {
         let menu = try transcriptMenu()
         let groups = [
             [#"Button("Back")"#, #"Button("Jump to Next Speaker")"#, #"Button("Jump to Time…")"#, #"Button("Show Outline")"#],
-            [#"Button("Favorite Segment")"#, #"Button("Manage People…")"#],
+            [#"Button("Rename…")"#, #"Button("Favorite Segment")"#, #"Button("Manage People…")"#],
             [
                 #"Button("Copy Transcript")"#, #"Button("Copy with Timestamps")"#, #"Button("Copy as Markdown")"#,
                 #"Button("Copy as SRT")"#, #"Button("Copy Favorites")"#,

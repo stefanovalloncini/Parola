@@ -342,6 +342,13 @@ extension AppModel {
         }
     }
 
+    var canRenameOpenTranscript: Bool { mainTranscriptCommandsEnabled && selectedEntryID != nil }
+
+    func renameOpenTranscript(to newName: String) {
+        guard let id = selectedEntryID else { return }
+        renameEntry(id, to: newName)
+    }
+
     func beginEditingNote(for segment: TranscriptSegment) {
         guard let entryID = selectedEntryID else { return }
         editingSegmentNote = SegmentNoteTarget(

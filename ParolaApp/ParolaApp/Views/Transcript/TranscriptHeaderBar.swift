@@ -10,6 +10,8 @@ struct TranscriptHeaderBar: View {
     @State private var jumpOpen = false
     @State private var jumpDraft = ""
     @FocusState private var jumpFocused: Bool
+    @State private var renaming = false
+    @State private var renameDraft = ""
     @State private var copied = false
     @State private var copiedReset: Task<Void, Never>?
     // Cached so the header doesn't rebuild `transcript.text`, a full-segment join, on every re-render.
@@ -25,6 +27,11 @@ struct TranscriptHeaderBar: View {
                 .font(DS.Font.heading)
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .contextMenu {
+                    Button("Rename…") { beginRename() }
+                        .disabled(!model.canRenameOpenTranscript)
+                }
+                .accessibilityAction(named: "Rename…") { beginRename() }
 
             if let label = languageLabel {
                 Text(label)
@@ -47,6 +54,20 @@ struct TranscriptHeaderBar: View {
         .onChange(of: title) { _, _ in rebuildShareItem() }
         .onChange(of: model.jumpToTimeRequests) { _, _ in jumpOpen = true }
         .onChange(of: model.outlineRequests) { _, _ in outlineOpen = true }
+        .onChange(of: model.renameRequests) { _, _ in beginRename() }
+        .alert("Rename entry", isPresented: $renaming) {
+            TextField("Title", text: $renameDraft)
+            Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("alert.rename.cancel")
+            Button("Rename") { model.renameOpenTranscript(to: renameDraft) }
+                .accessibilityIdentifier("alert.rename.confirm")
+        }
+    }
+
+    private func beginRename() {
+        guard model.canRenameOpenTranscript else { return }
+        renameDraft = title
+        renaming = true
     }
 
     private var controls: some View {

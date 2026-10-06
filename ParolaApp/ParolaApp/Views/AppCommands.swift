@@ -341,6 +341,9 @@ struct TranscriptCommands: View {
             .disabled(!model.mainTranscriptCommandsEnabled)
             .axLeaf("Menu.Transcript.ShowOutline")
         Divider()
+        Button("Rename…") { model.renameRequests &+= 1 }
+            .disabled(!model.canRenameOpenTranscript)
+            .axLeaf("Menu.Transcript.Rename")
         Button("Favorite Segment") {
             guard let id = model.focusedSegmentIDForCommands else { return }
             model.toggleSegmentFavorite(id)

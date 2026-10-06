@@ -825,6 +825,31 @@ struct AppModelLibraryTests {
         #expect(LibraryEntryDisplay.listTitle(for: renamed, showsAITitle: true) == "My real title")
     }
 
+    @Test("Rename… on an open transcript renames its entry, and the header follows")
+    func renameOpenTranscript() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        await model.refreshLibraryAndWait()
+        #expect(!model.canRenameOpenTranscript)
+
+        try await model.openEntry(seeded.id)
+        #expect(model.canRenameOpenTranscript)
+
+        model.renameOpenTranscript(to: "  Weekly sync  ")
+        let renamed = await waitUntil { model.transcriptHeaderTitle == "Weekly sync" }
+        #expect(renamed)
+        #expect(model.libraryEntry(id: seeded.id)?.manifest.titleSource == .user)
+    }
+
     @Test("LibrarySortOrder exposes a label for every case")
     func sortOrderLabels() {
         for order in LibrarySortOrder.allCases {
