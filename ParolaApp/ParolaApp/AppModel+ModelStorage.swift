@@ -19,7 +19,6 @@ struct ModelsDiskSummary: Equatable, Sendable {
     let bytes: Int64
     let earlierBytes: Int64
 
-    /// The models and the earlier downloads as two figures, so neither reads as part of the other.
     var usageText: String {
         let models = AppFormat.byteSize(bytes - earlierBytes)
         guard earlierBytes > 0 else { return models }

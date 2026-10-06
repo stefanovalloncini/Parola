@@ -130,6 +130,7 @@ struct AIServicesPane: View {
     private var addMenu: some View {
         Menu("Add Service") { addMenuItems }
             .fixedSize()
+            // Hosted in this pane, the Menu's own AXMenuButton comes out unnamed; the stand-in carries the title.
             .accessibilityRepresentation { Menu("Add Service") { addMenuItems } }
             .axLeaf("AIServices.Menu.Add")
     }
