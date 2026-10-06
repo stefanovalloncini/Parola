@@ -54,14 +54,16 @@ struct StatisticsView: View {
             VStack(alignment: .leading, spacing: DS.Spacing.large) {
                 tiles(stats)
                 // The caveat for the timed tiles and the table below, not a fact about the page.
-                Text(StatisticsCopy.coverage(
+                if let coverage = StatisticsCopy.coverage(
                     stats.timed, wordsCountedFor: stats.totals.wordsCountedFor, entries: stats.totals.entries
-                ))
-                    .font(DS.Font.secondary)
-                    .monospacedDigit()
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .axLeaf("Text.Coverage")
+                ) {
+                    Text(coverage)
+                        .font(DS.Font.secondary)
+                        .monospacedDigit()
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .axLeaf("Text.Coverage")
+                }
                 activity(stats)
                 if !stats.perModel.isEmpty {
                     modelTable(stats)

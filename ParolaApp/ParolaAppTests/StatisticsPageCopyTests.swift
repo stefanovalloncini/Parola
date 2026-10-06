@@ -11,15 +11,15 @@ struct StatisticsPageCopyTests {
     @Test("the coverage note says when timing started and how much of the library it covers")
     func coverageNamesTheGap() {
         let partial = LibraryStatistics.Coverage(count: 4, total: 27, since: day)
-        let note = StatisticsCopy.coverage(partial, wordsCountedFor: 27, entries: 27, locale: english)
+        let note = StatisticsCopy.coverage(partial, wordsCountedFor: 27, entries: 27, locale: english) ?? ""
         #expect(note.hasPrefix("Timing recorded since "))
         #expect(note.hasSuffix(" · 4 / 27 transcripts"))
     }
 
-    @Test("a fully timed library says so, and an untimed one says what will happen")
+    @Test("a fully timed and counted library has no caveat, and an untimed one says what will happen")
     func coverageEdges() {
         let all = LibraryStatistics.Coverage(count: 3, total: 3, since: day)
-        #expect(StatisticsCopy.coverage(all, wordsCountedFor: 3, entries: 3, locale: english) == "Timing recorded for every transcript.")
+        #expect(StatisticsCopy.coverage(all, wordsCountedFor: 3, entries: 3, locale: english) == nil)
 
         let none = LibraryStatistics.Coverage(count: 0, total: 9, since: nil)
         #expect(
@@ -33,17 +33,15 @@ struct StatisticsPageCopyTests {
         let all = LibraryStatistics.Coverage(count: 3, total: 3, since: day)
         #expect(
             StatisticsCopy.coverage(all, wordsCountedFor: 2, entries: 3, locale: english)
-                == "Timing recorded for every transcript · words counted for 2 / 3"
+                == "Words counted for 2 / 3"
         )
         #expect(
             StatisticsCopy.coverage(all, wordsCountedFor: 0, entries: 3, locale: english)
-                == "Timing recorded for every transcript · no word counts yet"
+                == "No word counts yet"
         )
         let partial = LibraryStatistics.Coverage(count: 4, total: 27, since: day)
-        #expect(
-            StatisticsCopy.coverage(partial, wordsCountedFor: 20, entries: 27, locale: english)
-                .hasSuffix(" · 4 / 27 transcripts · words counted for 20 / 27")
-        )
+        let both = StatisticsCopy.coverage(partial, wordsCountedFor: 20, entries: 27, locale: english) ?? ""
+        #expect(both.hasSuffix(" · 4 / 27 transcripts · words counted for 20 / 27"))
     }
 
     @Test("the activity caption counts entries and audio in either range, or says there were none")

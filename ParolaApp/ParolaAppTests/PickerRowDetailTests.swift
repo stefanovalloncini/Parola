@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 @Suite("Language row detail")
 struct LanguageRowDetailTests {
@@ -77,6 +78,21 @@ struct LanguageChoicesTests {
 struct ModelRowDetailTests {
     private let turbo = ModelCatalog.variant(id: "openai_whisper-large-v3_turbo")!
     private let appleSpeech = ModelCatalog.variant(id: "apple-speech-analyzer")!
+
+    @Test("the model popover ends on Manage models…, with no Refresh row to press")
+    func noRefreshRow() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("model-popover"))
+        let popover = HostedWindow(
+            ModelPickerPopover(searchText: .constant(""), installedOnly: .constant(false), offersDownloads: false).environment(model),
+            width: 400, height: 600
+        )
+        defer { popover.close() }
+
+        let words = HostedAccessibility.words(in: popover.host)
+
+        #expect(words.contains("Manage models…"), "\(words)")
+        #expect(!words.contains("Refresh"), "\(words)")
+    }
 
     @Test("a download in flight for this row shows its progress")
     func downloadingRowShowsProgress() {

@@ -58,7 +58,10 @@ struct ModelPickerPopover: View {
     var body: some View {
         VStack(spacing: 0) {
             searchField
-                .onAppear { model.prewarmSelectedModel() }
+                .onAppear {
+                    model.refreshModelList()
+                    model.prewarmSelectedModel()
+                }
                 .padding(.horizontal, DS.Spacing.small)
                 .padding(.top, DS.Spacing.tight)
                 .padding(.bottom, DS.Spacing.snug)
@@ -107,12 +110,6 @@ struct ModelPickerPopover: View {
                 title: String(localized: "Manage models…"),
                 leading: .symbol("slider.horizontal.3"),
                 action: { model.openSettings(route: .localModels) }
-            )
-            PillPopoverRow(
-                title: String(localized: "Refresh"),
-                leading: .symbol("arrow.clockwise"),
-                dismissesOnSelect: false,
-                action: { model.refreshModelList() }
             )
         }
         .padding(.horizontal, DS.Spacing.snug)

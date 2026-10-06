@@ -12201,17 +12201,6 @@
         }
       }
     },
-    "Refresh": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiorna"
-          }
-        }
-      }
-    },
     "Regenerate": {
       "extractionState": "manual",
       "localizations": {
@@ -16270,17 +16259,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Timing"
-          }
-        }
-      }
-    },
-    "Timing recorded for every transcript.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tempi registrati per ogni trascrizione."
           }
         }
       }

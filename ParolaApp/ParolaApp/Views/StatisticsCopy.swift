@@ -3,14 +3,14 @@ import ParolaCore
 
 /// The sentences timing and statistics are written in, kept out of the views so both languages can be read back.
 enum StatisticsCopy {
-    /// Why the timed tiles, the model table and the word count can cover less than the library does.
+    /// Why the timed tiles, the model table and the word count can cover less than the library does; nil when they cover it all.
     static func coverage(
         _ timed: LibraryStatistics.Coverage,
         wordsCountedFor: Int,
         entries: Int,
         bundle: Bundle = .main,
         locale: Locale = AppFormat.locale
-    ) -> String {
+    ) -> String? {
         let timing = timingCoverage(timed, bundle: bundle, locale: locale)
         guard entries > 0, wordsCountedFor < entries else { return timing }
         let words: String
@@ -20,18 +20,17 @@ enum StatisticsCopy {
             let share = "\(AppFormat.integer(wordsCountedFor, locale: locale)) / \(AppFormat.integer(entries, locale: locale))"
             words = String(localized: "words counted for \(share)", bundle: bundle)
         }
+        guard let timing else { return words.prefix(1).uppercased(with: locale) + words.dropFirst() }
         // A full stop mid-line would read as two sentences; the separator carries the pause.
         let lead = timing.hasSuffix(".") ? String(timing.dropLast()) : timing
         return "\(lead) · \(words)"
     }
 
-    private static func timingCoverage(_ timed: LibraryStatistics.Coverage, bundle: Bundle, locale: Locale) -> String {
+    private static func timingCoverage(_ timed: LibraryStatistics.Coverage, bundle: Bundle, locale: Locale) -> String? {
         guard let since = timed.since, timed.count > 0 else {
             return String(localized: "No run has been timed yet — new transcriptions record how long they take.", bundle: bundle)
         }
-        guard !timed.coversEverything else {
-            return String(localized: "Timing recorded for every transcript.", bundle: bundle)
-        }
+        guard !timed.coversEverything else { return nil }
         let share = "\(AppFormat.integer(timed.count, locale: locale)) / \(AppFormat.integer(timed.total, locale: locale))"
         return String(localized: "Timing recorded since \(AppFormat.day(since, locale: locale)) · \(share) transcripts", bundle: bundle)
     }

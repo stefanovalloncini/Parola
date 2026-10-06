@@ -109,7 +109,7 @@ struct StatisticsLocalizationTests {
             StatisticsCopy.coverage(
                 LibraryStatistics.Coverage(count: 3, total: 3, since: day),
                 wordsCountedFor: 3, entries: 3, bundle: bundle, locale: italian
-            ) == "Tempi registrati per ogni trascrizione."
+            ) == nil
         )
         #expect(
             StatisticsCopy.coverage(
@@ -126,11 +126,11 @@ struct StatisticsLocalizationTests {
         let all = LibraryStatistics.Coverage(count: 3, total: 3, since: day)
         #expect(
             StatisticsCopy.coverage(all, wordsCountedFor: 2, entries: 3, bundle: bundle, locale: italian)
-                == "Tempi registrati per ogni trascrizione · parole contate per 2 / 3"
+                == "Parole contate per 2 / 3"
         )
         #expect(
             StatisticsCopy.coverage(all, wordsCountedFor: 0, entries: 3, bundle: bundle, locale: italian)
-                == "Tempi registrati per ogni trascrizione · nessun conteggio parole"
+                == "Nessun conteggio parole"
         )
     }
 }
