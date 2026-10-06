@@ -146,6 +146,8 @@ targets:
         product: ParolaCore
       - package: ParolaCore
         product: ParolaDictation
+      - package: ParolaCore
+        product: ParolaSpeech
       - package: Sparkle
         product: Sparkle
       - target: ParolaQuickLook
@@ -191,6 +193,8 @@ targets:
         product: ParolaCore
       - package: ParolaCore
         product: ParolaDictation
+      - package: ParolaCore
+        product: ParolaSpeech
       - package: ParolaCore
         product: ParolaTestSupport
       - package: ParolaCore

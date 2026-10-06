@@ -10,6 +10,7 @@ let package = Package(
     products: [
         .library(name: "ParolaCore", targets: ["ParolaCore"]),
         .library(name: "ParolaDictation", targets: ["ParolaDictation"]),
+        .library(name: "ParolaSpeech", targets: ["ParolaSpeech"]),
         .library(name: "ParolaMCP", targets: ["ParolaMCP"]),
         .library(name: "ScenarioKit", targets: ["ScenarioKit"]),
         .library(name: "ParolaTestSupport", targets: ["ParolaTestSupport"]),
@@ -39,6 +40,10 @@ let package = Package(
                 "ParolaCore",
                 .product(name: "Clocks", package: "swift-clocks"),
             ]
+        ),
+        .target(
+            name: "ParolaSpeech",
+            dependencies: ["ParolaCore"]
         ),
         .target(
             name: "ParolaMCP",
@@ -89,6 +94,10 @@ let package = Package(
         .testTarget(
             name: "ParolaCLITests",
             dependencies: ["ParolaCore", "ParolaTestSupport", "parola"]
+        ),
+        .testTarget(
+            name: "ParolaSpeechTests",
+            dependencies: ["ParolaSpeech", "ParolaCore", "ParolaTestSupport"]
         ),
         .testTarget(
             name: "ParolaMCPTests",
