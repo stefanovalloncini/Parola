@@ -16625,17 +16625,6 @@
         }
       }
     },
-    "Transcript after you stop": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trascrizione al termine"
-          }
-        }
-      }
-    },
     "Transcript appears as you speak. Off records the whole take first, then transcribes.": {
       "extractionState": "manual",
       "localizations": {

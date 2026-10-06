@@ -247,8 +247,10 @@ struct StageFacts: View {
                 if take.isRunning {
                     separator
                     StageDeviceMenu(take: take)
-                    separator
-                    Text(verbatim: Self.modeLine(isStreaming: take.isStreaming))
+                    if let modeLine = Self.modeLine(isStreaming: take.isStreaming) {
+                        separator
+                        Text(verbatim: modeLine)
+                    }
                 }
             }
             if let warning = TakeRemote.warning(for: take, in: model) {
@@ -268,10 +270,9 @@ struct StageFacts: View {
         }
     }
 
-    static func modeLine(isStreaming: Bool, bundle: Bundle = .main) -> String {
-        isStreaming
-            ? String(localized: "Live transcript", bundle: bundle)
-            : String(localized: "Transcript after you stop", bundle: bundle)
+    /// None after Stop: the quiet line under the band says when the transcript comes.
+    static func modeLine(isStreaming: Bool, bundle: Bundle = .main) -> String? {
+        isStreaming ? String(localized: "Live transcript", bundle: bundle) : nil
     }
 
     /// "Transcribing… · 42% · 12 min left" as the run reads the take; "Preparing audio…" while the engine has nothing to count yet.

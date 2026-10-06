@@ -83,7 +83,7 @@ struct StageLayoutTests {
     func italian() throws {
         let it = try italianBundle()
         #expect(StageFacts.modeLine(isStreaming: true, bundle: it) == "Trascrizione in tempo reale")
-        #expect(StageFacts.modeLine(isStreaming: false, bundle: it) == "Trascrizione al termine")
+        #expect(StageFacts.modeLine(isStreaming: false, bundle: it) == nil, "the quiet line under the band already says it")
         #expect(StageFacts.modeLine(isStreaming: true) == "Live transcript")
         #expect(String(localized: "Transcript appears when you stop", bundle: it) == "La trascrizione appare quando fermi la registrazione")
         #expect(String(localized: "Stop the recording to change the microphone", bundle: it) == "Ferma la registrazione per cambiare microfono")
@@ -287,8 +287,7 @@ struct StageLayoutTests {
         let shown = try #require(onStage.first { $0.identifier?.hasSuffix("Stage.Notice") == true }, "the Stage has no line for it")
         #expect(shown.value == line.message)
         #expect(placed(onStageOf: model, in: hosted) == clear, "the line moved the Stage")
-        let modeLine = StageFacts.modeLine(isStreaming: false)
-        let facts = try #require(onStage.first { $0.value == modeLine }).frame
+        let facts = try #require(onStage.first { $0.value == "REC" }).frame
         let band = try #require(onStage.first { $0.label == "Input level" }).frame
         #expect(!shown.frame.intersects(facts) && !shown.frame.intersects(band), "the line overlaps the facts or the band")
         #expect((facts.midY - shown.frame.midY) * (band.midY - shown.frame.midY) < 0, "the line is not between the facts and the band")
