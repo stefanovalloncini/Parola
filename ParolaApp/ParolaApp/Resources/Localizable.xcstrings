@@ -1292,23 +1292,6 @@
         }
       }
     },
-    "About": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "About"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Informazioni"
-          }
-        }
-      }
-    },
     "About Parola": {
       "extractionState": "manual",
       "localizations": {
@@ -2662,13 +2645,13 @@
         }
       }
     },
-    "Backup, restore and reset for your settings.": {
+    "Backup, restore and reset for your settings, and the diagnostics log.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Backup, ripristino e azzeramento delle impostazioni."
+            "value": "Backup, ripristino e azzeramento delle impostazioni, e il registro di diagnostica."
           }
         }
       }
@@ -17521,17 +17504,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Versione %@ (%@)"
-          }
-        }
-      }
-    },
-    "Version and project links.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Versione e link al progetto."
           }
         }
       }

@@ -71,7 +71,7 @@ struct SettingsSidebarCatalogTests {
         #expect(SettingsSidebarCatalog.matches(route: .dictation, query: "dictation"))
         #expect(SettingsSidebarCatalog.matches(route: .localModels, query: "parakeet"))
         #expect(SettingsSidebarCatalog.matches(route: .exportFormats, query: "srt"))
-        #expect(!SettingsSidebarCatalog.matches(route: .about, query: "srt"))
+        #expect(!SettingsSidebarCatalog.matches(route: .advanced, query: "srt"))
     }
 }
 

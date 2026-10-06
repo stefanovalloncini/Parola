@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import ParolaCore
 
 /// Version and channel strings shared by every About surface so they can't drift apart.
@@ -23,8 +24,7 @@ enum AboutInfo {
     }
 }
 
-/// Icon, version, channel badge, and credits — the single About body shared by the menu-bar About
-/// sheet and the Settings About pane, so the two never present conflicting information.
+/// Icon, version, channel badge, and credits: the About window's body.
 struct AboutInfoView: View {
     @Environment(AppModel.self) private var model
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 44
@@ -58,34 +58,55 @@ struct AboutInfoView: View {
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 8) {
-                creditRow(title: "Transcription", value: "WhisperKit · FluidAudio Parakeet · Apple Speech")
-                creditRow(title: "Local LLM", value: "Apple Foundation Models")
-                creditRow(title: "Auto-update", value: "Sparkle")
-                if let modelsOnDiskLabel {
-                    creditRow(title: "Models on disk", value: modelsOnDiskLabel)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            AboutCredits(rows: credits)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .task { model.refreshModelList() }
     }
 
-    private var modelsOnDiskLabel: String? {
-        let summary = model.modelsOnDiskSummary
-        guard summary.bytes > 0 else { return nil }
-        return "\(summary.count) · \(AppFormat.byteSize(summary.bytes))"
+    private var credits: [AboutCredit] {
+        var rows = [
+            AboutCredit(title: "Transcription", value: "WhisperKit · FluidAudio Parakeet · Apple Speech"),
+            AboutCredit(title: "Local LLM", value: "Apple Foundation Models"),
+            AboutCredit(title: "Auto-update", value: "Sparkle"),
+        ]
+        if let modelsOnDiskLabel {
+            rows.append(AboutCredit(title: "Models on disk", value: modelsOnDiskLabel))
+        }
+        return rows
     }
 
-    private func creditRow(title: LocalizedStringKey, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(title)
-                .font(DS.Font.bodyStrong)
-                .foregroundStyle(DS.Color.secondaryText)
-                .frame(width: 90, alignment: .leading)
-            Text(verbatim: value)
-                .font(DS.Font.body)
-                .foregroundStyle(.primary)
+    private var modelsOnDiskLabel: String? {
+        Self.modelsLine(model.modelsOnDiskSummary)
+    }
+
+    static func modelsLine(_ summary: ModelsDiskSummary) -> String? {
+        summary.bytes > 0 ? summary.usageText : nil
+    }
+}
+
+struct AboutCredit: Identifiable {
+    let title: LocalizedStringKey
+    let value: String
+    var id: String { value }
+}
+
+struct AboutCredits: View {
+    let rows: [AboutCredit]
+
+    var body: some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 8) {
+            ForEach(rows) { row in
+                GridRow {
+                    Text(row.title)
+                        .font(DS.Font.bodyStrong)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .fixedSize()
+                    Text(verbatim: row.value)
+                        .font(DS.Font.body)
+                        .foregroundStyle(.primary)
+                }
+            }
         }
     }
 }
@@ -95,10 +116,37 @@ enum AboutWindowScene {
 }
 
 struct AboutWindow: View {
+    @State private var copiedVersion = false
+
     var body: some View {
-        AboutInfoView()
-            .padding(DS.Spacing.large)
-            .frame(width: 380)
-            .axBranch("About")
+        VStack(spacing: 16) {
+            AboutInfoView()
+            HStack(spacing: 10) {
+                Button("Open Repository") {
+                    NSWorkspace.shared.open(SupportLinks.repository)
+                }
+                .axLeaf("Button.OpenRepository")
+                Button(copiedVersion ? "Copied" : "Copy Version") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString("Parola \(AboutInfo.versionString)", forType: .string)
+                    copiedVersion = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        copiedVersion = false
+                    }
+                }
+                .axLeaf("Button.CopyVersion")
+            }
+            .controlSize(.small)
+            if ManagedConfiguration.shared.isActive {
+                Text("Some features are managed by your deployment.")
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .axLeaf("Text.ManagedNote")
+            }
+        }
+        .padding(DS.Spacing.large)
+        .frame(width: 380)
+        .axBranch("About")
     }
 }

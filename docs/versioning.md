@@ -13,9 +13,9 @@ the MCP server — they ship together, so they never diverge.
 The build number is the commit count at release time, so it always rises and
 never needs a decision. `scripts/bump.sh` writes both; nothing else should.
 
-The marketing version reaches users through `parola --version`, the About sheet
-and the Settings About pane (`AboutInfo.versionString`, which renders
-`0.2.0 (1181)`), and the `appVersion` field the MCP bridge reports.
+The marketing version reaches users through `parola --version`, the About window
+(`AboutInfo.versionString`, which renders `0.2.0 (1181)`), and the `appVersion`
+field the MCP bridge reports.
 
 ## Choosing the next version
 

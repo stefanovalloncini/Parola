@@ -117,7 +117,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .prompts: return ["prompt", "cleanup", "translate", "bullet", "action", "trigger words", "assistant", "rewrite"]
         case .automation: return ["mcp", "bridge", "claude code", "codex", "loopback"]
         case .updates: return ["sparkle", "appcast", "channel", "auto-update"]
-        case .advanced: return ["reset", "backup", "restore", "export settings", "import settings"]
+        case .advanced: return ["reset", "backup", "restore", "export settings", "import settings", "diagnostics", "logs"]
         }
     }
 

@@ -42,6 +42,8 @@ struct AdvancedPane: View {
                 .padding(DS.Spacing.medium)
             }
 
+            DiagnosticsSection()
+
             SettingsSection("Reset") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Returns every setting to its default. Models on disk are untouched.")

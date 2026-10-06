@@ -49,7 +49,7 @@ Remove the policy:
 defaults delete app.parola.ParolaApp com.apple.configuration.managed
 ```
 
-When any managed key is set, the About pane shows a note that features are
+When any managed key is set, the About window shows a note that features are
 managed by the deployment. Without MDM the dict is plain defaults, so a user
 with terminal access can undo it; the lock is against the UI, not a
 determined administrator.

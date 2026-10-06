@@ -43,7 +43,7 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     case aiServices, prompts
     case automation
     case updates
-    case advanced, about
+    case advanced
 
     var id: String { rawValue }
 
@@ -80,7 +80,6 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     var extraSearchKeywords: [String] {
         switch self {
         case .localModels: return ["model", "whisper", "parakeet", "apple speech", "download", "storage", "delete", "activate", "default", "models folder", "model storage", "cache", "reveal"]
-        case .about: return ["version", "repository", "diagnostics"]
         default: return []
         }
     }
@@ -127,8 +126,7 @@ private struct SettingsRouteMeta {
         .prompts: SettingsRouteMeta(titleKey: "Prompts", summaryKey: "The prompt library behind dictation cleanup and the Transcript menu.", symbol: "text.cursor", scope: .prompts),
         .automation: SettingsRouteMeta(titleKey: "MCP & Automation", summaryKey: "The MCP server other apps and agents use to drive Parola.", symbol: "bolt.horizontal.circle", scope: .automation),
         .updates: SettingsRouteMeta(titleKey: "Updates", summaryKey: "How Parola checks for new versions.", symbol: "arrow.down.circle", scope: .updates),
-        .advanced: SettingsRouteMeta(titleKey: "Advanced", summaryKey: "Backup, restore and reset for your settings.", symbol: "wrench.and.screwdriver", scope: .advanced),
-        .about: SettingsRouteMeta(titleKey: "About", summaryKey: "Version and project links.", symbol: "info.circle", scope: nil)
+        .advanced: SettingsRouteMeta(titleKey: "Advanced", summaryKey: "Backup, restore and reset for your settings, and the diagnostics log.", symbol: "wrench.and.screwdriver", scope: .advanced)
     ]
 }
 
@@ -149,7 +147,7 @@ enum SettingsSidebarCatalog {
             SidebarGroup(id: "export", title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .sendTo]),
             SidebarGroup(id: "ai", title: "AI", routes: [.aiServices, .prompts]),
             SidebarGroup(id: "automation", title: "AUTOMATION", routes: [.automation]),
-            SidebarGroup(id: "end", title: "SUPPORT", routes: [.advanced, .about])
+            SidebarGroup(id: "end", title: "SUPPORT", routes: [.advanced])
         ]
     }
 
@@ -285,7 +283,6 @@ private struct SettingsDetail: View {
         case .automation: AutomationPane()
         case .updates: UpdatesPane()
         case .advanced: AdvancedPane()
-        case .about: AboutPane()
         }
     }
 }

@@ -19,7 +19,7 @@ struct SettingsControlNamesTests {
 
     /// The panes left out open the microphone, start the updater or run yt-dlp as they appear.
     private static let walkedRoutes = SettingsRoute.allCases.filter {
-        ![.microphone, .updates, .integrations, .localModels, .about].contains($0)
+        ![.microphone, .updates, .integrations, .localModels].contains($0)
     }
 
     @ViewBuilder
@@ -47,7 +47,7 @@ struct SettingsControlNamesTests {
         case .prompts: PromptsPane()
         case .automation: AutomationPane()
         case .advanced: AdvancedPane()
-        case .microphone, .updates, .integrations, .localModels, .about: EmptyView()
+        case .microphone, .updates, .integrations, .localModels: EmptyView()
         }
     }
 
