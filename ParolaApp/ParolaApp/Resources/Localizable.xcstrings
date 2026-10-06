@@ -14285,17 +14285,6 @@
         }
       }
     },
-    "Sort jobs": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ordina job"
-          }
-        }
-      }
-    },
     "Sort prompts": {
       "extractionState": "manual",
       "localizations": {

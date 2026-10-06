@@ -66,6 +66,14 @@ struct QueueListTests {
         #expect(model.batchJobs.map(\.id) == [running.id, next.id])
     }
 
+    @Test("right-clicking empty space while jobs run offers Cancel All… with no line above it")
+    func emptySpaceMenuStartsWithCancelAll() {
+        let model = makeModel()
+        model.batchJobs = [Self.job("running", .transcribing)]
+
+        #expect(titles(menu([], in: model)) == ["Cancel All…"])
+    }
+
     @Test("the menu acts on every selected row, and Open waits for a single one")
     func menuFollowsTheSelection() {
         let model = makeModel()

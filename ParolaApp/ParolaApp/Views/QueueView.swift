@@ -82,7 +82,7 @@ struct QueueView: View {
         .buttonStyle(DSIconChipButtonStyle(side: 26))
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Sort jobs")
+        .help("Sort")
         .axLeaf("Toolbar.Menu.Sort")
     }
 
@@ -224,17 +224,6 @@ struct QueueView: View {
         return provider
     }
 
-    private func handleReturn(job: BatchJob) {
-        switch job.status {
-        case .done: model.openBatchJobTranscript(job.id)
-        case .failed, .cancelled: model.retryBatchJob(job.id)
-        case .pending, .transcribing: break
-        }
-    }
-
-    private func handleDelete(job: BatchJob) {
-        model.cancelBatchJob(job.id)
-    }
 }
 
 /// The right-click menu for the rows it was opened on: the selection when the clicked row is in it.
@@ -270,7 +259,7 @@ struct QueueRowMenu: View {
                 .axLeaf("Row.ContextMenuItem.Cancel")
         }
         if model.batchJobs.contains(where: { $0.status == .pending || $0.status == .transcribing }) {
-            Divider()
+            if !jobs.isEmpty { Divider() }
             Button("Cancel All…", action: cancelAll)
                 .axLeaf("Row.ContextMenuItem.CancelAll")
         }
