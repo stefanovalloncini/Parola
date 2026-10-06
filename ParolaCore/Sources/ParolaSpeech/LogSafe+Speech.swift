@@ -11,9 +11,10 @@ public enum SpeechEngineKind: String, Sendable, CaseIterable, LogSafe {
     public var logToken: String { rawValue }
 }
 
-/// Logs a voice as its scheme and pack only: `apple:auto`, `apple:<quality>` or the neural pack id.
-/// An Apple identifier and a voice name never reach the log, since a Personal Voice is named by its owner;
-/// a voice that didn't parse, or an Apple voice logged without its quality, logs `unrecognized`.
+/// Logs a voice as its scheme and pack only: `apple:auto`, `apple:<quality>` (`apple` when the quality is
+/// unknown, as for a voice no longer installed) or the neural pack id. An Apple identifier and a voice name
+/// never reach the log, since a Personal Voice is named by its owner; a voice that didn't parse logs
+/// `unrecognized`.
 public struct VoiceToken: LogSafe {
     public enum AppleQuality: String, Sendable, CaseIterable {
         case premium
@@ -43,7 +44,7 @@ public struct VoiceToken: LogSafe {
         case .appleAutomatic:
             logToken = "apple:auto"
         case .apple:
-            logToken = appleQuality.map { "apple:\($0.rawValue)" } ?? Self.unrecognized
+            logToken = appleQuality.map { "apple:\($0.rawValue)" } ?? "apple"
         case .neural(let pack, _):
             logToken = pack
         case nil:

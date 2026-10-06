@@ -34,10 +34,10 @@ struct LogSafeSpeechTests {
         #expect(!token.contains(identifier))
     }
 
-    @Test("an Apple voice with no quality given logs unrecognized")
+    @Test("an Apple voice with no known quality logs the scheme alone")
     func appleWithoutQuality() throws {
-        let voice = try #require(VoiceID.apple(identifier: "com.apple.voice.compact.en-US.Samantha"))
-        #expect(VoiceToken(voice).logToken == "unrecognized")
+        let voice = try #require(VoiceID.apple(identifier: "com.apple.voice.premium.en-US.Ava"))
+        #expect(VoiceToken(voice).logToken == "apple")
     }
 
     @Test("a neural voice logs its pack id only", arguments: [
