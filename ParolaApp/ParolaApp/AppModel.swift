@@ -841,7 +841,7 @@ final class AppModel {
 
     var translateMismatchWarning: String? {
         guard translate, !selectedModelCapabilities.supportsTranslate else { return nil }
-        return "\(AppModel.modelLabel(selectedModel)) can't translate, so transcriptions stay in the source language."
+        return String(localized: "\(AppModel.modelLabel(selectedModel)) can't translate, so transcriptions stay in the source language.")
     }
 
     var selectedLanguage: String? {
@@ -1058,7 +1058,7 @@ final class AppModel {
     /// Nil when the selected model can stream live captions; otherwise the user-facing reason.
     var liveCaptionsUnavailableReason: String? {
         guard !ModelCatalog.canStream(id: selectedModel) else { return nil }
-        return "\(AppModel.modelLabel(selectedModel)) can't stream Live Captions. Pick a Whisper model first."
+        return String(localized: "\(AppModel.modelLabel(selectedModel)) can't stream Live Captions. Pick a Whisper model first.")
     }
 
     func toggleLiveCaptions() {

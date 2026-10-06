@@ -78,6 +78,22 @@ struct SettingsCopyTests {
         #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
     }
 
+    @Test("the Live Captions and Translation panes' model warnings have their Italian")
+    func modelWarningsAreTranslated() throws {
+        let model = makeModel("settings-copy-model-warnings")
+        model.selectedModel = "nvidia_parakeet-tdt-0.6b-v3"
+        model.translate = true
+        let captions = try #require(model.liveCaptionsUnavailableReason)
+        #expect(captions.hasSuffix(" can't stream Live Captions. Pick a Whisper model first."), "\(captions)")
+        let translate = try #require(model.translateMismatchWarning)
+        #expect(translate.hasSuffix(" can't translate, so transcriptions stay in the source language."), "\(translate)")
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        for key in ["%@ can't stream Live Captions. Pick a Whisper model first.", "%@ can't translate, so transcriptions stay in the source language."] {
+            #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING", "\(key)")
+        }
+    }
+
     @Test("the service editor's Test is off while Keep AI on this Mac pauses the service, and the editor says why")
     func pausedServiceEditor() throws {
         let model = makeModel("settings-copy-paused-editor")

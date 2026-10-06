@@ -67,6 +67,17 @@
         }
       }
     },
+    "%@ can't stream Live Captions. Pick a Whisper model first.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ non può fare i sottotitoli in tempo reale. Scegli prima un modello Whisper."
+          }
+        }
+      }
+    },
     "%@ can't transcribe %@. Pick a multilingual model (like Whisper) to transcribe other languages.": {
       "extractionState": "manual",
       "localizations": {
@@ -74,6 +85,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ non trascrive %@. Scegli un modello multilingue (come Whisper) per trascrivere altre lingue."
+          }
+        }
+      }
+    },
+    "%@ can't translate, so transcriptions stay in the source language.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ non sa tradurre, quindi le trascrizioni restano nella lingua originale."
           }
         }
       }
