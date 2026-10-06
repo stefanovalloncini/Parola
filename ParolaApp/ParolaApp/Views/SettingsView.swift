@@ -118,7 +118,7 @@ private struct SettingsRouteMeta {
         .people: SettingsRouteMeta(titleKey: "People", summaryKey: "The speakers you name, the colour each one wears, and where they show up.", symbol: "person.2", scope: .people),
         .ignoredSegments: SettingsRouteMeta(titleKey: "Ignored Segments", summaryKey: "Segments dropped from a transcript when the text matches a pattern.", symbol: "line.3.horizontal.decrease.circle", scope: .ignoredSegments),
         .findReplace: SettingsRouteMeta(titleKey: "Find & Replace", summaryKey: "Substitutions applied to every transcript before it's saved.", symbol: "arrow.triangle.2.circlepath", scope: .findReplace),
-        .exportFormats: SettingsRouteMeta(titleKey: "Export Formats", summaryKey: "The named exports Parola can write, and what each one puts in the file.", symbol: "square.and.arrow.up", scope: .exportFormats),
+        .exportFormats: SettingsRouteMeta(titleKey: "Export Presets", summaryKey: "The named exports Parola can write, and what each one puts in the file.", symbol: "square.and.arrow.up", scope: .exportFormats),
         .batchExport: SettingsRouteMeta(titleKey: "Batch Export", summaryKey: "What happens to files exported from a batch run.", symbol: "rectangle.stack.badge.play", scope: .batchExport),
         .autoExport: SettingsRouteMeta(titleKey: "Auto-Export", summaryKey: "Rules that write a transcript to disk as soon as it's ready.", symbol: "arrow.up.doc", scope: .autoExport),
         .sendTo: SettingsRouteMeta(titleKey: "Send To", summaryKey: "Where a finished transcript is sent, starting with a folder in your Obsidian vault.", symbol: "paperplane", scope: .sendTo),

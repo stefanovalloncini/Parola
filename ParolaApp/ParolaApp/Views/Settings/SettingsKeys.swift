@@ -47,7 +47,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .transcriptionDefaults: return "Transcription Defaults"
         case .ignoredSegments: return "Ignored Segments"
         case .findReplace: return "Find & Replace"
-        case .exportFormats: return "Export Formats"
+        case .exportFormats: return "Export Presets"
         case .batchExport: return "Batch Export"
         case .autoExport: return "Auto-Export"
         case .sendTo: return "Send To"
@@ -77,7 +77,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .transcriptionDefaults: return String(localized: "Transcription Defaults")
         case .ignoredSegments: return String(localized: "Ignored Segments")
         case .findReplace: return String(localized: "Find & Replace")
-        case .exportFormats: return String(localized: "Export Formats")
+        case .exportFormats: return String(localized: "Export Presets")
         case .batchExport: return String(localized: "Batch Export")
         case .autoExport: return String(localized: "Auto-Export")
         case .sendTo: return String(localized: "Send To")
@@ -108,8 +108,8 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "vocabulary", "jargon", "names", "speakers", "detect speakers", "diarize", "word timestamps", "apple speech", "playback"]
         case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
         case .findReplace: return ["regex", "replace", "term pack", "substitution", "rule"]
-        case .exportFormats: return ["preset", "txt", "srt", "vtt", "csv", "tsv", "docx", "pdf", "markdown", "html", "json", "jsonl", "fcpxml", "final cut", "lrc", "lyrics", "subtitles"]
-        case .batchExport: return ["batch", "multiple files", "drag drop", "queue", "sidecar", "folder", "preset"]
+        case .exportFormats: return ["preset", "format", "export formats", "txt", "srt", "vtt", "csv", "tsv", "docx", "pdf", "markdown", "html", "json", "jsonl", "fcpxml", "final cut", "lrc", "lyrics", "subtitles"]
+        case .batchExport: return ["batch", "multiple files", "drag drop", "queue", "folder", "preset"]
         case .autoExport: return ["auto export", "rule", "line length", "qc", "timestamps", "html theme", "preset", "folder"]
         case .sendTo: return ["obsidian", "vault", "send", "destination", "note", "markdown", "frontmatter", "wikilink"]
         case .integrations: return ["yt-dlp", "youtube", "homebrew", "install", "link", "video", "integrations"]

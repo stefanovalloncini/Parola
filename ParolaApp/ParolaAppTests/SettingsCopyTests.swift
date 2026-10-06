@@ -186,4 +186,16 @@ struct SettingsCopyTests {
             #expect(after < sideBySide && sideBySide < during && during < byDefault, "\(words)")
         }
     }
+
+    @Test("export presets go by one name in Settings, and Batch Export has no fake Drag & Drop row")
+    func exportPresetsHaveOneName() {
+        #expect(SettingsRoute.exportFormats.label == "Export Presets")
+        #expect(SettingsPaneScope.exportFormats.localizedLabel == "Export Presets")
+        let model = makeModel("settings-copy-presets")
+        let batch = words(BatchExportSettingsPane(), model: model)
+        #expect(batch.contains("Export Presets"), "\(batch)")
+        let sidecar = batch.filter { $0.localizedCaseInsensitiveContains("sidecar") }
+        #expect(sidecar.isEmpty, "\(sidecar)")
+        #expect(!batch.contains("Drag & Drop"), "\(batch)")
+    }
 }

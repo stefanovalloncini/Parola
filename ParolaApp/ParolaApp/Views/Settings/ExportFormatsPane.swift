@@ -126,7 +126,7 @@ struct BatchExportSettingsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SettingsSection("Sidecar presets") {
+            SettingsSection("Export Presets") {
                 VStack(alignment: .leading, spacing: DS.Spacing.small) {
                     Text("Parola writes these presets beside every file a batch transcribes.")
                         .font(DS.Font.secondary)
@@ -143,13 +143,9 @@ struct BatchExportSettingsPane: View {
             }
 
             SettingsSection {
-                SettingRow("Multi-file transcription",
-                           description: "Open multiple audio files at once to queue them for batch transcription.",
-                           isFirst: true) {
-                    Text("Drag & Drop").foregroundStyle(DS.Color.secondaryText)
-                }
                 SettingRow("Batch view",
-                           description: "Pick presets in the Batch view too. Parola writes them as each transcription finishes.") {
+                           description: "Pick presets in the Batch view too. Parola writes them as each transcription finishes.",
+                           isFirst: true) {
                     Button("Open Batch") {
                         model.route = .batch
                         NSApp.activate(ignoringOtherApps: true)
@@ -162,7 +158,7 @@ struct BatchExportSettingsPane: View {
                     .axLeaf("BatchExport.Button.OpenBatch")
                 }
             }
-            SettingHelper(text: "Drop a folder of files on the Parola window to start a batch.")
+            SettingHelper(text: "To start a batch, open several files at once or drop a folder on the Parola window.")
             ResetPaneButton(scope: .batchExport)
         }
     }
