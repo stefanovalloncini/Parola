@@ -8856,6 +8856,17 @@
         }
       }
     },
+    "Move to Recently Deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sposta in Eliminati di recente"
+          }
+        }
+      }
+    },
     "Move to Top": {
       "extractionState": "manual",
       "localizations": {

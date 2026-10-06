@@ -132,6 +132,9 @@ struct ParolaApp: App {
             CommandGroup(replacing: .newItem) {
                 FileCommands(model: model)
             }
+            CommandGroup(after: .newItem) {
+                LibraryRowCommands(model: model)
+            }
             CommandGroup(after: .sidebar) {
                 ViewCommands(model: model)
             }

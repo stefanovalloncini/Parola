@@ -102,6 +102,9 @@ struct ShortcutCatalog {
                 Entry(label: text("Search Library"),             keys: "⌘ ⌥ F"),
                 Entry(label: text("Auto-Detect Language"),       keys: "⌘ ⇧ D"),
             ]),
+            Section(title: text("Library"), entries: [
+                Entry(label: text("Move to Recently Deleted"),   keys: "⌘ ⌫"),
+            ]),
             Section(title: text("Help"), entries: [
                 Entry(label: text("Keyboard Shortcuts"),         keys: "⌘ /"),
             ]),

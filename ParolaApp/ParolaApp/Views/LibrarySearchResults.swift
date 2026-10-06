@@ -98,6 +98,7 @@ struct LibrarySearchResults: View {
                             renameDraft = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: model.showAITitles)
                             renamingEntry = entry
                         },
+                        pendingBulkDelete: $pendingBulkDelete,
                         focus: focus,
                         focusKey: .results,
                         rowAppeared: rowAppeared

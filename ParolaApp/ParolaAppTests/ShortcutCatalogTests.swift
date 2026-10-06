@@ -44,7 +44,8 @@ struct ShortcutCatalogTests {
         let it = try #require(Bundle(path: path))
         let sections = ShortcutCatalog.sections(features: .all, bundle: it)
         #expect(sections.map(\.title) == [
-            "Acquisizione", "Registrazione", "Trascrizione", "Trova", "Copia ed esporta", "Riproduzione", "Navigazione", "Aiuto",
+            "Acquisizione", "Registrazione", "Trascrizione", "Trova", "Copia ed esporta", "Riproduzione", "Navigazione", "Libreria",
+            "Aiuto",
         ])
         let italian = sections.flatMap(\.entries).map(\.label)
         let english = ShortcutCatalog.sections(features: .all).flatMap(\.entries).map(\.label)
@@ -91,7 +92,7 @@ struct ShortcutCatalogTests {
     private static func shortcuts(in name: String) throws -> [String] {
         let text = try source(name)
         let pattern = #/[kK]eyboardShortcut\(\s*(?:"(?<char>[^"]+)"|\.(?<named>\w+))\s*(?:,\s*modifiers:\s*(?<mods>\[[^\]]*\]|\.\w+))?\s*\)/#
-        let glyphs = ["return": "↩", "upArrow": "↑", "downArrow": "↓", "leftArrow": "←", "rightArrow": "→"]
+        let glyphs = ["return": "↩", "delete": "⌫", "upArrow": "↑", "downArrow": "↓", "leftArrow": "←", "rightArrow": "→"]
         var found: [String] = []
         for match in text.matches(of: pattern) {
             let key: String
@@ -113,7 +114,9 @@ struct ShortcutCatalogTests {
         return found
     }
 
-    private static let menuFiles = ["Views/AppCommands", "Views/MiniPlayerCommand", "Views/Chat/FocusChatComposerCommand"]
+    private static let menuFiles = [
+        "Views/AppCommands", "Views/MiniPlayerCommand", "Views/Chat/FocusChatComposerCommand", "Views/Library/LibraryRowCommands",
+    ]
 
     @Test("no two menu commands share a key")
     func menuKeysAreUnique() throws {

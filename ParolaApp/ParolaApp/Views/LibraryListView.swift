@@ -457,6 +457,7 @@ private struct LibraryBrowseList: View, Equatable {
                             renameDraft = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: model.showAITitles)
                             renamingEntry = entry
                         },
+                        pendingBulkDelete: $pendingBulkDelete,
                         focus: focus,
                         focusKey: .browse,
                         top: pageTop(showsIntake: true)

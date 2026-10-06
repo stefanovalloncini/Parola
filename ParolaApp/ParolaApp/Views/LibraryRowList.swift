@@ -57,6 +57,7 @@ struct LibraryRowList<Top: View>: View {
     let detail: LibraryListRow.Detail
     let animatesRows: Bool
     let rename: (LibraryEntry) -> Void
+    @Binding var pendingBulkDelete: Bool
     let focus: FocusState<LibraryListFocus?>.Binding
     let focusKey: LibraryListFocus
     var rowAppeared: ((LibraryEntry.ID) -> Void)?
@@ -69,6 +70,7 @@ struct LibraryRowList<Top: View>: View {
         detail: LibraryListRow.Detail,
         animatesRows: Bool,
         rename: @escaping (LibraryEntry) -> Void,
+        pendingBulkDelete: Binding<Bool>,
         focus: FocusState<LibraryListFocus?>.Binding,
         focusKey: LibraryListFocus,
         rowAppeared: ((LibraryEntry.ID) -> Void)? = nil,
@@ -80,6 +82,7 @@ struct LibraryRowList<Top: View>: View {
         self.detail = detail
         self.animatesRows = animatesRows
         self.rename = rename
+        _pendingBulkDelete = pendingBulkDelete
         self.focus = focus
         self.focusKey = focusKey
         self.rowAppeared = rowAppeared
@@ -132,6 +135,10 @@ struct LibraryRowList<Top: View>: View {
         .listStyle(.inset)
         .tint(DS.Color.accentFill)
         .focused(focus, equals: focusKey)
+        .focusedValue(\.libraryRows, LibraryRowsTarget(
+            entries: LibraryRowsTarget.selectedEntries(selection, in: items), rename: rename, delete: deleteSelection
+        ))
+        .onDeleteCommand(perform: deleteSelection)
         .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: itemIDs)
         // Empty on purpose: each row keeps its own context menu, and the list takes only double-click and Return.
         .contextMenu(forSelectionType: LibraryEntry.ID.self) { _ in
@@ -145,6 +152,19 @@ struct LibraryRowList<Top: View>: View {
         let entries = LibraryListItem.entries(in: ids, items: items)
         guard let request = LibraryListContent.openRequest(for: entries, modifiers: NSEvent.modifierFlags) else { return }
         model.openEntryFromLibrary(request.id, inNewWindow: request.inNewWindow)
+    }
+
+    private func deleteSelection() {
+        let ids = LibraryListItem.entries(in: selection, items: items)
+        switch LibraryDeleteRequest.forSelection(count: ids.count) {
+        case .none:
+            break
+        case .now:
+            selection.subtract(ids)
+            for id in ids { model.deleteEntry(id) }
+        case .confirm:
+            pendingBulkDelete = true
+        }
     }
 }
 

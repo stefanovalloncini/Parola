@@ -117,7 +117,16 @@ struct MacRecentlyDeletedView: View {
         }
         .listStyle(.inset)
         .tint(DS.Color.accentFill)
+        .onDeleteCommand(perform: confirmPurgeSelection)
         .animation(reduceMotion ? nil : DS.Motion.listRows, value: model.deletedEntries.map(\.id))
+    }
+
+    private func confirmPurgeSelection() {
+        switch LibraryDeleteRequest.forSelection(count: selection.count) {
+        case .none: break
+        case .now: confirmingPurge = selection.first
+        case .confirm: confirmingPurgeBulk = selection
+        }
     }
 
     private func row(_ display: LibraryRowDisplay) -> some View {

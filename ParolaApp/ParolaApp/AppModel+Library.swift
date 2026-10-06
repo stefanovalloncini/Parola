@@ -330,6 +330,20 @@ extension AppModel {
         }
     }
 
+    func setPinned(_ pinned: Bool, for ids: [LibraryEntry.ID]) {
+        Task { [weak self] in
+            guard let self else { return }
+            for id in ids {
+                do {
+                    try await library.setPinned(pinned, for: id)
+                } catch {
+                    noteLibraryFailure(pinned ? String(localized: "Couldn't pin") : String(localized: "Couldn't unpin"), error)
+                }
+            }
+            refreshLibrary()
+        }
+    }
+
     func renameEntry(_ id: LibraryEntry.ID, to newName: String) {
         Task { [weak self] in
             guard let self else { return }
