@@ -16,6 +16,12 @@ extension AppModel {
             suggestedName: "Parola-Diagnostics-\(stamp).txt",
             allowedTypes: [.plainText]
         ) else { return nil }
+        return try await exportDiagnostics(to: destination, directory: directory)
+    }
+
+    /// Renders the report and writes it to `destination` directly, with no save panel.
+    @discardableResult
+    func exportDiagnostics(to destination: URL, directory: URL = AppModel.diagnosticsDirectory) async throws -> URL {
         let environment = await diagnosticsEnvironment()
         do {
             try await Self.offMainIO {

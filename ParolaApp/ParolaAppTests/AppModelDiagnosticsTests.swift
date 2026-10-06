@@ -10,9 +10,9 @@ import ParolaTestSupport
 @Suite("App diagnostics export")
 struct AppModelDiagnosticsTests {
 
-    private func makeModel() -> AppModel {
+    private func makeModel(mode: AppBootstrap.Mode = .test) -> AppModel {
         let bootstrap = AppBootstrap(
-            mode: .test,
+            mode: mode,
             library: makeTempLibraryURL("diagnostics"),
             defaultsOverride: temporaryDefaults(),
             sideEffects: [],
@@ -216,6 +216,84 @@ struct AppModelDiagnosticsTests {
             Issue.record("expected the handler to throw")
         } catch let error as AutomationError {
             #expect(error.code == "INTERNAL")
+        }
+        withExtendedLifetime(server) {}
+    }
+
+    @Test("a path argument writes directly, opening no save panel")
+    func bridgeExportWithPathWritesDirectly() async throws {
+        let model = makeModel(mode: .normal)
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let command = try #require(
+            server.diagnosticsCommands().first { $0.name == "exportDiagnostics" }
+        )
+        let folder = scratchDirectory()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let destination = folder.appendingPathComponent("direct.txt")
+
+        let reply = try await command.handler(AutomationArgs(["path": .string(destination.path)]), context)
+        withExtendedLifetime(server) {}
+
+        #expect(reply == .object(["path": .string(destination.path)]))
+        let text = try String(contentsOf: destination, encoding: .utf8)
+        #expect(text.hasPrefix("Parola Diagnostics — generated "))
+    }
+
+    @Test("a relative path is refused")
+    func bridgeExportRelativePathIsRefused() async throws {
+        let model = makeModel()
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let command = try #require(
+            server.diagnosticsCommands().first { $0.name == "exportDiagnostics" }
+        )
+
+        do {
+            _ = try await command.handler(AutomationArgs(["path": .string("relative/report.txt")]), context)
+            Issue.record("expected the handler to throw")
+        } catch let error as AutomationError {
+            #expect(error.code == "PRECONDITION")
+            #expect(error.message == "path must be absolute")
+        }
+        withExtendedLifetime(server) {}
+    }
+
+    @Test("a path whose folder doesn't exist is refused")
+    func bridgeExportMissingFolderIsRefused() async throws {
+        let model = makeModel()
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let command = try #require(
+            server.diagnosticsCommands().first { $0.name == "exportDiagnostics" }
+        )
+        let missing = scratchDirectory().appendingPathComponent("nope/report.txt")
+
+        do {
+            _ = try await command.handler(AutomationArgs(["path": .string(missing.path)]), context)
+            Issue.record("expected the handler to throw")
+        } catch let error as AutomationError {
+            #expect(error.code == "PRECONDITION")
+            #expect(error.message == "the folder for path does not exist")
+        }
+        withExtendedLifetime(server) {}
+    }
+
+    @Test("without a path, outside test mode the bridge refuses instead of opening a panel")
+    func bridgeExportOutsideTestModeWithoutPathIsRefused() async throws {
+        let model = makeModel(mode: .normal)
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let command = try #require(
+            server.diagnosticsCommands().first { $0.name == "exportDiagnostics" }
+        )
+
+        do {
+            _ = try await command.handler(AutomationArgs(), context)
+            Issue.record("expected the handler to throw")
+        } catch let error as AutomationError {
+            #expect(error.code == "PRECONDITION")
+            #expect(error.message == "outside test mode, pass path")
         }
         withExtendedLifetime(server) {}
     }
