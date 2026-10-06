@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 enum LanguageDisplay {
     /// Localized, capitalized name for a transcript's language code, or nil when there's no
@@ -20,9 +21,6 @@ enum LanguageDisplay {
     }
 
     private static func realCode(_ code: String?) -> String? {
-        guard let raw = code else { return nil }
-        let normalized = raw.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !normalized.isEmpty, normalized != "unknown", normalized != "auto" else { return nil }
-        return normalized
+        SpokenLanguage.realCode(code)?.lowercased()
     }
 }

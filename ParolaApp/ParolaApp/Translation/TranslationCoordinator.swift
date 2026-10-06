@@ -224,9 +224,7 @@ final class TranslationCoordinator {
 
     /// A transcript that never settled on a language leaves the source open, and the framework detects it.
     static func sourceLanguage(for language: String) -> String? {
-        let trimmed = language.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !trimmed.isEmpty, trimmed != "auto", trimmed != "unknown" else { return nil }
-        return trimmed
+        SpokenLanguage.realCode(language)?.lowercased()
     }
 
     static func message(for error: any Error) -> String {
