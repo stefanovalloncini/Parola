@@ -89,4 +89,11 @@ final class FakeOutputSink: ReadAloudOutputSink {
         generation += 1
         pending.removeAll()
     }
+
+    func simulateOutputChange() {
+        generation += 1
+        pending.removeAll()
+        listener?.finish()
+        listener = nil
+    }
 }

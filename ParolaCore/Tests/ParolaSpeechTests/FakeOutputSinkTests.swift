@@ -115,6 +115,26 @@ struct FakeOutputSinkTests {
         #expect(fromCurrent == [UnitFinished(epoch: 1, unitID: 0), UnitFinished(epoch: 1, unitID: 1)])
     }
 
+    @Test("an output change ends the stream and drops pending completions until the caller subscribes again")
+    func outputChangeSupersedes() async {
+        let sink = FakeOutputSink()
+        let events = sink.unitFinishedEvents()
+        sink.finishUnit(0, epoch: 0, pauseAfter: 0)
+        let late = sink.pending
+
+        sink.simulateOutputChange()
+        let received = await collect(events, "the stream to end")
+        #expect(received == [])
+        #expect(sink.pending.isEmpty)
+        #expect(late.map { sink.deliver($0) } == [false])
+
+        let again = sink.unitFinishedEvents()
+        sink.finishUnit(0, epoch: 1, pauseAfter: 0)
+        sink.completeNextUnit()
+        _ = sink.unitFinishedEvents()
+        #expect(await collect(again, "the new stream to end") == [UnitFinished(epoch: 1, unitID: 0)])
+    }
+
     @Test("scheduling before subscribing is counted")
     func scheduleBeforeSubscribing() {
         let sink = FakeOutputSink()
