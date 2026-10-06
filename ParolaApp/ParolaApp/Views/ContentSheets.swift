@@ -31,10 +31,10 @@ struct ContentSheetsModifier: ViewModifier {
                 if let name { meetingAppSnapshot = name }
             }
             .alert(
-                "\(meetingAppSnapshot) is running",
+                "\(meetingPromptName) is running",
                 isPresented: meetingPromptBinding
             ) {
-                Button("Record \(meetingAppSnapshot) Meeting") { model.startMeetingRecording() }
+                Button("Record \(meetingPromptName) Meeting") { model.startMeetingRecording() }
                     .axLeaf("Meeting.Button.Record")
                 Button("Not Now", role: .cancel) { model.dismissMeetingPrompt() }
                     .axLeaf("Meeting.Button.NotNow")
@@ -89,6 +89,14 @@ struct ContentSheetsModifier: ViewModifier {
             get: { model.meetingDetectedApp != nil },
             set: { if !$0 { model.dismissMeetingPrompt() } }
         )
+    }
+
+    private var meetingPromptName: String {
+        Self.meetingPromptName(detected: model.meetingDetectedApp, snapshot: meetingAppSnapshot)
+    }
+
+    static func meetingPromptName(detected: String?, snapshot: String) -> String {
+        detected ?? snapshot
     }
 
     private var recoveryTitle: String {
