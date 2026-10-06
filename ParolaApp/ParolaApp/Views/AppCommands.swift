@@ -79,7 +79,7 @@ struct FileCommands: View {
             .axLeaf("Menu.File.TranscribeLink")
         }
         if model.features.isEnabled(.batch) {
-            Button(NewMenuCommand.batchTranscribe.title) {
+            Button(NewMenuCommand.addToQueue.title) {
                 model.showMainWindow { openWindow(id: MainWindowScene.id) }
                 model.presentBatchOpenPanel()
             }

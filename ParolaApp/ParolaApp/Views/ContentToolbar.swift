@@ -39,13 +39,13 @@ struct ContentToolbar: ToolbarContent {
 enum NewMenuCommand {
     case openFiles
     case transcribeLink
-    case batchTranscribe
+    case addToQueue
 
     var title: LocalizedStringKey {
         switch self {
         case .openFiles: "Open Files…"
         case .transcribeLink: "Transcribe Link…"
-        case .batchTranscribe: "Batch Transcribe…"
+        case .addToQueue: "Add to Queue…"
         }
     }
 
@@ -53,7 +53,7 @@ enum NewMenuCommand {
         switch self {
         case .openFiles: Label(title, systemImage: DS.Symbol.openFiles)
         case .transcribeLink: Label(title, systemImage: "link")
-        case .batchTranscribe: Label(title, systemImage: "square.stack.3d.up")
+        case .addToQueue: Label(title, systemImage: "square.stack.3d.up")
         }
     }
 }
@@ -72,7 +72,7 @@ struct NewMenuItems: View {
                     .axLeaf("Toolbar.MenuItem.NewLink")
             }
             if model.features.isEnabled(.batch) {
-                Button { model.presentBatchOpenPanel() } label: { NewMenuCommand.batchTranscribe.label }
+                Button { model.presentBatchOpenPanel() } label: { NewMenuCommand.addToQueue.label }
                     .axLeaf("Toolbar.MenuItem.NewBatch")
             }
         }

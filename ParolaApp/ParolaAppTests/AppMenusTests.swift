@@ -47,6 +47,17 @@ struct AppMenusTests {
         #expect(plain == plainNewMenu + ["Open Recent", "Save As Parola Document…"])
     }
 
+    @Test("File and the + menu offer Add to Queue…, and each way in takes the same key in both")
+    func fileMenuSharesTheNewMenuKeys() {
+        let model = makeModel("file-menu-keys")
+        let newMenu = items(NewMenuItems().environment(model))
+        #expect(newMenu.map(\.title).last == "Add to Queue…")
+        let keyed: (NSMenuItem) -> String = { "\($0.title) \($0.keyEquivalent) \($0.keyEquivalentModifierMask.rawValue)" }
+        let newMenuKeys = newMenu.map(keyed)
+        let fileKeys = items(FileCommands(model: model)).map(keyed)
+        #expect(fileKeys.filter(newMenuKeys.contains) == newMenuKeys, "\(fileKeys) vs \(newMenuKeys)")
+    }
+
     @Test("Check for Updates… sits under About Parola, off in a build with no update feed")
     func checkForUpdatesInTheAppMenu() throws {
         let appInfo = items(AppInfoCommands(showAbout: {}))
