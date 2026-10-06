@@ -515,6 +515,7 @@ private struct LibraryBrowseList: View, Equatable {
             renamingEntry: $renamingEntry,
             renameDraft: $renameDraft
         ))
+        .background { LibraryListMenusPublisher(listShows: pageCount > 0) }
     }
 
     @ViewBuilder

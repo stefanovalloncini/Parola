@@ -140,6 +140,9 @@ struct ParolaApp: App {
                 ViewCommands(model: model)
             }
             CommandGroup(after: .sidebar) {
+                ListOptionsCommands()
+            }
+            CommandGroup(after: .sidebar) {
                 GoCommands(model: model)
             }
             CommandGroup(after: .textEditing) {

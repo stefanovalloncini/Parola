@@ -4,6 +4,7 @@ import Testing
 @testable import Parola
 import ParolaCore
 import ParolaTestSupport
+import SwiftUI
 
 @MainActor
 @Suite("Menus follow the page in front")
@@ -117,5 +118,70 @@ struct PageCommandsTests {
         }
         let sidebar = titles.contains("Show Sidebar") || titles.contains("Hide Sidebar")
         #expect(sidebar)
+    }
+
+    private static func source(_ name: String) throws -> String {
+        let path = #filePath.replacingOccurrences(
+            of: "ParolaAppTests/PageCommandsTests.swift",
+            with: "ParolaApp/\(name).swift"
+        )
+        return try String(contentsOfFile: path, encoding: .utf8)
+    }
+
+    @Test("View ▸ Sort By and Show set the library's own sort, grouping and date filter")
+    func libraryListMenusDriveTheModel() {
+        model.librarySortOrder = .newest
+        let menus = PageListMenus.library(model)
+        #expect(menus.sort.selected == LibrarySortOrder.newest.rawValue)
+        #expect(menus.sort.options.map(\.id) == LibrarySortOrder.allCases.map(\.rawValue))
+        #expect(menus.groupsByDateApplies)
+
+        menus.sort.choose(LibrarySortOrder.oldest.rawValue)
+        menus.show?.choose(LibraryDateRangeFilter.week.rawValue)
+        menus.groupsByDate?.wrappedValue = false
+
+        #expect(model.librarySortOrder == .oldest)
+        #expect(model.dateRangeFilter == .week)
+        #expect(!model.libraryGroupsByDate)
+        model.librarySortOrder = .titleAZ
+        #expect(!PageListMenus.library(model).groupsByDateApplies)
+    }
+
+    @Test("Recently Deleted and the Queue hand their header's sort, and Recently Deleted its kind, to the View menu")
+    func pageStateMenusWriteThroughTheirBindings() {
+        var deletedSort = RecentlyDeletedSort.deletedEarliest
+        var kind = RecentlyDeletedCategoryFilter.all
+        var queueSort = QueueView.SortOption.newestFirst
+        let deleted = PageListMenus.recentlyDeleted(
+            sort: Binding(get: { deletedSort }, set: { deletedSort = $0 }),
+            kind: Binding(get: { kind }, set: { kind = $0 })
+        )
+        let queue = PageListMenus.queue(sort: Binding(get: { queueSort }, set: { queueSort = $0 }))
+
+        deleted.sort.choose(RecentlyDeletedSort.titleAZ.rawValue)
+        deleted.show?.choose(RecentlyDeletedCategoryFilter.meetings.rawValue)
+        queue.sort.choose(QueueView.SortOption.mostProgress.rawValue)
+
+        #expect(deletedSort == .titleAZ)
+        #expect(kind == .meetings)
+        #expect(queueSort == .mostProgress)
+        #expect(queue.show == nil)
+    }
+
+    @Test("View holds Sort By and Show ahead of Go, and each list page publishes its own")
+    func sortAndShowInTheViewMenu() async throws {
+        let view = try #require(await viewMenu())
+        let titles = view.items.map(\.title)
+        let sort = try #require(titles.firstIndex(of: "Sort By"))
+        let show = try #require(titles.firstIndex(of: "Show"))
+        let go = try #require(titles.firstIndex(of: "Go"))
+        #expect(sort < show && show < go)
+
+        let library = try Self.source("Views/LibraryListView")
+        let deleted = try Self.source("Views/MacRecentlyDeletedView")
+        let queue = try Self.source("Views/QueueView")
+        #expect(library.contains(".background { LibraryListMenusPublisher(listShows: pageCount > 0) }"))
+        #expect(deleted.contains(".focusedSceneValue(\\.pageListMenus, .recentlyDeleted(sort: $sortOption, kind: $categoryFilter))"))
+        #expect(queue.contains(".focusedSceneValue(\\.pageListMenus, .queue(sort: $sortOption))"))
     }
 }

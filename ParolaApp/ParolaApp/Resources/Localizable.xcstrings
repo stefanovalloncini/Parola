@@ -14161,6 +14161,17 @@
         }
       }
     },
+    "Sort By": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ordina per"
+          }
+        }
+      }
+    },
     "Sort by": {
       "extractionState": "manual",
       "localizations": {

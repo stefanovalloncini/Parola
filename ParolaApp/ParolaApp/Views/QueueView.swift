@@ -28,6 +28,7 @@ struct QueueView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
         .toolbarSearch(text: $searchText, for: .queue)
+        .focusedSceneValue(\.pageListMenus, .queue(sort: $sortOption))
         .axBranch("Queue")
     }
 
