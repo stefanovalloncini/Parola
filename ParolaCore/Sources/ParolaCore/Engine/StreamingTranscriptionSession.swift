@@ -200,8 +200,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         return try await streamOnceDecoding(stream)
     }
 
-    /// Hands the stream over once decodes can run, or once the take ends before that; a cancel and
-    /// a model that failed to load throw instead.
+    /// Hands the stream over once decodes can run or the take ends first; a cancel or a failed load throws instead.
     private func streamOnceDecoding(_ stream: AsyncStream<StreamingEvent>) async throws -> AsyncStream<StreamingEvent> {
         guard let loop, let streamerTask else { return stream }
         var decoding = false

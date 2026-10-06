@@ -225,8 +225,8 @@ private func finishedTranscript(of events: AsyncStream<StreamingEvent>) async ->
 
 @Suite("Ending a live take")
 struct StreamingTakeEndingTests {
-    @Test("a stop while the model loads ends the take before capture: the load yields nothing to launch")
-    func stopDuringLoadEndsTheTake() async throws {
+    @Test("a stop during the model download ends the take before capture: the download yields nothing to launch")
+    func stopDuringDownloadEndsTheTake() async throws {
         let session = StreamingTranscriptionSession()
         let loader = SuspendingLoader()
         let starting = Task { try await session.loadingModel { await loader.load() } }
@@ -239,8 +239,8 @@ struct StreamingTakeEndingTests {
         #expect(try await starting.value == nil)
     }
 
-    @Test("a cancel while the model loads throws instead of launching")
-    func cancelDuringLoadThrows() async throws {
+    @Test("a cancel during the model download throws instead of launching")
+    func cancelDuringDownloadThrows() async throws {
         let session = StreamingTranscriptionSession()
         let loader = SuspendingLoader()
         let starting = Task { try await session.loadingModel { await loader.load() } }
@@ -287,7 +287,8 @@ struct StreamingTakeEndingTests {
         let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
         await probe.loads.wait(atLeast: 1, "the model load to start")
 
-        await session.stop()
+        let stopping = GuardedTask { await session.stop() }
+        _ = try await stopping.value("the stop to return without the model")
         await gate.open(Self.tiny)
 
         let events = try #require(try await starting.value("the start to return"))
@@ -311,7 +312,8 @@ struct StreamingTakeEndingTests {
         let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
         await probe.loads.wait(atLeast: 1, "the model load to start")
 
-        await session.cancel()
+        let cancelling = GuardedTask { await session.cancel() }
+        _ = try await cancelling.value("the cancel to return without the model")
         await gate.open(Self.tiny)
 
         await #expect(throws: CancellationError.self) { _ = try await starting.value("the start to return") }
