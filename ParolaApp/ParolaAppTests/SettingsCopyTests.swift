@@ -115,4 +115,19 @@ struct SettingsCopyTests {
         #expect(!MicErrorBanner.offersSystemSettings(for: .authorized))
         #expect(!MicErrorBanner.offersSystemSettings(for: .notDetermined))
     }
+
+    @Test("Record Meetings asks only for the permission the capture setting uses; the other reads Not needed")
+    func recordMeetingsAsksForWhatItUses() {
+        #expect(RecordMeetingsPane.neededPermissions(appOnly: false) == .init(screenRecording: true, systemAudio: false))
+        #expect(RecordMeetingsPane.neededPermissions(appOnly: true) == .init(screenRecording: false, systemAudio: true))
+
+        let model = makeModel("settings-copy-meetings")
+        for appOnly in [false, true] {
+            model.meetingCaptureAppOnly = appOnly
+            let words = words(RecordMeetingsPane(), model: model)
+            let notNeeded = words.filter { $0 == "Not needed" }.count
+            #expect(notNeeded == 1, "\(appOnly): \(words)")
+            #expect(!words.contains("Parola watches running applications; nothing leaves your Mac."))
+        }
+    }
 }

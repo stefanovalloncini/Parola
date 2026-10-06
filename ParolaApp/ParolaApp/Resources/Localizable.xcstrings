@@ -9734,6 +9734,17 @@
         }
       }
     },
+    "Not needed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non serve"
+          }
+        }
+      }
+    },
     "Not supported by %@": {
       "extractionState": "manual",
       "localizations": {
@@ -10016,6 +10027,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Offre di registrare l'audio di sistema quando si avvia Zoom, Teams, Webex o Meet."
+          }
+        }
+      }
+    },
+    "Offers to record system audio when you open or switch to a meeting app like Zoom, Teams, or Webex. Meetings in a browser aren't detected. Parola only looks at which apps are running, and nothing leaves your Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Propone di registrare l'audio di sistema quando apri o passi a un'app per riunioni come Zoom, Teams o Webex. Le riunioni nel browser non vengono rilevate. Parola guarda solo quali app sono aperte, e nulla esce dal Mac."
           }
         }
       }
@@ -10754,17 +10776,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola usa yt-dlp per scaricare l'audio da YouTube in locale. Installalo una volta e sei a posto."
-          }
-        }
-      }
-    },
-    "Parola watches running applications; nothing leaves your Mac.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parola osserva le applicazioni in esecuzione; nulla esce dal Mac."
           }
         }
       }

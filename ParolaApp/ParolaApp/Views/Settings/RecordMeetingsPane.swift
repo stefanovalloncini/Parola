@@ -9,9 +9,20 @@ struct RecordMeetingsPane: View {
         !SettingsRoute.microphone.isVisible(features: features)
     }
 
+    struct NeededPermissions: Equatable {
+        var screenRecording: Bool
+        var systemAudio: Bool
+    }
+
+    /// One capture at a time: the whole mix needs Screen Recording, one app's audio needs System Audio Recording.
+    nonisolated static func neededPermissions(appOnly: Bool) -> NeededPermissions {
+        NeededPermissions(screenRecording: !appOnly, systemAudio: appOnly)
+    }
+
     var body: some View {
         @Bindable var model = model
         @Bindable var detector = model.meetingDetector
+        let needed = Self.neededPermissions(appOnly: model.meetingCaptureAppOnly)
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection("Permissions") {
                 PermissionRow(
@@ -21,7 +32,8 @@ struct RecordMeetingsPane: View {
                     isFirst: true,
                     axID: "RecordMeetings.Button.GrantScreenRecording",
                     action: { model.capturePermissions.requestScreenRecording() },
-                    actionLabel: String(localized: "Allow…")
+                    actionLabel: String(localized: "Allow…"),
+                    needed: needed.screenRecording
                 )
                 PermissionRow(
                     title: String(localized: "System Audio Recording"),
@@ -30,12 +42,13 @@ struct RecordMeetingsPane: View {
                     isFirst: false,
                     axID: "RecordMeetings.Button.GrantSystemAudio",
                     action: { model.capturePermissions.requestSystemAudio() },
-                    actionLabel: String(localized: "Allow…")
+                    actionLabel: String(localized: "Allow…"),
+                    needed: needed.systemAudio
                 )
             }
             SettingsSection {
                 SettingRow("Auto-detect meeting apps",
-                           description: "Offers to record system audio when you open or switch to a meeting app like Zoom, Teams, or Webex. Meetings in a browser aren't detected.",
+                           description: "Offers to record system audio when you open or switch to a meeting app like Zoom, Teams, or Webex. Meetings in a browser aren't detected. Parola only looks at which apps are running, and nothing leaves your Mac.",
                            isFirst: true) {
                     Toggle("", isOn: $detector.isEnabled).labelsHidden()
                         .axLeaf("RecordMeetings.Toggle.Enabled")
@@ -52,7 +65,6 @@ struct RecordMeetingsPane: View {
                         .axLeaf("RecordMeetings.Toggle.Microphone")
                 }
             }
-            SettingHelper(text: "Parola watches running applications; nothing leaves your Mac.")
             if Self.showsRecordingControls(features: model.features) {
                 RecordingControlsSection(pane: "RecordMeetings")
             }
