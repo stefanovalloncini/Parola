@@ -221,8 +221,14 @@ struct QueueView: View {
                 guard case .done = job.status else { return NSItemProvider() }
                 let exports = (model.batchSidecars[job.id] ?? [])
                     .filter { FileManager.default.fileExists(atPath: $0.path) }
-                return NSItemProvider(object: (exports.first ?? job.url) as NSURL)
+                return Self.dragProvider(for: exports.first ?? job.url)
             }
+    }
+
+    static func dragProvider(for url: URL) -> NSItemProvider {
+        let provider = NSItemProvider(object: url as NSURL)
+        RowDrag.mark(provider)
+        return provider
     }
 
     private func handleReturn(job: BatchJob) {

@@ -106,6 +106,10 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension:
                 - parola
+          - UTTypeIdentifier: app.parola.row-drag
+            UTTypeDescription: Parola Row
+            UTTypeConformsTo:
+              - public.data
         NSServices:
           - NSMessage: transcribeFile
             NSPortName: Parola

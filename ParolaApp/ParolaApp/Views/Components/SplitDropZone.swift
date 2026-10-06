@@ -32,13 +32,14 @@ struct SplitDropZone: ViewModifier {
     }
 }
 
-private struct SplitDropDelegate: DropDelegate {
+struct SplitDropDelegate: DropDelegate {
     let model: AppModel
     let height: CGFloat
 
     func validateDrop(info: DropInfo) -> Bool {
+        guard !info.hasItemsConforming(to: [.parolaRowDrag]) else { return false }
         if model.dropDragPayload == nil {
-            model.dropDragPayload = DroppedFiles.classify(Self.draggedURLs(), folders: .shallow).kind
+            model.dropDragPayload = Self.payload(on: NSPasteboard(name: .drag))
         }
         guard model.dropZonePlan != .none else {
             model.dropDragPayload = nil
@@ -66,7 +67,7 @@ private struct SplitDropDelegate: DropDelegate {
         let target = half(at: info.location)
         model.dropDragPayload = nil
         model.dropHighlight = nil
-        let urls = Self.draggedURLs()
+        let urls = Self.draggedURLs(on: NSPasteboard(name: .drag))
         guard !urls.isEmpty else { return false }
         model.drop(urls, on: target)
         return true
@@ -83,10 +84,14 @@ private struct SplitDropDelegate: DropDelegate {
         }
     }
 
+    static func payload(on pasteboard: NSPasteboard) -> DroppedFiles.Kind? {
+        guard !RowDrag.isFromThisApp(pasteboard) else { return nil }
+        return DroppedFiles.classify(draggedURLs(on: pasteboard), folders: .shallow).kind
+    }
+
     /// The drag pasteboard is readable straight through, which keeps the payload synchronous —
     /// item providers only hand a URL back asynchronously, long after the zones must be drawn.
-    private static func draggedURLs() -> [URL] {
-        let pasteboard = NSPasteboard(name: .drag)
+    private static func draggedURLs(on pasteboard: NSPasteboard) -> [URL] {
         let objects = pasteboard.readObjects(
             forClasses: [NSURL.self],
             options: [.urlReadingFileURLsOnly: false]

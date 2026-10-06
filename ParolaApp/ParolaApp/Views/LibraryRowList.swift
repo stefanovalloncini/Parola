@@ -139,6 +139,12 @@ struct LibraryRowList<Top: View>: View {
             entries: LibraryRowsTarget.selectedEntries(selection, in: items), rename: rename, delete: deleteSelection
         ))
         .onDeleteCommand(perform: deleteSelection)
+        .dragContainer(for: LibraryEntryDragItem.self) { ids in
+            LibraryRowsTarget.selectedEntries(Set(ids), in: items).map {
+                LibraryEntryDragItem(entry: $0, showsAITitle: model.showAITitles)
+            }
+        }
+        .dragContainerSelection(Array(selection))
         .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: itemIDs)
         .contextMenu(forSelectionType: LibraryEntry.ID.self) { ids in
             LibraryRowMenu(
@@ -221,7 +227,7 @@ struct LibraryListRow: View, Equatable {
                 if let model { actions(for: entry, model: model) }
             }
             .contentShape(Rectangle())
-            .draggable(entry.bundleURL)
+            .draggable(containerItemID: entry.id)
             .accessibilityIdentifier("library.row.\(entry.id)")
     }
 
