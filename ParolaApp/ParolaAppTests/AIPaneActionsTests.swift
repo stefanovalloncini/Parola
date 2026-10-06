@@ -31,15 +31,18 @@ struct AIPaneActionsTests {
         HostedAccessibility.elements(in: hosted.host).compactMap(\.identifier)
     }
 
-    @Test("a failed summary offers Try Again where the error shows, and it runs the summary again")
-    func failedSummaryOffersTryAgain() async {
+    @Test("a failed summary offers Retry, the app's word for it, where the error shows, and it runs the summary again")
+    func failedSummaryOffersRetry() async {
         let model = makeModel()
         model.summaryError = "The model stopped answering."
         model.summariseOperation = { _, _ in Summary(text: "second try") }
         let hosted = HostedWindow(SummaryPane().environment(model))
         defer { hosted.close() }
 
-        #expect(HostedAccessibility.press(endingWith: "Summary.Button.TryAgain", in: hosted.host))
+        let words = HostedAccessibility.words(in: hosted.host)
+        #expect(words.contains("Retry"))
+        #expect(!words.contains("Try Again"))
+        #expect(HostedAccessibility.press(endingWith: "Summary.Button.Retry", in: hosted.host))
         let landed = await waitUntil { model.transcript?.summary?.text == "second try" }
         #expect(landed)
         #expect(model.summaryError == nil)

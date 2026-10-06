@@ -17046,17 +17046,6 @@
         }
       }
     },
-    "Try Again": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Riprova"
-          }
-        }
-      }
-    },
     "Try again": {
       "extractionState": "manual",
       "localizations": {

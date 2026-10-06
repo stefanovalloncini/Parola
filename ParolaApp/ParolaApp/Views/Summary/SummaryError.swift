@@ -3,7 +3,7 @@ import SwiftUI
 struct SummaryError: View {
     let message: String
     let offersSettings: Bool
-    let onTryAgain: () -> Void
+    let onRetry: () -> Void
 
     var body: some View {
         ContentUnavailableView {
@@ -11,9 +11,9 @@ struct SummaryError: View {
         } description: {
             Text(message)
         } actions: {
-            Button("Try Again", action: onTryAgain)
+            Button("Retry", action: onRetry)
                 .buttonStyle(DSPillButtonStyle(kind: .primary))
-                .axLeaf("Summary.Button.TryAgain")
+                .axLeaf("Summary.Button.Retry")
             if offersSettings {
                 OpenAISettingsButton(leaf: "Summary.Button.OpenAISettings")
                     .buttonStyle(DSPillButtonStyle(kind: .secondary))
