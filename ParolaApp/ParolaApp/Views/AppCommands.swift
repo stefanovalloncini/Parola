@@ -394,6 +394,11 @@ struct TranscriptCommands: View {
         .keyboardShortcut("d", modifiers: [.command])
         .disabled(segmentCommandsDisabled || model.selectedEntryID == nil)
         .help(favoriteSegmentHelp)
+        Button("Split Segment") { model.splitFocusedSegment() }
+            .disabled(segmentCommandsDisabled)
+            .help(segmentHelp)
+            .axLeaf("Menu.Transcript.SplitSegment")
+        MergeSegmentMenuItem(model: model, isDisabled: segmentCommandsDisabled, help: segmentHelp)
         Button("Delete Segment") { model.deleteFocusedSegment() }
             .disabled(segmentCommandsDisabled)
             .help(segmentHelp)
@@ -457,5 +462,19 @@ struct TranscriptCommands: View {
         Button("Open in Main Window") { model.openKeyViewerInMainWindow() }
             .disabled(!model.keyWindowIsViewer)
             .axLeaf("Menu.Transcript.OpenInMainWindow")
+    }
+}
+
+/// Its own view, so the transcript read that spots the last segment stays out of TranscriptCommands.body.
+private struct MergeSegmentMenuItem: View {
+    let model: AppModel
+    let isDisabled: Bool
+    let help: LocalizedStringKey
+
+    var body: some View {
+        Button("Merge with Next Segment") { model.mergeFocusedSegmentWithNext() }
+            .disabled(isDisabled || !model.focusedSegmentHasNext)
+            .help(help)
+            .axLeaf("Menu.Transcript.MergeSegment")
     }
 }

@@ -117,6 +117,7 @@ struct TranscriptMenuTests {
                 #"Button("Rename…")"#, "TranscribeAgainMenu(model: model)", "TranslateMenu(model: model)",
                 #"Button("Edit Segment") { model.editFocusedSegment() }"#,
                 #"Button("Add Note…") { model.noteFocusedSegment() }"#, #"Button("Favorite Segment")"#,
+                #"Button("Split Segment") { model.splitFocusedSegment() }"#, "MergeSegmentMenuItem(model: model",
                 #"Button("Delete Segment") { model.deleteFocusedSegment() }"#, #"Button("Rename Speakers…")"#,
                 #"Button("Manage People…")"#,
             ],

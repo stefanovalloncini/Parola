@@ -452,7 +452,7 @@ struct SegmentCard: View {
         }
     }
 
-    /// Everything the hover strip and its ••• menu offer, for a right-click or Control-Return.
+    /// Everything the hover strip and its ••• menu offer, for a right-click.
     @ViewBuilder
     private func segmentContextMenu(isFavorite: Bool) -> some View {
         Button("Edit Segment") { beginEditing() }
@@ -571,14 +571,7 @@ struct SegmentCard: View {
     }
 
     private func splitSegment() {
-        if isCurrent,
-           let words = segment.words,
-           let wordID = model.currentWordID,
-           let index = words.firstIndex(where: { $0.id == wordID }) {
-            model.splitSegment(id: segment.id, atWordIndex: index)
-        } else {
-            model.splitSegment(id: segment.id, atFraction: 0.5)
-        }
+        model.splitAtPlayingWord(segment)
     }
 
     private func beginEditing() {

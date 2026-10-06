@@ -46,6 +46,23 @@ struct SegmentCommandsTests {
         #expect(model.pendingSegmentEditID == nil)
     }
 
+    @Test("Split Segment and Merge with Next Segment act on the chosen segment, and Merge stops at the last")
+    func splitAndMergeTheChosenSegment() throws {
+        model.chooseSegment(try #require(model.transcript?.segments[0]))
+        model.splitFocusedSegment()
+        #expect(model.transcript?.segments.count == 4)
+        #expect(model.transcript?.segments.first?.text == "Hello")
+
+        model.chooseSegment(try #require(model.transcript?.segments[0]))
+        #expect(model.focusedSegmentHasNext)
+        model.mergeFocusedSegmentWithNext()
+        #expect(model.transcript?.segments.count == 3)
+        #expect(model.transcript?.segments.first?.text == "Hello world.")
+
+        model.chooseSegment(try #require(model.transcript?.segments.last))
+        #expect(!model.focusedSegmentHasNext)
+    }
+
     @Test("Delete Segment removes the chosen segment and lets go of the choice")
     func deleteTheChosenSegment() throws {
         model.chooseSegment(try #require(model.transcript?.segments[1]))

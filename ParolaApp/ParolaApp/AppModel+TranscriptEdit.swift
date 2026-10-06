@@ -110,6 +110,33 @@ extension AppModel {
         deleteSegment(id: segment.id)
     }
 
+    func splitFocusedSegment() {
+        guard let segment = focusedSegment else { return }
+        splitAtPlayingWord(segment)
+    }
+
+    func mergeFocusedSegmentWithNext() {
+        guard let segment = focusedSegment else { return }
+        mergeSegmentWithNext(id: segment.id)
+    }
+
+    var focusedSegmentHasNext: Bool {
+        guard let id = focusedSegmentIDForCommands, let last = transcript?.segments.last else { return false }
+        return last.id != id
+    }
+
+    /// The playing word when this is the current segment and it has word times; the middle otherwise.
+    func splitAtPlayingWord(_ segment: TranscriptSegment) {
+        if segment.id == currentSegmentID,
+           let words = segment.words,
+           let wordID = currentWordID,
+           let index = words.firstIndex(where: { $0.id == wordID }) {
+            splitSegment(id: segment.id, atWordIndex: index)
+        } else {
+            splitSegment(id: segment.id, atFraction: 0.5)
+        }
+    }
+
     func deleteSegment(id: TranscriptSegment.ID) {
         guard var t = transcript else { return }
         if currentSegmentID == id { currentSegmentID = nil }
