@@ -10206,6 +10206,17 @@
         }
       }
     },
+    "Open Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri registrazione"
+          }
+        }
+      }
+    },
     "Open Repository": {
       "extractionState": "manual",
       "localizations": {
@@ -10680,13 +10691,13 @@
         }
       }
     },
-    "Parola quit while recording. Restore opens what was captured; Not Now saves it to your library for later.": {
+    "Parola quit while recording.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parola si è chiusa durante una registrazione. Ripristina apre quanto registrato; Non ora la salva nella libreria per dopo."
+            "value": "Parola si è chiusa durante una registrazione."
           }
         }
       }
@@ -10698,17 +10709,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola si è chiusa mentre trascriveva %@."
-          }
-        }
-      }
-    },
-    "Parola quit while transcribing %@. Not Now saves the recording to your library without a transcript.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parola si è chiusa mentre trascriveva %@. Non ora salva la registrazione nella libreria senza trascrizione."
           }
         }
       }
@@ -12918,6 +12918,17 @@
         }
       }
     },
+    "Save Without Transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva senza trascrizione"
+          }
+        }
+      }
+    },
     "Save as Preset": {
       "extractionState": "manual",
       "localizations": {
@@ -12969,6 +12980,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salva prima la trascrizione nella libreria"
+          }
+        }
+      }
+    },
+    "Save to Library": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva nella libreria"
           }
         }
       }
@@ -18283,6 +18305,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "riepilogo, sintesi"
+          }
+        }
+      }
+    },
+    "this file": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "questo file"
+          }
+        }
+      }
+    },
+    "this recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "questa registrazione"
           }
         }
       }

@@ -46,23 +46,16 @@ struct ContentSheetsModifier: ViewModifier {
                 isPresented: recoveryBinding,
                 presenting: model.pendingRecovery
             ) { checkpoint in
-                Button(checkpoint.kind == .recording ? "Restore" : "Transcribe") { model.acceptPendingRecovery() }
+                Button(RecoveryPromptCopy.accept(checkpoint)) { model.acceptPendingRecovery() }
                     .axLeaf("Recovery.Button.Accept")
-                Button("Not Now", role: .cancel) { model.declinePendingRecovery() }
+                Button(RecoveryPromptCopy.decline(checkpoint), role: .cancel) { model.declinePendingRecovery() }
                     .axLeaf("Recovery.Button.Decline")
                 if checkpoint.isTake {
                     Button("Discard…", role: .destructive) { confirmingRecoveryDiscard = true }
                         .axLeaf("Recovery.Button.Discard")
                 }
             } message: { checkpoint in
-                switch checkpoint.kind {
-                case .recording, .micTrack:
-                    Text("Parola quit while recording. Restore opens what was captured; Not Now saves it to your library for later.")
-                case .fileTranscription where checkpoint.isTake:
-                    Text("Parola quit while transcribing \(checkpoint.sourceName ?? "this recording"). Not Now saves the recording to your library without a transcript.")
-                case .fileTranscription:
-                    Text("Parola quit while transcribing \(checkpoint.sourceName ?? "this file").")
-                }
+                Text(verbatim: RecoveryPromptCopy.message(checkpoint))
             }
             .alert(
                 retranscribeTitle,
@@ -130,5 +123,34 @@ struct ContentSheetsModifier: ViewModifier {
 extension View {
     func contentSheets() -> some View {
         modifier(ContentSheetsModifier())
+    }
+}
+
+/// Each button of the recovery prompt says what it does, so the message only has to say what happened.
+enum RecoveryPromptCopy {
+    nonisolated static func accept(_ checkpoint: RecoveryCheckpoint, bundle: Bundle = .main) -> String {
+        switch checkpoint.kind {
+        case .recording, .micTrack: String(localized: "Open Recording", bundle: bundle)
+        case .fileTranscription: String(localized: "Transcribe", bundle: bundle)
+        }
+    }
+
+    nonisolated static func decline(_ checkpoint: RecoveryCheckpoint, bundle: Bundle = .main) -> String {
+        switch checkpoint.kind {
+        case .recording, .micTrack: String(localized: "Save to Library", bundle: bundle)
+        case .fileTranscription where checkpoint.isTake: String(localized: "Save Without Transcript", bundle: bundle)
+        case .fileTranscription: String(localized: "Not Now", bundle: bundle)
+        }
+    }
+
+    nonisolated static func message(_ checkpoint: RecoveryCheckpoint, bundle: Bundle = .main) -> String {
+        switch checkpoint.kind {
+        case .recording, .micTrack:
+            return String(localized: "Parola quit while recording.", bundle: bundle)
+        case .fileTranscription:
+            let name = checkpoint.sourceName
+                ?? (checkpoint.isTake ? String(localized: "this recording", bundle: bundle) : String(localized: "this file", bundle: bundle))
+            return String(localized: "Parola quit while transcribing \(name).", bundle: bundle)
+        }
     }
 }
