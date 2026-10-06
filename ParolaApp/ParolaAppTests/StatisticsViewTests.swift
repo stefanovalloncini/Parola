@@ -130,7 +130,8 @@ struct StatisticsViewTests {
 
             let words = HostedAccessibility.words(in: page.host)
 
-            #expect(!words.contains { $0.contains(" · ") && $0.hasSuffix(" transcribed") }, "\(words)")
+            let restated = words.contains { $0.contains(" · ") && $0.hasSuffix(" transcribed") }
+            #expect(!restated, "\(words)")
             #expect(words.contains("Average speed (× real time)"), "\(words)")
         }
     }
@@ -164,7 +165,8 @@ struct StatisticsViewTests {
 
             #expect(words.contains("Open Files…"), "\(words)")
             #expect(words.contains("Transcripts you record or open appear here."), "\(words)")
-            #expect(!words.contains { $0.contains("0 transcripts") }, "\(words)")
+            let counted = words.contains { $0.contains("0 transcripts") }
+            #expect(!counted, "\(words)")
         }
     }
 
