@@ -61,6 +61,7 @@ extension AppModel {
                 translateOverride: translateOverride
             )
         }
+        noteRequeue(.file(fileURL, translateOverride: translateOverride), for: duplicateCheckTask)
     }
 
     /// Waits for the pending hash-and-look-up so a caller can assert on what it decided.

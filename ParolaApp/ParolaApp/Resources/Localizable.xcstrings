@@ -14664,6 +14664,17 @@
         }
       }
     },
+    "Stopped transcribing %@. It starts again after the recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione di %@ interrotta. Riparte dopo la registrazione."
+          }
+        }
+      }
+    },
     "Stops a microphone or system-audio recording and transcribes it once this many minutes pass.": {
       "extractionState": "manual",
       "localizations": {

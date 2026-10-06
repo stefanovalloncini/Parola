@@ -217,6 +217,8 @@ final class AppModel {
     @ObservationIgnored var duplicateCheckTask: Task<Void, Never>? {
         didSet { if oldValue != nil, duplicateCheckTask == nil { foregroundLetGo() } }
     }
+    /// What each file or link run goes back in line as when a take cuts it off.
+    @ObservationIgnored private var requeues: [Task<Void, Never>: RunRetry] = [:]
     @ObservationIgnored var batchImportTask: Task<Void, Never>?
     /// A run the user stopped does not ring when its queue unwinds. Cleared when a wave starts.
     @ObservationIgnored var batchRunCancelled = false
@@ -1933,6 +1935,34 @@ final class AppModel {
         youtubeSubsTask = nil
     }
 
+    private var requeuableRuns: [Task<Void, Never>] {
+        [duplicateCheckTask, fileTranscribeTask, youtubeTranscribeTask, youtubeSubsTask].compactMap(\.self)
+    }
+
+    /// Remembers what `task` goes back in line as if a take cuts it off.
+    func noteRequeue(_ retry: RunRetry, for task: Task<Void, Never>?) {
+        let running = Set(requeuableRuns)
+        requeues = requeues.filter { running.contains($0.key) }
+        if let task { requeues[task] = retry }
+    }
+
+    /// A take outranks a file or link run: the run stops, waits in line behind the take, and the take's Stage says so.
+    private func requeueRunsForTake() {
+        let interrupted = requeuableRuns.compactMap { requeues[$0] }
+        requeues = [:]
+        guard let first = interrupted.first else { return }
+        for retry in interrupted {
+            switch retry {
+            case .file(let url, _): deferredArrivals.append(url)
+            case .link(let link): deferredLinks.append(link)
+            }
+        }
+        exportNotice = ExportNotice(
+            message: String(localized: "Stopped transcribing \(first.name). It starts again after the recording."),
+            failures: [], folder: nil, tone: .info, whileTakeRuns: true
+        )
+    }
+
     /// New work outranks a take still transcribing: its pane comes down now, and its save says why.
     func stopTakeRunForNewWork() {
         takeRunStoppedByNewWork = takeRun
@@ -2880,6 +2910,9 @@ final class AppModel {
             }
             if !Task.isCancelled { self.fileTranscribeTask = nil }
         }
+        if arrival == nil {
+            noteRequeue(fetchedLink.map { .link($0.retry) } ?? .file(fileURL, translateOverride: translateOverride), for: fileTranscribeTask)
+        }
     }
 
     /// The user opened an entry while a run was going, or went to another page than the run's.
@@ -3213,6 +3246,13 @@ final class AppModel {
     enum RunRetry: Equatable {
         case file(URL, translateOverride: Bool?)
         case link(DeferredLink)
+
+        var name: String {
+            switch self {
+            case .file(let url, _): url.lastPathComponent
+            case .link(.transcribe(let link)), .link(.subtitles(let link)): link
+            }
+        }
     }
 
     /// A link run's download, handed to the file run that transcribes it.
@@ -3304,6 +3344,7 @@ final class AppModel {
                 self.youtubeTranscribeTask = nil
             }
         }
+        noteRequeue(.link(.transcribe(url.absoluteString)), for: youtubeTranscribeTask)
         return .started
     }
 
@@ -3395,6 +3436,7 @@ final class AppModel {
             }
             if !Task.isCancelled { self.youtubeSubsTask = nil }
         }
+        noteRequeue(.link(.subtitles(url.absoluteString)), for: youtubeSubsTask)
         return .started
     }
 
@@ -3898,6 +3940,7 @@ final class AppModel {
             }
             // A recording replaces any transcription in flight, like a user file-open does;
             // otherwise the old run would finish later and stomp the new take's transcript.
+            requeueRunsForTake()
             cancelTranscriptionRuns()
             leaveRunPhase()
             if source == .microphone, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
