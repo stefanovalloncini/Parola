@@ -11,12 +11,17 @@ struct IntroductionBottomBarTests {
             (.transcribe, "Continue", "Continue"),
             (.features, "Continue", "Continue"),
             (.engine, "Continue", "Continue"),
-            (.ready, "Open Parola", "Finish")
+            (.ready, "Get Started", "Finish")
         ]
         for (step, title, role) in expected {
             #expect(IntroductionBottomBar.primaryTitle(step) == title, "\(step)")
             #expect(IntroductionBottomBar.primaryRole(step) == role, "\(step)")
         }
+    }
+
+    @Test("Back answers ⌘[, as Back does in the Transcript menu and in Settings")
+    func backHasAKey() {
+        #expect(IntroductionBottomBar.backShortcut == KeyboardShortcut("[", modifiers: .command))
     }
 
     @Test("the last step is the only one that offers a file")

@@ -6622,6 +6622,17 @@
         }
       }
     },
+    "Get Started": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inizia"
+          }
+        }
+      }
+    },
     "Getting ready to record": {
       "extractionState": "manual",
       "localizations": {

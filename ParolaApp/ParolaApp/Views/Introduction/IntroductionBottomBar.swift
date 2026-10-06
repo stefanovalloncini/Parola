@@ -19,6 +19,7 @@ struct IntroductionBottomBar: View {
             if introduction.canGoBack {
                 Button("Back") { introduction.back() }
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .keyboardShortcut(Self.backShortcut)
                     .axLeaf("Introduction.Button.Back")
             }
             if !introduction.isLastStep {
@@ -52,10 +53,12 @@ struct IntroductionBottomBar: View {
         }
     }
 
+    static let backShortcut = KeyboardShortcut("[", modifiers: .command)
+
     nonisolated static func primaryTitle(_ step: IntroductionStep) -> LocalizedStringKey {
         switch step {
         case .hello: "Begin"
-        case .ready: "Open Parola"
+        case .ready: "Get Started"
         case .transcribe, .features, .engine: "Continue"
         }
     }
