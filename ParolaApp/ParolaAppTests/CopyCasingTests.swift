@@ -36,6 +36,7 @@ struct CopyCasingTests {
     }
 
     @Test("library empty states title in Title Case")
+    @MainActor
     func libraryEmptyTitlesAreTitleCase() {
         var titles = [NoResultsView.title]
         for category in EntryCategory.allCases {
