@@ -69,6 +69,7 @@ struct ShortcutCatalog {
                 Entry(label: text("Jump to Time…"),              keys: "⌘ J"),
                 Entry(label: text("Show Outline"),               keys: "⌘ ⇧ O"),
                 Entry(label: text("Favorite Segment"),           keys: "⌘ D"),
+                Entry(label: text("Auto-Detect Language"),       keys: "⌘ ⇧ D"),
                 Entry(label: text("Show or Hide Inspector"),     keys: "⌘ ⇧ I"),
                 Entry(label: text("Focus Chat Composer"),        keys: "⌘ L", requires: .ai),
                 Entry(label: text("Open in New Window"),         keys: "⌘ ⇧ N"),
@@ -100,7 +101,6 @@ struct ShortcutCatalog {
                 Entry(label: text("Open Settings"),              keys: "⌘ ,"),
                 Entry(label: text("Open Files…"),                keys: "⌘ O"),
                 Entry(label: text("Search Library"),             keys: "⌘ ⌥ F"),
-                Entry(label: text("Auto-Detect Language"),       keys: "⌘ ⇧ D"),
             ]),
             Section(title: text("Go"), entries: [
                 Entry(label: text("Library"),                    keys: "⌘ ⌥ 1"),

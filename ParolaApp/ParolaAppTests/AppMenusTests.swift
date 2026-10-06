@@ -50,6 +50,19 @@ struct AppMenusTests {
         #expect(check.isEnabled == SparkleUpdater.feedURLConfigured)
     }
 
+    @Test("Captions holds only Live Captions; Auto-Detect Language is a Transcript command, not an Edit one")
+    func menusHoldWhatTheirNamesSay() {
+        let model = makeModel("menu-places")
+        let captions = titles(CaptionsCommands(model: model, liveCaptions: LiveCaptionsController()))
+        #expect(!captions.contains("Start Dictation"), "\(captions)")
+        #expect(!captions.contains("Show Scratchpad"), "\(captions)")
+        #expect(captions.contains("Start Live Captions"), "\(captions)")
+        let edit = titles(EditCommands(model: model))
+        #expect(!edit.contains("Auto-Detect Language"), "\(edit)")
+        let transcript = titles(TranscriptCommands(model: model))
+        #expect(transcript.contains("Auto-Detect Language"), "\(transcript)")
+    }
+
     @Test("the releases page is the repository's")
     func releasesPage() {
         #expect(SupportLinks.releases.absoluteString == "https://github.com/stefanovalloncini/Parola/releases")

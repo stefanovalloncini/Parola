@@ -156,9 +156,14 @@ struct ParolaApp: App {
             CommandMenu("Playback") {
                 PlaybackCommands(model: model)
             }
-            if model.features.isEnabled(.dictation) || model.features.isEnabled(.liveCaptions) {
+            if model.features.isEnabled(.dictation) {
+                CommandMenu("Dictation") {
+                    DictationCommands(model: model, scratchpad: scratchpad)
+                }
+            }
+            if model.features.isEnabled(.liveCaptions) {
                 CommandMenu("Captions") {
-                    CaptionsCommands(model: model, scratchpad: scratchpad, liveCaptions: liveCaptions)
+                    CaptionsCommands(model: model, liveCaptions: liveCaptions)
                 }
             }
             CommandMenu("Transcript") {

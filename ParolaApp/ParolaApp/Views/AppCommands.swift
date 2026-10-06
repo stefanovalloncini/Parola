@@ -261,9 +261,6 @@ struct EditCommands: View {
             .keyboardShortcut("f", modifiers: [.command, .option])
             .disabled(model.introduction.isPresented || searchTitle == nil)
             .axLeaf("Menu.Edit.SearchLibrary")
-        Divider()
-        Button("Auto-Detect Language") { model.selectedLanguage = nil }
-            .keyboardShortcut("d", modifiers: [.command, .shift])
         FocusChatComposerCommand()
     }
 }
@@ -315,26 +312,30 @@ struct PlaybackCommands: View {
     }
 }
 
-struct CaptionsCommands: View {
+struct DictationCommands: View {
     let model: AppModel
     let scratchpad: ScratchpadController
+
+    var body: some View {
+        let dictationItem = MenuBarController.dictationMenuItem(for: model.dictationState)
+        Button(dictationItem.title) {
+            dictationItem.stops ? model.stopDictationFromIntent() : model.startDictationFromIntent()
+        }
+        .disabled(model.introduction.isPresented)
+        Button(scratchpad.isOpen ? "Hide Scratchpad" : "Show Scratchpad") {
+            scratchpad.toggle()
+        }
+        .keyboardShortcut("k", modifiers: [.command, .shift])
+        .disabled(model.introduction.isPresented)
+    }
+}
+
+struct CaptionsCommands: View {
+    let model: AppModel
     let liveCaptions: LiveCaptionsController
 
     var body: some View {
-        if model.features.isEnabled(.dictation) {
-            Button(scratchpad.isOpen ? "Hide Scratchpad" : "Show Scratchpad") {
-                scratchpad.toggle()
-            }
-            .keyboardShortcut("k", modifiers: [.command, .shift])
-            .disabled(model.introduction.isPresented)
-            let dictationItem = MenuBarController.dictationMenuItem(for: model.dictationState)
-            Button(dictationItem.title) {
-                dictationItem.stops ? model.stopDictationFromIntent() : model.startDictationFromIntent()
-            }
-            .disabled(model.introduction.isPresented)
-        }
         if model.features.isEnabled(.liveCaptions) {
-            Divider()
             Button(liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
                 model.toggleLiveCaptions()
             }
@@ -406,6 +407,8 @@ struct TranscriptCommands: View {
             .disabled(!model.canRenameOpenTranscript)
             .axLeaf("Menu.Transcript.Rename")
         TranscribeAgainMenu(model: model)
+        Button("Auto-Detect Language") { model.selectedLanguage = nil }
+            .keyboardShortcut("d", modifiers: [.command, .shift])
         TranslateMenu(model: model)
         Button("Edit Segment") { model.editFocusedSegment() }
             .disabled(segmentCommandsDisabled)

@@ -65,7 +65,8 @@ struct MenuLeafFlagsTests {
         _ = GoCommands(model: model).body
         _ = EditCommands(model: model).body
         _ = PlaybackCommands(model: model).body
-        _ = CaptionsCommands(model: model, scratchpad: ScratchpadController(), liveCaptions: LiveCaptionsController()).body
+        _ = DictationCommands(model: model, scratchpad: ScratchpadController()).body
+        _ = CaptionsCommands(model: model, liveCaptions: LiveCaptionsController()).body
         _ = TranscriptCommands(model: model).body
         _ = ContentRoutes.routeID(for: model)
         _ = model.isBrowsingLibrary
