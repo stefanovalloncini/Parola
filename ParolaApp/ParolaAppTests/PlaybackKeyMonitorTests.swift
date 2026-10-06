@@ -74,6 +74,39 @@ struct PlaybackKeyMonitorTests {
         #expect(!PlaybackKeyMonitor.takesSpace(nil))
     }
 
+    @Test("off the Stage, Space plays or pauses with a control focused, the scrubber included")
+    func spaceOnAFocusedScrubber() {
+        let action = PlaybackKeyMonitor.action(
+            keyCode: 49, modifiers: [], textInputActive: false, hasPlayer: true, focusedControlTakesSpace: true
+        )
+        #expect(action == .togglePlayPause)
+    }
+
+    @Test("in a viewer, Space and the skip keys drive the viewer's own player, not the main window's")
+    @MainActor
+    func viewerKeysDriveItsOwnPlayer() async throws {
+        let model = EntryWindowTestSupport.makeModel("keys-viewer")
+        let audio = try EntryWindowTestSupport.silentAudioFile()
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let entry = try await EntryWindowTestSupport.seed(model, texts: ["alpha", "beta"], speakers: [nil, nil], audio: audio)
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        defer { model.releaseEntryWindow(session) }
+        model.entryWindowKeyChanged(entry.id, isKey: true)
+        #expect(model.player == nil)
+        #expect(session.player != nil)
+
+        let space = PlaybackKeyMonitor.handle(
+            keyCode: 49, modifiers: [], firstResponder: nil, inMainWindow: false, model: model
+        )
+        let forward = PlaybackKeyMonitor.handle(
+            keyCode: 124, modifiers: [.command], firstResponder: nil, inMainWindow: false, model: model
+        )
+
+        #expect(space)
+        #expect(forward)
+        #expect(session.currentTime > 0)
+    }
+
     @Test("on the Stage, Space typed into the title stays text, and modified Space is not Pause")
     func stageSpaceLeavesTextAlone() {
         let typing = PlaybackKeyMonitor.action(keyCode: 49, modifiers: [], textInputActive: true, hasPlayer: true, stageShowsTake: true)

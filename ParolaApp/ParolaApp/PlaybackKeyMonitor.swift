@@ -52,15 +52,15 @@ final class PlaybackKeyMonitor {
             keyCode: keyCode,
             modifiers: modifiers,
             textInputActive: (firstResponder as? NSTextView)?.isEditable == true,
-            hasPlayer: model.player != nil,
+            hasPlayer: model.keyWindowHasPlayer,
             stageShowsTake: inMainWindow && stageShowsTake(model),
             isRepeat: isRepeat,
             focusedControlTakesSpace: takesSpace(firstResponder)
         ) else { return false }
         switch action {
-        case .togglePlayPause: model.togglePlayPause()
-        case .skipBack: model.skip(by: PlaybackSkip.back.seconds)
-        case .skipForward: model.skip(by: PlaybackSkip.forward.seconds)
+        case .togglePlayPause: model.togglePlayPauseInKeyWindow()
+        case .skipBack: model.skipInKeyWindow(by: PlaybackSkip.back.seconds)
+        case .skipForward: model.skipInKeyWindow(by: PlaybackSkip.forward.seconds)
         case .toggleTakePause: StageControls.togglePause(model)
         case .swallowRepeat: break
         }

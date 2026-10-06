@@ -32,8 +32,8 @@ struct PlaybackTransportTests {
             #expect(!bar.contains("gobackward.15"), "\(file)")
         }
         let monitor = try source("PlaybackKeyMonitor")
-        #expect(monitor.contains("model.skip(by: PlaybackSkip.back.seconds)"))
-        #expect(monitor.contains("model.skip(by: PlaybackSkip.forward.seconds)"))
+        #expect(monitor.contains("model.skipInKeyWindow(by: PlaybackSkip.back.seconds)"))
+        #expect(monitor.contains("model.skipInKeyWindow(by: PlaybackSkip.forward.seconds)"))
     }
 
     @Test("the scrubber steps 5 seconds and stays inside the media")
