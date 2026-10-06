@@ -88,7 +88,9 @@ private struct ExportPresetRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: DS.Spacing.small)
-                BatchFormatChip(extension: preset.spec.format.fileExtension)
+                if ExportPresetChecks.needsExtensionChip(preset) {
+                    BatchFormatChip(extension: preset.spec.format.fileExtension)
+                }
                 controls
             }
             .padding(.horizontal, DS.Spacing.medium)

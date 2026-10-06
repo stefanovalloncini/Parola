@@ -34,29 +34,12 @@ struct BatchView: View {
             subtitleAxID: caption?.isProgress == true ? "Header.Text.Progress" : nil,
             trailing: {
                 Menu {
-                    ForEach(model.exportPresets) { preset in
-                        let isOn = model.batchExportPresetIDs.contains(preset.id)
-                        Button {
-                            model.toggleBatchExportPreset(preset.id)
-                        } label: {
-                            if isOn {
-                                Label {
-                                    ExportPresetChecks.label(preset)
-                                } icon: {
-                                    Image(systemName: "checkmark")
-                                }
-                            } else {
-                                ExportPresetChecks.label(preset)
-                            }
-                        }
-                        .axLeaf("Header.MenuItem.Preset.\(ExportPresetChecks.slug(preset))")
-                    }
+                    BatchExportMenuItems(model: model)
                 } label: {
-                    Label("Add Preset", systemImage: "plus")
-                        .labelStyle(.titleAndIcon)
+                    Text("Export As")
                 }
                 .menuStyle(.button)
-                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .help("Choose which presets Parola writes next to each transcribed file.")
                 .accessibilityIdentifier("batch.addFormat")
                 .axLeaf("Header.Menu.AddPreset")
@@ -93,5 +76,22 @@ struct BatchView: View {
     private var exportPane: some View {
         BatchExportPanel()
             .background(DS.Color.surfaceElevated)
+    }
+}
+
+/// One switch per preset: the menu turns them off as well as on, so each carries its tick.
+struct BatchExportMenuItems: View {
+    let model: AppModel
+
+    var body: some View {
+        ForEach(model.exportPresets) { preset in
+            Toggle(isOn: Binding(
+                get: { model.batchExportPresetIDs.contains(preset.id) },
+                set: { _ in model.toggleBatchExportPreset(preset.id) }
+            )) {
+                ExportPresetChecks.label(preset)
+            }
+            .axLeaf("Header.MenuItem.Preset.\(ExportPresetChecks.slug(preset))")
+        }
     }
 }

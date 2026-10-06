@@ -31,6 +31,11 @@ struct ExportPresetChecks: View {
         preset.isBuiltIn ? Text(LocalizedStringKey(preset.name)) : Text(verbatim: preset.name)
     }
 
+    /// The built-ins name their extension, "Transcript (.txt)"; a chip beside them would print it twice.
+    static func needsExtensionChip(_ preset: ExportPreset) -> Bool {
+        !preset.name.localizedCaseInsensitiveContains(".\(preset.spec.format.fileExtension)")
+    }
+
     /// Nothing stops two presets sharing a name, so the id's stem keeps their ax ids apart.
     static func slug(_ preset: ExportPreset) -> String {
         let letters = preset.name.filter { $0.isLetter || $0.isNumber }

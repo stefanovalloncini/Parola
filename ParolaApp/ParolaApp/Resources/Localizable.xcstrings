@@ -1539,17 +1539,6 @@
         }
       }
     },
-    "Add Preset": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi preset"
-          }
-        }
-      }
-    },
     "Add Prompt": {
       "extractionState": "manual",
       "localizations": {
@@ -17281,17 +17270,6 @@
         }
       }
     },
-    "Use Add Preset above to pick the files Parola writes next to each transcribed audio or video.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Usa Aggiungi preset qui sopra per scegliere i file che Parola scrive accanto a ogni audio o video trascritto."
-          }
-        }
-      }
-    },
     "Use Captions": {
       "extractionState": "manual",
       "localizations": {
@@ -17310,6 +17288,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Predefinita"
+          }
+        }
+      }
+    },
+    "Use Export As above to pick the files Parola writes next to each transcribed audio or video.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa Esporta come qui sopra per scegliere i file che Parola scrive accanto a ogni audio o video trascritto."
           }
         }
       }

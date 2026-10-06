@@ -15,7 +15,7 @@ struct BatchExportPanel: View {
                 if model.batchExportPresets.isEmpty {
                     VStack(spacing: DS.Spacing.small) {
                         InlineEmptyText("No presets selected")
-                        Text("Use Add Preset above to pick the files Parola writes next to each transcribed audio or video.")
+                        Text("Use Export As above to pick the files Parola writes next to each transcribed audio or video.")
                             .font(DS.Font.secondary)
                             .foregroundStyle(DS.Color.secondaryText)
                             .multilineTextAlignment(.center)
@@ -48,7 +48,9 @@ struct BatchPresetCard: View {
             ExportPresetChecks.label(preset)
                 .font(DS.Font.body.weight(.semibold))
                 .foregroundStyle(DS.Color.primaryText)
-            BatchFormatChip(extension: preset.spec.format.fileExtension)
+            if ExportPresetChecks.needsExtensionChip(preset) {
+                BatchFormatChip(extension: preset.spec.format.fileExtension)
+            }
             Spacer()
             Button {
                 model.toggleBatchExportPreset(preset.id)

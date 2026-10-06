@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
@@ -19,6 +20,27 @@ struct ExportPresetsTests {
 
     private var txtPreset: ExportPreset { ExportPreset.builtIn(for: .txt)! }
     private var srtPreset: ExportPreset { ExportPreset.builtIn(for: .srt)! }
+
+    @Test("the Batch page's Export As menu ticks the presets that are on, and a tick turns one off")
+    func exportAsTicksThePresetsOn() throws {
+        let model = makeModel()
+        model.batchExportPresetIDs = [txtPreset.id]
+        let menu = NSHostingMenu(rootView: BatchExportMenuItems(model: model))
+        menu.update()
+
+        let ticked = menu.items.filter { $0.state == .on }.map(\.title)
+        #expect(ticked == ["Transcript (.txt)"])
+
+        let index = try #require(menu.items.firstIndex { $0.title == "Transcript (.txt)" })
+        menu.performActionForItem(at: index)
+        #expect(model.batchExportPresetIDs.isEmpty)
+    }
+
+    @Test("a preset card prints its extension once: in the name when the name has it, else in the chip")
+    func extensionPrintedOnce() {
+        #expect(!ExportPresetChecks.needsExtensionChip(txtPreset))
+        #expect(ExportPresetChecks.needsExtensionChip(ExportPreset(name: "Reels", spec: .standard(for: .srt))))
+    }
 
     @Test("a preset the user named is rendered verbatim, a built-in through the catalog")
     func userNamesAreNotCatalogKeys() {
