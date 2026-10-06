@@ -36,10 +36,16 @@ struct BatchView: View {
                 Menu {
                     BatchExportMenuItems(model: model)
                 } label: {
-                    Text("Export As")
+                    HStack(spacing: DS.Spacing.tight) {
+                        Text("Export As")
+                        Image(systemName: "chevron.down")
+                            .font(DS.Font.caption)
+                            .accessibilityHidden(true)
+                    }
                 }
                 .menuStyle(.button)
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                .menuIndicator(.hidden)
                 .help("Choose which presets Parola writes next to each transcribed file.")
                 .accessibilityIdentifier("batch.addFormat")
                 .axLeaf("Header.Menu.AddPreset")
