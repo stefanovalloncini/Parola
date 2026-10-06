@@ -8834,6 +8834,17 @@
         }
       }
     },
+    "Move": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sposta"
+          }
+        }
+      }
+    },
     "Move down": {
       "extractionState": "manual",
       "localizations": {

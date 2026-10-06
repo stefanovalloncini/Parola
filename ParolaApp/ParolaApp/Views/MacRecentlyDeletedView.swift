@@ -257,7 +257,7 @@ struct MacRecentlyDeletedView: View {
     }
 
     private func restore(_ ids: [LibraryEntry.ID]) {
-        for id in ids { model.restoreEntry(id) }
+        model.restoreEntries(ids)
         model.recentlyDeletedSelection.subtract(ids)
     }
 

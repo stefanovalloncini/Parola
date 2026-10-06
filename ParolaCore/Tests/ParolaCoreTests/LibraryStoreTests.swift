@@ -427,6 +427,24 @@ struct LibraryStoreTests {
         #expect(renamed.manifest.titleSource == .user)
     }
 
+    @Test("restoring a title puts back the stored title and its source, and search follows")
+    func restoreTitleUndoesARename() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: try makeFakeAudio())
+        try await store.renameEntry(entry.id, to: "Quarterly standup")
+
+        try await store.restoreTitle(nil, source: nil, for: entry.id)
+
+        let restored = try #require(await store.list().first)
+        #expect(restored.manifest.title == nil)
+        #expect(restored.manifest.titleSource == nil)
+        #expect(await store.search("Quarterly").isEmpty)
+        try await store.restoreTitle("Kept", source: .source, for: entry.id)
+        let linked = try #require(await store.list().first)
+        #expect(linked.manifest.title == "Kept")
+        #expect(linked.manifest.titleSource == .source)
+    }
+
     @Test("setLabels trims, drops empties, and dedupes")
     func setLabelsNormalizes() async throws {
         let (store, _) = try makeTempLibrary()

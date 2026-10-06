@@ -26,6 +26,12 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
     }
 }
 
+/// A stored title and how it was set, the pair an undone rename puts back.
+struct EntryTitle: Equatable, Sendable {
+    var title: String?
+    var source: TitleSource?
+}
+
 /// The list a transcript was opened from, so the header can offer the way back.
 enum LibraryOrigin: Equatable {
     case all
@@ -306,34 +312,49 @@ extension AppModel {
     }
 
     func moveEntry(_ id: LibraryEntry.ID, to category: EntryCategory) {
+        moveEntries([id], to: category)
+    }
+
+    func moveEntries(_ ids: [LibraryEntry.ID], to category: EntryCategory) {
+        let old = knownValues(of: ids) { $0.category }
+        applyCategories(Dictionary(ids.map { ($0, category) }) { first, _ in first }, replacing: old)
+    }
+
+    /// Both values travel with the step, so undo and redo never read a cache a refresh is about to replace.
+    private func applyCategories(_ new: [LibraryEntry.ID: EntryCategory], replacing old: [LibraryEntry.ID: EntryCategory]) {
+        if old.contains(where: { new[$0.key] != $0.value }) {
+            registerUndoStep(actionName: String(localized: "Move")) { $0.applyCategories(old, replacing: new) }
+        }
         Task { [weak self] in
             guard let self else { return }
-            do {
-                try await library.setCategory(category, for: id)
-            } catch {
-                noteLibraryFailure(String(localized: "Couldn't move"), error)
+            for (id, category) in new {
+                do {
+                    try await library.setCategory(category, for: id)
+                } catch {
+                    noteLibraryFailure(String(localized: "Couldn't move"), error)
+                }
             }
             refreshLibrary()
         }
     }
 
     func togglePinned(for id: LibraryEntry.ID) {
-        let current = libraryEntry(id: id)?.pinned ?? false
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await library.setPinned(!current, for: id)
-            } catch {
-                noteLibraryFailure(current ? String(localized: "Couldn't unpin") : String(localized: "Couldn't pin"), error)
-            }
-            refreshLibrary()
-        }
+        setPinned(!(libraryEntry(id: id)?.pinned ?? false), for: [id])
     }
 
     func setPinned(_ pinned: Bool, for ids: [LibraryEntry.ID]) {
+        let old = knownValues(of: ids) { $0.pinned }
+        let actionName = pinned ? String(localized: "Pin") : String(localized: "Unpin")
+        applyPins(Dictionary(ids.map { ($0, pinned) }) { first, _ in first }, replacing: old, actionName: actionName)
+    }
+
+    private func applyPins(_ new: [LibraryEntry.ID: Bool], replacing old: [LibraryEntry.ID: Bool], actionName: String) {
+        if old.contains(where: { new[$0.key] != $0.value }) {
+            registerUndoStep(actionName: actionName) { $0.applyPins(old, replacing: new, actionName: actionName) }
+        }
         Task { [weak self] in
             guard let self else { return }
-            for id in ids {
+            for (id, pinned) in new {
                 do {
                     try await library.setPinned(pinned, for: id)
                 } catch {
@@ -345,10 +366,20 @@ extension AppModel {
     }
 
     func renameEntry(_ id: LibraryEntry.ID, to newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let old = libraryEntry(id: id).map { EntryTitle(title: $0.manifest.title, source: $0.manifest.titleSource) }
+        applyTitle(EntryTitle(title: trimmed, source: .user), replacing: old, for: id)
+    }
+
+    private func applyTitle(_ new: EntryTitle, replacing old: EntryTitle?, for id: LibraryEntry.ID) {
+        if let old, old != new {
+            registerUndoStep(actionName: String(localized: "Rename")) { $0.applyTitle(old, replacing: new, for: id) }
+        }
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await library.renameEntry(id, to: newName)
+                try await library.restoreTitle(new.title, source: new.source, for: id)
             } catch {
                 noteLibraryFailure(String(localized: "Couldn't rename"), error)
             }
@@ -361,6 +392,17 @@ extension AppModel {
     func renameOpenTranscript(to newName: String) {
         guard let id = selectedEntryID else { return }
         renameEntry(id, to: newName)
+    }
+
+    /// Only rows the library knows, so an undo never invents a value for an entry it never saw.
+    private func knownValues<Value>(
+        of ids: [LibraryEntry.ID], _ value: (LibraryEntry) -> Value
+    ) -> [LibraryEntry.ID: Value] {
+        var values: [LibraryEntry.ID: Value] = [:]
+        for id in ids {
+            if let entry = libraryEntry(id: id) { values[id] = value(entry) }
+        }
+        return values
     }
 
     func beginEditingNote(for segment: TranscriptSegment) {
@@ -495,29 +537,49 @@ extension AppModel {
     }
 
     func deleteEntry(_ id: LibraryEntry.ID) {
+        deleteEntries([id])
+    }
+
+    func deleteEntries(_ ids: [LibraryEntry.ID]) {
+        setDeleted(true, ids, actionName: String(localized: "Delete"))
+    }
+
+    func restoreEntry(_ id: LibraryEntry.ID) {
+        restoreEntries([id])
+    }
+
+    func restoreEntries(_ ids: [LibraryEntry.ID]) {
+        setDeleted(false, ids, actionName: String(localized: "Restore"))
+    }
+
+    private func setDeleted(_ deleted: Bool, _ ids: [LibraryEntry.ID], actionName: String) {
+        guard !ids.isEmpty else { return }
+        registerUndoStep(actionName: actionName) { $0.setDeleted(!deleted, ids, actionName: actionName) }
         Task { [weak self] in
             guard let self else { return }
-            aiJobs.cancelAll(for: id)
-            do {
-                try await library.delete(id)
-                if selectedEntryID == id { clearLoadedEntry() }
-                if destinationsEnabled { await deliveryEngine.cancel(entryID: id) }
-            } catch {
-                noteLibraryFailure(String(localized: "Couldn't delete"), error)
+            for id in ids {
+                if deleted {
+                    await moveToRecentlyDeleted(id)
+                } else {
+                    do {
+                        try await library.restore(id)
+                    } catch {
+                        noteLibraryFailure(String(localized: "Couldn't restore"), error)
+                    }
+                }
             }
             refreshLibrary()
         }
     }
 
-    func restoreEntry(_ id: LibraryEntry.ID) {
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await library.restore(id)
-            } catch {
-                noteLibraryFailure(String(localized: "Couldn't restore"), error)
-            }
-            refreshLibrary()
+    private func moveToRecentlyDeleted(_ id: LibraryEntry.ID) async {
+        aiJobs.cancelAll(for: id)
+        do {
+            try await library.delete(id)
+            if selectedEntryID == id { clearLoadedEntry() }
+            if destinationsEnabled { await deliveryEngine.cancel(entryID: id) }
+        } catch {
+            noteLibraryFailure(String(localized: "Couldn't delete"), error)
         }
     }
 

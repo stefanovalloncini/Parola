@@ -161,7 +161,7 @@ struct LibraryRowList<Top: View>: View {
             break
         case .now:
             selection.subtract(ids)
-            for id in ids { model.deleteEntry(id) }
+            model.deleteEntries(Array(ids))
         case .confirm:
             pendingBulkDelete = true
         }
@@ -370,9 +370,7 @@ struct LibraryListAlerts: ViewModifier {
     private func deleteSelection() {
         let targets = selection
         selection.removeAll()
-        for id in targets {
-            model.deleteEntry(id)
-        }
+        model.deleteEntries(Array(targets))
     }
 
     private var isRenaming: Binding<Bool> {

@@ -916,6 +916,22 @@ public actor LibraryStore {
         }
     }
 
+    /// Puts back a title together with how it was set, as undoing a rename needs; a nil title shows the file's name again.
+    public func restoreTitle(_ title: String?, source: TitleSource?, for id: LibraryEntry.ID) async throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.title = title
+            manifest.titleSource = source
+        }
+        let entry = try recacheEntry(at: bundleURL)
+        if let transcript = await transcriptForReindex(id, at: bundleURL) {
+            await indexEntry(entry, transcript: transcript)
+        }
+    }
+
     /// Replaces the entry's translation, or clears it when `translation` is nil. Translations are
     /// not searchable, so this write skips the index.
     public func setTranslation(_ translation: TranscriptTranslation?, for id: LibraryEntry.ID) async throws {
