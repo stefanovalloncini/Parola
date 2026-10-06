@@ -230,6 +230,11 @@ struct SettingsResetServiceTests {
         }
     }
 
+    @Test("Advanced's reset message names the per-app dictation settings it also deletes")
+    func resetAllMessageNamesDictationOverrides() {
+        #expect(AdvancedPane.resetAllMessage().contains("per-app dictation settings"))
+    }
+
     @Test("reset posts a notification carrying the scope")
     func resetPostsNotification() async {
         await confirmation("scope notification fires") { confirmed in

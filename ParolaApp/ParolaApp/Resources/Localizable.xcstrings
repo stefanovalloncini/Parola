@@ -5603,17 +5603,6 @@
         }
       }
     },
-    "Every Settings pane returns to its defaults. This also deletes your watched folders, rules, snippets, export presets, Send To destinations, and AI services with their API keys. Library entries, models, and custom prompts are kept.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ogni pannello delle Impostazioni torna ai valori predefiniti. Vengono eliminati anche le cartelle monitorate, le regole, gli snippet, i preset di esportazione, le destinazioni di Invia a e i servizi AI con le loro chiavi API. Le voci della libreria, i modelli e i prompt personalizzati restano."
-          }
-        }
-      }
-    },
     "Every main-branch build. Expect bugs.": {
       "extractionState": "manual",
       "localizations": {
@@ -18517,6 +18506,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "⌘S"
+          }
+        }
+      }
+    },
+    "Every Settings pane returns to its defaults. This also deletes your watched folders, rules, snippets, export presets, Send To destinations, per-app dictation settings, and AI services with their API keys. Library entries, models, and custom prompts are kept.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ogni pannello delle Impostazioni torna ai valori predefiniti. Vengono eliminati anche le cartelle monitorate, le regole, gli snippet, i preset di esportazione, le destinazioni di Invia a, le impostazioni di dettatura per app e i servizi AI con le loro chiavi API. Le voci della libreria, i modelli e i prompt personalizzati restano."
           }
         }
       }

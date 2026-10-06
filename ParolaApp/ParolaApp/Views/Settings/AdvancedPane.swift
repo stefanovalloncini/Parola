@@ -78,7 +78,14 @@ struct AdvancedPane: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Every Settings pane returns to its defaults. This also deletes your watched folders, rules, snippets, export presets, Send To destinations, and AI services with their API keys. Library entries, models, and custom prompts are kept.")
+            Text(verbatim: Self.resetAllMessage())
         }
+    }
+
+    nonisolated static func resetAllMessage(bundle: Bundle = .main) -> String {
+        String(
+            localized: "Every Settings pane returns to its defaults. This also deletes your watched folders, rules, snippets, export presets, Send To destinations, per-app dictation settings, and AI services with their API keys. Library entries, models, and custom prompts are kept.",
+            bundle: bundle
+        )
     }
 }
