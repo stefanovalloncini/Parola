@@ -98,7 +98,7 @@ struct ShortcutCatalog {
             Section(title: text("Navigation"), entries: [
                 Entry(label: text("Back to the List"),           keys: "⌘ ["),
                 Entry(label: text("Open Settings"),              keys: "⌘ ,"),
-                Entry(label: text("Open…"),                      keys: "⌘ O"),
+                Entry(label: text("Open Files…"),                keys: "⌘ O"),
                 Entry(label: text("Search Library"),             keys: "⌘ ⌥ F"),
                 Entry(label: text("Auto-Detect Language"),       keys: "⌘ ⇧ D"),
             ]),

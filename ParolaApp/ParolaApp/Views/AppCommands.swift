@@ -52,9 +52,26 @@ struct FileCommands: View {
                 .disabled(!model.canStartTake(.systemAudio) || model.introduction.isPresented)
                 .axLeaf("Menu.File.NewSystemAudioRecording")
         }
-        Button("Open…") { model.presentOpenPanel() }
+        if RecordControl.primarySource(features: model.features) != nil {
+            Divider()
+        }
+        Button("Open Files…") { model.presentOpenPanel() }
             .keyboardShortcut("o")
             .disabled(model.introduction.isPresented)
+            .axLeaf("Menu.File.OpenFiles")
+        if model.features.isEnabled(.youtube) {
+            Button("Transcribe Link…") {
+                model.showMainWindow { openWindow(id: MainWindowScene.id) }
+                model.openLinkSheet(prefill: nil)
+            }
+            .disabled(model.introduction.isPresented)
+            .axLeaf("Menu.File.TranscribeLink")
+        }
+        if model.features.isEnabled(.batch) {
+            Button("Batch Transcribe…") { model.presentBatchOpenPanel() }
+                .disabled(model.introduction.isPresented)
+                .axLeaf("Menu.File.BatchTranscribe")
+        }
         Menu("Open Recent") {
             let recents = model.recentFiles
             if recents.isEmpty {
