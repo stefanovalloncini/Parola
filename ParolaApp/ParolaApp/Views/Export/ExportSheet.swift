@@ -18,6 +18,7 @@ struct ExportSheet: View {
         )
         .sheetSize(width: 760, minHeight: 460, maxHeight: 620)
         .hidesCloseButton()
+        .onDisappear { copiedReset?.cancel() }
         .alert("Save as Preset", isPresented: $namingPreset) {
             TextField("Preset name", text: $presetName)
                 .axLeaf("Export.TextField.PresetName")
