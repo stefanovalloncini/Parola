@@ -75,6 +75,22 @@ struct SettingsWindowClassifierTests {
         ) == false)
     }
 
+    @Test("a tagged window whose transcript title names Settings is not settings")
+    func taggedWindowIgnoresItsTitle() {
+        #expect(SettingsWindowClassifier.isSettings(
+            identifier: "com.apple.SwiftUI.window-AB12",
+            title: "Settings walkthrough",
+            isMainWindow: false,
+            isTitled: true
+        ) == false)
+        #expect(SettingsWindowClassifier.isSettings(
+            identifier: "transcript-window",
+            title: "Preferences survey",
+            isMainWindow: false,
+            isTitled: true
+        ) == false)
+    }
+
     @Test("a transcript window titled with the file name is not settings")
     func transcriptWindowIsNotSettings() {
         #expect(SettingsWindowClassifier.isSettings(

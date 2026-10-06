@@ -26,9 +26,8 @@ enum SettingsWindowClassifier {
             || identifier.localizedCaseInsensitiveContains("preferences") {
             return true
         }
-        // Fallback for OS versions that don't tag the identifier: a titled, non-main window whose
-        // title names Settings/Preferences. The main window uses a hidden title bar (empty title).
-        guard !title.isEmpty, isTitled else { return false }
+        // Only an untagged window falls back to its title: the main and viewer windows carry a transcript's name.
+        guard identifier.isEmpty, !title.isEmpty, isTitled else { return false }
         return title.localizedCaseInsensitiveContains("settings")
             || title.localizedCaseInsensitiveContains("preferences")
     }
