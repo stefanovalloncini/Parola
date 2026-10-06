@@ -84,9 +84,10 @@ struct SettingsPaneScopeTests {
         }
     }
 
-    @Test("the export presets library belongs to its pane")
-    func exportFormatsResetsThePresets() {
-        #expect(SettingsPaneScope.exportFormats.defaultsKeys == ["exportPresets"])
+    @Test("the export presets library belongs to its pane, and its Reset clears only the export options")
+    func exportFormatsKeepsThePresets() {
+        #expect(SettingsPaneScope.exportFormats.defaultsKeys.contains("exportPresets"))
+        #expect(SettingsPaneScope.exportFormats.resetKeys(features: .all) == ["subtitleCaptionLength", "markdownTimestamps", "txtExportTimestamps", "htmlExportTheme"])
     }
 
     @Test("the models storage path stays out of every scope")
@@ -112,7 +113,7 @@ struct SettingsPaneScopeTests {
 
     @Test("a pane that holds only a list people made has no Reset to Defaults")
     func listPanesHaveNoReset() {
-        let lists: [SettingsPaneScope] = [.watchedFolders, .snippets, .corrections, .ignoredSegments, .findReplace, .exportFormats, .sendTo]
+        let lists: [SettingsPaneScope] = [.watchedFolders, .snippets, .corrections, .ignoredSegments, .findReplace, .autoExport, .sendTo]
         for scope in lists {
             #expect(scope.resetKeys(features: .all).isEmpty, "\(scope.rawValue) still offers a reset")
         }
