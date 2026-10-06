@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Parola
+import ParolaCore
 import ParolaTestSupport
 
 @MainActor
@@ -26,6 +27,24 @@ struct TranscriptDisplayModeTests {
 
         #expect(model.transcriptDisplayMode == .segments)
         #expect(defaults.string(forKey: "transcriptDisplayMode") == TranscriptDisplayMode.segments.rawValue)
+    }
+
+    @Test("View ▸ Paragraphs and Segments pick the layout and bring the transcript forward")
+    func layoutCommandsShowTheTranscript() {
+        let model = makeModel(temporaryDefaults())
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+            language: "en",
+            modelName: "stub"
+        )
+        model.transcriptPaneMode = .summary
+
+        model.showTranscriptLayout(.segments)
+        #expect(model.transcriptDisplayMode == .segments)
+        #expect(model.transcriptPaneMode == .transcript)
+
+        model.showTranscriptLayout(.transcript)
+        #expect(model.transcriptDisplayMode == .transcript)
     }
 
     @Test("a persisted value is read back at bootstrap")

@@ -170,6 +170,16 @@ struct ViewCommands: View {
         Button("Show Chat") { model.setTranscriptPaneMode(.chat) }
             .keyboardShortcut("3", modifiers: [.command])
             .disabled(!model.canShow(.chat) || model.keyWindowIsViewer)
+        Divider()
+        Toggle("Paragraphs", isOn: layoutBinding(.transcript))
+            .keyboardShortcut("1", modifiers: [.command, .control])
+            .disabled(!model.mainTranscriptCommandsEnabled)
+            .axLeaf("Menu.View.Paragraphs")
+        Toggle("Segments", isOn: layoutBinding(.segments))
+            .keyboardShortcut("2", modifiers: [.command, .control])
+            .disabled(!model.mainTranscriptCommandsEnabled)
+            .axLeaf("Menu.View.Segments")
+        Divider()
         Toggle("Show Translations Side by Side", isOn: $model.translationSideBySide)
             .disabled(!model.hasTranslation)
             .axLeaf("Menu.View.TranslationSideBySide")
@@ -195,6 +205,13 @@ struct ViewCommands: View {
         Button("Statistics") { model.openStatistics() }
             .disabled(model.introduction.isPresented)
             .axLeaf("Menu.View.Statistics")
+    }
+
+    private func layoutBinding(_ layout: TranscriptDisplayMode) -> Binding<Bool> {
+        Binding(
+            get: { model.transcriptDisplayMode == layout },
+            set: { _ in model.showTranscriptLayout(layout) }
+        )
     }
 }
 

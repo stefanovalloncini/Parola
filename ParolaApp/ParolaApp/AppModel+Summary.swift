@@ -159,6 +159,12 @@ extension AppModel {
         guard canShow(mode) else { return }
         transcriptPaneMode = mode
     }
+
+    /// A layout only shows on the Transcript pane, so picking one from Summary or Chat goes there too.
+    func showTranscriptLayout(_ layout: TranscriptDisplayMode) {
+        transcriptDisplayMode = layout
+        setTranscriptPaneMode(.transcript)
+    }
 }
 
 extension Transcript {

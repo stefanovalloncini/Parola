@@ -32,6 +32,16 @@ struct TranscriptMenuTests {
         #expect(header.contains("model.renameOpenTranscript(to: renameDraft)"))
     }
 
+    @Test("the layouts are a checked pair in the View menu, with keys, named as the inspector names them")
+    func layoutsAreViewCommands() throws {
+        let commands = try source("Views/AppCommands")
+        #expect(commands.contains(#"Toggle("Paragraphs", isOn: layoutBinding(.transcript)) .keyboardShortcut("1", modifiers: [.command, .control])"#))
+        #expect(commands.contains(#"Toggle("Segments", isOn: layoutBinding(.segments)) .keyboardShortcut("2", modifiers: [.command, .control])"#))
+        let inspector = try source("Views/Transcript/FormatInspector")
+        #expect(inspector.contains(#"DisplayModeCard( title: "Paragraphs", icon: "text.alignleft""#))
+        #expect(!inspector.contains(#"title: "Transcript""#))
+    }
+
     @Test("the display options are checked View menu items")
     func displayOptionsAreViewToggles() throws {
         let commands = try source("Views/AppCommands")

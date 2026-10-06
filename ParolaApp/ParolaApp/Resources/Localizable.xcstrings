@@ -10450,6 +10450,17 @@
         }
       }
     },
+    "Paragraphs": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paragrafi"
+          }
+        }
+      }
+    },
     "Parola": {
       "localizations": {
         "it": {

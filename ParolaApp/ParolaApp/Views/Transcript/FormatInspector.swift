@@ -42,7 +42,7 @@ struct FormatInspector: View {
         return InspectorSection(title: "Display Modes") {
             HStack(spacing: DS.Spacing.small) {
                 DisplayModeCard(
-                    title: "Transcript",
+                    title: "Paragraphs",
                     icon: "text.alignleft",
                     isSelected: displayMode == .transcript
                 ) { model.transcriptDisplayMode = .transcript }

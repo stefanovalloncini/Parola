@@ -61,6 +61,8 @@ struct ShortcutCatalog {
                 Entry(label: text("Show Transcript"),            keys: "⌘ 1"),
                 Entry(label: text("Show Summary"),               keys: "⌘ 2", requires: .ai),
                 Entry(label: text("Show Chat"),                  keys: "⌘ 3", requires: .ai),
+                Entry(label: text("Paragraphs"),                 keys: "⌘ ⌃ 1"),
+                Entry(label: text("Segments"),                   keys: "⌘ ⌃ 2"),
                 Entry(label: text("Next Segment"),               keys: "⌘ ⌥ ↓"),
                 Entry(label: text("Previous Segment"),           keys: "⌘ ⌥ ↑"),
                 Entry(label: text("Jump to Next Speaker"),       keys: "⌘ ⇧ J"),
