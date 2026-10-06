@@ -273,7 +273,7 @@ struct SegmentCard: View {
     }
 
     /// The stripe is colour alone, so a low segment also says so in a glyph that VoiceOver reads.
-    static func confidenceNote(_ bucket: SegmentConfidence.Bucket?) -> String? {
+    nonisolated static func confidenceNote(_ bucket: SegmentConfidence.Bucket?) -> String? {
         bucket == .low ? String(localized: "Low confidence") : nil
     }
 
