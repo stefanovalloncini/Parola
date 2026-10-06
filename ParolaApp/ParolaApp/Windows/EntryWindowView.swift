@@ -77,6 +77,7 @@ struct EntryWindowView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, DS.Spacing.small)
+                .onHover { inside in if inside { hintTask?.cancel() } else { flashEditHint() } }
                 .transition(.opacity)
             }
             if session.player != nil {
