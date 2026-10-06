@@ -12,14 +12,18 @@ struct OutputProcess: Sendable, Equatable {
     let isRunningOutput: Bool
 }
 
-/// Supplies the processes currently known to the audio hardware. Tests inject a fixture;
-/// the default reads `kAudioHardwarePropertyProcessObjectList` and never runs off the main test suite.
+/// Supplies the processes known to the audio hardware; tests inject a fixture instead of this reading CoreAudio.
 typealias OutputActivityProbe = @Sendable () -> [OutputProcess]
 
 struct MediaRemotePauseAdapter: MediaPlaybackToggler {
+    private let nowPlayingQuery: @Sendable () async -> Bool
     private let outputActivityProbe: OutputActivityProbe
 
-    init(outputActivityProbe: @escaping OutputActivityProbe = Self.liveOutputActivityProbe) {
+    init(
+        nowPlayingQuery: @escaping @Sendable () async -> Bool = Self.liveNowPlayingQuery,
+        outputActivityProbe: @escaping OutputActivityProbe = Self.liveOutputActivityProbe
+    ) {
+        self.nowPlayingQuery = nowPlayingQuery
         self.outputActivityProbe = outputActivityProbe
     }
 
@@ -39,26 +43,34 @@ struct MediaRemotePauseAdapter: MediaPlaybackToggler {
     /// macOS even while media plays (send still works), so a process other than Parola's
     /// own that is actively rendering output also counts as playing.
     func isPlaying() async -> Bool {
-        #if canImport(Darwin) && os(macOS)
-        let mediaRemoteSaysPlaying = await MediaRemoteBridge.shared.isPlaying()
-        return Self.decide(mediaRemoteSaysPlaying: mediaRemoteSaysPlaying, processes: outputActivityProbe())
-        #else
-        return true
-        #endif
+        if await nowPlayingQuery() { return true }
+        return Self.otherProcessIsRunningOutput(in: outputActivityProbe())
     }
 
-    static func decide(mediaRemoteSaysPlaying: Bool, processes: [OutputProcess]) -> Bool {
-        if mediaRemoteSaysPlaying { return true }
+    static func otherProcessIsRunningOutput(in processes: [OutputProcess]) -> Bool {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         return processes.contains { $0.pid != ownPID && $0.isRunningOutput }
     }
 
     #if canImport(Darwin) && os(macOS)
-    static func liveOutputActivityProbe() -> [OutputProcess] {
-        AudioProcessObjectList.current().compactMap { object in
-            guard let pid = pid(of: object), let isRunningOutput = isRunningOutput(of: object) else { return nil }
-            return OutputProcess(pid: pid, isRunningOutput: isRunningOutput)
+    static func liveNowPlayingQuery() async -> Bool {
+        await MediaRemoteBridge.shared.isPlaying()
+    }
+
+    /// macOS-only (`AudioObjectID` needs CoreAudio); pure given its readers, so tests use fixtures, never the live HAL.
+    static func outputProcesses(
+        _ objects: [AudioObjectID],
+        pid: (AudioObjectID) -> pid_t?,
+        isRunningOutput: (AudioObjectID) -> Bool?
+    ) -> [OutputProcess] {
+        objects.compactMap { object in
+            guard let objectPID = pid(object), let objectIsRunningOutput = isRunningOutput(object) else { return nil }
+            return OutputProcess(pid: objectPID, isRunningOutput: objectIsRunningOutput)
         }
+    }
+
+    static func liveOutputActivityProbe() -> [OutputProcess] {
+        outputProcesses(AudioProcessObjectList.current(), pid: pid(of:), isRunningOutput: isRunningOutput(of:))
     }
 
     private static func pid(of processObject: AudioObjectID) -> pid_t? {
@@ -85,6 +97,7 @@ struct MediaRemotePauseAdapter: MediaPlaybackToggler {
         return value != 0
     }
     #else
+    static func liveNowPlayingQuery() async -> Bool { true }
     static func liveOutputActivityProbe() -> [OutputProcess] { [] }
     #endif
 }
