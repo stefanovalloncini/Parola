@@ -186,9 +186,13 @@ private final class StandInMic: Sendable {
 
     var decodedSampleCounts: [Int] { state.withLock { $0.decodedSampleCounts } }
 
-    func push(seconds: Double, value: Float) {
+    func push(_ samples: [Float]) {
         let onBuffer = state.withLock { $0.onBuffer }
-        onBuffer?([Float](repeating: value, count: Int(seconds * 16_000)))
+        onBuffer?(samples)
+    }
+
+    func push(seconds: Double, value: Float) {
+        push([Float](repeating: value, count: Int(seconds * 16_000)))
     }
 
     /// A breath of silence first: VAD hears voice against the quietest recent buffer.
@@ -196,6 +200,19 @@ private final class StandInMic: Sendable {
         push(seconds: 0.1, value: 0)
         push(seconds: seconds, value: 0.5)
     }
+}
+
+/// One `read` hands back at most a chunk of the file, so this reads until it has `count` frames or the file ends.
+private func firstSamples(_ count: Int, in file: URL) throws -> [Float] {
+    let audio = try AVAudioFile(forReading: file)
+    let buffer = try #require(AVAudioPCMBuffer(pcmFormat: audio.processingFormat, frameCapacity: AVAudioFrameCount(count)))
+    var samples: [Float] = []
+    while samples.count < count {
+        try audio.read(into: buffer, frameCount: AVAudioFrameCount(count - samples.count))
+        guard buffer.frameLength > 0, let channel = buffer.floatChannelData?[0] else { break }
+        samples.append(contentsOf: UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
+    }
+    return samples
 }
 
 private func finishedTranscript(of events: AsyncStream<StreamingEvent>) async -> Transcript? {
@@ -708,6 +725,82 @@ struct StreamingCaptureFirstTests {
         #expect(await cache.leaseCount(for: Self.tiny) == 0)
         #expect(await cache.droppedLeases == 0)
         await gate.open(Self.tiny)
+    }
+
+    @Test("a take that loads normally keeps the audio from before the model at the start of its file")
+    func normalTakeFileStartsBeforeTheModel() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+        let early = (0..<16_000).map { Float($0) / 32_000 }
+        mic.push(early)
+
+        await gate.open(Self.tiny)
+        let events = try #require(try await starting.value("the start to return"))
+        mic.push(seconds: 1, value: 0.25)
+        let stopping = GuardedTask { await session.stop() }
+        _ = try await stopping.value("the stop to finish")
+
+        let finished = await finishedTranscript(of: events)
+        let audio = try #require(finished?.sourceURL)
+        defer { try? FileManager.default.removeItem(at: audio) }
+        #expect(try AVAudioFile(forReading: audio).length == 32_000)
+        #expect(try firstSamples(16_000, in: audio) == early)
+    }
+
+    @Test("a pause during the model load keeps the paused audio out of the buffer and the file")
+    func pauseDuringLoad() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+
+        mic.speak(seconds: 1)
+        await session.setPaused(true)
+        mic.push(seconds: 1, value: 0.5)
+        await session.setPaused(false)
+        mic.push(seconds: 1, value: 0.5)
+        await gate.open(Self.tiny)
+
+        let events = try #require(try await starting.value("the start to return"))
+        await mic.decodes.wait(atLeast: 1, "the held audio to decode")
+        #expect(mic.decodedSampleCounts.first == 33_600)
+        let stopping = GuardedTask { await session.stop() }
+        _ = try await stopping.value("the stop to finish")
+        let finished = await finishedTranscript(of: events)
+        let audio = try #require(finished?.sourceURL)
+        defer { try? FileManager.default.removeItem(at: audio) }
+        #expect(try AVAudioFile(forReading: audio).length == 33_600)
+    }
+
+    @Test("the level meter moves while the model loads")
+    func meterMovesDuringLoad() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.loads.wait(atLeast: 1, "the model load to start")
+        #expect(session.levelMeter.firstReadingAt == nil)
+
+        mic.push(seconds: 0.1, value: 0.5)
+
+        #expect(session.levelMeter.firstReadingAt != nil)
+        #expect(session.levelMeter.level > 0)
+        #expect(!starting.isFinished, "the model is still loading")
+        await gate.open(Self.tiny)
+        let events = try #require(try await starting.value("the start to return"))
+        let stopping = GuardedTask { await session.stop() }
+        _ = try await stopping.value("the stop to finish")
+        for await _ in events {}
     }
 
     @Test("a start cancelled during the model load stops capture and returns its lease")
