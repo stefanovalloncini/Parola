@@ -312,4 +312,16 @@ struct EntryWindowViewerTests {
         #expect(viewerBar.contains("PlaybackSpeedMenu(rate: session.rate)"))
         #expect(!viewerBar.contains(#"Picker("Playback speed""#))
     }
+
+    @Test("a long title is cut at its end and reads whole on hover, in both windows")
+    func longTitlesCutAtTheEnd() throws {
+        func source(_ name: String) throws -> String {
+            let path = #filePath.replacingOccurrences(of: "ParolaAppTests/EntryWindowViewerTests.swift", with: "ParolaApp/\(name).swift")
+            return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        }
+        let main = try source("Views/Transcript/TranscriptHeaderBar")
+        #expect(main.contains("Text(title) .font(DS.Font.heading) .lineLimit(1) .truncationMode(.tail) .help(Text(verbatim: title))"))
+        let viewer = try source("Windows/EntryViewerHeader")
+        #expect(viewer.contains("Text(verbatim: session.title) .font(DS.Font.heading) .lineLimit(1) .truncationMode(.tail) .help(Text(verbatim: session.title))"))
+    }
 }

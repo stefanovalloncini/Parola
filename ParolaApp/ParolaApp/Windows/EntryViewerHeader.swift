@@ -12,7 +12,8 @@ struct EntryViewerHeader: View {
                 Text(verbatim: session.title)
                     .font(DS.Font.heading)
                     .lineLimit(1)
-                    .truncationMode(.middle)
+                    .truncationMode(.tail)
+                    .help(Text(verbatim: session.title))
                 if let subtitle {
                     Text(verbatim: subtitle)
                         .font(DS.Font.secondary)

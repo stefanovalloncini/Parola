@@ -25,7 +25,8 @@ struct TranscriptHeaderBar: View {
             Text(title)
                 .font(DS.Font.heading)
                 .lineLimit(1)
-                .truncationMode(.middle)
+                .truncationMode(.tail)
+                .help(Text(verbatim: title))
                 .contextMenu {
                     Button("Rename…") { beginRename() }
                         .disabled(!model.canRenameOpenTranscript)
