@@ -472,4 +472,52 @@ struct SpokenTextNormalizerTests {
     func englishInvalidISODateUnchanged() {
         #expect(SpokenTextNormalizer.normalize("2026-13-06", language: "en") == "2026-13-06")
     }
+
+    // MARK: - F: negative "uno" only elides before a masculine noun (fix round 3, adversarial)
+
+    @Test("IT a standalone negative one keeps the plain cardinal uno, not un")
+    func italianNegativeOneStandaloneStaysUno() {
+        #expect(SpokenTextNormalizer.normalize("-1", language: "it") == "meno uno")
+    }
+
+    @Test("IT a negative one before an unrelated word keeps uno, not un")
+    func italianNegativeOneBeforeAdverbStaysUno() {
+        let expected = "La temperatura è meno uno oggi."
+        #expect(SpokenTextNormalizer.normalize("La temperatura è -1 oggi.", language: "it") == expected)
+    }
+
+    @Test("IT a negative one before a feminine noun keeps uno, same as the positive form today")
+    func italianNegativeOneBeforeFeminineNounStaysUno() {
+        #expect(SpokenTextNormalizer.normalize("-1 mela", language: "it") == "meno uno mela")
+    }
+
+    @Test("IT a negative one before a masculine noun from the I4 list still elides to un")
+    func italianNegativeOneBeforeMasculineNounStillElides() {
+        #expect(SpokenTextNormalizer.normalize("-1 euro", language: "it") == "meno un euro")
+    }
+
+    // MARK: - Mixed range with one bare-hour endpoint (fix round 3, cheap)
+
+    @Test("EN a range with only the first side spelled as hh:mm reads the bare side on the hour")
+    func englishMixedTimeRangeBareSecondEndpoint() {
+        #expect(SpokenTextNormalizer.normalize("10:30-11", language: "en") == "ten thirty to eleven")
+    }
+
+    @Test("IT a range with only the first side spelled as hh:mm reads the bare side on the hour")
+    func italianMixedTimeRangeBareSecondEndpoint() {
+        #expect(SpokenTextNormalizer.normalize("10:30-11", language: "it") == "dieci e trenta a undici")
+    }
+
+    @Test("EN a range with only the second side spelled as hh:mm reads the bare side on the hour")
+    func englishMixedTimeRangeBareFirstEndpoint() {
+        #expect(SpokenTextNormalizer.normalize("9-10:30", language: "en") == "nine to ten thirty")
+    }
+
+    @Test("EN a mixed time range inside a sentence leaves no colon and no stray dash")
+    func englishMixedTimeRangeInSentence() {
+        let result = SpokenTextNormalizer.normalize("Call between 10:30-11 please.", language: "en")
+        #expect(result == "Call between ten thirty to eleven please.")
+        #expect(!result.contains(":"))
+        #expect(!result.contains("-"))
+    }
 }

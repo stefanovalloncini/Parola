@@ -134,7 +134,7 @@ public enum SpokenTextNormalizer {
         result = replacingNegativeNumbers(result, language: "it", locale: locale, numberPattern: numberPattern)
         result = replacingCurrencySymbols(result, language: "it", locale: locale, numberPattern: numberPattern)
         result = replacingCurrencyWords(result, language: "it", locale: locale, numberPattern: numberPattern)
-        result = replacingItalianMasculineOne(result)
+        result = replacingItalianMasculineOne(result, locale: locale)
         result = replacingPercent(result, suffix: "per cento", locale: locale, numberPattern: numberPattern)
         result = replacingVersionStrings(result, locale: locale, joiner: "punto")
         result = replacingItalianDates(result)
@@ -143,11 +143,13 @@ public enum SpokenTextNormalizer {
     }
 
     /// Italian elides "uno" to "un" before any of these masculine nouns, standing alone (not as the
-    /// last digit of a larger number: "ventuno euro" keeps `NumberFormatter`'s own form).
-    private static func replacingItalianMasculineOne(_ text: String) -> String {
+    /// last digit of a larger number: "ventuno euro" keeps `NumberFormatter`'s own form). Goes through
+    /// the same `italianNumeralWords` helper as the currency and negative-number passes.
+    private static func replacingItalianMasculineOne(_ text: String, locale: Locale) -> String {
         let wordPattern = italianMasculineNouns.joined(separator: "|")
         return replaceMatches(pattern: "\\b1\\s+(\(wordPattern))\\b", in: text) { match, ns in
-            "un " + ns.substring(with: match.range(at: 1))
+            let word = ns.substring(with: match.range(at: 1))
+            return italianNumeralWords(NSNumber(value: 1), locale: locale, followedBy: word) + " " + word
         }
     }
 
@@ -275,15 +277,25 @@ public enum SpokenTextNormalizer {
     // MARK: - Shared: negative numbers
 
     /// A "-"/"−" right at a word start (not glued after a letter, as in "COVID-19", and not the dash
-    /// of a range) reads as "minus"/"meno".
+    /// of a range) reads as "minus"/"meno". A negative number elides "uno" the same way a positive one
+    /// does — only right before a masculine noun — so the following word (if any) is captured too,
+    /// just to check it against `italianNumeralWords`, and handed back unchanged either way.
     private static func replacingNegativeNumbers(
         _ text: String, language: String, locale: Locale, numberPattern: String
     ) -> String {
         let word = language == "it" ? "meno" : "minus"
-        return replaceMatches(pattern: "(?<![\\w.,])[-\u{2212}](\(numberPattern))", in: text) { match, ns in
+        let pattern = "(?<![\\w.,])[-\u{2212}](\(numberPattern))(?:(\\s+)(\\p{L}+))?"
+        return replaceMatches(pattern: pattern, in: text) { match, ns in
             let raw = ns.substring(with: match.range(at: 1))
             guard let amount = parseNumber(raw, locale: locale) else { return nil }
-            return word + " " + numeralWords(amount, language: language, locale: locale)
+            let wordRange = match.range(at: 3)
+            let followingWord = wordRange.location != NSNotFound ? ns.substring(with: wordRange) : nil
+            let numeral = language == "it"
+                ? italianNumeralWords(amount, locale: locale, followedBy: followingWord)
+                : spellOut(amount, locale: locale)
+            guard let followingWord else { return word + " " + numeral }
+            let space = ns.substring(with: match.range(at: 2))
+            return word + " " + numeral + space + followingWord
         }
     }
 
@@ -299,9 +311,18 @@ public enum SpokenTextNormalizer {
     private static let euroWords = ["en": CurrencyWords(singular: "euro", plural: "euros"),
                                      "it": CurrencyWords(singular: "euro", plural: "euro")]
 
-    /// Italian elides "uno" to "un" before a masculine currency noun ("un euro", not "uno euro").
-    private static func numeralWords(_ amount: NSNumber, language: String, locale: Locale) -> String {
-        language == "it" && amount.doubleValue == 1 ? "un" : spellOut(amount, locale: locale)
+    /// Italian "uno" elides to "un" only right before one of these masculine nouns; every other
+    /// context — standalone, or before any other word — keeps the plain cardinal "uno". Shared by the
+    /// currency, masculine-noun and negative-number passes so they can't drift on what counts as
+    /// elidable (the negative-number path doesn't get to assume a noun follows at all).
+    private static let italianElidingNouns: Set<String> = [
+        "euro", "dollaro", "dollari", "minuto", "secondo", "giorno", "anno", "mese",
+    ]
+
+    private static func italianNumeralWords(_ amount: NSNumber, locale: Locale, followedBy word: String?) -> String {
+        guard amount.doubleValue == 1 else { return spellOut(amount, locale: locale) }
+        guard let word, italianElidingNouns.contains(word.lowercased()) else { return "uno" }
+        return "un"
     }
 
     private static func replacingCurrencySymbols(
@@ -314,7 +335,8 @@ public enum SpokenTextNormalizer {
             let words = symbol == "$" ? dollarWords[language] : euroWords[language]
             guard let words else { return nil }
             let unit = amount.doubleValue == 1 ? words.singular : words.plural
-            return numeralWords(amount, language: language, locale: locale) + " " + unit
+            let numeral = language == "it" ? italianNumeralWords(amount, locale: locale, followedBy: unit) : spellOut(amount, locale: locale)
+            return numeral + " " + unit
         }
     }
 
@@ -329,7 +351,8 @@ public enum SpokenTextNormalizer {
             let words = word.hasPrefix("dollar") ? dollarWords[language] : euroWords[language]
             guard let words else { return nil }
             let unit = amount.doubleValue == 1 ? words.singular : words.plural
-            return numeralWords(amount, language: language, locale: locale) + " " + unit
+            let numeral = language == "it" ? italianNumeralWords(amount, locale: locale, followedBy: unit) : spellOut(amount, locale: locale)
+            return numeral + " " + unit
         }
     }
 
@@ -364,13 +387,16 @@ public enum SpokenTextNormalizer {
 
     // MARK: - Shared: times
 
-    private static let timeComponent = "(2[0-4]|[01]?\\d):([0-5]\\d)"
+    private static let timeHourMinute = "(2[0-4]|[01]?\\d):([0-5]\\d)"
+    private static let timeHourOnly = "(2[0-4]|[01]?\\d)"
 
     /// Runs before the generic dash-range rule, so "10:30-11:00" reads as one time range instead of
-    /// the range regex cutting across the colon and leaving a bogus "10:"/":00" behind.
+    /// the range regex cutting across the colon and leaving a bogus "10:"/":00" behind. A range with
+    /// only one side spelled out in full ("10:30-11") reads the bare side as on the hour, so neither
+    /// a colon nor the dash itself ever leaks into the output.
     private static func replacingTimes(_ text: String, language: String, locale: Locale) -> String {
         let connector = language == "it" ? "a" : "to"
-        var result = replaceMatches(pattern: "\\b\(timeComponent)-\(timeComponent)\\b", in: text) { match, ns in
+        var result = replaceMatches(pattern: "\\b\(timeHourMinute)-\(timeHourMinute)\\b", in: text) { match, ns in
             guard let hour1 = Int(ns.substring(with: match.range(at: 1))),
                   let minute1 = Int(ns.substring(with: match.range(at: 2))),
                   let hour2 = Int(ns.substring(with: match.range(at: 3))),
@@ -379,7 +405,23 @@ public enum SpokenTextNormalizer {
             let second = spokenTime(hour: hour2, minute: minute2, language: language, locale: locale, inRange: true)
             return first + " " + connector + " " + second
         }
-        result = replaceMatches(pattern: "\\b\(timeComponent)\\b", in: result) { match, ns in
+        result = replaceMatches(pattern: "\\b\(timeHourMinute)-\(timeHourOnly)(?!:)\\b", in: result) { match, ns in
+            guard let hour1 = Int(ns.substring(with: match.range(at: 1))),
+                  let minute1 = Int(ns.substring(with: match.range(at: 2))),
+                  let hour2 = Int(ns.substring(with: match.range(at: 3))) else { return nil }
+            let first = spokenTime(hour: hour1, minute: minute1, language: language, locale: locale, inRange: true)
+            let second = spokenTime(hour: hour2, minute: 0, language: language, locale: locale, inRange: true)
+            return first + " " + connector + " " + second
+        }
+        result = replaceMatches(pattern: "\\b\(timeHourOnly)-\(timeHourMinute)\\b", in: result) { match, ns in
+            guard let hour1 = Int(ns.substring(with: match.range(at: 1))),
+                  let hour2 = Int(ns.substring(with: match.range(at: 2))),
+                  let minute2 = Int(ns.substring(with: match.range(at: 3))) else { return nil }
+            let first = spokenTime(hour: hour1, minute: 0, language: language, locale: locale, inRange: true)
+            let second = spokenTime(hour: hour2, minute: minute2, language: language, locale: locale, inRange: true)
+            return first + " " + connector + " " + second
+        }
+        result = replaceMatches(pattern: "\\b\(timeHourMinute)\\b", in: result) { match, ns in
             guard let hour = Int(ns.substring(with: match.range(at: 1))),
                   let minute = Int(ns.substring(with: match.range(at: 2))) else { return nil }
             return spokenTime(hour: hour, minute: minute, language: language, locale: locale)
