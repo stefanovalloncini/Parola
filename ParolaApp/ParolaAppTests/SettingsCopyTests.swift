@@ -160,4 +160,15 @@ struct SettingsCopyTests {
         model.refreshYtDlpAvailability()
         #expect(model.homebrewAvailable)
     }
+
+    @Test("a downloaded model is made the default with Use as Default, and the chosen one reads Default")
+    func modelRowsSayDefault() throws {
+        let variant = try #require(ModelCatalog.all.first)
+        let model = makeModel("settings-copy-default-model")
+        let installed = words(ModelCardRow(variant: variant, kind: .installed, primaryAction: {}), model: model)
+        #expect(installed.contains("Use as Default"), "\(installed)")
+        #expect(!installed.contains("Activate"), "\(installed)")
+        let active = words(ModelCardRow(variant: variant, kind: .active, primaryAction: {}), model: model)
+        #expect(active.contains("Default"), "\(active)")
+    }
 }

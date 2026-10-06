@@ -78,10 +78,11 @@ struct ModelCardRow: View {
         } else {
             switch kind {
             case .active:
-                Image(systemName: "checkmark.circle.fill")
-                    .font(DS.Font.title)
+                Label("Default", systemImage: "checkmark.circle.fill")
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.accent)
-                    .accessibilityLabel("Active model")
+                    .labelStyle(.titleAndIcon)
+                    .axLeaf("Card.Label.Default")
             case .installed:
                 HStack(spacing: 6) {
                     if let deleteAction {
@@ -97,7 +98,7 @@ struct ModelCardRow: View {
                         .axLeaf("Card.Button.Delete")
                     }
                     Button(action: primaryAction) {
-                        Text("Activate")
+                        Text("Use as Default")
                     }
                     .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                     .accessibilityIdentifier("model.\(variant.id).activate")

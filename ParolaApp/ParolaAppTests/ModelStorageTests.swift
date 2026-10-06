@@ -104,17 +104,17 @@ struct ModelStorageTests {
         #expect(summary.bytes == otherBytes + leftoverBytes)
     }
 
-    @Test("the usage line names the earlier downloads only when there are some")
+    @Test("the usage line gives the models and the earlier downloads as two figures, never one inside the other")
     func usageTextMentionsEarlierDownloads() {
         let clean = ModelsDiskSummary(count: 8, bytes: 7_500_000_000, earlierBytes: 0)
-        #expect(clean.usageText == "8 installed · \(AppFormat.byteSize(Int64(7_500_000_000)))")
+        #expect(clean.usageText == AppFormat.byteSize(Int64(7_500_000_000)))
 
         let withLeftovers = ModelsDiskSummary(count: 8, bytes: 13_300_000_000, earlierBytes: 5_800_000_000)
-        #expect(withLeftovers.usageText == "8 installed · \(AppFormat.byteSize(Int64(13_300_000_000))) · "
-            + "\(AppFormat.byteSize(Int64(5_800_000_000))) in earlier downloads")
+        #expect(withLeftovers.usageText == "\(AppFormat.byteSize(Int64(7_500_000_000))) · "
+            + "Earlier downloads: \(AppFormat.byteSize(Int64(5_800_000_000)))")
     }
 
-    @Test("the usage line and the earlier-download strings read in Italian, with a singular for one model")
+    @Test("the usage line and the earlier-download strings read in Italian")
     func italianStrings() throws {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let bundle = try #require(Bundle(path: path))
@@ -122,9 +122,7 @@ struct ModelStorageTests {
         let name = "Whisper Large v3 Turbo"
         let reason = "disco pieno"
 
-        #expect(String(localized: "\(1) installed · \(size)", bundle: bundle) == "1 installato · 3 GB")
-        #expect(String(localized: "\(8) installed · \(size)", bundle: bundle) == "8 installati · 3 GB")
-        #expect(String(localized: "\(size) in earlier downloads", bundle: bundle) == "3 GB in download precedenti")
+        #expect(String(localized: "Earlier downloads: \(size)", bundle: bundle) == "Download precedenti: 3 GB")
         #expect(String(localized: "Delete the earlier download of \(name)?", bundle: bundle)
             == "Eliminare il download precedente di Whisper Large v3 Turbo?")
         #expect(String(localized: "Could not delete \(name): \(reason)", bundle: bundle)

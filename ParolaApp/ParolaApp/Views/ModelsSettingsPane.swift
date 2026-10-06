@@ -128,7 +128,7 @@ struct ModelsSettingsPane: View {
         let summary = model.modelsOnDiskSummary
         if summary.bytes > 0 {
             Divider()
-            UsageRow(icon: "cpu", label: "Models on disk:", value: summary.usageText)
+            UsageRow(icon: "cpu", label: "Models:", value: summary.usageText)
         }
     }
 
@@ -282,7 +282,7 @@ struct ModelsSettingsPane: View {
 
     private func downloadedSection(_ variants: [ModelVariant]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Downloaded", count: variants.count)
+            sectionHeader("On This Mac", count: variants.count)
             if variants.isEmpty {
                 DownloadedEmpty()
             } else {

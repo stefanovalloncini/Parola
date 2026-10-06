@@ -19,10 +19,11 @@ struct ModelsDiskSummary: Equatable, Sendable {
     let bytes: Int64
     let earlierBytes: Int64
 
+    /// The models and the earlier downloads as two figures, so neither reads as part of the other.
     var usageText: String {
-        let usage = String(localized: "\(count) installed · \(AppFormat.byteSize(bytes))")
-        guard earlierBytes > 0 else { return usage }
-        return usage + " · " + String(localized: "\(AppFormat.byteSize(earlierBytes)) in earlier downloads")
+        let models = AppFormat.byteSize(bytes - earlierBytes)
+        guard earlierBytes > 0 else { return models }
+        return models + " · " + String(localized: "Earlier downloads: \(AppFormat.byteSize(earlierBytes))")
     }
 }
 

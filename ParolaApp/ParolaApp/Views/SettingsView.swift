@@ -79,7 +79,7 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     /// Search terms for routes without a pane scope; scoped routes get theirs from the scope.
     var extraSearchKeywords: [String] {
         switch self {
-        case .localModels: return ["model", "whisper", "parakeet", "apple speech", "download", "storage", "delete", "activate"]
+        case .localModels: return ["model", "whisper", "parakeet", "apple speech", "download", "storage", "delete", "activate", "default"]
         case .about: return ["version", "repository", "diagnostics"]
         default: return []
         }
