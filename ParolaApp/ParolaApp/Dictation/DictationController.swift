@@ -286,7 +286,10 @@ final class DictationController {
             start(configuration: configuration)
         case .transcribing:
             cancelTranscription()
-        case .idle, .failed:
+        case .failed:
+            dismissFailure()
+            return
+        case .idle:
             return
         }
         speak(String(localized: "Dictation cancelled"), .medium)
@@ -382,7 +385,7 @@ final class DictationController {
             showHUD()
             stopLevelStream()
         case .failed:
-            stopWatchingEscape()
+            watchEscape()
             showHUD()
             stopLevelStream()
             stopPartialStream()

@@ -174,6 +174,29 @@ struct DictationControllerLifecycleTests {
         controller.stop()
     }
 
+    @Test("Escape dismisses a failed HUD", .timeLimit(.minutes(1)))
+    func escapeDismissesFailure() async {
+        let log = MonitorLog()
+        let controller = DictationController()
+        controller.hotkeyFactory = { _, _ in SpyHotkeyMonitor(id: 1, log: log) }
+        controller.recorderFactory = { _ in BusyMicRecorder() }
+        controller.start(configuration: makeConfiguration())
+        await log.waitForOps(2)
+
+        controller.simulatePress()
+        await waitUntil {
+            guard case .failed = controller.state else { return false }
+            return true
+        }
+        #expect(controller.hudIsUp)
+
+        controller.cancelDictation()
+
+        await waitUntil { controller.state == .idle }
+        #expect(!controller.hudIsUp)
+        controller.stop()
+    }
+
     @Test("VoiceOver hears dictation listen, transcribe and fail")
     func dictationIsAnnounced() async {
         let log = MonitorLog()
