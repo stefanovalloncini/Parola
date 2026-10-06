@@ -6317,6 +6317,17 @@
         }
       }
     },
+    "Final Cut Pro project with the transcript as captions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Progetto Final Cut Pro con la trascrizione come sottotitoli."
+          }
+        }
+      }
+    },
     "Find": {
       "extractionState": "manual",
       "localizations": {
@@ -6673,6 +6684,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Frontmatter"
+          }
+        }
+      }
+    },
+    "Full transcript data: segments, timings, words, speakers.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutti i dati della trascrizione: segmenti, timing, parole, speaker."
           }
         }
       }
@@ -8543,6 +8565,17 @@
         }
       }
     },
+    "Markdown paragraphs. Start-time prefixes optional at export.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paragrafi Markdown. Prefissi con il tempo di inizio opzionali all'export."
+          }
+        }
+      }
+    },
     "Markdown timestamps": {
       "extractionState": "manual",
       "localizations": {
@@ -10322,6 +10355,17 @@
         }
       }
     },
+    "One JSON segment per line, for scripts and pipelines.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un segmento JSON per riga, per script e pipeline."
+          }
+        }
+      }
+    },
     "Opacity": {
       "extractionState": "manual",
       "localizations": {
@@ -11327,6 +11371,17 @@
         }
       }
     },
+    "Plain text. Line timestamps optional at export.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testo semplice. Timestamp di riga opzionali all'export."
+          }
+        }
+      }
+    },
     "Play": {
       "extractionState": "manual",
       "localizations": {
@@ -11648,6 +11703,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stampa trascrizione…"
+          }
+        }
+      }
+    },
+    "Print-ready document.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documento pronto per la stampa."
           }
         }
       }
@@ -14613,6 +14679,17 @@
         }
       }
     },
+    "Spreadsheet rows: start, end, speaker, text.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Righe di foglio di calcolo: inizio, fine, speaker, testo."
+          }
+        }
+      }
+    },
     "Stable": {
       "extractionState": "manual",
       "localizations": {
@@ -15088,6 +15165,17 @@
         }
       }
     },
+    "SubRip subtitles with numbered, timed cues.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli SubRip con battute numerate e temporizzate."
+          }
+        }
+      }
+    },
     "Subfolder": {
       "extractionState": "manual",
       "localizations": {
@@ -15365,6 +15453,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "TSV"
+          }
+        }
+      }
+    },
+    "Tab-separated rows, same columns as CSV.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Righe separate da tabulazioni, stesse colonne del CSV."
           }
         }
       }
@@ -16372,6 +16471,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tempo di trascrizione"
+          }
+        }
+      }
+    },
+    "Timed lyric lines for music players.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Righe di testo temporizzate per i player musicali."
           }
         }
       }
@@ -17701,6 +17811,17 @@
         }
       }
     },
+    "Web page in a light, dark, or sepia theme.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pagina web in tema chiaro, scuro o seppia."
+          }
+        }
+      }
+    },
     "Web video — %@": {
       "extractionState": "manual",
       "localizations": {
@@ -17730,6 +17851,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli WebVTT"
+          }
+        }
+      }
+    },
+    "WebVTT subtitles for web players.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli WebVTT per i player web."
           }
         }
       }
@@ -18004,6 +18136,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Documento Word"
+          }
+        }
+      }
+    },
+    "Word document with speaker names.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documento Word con i nomi degli speaker."
           }
         }
       }
