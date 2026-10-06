@@ -67,6 +67,8 @@ enum HostedAccessibility {
         let frame: CGRect
         /// The named actions VoiceOver lists in its Actions rotor.
         let actions: [String]
+        /// Whether VoiceOver reads it as the chosen one.
+        let isSelected: Bool
 
         var words: [String] { [label, value].compactMap { $0 }.filter { !$0.isEmpty } }
         /// What VoiceOver calls the element: its label, or else its title element's.
@@ -131,7 +133,8 @@ enum HostedAccessibility {
                     role: (read("accessibilityRole", of: child) as? NSAccessibility.Role)?.rawValue
                         ?? read("accessibilityRole", of: child) as? String,
                     frame: (read("accessibilityFrame", of: child) as? NSValue)?.rectValue ?? .zero,
-                    actions: (read("accessibilityCustomActions", of: child) as? [NSAccessibilityCustomAction])?.map(\.name) ?? []
+                    actions: (read("accessibilityCustomActions", of: child) as? [NSAccessibilityCustomAction])?.map(\.name) ?? [],
+                    isSelected: (read("isAccessibilitySelected", of: child) as? Bool) ?? false
                 ))
                 visit(child, depth: depth + 1)
             }

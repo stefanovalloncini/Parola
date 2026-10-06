@@ -47,7 +47,7 @@ struct ExportSheetLayoutTests {
         let hosted = host(model)
         defer { hosted.close() }
         let elements = HostedAccessibility.elements(in: hosted.host)
-        let firstStyle = elements.first { $0.identifier?.hasSuffix("Export.Picker.Style") == true }
+        let firstStyle = elements.first { $0.identifier?.hasSuffix("Export.Button.Style.transcript") == true }
         let heading = try #require(firstStyle)
         for leaf in ["Timestamps", "EndTimestamps", "Milliseconds", "Speakers"] {
             let found = elements.first { $0.identifier?.hasSuffix("Export.Toggle.\(leaf)") == true }
@@ -63,26 +63,24 @@ struct ExportSheetLayoutTests {
         #expect(!sheet.contains(".frame(width: 180"))
     }
 
-    @Test("Style and Format are pickers VoiceOver reads as one choice each: segmented, then radio buttons")
-    func styleAndFormatArePickers() throws {
-        let sheet = try source()
-        let style = try #require(sheet.range(of: "private var styleSection: some View"))
-        let options = try #require(sheet.range(of: "private var optionsSection: some View"))
-        let pickers = String(sheet[style.lowerBound..<options.lowerBound])
-        #expect(!pickers.contains("DSPillButtonStyle"))
-        #expect(pickers.contains(#"Picker("Style", selection: styleBinding)"#))
-        #expect(pickers.contains(".pickerStyle(.segmented)"))
-        #expect(pickers.contains(#"Picker("Format", selection: formatBinding)"#))
-        #expect(pickers.contains(".pickerStyle(.radioGroup)"))
-
+    @Test("Style and Format keep their pills, and VoiceOver hears which one is chosen")
+    func chosenPillsReadAsSelected() throws {
         let model = makeModel()
         let hosted = host(model)
         defer { hosted.close() }
-        let ids = HostedAccessibility.elements(in: hosted.host).compactMap(\.identifier)
-        let hasStyle = ids.contains { $0.hasSuffix("Export.Picker.Style") }
-        let hasFormat = ids.contains { $0.hasSuffix("Export.Picker.Format") }
-        #expect(hasStyle)
-        #expect(hasFormat)
+        let elements = HostedAccessibility.elements(in: hosted.host)
+        func pill(_ leaf: String) throws -> HostedAccessibility.Element {
+            let found = elements.first { $0.identifier?.hasSuffix(leaf) == true }
+            return try #require(found, "no \(leaf)")
+        }
+        let chosenStyle = try pill("Export.Button.Style.transcript")
+        let otherStyle = try pill("Export.Button.Style.subtitles")
+        let chosenFormat = try pill("Export.Button.Format.txt")
+        let otherFormat = try pill("Export.Button.Format.md")
+        #expect(chosenStyle.isSelected)
+        #expect(!otherStyle.isSelected)
+        #expect(chosenFormat.isSelected)
+        #expect(!otherFormat.isSelected)
     }
 
     @Test("Close sits beside Export on the trailing side, and Copy to Clipboard leads")
