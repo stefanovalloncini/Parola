@@ -86,10 +86,12 @@ struct SentenceSplitter {
 
     private let language: NLLanguage?
     private let maxLength: Int
+    private let minLength: Int
 
-    init(language: String?, maxLength: Int) {
+    init(language: String?, maxLength: Int, minLength: Int) {
         self.language = language.flatMap { $0.isEmpty ? nil : NLLanguage(rawValue: $0) }
         self.maxLength = maxLength
+        self.minLength = minLength
     }
 
     func drafts(of script: AnchoredText) -> [DraftUnit] {
@@ -148,7 +150,7 @@ struct SentenceSplitter {
         var start = sentence.lowerBound
         while let limit = text.index(start, offsetBy: maxLength, limitedBy: sentence.upperBound),
               limit < sentence.upperBound,
-              let cut = Self.cut(in: start..<sentence.upperBound, limit: limit, text: text) {
+              let cut = Self.cut(in: start..<sentence.upperBound, limit: limit, minLength: minLength, text: text) {
             if let piece = Self.trimmed(start..<cut, in: text) { pieces.append(piece) }
             start = cut
             while start < sentence.upperBound, text[start].isWhitespace { start = text.index(after: start) }
@@ -157,17 +159,18 @@ struct SentenceSplitter {
         return pieces
     }
 
-    /// After the last clause mark within `limit`, else the last space, else the first space past it: never inside a word.
-    private static func cut(in range: Range<String.Index>, limit: String.Index, text: String) -> String.Index? {
+    /// The last clause mark, else the last space, between `minLength` and `limit`; else the first space past `limit`.
+    private static func cut(in range: Range<String.Index>, limit: String.Index, minLength: Int, text: String) -> String.Index? {
         var clauseCut: String.Index?
         var spaceCut: String.Index?
         var index = range.lowerBound
+        var length = 0
         while index <= limit {
             let character = text[index]
             let next = text.index(after: index)
             if character.isWhitespace {
-                spaceCut = index
-            } else if index < limit {
+                if length >= minLength { spaceCut = index }
+            } else if index < limit, length + 1 >= minLength {
                 if fullWidthClauseMarks.contains(character) {
                     clauseCut = next
                 } else if clauseMarks.contains(character), next < range.upperBound, text[next].isWhitespace {
@@ -175,6 +178,7 @@ struct SentenceSplitter {
                 }
             }
             index = next
+            length += 1
         }
         if let cut = clauseCut ?? spaceCut { return cut }
         return text[limit..<range.upperBound].firstIndex(where: \.isWhitespace)

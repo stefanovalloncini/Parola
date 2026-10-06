@@ -26,21 +26,26 @@ struct ReadingScriptBuilderTests {
         (text as NSString).substring(with: range)
     }
 
+    private func firstAnchorText(in text: String, _ unit: ReadingUnit) -> String {
+        unit.anchors.first.map { substring(text, $0.range) } ?? ""
+    }
+
     // MARK: - Sentences and anchors
 
     @Test("each sentence of a segment becomes a unit anchored to its span")
-    func sentencesAnchorToTheirSpan() {
+    func sentencesAnchorToTheirSpan() throws {
         let units = ReadingScriptBuilder.transcript(
             transcript([segment(0, "Hello there. How are you?", start: 0)]),
             language: "en"
         )
         #expect(units.map(\.text) == ["Hello there.", "How are you?"])
+        try #require(units.count == 2)
         #expect(units[0].anchors == [anchored(.segment(0), 0, 12)])
         #expect(units[1].anchors == [anchored(.segment(0), 13, 12)])
     }
 
     @Test("a sentence spanning two segments carries both anchors with their own ranges")
-    func sentenceSpanningTwoSegments() {
+    func sentenceSpanningTwoSegments() throws {
         let units = ReadingScriptBuilder.transcript(
             transcript([
                 segment(0, "Hello there,", start: 0, end: 1),
@@ -49,6 +54,7 @@ struct ReadingScriptBuilderTests {
             language: "en"
         )
         #expect(units.map(\.text) == ["Hello there, how are you today?", "Fine."])
+        try #require(units.count == 2)
         #expect(units[0].anchors == [anchored(.segment(0), 0, 12), anchored(.segment(1), 1, 18)])
         #expect(units[1].anchors == [anchored(.segment(1), 20, 5)])
     }
@@ -58,7 +64,7 @@ struct ReadingScriptBuilderTests {
         let text = "  Caffè ☕️ pronto. Sì."
         let units = ReadingScriptBuilder.transcript(transcript([segment(0, text, start: 0)]), language: "it")
         #expect(units.map(\.text) == ["Caffè ☕️ pronto.", "Sì."])
-        #expect(units.map { substring(text, $0.anchors[0].range) } == ["Caffè ☕️ pronto.", "Sì."])
+        #expect(units.map { firstAnchorText(in: text, $0) } == ["Caffè ☕️ pronto.", "Sì."])
     }
 
     @Test("segments with no text are skipped")
@@ -211,15 +217,15 @@ struct ReadingScriptBuilderTests {
     // MARK: - Length cap
 
     @Test("an over-long sentence splits at the last comma before the cap")
-    func capSplitsAtPunctuation() {
+    func capSplitsAtPunctuation() throws {
         let first = String(repeating: "word ", count: 25) + "then, more"
         let second = String(repeating: " again", count: 20) + "."
         let text = first + second
         let units = ReadingScriptBuilder.transcript(transcript([segment(0, text, start: 0)]), language: "en")
-        #expect(units.count == 2)
+        try #require(units.count == 2)
         #expect(units[0].text == String(repeating: "word ", count: 25) + "then,")
         #expect(units.allSatisfy { $0.text.count <= ReadingScriptBuilder.maxUnitLength })
-        #expect(units.map { substring(text, $0.anchors[0].range) } == units.map(\.text))
+        #expect(units.map { firstAnchorText(in: text, $0) } == units.map(\.text))
         #expect(units.map(\.pauseAfter) == [0, 0])
     }
 
@@ -231,7 +237,7 @@ struct ReadingScriptBuilderTests {
         #expect(units.count > 1)
         #expect(units.allSatisfy { $0.text.count <= ReadingScriptBuilder.maxUnitLength })
         #expect(units.flatMap { $0.text.split(separator: " ").map(String.init) } == words)
-        #expect(units.map { substring(text, $0.anchors[0].range) } == units.map(\.text))
+        #expect(units.map { firstAnchorText(in: text, $0) } == units.map(\.text))
     }
 
     @Test("a comma inside a number is no split point")
@@ -250,6 +256,26 @@ struct ReadingScriptBuilderTests {
         #expect(units.map(\.text) == [String(repeating: "我们", count: 60) + "，", String(repeating: "今天", count: 60) + "。"])
     }
 
+    @Test("an early comma never leaves a tiny unit")
+    func capSkipsAnEarlyComma() {
+        let words = (0..<35).map { "word\($0)" }
+        let text = "Well, " + words.joined(separator: " ") + "."
+        let units = ReadingScriptBuilder.transcript(transcript([segment(0, text, start: 0)]), language: "en")
+        #expect(units.count == 2)
+        #expect(units.first?.text.hasPrefix("Well, word0") == true)
+        #expect(units.dropLast().allSatisfy { $0.text.count >= ReadingScriptBuilder.minPieceLength })
+        #expect(units.allSatisfy { $0.text.count <= ReadingScriptBuilder.maxUnitLength })
+        #expect(units.map { firstAnchorText(in: text, $0) } == units.map(\.text))
+    }
+
+    @Test("an early space before an over-long word never leaves a tiny unit")
+    func capSkipsAnEarlySpace() {
+        let link = "https://example.com/" + String(repeating: "a", count: 230)
+        let text = "See " + link + " for the details."
+        let units = ReadingScriptBuilder.transcript(transcript([segment(0, text, start: 0)]), language: "en")
+        #expect(units.map(\.text) == ["See " + link, "for the details."])
+    }
+
     @Test("a single word longer than the cap stays whole")
     func capKeepsAnOverlongWord() {
         let word = String(repeating: "a", count: 250)
@@ -260,7 +286,7 @@ struct ReadingScriptBuilderTests {
     // MARK: - Empty units
 
     @Test("an emoji-only sentence folds into the previous unit")
-    func emojiOnlyFoldsIntoPrevious() {
+    func emojiOnlyFoldsIntoPrevious() throws {
         let units = ReadingScriptBuilder.transcript(
             transcript([
                 segment(0, "Hello.", start: 0, end: 1),
@@ -270,12 +296,13 @@ struct ReadingScriptBuilderTests {
             language: "en"
         )
         #expect(units.map(\.text) == ["Hello.", "Bye."])
+        try #require(units.count == 2)
         #expect(units[0].anchors == [anchored(.segment(0), 0, 6), anchored(.segment(1), 0, 4)])
         #expect(units.map(\.pauseAfter) == [0.35, 0])
     }
 
     @Test("a punctuation-only sentence at the start folds into the next unit")
-    func leadingEmptyFoldsIntoNext() {
+    func leadingEmptyFoldsIntoNext() throws {
         let units = ReadingScriptBuilder.transcript(
             transcript([
                 segment(0, "...", start: 0, end: 1),
@@ -284,12 +311,13 @@ struct ReadingScriptBuilderTests {
             language: "en"
         )
         #expect(units.map(\.text) == ["Hello."])
+        try #require(units.count == 1)
         #expect(units[0].anchors == [anchored(.segment(0), 0, 3), anchored(.segment(1), 0, 6)])
         #expect(units[0].pauseAfter == 0)
     }
 
     @Test("an empty last unit leaves the last pause at zero")
-    func trailingEmptyKeepsLastPauseZero() {
+    func trailingEmptyKeepsLastPauseZero() throws {
         let units = ReadingScriptBuilder.transcript(
             transcript([
                 segment(0, "Hello.", start: 0, end: 1, speaker: "A"),
@@ -300,6 +328,7 @@ struct ReadingScriptBuilderTests {
         )
         #expect(units.map(\.text) == ["Hello.", "Bye."])
         #expect(units.map(\.pauseAfter) == [0.6, 0])
+        try #require(units.count == 2)
         #expect(units[1].anchors.map(\.anchor) == [.segment(1), .segment(2)])
     }
 
@@ -336,13 +365,13 @@ struct ReadingScriptBuilderTests {
         #expect(units.map(\.text).joined(separator: " ") == text)
         #expect(units.first?.text == "Buongiorno a tutti.")
         #expect(units.last?.text == "Poi parliamo del budget.")
-        #expect(units.map { substring(text, $0.anchors[0].range) } == units.map(\.text))
+        #expect(units.map { firstAnchorText(in: text, $0) } == units.map(\.text))
     }
 
     // MARK: - Translation
 
     @Test("a translation reads in segment order and skips segments without one")
-    func translationOrder() {
+    func translationOrder() throws {
         let original = transcript(
             [
                 segment(5, "First.", start: 0, end: 1),
@@ -360,7 +389,8 @@ struct ReadingScriptBuilderTests {
         let units = ReadingScriptBuilder.translation(translation, of: original, language: "it")
         #expect(units.map(\.text) == ["Primo.", "Terzo."])
         #expect(units.map { $0.anchors.map(\.anchor) } == [[.translation(segmentID: 5)], [.translation(segmentID: 9)]])
-        #expect(units[1].anchors[0].range == NSRange(location: 1, length: 6))
+        try #require(units.count == 2)
+        #expect(units[1].anchors.first?.range == NSRange(location: 1, length: 6))
         #expect(units.allSatisfy { $0.language == "it" })
     }
 
@@ -403,7 +433,7 @@ struct ReadingScriptBuilderTests {
     // MARK: - Summary
 
     @Test("a summary is read without markdown, then chapters, then action items, with no headings")
-    func summarySections() {
+    func summarySections() throws {
         let summary = Summary(
             text: "# Overview\nThe **team** agreed on [the plan](https://example.com).\n\n- First _point_\n- Second point",
             chapters: [Chapter(id: "c1", title: "Intro", start: 0), Chapter(id: "c2", title: "Budget", start: 60)],
@@ -432,11 +462,17 @@ struct ReadingScriptBuilderTests {
             [.actionItem(0)],
             [.actionItem(1)],
         ])
-        #expect(units[0].anchors[0].range == NSRange(location: 2, length: 8))
-        #expect(units[1].anchors[0].range == NSRange(location: 0, length: 55))
-        #expect(units[2].anchors[0].range == NSRange(location: 2, length: 12))
-        #expect(units[6].anchors[0].range == NSRange(location: 0, length: 16))
-        #expect(units[7].anchors[0].range == NSRange(location: 3, length: 13))
+        try #require(units.count == 8)
+        #expect(units.map { $0.anchors.first?.range } == [
+            NSRange(location: 2, length: 8),
+            NSRange(location: 0, length: 55),
+            NSRange(location: 2, length: 12),
+            NSRange(location: 2, length: 12),
+            NSRange(location: 0, length: 5),
+            NSRange(location: 0, length: 6),
+            NSRange(location: 0, length: 16),
+            NSRange(location: 3, length: 13),
+        ])
         #expect(!units.contains { ["Chapters", "Action Items", "Summary"].contains($0.text) })
     }
 
@@ -470,7 +506,31 @@ struct ReadingScriptBuilderTests {
         let stripped = ReadingScriptBuilder.strippingMarkdown(
             "## Notes\n* **Bold** and __strong__ with `code`\n> quoted ~~old~~ file_name\n![logo](a.png) 3. 2 * 3\n- [x] Done"
         )
-        #expect(stripped == "Notes\nBold and strong with code\nquoted old file_name\nlogo 3. 2  3\nDone")
+        #expect(stripped == "Notes\nBold and strong with code\nquoted old file_name\nlogo 3. 2 * 3\nDone")
+    }
+
+    @Test("a lone asterisk or underscore is text, not emphasis")
+    func strippingKeepsLiteralMarkers() {
+        #expect(ReadingScriptBuilder.strippingMarkdown("2 * 3 = 6, 5*4 and 3*2, a_b") == "2 * 3 = 6, 5*4 and 3*2, a_b")
+        #expect(ReadingScriptBuilder.strippingMarkdown("**Alice:** said *yes* and __no__") == "Alice: said yes and no")
+        #expect(ReadingScriptBuilder.strippingMarkdown("an *unclosed marker") == "an *unclosed marker")
+    }
+
+    @Test("a link whose address has parentheses reads as its text")
+    func strippingLinkWithParentheses() {
+        #expect(
+            ReadingScriptBuilder.strippingMarkdown("See [the page](https://en.wikipedia.org/wiki/Rome_(city)) today.")
+                == "See the page today."
+        )
+        #expect(ReadingScriptBuilder.strippingMarkdown("A [broken](link and more") == "A [broken](link and more")
+    }
+
+    @Test("a summary line with a literal asterisk keeps its range on the raw line")
+    func summaryLiteralAsterisk() throws {
+        let units = ReadingScriptBuilder.summary(Summary(text: "- Costs went up 2 * 3 times."), language: "en")
+        #expect(units.map(\.text) == ["Costs went up 2 * 3 times."])
+        try #require(units.count == 1)
+        #expect(units[0].anchors == [anchored(.summaryParagraph(0), 2, 26)])
     }
 
     // MARK: - Dispatch

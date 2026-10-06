@@ -7,6 +7,7 @@ public enum ReadingScriptBuilder {
     static let turnPause = 0.6
     static let sectionPause = 0.5
     static let maxUnitLength = 200
+    static let minPieceLength = 40
 
     public static func build(_ source: ReadingSource, of transcript: Transcript, language: String?) -> [ReadingUnit] {
         switch source {
@@ -209,7 +210,8 @@ public enum ReadingScriptBuilder {
     }
 
     private static func units(of script: AnchoredText, language: String?) -> [ReadingUnit] {
-        folded(SentenceSplitter(language: language, maxLength: maxUnitLength).drafts(of: script), language: language)
+        let splitter = SentenceSplitter(language: language, maxLength: maxUnitLength, minLength: minPieceLength)
+        return folded(splitter.drafts(of: script), language: language)
     }
 
     private static func folded(_ drafts: [DraftUnit], language: String?) -> [ReadingUnit] {

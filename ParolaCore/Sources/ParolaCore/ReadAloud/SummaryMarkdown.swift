@@ -33,79 +33,111 @@ enum SummaryMarkdown {
     }
 
     private static func inlineKept(_ line: Substring, from start: String.Index) -> [Range<String.Index>] {
+        let indices = Array(line[start...].indices)
+        let characters = indices.map { line[$0] }
+        var dropped = [Bool](repeating: false, count: characters.count)
+        dropLinkSyntax(in: characters, &dropped)
+        dropCodeAndStrikeMarks(in: characters, &dropped)
+        dropEmphasisPairs(in: characters, &dropped)
+
         var kept: [Range<String.Index>] = []
-        var runStart: String.Index?
-        var linkTail: Range<String.Index>?
-        var index = start
-
-        func close(at end: String.Index) {
-            if let open = runStart, open < end { kept.append(open..<end) }
-            runStart = nil
+        var runStart: Int?
+        for position in 0...characters.count {
+            let keeps = position < characters.count && !dropped[position]
+            if keeps, runStart == nil {
+                runStart = position
+            } else if !keeps, let open = runStart {
+                kept.append(indices[open]..<(position < indices.count ? indices[position] : line.endIndex))
+                runStart = nil
+            }
         }
-
-        while index < line.endIndex {
-            if let tail = linkTail, index == tail.lowerBound {
-                close(at: index)
-                index = tail.upperBound
-                linkTail = nil
-                continue
-            }
-            let character = line[index]
-            let next = line.index(after: index)
-            if linkTail == nil {
-                let bracket = character == "!" && next < line.endIndex && line[next] == "[" ? next : index
-                if line[bracket] == "[", let tail = linkTailRange(line, openingAt: bracket) {
-                    close(at: index)
-                    linkTail = tail
-                    index = line.index(after: bracket)
-                    continue
-                }
-            }
-            if isInlineMarker(character, at: index, in: line) {
-                close(at: index)
-            } else if runStart == nil {
-                runStart = index
-            }
-            index = next
-        }
-        close(at: line.endIndex)
         return kept
     }
 
-    private static func isInlineMarker(_ character: Character, at index: String.Index, in line: Substring) -> Bool {
-        switch character {
-        case "*", "`":
-            return true
-        case "~":
-            return neighbour(before: index, in: line) == "~" || neighbour(after: index, in: line) == "~"
-        case "_":
-            return !isWordCharacter(neighbour(before: index, in: line)) || !isWordCharacter(neighbour(after: index, in: line))
-        default:
-            return false
+    private static func dropLinkSyntax(in characters: [Character], _ dropped: inout [Bool]) {
+        var position = 0
+        while position < characters.count {
+            guard characters[position] == "[", let tail = linkTail(in: characters, openingAt: position) else {
+                position += 1
+                continue
+            }
+            if position > 0, characters[position - 1] == "!" { dropped[position - 1] = true }
+            dropped[position] = true
+            for index in tail { dropped[index] = true }
+            position = tail.upperBound
         }
     }
 
-    private static func isWordCharacter(_ character: Character?) -> Bool {
+    /// The `](address)` after a link's text, when the `[` at `bracket` opens one; the address may nest parentheses.
+    private static func linkTail(in characters: [Character], openingAt bracket: Int) -> Range<Int>? {
+        guard let close = characters[(bracket + 1)...].firstIndex(of: "]"),
+              close + 1 < characters.count, characters[close + 1] == "(" else { return nil }
+        var depth = 0
+        for position in (close + 1)..<characters.count {
+            if characters[position] == "(" {
+                depth += 1
+            } else if characters[position] == ")" {
+                depth -= 1
+                if depth == 0 { return close..<position + 1 }
+            }
+        }
+        return nil
+    }
+
+    private static func dropCodeAndStrikeMarks(in characters: [Character], _ dropped: inout [Bool]) {
+        for position in characters.indices where !dropped[position] {
+            switch characters[position] {
+            case "`":
+                dropped[position] = true
+            case "~":
+                let doubled = (position > 0 && characters[position - 1] == "~")
+                    || (position + 1 < characters.count && characters[position + 1] == "~")
+                if doubled { dropped[position] = true }
+            default:
+                break
+            }
+        }
+    }
+
+    /// Drops `*` and `_` runs only as matched opener/closer pairs, CommonMark's flanking rules without intraword emphasis.
+    private static func dropEmphasisPairs(in characters: [Character], _ dropped: inout [Bool]) {
+        var openers: [(mark: Character, run: Range<Int>)] = []
+        var position = 0
+        while position < characters.count {
+            let mark = characters[position]
+            guard mark == "*" || mark == "_", !dropped[position] else {
+                position += 1
+                continue
+            }
+            var end = position + 1
+            while end < characters.count, characters[end] == mark, !dropped[end] { end += 1 }
+            let before = position > 0 ? characters[position - 1] : nil
+            let after = end < characters.count ? characters[end] : nil
+            let left = isLeftFlanking(before: before, after: after)
+            let right = isLeftFlanking(before: after, after: before)
+            let canOpen = left && (!right || isPunctuation(before))
+            let canClose = right && (!left || isPunctuation(after))
+            if canClose, let match = openers.lastIndex(where: { $0.mark == mark }) {
+                for index in openers[match].run { dropped[index] = true }
+                for index in position..<end { dropped[index] = true }
+                openers.removeSubrange(match...)
+            } else if canOpen {
+                openers.append((mark, position..<end))
+            }
+            position = end
+        }
+    }
+
+    private static func isLeftFlanking(before: Character?, after: Character?) -> Bool {
+        guard let after, !after.isWhitespace else { return false }
+        guard isPunctuation(after) else { return true }
+        guard let before else { return true }
+        return before.isWhitespace || isPunctuation(before)
+    }
+
+    private static func isPunctuation(_ character: Character?) -> Bool {
         guard let character else { return false }
-        return character.isLetter || character.isNumber
-    }
-
-    private static func neighbour(before index: String.Index, in line: Substring) -> Character? {
-        index > line.startIndex ? line[line.index(before: index)] : nil
-    }
-
-    private static func neighbour(after index: String.Index, in line: Substring) -> Character? {
-        let next = line.index(after: index)
-        return next < line.endIndex ? line[next] : nil
-    }
-
-    /// The `](url)` after a link's text, when the `[` at `bracket` opens one.
-    private static func linkTailRange(_ line: Substring, openingAt bracket: String.Index) -> Range<String.Index>? {
-        guard let close = line[line.index(after: bracket)...].firstIndex(of: "]") else { return nil }
-        let paren = line.index(after: close)
-        guard paren < line.endIndex, line[paren] == "(",
-              let end = line[paren...].firstIndex(of: ")") else { return nil }
-        return close..<line.index(after: end)
+        return character.isPunctuation || character.isSymbol
     }
 
     private static func headingMarkerEnd(_ line: Substring, at start: String.Index) -> String.Index? {
