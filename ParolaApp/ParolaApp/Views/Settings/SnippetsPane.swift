@@ -4,11 +4,13 @@ import ParolaDictation
 
 struct SnippetsPane: View {
     @Environment(AppModel.self) private var model
-    @State private var searchText: String = ""
+    @State private var query = RuleListQuery()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SearchPill(text: $searchText, placeholder: "Search snippets…", leaf: "Snippets.TextField.Search")
+            if query.showsToolbar(ruleCount: model.snippets.count) {
+                RuleListToolbar(query: $query, placeholder: "Search snippets…", leafPrefix: "Snippets")
+            }
 
             SettingsSection {
                 let visible = visibleSnippets
@@ -33,7 +35,7 @@ struct SnippetsPane: View {
 
             HStack(spacing: 8) {
                 Button {
-                    searchText = ""
+                    query.showNewRule()
                     model.snippets.append(Snippet(trigger: "", replacement: ""))
                 } label: {
                     Label("Add Snippet", systemImage: "plus.circle")
@@ -65,11 +67,7 @@ struct SnippetsPane: View {
     }
 
     private var visibleSnippets: [Snippet] {
-        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !query.isEmpty else { return model.snippets }
-        return model.snippets.filter {
-            $0.trigger.lowercased().contains(query) || $0.replacement.lowercased().contains(query)
-        }
+        query.arrange(model.snippets, fields: { [$0.trigger, $0.replacement] }, isEnabled: SnippetRow.isEffectivelyEnabled)
     }
 
     // Resolved by id on every access: an index captured at render time can go stale
@@ -95,9 +93,13 @@ private struct SnippetRow: View {
         !snippet.trigger.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    static func isEffectivelyEnabled(_ snippet: Snippet) -> Bool {
+        snippet.enabled && !snippet.trigger.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var enabledBinding: Binding<Bool> {
         Binding(
-            get: { snippet.enabled && canEnable },
+            get: { Self.isEffectivelyEnabled(snippet) },
             set: { if canEnable { snippet.enabled = $0 } }
         )
     }

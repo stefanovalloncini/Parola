@@ -3,14 +3,13 @@ import ParolaCore
 
 struct FindReplacePane: View {
     @Environment(AppModel.self) private var model
-    @State private var searchText: String = ""
-    @State private var statusFilter: RuleEnabledFilter = .all
-    @State private var sortOption: SortOption = .original
+    @State private var query = RuleListQuery()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SearchPill(text: $searchText, placeholder: "Search rules…", leaf: "FindReplace.TextField.Search")
-            filterRow
+            if query.showsToolbar(ruleCount: model.findReplaceRules.count) {
+                RuleListToolbar(query: $query, placeholder: "Search rules…", leafPrefix: "FindReplace")
+            }
 
             SettingsSection {
                 let visible = visibleRules
@@ -35,8 +34,7 @@ struct FindReplacePane: View {
 
             HStack(spacing: 8) {
                 Button {
-                    searchText = ""
-                    statusFilter = .all
+                    query.showNewRule()
                     model.findReplaceRules.append(FindReplaceRule(find: "", replace: ""))
                 } label: {
                     Label("Add Rule", systemImage: "plus.circle")
@@ -68,33 +66,13 @@ struct FindReplacePane: View {
                 .axLeaf("FindReplace.Button.ExportPack")
             }
 
-            SettingHelper(text: "Substitutions applied to every new transcript before it's saved. Term packs add curated rules in one click.")
+            SettingHelper(text: "Term packs add curated rules in one click.")
             ResetPaneButton(scope: .findReplace)
         }
     }
 
     private var visibleRules: [FindReplaceRule] {
-        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
-        var rules = model.findReplaceRules
-        if !query.isEmpty {
-            rules = rules.filter {
-                $0.find.lowercased().contains(query) || $0.replace.lowercased().contains(query)
-            }
-        }
-        // Match the row toggle's effective value: a rule with an empty find or a broken
-        // regex renders as off, so the chips must not classify it as enabled.
-        rules = rules.filter { statusFilter.includes(Self.isEffectivelyEnabled($0)) }
-        switch sortOption {
-        case .original: break
-        case .findAZ: rules.sort { $0.find.localizedCaseInsensitiveCompare($1.find) == .orderedAscending }
-        case .findZA: rules.sort { $0.find.localizedCaseInsensitiveCompare($1.find) == .orderedDescending }
-        case .enabledFirst:
-            rules.sort { lhs, rhs in
-                if lhs.enabled == rhs.enabled { return false }
-                return lhs.enabled
-            }
-        }
-        return rules
+        query.arrange(model.findReplaceRules, fields: { [$0.find, $0.replace] }, isEnabled: Self.isEffectivelyEnabled)
     }
 
     static func isEffectivelyEnabled(_ rule: FindReplaceRule) -> Bool {
@@ -115,54 +93,6 @@ struct FindReplacePane: View {
                 model.findReplaceRules[idx] = newValue
             }
         )
-    }
-
-    private var filterRow: some View {
-        HStack(spacing: 8) {
-            RuleEnabledFilterChips(filter: $statusFilter)
-            Spacer()
-            Menu {
-                sortOptions
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
-            }
-            .menuStyle(.button)
-            .buttonStyle(DSIconChipButtonStyle(side: 28))
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Sort rules")
-            .accessibilityRepresentation {
-                Menu("Sort rules") { sortOptions }
-            }
-            .axLeaf("FindReplace.Menu.Sort")
-        }
-    }
-
-    @ViewBuilder private var sortOptions: some View {
-        ForEach(SortOption.allCases, id: \.self) { option in
-            Button {
-                sortOption = option
-            } label: {
-                if sortOption == option {
-                    Label(option.label, systemImage: "checkmark")
-                } else {
-                    Text(option.label)
-                }
-            }
-        }
-    }
-
-    enum SortOption: CaseIterable {
-        case original, findAZ, findZA, enabledFirst
-
-        var label: LocalizedStringKey {
-            switch self {
-            case .original: return "Original order"
-            case .findAZ: return "Find A→Z"
-            case .findZA: return "Find Z→A"
-            case .enabledFirst: return "Enabled first"
-            }
-        }
     }
 }
 

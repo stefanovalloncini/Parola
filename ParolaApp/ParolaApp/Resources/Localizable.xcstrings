@@ -1240,17 +1240,6 @@
         }
       }
     },
-    "Aa": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aa"
-          }
-        }
-      }
-    },
     "About": {
       "extractionState": "manual",
       "localizations": {
@@ -2478,6 +2467,17 @@
         }
       }
     },
+    "A→Z": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A→Z"
+          }
+        }
+      }
+    },
     "BYOK": {
       "extractionState": "manual",
       "localizations": {
@@ -3141,17 +3141,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Case-sensitive"
-          }
-        }
-      }
-    },
-    "Case-sensitive match": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Match case-sensitive"
           }
         }
       }
@@ -6270,17 +6259,6 @@
         }
       }
     },
-    "Find A→Z": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Find A→Z"
-          }
-        }
-      }
-    },
     "Find Next": {
       "extractionState": "manual",
       "localizations": {
@@ -6299,17 +6277,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trova precedente"
-          }
-        }
-      }
-    },
-    "Find Z→A": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Find Z→A"
           }
         }
       }
@@ -10972,28 +10939,6 @@
         }
       }
     },
-    "Pattern A→Z": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pattern A→Z"
-          }
-        }
-      }
-    },
-    "Pattern Z→A": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pattern Z→A"
-          }
-        }
-      }
-    },
     "Pause": {
       "extractionState": "manual",
       "localizations": {
@@ -14296,17 +14241,6 @@
         }
       }
     },
-    "Sort rules": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ordina regole"
-          }
-        }
-      }
-    },
     "Sort: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -14986,17 +14920,6 @@
         }
       }
     },
-    "Substitutions applied to every new transcript before it's saved. Term packs add curated rules in one click.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sostituzioni applicate a ogni nuova trascrizione prima del salvataggio. I term pack aggiungono regole curate con un click."
-          }
-        }
-      }
-    },
     "Substitutions applied to every transcript before it's saved.": {
       "extractionState": "manual",
       "localizations": {
@@ -15303,6 +15226,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Termini tecnici (Inglese)"
+          }
+        }
+      }
+    },
+    "Term packs add curated rules in one click.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I term pack aggiungono regole curate con un click."
           }
         }
       }
@@ -18231,6 +18165,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La tua versione di yt-dlp non è aggiornata: aggiornala e riprova."
+          }
+        }
+      }
+    },
+    "Z→A": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Z→A"
           }
         }
       }

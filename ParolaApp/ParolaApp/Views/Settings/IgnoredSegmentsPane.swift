@@ -3,19 +3,13 @@ import ParolaCore
 
 struct IgnoredSegmentsPane: View {
     @Environment(AppModel.self) private var model
-    @State private var searchText = ""
-    @State private var enabledFilter: RuleEnabledFilter = .all
-    @State private var sort: IgnoredSegmentsSort = .originalOrder
+    @State private var query = RuleListQuery()
 
     var body: some View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                SearchPill(text: $searchText, placeholder: "Search patterns…", leaf: "IgnoredSegments.TextField.Search")
-                    .frame(maxWidth: 240)
-                RuleEnabledFilterChips(filter: $enabledFilter)
-                Spacer()
-                sortMenu
+            if query.showsToolbar(ruleCount: model.ignoredSegmentRules.count) {
+                RuleListToolbar(query: $query, placeholder: "Search patterns…", leafPrefix: "IgnoredSegments")
             }
 
             SettingsSection {
@@ -39,8 +33,7 @@ struct IgnoredSegmentsPane: View {
             }
 
             Button {
-                searchText = ""
-                enabledFilter = .all
+                query.showNewRule()
                 model.ignoredSegmentRules.append(IgnoredSegmentRule(pattern: ""))
             } label: {
                 Label("Add Pattern", systemImage: "plus.circle")
@@ -53,26 +46,7 @@ struct IgnoredSegmentsPane: View {
     }
 
     private var displayedRules: [IgnoredSegmentRule] {
-        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
-        var indices = model.ignoredSegmentRules.indices.filter { idx in
-            let rule = model.ignoredSegmentRules[idx]
-            if !enabledFilter.includes(rule.enabled) { return false }
-            if query.isEmpty { return true }
-            return rule.pattern.lowercased().contains(query)
-        }
-        switch sort {
-        case .originalOrder:
-            break
-        case .patternAscending:
-            indices.sort { pattern(at: $0).localizedCaseInsensitiveCompare(pattern(at: $1)) == .orderedAscending }
-        case .patternDescending:
-            indices.sort { pattern(at: $0).localizedCaseInsensitiveCompare(pattern(at: $1)) == .orderedDescending }
-        case .enabledFirst:
-            indices.sort { enabledFirstOrder(lhs: $0, rhs: $1, preferEnabled: true) }
-        case .disabledFirst:
-            indices.sort { enabledFirstOrder(lhs: $0, rhs: $1, preferEnabled: false) }
-        }
-        return indices.map { model.ignoredSegmentRules[$0] }
+        query.arrange(model.ignoredSegmentRules, fields: { [$0.pattern] }, isEnabled: IgnoredRuleRow.isEffectivelyEnabled)
     }
 
     // Resolved by id on every access: an index captured at render time can go stale
@@ -87,66 +61,6 @@ struct IgnoredSegmentsPane: View {
             }
         )
     }
-
-    private func pattern(at index: Int) -> String {
-        model.ignoredSegmentRules[index].pattern
-    }
-
-    private func enabledFirstOrder(lhs: Int, rhs: Int, preferEnabled: Bool) -> Bool {
-        let l = model.ignoredSegmentRules[lhs].enabled
-        let r = model.ignoredSegmentRules[rhs].enabled
-        if l == r { return lhs < rhs }
-        return preferEnabled ? l : r
-    }
-
-    private var sortMenu: some View {
-        Menu {
-            sortOptions
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-        }
-        .menuStyle(.button)
-        .buttonStyle(DSIconChipButtonStyle(side: 28))
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Sort")
-        .accessibilityRepresentation {
-            Menu("Sort") { sortOptions }
-        }
-        .axLeaf("IgnoredSegments.Menu.Sort")
-    }
-
-    @ViewBuilder private var sortOptions: some View {
-        ForEach(IgnoredSegmentsSort.allCases, id: \.self) { option in
-            Button {
-                sort = option
-            } label: {
-                if sort == option {
-                    Label(option.title, systemImage: "checkmark")
-                } else {
-                    Text(option.title)
-                }
-            }
-        }
-    }
-}
-
-enum IgnoredSegmentsSort: CaseIterable {
-    case originalOrder
-    case patternAscending
-    case patternDescending
-    case enabledFirst
-    case disabledFirst
-
-    var title: LocalizedStringKey {
-        switch self {
-        case .originalOrder: return "Original order"
-        case .patternAscending: return "Pattern A→Z"
-        case .patternDescending: return "Pattern Z→A"
-        case .enabledFirst: return "Enabled first"
-        case .disabledFirst: return "Disabled first"
-        }
-    }
 }
 
 private struct IgnoredRuleRow: View {
@@ -158,9 +72,13 @@ private struct IgnoredRuleRow: View {
         !rule.pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    static func isEffectivelyEnabled(_ rule: IgnoredSegmentRule) -> Bool {
+        rule.enabled && !rule.pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var enabledBinding: Binding<Bool> {
         Binding(
-            get: { rule.enabled && canEnable },
+            get: { Self.isEffectivelyEnabled(rule) },
             set: { if canEnable { rule.enabled = $0 } }
         )
     }

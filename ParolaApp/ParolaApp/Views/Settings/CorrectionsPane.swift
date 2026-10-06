@@ -4,11 +4,13 @@ import ParolaDictation
 
 struct CorrectionsPane: View {
     @Environment(AppModel.self) private var model
-    @State private var searchText: String = ""
+    @State private var query = RuleListQuery()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SearchPill(text: $searchText, placeholder: "Search corrections…", leaf: "Corrections.TextField.Search")
+            if query.showsToolbar(ruleCount: model.correctionRules.count) {
+                RuleListToolbar(query: $query, placeholder: "Search corrections…", leafPrefix: "Corrections")
+            }
 
             SettingsSection {
                 let visible = visibleRules
@@ -32,7 +34,7 @@ struct CorrectionsPane: View {
             }
 
             Button {
-                searchText = ""
+                query.showNewRule()
                 model.correctionRules.append(CorrectionRule(from: "", to: ""))
             } label: {
                 Label("Add Correction", systemImage: "plus.circle")
@@ -45,11 +47,7 @@ struct CorrectionsPane: View {
     }
 
     private var visibleRules: [CorrectionRule] {
-        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !query.isEmpty else { return model.correctionRules }
-        return model.correctionRules.filter {
-            $0.from.lowercased().contains(query) || $0.to.lowercased().contains(query)
-        }
+        query.arrange(model.correctionRules, fields: { [$0.from, $0.to] }, isEnabled: CorrectionRow.isEffectivelyEnabled)
     }
 
     // Resolved by id on every access: an index captured at render time can go stale
@@ -75,9 +73,13 @@ private struct CorrectionRow: View {
         !rule.from.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    static func isEffectivelyEnabled(_ rule: CorrectionRule) -> Bool {
+        rule.enabled && !rule.from.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var enabledBinding: Binding<Bool> {
         Binding(
-            get: { rule.enabled && canEnable },
+            get: { Self.isEffectivelyEnabled(rule) },
             set: { if canEnable { rule.enabled = $0 } }
         )
     }
@@ -98,10 +100,10 @@ private struct CorrectionRow: View {
                 TextField("write", text: $rule.to)
                     .textFieldStyle(.roundedBorder)
                     .axLeaf("Corrections.TextField.To")
-                Toggle("Aa", isOn: $rule.caseSensitive)
-                    .toggleStyle(.button)
-                    .controlSize(.small)
-                    .help("Case-sensitive match")
+                Toggle("Case-sensitive", isOn: $rule.caseSensitive)
+                    .toggleStyle(.checkbox)
+                    .font(DS.Font.secondary)
+                    .fixedSize()
                     .axLeaf("Corrections.Toggle.CaseSensitive")
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
