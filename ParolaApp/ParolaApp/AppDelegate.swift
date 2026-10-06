@@ -214,6 +214,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = semaphore.wait(timeout: .now() + 2)
     }
 
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        menuBar.dockMenu()
+    }
+
     func applicationDidResignActive(_ notification: Notification) {
         model?.handleAppResignedActive()
         recordingPill.appActiveChanged(false)

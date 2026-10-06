@@ -132,6 +132,21 @@ struct MenuBarItemsTests {
         #expect(submenus == ["Microphone"])
     }
 
+    @Test("the Dock menu offers the menu bar's Record, Live Captions and Dictation items, and Stop in place of Record during a take")
+    func dockItems() {
+        let idle = MenuBarController.dockItems(for: fullSnapshot(detectedMeetingApp: "Zoom"), endTitle: nil, target: nil)
+        #expect(titles(idle) == [
+            "New Recording", "New System Audio Recording", "Record Zoom Meeting", "Start Live Captions", "Start Dictation",
+        ])
+        let during = MenuBarController.dockItems(for: fullSnapshot(), endTitle: "Stop Recording", target: nil)
+        #expect(titles(during) == ["Stop Recording", "Start Live Captions", "Start Dictation"])
+        let bare = MenuBarController.dockItems(
+            for: fullSnapshot(showsDictation: false, showsMicRecording: false, showsSystemAudio: false, captionsShown: false),
+            endTitle: nil, target: nil
+        )
+        #expect(bare.isEmpty)
+    }
+
     @Test("Live Captions is hidden when the feature is off")
     func liveCaptionsHiddenWhenFeatureOff() {
         let snapshot = fullSnapshot(captionsShown: false)

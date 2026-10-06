@@ -33,6 +33,25 @@ struct RecordDuringTakeTests {
         #expect(MenuBarController.snapshot(for: model) == before)
     }
 
+    @Test("the Dock menu works with the menu bar extra off, and offers Stop Recording while a take runs")
+    func dockMenuFollowsTheTake() throws {
+        let wav = try tempWAV("record-during-take-dock")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        let model = makeRecordingModel("record-during-take-dock")
+        model.showMenuBarExtra = false
+        let controller = MenuBarController()
+        controller.bind(model)
+        let idle = controller.dockMenu()?.items.map(\.title) ?? []
+        #expect(idle.first == "New Recording", "\(idle)")
+
+        model.installTestTake(source: .systemAudio, liveSource: StubSource(url: wav))
+        let menu = try #require(controller.dockMenu())
+        let stop = try #require(menu.items.first)
+        #expect(stop.title == "Stop Recording")
+        #expect(!menu.items.map(\.title).contains("New Recording"))
+        model.endTestTake()
+    }
+
     @Test("a mic-only build's New Recording is off while a take runs")
     func micOnlyRecordItem() {
         var snapshot = MenuBarController.MenuSnapshot(

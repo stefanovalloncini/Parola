@@ -94,8 +94,8 @@ final class MenuBarController: NSObject {
         refresh()
     }
 
-    static func snapshot(for model: AppModel) -> MenuSnapshot {
-        let mode = Mode(showExtra: model.showMenuBarExtra, dictationEnabled: model.dictationEnabled, features: model.features)
+    static func snapshot(for model: AppModel, mode: Mode? = nil) -> MenuSnapshot {
+        let mode = mode ?? Mode(showExtra: model.showMenuBarExtra, dictationEnabled: model.dictationEnabled, features: model.features)
         var snapshot = MenuSnapshot(
             mode: mode,
             dictateTitle: dictationMenuItem(for: model.dictationState).title,
@@ -280,6 +280,37 @@ final class MenuBarController: NSObject {
         return items
     }
 
+    /// The Dock icon's menu, whatever the menu bar shows; a nil target leaves every item unwired.
+    static func dockItems(for snapshot: MenuSnapshot, endTitle: String?, target: AnyObject?) -> [NSMenuItem] {
+        var items: [NSMenuItem] = []
+        if let endTitle {
+            items.append(menuItem(title: endTitle, action: #selector(endTake), target: target))
+        } else {
+            items.append(contentsOf: recordItems(for: snapshot, target: target))
+        }
+        if snapshot.captionsShown {
+            items.append(liveCaptionsItem(for: snapshot, target: target))
+        }
+        if snapshot.showsDictation {
+            items.append(menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: target))
+        }
+        return items
+    }
+
+    func dockMenu() -> NSMenu? {
+        guard let model else { return nil }
+        let take = model.recording
+        let endTitle = TakeRemote.canEnd(take) ? TakeRemote.endTitle(for: take) : nil
+        let items = Self.dockItems(for: Self.snapshot(for: model, mode: .full), endTitle: endTitle, target: self)
+        guard !items.isEmpty else { return nil }
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for item in items {
+            menu.addItem(item)
+        }
+        return menu
+    }
+
     private static func liveCaptionsItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem {
         let title = snapshot.captionsActive
             ? String(localized: "Stop Live Captions")
@@ -339,6 +370,11 @@ final class MenuBarController: NSObject {
 
     @objc private func recordSystem() {
         model?.startRecording(source: .systemAudio)
+    }
+
+    @objc private func endTake() {
+        guard let model else { return }
+        TakeRemote.stopOrCancel(model, cancels: model.recording?.isArming == true)
     }
 
     @objc private func recordDetectedMeeting(_ sender: NSMenuItem) {
