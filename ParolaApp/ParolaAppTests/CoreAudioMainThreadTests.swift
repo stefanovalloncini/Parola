@@ -59,4 +59,13 @@ struct CoreAudioMainThreadTests {
         #expect(recorded)
         #expect(ranOnMain.withLock { $0 } == false)
     }
+
+    @Test("the microphone pane calls no saved input disconnected before CoreAudio has listed the inputs")
+    func savedInputIsNotDisconnectedWhileListing() {
+        let usb = AudioInputDevice(uid: "usb", name: "USB Mic", isDefault: false)
+        #expect(!MicrophonePane.savedDeviceDisconnected(savedUID: "usb", devices: nil))
+        #expect(!MicrophonePane.savedDeviceDisconnected(savedUID: "usb", devices: [usb]))
+        #expect(MicrophonePane.savedDeviceDisconnected(savedUID: "usb", devices: []))
+        #expect(!MicrophonePane.savedDeviceDisconnected(savedUID: "", devices: []))
+    }
 }

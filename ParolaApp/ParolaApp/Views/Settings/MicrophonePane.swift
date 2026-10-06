@@ -12,7 +12,7 @@ func openMicrophonePrivacySettings() {
 
 struct MicrophonePane: View {
     @Environment(AppModel.self) private var model
-    @State private var devices: [AudioInputDevice] = []
+    @State private var devices: [AudioInputDevice]?
     @State private var preview: MicPreviewController?
     @State private var previewMeter: LevelMeter?
     @State private var startError: String?
@@ -32,7 +32,7 @@ struct MicrophonePane: View {
                            isFirst: true) {
                     Picker("", selection: $model.inputDeviceUID) {
                         Text("System default").tag("")
-                        ForEach(devices) { device in
+                        ForEach(devices ?? []) { device in
                             if device.isDefault {
                                 Text("\(device.name) (default)").tag(device.uid)
                             } else {
@@ -127,7 +127,13 @@ struct MicrophonePane: View {
     }
 
     private var savedDeviceDisconnected: Bool {
-        !model.inputDeviceUID.isEmpty && !devices.contains { $0.uid == model.inputDeviceUID }
+        Self.savedDeviceDisconnected(savedUID: model.inputDeviceUID, devices: devices)
+    }
+
+    /// Until CoreAudio answers, nothing is known to be disconnected.
+    static func savedDeviceDisconnected(savedUID: String, devices: [AudioInputDevice]?) -> Bool {
+        guard let devices, !savedUID.isEmpty else { return false }
+        return !devices.contains { $0.uid == savedUID }
     }
 
     private func startPreview() {
