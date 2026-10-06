@@ -187,6 +187,12 @@ struct Record: AsyncParsableCommand {
             throw error
         }
         progress.finish()
+        // A capture that never gives a buffer still ends: --seconds then counts from here.
+        if let seconds {
+            timers.append(Self.stopTimer(requestStop) {
+                await meter.waitForAudio(seconds: seconds, noAudioLimit: .seconds(seconds))
+            })
+        }
 
         let endedByInterrupt = await play(events, interrupted: { interrupts.wasInterrupted }, sink: .standard)
         requestStop.finish()

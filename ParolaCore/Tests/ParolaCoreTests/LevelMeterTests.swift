@@ -43,6 +43,22 @@ struct LevelMeterTests {
         _ = try await waiting.value("the wait to end five seconds after the first reading")
     }
 
+    @Test("with a limit, waiting for audio ends once that long passes with no reading")
+    func waitForAudioGivesUpWithoutAudio() async throws {
+        let clock = TestClock()
+        let meter = LevelMeter()
+        let waiting = GuardedTask { await meter.waitForAudio(seconds: 5, noAudioLimit: .seconds(1), clock: clock) }
+        for _ in 0..<19 {
+            await clock.waitForSleeper()
+            clock.advance(by: .milliseconds(50))
+        }
+        await clock.waitForSleeper()
+        #expect(!waiting.isFinished, "still within the limit")
+        clock.advance(by: .milliseconds(50))
+
+        _ = try await waiting.value("the wait to give up after a second with no audio")
+    }
+
     @Test("a reading outside 0...1 is clamped and a NaN reads as silence")
     func clampsItsInput() {
         let meter = LevelMeter()

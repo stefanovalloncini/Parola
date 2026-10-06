@@ -67,11 +67,18 @@ public final class LevelMeter: Sendable {
         reading.withLock { $0 = Reading() }
     }
 
-    /// Returns `seconds` after the first reading, which a live take can get long before its model is ready.
-    public func waitForAudio(seconds: Double, clock: any Clock<Duration> = ContinuousClock()) async {
+    /// Returns `seconds` after the first reading, which a live take can get long before its model is ready, or once
+    /// `noAudioLimit` passes with no reading at all.
+    public func waitForAudio(
+        seconds: Double, noAudioLimit: Duration? = nil, clock: any Clock<Duration> = ContinuousClock()
+    ) async {
+        let poll = Duration.milliseconds(50)
+        var waited = Duration.zero
         var firstReading = firstReadingAt
         while firstReading == nil {
-            do { try await Task.sleep(for: .milliseconds(50), clock: clock) } catch { return }
+            if let noAudioLimit, waited >= noAudioLimit { return }
+            do { try await Task.sleep(for: poll, clock: clock) } catch { return }
+            waited += poll
             firstReading = firstReadingAt
         }
         guard let firstReading else { return }
