@@ -69,6 +69,45 @@ struct TranscriptChatCancellationTests {
         #expect(history.map(\.text) == ["Follow-up", "Late answer"], "a cancelled generation must not be recorded in history")
     }
 
+    @Test("a stopped reply the caller keeps stays in history, ahead of the next reply, and in its context")
+    func keptStoppedReplyStays() async throws {
+        let model = GatedLanguageModel()
+        let chat = TranscriptChatSession(transcript: makeTranscript(), model: model)
+        let question = ChatMessage(role: .user, text: "Q")
+
+        let firstDelta = TestSignal()
+        let consumer = Task {
+            for try await event in chat.stream(question.text, id: question.id) {
+                if case .delta = event { firstDelta.fire() }
+            }
+        }
+        await firstDelta.wait("the first delta to reach the consumer")
+        consumer.cancel()
+        let kept = await chat.keepStopped(question: question, reply: ChatMessage(role: .assistant, text: "Hello"))
+        #expect(kept.map(\.text) == ["Q", "Hello"])
+        model.gate.open()
+        await model.streamClosed.wait("the stopped stream to wind down")
+
+        let context = await chat.turns(for: ChatMessage(role: .user, text: "Next")).map(\.text)
+        #expect(context == ["Q", "Hello", "Next"])
+        for try await _ in chat.stream("Next") {}
+        let history = await chat.history
+        #expect(history.map(\.text) == ["Q", "Hello", "Next", "Hello world"])
+    }
+
+    @Test("keeping a reply whose turn already finished records it once")
+    func keptFinishedReplyIsNotDoubled() async throws {
+        let model = GatedLanguageModel()
+        model.gate.open()
+        let chat = TranscriptChatSession(transcript: makeTranscript(), model: model)
+        let question = ChatMessage(role: .user, text: "Q")
+        for try await _ in chat.stream(question.text, id: question.id) {}
+
+        let kept = await chat.keepStopped(question: question, reply: ChatMessage(role: .assistant, text: "Hello"))
+        #expect(kept.map(\.text) == ["Q", "Hello world"])
+        #expect(kept.first?.id == question.id)
+    }
+
     @Test("cancelling ask surfaces CancellationError and appends nothing to history")
     func askCancellationPropagates() async throws {
         let model = GatedLanguageModel()

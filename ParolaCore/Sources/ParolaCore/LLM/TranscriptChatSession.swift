@@ -110,13 +110,23 @@ public actor TranscriptChatSession {
         return assistant
     }
 
-    public nonisolated func stream(_ message: String) -> AsyncThrowingStream<StreamEvent, Error> {
+    /// The question goes into history under `id` once the reply finishes, so a caller can tell it was recorded.
+    public nonisolated func stream(_ message: String, id: UUID = UUID()) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task { [self] in
-                await self.runSerialStream(message: message, continuation: continuation)
+                await self.runSerialStream(message: message, id: id, continuation: continuation)
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    /// Keeps a reply the user stopped part-way, after its question, unless that turn finished and was recorded first.
+    public func keepStopped(question: ChatMessage, reply: ChatMessage) -> [ChatMessage] {
+        if !history.contains(where: { $0.id == question.id }) {
+            history.append(question)
+            history.append(reply)
+        }
+        return history
     }
 
     public func clearHistory() {
@@ -125,12 +135,13 @@ public actor TranscriptChatSession {
 
     private func runSerialStream(
         message: String,
+        id: UUID,
         continuation: AsyncThrowingStream<StreamEvent, Error>.Continuation
     ) async {
         let prior = inFlight
         let current = Task { [self] in
             await prior?.value
-            await self.runStreamBody(message: message, continuation: continuation)
+            await self.runStreamBody(message: message, id: id, continuation: continuation)
         }
         inFlight = current
         // Same forwarding as ask(): the serial task won't see the stream's termination otherwise.
@@ -143,11 +154,12 @@ public actor TranscriptChatSession {
 
     private func runStreamBody(
         message: String,
+        id: UUID,
         continuation: AsyncThrowingStream<StreamEvent, Error>.Continuation
     ) async {
         do {
             try Task.checkCancellation()
-            let user = ChatMessage(role: .user, text: message)
+            let user = ChatMessage(id: id, role: .user, text: message)
             let turns = turns(for: user)
             var collected = ""
             do {

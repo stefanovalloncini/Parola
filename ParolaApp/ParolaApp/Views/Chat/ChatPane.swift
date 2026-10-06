@@ -36,6 +36,8 @@ struct ChatPane: View {
     @State private var searchQuery: String = ""
     @State private var senderFilter: ChatSenderFilter = .all
     @State private var sendTask: Task<Void, Never>?
+    @State private var liveTurn: LiveTurn?
+    @State private var keepingStopped: Task<Void, Never>?
     @State private var userPrompts: [Prompt] = []
     @State private var confirmingClear = false
     @FocusState private var composerFocused: Bool
@@ -339,6 +341,8 @@ struct ChatPane: View {
     private func rebuildSession() async {
         sendTask?.cancel()
         sendTask = nil
+        liveTurn = nil
+        keepingStopped = nil
         isSending = false
         isReplying = false
         sessionError = nil
@@ -388,11 +392,14 @@ struct ChatPane: View {
         // Clearing while a reply streams: the next delta would index into the emptied history.
         sendTask?.cancel()
         sendTask = nil
+        liveTurn = nil
         isSending = false
         isReplying = false
         turnError = nil
         let entryID = model.selectedEntryID
+        let keeping = keepingStopped
         Task {
+            await keeping?.value
             await session.clearHistory()
             let updated = await session.history
             guard entryID == model.selectedEntryID else { return }
@@ -435,6 +442,35 @@ struct ChatPane: View {
         sendTask = nil
         isSending = false
         isReplying = false
+        guard let live = liveTurn, let session else { return }
+        liveTurn = nil
+        switch Self.stoppedTurn(live, in: displayedHistory) {
+        case .keep(let reply):
+            let entryID = model.selectedEntryID
+            keepingStopped = Task {
+                let kept = await session.keepStopped(question: live.question, reply: reply)
+                model.recordChat(history: kept, for: entryID)
+            }
+        case .unanswered:
+            displayedHistory.removeAll { $0.id == live.question.id }
+            if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { input = live.question.text }
+        }
+    }
+
+    struct LiveTurn {
+        let question: ChatMessage
+        let replyID: UUID
+    }
+
+    enum StoppedTurn: Equatable {
+        case keep(ChatMessage)
+        case unanswered
+    }
+
+    /// A stopped reply stays with the words it had said; one stopped before its first word hands the question back.
+    static func stoppedTurn(_ live: LiveTurn, in history: [ChatMessage]) -> StoppedTurn {
+        let said = history.last { $0.id == live.replyID }?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return said.isEmpty ? .unanswered : .keep(ChatMessage(id: live.replyID, role: .assistant, text: said))
     }
 
     /// Leaves the composer draft untouched — a preset send must not clobber what the user was typing.
@@ -445,19 +481,25 @@ struct ChatPane: View {
         isReplying = true
         turnError = nil
         let entryID = model.selectedEntryID
-        displayedHistory.append(ChatMessage(role: .user, text: text))
+        let question = ChatMessage(role: .user, text: text)
+        let liveID = UUID()
+        displayedHistory.append(question)
+        liveTurn = LiveTurn(question: question, replyID: liveID)
+        let keeping = keepingStopped
         sendTask = Task {
             defer {
                 if !Task.isCancelled, entryID == model.selectedEntryID {
                     isSending = false
                     isReplying = false
+                    liveTurn = nil
                 }
             }
-            let liveID = UUID()
+            // A reply stopped just before must be in the history this question is asked after.
+            await keeping?.value
             var collected = ""
             var started = false
             do {
-                for try await event in session.stream(text) {
+                for try await event in session.stream(text, id: question.id) {
                     guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
                     switch event {
                     case .delta(let delta):
@@ -468,6 +510,7 @@ struct ChatPane: View {
                         }
                         displayedHistory = Self.updatedHistory(displayedHistory, liveID: liveID, text: collected)
                     case .completed:
+                        liveTurn = nil
                         let updated = await session.history
                         displayedHistory = updated
                         model.recordChat(history: updated, for: entryID)

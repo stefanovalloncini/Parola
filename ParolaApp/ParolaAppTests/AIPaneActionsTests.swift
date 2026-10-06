@@ -133,6 +133,28 @@ struct AIPaneActionsTests {
         #expect(!pane.contains("sendTask?.cancel() displayedHistory.append"))
     }
 
+    @Test("a stopped reply keeps the words it had said, and one stopped before a word gives its question back")
+    func stoppedReplyKeepsItsWords() throws {
+        let question = ChatMessage(role: .user, text: "What was decided?")
+        let replyID = UUID()
+        let live = ChatPane.LiveTurn(question: question, replyID: replyID)
+        let started = [question, ChatMessage(id: replyID, role: .assistant, text: "We ship on Fri ")]
+        guard case .keep(let reply) = ChatPane.stoppedTurn(live, in: started) else {
+            Issue.record("a reply with words wasn't kept")
+            return
+        }
+        #expect(reply.id == replyID)
+        #expect(reply.role == .assistant)
+        #expect(reply.text == "We ship on Fri")
+        let unanswered = ChatPane.stoppedTurn(live, in: [question])
+        #expect(unanswered == .unanswered)
+
+        let pane = try source("Views/Chat/ChatPane")
+        #expect(pane.contains("await session.keepStopped(question: live.question, reply: reply)"))
+        #expect(pane.contains("for try await event in session.stream(text, id: question.id)"))
+        #expect(pane.contains("await keeping?.value"))
+    }
+
     @Test("every AI-unavailable state offers Open AI Settings…, and a plain failure note doesn't")
     func unavailableStatesOfferSettings() throws {
         let model = makeModel()
