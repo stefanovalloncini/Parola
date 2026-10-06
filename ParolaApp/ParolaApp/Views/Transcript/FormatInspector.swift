@@ -60,7 +60,7 @@ struct FormatInspector: View {
 
             if displayMode == .segments {
                 Toggle(isOn: $model.showSubtitleQC) {
-                    Text("Subtitle QC")
+                    Text("Subtitle Warnings")
                 }
                 .help("Warn about segments that read too fast or fall outside caption limits.")
                 .accessibilityIdentifier("toolbar.subtitleQC")

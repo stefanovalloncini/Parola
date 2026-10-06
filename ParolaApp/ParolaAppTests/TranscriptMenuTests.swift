@@ -221,6 +221,19 @@ struct TranscriptMenuTests {
         #expect(TranslationSection.targets(from: ["it", "en"], excluding: "auto").count == 2)
     }
 
+    @Test("the transcript view says things in plain words: no QC, no Re-Extract, no Engine, no chars")
+    func plainWordsForJargon() throws {
+        let format = try source("Views/Transcript/FormatInspector")
+        #expect(format.contains(#"Text("Subtitle Warnings")"#))
+        #expect(!format.contains("Subtitle QC"))
+        let info = try source("Views/Transcript/InfoInspector")
+        #expect(!info.contains(#"label: "Engine""#))
+        let items = try source("Views/Transcript/ActionItemsSection")
+        #expect(!items.contains("Re-Extract"))
+        let summary = try source("Views/Summary/SummaryPane")
+        #expect(!summary.contains("chars"))
+    }
+
     @Test("the Playback menu holds speed and Skip Silences, and names the keys the player owns")
     func playbackMenuHasEveryControl() throws {
         let commands = try source("Views/AppCommands")

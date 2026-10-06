@@ -5581,17 +5581,6 @@
         }
       }
     },
-    "Engine": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Motore"
-          }
-        }
-      }
-    },
     "Engine families": {
       "extractionState": "manual",
       "localizations": {
@@ -15027,17 +15016,6 @@
         }
       }
     },
-    "Subtitle QC": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "QC sottotitoli"
-          }
-        }
-      }
-    },
     "Subtitle Warnings": {
       "extractionState": "manual",
       "localizations": {
@@ -17531,6 +17509,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "In attesa della voce…"
+          }
+        }
+      }
+    },
+    "Warn about segments that read too fast or fall outside caption limits.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvisa sui segmenti che si leggono troppo in fretta o escono dai limiti dei sottotitoli."
           }
         }
       }

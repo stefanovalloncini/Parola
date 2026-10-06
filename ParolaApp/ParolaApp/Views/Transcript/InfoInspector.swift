@@ -48,9 +48,6 @@ struct InfoInspector: View {
                 if let modelName = model.transcript?.modelName {
                     modelRow(current: modelName, variants: variants)
                 }
-                if let engineLabel {
-                    InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
-                }
                 InfoRow(icon: "character", label: "Characters", value: AppFormat.integer(charCount), numeric: true)
                 InfoRow(icon: "text.word.spacing", label: "Words", value: AppFormat.integer(wordCount), numeric: true)
                 InfoRow(icon: "text.alignleft", label: "Sentences", value: AppFormat.integer(sentenceCount), numeric: true)
@@ -156,14 +153,6 @@ struct InfoInspector: View {
 
     private var languageLabel: String {
         LanguageDisplay.name(for: model.transcript?.language) ?? String(localized: "Auto")
-    }
-
-    private var engineLabel: String? {
-        guard let modelName = model.transcript?.modelName,
-              let variant = ModelCatalog.variant(id: modelName) else {
-            return nil
-        }
-        return variant.engineID.displayName
     }
 
     private var durationLabel: String? {
