@@ -1134,6 +1134,60 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a mic take shows the name CoreAudio gives the saved input")
+        func micTakeNamesItsInput() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel("stage-input-name")
+                model.inputDeviceUID = "usb"
+                model.takeInputNameLookup = { uid in uid == "usb" ? "USB Mic" : "System Default" }
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["hello"]))
+                model.useStreaming = true
+
+                model.startRecording(source: .microphone)
+
+                let named = await waitUntil { model.recording?.device == "USB Mic" }
+                #expect(named)
+                await model.discardTake()
+            }
+        }
+
+        @Test("takes still come up while CoreAudio leaves every input lookup hanging, more of them than GCD has threads")
+        func takesStartWhileInputLookupsHang() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let starts = Self.constrainedThreadLimit() + 8
+                let hanging = DispatchSemaphore(value: 0)
+                defer { for _ in 0..<starts { hanging.signal() } }
+                let model = makeModel("stage-input-lookups-hang")
+                model.takeInputNameLookup = { _ in
+                    hanging.wait()
+                    return nil
+                }
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["hello"]))
+                model.useStreaming = true
+                var started = 0
+                for _ in 0..<starts {
+                    model.startRecording(source: .microphone)
+                    let recording = await waitUntil(timeoutMs: 30_000) { model.recording?.state == .recording }
+                    guard recording else { break }
+                    started += 1
+                    await model.discardTake()
+                    let free = await waitUntil { !model.recordingActive }
+                    guard free else { break }
+                }
+                #expect(started == starts, "the take after \(started) hanging lookups stayed in \(String(describing: model.recording?.state))")
+            }
+        }
+
+        /// The most threads GCD runs for the global queues at once, however many of them are blocked.
+        private static func constrainedThreadLimit() -> Int {
+            var limit: Int32 = 0
+            var size = MemoryLayout<Int32>.size
+            guard sysctlbyname("kern.wq_max_constrained_threads", &limit, &size, nil, 0) == 0, limit > 0 else { return 64 }
+            return Int(limit)
+        }
+
         @Test("a live take let go by Cancel whose stream fails says so rather than waiting for words that never come")
         func letGoLiveTakeThatFailsSaysSo() async throws {
             try await withMocksCleared([.audioSource, .streaming]) {

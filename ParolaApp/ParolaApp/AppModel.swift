@@ -290,6 +290,11 @@ final class AppModel {
     @ObservationIgnored var micTrack: MicTrack?
     /// Test seam: when set, stands in for a meeting's microphone track; nil from it means this process has no microphone.
     @ObservationIgnored var micTrackCaptureOverride: (@MainActor () -> (any LiveAudioSource)?)?
+    /// Test seam: the name CoreAudio gives the input a take records from, by its device UID; a device that's gone leaves the mic on the default input.
+    @ObservationIgnored var takeInputNameLookup: @Sendable (String?) -> String? = { uid in
+        let devices = AudioDevices.inputDevices()
+        return AudioDevices.name(forUID: uid, in: devices) ?? AudioDevices.name(forUID: nil, in: devices)
+    }
     /// Test seam: when set, answers the microphone permission prompt in its place, for any capture.
     @ObservationIgnored var micAccessRequest: (@MainActor () async -> Bool)?
     /// Test seam: when set, stands in for the microphone permission as it stood before a meeting's take asked.
@@ -4268,12 +4273,9 @@ final class AppModel {
     /// Names the input a mic take listens on; listing devices asks CoreAudio, so it runs off the main thread.
     private func nameTakeDevice(_ take: TakeContext) {
         let uid = preferredInputDeviceUID
+        let lookup = takeInputNameLookup
         Task { [weak self] in
-            let name = (try? await Self.offMainIO {
-                let devices = AudioDevices.inputDevices()
-                // A device that's gone leaves the mic on the default input.
-                return AudioDevices.name(forUID: uid, in: devices) ?? AudioDevices.name(forUID: nil, in: devices)
-            }) ?? nil
+            let name = await Self.askCoreAudio { lookup(uid) }
             self?.updateSession(of: take.id) { $0.device = name }
         }
     }
@@ -5860,6 +5862,15 @@ final class AppModel {
             DispatchQueue.global(qos: qos).async {
                 continuation.resume(with: Result { try work() })
             }
+        }
+    }
+
+    nonisolated private static let coreAudioQueue = DispatchQueue(label: "app.parola.core-audio", qos: .userInitiated)
+
+    /// CoreAudio can take 30 s to answer a call; on one serial queue a stall holds one thread, never the shared pool a take's start waits on.
+    nonisolated static func askCoreAudio<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { continuation in
+            coreAudioQueue.async { continuation.resume(returning: work()) }
         }
     }
 

@@ -460,7 +460,7 @@ struct StageDeviceMenu: View {
                 .accessibilityValue(Text(verbatim: deviceName))
                 .axLeaf("Stage.Menu.Device")
                 .task {
-                    devices = (try? await AppModel.offMainIO { AudioDevices.inputDevices() }) ?? []
+                    devices = await AppModel.askCoreAudio { AudioDevices.inputDevices() }
                 }
             } else {
                 label(name: take.source.meterLabel, opensMenu: false)
