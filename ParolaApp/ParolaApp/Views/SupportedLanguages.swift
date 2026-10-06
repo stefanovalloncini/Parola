@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 /// The one language table shared by every picker (intake, Transcription Defaults,
 /// dictation workflows) so the offered languages can't drift between surfaces.
@@ -24,7 +25,7 @@ enum SupportedLanguages {
     ]
 
     static func displayName(for code: String) -> String {
-        let fallback = fallbackNames[code] ?? code
+        let fallback = fallbackNames[code] ?? WhisperLanguages.englishName(for: code) ?? code
         guard let localized = Locale.current.localizedString(forLanguageCode: code) else {
             return fallback
         }

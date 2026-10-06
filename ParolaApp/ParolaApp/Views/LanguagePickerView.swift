@@ -4,10 +4,11 @@ import ParolaCore
 struct LanguagePickerView: View {
     @Environment(AppModel.self) private var model
     var leaf: String? = nil
+    @State private var searchText = ""
 
     var body: some View {
         PillPickerButton(icon: "globe", caption: String(localized: "Language"), value: currentLabel, popoverWidth: 300, leaf: leaf) {
-            LanguagePickerPopover()
+            LanguagePickerPopover(searchText: $searchText)
         }
     }
 
@@ -22,13 +23,19 @@ struct LanguagePickerView: View {
     }
 }
 
+/// The model's own languages, led by the Mac's and the library's recent ones, with a search field as the model popover has.
 struct LanguagePickerPopover: View {
     @Environment(AppModel.self) private var model
+    @Binding var searchText: String
 
     static var autoLabel: String { String(localized: "Auto-detect") }
 
     var body: some View {
         VStack(spacing: 0) {
+            SearchPill(text: $searchText, placeholder: "Search languages", leaf: "LanguagePicker.TextField.Search")
+                .padding(.horizontal, DS.Spacing.small)
+                .padding(.top, DS.Spacing.tight)
+                .padding(.bottom, DS.Spacing.snug)
             PillPopoverRow(
                 title: Self.autoLabel,
                 subtitle: String(localized: "Identified from the audio"),
@@ -41,22 +48,44 @@ struct LanguagePickerPopover: View {
                 .padding(.horizontal, DS.Spacing.small)
                 .padding(.vertical, DS.Spacing.tight)
             PillPopoverList {
-                ForEach(SupportedLanguages.codes, id: \.self) { code in
-                    let note = Self.supportNote(for: code, scope: scope, modelName: modelName)
-                    PillPopoverRow(
-                        title: SupportedLanguages.displayName(for: code),
-                        subtitle: note ?? SupportedLanguages.endonym(for: code),
-                        subtitleTint: note == nil ? nil : DS.Color.warningText,
-                        isSelected: code == model.selectedLanguage,
-                        isDimmed: note != nil,
-                        leading: .monogram(code.uppercased()),
-                        minHeight: PillPopoverRow.twoLineHeight,
-                        action: { model.selectedLanguage = code }
-                    )
+                let sections = LanguageChoices.sections(
+                    scope: scope,
+                    leading: LanguageChoices.leading(model: model),
+                    query: searchText,
+                    name: SupportedLanguages.displayName(for:)
+                )
+                if sections.top.isEmpty, sections.rest.isEmpty {
+                    Text("No languages match")
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .padding(.horizontal, DS.Spacing.regular)
+                        .padding(.vertical, DS.Spacing.small)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                ForEach(sections.top, id: \.self) { code in row(code) }
+                if !sections.top.isEmpty, !sections.rest.isEmpty {
+                    Divider()
+                        .padding(.horizontal, DS.Spacing.small)
+                        .padding(.vertical, DS.Spacing.tight)
+                }
+                ForEach(sections.rest, id: \.self) { code in row(code) }
             }
         }
         .padding(.horizontal, DS.Spacing.snug)
+    }
+
+    private func row(_ code: String) -> some View {
+        let note = Self.supportNote(for: code, scope: scope, modelName: modelName)
+        return PillPopoverRow(
+            title: SupportedLanguages.displayName(for: code),
+            subtitle: note ?? SupportedLanguages.endonym(for: code),
+            subtitleTint: note == nil ? nil : DS.Color.warningText,
+            isSelected: code == model.selectedLanguage,
+            isDimmed: note != nil,
+            leading: .monogram(code.uppercased()),
+            minHeight: PillPopoverRow.twoLineHeight,
+            action: { model.selectedLanguage = code }
+        )
     }
 
     /// A pick the model can't honour still goes through (the intake popover warns), but the row says so first.
@@ -72,4 +101,47 @@ struct LanguagePickerPopover: View {
         guard let variant = ModelCatalog.variant(id: model.selectedModel) else { return model.selectedModel }
         return ModelPickerView.shortLabel(for: variant.displayName)
     }
+}
+
+/// What a language picker lists for the model in use, and in what order.
+enum LanguageChoices {
+    /// A model that takes any language is offered every one Whisper was trained on.
+    static func supported(by scope: ParolaCore.SupportedLanguages) -> Set<String> {
+        switch scope {
+        case .all: WhisperLanguages.codes
+        case .only(let codes): codes
+        }
+    }
+
+    /// `leading` comes first whether or not the model takes it, so a pick it can't honour still shows with its note.
+    static func sections(
+        scope: ParolaCore.SupportedLanguages, leading: [String], query: String, name: (String) -> String
+    ) -> (top: [String], rest: [String]) {
+        var seen = Set<String>()
+        let top = leading.filter { seen.insert($0).inserted }
+        let rest = supported(by: scope).subtracting(seen).sorted {
+            name($0).localizedStandardCompare(name($1)) == .orderedAscending
+        }
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return (top, rest) }
+        let matches = { (code: String) in
+            code.caseInsensitiveCompare(query) == .orderedSame || name(code).localizedStandardContains(query)
+        }
+        return (top.filter(matches), rest.filter(matches))
+    }
+
+    /// The pick in use, the Mac's own languages, then the last few the library was transcribed in.
+    @MainActor
+    static func leading(model: AppModel) -> [String] {
+        let system = Locale.preferredLanguages.compactMap { Locale(identifier: $0).language.languageCode?.identifier }
+        var recent: [String] = []
+        for entry in model.libraryEntries.sorted(by: { $0.createdAt > $1.createdAt }) {
+            guard let code = LanguageDisplay.code(for: entry.language)?.lowercased(), !recent.contains(code) else { continue }
+            recent.append(code)
+            if recent.count == recentLimit { break }
+        }
+        return [model.selectedLanguage].compactMap { $0 } + system + recent
+    }
+
+    static let recentLimit = 3
 }

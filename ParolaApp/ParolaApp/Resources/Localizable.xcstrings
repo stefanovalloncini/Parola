@@ -9464,6 +9464,17 @@
         }
       }
     },
+    "No languages match": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna lingua corrisponde"
+          }
+        }
+      }
+    },
     "No matches": {
       "extractionState": "manual",
       "localizations": {
@@ -13258,6 +13269,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cerca correzioni…"
+          }
+        }
+      }
+    },
+    "Search languages": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca lingue"
           }
         }
       }

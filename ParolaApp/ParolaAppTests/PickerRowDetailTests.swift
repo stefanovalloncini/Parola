@@ -34,6 +34,44 @@ struct LanguageRowDetailTests {
     }
 }
 
+@Suite("Language choices")
+struct LanguageChoicesTests {
+    private static func name(_ code: String) -> String {
+        ["en": "English", "it": "Italian", "pl": "Polish", "sv": "Swedish", "ja": "Japanese", "el": "Greek"][code] ?? code
+    }
+
+    @Test("a model lists the languages it takes: Parakeet v3 its 25, Whisper every one it was trained on")
+    func listsWhatTheModelTakes() {
+        let parakeet = LanguageChoices.supported(by: .only(ParakeetLanguages.v3))
+        let whisper = LanguageChoices.supported(by: .all)
+
+        #expect(parakeet == ParakeetLanguages.v3)
+        #expect(whisper.isSuperset(of: ["pl", "sv", "el", "sw", "haw", "en"]))
+        #expect(whisper.count >= 99)
+    }
+
+    @Test("the Mac's languages and recent ones lead, the model's own follow A–Z")
+    func systemAndRecentLead() {
+        let sections = LanguageChoices.sections(
+            scope: .only(["en", "it", "pl", "sv"]), leading: ["it", "ja", "it"], query: "", name: Self.name
+        )
+
+        #expect(sections.top == ["it", "ja"], "Japanese leads although the model can't take it; its row says so")
+        #expect(sections.rest == ["en", "pl", "sv"])
+    }
+
+    @Test("typing narrows both groups by name or code")
+    func searchNarrows() {
+        let sections = LanguageChoices.sections(
+            scope: .only(["en", "it", "pl", "sv"]), leading: ["it"], query: "pol", name: Self.name
+        )
+
+        #expect(sections.top.isEmpty)
+        #expect(sections.rest == ["pl"])
+        #expect(LanguageChoices.sections(scope: .only(["en", "sv"]), leading: [], query: "SV", name: Self.name).rest == ["sv"])
+    }
+}
+
 @MainActor
 @Suite("Model row detail")
 struct ModelRowDetailTests {
