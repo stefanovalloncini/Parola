@@ -107,4 +107,12 @@ struct SettingsCopyTests {
         #expect(words.contains("Recording shortcut"), "\(words)")
         #expect(words.contains("Accessibility"), "\(words)")
     }
+
+    @Test("the microphone error offers System Settings when access is off, whatever language the error is in")
+    func micErrorDecidesOnTheStatus() {
+        #expect(MicErrorBanner.offersSystemSettings(for: .denied))
+        #expect(MicErrorBanner.offersSystemSettings(for: .restricted))
+        #expect(!MicErrorBanner.offersSystemSettings(for: .authorized))
+        #expect(!MicErrorBanner.offersSystemSettings(for: .notDetermined))
+    }
 }

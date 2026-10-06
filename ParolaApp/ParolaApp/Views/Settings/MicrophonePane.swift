@@ -83,12 +83,12 @@ struct MicrophonePane: View {
                 }
             }
             if let startError {
-                MicErrorBanner(message: startError)
+                MicErrorBanner(message: startError, status: micStatus)
             }
 
             SettingsSection("While recording") {
-                SettingRow("Mute system audio",
-                           description: "Mutes the default output device while recording from the microphone, so playback doesn't leak into your transcript. Restores the previous mute state when recording stops.",
+                SettingRow("Mute your Mac's sound while recording",
+                           description: "So playback doesn't end up in the transcript. The sound comes back when the recording stops.",
                            isFirst: true) {
                     Toggle("", isOn: $model.autoMuteWhileRecording).labelsHidden()
                         .axLeaf("Microphone.Toggle.AutoMute")
@@ -99,7 +99,7 @@ struct MicrophonePane: View {
                         .axLeaf("Microphone.Toggle.AutoPauseMedia")
                 }
             }
-            SettingHelper(text: "Both apply to dictation too. Mute is skipped when the recording source is system audio.")
+            SettingHelper(text: "Both apply to dictation too. A system audio recording never mutes your Mac.")
 
             if RecordControl.primarySource(features: model.features) != nil {
                 RecordingControlsSection(pane: "Microphone")
@@ -159,7 +159,7 @@ struct MicrophonePane: View {
                     .foregroundStyle(DS.Color.secondaryText)
             }
             Spacer()
-            Button("Open Settings…") { openMicrophonePrivacySettings() }
+            Button("Open System Settings…") { openMicrophonePrivacySettings() }
                 .controlSize(.small)
                 .axLeaf("Microphone.Button.OpenAccessSettings")
         }
@@ -195,16 +195,16 @@ private final class MicPreviewController {
     }
 }
 
-private struct MicErrorBanner: View {
+struct MicErrorBanner: View {
     let message: String
+    let status: AVAuthorizationStatus
 
-    private var looksLikePermissionError: Bool {
-        let l = message.lowercased()
-        return l.contains("permission") || l.contains("denied") || l.contains("authoriz")
+    static func offersSystemSettings(for status: AVAuthorizationStatus) -> Bool {
+        status == .denied || status == .restricted
     }
 
     private var hint: String {
-        if looksLikePermissionError {
+        if Self.offersSystemSettings(for: status) {
             return String(localized: "Open System Settings → Privacy & Security → Microphone and grant Parola access.")
         }
         return String(localized: "Pick a different device or reconnect the current one.")
@@ -225,7 +225,7 @@ private struct MicErrorBanner: View {
             Text(hint)
                 .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
-            if looksLikePermissionError {
+            if Self.offersSystemSettings(for: status) {
                 Button("Open System Settings…") { openMicrophonePrivacySettings() }
                 .controlSize(.small)
                 .axLeaf("Microphone.Button.OpenSystemSettings")

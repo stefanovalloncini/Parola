@@ -2707,13 +2707,13 @@
         }
       }
     },
-    "Both apply to dictation too. Mute is skipped when the recording source is system audio.": {
+    "Both apply to dictation too. A system audio recording never mutes your Mac.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Entrambe si applicano anche alla dettatura. La silenziatura viene saltata quando la sorgente è l'audio di sistema."
+            "value": "Entrambe valgono anche per la dettatura. Una registrazione dell'audio di sistema non disattiva mai l'audio del Mac."
           }
         }
       }
@@ -8878,24 +8878,13 @@
         }
       }
     },
-    "Mute system audio": {
+    "Mute your Mac's sound while recording": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Silenzia l'audio di sistema"
-          }
-        }
-      }
-    },
-    "Mutes the default output device while recording from the microphone, so playback doesn't leak into your transcript. Restores the previous mute state when recording stops.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Silenzia l'uscita audio predefinita durante la registrazione dal microfono, così la riproduzione non finisce nella trascrizione. Ripristina lo stato precedente quando la registrazione finisce."
+            "value": "Disattiva l'audio del Mac durante la registrazione"
           }
         }
       }
@@ -14102,6 +14091,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Snippet"
+          }
+        }
+      }
+    },
+    "So playback doesn't end up in the transcript. The sound comes back when the recording stops.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Così la riproduzione non finisce nella trascrizione. L'audio torna quando la registrazione si ferma."
           }
         }
       }
