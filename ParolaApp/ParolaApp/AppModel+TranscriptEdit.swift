@@ -76,8 +76,43 @@ extension AppModel {
         applyTranscriptEdit(t, actionName: String(localized: "Edit Segment"))
     }
 
+    /// A click plays from the segment when there is audio; without it, the click still chooses the segment for the menus.
+    func chooseSegment(_ segment: TranscriptSegment) {
+        if player != nil {
+            seek(to: segment)
+        } else {
+            currentSegmentID = segment.id
+        }
+    }
+
+    private var focusedSegment: TranscriptSegment? {
+        guard let id = focusedSegmentIDForCommands else { return nil }
+        return transcript?.segments.first { $0.id == id }
+    }
+
+    /// Only a card can hold the edit field, so from Paragraphs or another pane the segments come forward first.
+    func editFocusedSegment() {
+        guard let segment = focusedSegment else { return }
+        if transcriptDisplayMode != .segments || transcriptPaneMode != .transcript {
+            showTranscriptLayout(.segments)
+        }
+        pendingRevealSegmentID = segment.id
+        pendingSegmentEditID = segment.id
+    }
+
+    func noteFocusedSegment() {
+        guard let segment = focusedSegment else { return }
+        beginEditingNote(for: segment)
+    }
+
+    func deleteFocusedSegment() {
+        guard let segment = focusedSegment else { return }
+        deleteSegment(id: segment.id)
+    }
+
     func deleteSegment(id: TranscriptSegment.ID) {
         guard var t = transcript else { return }
+        if currentSegmentID == id { currentSegmentID = nil }
         t.segments.removeAll { $0.id == id }
         t.translation = t.translation?.afterDelete(of: id)
         let favorites = favoriteSegmentIDs

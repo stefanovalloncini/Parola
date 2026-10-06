@@ -1580,6 +1580,17 @@
         }
       }
     },
+    "Add Note…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi nota…"
+          }
+        }
+      }
+    },
     "Add Pattern": {
       "extractionState": "manual",
       "localizations": {
@@ -3815,6 +3826,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copia percorso"
+          }
+        }
+      }
+    },
+    "Copy Segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia segmento"
           }
         }
       }
@@ -11031,6 +11053,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riproduci un suono al termine di una trascrizione"
+          }
+        }
+      }
+    },
+    "Play from Here": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riproduci da qui"
           }
         }
       }

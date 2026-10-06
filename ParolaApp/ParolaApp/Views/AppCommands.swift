@@ -343,7 +343,15 @@ struct TranscriptCommands: View {
 
     private var favoriteSegmentHelp: LocalizedStringKey {
         if model.selectedEntryID == nil { return "Save the transcript to the library first" }
-        return model.hasCurrentSegment ? "" : "Click a segment or play the audio first"
+        return segmentHelp
+    }
+
+    private var segmentHelp: LocalizedStringKey {
+        model.hasCurrentSegment ? "" : "Click a segment or play the audio first"
+    }
+
+    private var segmentCommandsDisabled: Bool {
+        !model.mainTranscriptCommandsEnabled || !model.hasCurrentSegment
     }
 
     var body: some View {
@@ -373,13 +381,25 @@ struct TranscriptCommands: View {
         Button("Rename…") { model.renameRequests &+= 1 }
             .disabled(!model.canRenameOpenTranscript)
             .axLeaf("Menu.Transcript.Rename")
+        Button("Edit Segment") { model.editFocusedSegment() }
+            .disabled(segmentCommandsDisabled)
+            .help(segmentHelp)
+            .axLeaf("Menu.Transcript.EditSegment")
+        Button("Add Note…") { model.noteFocusedSegment() }
+            .disabled(segmentCommandsDisabled || model.selectedEntryID == nil)
+            .help(favoriteSegmentHelp)
+            .axLeaf("Menu.Transcript.AddNote")
         Button("Favorite Segment") {
             guard let id = model.focusedSegmentIDForCommands else { return }
             model.toggleSegmentFavorite(id)
         }
         .keyboardShortcut("d", modifiers: [.command])
-        .disabled(!model.mainTranscriptCommandsEnabled || model.selectedEntryID == nil || !model.hasCurrentSegment)
+        .disabled(segmentCommandsDisabled || model.selectedEntryID == nil)
         .help(favoriteSegmentHelp)
+        Button("Delete Segment") { model.deleteFocusedSegment() }
+            .disabled(segmentCommandsDisabled)
+            .help(segmentHelp)
+            .axLeaf("Menu.Transcript.DeleteSegment")
         Button("Manage People…") { model.showingPeopleSheet = true }
         Divider()
         Button("Copy Transcript") { Task { await model.copyTranscript() } }

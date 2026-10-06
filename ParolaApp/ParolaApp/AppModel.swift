@@ -221,8 +221,11 @@ final class AppModel {
     var currentSegmentID: TranscriptSegment.ID? {
         didSet {
             if hasCurrentSegment != (currentSegmentID != nil) { hasCurrentSegment = currentSegmentID != nil }
+            if let pending = pendingSegmentEditID, pending != currentSegmentID { pendingSegmentEditID = nil }
         }
     }
+    /// Transcript ▸ Edit Segment names its segment here; the card opens its field when it shows, then clears it.
+    var pendingSegmentEditID: TranscriptSegment.ID?
     /// What the menus read, so a playing transcript's segment ticks don't redraw them.
     private(set) var hasCurrentSegment = false
     /// A segment a search result asked the transcript to open on. The write lands before the route

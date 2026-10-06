@@ -93,9 +93,16 @@ struct SegmentCard: View {
         .clipShape(RoundedRectangle(cornerRadius: radius))
         .contentShape(Rectangle())
         .rowStateAnimation(hovering)
-        .contextMenu { assignSegmentMenu }
+        .accessibilityElement(children: .contain)
+        .accessibilityActions { segmentAccessibilityActions(isFavorite: isFavorite) }
+        .contextMenu { segmentContextMenu(isFavorite: isFavorite) }
         .draggable(draggablePayload)
         .onHover { hovering = $0 }
+        .onChange(of: model.pendingSegmentEditID, initial: true) { _, id in
+            guard id == segment.id else { return }
+            model.pendingSegmentEditID = nil
+            beginEditing()
+        }
         .alert("Rename speaker", isPresented: $renamingSpeaker, presenting: segment.speaker) { current in
             TextField("Name", text: $draftSpeakerName)
             Button("Cancel", role: .cancel) {}
@@ -308,8 +315,8 @@ struct SegmentCard: View {
 
     private func seekFromCard() {
         // hoveredSpeaker is set only while the pointer sits on the chip, which opens its popover instead.
-        guard !isEditing, hoveredSpeaker.wrappedValue == nil, model.player != nil else { return }
-        model.seek(to: segment)
+        guard !isEditing, hoveredSpeaker.wrappedValue == nil else { return }
+        model.chooseSegment(segment)
     }
 
     private var showsWordKaraoke: Bool {
@@ -435,6 +442,59 @@ struct SegmentCard: View {
         .onScrollVisibilityChange { visible in
             if !visible { timingPopoverOpen = false }
         }
+    }
+
+    /// Everything the hover strip and its ••• menu offer, for a right-click or Control-Return.
+    @ViewBuilder
+    private func segmentContextMenu(isFavorite: Bool) -> some View {
+        Button("Edit Segment") { beginEditing() }
+            .axLeaf("Card.MenuItem.Edit")
+        Button("Add Note…") { model.beginEditingNote(for: segment) }
+            .disabled(libraryOnlyReason != nil)
+            .axLeaf("Card.MenuItem.Note")
+        if model.player != nil {
+            Button("Play from Here") { model.seek(to: segment) }
+                .axLeaf("Card.MenuItem.Play")
+        }
+        Button("Copy Segment") { copySegment() }
+            .axLeaf("Card.MenuItem.Copy")
+        Button(isFavorite ? "Unfavorite" : "Favorite") { model.toggleSegmentFavorite(segment.id) }
+            .disabled(libraryOnlyReason != nil)
+            .axLeaf("Card.MenuItem.Favorite")
+        Divider()
+        Button("Nudge Timing…") { timingPopoverOpen = true }
+            .axLeaf("Card.MenuItem.Timing")
+        Button("Split Segment") { splitSegment() }
+            .axLeaf("Card.MenuItem.Split")
+        Button("Merge with Next Segment") { model.mergeSegmentWithNext(id: segment.id) }
+            .disabled(isLastSegment)
+            .axLeaf("Card.MenuItem.Merge")
+        Button("Copy Link to This Segment") { copyDeeplink() }
+            .disabled(model.selectedEntryID == nil)
+            .axLeaf("Card.MenuItem.CopyLink")
+        Divider()
+        assignSegmentMenu
+        Divider()
+        Button("Delete Segment", role: .destructive) { model.deleteSegment(id: segment.id) }
+            .axLeaf("Card.MenuItem.Delete")
+    }
+
+    @ViewBuilder
+    private func segmentAccessibilityActions(isFavorite: Bool) -> some View {
+        Button("Edit Segment") { beginEditing() }
+        if libraryOnlyReason == nil {
+            Button(isFavorite ? "Unfavorite" : "Favorite") { model.toggleSegmentFavorite(segment.id) }
+            Button("Add Note…") { model.beginEditingNote(for: segment) }
+        }
+        if model.player != nil {
+            Button("Play from Here") { model.seek(to: segment) }
+        }
+        Button("Copy Segment") { copySegment() }
+        Button("Split Segment") { splitSegment() }
+        if !isLastSegment {
+            Button("Merge with Next Segment") { model.mergeSegmentWithNext(id: segment.id) }
+        }
+        Button("Delete Segment") { model.deleteSegment(id: segment.id) }
     }
 
     private func cardButton(

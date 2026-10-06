@@ -62,7 +62,11 @@ struct TranscriptMenuTests {
         let menu = try transcriptMenu()
         let groups = [
             [#"Button("Back")"#, #"Button("Jump to Next Speaker")"#, #"Button("Jump to Time…")"#, #"Button("Show Outline")"#],
-            [#"Button("Rename…")"#, #"Button("Favorite Segment")"#, #"Button("Manage People…")"#],
+            [
+                #"Button("Rename…")"#, #"Button("Edit Segment") { model.editFocusedSegment() }"#,
+                #"Button("Add Note…") { model.noteFocusedSegment() }"#, #"Button("Favorite Segment")"#,
+                #"Button("Delete Segment") { model.deleteFocusedSegment() }"#, #"Button("Manage People…")"#,
+            ],
             [
                 #"Button("Copy Transcript")"#, #"Button("Copy with Timestamps")"#, #"Button("Copy as Markdown")"#,
                 #"Button("Copy as SRT")"#, #"Button("Copy Favorites")"#,
