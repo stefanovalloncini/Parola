@@ -64,4 +64,35 @@ struct PageCommandsTests {
         #expect(!model.findIsOpen)
         #expect(model.librarySearchFocusRequests == before &+ 1)
     }
+
+    @Test("⌘P, ⌘E, ⌘1–3 and ⇧⌘I wait for a transcript on screen: not on the Queue or results over it")
+    func transcriptCommandsNeedTheTranscriptInFront() {
+        openTranscript()
+        #expect(model.mainTranscriptCommandsEnabled)
+        #expect(model.canShow(.transcript))
+
+        model.openQueue()
+        #expect(model.hasTranscript, "the Queue keeps the transcript loaded behind it")
+        #expect(!model.mainTranscriptCommandsEnabled)
+        #expect(!model.canShow(.transcript))
+
+        model.route = .transcript
+        model.searchRanking = []
+        #expect(!model.mainTranscriptCommandsEnabled)
+        #expect(!model.canShow(.transcript))
+
+        model.searchRanking = nil
+        #expect(model.mainTranscriptCommandsEnabled)
+    }
+
+    @Test("a mode set while another page is in front still lands for when the transcript comes back")
+    func paneModeSetsBehindAnotherPage() {
+        openTranscript()
+        model.transcriptPaneMode = .summary
+        model.openQueue()
+
+        model.setTranscriptPaneMode(.transcript)
+
+        #expect(model.transcriptPaneMode == .transcript)
+    }
 }

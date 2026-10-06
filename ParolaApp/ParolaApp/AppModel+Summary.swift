@@ -146,8 +146,13 @@ extension AppModel {
         case transcript, summary, chat
     }
 
-    /// Every mode needs a transcript; `.summary`/`.chat` also need the AI feature.
+    /// ⌘1/2/3 and the header picker: the transcript has to be on screen, and `.summary`/`.chat` need the AI feature.
     func canShow(_ mode: TranscriptPaneMode) -> Bool {
+        transcriptIsOnScreen && paneCanHold(mode)
+    }
+
+    /// Every mode needs a transcript; `.summary`/`.chat` also need the AI feature.
+    private func paneCanHold(_ mode: TranscriptPaneMode) -> Bool {
         switch mode {
         case .transcript: return hasTranscript
         case .summary, .chat: return hasTranscript && features.isEnabled(.ai)
@@ -156,7 +161,7 @@ extension AppModel {
 
     /// The one entry point for switching modes: the picker, the AI menu, ⌘1/2/3 and the bridge all call this.
     func setTranscriptPaneMode(_ mode: TranscriptPaneMode) {
-        guard canShow(mode) else { return }
+        guard paneCanHold(mode) else { return }
         transcriptPaneMode = mode
     }
 

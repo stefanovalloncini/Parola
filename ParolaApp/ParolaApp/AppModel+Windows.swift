@@ -93,8 +93,8 @@ extension AppModel {
         keyViewerEntryIDs.sorted().lazy.compactMap { self.entryWindows.existingSession(for: $0) }.first
     }
 
-    /// Off while a viewer holds focus, where these would edit or export something the user can't see.
-    var mainTranscriptCommandsEnabled: Bool { hasTranscript && !keyWindowIsViewer }
+    /// Off while a viewer holds focus or another page covers the transcript, where these would act on something the user can't see.
+    var mainTranscriptCommandsEnabled: Bool { transcriptIsOnScreen && !keyWindowIsViewer }
 
     /// The main window shows the loaded transcript, with no list, results or other page over it.
     var transcriptIsOnScreen: Bool {

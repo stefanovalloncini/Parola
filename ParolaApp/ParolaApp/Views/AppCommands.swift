@@ -70,7 +70,7 @@ struct FileCommands: View {
         .disabled(model.introduction.isPresented)
         Button("Save As Parola Document…") { model.saveProjectDocument() }
             .keyboardShortcut("s")
-            .disabled(!model.hasTranscript)
+            .disabled(!model.mainTranscriptCommandsEnabled)
     }
 
     /// From a viewer, Settings or with no window open, the take's Stop still has to be on screen.
