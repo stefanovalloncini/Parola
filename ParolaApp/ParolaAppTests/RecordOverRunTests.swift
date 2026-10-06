@@ -33,6 +33,35 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Record over a run keeps an earlier notice with buttons, not just lose it", .timeLimit(.minutes(1)))
+        func requeueKeepsAnEarlierNoticeWithButtons() async throws {
+            let file = try makeTakeWAV("record-over-covers")
+            defer { try? FileManager.default.removeItem(at: file) }
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await installMockTranscriber(segments: [(0, 1, "the file's words")], partials: ["the file"], gate: gate)
+                let model = makeRecordingModel("record-over-covers")
+                model.selectedModel = "openai_whisper-tiny"
+
+                let earlier = ExportNotice(
+                    message: "Couldn't transcribe earlier.mp3.", failures: [], folder: nil, tone: .failure,
+                    actions: [ExportNotice.Action(title: "Retry", handler: .retryRun(.file(file, translateOverride: nil)))]
+                )
+                model.exportNotice = earlier
+
+                model.beginFileTranscription(fileURL: file, translateOverride: nil)
+                await waitUntil { model.filePartialText == "the file" }
+
+                try await startMeteredTake(model)
+                #expect(model.exportNotice?.whileTakeRuns == true)
+
+                await gate.open()
+                await model.discardTake()
+                await waitUntil { model.exportNotice?.id == earlier.id }
+                #expect(model.exportNotice?.message == earlier.message)
+            }
+        }
+
         @Test("Record during a link's download puts the link back in line and says so", .timeLimit(.minutes(1)))
         func linkRunWaitsForTheTake() async throws {
             let audio = try makeTakeWAV("record-over-link")

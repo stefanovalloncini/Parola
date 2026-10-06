@@ -1959,10 +1959,12 @@ final class AppModel {
             case .link(let link): deferredLinks.append(link)
             }
         }
+        let covered = exportNotice
         exportNotice = ExportNotice(
             message: String(localized: "Stopped transcribing \(first.name). It starts again after the recording."),
             failures: [], folder: nil, tone: .info, whileTakeRuns: true
         )
+        keepCovered(covered, take: nil)
     }
 
     /// New work outranks a take still transcribing: its pane comes down now, and its save says why.
