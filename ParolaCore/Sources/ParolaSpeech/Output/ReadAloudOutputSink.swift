@@ -11,13 +11,19 @@ public struct UnitFinished: Hashable, Sendable {
     }
 }
 
-/// Where a reading's audio plays. The session schedules each unit's chunks with its epoch and the voice's
-/// gain, then closes the unit with `finishUnit`, which adds the trailing pause (a unit with no audio gets
-/// only that). `unitFinishedEvents()` reports each closed unit once it has played; a new call finishes the
-/// previous stream, so one session listens at a time.
+/// Where a reading's audio plays; one sink serves every reading. A caller subscribes with
+/// `unitFinishedEvents()` before its first `schedule` or `finishUnit`. Each call starts a new generation:
+/// it finishes the previous stream and drops the completions of everything scheduled before it, whatever
+/// their epoch, and `stop()` drops every pending completion the same way. Chunks carry the caller's epoch
+/// and the voice's gain; `finishUnit` closes a unit and adds its trailing pause (a unit with no audio gets
+/// only that), and the stream reports the unit once all of it has played. A caller whose stream ends
+/// without its own `stop()` was superseded: it doesn't report the reading finished, and to go on it
+/// subscribes again and reschedules from its current unit.
 @MainActor
-public protocol ReadAloudOutputSink: AnyObject {
-    var speed: Double { get set }
+public protocol ReadAloudOutputSink: AnyObject, Sendable {
+    var speed: Double { get }
+
+    func setSpeed(_ speed: Double)
 
     func unitFinishedEvents() -> AsyncStream<UnitFinished>
 
