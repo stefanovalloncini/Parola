@@ -152,12 +152,15 @@ private final class StandInMic: Sendable {
 
     private let state = OSAllocatedUnfairLock(initialState: State())
     private let granted: Bool
+    private let holdsDecodes: Bool
     let captureStarted = TestSignal()
     let captureStopped = TestSignal()
     let decodes = Awaitable(0)
 
-    init(granted: Bool = true) {
+    /// `holdsDecodes` parks every decode until its task is cancelled.
+    init(granted: Bool = true, holdsDecodes: Bool = false) {
         self.granted = granted
+        self.holdsDecodes = holdsDecodes
     }
 
     func microphone(_ deviceID: DeviceID?) -> StreamingTranscriptionSession.Microphone {
@@ -175,6 +178,7 @@ private final class StandInMic: Sendable {
         .init(options: DecodingOptions()) { [self] samples, _, _ in
             state.withLock { $0.decodedSampleCounts.append(samples.count) }
             decodes.increment()
+            if holdsDecodes { try await Task.sleep(for: .seconds(3600)) }
             return TranscriptionResult(
                 text: " early words",
                 segments: [TranscriptionSegment(start: 0, end: 0.5, text: " early words")],
@@ -888,6 +892,32 @@ struct StreamingCaptureFirstTests {
         #expect(await cache.leaseCount(for: Self.tiny) == 0)
         #expect(await cache.droppedLeases == 0)
         await gate.open(Self.tiny)
+    }
+
+    @Test("a cancel during a stopped take's final decode discards the take")
+    func cancelDuringTheFinalDecodeDiscards() async throws {
+        let cache = StreamingModelCache.probing(CacheProbe())
+        let mic = StandInMic(holdsDecodes: true)
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
+        let transcriber: any StreamingTranscriber = session
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        let events = try #require(try await starting.value("the start to return"))
+        mic.speak(seconds: 0.8)
+        let audio = try #require(await transcriber.recordingAudioURL())
+        let stopping = GuardedTask { await session.stop() }
+        await mic.decodes.wait(atLeast: 1, "the stop's final decode to start")
+
+        let cancelling = GuardedTask { await session.cancel() }
+        _ = try await cancelling.value("the cancel to return")
+        _ = try await stopping.value("the stop to end with the cancel")
+
+        var finished = false
+        for await event in events {
+            if case .finished = event { finished = true }
+        }
+        #expect(!finished, "a cancelled take sends no finished transcript")
+        #expect(!FileManager.default.fileExists(atPath: audio.path))
+        #expect(await cache.leaseCount(for: Self.tiny) == 0)
     }
 
     @Test("a session asked to wait for its model on stop keeps every word without keeping audio")

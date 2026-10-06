@@ -225,7 +225,8 @@ actor StreamingRealtimeLoop {
         // Runs on this task, never from stop(): a flush entering the actor mid-iterate
         // would race the in-flight decode on the shared TranscribeTask.
         await finalFlush(with: decoder)
-        return .stopped
+        // A cancel that lands during the flush still discards the take.
+        return flushesOnStop ? .stopped : .cancelled
     }
 
     /// Waits for the model while capture fills the inbox; a stop or a cancel cancels the load.
