@@ -1,8 +1,6 @@
 import Foundation
 
-/// The loudness of the speech played so far, as a slow average in dBFS, and the output gain that pulls it
-/// down toward the target. Pauses don't count and a single loud sentence moves it only a little; it never
-/// raises a quiet voice, which the voice's own gain is for.
+/// A slow average of speech loudness and the cut toward the target; it never boosts (the voice gain does).
 struct SpeechLevel: Equatable {
     static let targetDB = -20.0
     static let timeConstant = 3.0
@@ -23,7 +21,7 @@ struct SpeechLevel: Equatable {
     }
 }
 
-/// How much speech a run of samples holds: the 10 ms blocks above the gate, and their mean power in dBFS.
+/// The 10 ms blocks of a run of samples above the gate, and their mean power in dBFS.
 struct SpeechMeasure: Equatable, Sendable {
     static let gateDB = -50.0
     static let blockSeconds = 0.01

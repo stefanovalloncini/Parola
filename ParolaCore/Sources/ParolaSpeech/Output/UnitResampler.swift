@@ -1,8 +1,7 @@
 import AVFoundation
 import ParolaCore
 
-/// Brings one reading unit's audio to the output format. Every chunk of the unit goes through the same
-/// converter, so the filter carries across the joins, and `flush()` drains what it still holds at the end.
+/// One converter for all of a unit's chunks, so the filter carries across joins; `flush()` drains its tail.
 final class UnitResampler {
     let unitID: Int
     let sourceRate: Double

@@ -17,7 +17,8 @@ public struct UnitFinished: Hashable, Sendable {
 /// their epoch, and `stop()` drops every pending completion the same way. Chunks carry the caller's epoch
 /// and the voice's gain; `finishUnit` closes a unit and adds its trailing pause (a unit with no audio gets
 /// only that), and the stream reports the unit once all of it has played. After a subscription or a
-/// `stop()` the sink is idle and holds what is scheduled until `resume()`. A caller whose stream ends
+/// `stop()` the sink is idle and holds what is scheduled until `resume()`; a reading that ends calls
+/// `stop()` so the sink lets go of the output device. A caller whose stream ends
 /// without its own `stop()` was superseded, by another subscription or by the sink itself when the output
 /// device changes and it pauses: it doesn't report the reading finished, and to go on it subscribes again
 /// and reschedules from its current unit.
