@@ -13540,6 +13540,17 @@
         }
       }
     },
+    "Select audio or video files to transcribe.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seleziona i file audio o video da trascrivere."
+          }
+        }
+      }
+    },
     "Send (⌘↩)": {
       "extractionState": "manual",
       "localizations": {

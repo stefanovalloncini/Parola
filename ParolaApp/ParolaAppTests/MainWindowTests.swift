@@ -94,4 +94,12 @@ struct MainWindowTests {
             "Button(NewMenuCommand.addToQueue.title) { model.showMainWindow { openWindow(id: MainWindowScene.id) } model.presentBatchOpenPanel() }"
         ))
     }
+
+    @Test("the batch open panel's message has Italian")
+    func batchOpenPanelMessageHasItalian() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        let key = "Select audio or video files to transcribe."
+        #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
+    }
 }

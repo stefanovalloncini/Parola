@@ -357,7 +357,7 @@ extension AppModel {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.audio, .movie]
         panel.allowsMultipleSelection = true
-        panel.message = "Select audio or video files to transcribe."
+        panel.message = String(localized: "Select audio or video files to transcribe.")
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
         importBatchFiles(panel.urls)
     }
