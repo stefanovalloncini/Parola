@@ -20,7 +20,8 @@ final class LiveCaptionsController {
     private(set) var hasHistory: Bool = false
     var translateToEnglish: Bool = false
 
-    private var panel: NSPanel?
+    private(set) var panel: NSPanel?
+    @ObservationIgnored private var panelCloseObserver: (any NSObjectProtocol)?
     /// Off in tests, which drive a session without putting a floating panel on screen.
     private let showsPanel: Bool
     private var presenterWindow: NSWindow?
@@ -35,6 +36,7 @@ final class LiveCaptionsController {
 
     isolated deinit {
         consumer?.cancel()
+        if let panelCloseObserver { NotificationCenter.default.removeObserver(panelCloseObserver) }
     }
 
     var isPresenterOpen: Bool { presenterWindow != nil }
@@ -127,18 +129,30 @@ final class LiveCaptionsController {
     }
 
     private func showWindow() {
+        let panel = panel ?? makePanel()
         guard showsPanel else { return }
-        if panel == nil {
-            panel = LiveCaptionsWindow.make { [weak self] in
-                if let self {
-                    LiveCaptionsView(controller: self)
-                } else {
-                    EmptyView()
-                }
+        panel.center()
+        panel.orderFrontRegardless()
+    }
+
+    private func makePanel() -> NSPanel {
+        let made = LiveCaptionsWindow.make { [weak self] in
+            if let self {
+                LiveCaptionsView(controller: self)
+            } else {
+                EmptyView()
             }
         }
-        panel?.center()
-        panel?.orderFrontRegardless()
+        panelCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: made, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Task { await self.stop() }
+            }
+        }
+        panel = made
+        return made
     }
 
     private func hideWindow() {

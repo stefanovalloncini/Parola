@@ -11,6 +11,7 @@ enum LiveCaptionsWindow {
             defer: false
         )
         panel.title = "Live Captions"
+        panel.isReleasedWhenClosed = false
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
