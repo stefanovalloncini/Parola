@@ -882,4 +882,116 @@ struct DictationCoordinatorTests {
         let inserted = await inserter.inserted
         #expect(inserted == ["deferred stop"], "a stop requested mid-startup must finish the session once the recorder is up")
     }
+
+    private actor CallOrderRecorder {
+        private(set) var events: [String] = []
+        func record(_ event: String) { events.append(event) }
+    }
+
+    private actor LoggingMuter: SystemAudioMuter {
+        private let log: CallOrderRecorder
+        private var current = false
+        init(log: CallOrderRecorder) { self.log = log }
+        func isMuted() async -> Bool {
+            await log.record("mediaSession.enterRecording")
+            return current
+        }
+        func setMuted(_ muted: Bool) async { current = muted }
+    }
+
+    private actor LoggingPlayer: MediaPlaybackToggler {
+        func pause() async {}
+        func play() async {}
+    }
+
+    private actor LoggingRecorder: DictationRecorder {
+        private let log: CallOrderRecorder
+        init(log: CallOrderRecorder) { self.log = log }
+        func start() async throws { await log.record("recorder.start") }
+        func stopAndTranscribe() async throws -> String { "done" }
+        func stopAndDiscard() async {}
+    }
+
+    @Test("willListen runs before mediaSession.enterRecording and before recorder.start()")
+    func willListenRunsBeforeSessionAndRecorder() async throws {
+        let log = CallOrderRecorder()
+        let media = MediaSession(muter: LoggingMuter(log: log), player: LoggingPlayer())
+        let coord = DictationCoordinator(
+            hotkey: MockHotkey(),
+            recorder: LoggingRecorder(log: log),
+            inserter: MockInserter(),
+            mediaSession: media,
+            mediaConfigProvider: { MediaSessionConfig(muteSystemAudio: true, pausePlayback: false) },
+            willListen: { await log.record("willListen") }
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await #expect(coord.state == .listening)
+        let events = await log.events
+        #expect(events == ["willListen", "mediaSession.enterRecording", "recorder.start"])
+    }
+
+    @Test("a nil willListen hook leaves today's start order unchanged")
+    func nilWillListenLeavesOrderUnchanged() async throws {
+        let log = CallOrderRecorder()
+        let media = MediaSession(muter: LoggingMuter(log: log), player: LoggingPlayer())
+        let coord = DictationCoordinator(
+            hotkey: MockHotkey(),
+            recorder: LoggingRecorder(log: log),
+            inserter: MockInserter(),
+            mediaSession: media,
+            mediaConfigProvider: { MediaSessionConfig(muteSystemAudio: true, pausePlayback: false) }
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await #expect(coord.state == .listening)
+        let events = await log.events
+        #expect(events == ["mediaSession.enterRecording", "recorder.start"])
+    }
+
+    private actor Gate {
+        private var continuation: CheckedContinuation<Void, Never>?
+        private(set) var isWaiting = false
+        func wait() async {
+            isWaiting = true
+            await withCheckedContinuation { continuation = $0 }
+        }
+        func open() {
+            isWaiting = false
+            continuation?.resume()
+            continuation = nil
+        }
+    }
+
+    @Test("a willListen hook that awaits a gate holds recorder.start() until released")
+    func willListenGateHoldsRecorderStart() async throws {
+        let gate = Gate()
+        let recorder = MockRecorder(outcome: .text("hi"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(
+            hotkey: MockHotkey(),
+            recorder: recorder,
+            inserter: inserter,
+            willListen: { await gate.wait() }
+        )
+        await coord.startMonitoring()
+
+        let press = Task { await coord.simulatePress() }
+        var spins = 0
+        while await gate.isWaiting == false {
+            await Task.yield()
+            spins += 1
+            if spins > 100_000 { break }
+        }
+
+        let startsBeforeOpen = await recorder.startCalls
+        #expect(startsBeforeOpen == 0, "recorder.start() must not run while the willListen hook is still awaiting")
+
+        await gate.open()
+        await press.value
+
+        await #expect(coord.state == .listening)
+        let startsAfterOpen = await recorder.startCalls
+        #expect(startsAfterOpen == 1)
+    }
 }

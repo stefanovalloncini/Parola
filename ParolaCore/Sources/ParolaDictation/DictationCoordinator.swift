@@ -19,6 +19,7 @@ public actor DictationCoordinator {
     private let onStateChange: @Sendable (State) async -> Void
     private var mediaSession: MediaSession?
     private var mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)?
+    private var willListen: (@Sendable () async -> Void)?
     private var eventTask: Task<Void, Never>?
     private var eventContinuation: AsyncStream<(HotkeyEvent, Date)>.Continuation?
 
@@ -58,6 +59,7 @@ public actor DictationCoordinator {
         mode: DictationMode = .pushToTalk,
         mediaSession: MediaSession? = nil,
         mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil,
+        willListen: (@Sendable () async -> Void)? = nil,
         features: FeatureSet = .resolve(),
         onStateChange: @escaping @Sendable (State) async -> Void
     ) {
@@ -68,6 +70,7 @@ public actor DictationCoordinator {
         self.mode = mode
         self.mediaSession = mediaSession
         self.mediaConfigProvider = mediaConfigProvider
+        self.willListen = willListen
         self.features = features
         self.onStateChange = onStateChange
     }
@@ -80,6 +83,7 @@ public actor DictationCoordinator {
         mode: DictationMode = .pushToTalk,
         mediaSession: MediaSession? = nil,
         mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil,
+        willListen: (@Sendable () async -> Void)? = nil,
         features: FeatureSet = .resolve()
     ) {
         self.hotkey = hotkey
@@ -89,6 +93,7 @@ public actor DictationCoordinator {
         self.mode = mode
         self.mediaSession = mediaSession
         self.mediaConfigProvider = mediaConfigProvider
+        self.willListen = willListen
         self.features = features
         self.onStateChange = { _ in }
     }
@@ -298,6 +303,9 @@ public actor DictationCoordinator {
         startInFlight = true
         releaseDuringStart = false
         stopRequestedDuringStart = false
+        // After startInFlight so a press racing this await is deferred by `handle`'s own
+        // guard, not re-entering beginListening while state is still .idle/.failed.
+        await willListen?()
         if let session = mediaSession {
             let config = await mediaConfigProvider?() ?? .none
             await session.enterRecording(config: config)
