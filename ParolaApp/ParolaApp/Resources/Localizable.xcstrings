@@ -13721,17 +13721,6 @@
         }
       }
     },
-    "Shortcut: %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scorciatoia: %@"
-          }
-        }
-      }
-    },
     "Shortcuts": {
       "extractionState": "manual",
       "localizations": {

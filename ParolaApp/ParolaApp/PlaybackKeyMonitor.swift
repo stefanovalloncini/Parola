@@ -67,6 +67,32 @@ final class PlaybackKeyMonitor {
         return true
     }
 
+    /// The keys the Playback menu shows; the monitor owns them, so the menu's key equivalents never fire.
+    nonisolated static func isMenuKey(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+        switch (keyCode, modifiers.intersection([.command, .option, .control, .shift])) {
+        case (49, []), (123, [.command]), (124, [.command]): return true
+        default: return false
+        }
+    }
+
+    /// The event to pass on, or nil when it was used here or handed straight to its window past the menu.
+    static func route(_ event: NSEvent, window: NSWindow?, model: AppModel) -> NSEvent? {
+        let used = handle(
+            keyCode: event.keyCode,
+            modifiers: event.modifierFlags,
+            isRepeat: event.isARepeat,
+            firstResponder: window?.firstResponder,
+            inMainWindow: window != nil && window === model.mainWindow,
+            model: model
+        )
+        if used { return nil }
+        guard let window, model.keyWindowHasPlayer, isMenuKey(keyCode: event.keyCode, modifiers: event.modifierFlags) else {
+            return event
+        }
+        window.sendEvent(event)
+        return nil
+    }
+
     /// A control with keyboard focus that Space presses, as Full Keyboard Access gives one.
     static func takesSpace(_ responder: NSResponder?) -> Bool {
         if responder is NSButton || responder is NSSegmentedControl { return true }
@@ -84,16 +110,7 @@ final class PlaybackKeyMonitor {
         self.model = model
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let model = self?.model else { return event }
-            let window = event.window ?? NSApp.keyWindow
-            let used = Self.handle(
-                keyCode: event.keyCode,
-                modifiers: event.modifierFlags,
-                isRepeat: event.isARepeat,
-                firstResponder: window?.firstResponder,
-                inMainWindow: window != nil && window === model.mainWindow,
-                model: model
-            )
-            return used ? nil : event
+            return Self.route(event, window: event.window ?? NSApp.keyWindow, model: model)
         }
     }
 }
