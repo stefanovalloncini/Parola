@@ -3013,6 +3013,17 @@
         }
       }
     },
+    "Captures a single app's audio. Used for a detected meeting when “Record only the meeting app's audio” is on.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cattura l'audio di una sola app. Lo usa una riunione rilevata quando è attivo “Registra solo l'audio dell'app della riunione”."
+          }
+        }
+      }
+    },
     "Captures the start and end time of each word. Required for karaoke highlight.": {
       "extractionState": "manual",
       "localizations": {
@@ -3020,6 +3031,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cattura inizio e fine di ogni parola. Richiesto per il karaoke."
+          }
+        }
+      }
+    },
+    "Captures the system-wide audio mix. Every system audio recording uses it, except a detected meeting when “Record only the meeting app's audio” is on.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cattura tutto l'audio di sistema. Lo usa ogni registrazione dell'audio di sistema, tranne una riunione rilevata quando è attivo “Registra solo l'audio dell'app della riunione”."
           }
         }
       }
@@ -7797,6 +7819,17 @@
         }
       }
     },
+    "Leaves notification sounds and other apps out of the recording. Skip this if the meeting app plays audio through a helper the recording could miss.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lascia fuori dalla registrazione i suoni delle notifiche e le altre app. Non attivarlo se l'app della riunione riproduce l'audio tramite un processo di supporto che la registrazione potrebbe perdere."
+          }
+        }
+      }
+    },
     "Length": {
       "extractionState": "manual",
       "localizations": {
@@ -11811,6 +11844,17 @@
         }
       }
     },
+    "Record only the meeting app's audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra solo l'audio dell'app della riunione"
+          }
+        }
+      }
+    },
     "Record system audio": {
       "extractionState": "manual",
       "localizations": {
@@ -12994,6 +13038,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salvataggio della registrazione prima di chiudere Parola…"
+          }
+        }
+      }
+    },
+    "Screen Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione schermo"
           }
         }
       }

@@ -14,9 +14,9 @@ struct RecordMeetingsPane: View {
         var systemAudio: Bool
     }
 
-    /// One capture at a time: the whole mix needs Screen Recording, one app's audio needs System Audio Recording.
+    /// Only a detected meeting with app-only capture taps one app; every other system audio take records the whole mix.
     nonisolated static func neededPermissions(appOnly: Bool) -> NeededPermissions {
-        NeededPermissions(screenRecording: !appOnly, systemAudio: appOnly)
+        NeededPermissions(screenRecording: true, systemAudio: appOnly)
     }
 
     var body: some View {
@@ -27,7 +27,7 @@ struct RecordMeetingsPane: View {
             SettingsSection("Permissions") {
                 PermissionRow(
                     title: String(localized: "Screen Recording"),
-                    detail: String(localized: "Captures the system-wide audio mix. Used unless “Record only the meeting app's audio” is on."),
+                    detail: String(localized: "Captures the system-wide audio mix. Every system audio recording uses it, except a detected meeting when “Record only the meeting app's audio” is on."),
                     granted: model.capturePermissions.screenRecordingGranted,
                     isFirst: true,
                     axID: "RecordMeetings.Button.GrantScreenRecording",
@@ -37,7 +37,7 @@ struct RecordMeetingsPane: View {
                 )
                 PermissionRow(
                     title: String(localized: "System Audio Recording"),
-                    detail: String(localized: "Captures a single app's audio. Used when “Record only the meeting app's audio” is on."),
+                    detail: String(localized: "Captures a single app's audio. Used for a detected meeting when “Record only the meeting app's audio” is on."),
                     granted: model.capturePermissions.systemAudioGranted,
                     isFirst: false,
                     axID: "RecordMeetings.Button.GrantSystemAudio",
