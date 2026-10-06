@@ -275,11 +275,12 @@ actor StreamingModelCache {
         }
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
+                pending.withLock { $0 = continuation }
+                // Checked after the store: a cancel that came before it found nothing to resume.
                 if Task.isCancelled {
-                    continuation.resume(throwing: CancellationError())
+                    take()?.resume(throwing: CancellationError())
                     return
                 }
-                pending.withLock { $0 = continuation }
                 Task {
                     let result: Result<SharedWhisperKit, Error>
                     do { result = .success(try await task.value) } catch { result = .failure(error) }
