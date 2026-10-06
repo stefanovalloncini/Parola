@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Parola
@@ -94,5 +95,27 @@ struct PageCommandsTests {
         model.setTranscriptPaneMode(.transcript)
 
         #expect(model.transcriptPaneMode == .transcript)
+    }
+
+    private func viewMenu() async -> NSMenu? {
+        await waitUntil { NSApp.mainMenu?.items.first { $0.title == "View" }?.submenu != nil }
+        return NSApp.mainMenu?.items.first { $0.title == "View" }?.submenu
+    }
+
+    @Test("View ▸ Go reaches every sidebar page and Statistics on ⌥⌘1–7, and View shows or hides the sidebar")
+    func goSectionInTheViewMenu() async throws {
+        let view = try #require(await viewMenu())
+        let titles = view.items.map(\.title)
+        let go = try #require(titles.firstIndex(of: "Go"))
+        let pages = ["Library", "Transcriptions", "Meetings", "Dictations", "Activity", "Recently Deleted", "Statistics"]
+
+        for (offset, page) in pages.enumerated() {
+            let item = view.items[go + 1 + offset]
+            #expect(item.title == page)
+            #expect(item.keyEquivalent == String(offset + 1))
+            #expect(item.keyEquivalentModifierMask == [.command, .option])
+        }
+        let sidebar = titles.contains("Show Sidebar") || titles.contains("Hide Sidebar")
+        #expect(sidebar)
     }
 }

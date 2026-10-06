@@ -135,8 +135,12 @@ struct ParolaApp: App {
             CommandGroup(after: .newItem) {
                 LibraryRowCommands(model: model)
             }
+            SidebarCommands()
             CommandGroup(after: .sidebar) {
                 ViewCommands(model: model)
+            }
+            CommandGroup(after: .sidebar) {
+                GoCommands(model: model)
             }
             CommandGroup(after: .textEditing) {
                 EditCommands(model: model)

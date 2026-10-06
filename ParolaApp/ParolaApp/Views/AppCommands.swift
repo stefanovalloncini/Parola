@@ -201,10 +201,6 @@ struct ViewCommands: View {
         .axLeaf("Menu.View.Inspector")
         Toggle("Always on Top", isOn: $model.mainWindowAlwaysOnTop)
         MiniPlayerCommand()
-        Divider()
-        Button("Statistics") { model.openStatistics() }
-            .disabled(model.introduction.isPresented)
-            .axLeaf("Menu.View.Statistics")
     }
 
     private func layoutBinding(_ layout: TranscriptDisplayMode) -> Binding<Bool> {

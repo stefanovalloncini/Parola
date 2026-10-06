@@ -62,6 +62,7 @@ struct MenuLeafFlagsTests {
         _ = HelpCommands(model: model, showShortcuts: {}).body
         _ = FileCommands(model: model).body
         _ = ViewCommands(model: model).body
+        _ = GoCommands(model: model).body
         _ = EditCommands(model: model).body
         _ = PlaybackCommands(model: model).body
         _ = CaptionsCommands(model: model, scratchpad: ScratchpadController(), liveCaptions: LiveCaptionsController()).body

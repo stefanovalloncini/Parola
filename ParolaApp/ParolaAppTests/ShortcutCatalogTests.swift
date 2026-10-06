@@ -44,8 +44,8 @@ struct ShortcutCatalogTests {
         let it = try #require(Bundle(path: path))
         let sections = ShortcutCatalog.sections(features: .all, bundle: it)
         #expect(sections.map(\.title) == [
-            "Acquisizione", "Registrazione", "Trascrizione", "Trova", "Copia ed esporta", "Riproduzione", "Navigazione", "Libreria",
-            "Aiuto",
+            "Acquisizione", "Registrazione", "Trascrizione", "Trova", "Copia ed esporta", "Riproduzione", "Navigazione", "Vai",
+            "Libreria", "Aiuto",
         ])
         let italian = sections.flatMap(\.entries).map(\.label)
         let english = ShortcutCatalog.sections(features: .all).flatMap(\.entries).map(\.label)
@@ -116,6 +116,7 @@ struct ShortcutCatalogTests {
 
     private static let menuFiles = [
         "Views/AppCommands", "Views/MiniPlayerCommand", "Views/Chat/FocusChatComposerCommand", "Views/Library/LibraryRowCommands",
+        "Views/GoCommands",
     ]
 
     @Test("no two menu commands share a key")

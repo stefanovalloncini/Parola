@@ -102,6 +102,16 @@ struct ShortcutCatalog {
                 Entry(label: text("Search Library"),             keys: "⌘ ⌥ F"),
                 Entry(label: text("Auto-Detect Language"),       keys: "⌘ ⇧ D"),
             ]),
+            Section(title: text("Go"), entries: [
+                Entry(label: text("Library"),                    keys: "⌘ ⌥ 1"),
+                Entry(label: text("Transcriptions"),             keys: "⌘ ⌥ 2"),
+                Entry(label: text("Meetings"),                   keys: "⌘ ⌥ 3", requires: .meetings),
+                Entry(label: text("Dictations"),                 keys: "⌘ ⌥ 4", requires: .dictation),
+                Entry(label: text("Activity"),                   keys: "⌘ ⌥ 5"),
+                Entry(label: text("Recently Deleted"),           keys: "⌘ ⌥ 6"),
+                Entry(label: text("Statistics"),                 keys: "⌘ ⌥ 7"),
+                Entry(label: text("Show or Hide Sidebar"),       keys: "⌘ ⌃ S"),
+            ]),
             Section(title: text("Library"), entries: [
                 Entry(label: text("Move to Recently Deleted"),   keys: "⌘ ⌫"),
             ]),

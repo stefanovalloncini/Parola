@@ -13886,6 +13886,17 @@
         }
       }
     },
+    "Show or Hide Sidebar": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra o nascondi la barra laterale"
+          }
+        }
+      }
+    },
     "Show replace": {
       "extractionState": "manual",
       "localizations": {
