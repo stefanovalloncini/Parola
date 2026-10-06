@@ -3,9 +3,9 @@ import ParolaCore
 
 struct FormatInspector: View {
     @Environment(AppModel.self) private var model
-    @State private var newSpeaker: String = ""
+    @State private var newPerson: String = ""
     @State private var speakerRows: [(label: String, count: Int)] = []
-    @FocusState private var speakerFocused: Bool
+    @FocusState private var personFieldFocused: Bool
 
     private var displayMode: TranscriptDisplayMode {
         model.transcriptDisplayMode
@@ -21,11 +21,11 @@ struct FormatInspector: View {
                 ForEach(speakerRows, id: \.label) { row in
                     SpeakerPersonRow(label: row.label, segmentCount: row.count)
                 }
-                TextField("Add a speaker…", text: $newSpeaker)
+                TextField("Add a person…", text: $newPerson)
                     .textFieldStyle(.plain)
-                    .focused($speakerFocused)
-                    .fieldChrome(focused: speakerFocused)
-                    .onSubmit { commitSpeaker() }
+                    .focused($personFieldFocused)
+                    .fieldChrome(focused: personFieldFocused)
+                    .onSubmit { commitPerson() }
                     .axLeaf("Inspector.TextField.AddSpeaker")
                 Button("Manage People…") { model.showingPeopleSheet = true }
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
@@ -71,11 +71,11 @@ struct FormatInspector: View {
         }
     }
 
-    private func commitSpeaker() {
-        let trimmed = newSpeaker.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func commitPerson() {
+        let trimmed = newPerson.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         Task { await model.addPerson(named: trimmed) }
-        newSpeaker = ""
+        newPerson = ""
     }
 }
 

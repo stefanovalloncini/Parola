@@ -56,6 +56,15 @@ struct TranscriptMenuTests {
         #expect(popover.contains(#"footerButton("No Speaker")"#))
     }
 
+    @Test("the inspector's field adds a person, as the People sheet's does; only the speaker popover adds a speaker")
+    func addAPersonMeansOneThing() throws {
+        let inspector = try source("Views/Transcript/FormatInspector")
+        #expect(inspector.contains(#"TextField("Add a person…", text: $newPerson)"#))
+        #expect(!inspector.contains("Add a speaker…"))
+        let sheet = try source("Views/People/ManagePeopleSheet")
+        #expect(sheet.contains(#"TextField("Add a person…""#))
+    }
+
     @Test("the display options are checked View menu items")
     func displayOptionsAreViewToggles() throws {
         let commands = try source("Views/AppCommands")
