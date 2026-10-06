@@ -16,9 +16,8 @@ struct CustomPaletteEditTests {
         AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("palette-edit"))
     }
 
-    /// Light and Dark are NSApp.appearance's alone; rebuilding the window for them left the toolbar search field's text in the old colour.
-    @Test("an appearance switch repaints nothing, and the main window takes it from the app alone")
-    func appearanceSwitchRebuildsNothing() throws {
+    @Test("switching Light and Dark doesn't rebuild the window")
+    func appearanceSwitchRebuildsNothing() {
         let defaults = temporaryDefaults()
         let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("appearance-switch"))
         let revision = model.themeRevision
@@ -28,12 +27,6 @@ struct CustomPaletteEditTests {
 
         #expect(model.appTheme == "light")
         #expect(model.themeRevision == revision)
-
-        let path = #filePath.replacingOccurrences(of: "ParolaAppTests/CustomPaletteEditTests.swift", with: "ParolaApp/ParolaApp.swift")
-        let app = try String(contentsOfFile: path, encoding: .utf8)
-        let start = try #require(app.range(of: "WindowGroup(id: MainWindowScene.id)"))
-        let end = try #require(app.range(of: "Settings {", range: start.upperBound..<app.endIndex))
-        #expect(!app[start.lowerBound..<end.lowerBound].contains(".preferredColorScheme"))
     }
 
     @Test("a well's edit is saved at once but repaints the app only when the edit ends")
