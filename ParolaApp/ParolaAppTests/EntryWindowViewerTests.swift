@@ -279,6 +279,21 @@ struct EntryWindowViewerTests {
         #expect(commands.contains(#"Button("Open in Main Window") { model.openKeyViewerInMainWindow() } .disabled(!model.keyWindowIsViewer)"#))
     }
 
+    @Test("Open in Main Window shows the transcript again when a list page covers it")
+    func openInMainWindowBringsTheTranscriptBackOverAListPage() async throws {
+        let model = EntryWindowTestSupport.makeModel("viewer-list-covers-transcript")
+        let entry = try await EntryWindowTestSupport.seed(model, texts: ["alpha"], speakers: [nil], audio: nil)
+        model.openInMainWindow(entry.id) {}
+        let opened = await waitUntil { model.selectedEntryID == entry.id && model.transcript != nil }
+        #expect(opened)
+
+        model.route = .queue
+        model.openInMainWindow(entry.id) {}
+
+        let backOnScreen = await waitUntil { model.route == .transcript }
+        #expect(backOnScreen)
+    }
+
     @Test("the viewer's Segments layout keeps the main window's reading width")
     func viewerSegmentsKeepTheReadingWidth() async throws {
         let model = EntryWindowTestSupport.makeModel("viewer-width")

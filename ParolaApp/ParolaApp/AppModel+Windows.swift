@@ -68,7 +68,7 @@ extension AppModel {
     /// A viewer is read-only: this brings its entry up in the main window, where it can be edited.
     func openInMainWindow(_ id: LibraryEntry.ID, activate: () -> Void = { NSApp.activate(ignoringOtherApps: true) }) {
         bringMainWindowForward(activate: activate)
-        guard selectedEntryID != id || transcript == nil else { return }
+        guard selectedEntryID != id || transcript == nil || !transcriptIsOnScreen else { return }
         _ = loadEntry(id)
     }
 
