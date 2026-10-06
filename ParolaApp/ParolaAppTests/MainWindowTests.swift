@@ -35,6 +35,25 @@ struct MainWindowTests {
         #expect(released)
     }
 
+    @Test("the main window takes no tabs, so View ▸ Show Tab Bar can't open a second one over the same model")
+    func mainWindowTakesNoTabs() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("main-window-tabs"))
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 240, height: 120),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: true
+        )
+        window.isReleasedWhenClosed = false
+        #expect(window.tabbingMode != .disallowed)
+
+        window.contentView = NSHostingView(rootView: Color.clear.background(MainWindowReporter(model: model)))
+        window.contentView?.layoutSubtreeIfNeeded()
+
+        #expect(window.tabbingMode == .disallowed)
+        window.close()
+    }
+
     @Test("from outside any scene, a closed main window opens again through the opener the scene handed over")
     func closedWindowOpensAgain() {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("main-window-reopen"))

@@ -67,6 +67,8 @@ struct MainWindowReporter: NSViewRepresentable {
             if let observer { NotificationCenter.default.removeObserver(observer) }
             observer = nil
             guard let window else { return }
+            // Every main window shares one model, so a tab would be a second copy of the same pages.
+            window.tabbingMode = .disallowed
             model?.mainWindow = window
             if let model { MainWindowCloseGuard.install(on: window, model: model) }
             observer = NotificationCenter.default.addObserver(
