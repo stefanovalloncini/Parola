@@ -83,13 +83,25 @@ struct TakeCategoryPicker: View {
             get: { take.category },
             set: { Self.choose($0, for: take.takeID, model: model) }
         )) {
-            Text("Note").tag(EntryCategory.transcription)
-            Text("Meeting").tag(EntryCategory.meeting)
+            ForEach(Self.choices, id: \.self) { category in
+                Text(Self.title(for: category)).tag(category)
+            }
         }
         .pickerStyle(.segmented)
         .labelsHidden()
         .fixedSize()
         .axLeaf("Stage.Picker.Category")
+    }
+
+    static let choices: [EntryCategory] = [.transcription, .meeting]
+
+    /// Singular of the sidebar's section names, so the picker, the saved notice and the sidebar agree.
+    nonisolated static func title(for category: EntryCategory, bundle: Bundle = .main) -> String {
+        switch category {
+        case .transcription: String(localized: "Transcription", bundle: bundle)
+        case .meeting: String(localized: "Meeting", bundle: bundle)
+        case .dictation: String(localized: "Dictation", bundle: bundle)
+        }
     }
 
     static func choose(_ category: EntryCategory, for takeID: Int, model: AppModel) {
