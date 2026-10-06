@@ -315,7 +315,7 @@ final class DictationController {
 
     static func isPlainEscape(_ event: NSEvent) -> Bool {
         event.keyCode == UInt16(kVK_Escape)
-            && event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty
+            && event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .function]).isEmpty
             && !event.isARepeat
     }
 

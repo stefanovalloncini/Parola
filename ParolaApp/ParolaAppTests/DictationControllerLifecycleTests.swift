@@ -264,8 +264,12 @@ struct DictationControllerLifecycleTests {
         let plain = try #require(Self.keyEvent(keyCode: escape, modifierFlags: [], isARepeat: false))
         let withCommand = try #require(Self.keyEvent(keyCode: escape, modifierFlags: .command, isARepeat: false))
         let repeated = try #require(Self.keyEvent(keyCode: escape, modifierFlags: [], isARepeat: true))
+        let withCapsLock = try #require(Self.keyEvent(keyCode: escape, modifierFlags: .capsLock, isARepeat: false))
+        let withFunction = try #require(Self.keyEvent(keyCode: escape, modifierFlags: .function, isARepeat: false))
 
         #expect(DictationController.isPlainEscape(plain))
+        #expect(DictationController.isPlainEscape(withCapsLock), "Caps Lock stays on; Escape must still cancel")
+        #expect(DictationController.isPlainEscape(withFunction))
         #expect(!DictationController.isPlainEscape(withCommand))
         #expect(!DictationController.isPlainEscape(repeated))
     }

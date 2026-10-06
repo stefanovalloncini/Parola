@@ -83,8 +83,7 @@ struct SettingsControlNamesTests {
         #expect(walked > 60, "the walk found \(walked) controls; the panes didn't render")
     }
 
-    /// Local Models stays out of the walk above (its `.task` scans the model store), so its Sort
-    /// chip is named directly instead.
+    /// Local Models stays out of the walk above (its `.task` scans the model store), so its Sort chip is checked here.
     @Test("the Local Models sort chip is named for VoiceOver on its own")
     func localModelsSortChipIsNamed() {
         let pane = ModelsSettingsPane()
