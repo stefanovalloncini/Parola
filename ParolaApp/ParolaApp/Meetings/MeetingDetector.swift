@@ -88,10 +88,7 @@ final class MeetingDetector {
             Task { @MainActor in self?.quit(appName: display) }
         }
         observerTokens.append(quitToken)
-        for display in runningApps() {
-            fire(appName: display)
-            break
-        }
+        if let display = runningApps().sorted().first { fire(appName: display) }
     }
 
     func fire(appName: String) {
