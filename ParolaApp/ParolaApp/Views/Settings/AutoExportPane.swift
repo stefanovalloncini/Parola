@@ -168,17 +168,7 @@ struct AutoExportPane: View {
 
     private var sortMenu: some View {
         Menu {
-            ForEach(AutoExportSort.allCases, id: \.self) { option in
-                Button {
-                    sort = option
-                } label: {
-                    if sort == option {
-                        Label(option.title, systemImage: "checkmark")
-                    } else {
-                        Text(option.title)
-                    }
-                }
-            }
+            sortOptions
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
@@ -187,7 +177,24 @@ struct AutoExportPane: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort")
+        .accessibilityRepresentation {
+            Menu("Sort") { sortOptions }
+        }
         .axLeaf("AutoExport.Menu.Sort")
+    }
+
+    @ViewBuilder private var sortOptions: some View {
+        ForEach(AutoExportSort.allCases, id: \.self) { option in
+            Button {
+                sort = option
+            } label: {
+                if sort == option {
+                    Label(option.title, systemImage: "checkmark")
+                } else {
+                    Text(option.title)
+                }
+            }
+        }
     }
 }
 

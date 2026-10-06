@@ -122,17 +122,7 @@ struct FindReplacePane: View {
             RuleEnabledFilterChips(filter: $statusFilter)
             Spacer()
             Menu {
-                ForEach(SortOption.allCases, id: \.self) { option in
-                    Button {
-                        sortOption = option
-                    } label: {
-                        if sortOption == option {
-                            Label(option.label, systemImage: "checkmark")
-                        } else {
-                            Text(option.label)
-                        }
-                    }
-                }
+                sortOptions
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
@@ -141,7 +131,24 @@ struct FindReplacePane: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Sort rules")
+            .accessibilityRepresentation {
+                Menu("Sort rules") { sortOptions }
+            }
             .axLeaf("FindReplace.Menu.Sort")
+        }
+    }
+
+    @ViewBuilder private var sortOptions: some View {
+        ForEach(SortOption.allCases, id: \.self) { option in
+            Button {
+                sortOption = option
+            } label: {
+                if sortOption == option {
+                    Label(option.label, systemImage: "checkmark")
+                } else {
+                    Text(option.label)
+                }
+            }
         }
     }
 
@@ -189,7 +196,7 @@ private struct FindReplaceRuleRow: View {
             if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Toggle("", isOn: enabledBinding)
+                    Toggle("Use this rule", isOn: enabledBinding)
                         .labelsHidden()
                         .disabled(!canEnable)
                         .axLeaf("FindReplace.Toggle.RuleEnabled")

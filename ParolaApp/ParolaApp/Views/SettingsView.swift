@@ -324,6 +324,7 @@ struct SettingRow<Trailing: View>: View {
     private let descriptionText: Text?
     @ViewBuilder var trailing: Trailing
     let isFirst: Bool
+    @Namespace private var pair
 
     init(_ title: LocalizedStringKey, description: LocalizedStringKey? = nil, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
         self.titleText = Text(title)
@@ -363,6 +364,7 @@ struct SettingRow<Trailing: View>: View {
                     titleText
                         .font(DS.Font.body)
                         .foregroundStyle(DS.Color.primaryText)
+                        .accessibilityLabeledPair(role: .label, id: "row", in: pair)
                     if let descriptionText {
                         descriptionText
                             .font(DS.Font.secondary)
@@ -372,6 +374,7 @@ struct SettingRow<Trailing: View>: View {
                 Spacer(minLength: 12)
                 trailing
                     .toggleStyle(DSSwitchToggleStyle())
+                    .accessibilityLabeledPair(role: .content, id: "row", in: pair)
             }
             .padding(.horizontal, DS.Spacing.medium)
             .padding(.vertical, DS.Spacing.small)

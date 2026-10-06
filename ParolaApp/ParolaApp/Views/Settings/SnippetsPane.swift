@@ -107,7 +107,7 @@ private struct SnippetRow: View {
             if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Toggle("", isOn: enabledBinding)
+                    Toggle("Use this snippet", isOn: enabledBinding)
                         .labelsHidden()
                         .disabled(!canEnable)
                         .axLeaf("Snippets.Toggle.SnippetEnabled")

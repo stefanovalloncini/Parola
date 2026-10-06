@@ -60,12 +60,17 @@ enum HostedAccessibility {
         let identifier: String?
         let label: String?
         let value: String?
+        /// Its title, or the label of the element that titles it, the way a settings row's text names its switch.
+        let title: String?
+        let role: String?
         /// In screen coordinates.
         let frame: CGRect
         /// The named actions VoiceOver lists in its Actions rotor.
         let actions: [String]
 
         var words: [String] { [label, value].compactMap { $0 }.filter { !$0.isEmpty } }
+        /// What VoiceOver calls the element: its label, or else its title element's.
+        var name: String? { [label, title].compactMap { $0?.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } }
     }
 
     static func elements(in root: NSObject) -> [Element] {
@@ -119,6 +124,12 @@ enum HostedAccessibility {
                     identifier: read("accessibilityIdentifier", of: child) as? String,
                     label: read("accessibilityLabel", of: child) as? String,
                     value: read("accessibilityValue", of: child) as? String,
+                    title: (read("accessibilityTitle", of: child) as? String).flatMap { $0.isEmpty ? nil : $0 }
+                        ?? (read("accessibilityTitleUIElement", of: child) as? NSObject).flatMap {
+                            (read("accessibilityLabel", of: $0) as? String) ?? (read("accessibilityValue", of: $0) as? String)
+                        },
+                    role: (read("accessibilityRole", of: child) as? NSAccessibility.Role)?.rawValue
+                        ?? read("accessibilityRole", of: child) as? String,
                     frame: (read("accessibilityFrame", of: child) as? NSValue)?.rectValue ?? .zero,
                     actions: (read("accessibilityCustomActions", of: child) as? [NSAccessibilityCustomAction])?.map(\.name) ?? []
                 ))

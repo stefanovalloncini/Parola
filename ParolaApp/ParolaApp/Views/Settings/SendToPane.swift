@@ -104,7 +104,7 @@ private struct DestinationRow: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Toggle("", isOn: enabledBinding)
+            Toggle("Use this destination", isOn: enabledBinding)
                 .labelsHidden()
                 .toggleStyle(DSSwitchToggleStyle())
                 .disabled(stored.destination == nil)
@@ -173,7 +173,7 @@ private struct DestinationRow: View {
 
             Spacer(minLength: 8)
 
-            Picker("", selection: titleFormatBinding) {
+            Picker("Note name", selection: titleFormatBinding) {
                 ForEach(TitleFormat.allCases) { format in
                     Text(LocalizedStringKey(format.displayName)).tag(format)
                 }

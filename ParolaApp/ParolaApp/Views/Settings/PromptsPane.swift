@@ -109,17 +109,7 @@ struct PromptsPane: View {
         HStack {
             Spacer()
             Menu {
-                ForEach(SortOption.allCases, id: \.self) { option in
-                    Button {
-                        sortOption = option
-                    } label: {
-                        if sortOption == option {
-                            Label(option.label, systemImage: "checkmark")
-                        } else {
-                            Text(option.label)
-                        }
-                    }
-                }
+                sortOptions
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
@@ -128,7 +118,24 @@ struct PromptsPane: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Sort prompts")
+            .accessibilityRepresentation {
+                Menu("Sort prompts") { sortOptions }
+            }
             .axLeaf("Prompts.Menu.Sort")
+        }
+    }
+
+    @ViewBuilder private var sortOptions: some View {
+        ForEach(SortOption.allCases, id: \.self) { option in
+            Button {
+                sortOption = option
+            } label: {
+                if sortOption == option {
+                    Label(option.label, systemImage: "checkmark")
+                } else {
+                    Text(option.label)
+                }
+            }
         }
     }
 

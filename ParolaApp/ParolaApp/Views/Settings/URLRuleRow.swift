@@ -27,7 +27,7 @@ struct URLRuleRow: View {
                 }
                 .axLeaf("URLRule.TextField.Pattern")
 
-            Picker("", selection: promptBinding) {
+            Picker("Cleanup prompt", selection: promptBinding) {
                 Text("Default prompt").tag("")
                 ForEach(Prompt.builtIns) { prompt in
                     Text(prompt.name).tag(prompt.id.uuidString)
@@ -38,7 +38,7 @@ struct URLRuleRow: View {
             .frame(width: 140)
             .axLeaf("URLRule.Picker.Prompt")
 
-            Picker("", selection: languageBinding) {
+            Picker("Language", selection: languageBinding) {
                 Text("Default language").tag("")
                 ForEach(WorkflowLanguageOptions.options, id: \.code) { option in
                     Text(option.name).tag(option.code)
@@ -49,7 +49,7 @@ struct URLRuleRow: View {
             .frame(width: 110)
             .axLeaf("URLRule.Picker.Language")
 
-            Picker("", selection: insertionBinding) {
+            Picker("Insert with", selection: insertionBinding) {
                 Text("Paste").tag(DictationInsertionMode.paste)
                 Text("Keystrokes").tag(DictationInsertionMode.keystroke)
             }

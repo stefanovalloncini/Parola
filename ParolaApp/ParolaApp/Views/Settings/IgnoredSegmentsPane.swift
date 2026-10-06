@@ -101,17 +101,7 @@ struct IgnoredSegmentsPane: View {
 
     private var sortMenu: some View {
         Menu {
-            ForEach(IgnoredSegmentsSort.allCases, id: \.self) { option in
-                Button {
-                    sort = option
-                } label: {
-                    if sort == option {
-                        Label(option.title, systemImage: "checkmark")
-                    } else {
-                        Text(option.title)
-                    }
-                }
-            }
+            sortOptions
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
@@ -120,7 +110,24 @@ struct IgnoredSegmentsPane: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort")
+        .accessibilityRepresentation {
+            Menu("Sort") { sortOptions }
+        }
         .axLeaf("IgnoredSegments.Menu.Sort")
+    }
+
+    @ViewBuilder private var sortOptions: some View {
+        ForEach(IgnoredSegmentsSort.allCases, id: \.self) { option in
+            Button {
+                sort = option
+            } label: {
+                if sort == option {
+                    Label(option.title, systemImage: "checkmark")
+                } else {
+                    Text(option.title)
+                }
+            }
+        }
     }
 }
 
@@ -162,7 +169,7 @@ private struct IgnoredRuleRow: View {
         VStack(spacing: 0) {
             if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             HStack(spacing: 10) {
-                Toggle("", isOn: enabledBinding)
+                Toggle("Use this rule", isOn: enabledBinding)
                     .labelsHidden()
                     .disabled(!canEnable)
                     .axLeaf("IgnoredSegments.Toggle.RuleEnabled")

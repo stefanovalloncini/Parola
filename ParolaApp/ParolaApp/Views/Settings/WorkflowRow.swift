@@ -94,7 +94,7 @@ struct WorkflowRow: View {
     }
 
     private var promptPicker: some View {
-        Picker("", selection: promptBinding) {
+        Picker("Cleanup prompt", selection: promptBinding) {
             Text("Default prompt").tag("")
             ForEach(Prompt.builtIns) { prompt in
                 Text(prompt.name).tag(prompt.id.uuidString)
@@ -107,7 +107,7 @@ struct WorkflowRow: View {
     }
 
     private var languagePicker: some View {
-        Picker("", selection: languageBinding) {
+        Picker("Language", selection: languageBinding) {
             Text("Default language").tag("")
             ForEach(WorkflowLanguageOptions.options, id: \.code) { option in
                 Text(option.name).tag(option.code)
@@ -120,7 +120,7 @@ struct WorkflowRow: View {
     }
 
     private var insertionPicker: some View {
-        Picker("", selection: insertionBinding) {
+        Picker("Insert with", selection: insertionBinding) {
             Text("Paste").tag(DictationInsertionMode.paste)
             Text("Keystrokes").tag(DictationInsertionMode.keystroke)
         }

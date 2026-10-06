@@ -3435,6 +3435,17 @@
         }
       }
     },
+    "Cleanup prompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt di pulizia"
+          }
+        }
+      }
+    },
     "Clear": {
       "extractionState": "manual",
       "localizations": {
@@ -7212,6 +7223,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il livello in ingresso del dispositivo scelto, per controllarlo prima di registrare."
+          }
+        }
+      }
+    },
+    "Insert with": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inserisci con"
           }
         }
       }
@@ -17153,6 +17175,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Usa timing precisi per ogni parola"
+          }
+        }
+      }
+    },
+    "Use this destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa questa destinazione"
+          }
+        }
+      }
+    },
+    "Use this rule": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa questa regola"
+          }
+        }
+      }
+    },
+    "Use this snippet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa questo snippet"
           }
         }
       }
