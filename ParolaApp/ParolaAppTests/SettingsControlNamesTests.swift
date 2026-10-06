@@ -82,4 +82,18 @@ struct SettingsControlNamesTests {
         }
         #expect(walked > 60, "the walk found \(walked) controls; the panes didn't render")
     }
+
+    /// Local Models stays out of the walk above (its `.task` scans the model store), so its Sort
+    /// chip is named directly instead.
+    @Test("the Local Models sort chip is named for VoiceOver on its own")
+    func localModelsSortChipIsNamed() {
+        let pane = ModelsSettingsPane()
+        let hosted = HostedWindow(pane.sortMenu, width: 80, height: 80)
+        defer { hosted.close() }
+        let controls = HostedAccessibility.elements(in: hosted.host).filter { Self.controlRoles.contains($0.role ?? "") }
+        #expect(controls.isEmpty == false, "the sort chip didn't render")
+        for control in controls {
+            #expect(control.name != nil, "unnamed \(control.role ?? "control")")
+        }
+    }
 }

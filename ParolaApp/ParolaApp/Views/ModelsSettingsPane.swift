@@ -157,14 +157,10 @@ struct ModelsSettingsPane: View {
         }
     }
 
-    private var sortMenu: some View {
+    /// Not private: a direct accessibility test hosts it alone, since the pane's own `.task` scan keeps it out of the blanket walk.
+    var sortMenu: some View {
         Menu {
-            Picker("Sort by", selection: $sortOption) {
-                ForEach(SortOption.allCases) { option in
-                    Text(option.label).tag(option)
-                }
-            }
-            .pickerStyle(.inline)
+            sortPicker
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
@@ -173,7 +169,19 @@ struct ModelsSettingsPane: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort: \(sortOption.label)")
+        .accessibilityRepresentation {
+            Menu("Sort") { sortPicker }
+        }
         .axLeaf("ModelsSettings.Menu.Sort")
+    }
+
+    private var sortPicker: some View {
+        Picker("Sort by", selection: $sortOption) {
+            ForEach(SortOption.allCases) { option in
+                Text(option.label).tag(option)
+            }
+        }
+        .pickerStyle(.inline)
     }
 
     private var chipsRow: some View {
