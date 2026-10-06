@@ -25,8 +25,9 @@ extension ParolaAutomationServer {
         }
     }
 
+    /// The window draws the saved take's toast only under that take's transcript, so it is null anywhere else.
     static func takeSavedState(_ model: AppModel) -> AutomationValue {
-        guard let notice = model.takeSavedNotice else { return .null }
+        guard let notice = model.takeSavedNotice, model.takeSavedToastIsOnItsTake else { return .null }
         return .object([
             "title": .string(TakeSavedToast.message(title: notice.title, category: notice.category)),
             "category": .string(notice.category.rawValue),
@@ -52,7 +53,7 @@ extension ParolaAutomationServer {
 
     /// Presses a toast's button the way a click does; Copy fills a pasteboard of the bridge's own, which never touches the clipboard.
     static func pressToastButton(_ actionID: String, model: AppModel) async -> (pressed: Bool, copied: String?) {
-        if let saved = model.takeSavedNotice,
+        if let saved = model.takeSavedNotice, model.takeSavedToastIsOnItsTake,
            let button = takeSavedButtons(model).first(where: { toastActionID(saved.id, $0) == actionID }) {
             switch button {
             case .summarize:

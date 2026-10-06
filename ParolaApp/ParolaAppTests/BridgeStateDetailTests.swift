@@ -140,10 +140,43 @@ struct BridgeStateDetailTests {
         #expect(exported["actions"] == .array([]))
     }
 
+    /// The transcript of `entryID` on screen, where the window draws that take's saved toast.
+    private func show(_ entryID: LibraryEntry.ID, on model: AppModel) {
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Weekly numbers.")], language: "en", modelName: "stub"
+        )
+        model.selectedEntryID = entryID
+        model.phase = .ready
+        model.route = .transcript
+    }
+
+    @Test("the saved take's toast is in getState only where the window draws it, under its take's transcript")
+    func savedToastOnlyWhereDrawn() throws {
+        let (model, server) = try makeRig()
+        model.takeSavedNotice = TakeSavedNotice(entryID: "entry", title: "Weekly sync", category: .meeting)
+        guard case .object(let away) = server.snapshotState() else {
+            Issue.record("getState should return an object")
+            return
+        }
+        #expect(away["takeSavedNotice"] == .null)
+
+        show("entry", on: model)
+        let drawn = try object(server.snapshotState(), "takeSavedNotice")
+        #expect(drawn["entryID"] == .string("entry"))
+
+        show("other", on: model)
+        guard case .object(let elsewhere) = server.snapshotState() else {
+            Issue.record("getState should return an object")
+            return
+        }
+        #expect(elsewhere["takeSavedNotice"] == .null)
+    }
+
     @Test("the saved take's toast and a landing's toast report their words, where the take went and their buttons")
     func toastsCarryTheirWordsAndButtons() throws {
         let (model, server) = try makeRig()
         model.aiUnavailableReason = "Apple Intelligence is turned off."
+        show("entry", on: model)
         let saved = TakeSavedNotice(entryID: "entry", title: "Weekly sync", category: .meeting)
         model.takeSavedNotice = saved
 

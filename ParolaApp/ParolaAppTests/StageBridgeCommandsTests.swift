@@ -133,7 +133,17 @@ extension TranscriberMockSuites {
             model.aiUnavailableReason = nil
             model.summariseOperation = { _, _ in Summary(text: "the gist") }
 
-            model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, title: "Weekly sync", category: .meeting)
+            let away = TakeSavedNotice(entryID: entry.id, title: "Weekly sync", category: .meeting)
+            model.takeSavedNotice = away
+            model.route = .statistics
+            let notDrawn = try await pressing(ParolaAutomationServer.toastActionID(away.id, .copy))
+            #expect(notDrawn["pressed"] == .bool(false), "the window draws the toast only under its take, so nothing elsewhere is pressed")
+            #expect(notDrawn["takeSavedNotice"] == .null)
+            #expect(model.takeSavedNotice == away)
+
+            _ = try await model.openEntry(entry.id)
+            model.route = .transcript
+            #expect(model.takeSavedToastIsOnItsTake)
             let saved = try buttons("takeSavedNotice")
             #expect(Set(saved.keys) == ["Summarize", "Copy", "Dismiss"])
             let copied = try await pressing(try #require(saved["Copy"]))
@@ -150,7 +160,6 @@ extension TranscriberMockSuites {
             #expect(again["pressed"] == .bool(false), "a toast that went takes its buttons with it")
 
             model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, title: "Weekly sync", category: .meeting)
-            model.route = .statistics
             _ = try await pressing(try #require(try buttons("takeSavedNotice")["Summarize"]))
             let summarized = await waitUntil { model.transcript?.summary?.text == "the gist" }
             #expect(summarized)
@@ -169,10 +178,14 @@ extension TranscriberMockSuites {
             #expect(open)
 
             model.takeSavedNotice = TakeSavedNotice(entryID: entry.id, title: "Weekly sync", category: .meeting)
+            let backOnItsTake = await waitUntil { model.takeSavedToastIsOnItsTake }
+            #expect(backOnItsTake)
+            let coveredDismiss = try #require(try buttons("takeSavedNotice")["Dismiss"])
             model.installTestTake(source: .microphone)
             #expect(model.noticesWaitForStage)
-            let covered = try await pressing(try #require(try buttons("takeSavedNotice")["Dismiss"]))
+            let covered = try await pressing(coveredDismiss)
             #expect(covered["pressed"] == .bool(false), "nothing under the Stage is drawn, so nothing there is pressed")
+            #expect(covered["takeSavedNotice"] == .null)
             #expect(model.takeSavedNotice != nil)
             model.endTestTake()
             withExtendedLifetime(server) {}

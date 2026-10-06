@@ -93,7 +93,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "pressNoticeAction",
                 area: .core,
-                summary: "Test mode: presses a button under the page by the id getState lists in exportNotice.actions, takeSavedNotice.actions or arrivalNotice.actions, the way a click does. Replies {pressed, notice, takeSavedNotice, arrivalNotice}, plus copied after a saved take's Copy; pressed is false when nothing up has that button, or while the Stage holds a take and draws none.",
+                summary: "Test mode: presses a button under the page by the id getState lists in exportNotice.actions, takeSavedNotice.actions or arrivalNotice.actions, the way a click does. Replies {pressed, notice, takeSavedNotice, arrivalNotice}, plus copied after a saved take's Copy; pressed is false when nothing drawn has that button: while the Stage holds a take and draws none, or for the saved take's toast away from its take.",
                 kind: .mutating,
                 args: [
                     .init(name: "actionID", kind: .string(), required: true, summary: "The button's id, from getState's exportNotice, takeSavedNotice or arrivalNotice actions"),
