@@ -52,3 +52,50 @@ extension TranscriberMockSuites {
         }
     }
 }
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("A take no model ran on", .serialized)
+    struct UntranscribedLiveTakeTests {
+        @Test("a take whose stop gave up waiting for its model lands as not transcribed, with its Transcribe action", .timeLimit(.minutes(1)))
+        func takeWithoutModelLandsNotTranscribed() async throws {
+            let audio = try makeTakeWAV("gave-up-on-model")
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(modelName: "", recordedAudio: audio))
+                let model = AppModel(bootstrap: AppBootstrap(
+                    mode: .test,
+                    library: makeTempLibraryURL("take-without-model"),
+                    defaultsOverride: temporaryDefaults(),
+                    sideEffects: [],
+                    filePicker: TestFilePicker(),
+                    clock: ContinuousClock()
+                ))
+                model.recordingCountInSeconds = 0
+                model.freeDiskSpaceProvider = { 50_000_000_000 }
+                model.cardMetadataOperation = { _ in nil }
+                model.useStreaming = true
+                model.selectedModel = "openai_whisper-tiny"
+                model.startRecording(source: .microphone)
+                await waitUntil { model.activeTake?.captureRequested == true }
+                let session = try #require(model.streamingSession as? MockStreamingTranscriber)
+                session.levelMeter.record(0.5)
+                await waitUntil { model.recording?.isCapturing == true }
+
+                model.stopRecordingAndTranscribe()
+
+                var saved: [LibraryEntry] = []
+                await waitUntil { saved = await model.library.list(); return !saved.isEmpty }
+                let entry = try #require(saved.first)
+                #expect(entry.title.hasSuffix("(not transcribed)"))
+                let transcript = try await model.library.load(entry.id).document.transcript
+                #expect(transcript.modelName.isEmpty && transcript.segments.isEmpty)
+                model.loadEntry(entry.id)
+                await waitUntil { model.selectedEntryID == entry.id && model.transcript != nil }
+                #expect(model.transcriptIsUntranscribed, "it opens as not transcribed, with Transcribe, not as no speech")
+                #expect(model.canRetranscribeSelectedEntry)
+            }
+        }
+    }
+}

@@ -83,6 +83,8 @@ actor StreamingRealtimeLoop {
         case failed(any Error)
         /// Capture was up when the model failed to load, so nothing was decoded.
         case modelFailed(any Error)
+        /// A stop gave up waiting for the model, so the take has its audio and no transcript.
+        case stoppedWithoutModel
     }
 
     /// While the model loads, pending audio past `trimAbove` samples is cut back to its newest `keep`.
@@ -199,7 +201,7 @@ actor StreamingRealtimeLoop {
                 isRunning = false
                 stopCapture()
                 if Task.isCancelled { return .cancelled }
-                return gaveUpOnModel ? .stopped : .modelFailed(error)
+                return gaveUpOnModel ? .stoppedWithoutModel : .modelFailed(error)
             }
         }
         decoderReadySignal.yield()

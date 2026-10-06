@@ -278,8 +278,8 @@ struct StreamingLoggingTests {
             clock.advance(by: .seconds(120))
 
             let outcome = try await run.value("the run to end")
-            guard case .stopped? = outcome else {
-                Issue.record("expected .stopped, got \(String(describing: outcome))")
+            guard case .stoppedWithoutModel? = outcome else {
+                Issue.record("expected .stoppedWithoutModel, got \(String(describing: outcome))")
                 return
             }
             let records = streamingRecords(sink, message: "a stopped take gave up waiting for its model")

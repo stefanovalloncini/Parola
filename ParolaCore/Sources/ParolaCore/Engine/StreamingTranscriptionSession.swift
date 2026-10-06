@@ -230,7 +230,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         switch await streamerTask.value {
         case .cancelled: throw CancellationError()
         case .modelFailed(let error): throw error
-        case .stopped, .permissionDenied, .failed: return stream
+        case .stopped, .stoppedWithoutModel, .permissionDenied, .failed: return stream
         }
     }
 
@@ -344,7 +344,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             let outcome = await loop.run()
             guard let self else { cont.finish(); return outcome }
             switch outcome {
-            case .stopped, .permissionDenied:
+            case .stopped, .stoppedWithoutModel, .permissionDenied:
                 await self.handleStreamerEndedWithoutStop()
             case .cancelled:
                 await self.finishStream(failure: nil)
@@ -380,6 +380,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         let outcome = await streamerTask?.value
         segmentContinuation?.finish()
         await consumerTask?.value
+        var modelRan = true
         switch outcome {
         case .modelFailed?:
             // start() throws the load failure, so the audio waits in recordingAudioURL() rather than in a .finished nobody reads.
@@ -392,6 +393,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             continuation?.finish()
             await teardown()
             return
+        case .stoppedWithoutModel?:
+            modelRan = false
         default:
             break
         }
@@ -401,15 +404,16 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             continuation?.yield(.warning("The recorder fell behind, so the saved audio has gaps."))
         }
         audioCutShort = persister?.writeFailed == true
-        let finalTranscript = await finishedTranscript(recordedURL: recordedURL)
+        let finalTranscript = await finishedTranscript(recordedURL: recordedURL, modelRan: modelRan)
         continuation?.yield(.finished(finalTranscript))
         continuation?.finish()
         await teardown()
     }
 
-    func finishedTranscript(recordedURL: URL?) async -> Transcript {
+    /// A take no model ran on is stamped with no model name, which callers keep as not transcribed rather than as no speech.
+    func finishedTranscript(recordedURL: URL?, modelRan: Bool = true) async -> Transcript {
         await Self.finishedTake(
-            segments: allConfirmed, options: optionsForRun, modelName: loadedModel ?? "unknown", audioURL: recordedURL
+            segments: allConfirmed, options: optionsForRun, modelName: modelRan ? loadedModel ?? "unknown" : "", audioURL: recordedURL
         )
     }
 

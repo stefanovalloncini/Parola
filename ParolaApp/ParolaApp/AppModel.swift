@@ -4532,6 +4532,9 @@ final class AppModel {
             _ = try? await AppModel.offMainIO { WAVHeaderRepair.makeReadable(audio) }
         }
         let hasContent = !processed.segments.isEmpty || processed.sourceURL != nil
+        // A take no model ran on (its stop gave up waiting for one) keeps its audio as not transcribed, not as no speech.
+        let untranscribed = processed.modelName.isEmpty && processed.segments.isEmpty
+        let note: TakeTitleSuffix? = cutShort ? .interrupted : untranscribed ? .notTranscribed : nil
         // Cancelled, or followed by another take, while those ran: it goes to the library without touching the screen.
         if let take, !takeIsCurrent(take) {
             liveTakesFinishingAlone.removeValue(forKey: take.id)
@@ -4540,7 +4543,7 @@ final class AppModel {
                 saveTake(
                     processed,
                     audio: processed.sourceURL,
-                    title: cutShort ? Self.takeTitle(title, suffix: .interrupted) : title,
+                    title: note.map { Self.takeTitle(title, suffix: $0) } ?? title,
                     source: takeSource,
                     category: takeCategory,
                     landingAs: .salvagedTake,
@@ -4590,7 +4593,7 @@ final class AppModel {
         saveTake(
             processed,
             audio: processed.sourceURL,
-            title: cutShort ? Self.takeTitle(title, suffix: .interrupted) : title,
+            title: note.map { Self.takeTitle(title, suffix: $0) } ?? title,
             source: takeSource,
             category: takeCategory,
             landingAs: inPlace ? .recording : .backgroundTake,

@@ -885,6 +885,7 @@ struct StreamingCaptureFirstTests {
         let events = try #require(try await starting.value("the start to return"))
         let finished = await finishedTranscript(of: events)
         #expect(finished?.segments.isEmpty == true)
+        #expect(finished?.modelName == "", "no model ran on it, so it is not transcribed rather than empty of speech")
         let audio = try #require(finished?.sourceURL, "the take keeps its audio")
         defer { try? FileManager.default.removeItem(at: audio) }
         #expect(try AVAudioFile(forReading: audio).length == 17_600)
