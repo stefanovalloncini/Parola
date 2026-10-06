@@ -16,9 +16,11 @@ public struct UnitFinished: Hashable, Sendable {
 /// it finishes the previous stream and drops the completions of everything scheduled before it, whatever
 /// their epoch, and `stop()` drops every pending completion the same way. Chunks carry the caller's epoch
 /// and the voice's gain; `finishUnit` closes a unit and adds its trailing pause (a unit with no audio gets
-/// only that), and the stream reports the unit once all of it has played. A caller whose stream ends
-/// without its own `stop()` was superseded: it doesn't report the reading finished, and to go on it
-/// subscribes again and reschedules from its current unit.
+/// only that), and the stream reports the unit once all of it has played. After a subscription or a
+/// `stop()` the sink is idle and holds what is scheduled until `resume()`. A caller whose stream ends
+/// without its own `stop()` was superseded, by another subscription or by the sink itself when the output
+/// device changes and it pauses: it doesn't report the reading finished, and to go on it subscribes again
+/// and reschedules from its current unit.
 @MainActor
 public protocol ReadAloudOutputSink: AnyObject, Sendable {
     var speed: Double { get }
