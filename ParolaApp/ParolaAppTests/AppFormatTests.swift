@@ -45,25 +45,24 @@ struct AppFormatTests {
         #expect(AppFormat.integer(0, locale: Locale(identifier: "en_US")) == "0")
     }
 
-    @Test("a span picks the two largest units that carry meaning and hides the rest")
+    @Test("a span reads as the library rows read it: seconds, then minutes, then hours and minutes")
     func durationPicksItsUnits() {
-        let english = Locale(identifier: "en_US")
-        #expect(AppFormat.duration(seconds: 40, locale: english) == "40 sec")
-        #expect(AppFormat.duration(seconds: 125, locale: english) == "2 min, 5 sec")
-        #expect(AppFormat.duration(seconds: 1_200, locale: english) == "20 min")
-        #expect(AppFormat.duration(seconds: 7_200, locale: english) == "2 hr")
-        #expect(AppFormat.duration(seconds: 4_800, locale: english) == "1 hr, 20 min")
-        #expect(AppFormat.duration(seconds: 12_500, locale: english) == "3 hr, 28 min")
+        #expect(AppFormat.duration(seconds: 40) == "40 s")
+        #expect(AppFormat.duration(seconds: 125) == "2 min")
+        #expect(AppFormat.duration(seconds: 1_200) == "20 min")
+        #expect(AppFormat.duration(seconds: 7_200) == "2 h")
+        #expect(AppFormat.duration(seconds: 4_800) == "1 h 20 min")
+        #expect(AppFormat.duration(seconds: 12_500) == "3 h 28 min")
+        #expect(LibraryRowFormat.duration(5_640) == AppFormat.duration(seconds: 5_640), "a row and Statistics print one length one way")
     }
 
     /// Nothing and almost-nothing are different facts: one library has no audio, the other has a run too quick to round.
     @Test("a span shorter than a second says so, and a true zero says zero")
     func durationNamesTheSmallSpans() {
-        let english = Locale(identifier: "en_US")
-        #expect(AppFormat.duration(seconds: 0, locale: english) == "0 sec")
-        #expect(AppFormat.duration(seconds: -30, locale: english) == "0 sec")
-        #expect(AppFormat.duration(seconds: 0.4, locale: english) == "<1 sec")
-        #expect(AppFormat.duration(seconds: 0.4, locale: Locale(identifier: "it_IT")).hasPrefix("<"))
+        #expect(AppFormat.duration(seconds: 0) == "0 s")
+        #expect(AppFormat.duration(seconds: -30) == "0 s")
+        #expect(AppFormat.duration(seconds: .infinity) == "0 s")
+        #expect(AppFormat.duration(seconds: 0.4) == "<1 s")
     }
 
     @Test("a running clock reads m:ss under an hour and h:mm:ss from the hour on")

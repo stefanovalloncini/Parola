@@ -8,16 +8,6 @@ struct StatisticsPageCopyTests {
     private let english = Locale(identifier: "en_US")
     private let day = Date(timeIntervalSince1970: 1_757_635_200)
 
-    @Test("the subtitle counts the transcripts and the audio behind them")
-    func subtitleCountsTranscriptsAndAudio() {
-        #expect(
-            StatisticsCopy.subtitle(entries: 12, audioSeconds: 4_800, locale: english)
-                == "12 transcripts · 1 hr, 20 min transcribed"
-        )
-        #expect(StatisticsCopy.subtitle(entries: 1, audioSeconds: 40, locale: english) == "1 transcript · 40 sec transcribed")
-        #expect(StatisticsCopy.subtitle(entries: 0, audioSeconds: 0, locale: english) == "0 transcripts · 0 sec transcribed")
-    }
-
     @Test("the coverage note says when timing started and how much of the library it covers")
     func coverageNamesTheGap() {
         let partial = LibraryStatistics.Coverage(count: 4, total: 27, since: day)
@@ -61,13 +51,13 @@ struct StatisticsPageCopyTests {
         #expect(StatisticsCopy.activity(range: .days30, entries: 0, audioSeconds: 0, locale: english) == "Nothing transcribed in the last 30 days")
         #expect(StatisticsCopy.activity(range: .months12, entries: 0, audioSeconds: 0, locale: english) == "Nothing transcribed in the last 12 months")
         #expect(StatisticsCopy.activity(range: .days30, entries: 1, audioSeconds: 600, locale: english) == "1 transcript · 10 min of audio")
-        #expect(StatisticsCopy.activity(range: .months12, entries: 4, audioSeconds: 4_800, locale: english) == "4 transcripts · 1 hr, 20 min of audio")
+        #expect(StatisticsCopy.activity(range: .months12, entries: 4, audioSeconds: 4_800, locale: english) == "4 transcripts · 1 h 20 min of audio")
     }
 
     @Test("the hover card names the bucket, its count and its audio, or says the bucket is empty")
     func hoverCard() {
         #expect(StatisticsCopy.bucket(label: "18 Sep", entries: 0, audioSeconds: 0, locale: english) == "18 Sep · Nothing transcribed")
         #expect(StatisticsCopy.bucket(label: "18 Sep", entries: 1, audioSeconds: 600, locale: english) == "18 Sep · 1 transcript · 10 min")
-        #expect(StatisticsCopy.bucket(label: "Sep 2026", entries: 3, audioSeconds: 4_800, locale: english) == "Sep 2026 · 3 transcripts · 1 hr, 20 min")
+        #expect(StatisticsCopy.bucket(label: "Sep 2026", entries: 3, audioSeconds: 4_800, locale: english) == "Sep 2026 · 3 transcripts · 1 h 20 min")
     }
 }

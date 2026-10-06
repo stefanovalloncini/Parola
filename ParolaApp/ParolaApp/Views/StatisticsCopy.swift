@@ -3,16 +3,6 @@ import ParolaCore
 
 /// The sentences timing and statistics are written in, kept out of the views so both languages can be read back.
 enum StatisticsCopy {
-    /// The line under the page title: how much the library holds, and how much audio is behind it.
-    static func subtitle(
-        entries: Int,
-        audioSeconds: Double,
-        bundle: Bundle = .main,
-        locale: Locale = AppFormat.locale
-    ) -> String {
-        String(localized: "\(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, locale: locale)) transcribed", bundle: bundle)
-    }
-
     /// Why the timed tiles, the model table and the word count can cover less than the library does.
     static func coverage(
         _ timed: LibraryStatistics.Coverage,
@@ -60,7 +50,7 @@ enum StatisticsCopy {
             case .months12: return String(localized: "Nothing transcribed in the last 12 months", bundle: bundle)
             }
         }
-        return String(localized: "\(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, locale: locale)) of audio", bundle: bundle)
+        return String(localized: "\(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, bundle: bundle)) of audio", bundle: bundle)
     }
 
     /// The card over a hovered bar: the day or month, then what it holds.
@@ -74,7 +64,7 @@ enum StatisticsCopy {
         guard entries > 0 else {
             return "\(label) · \(String(localized: "Nothing transcribed", bundle: bundle))"
         }
-        return "\(label) · \(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, locale: locale))"
+        return "\(label) · \(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, bundle: bundle))"
     }
 
     private static func transcripts(_ count: Int, bundle: Bundle, locale: Locale) -> String {
@@ -83,7 +73,7 @@ enum StatisticsCopy {
             : String(localized: "\(AppFormat.integer(count, locale: locale)) transcripts", bundle: bundle)
     }
 
-    /// "16× real time", the only form a speed is ever shown in.
+    /// "16× real time", for the inspector, whose row has no label to say what the multiple is of.
     static func speed(_ factor: Double?, bundle: Bundle = .main, locale: Locale = AppFormat.locale) -> String? {
         guard let factor else { return nil }
         return String(localized: "\(TranscriptionSpeed.label(factor, locale: locale))\u{00A0}real time", bundle: bundle)
@@ -96,7 +86,7 @@ enum StatisticsCopy {
         bundle: Bundle = .main,
         locale: Locale = AppFormat.locale
     ) -> String {
-        let took = AppFormat.duration(seconds: seconds, locale: locale)
+        let took = AppFormat.duration(seconds: seconds, bundle: bundle)
         guard let factor = TranscriptionSpeed.factor(audioSeconds: audioSeconds, transcriptionSeconds: seconds),
               let speed = speed(factor, bundle: bundle, locale: locale)
         else {

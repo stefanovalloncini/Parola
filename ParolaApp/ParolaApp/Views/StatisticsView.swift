@@ -6,6 +6,7 @@ struct StatisticsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var stats: LibraryStatistics?
     @State private var activityRange: ActivityRange = .days30
+    @State private var recordValueWidth: CGFloat?
 
     /// Seeded only by tests; in the app the `.task` fills it on the first pass.
     init(stats: LibraryStatistics? = nil) {
@@ -43,13 +44,7 @@ struct StatisticsView: View {
     }
 
     private var header: some View {
-        PageHeader(
-            title: "Statistics",
-            subtitle: stats.flatMap { stats in
-                stats.totals.entries == 0
-                    ? nil : StatisticsCopy.subtitle(entries: stats.totals.entries, audioSeconds: stats.totals.audioSeconds)
-            }
-        ) {
+        PageHeader(title: "Statistics") {
             EmptyView()
         }
     }
@@ -109,7 +104,7 @@ struct StatisticsView: View {
             axID: "Tile.Time"
         )
         StatTile(
-            label: "Average speed",
+            label: "Average speed (× real time)",
             value: stats.averageSpeed.map { TranscriptionSpeed.label($0, locale: AppFormat.locale) } ?? "—",
             axID: "Tile.Speed"
         )
@@ -151,10 +146,24 @@ struct StatisticsView: View {
                 SectionCaption("Records")
                 VStack(spacing: 0) {
                     ForEach(records) { record in
-                        RecordRow(record: record, showsAITitle: model.showAITitles, open: { model.loadEntry($0) })
+                        RecordRow(
+                            record: record,
+                            showsAITitle: model.showAITitles,
+                            open: { model.loadEntry($0) },
+                            valueWidth: recordValueWidth
+                        )
                     }
                 }
                 .padding(.horizontal, -DS.Spacing.small)
+                .background(alignment: .leading) {
+                    // The widest value sets the column, so a long one is never cut and the titles still line up.
+                    ZStack {
+                        ForEach(records) { RecordRow.valueText($0.value) }
+                    }
+                    .fixedSize()
+                    .hidden()
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { recordValueWidth = $0 }
+                }
             }
         }
     }
@@ -334,7 +343,8 @@ private struct ModelTableRow: View {
 
     private func number(_ text: String) -> some View {
         Text(text)
-            .font(DS.Font.mono)
+            .font(DS.Font.body)
+            .monospacedDigit()
             .foregroundStyle(DS.Color.secondaryText)
             .lineLimit(1)
             .fixedSize()

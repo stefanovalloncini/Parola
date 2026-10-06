@@ -43,7 +43,7 @@ struct LibraryRowFormatTests {
     func durationWords() {
         #expect(LibraryRowFormat.duration(nil) == nil)
         #expect(LibraryRowFormat.duration(0) == nil)
-        #expect(LibraryRowFormat.duration(0.4) == "1 s")
+        #expect(LibraryRowFormat.duration(0.4) == "<1 s")
         #expect(LibraryRowFormat.duration(8) == "8 s")
         #expect(LibraryRowFormat.duration(59.9) == "59 s")
         #expect(LibraryRowFormat.duration(60) == "1 min")

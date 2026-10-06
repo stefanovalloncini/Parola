@@ -40,17 +40,18 @@ struct StatisticsRecord: Identifiable, Equatable {
         var records: [StatisticsRecord] = []
         if let longest = stats.longestTranscript, let entry = lookup(longest.entryID) {
             records.append(StatisticsRecord(
-                kind: .longestTranscript, entry: entry, value: AppFormat.duration(seconds: longest.seconds, locale: locale)
+                kind: .longestTranscript, entry: entry, value: AppFormat.duration(seconds: longest.seconds, bundle: bundle)
             ))
         }
         if let run = stats.longestRun, let entry = lookup(run.entryID) {
             records.append(StatisticsRecord(
-                kind: .longestRun, entry: entry, value: AppFormat.duration(seconds: run.seconds, locale: locale)
+                kind: .longestRun, entry: entry, value: AppFormat.duration(seconds: run.seconds, bundle: bundle)
             ))
         }
-        if let fastest = stats.fastestRun, let entry = lookup(fastest.entryID),
-           let speed = StatisticsCopy.speed(fastest.speed, bundle: bundle, locale: locale) {
-            records.append(StatisticsRecord(kind: .fastestRun, entry: entry, value: speed))
+        if let fastest = stats.fastestRun, let entry = lookup(fastest.entryID) {
+            records.append(StatisticsRecord(
+                kind: .fastestRun, entry: entry, value: TranscriptionSpeed.label(fastest.speed, locale: locale)
+            ))
         }
         return records
     }
@@ -60,9 +61,15 @@ struct RecordRow: View {
     let record: StatisticsRecord
     let showsAITitle: Bool
     let open: (LibraryEntry.ID) -> Void
+    var valueWidth: CGFloat?
 
     static let labelWidth: CGFloat = 150
-    static let valueWidth: CGFloat = 120
+
+    static func valueText(_ value: String) -> some View {
+        Text(value)
+            .font(DS.Font.bodyStrong)
+            .monospacedDigit()
+    }
 
     @State private var hovered = false
 
@@ -78,12 +85,11 @@ struct RecordRow: View {
                     .foregroundStyle(DS.Color.secondaryText)
                     .lineLimit(1)
                     .frame(width: Self.labelWidth, alignment: .leading)
-                Text(record.value)
-                    .font(DS.Font.bodyStrong)
-                    .monospacedDigit()
+                Self.valueText(record.value)
                     .foregroundStyle(DS.Color.primaryText)
                     .lineLimit(1)
-                    .frame(width: Self.valueWidth, alignment: .leading)
+                    .fixedSize()
+                    .frame(width: valueWidth, alignment: .leading)
                 Text(LibraryEntryDisplay.listTitle(for: record.entry, showsAITitle: showsAITitle))
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)

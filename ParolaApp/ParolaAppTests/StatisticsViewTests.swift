@@ -120,6 +120,21 @@ struct StatisticsViewTests {
         #expect(shown == stats)
     }
 
+    @Test("the tiles are the summary: no line under the title restates them, and the speed tile says real time")
+    func totalsAreSaidOnce() {
+        withIsolatedDefaults { defaults in
+            let entries = [entry("a", timing: 60)]
+            let model = makeModel(defaults, entries: entries)
+            let page = HostedWindow(StatisticsView(stats: LibraryStatistics.compute(entries: entries)).environment(model))
+            defer { page.close() }
+
+            let words = HostedAccessibility.words(in: page.host)
+
+            #expect(!words.contains { $0.contains(" · ") && $0.hasSuffix(" transcribed") }, "\(words)")
+            #expect(words.contains("Average speed (× real time)"), "\(words)")
+        }
+    }
+
     @Test("an empty library's page says so once and offers the library's first step")
     func emptyPageOffersOpenFiles() {
         withIsolatedDefaults { defaults in

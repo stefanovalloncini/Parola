@@ -62,38 +62,18 @@ enum AppFormat {
         )
     }
 
-    /// Every span on screen: the largest two units that carry meaning, rounded to whole seconds — a shorter span reads "<1 sec".
-    static func duration(seconds: Double, locale: Locale = AppFormat.locale) -> String {
-        let total = Int(max(0, seconds).rounded())
-        guard total > 0 else {
-            // A span that rounds away still ran; "0 sec" is kept for a span that truly is nothing.
-            return seconds > 0
-                ? "<" + span(1, allowed: [.seconds], locale: locale)
-                : span(0, allowed: [.seconds], locale: locale, showsZero: true)
-        }
-        let allowed: Set<Duration.UnitsFormatStyle.Unit>
-        if total >= 3600 {
-            allowed = [.hours, .minutes]
-        } else if total >= 60 {
-            allowed = [.minutes, .seconds]
-        } else {
-            allowed = [.seconds]
-        }
-        return span(total, allowed: allowed, locale: locale)
-    }
-
-    private static func span(
-        _ seconds: Int,
-        allowed: Set<Duration.UnitsFormatStyle.Unit>,
-        locale: Locale,
-        showsZero: Bool = false
-    ) -> String {
-        Duration.seconds(seconds).formatted(
-            .units(
-                allowed: allowed,
-                width: .abbreviated,
-                zeroValueUnits: showsZero ? .show(length: 1) : .hide
-            ).locale(locale)
-        )
+    /// Every length on screen, the library rows' form: "8 s", "38 min", "1 h 12 min"; "<1 s" for a span too short to count.
+    static func duration(seconds: Double, bundle: Bundle = .main) -> String {
+        guard seconds.isFinite, seconds > 0 else { return String(localized: "\(0) s", bundle: bundle) }
+        let total = Int(min(seconds, Double(Int32.max)))
+        // A span too short to count still ran; "0 s" is kept for one that truly is nothing.
+        guard total > 0 else { return "<" + String(localized: "\(1) s", bundle: bundle) }
+        if total < 60 { return String(localized: "\(total) s", bundle: bundle) }
+        let hours = total / 3600
+        let minutes = total % 3600 / 60
+        guard hours > 0 else { return String(localized: "\(minutes) min", bundle: bundle) }
+        return minutes == 0
+            ? String(localized: "\(hours) h", bundle: bundle)
+            : String(localized: "\(hours) h \(minutes) min", bundle: bundle)
     }
 }

@@ -69,7 +69,7 @@ struct StatisticsRecordsTests {
 
         #expect(records.map(\.kind) == [.longestTranscript, .longestRun, .fastestRun])
         #expect(records.map(\.entry.id) == ["long", "long", "quick"])
-        #expect(records.map(\.value) == ["3 hr, 28 min", "20 min, 5 sec", "16×\u{00A0}real time"])
+        #expect(records.map(\.value) == ["3 h 28 min", "20 min", "16×"], "the tile's label says real time")
     }
 
     @Test("a record whose entry has left the library is not shown, and an untimed library has only the longest transcript")

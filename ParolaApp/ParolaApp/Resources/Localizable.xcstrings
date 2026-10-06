@@ -276,17 +276,6 @@
         }
       }
     },
-    "%@ · %@ transcribed": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · %@ trascritti"
-          }
-        }
-      }
-    },
     "%@ — for example %@.md": {
       "extractionState": "manual",
       "localizations": {
@@ -2467,13 +2456,13 @@
         }
       }
     },
-    "Average speed": {
+    "Average speed (× real time)": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Velocità media"
+            "value": "Velocità media (× tempo reale)"
           }
         }
       }

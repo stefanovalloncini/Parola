@@ -18,17 +18,17 @@ struct StatisticsCopyTests {
     func transcribedInPairsTimeAndSpeed() {
         #expect(
             StatisticsCopy.transcribedIn(seconds: 37, audioSeconds: 592, locale: english)
-                == "37 sec · 16×\u{00A0}real time"
+                == "37 s · 16×\u{00A0}real time"
         )
         #expect(
             StatisticsCopy.transcribedIn(seconds: 125, audioSeconds: 600, locale: english)
-                == "2 min, 5 sec · 4.8×\u{00A0}real time"
+                == "2 min · 4.8×\u{00A0}real time"
         )
     }
 
     @Test("without a media duration the value is just the wall time")
     func transcribedInWithoutAudio() {
-        #expect(StatisticsCopy.transcribedIn(seconds: 125, audioSeconds: nil, locale: english) == "2 min, 5 sec")
-        #expect(StatisticsCopy.transcribedIn(seconds: 125, audioSeconds: 0, locale: english) == "2 min, 5 sec")
+        #expect(StatisticsCopy.transcribedIn(seconds: 125, audioSeconds: nil, locale: english) == "2 min")
+        #expect(StatisticsCopy.transcribedIn(seconds: 125, audioSeconds: 0, locale: english) == "2 min")
     }
 }

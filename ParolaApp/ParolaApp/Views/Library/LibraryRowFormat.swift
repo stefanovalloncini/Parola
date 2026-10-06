@@ -2,16 +2,10 @@ import Foundation
 
 /// The words a library row and its page header use for when a take was made and how long it runs.
 enum LibraryRowFormat {
-    /// A length in words, never a clock: "8 s", "38 min", "1 h 12 min".
+    /// A length in words, never a clock; nothing at all for a length the manifest doesn't really have.
     static func duration(_ seconds: Double?, bundle: Bundle = .main) -> String? {
-        guard let total = wholeSeconds(seconds) else { return nil }
-        if total < 60 { return String(localized: "\(total) s", bundle: bundle) }
-        let hours = total / 3600
-        let minutes = total % 3600 / 60
-        guard hours > 0 else { return String(localized: "\(minutes) min", bundle: bundle) }
-        return minutes == 0
-            ? String(localized: "\(hours) h", bundle: bundle)
-            : String(localized: "\(hours) h \(minutes) min", bundle: bundle)
+        guard let seconds, seconds.isFinite, seconds > 0 else { return nil }
+        return AppFormat.duration(seconds: seconds, bundle: bundle)
     }
 
     /// The same length as VoiceOver says it, to the unit the row shows: "1 hour, 12 minutes", "1 ora e 12 minuti".
