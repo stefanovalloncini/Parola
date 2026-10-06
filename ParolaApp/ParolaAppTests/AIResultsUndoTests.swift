@@ -94,6 +94,26 @@ struct AIResultsUndoTests {
         #expect(restored)
     }
 
+    @Test("undo writes back only what it restores, not results another run saved meanwhile")
+    func undoWritesOnlyWhatItRestores() async throws {
+        let id = try await open(Self.seed())
+        model.clearSummary()
+        let cleared = await waitUntil { await stored(id)?.summary == nil }
+        #expect(cleared)
+        let newItems = [ActionItem(task: "Book the room")]
+        let newChapters = [Chapter(title: "Close", start: 1)]
+        try await model.library.setActionItems(newItems, for: id)
+        try await model.library.setChapters(newChapters, for: id)
+
+        undo.undo()
+        let restored = await waitUntil { await stored(id)?.summary?.text == "recap" }
+        #expect(restored)
+        let disk = await stored(id)
+        #expect(disk?.actionItems == newItems)
+        #expect(disk?.chapters == newChapters)
+        #expect(disk?.summary?.chapters == newChapters)
+    }
+
     @Test("a summary run that replaces one can be undone back to the old one")
     func regeneratedSummaryUndoes() async throws {
         let id = try await open(Self.seed())

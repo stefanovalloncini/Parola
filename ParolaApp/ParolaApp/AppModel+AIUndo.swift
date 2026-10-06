@@ -48,9 +48,10 @@ extension AppModel {
         Task { [library] in
             do {
                 try await library.mutateTranscript(for: entryID) { stored in
-                    stored.summary = saved.summary
-                    stored.chapters = saved.chapters
-                    stored.actionItems = saved.actionItems
+                    if fields.contains(.summary) { stored.summary = saved.summary }
+                    if fields.contains(.chapters) { stored.chapters = saved.chapters }
+                    if fields.contains(.actionItems) { stored.actionItems = saved.actionItems }
+                    if let chapters = stored.chapters { stored.summary?.chapters = chapters }
                 }
             } catch {
                 ParolaLog.error(.library, "restored AI results could not be saved to the library", [.error: .error(error)])
