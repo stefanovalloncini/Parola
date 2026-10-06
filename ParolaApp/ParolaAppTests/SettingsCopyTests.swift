@@ -130,4 +130,15 @@ struct SettingsCopyTests {
             #expect(!words.contains("Parola watches running applications; nothing leaves your Mac."))
         }
     }
+
+    @Test("Live Captions says it captions what you say, and starts from its own pane")
+    func liveCaptionsStartsFromThePane() {
+        #expect(SettingsRoute.liveCaptions.summary == "Captions of what you say, in a floating window.")
+        let model = makeModel("settings-copy-captions")
+        let pane = elements(LiveCaptionsPane(), model: model)
+        let buttons = pane.filter { $0.role == NSAccessibility.Role.button.rawValue }.compactMap(\.name)
+        #expect(buttons.contains("Start Live Captions"), "\(buttons)")
+        let words = pane.flatMap(\.words)
+        #expect(!words.contains("Status"), "\(words)")
+    }
 }

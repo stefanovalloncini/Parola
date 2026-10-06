@@ -108,7 +108,7 @@ private struct SettingsRouteMeta {
         .recordMeetings: SettingsRouteMeta(titleKey: "Record Meetings", summaryKey: "Recording meeting audio, and what Parola does when a meeting app starts.", symbol: "video.bubble", scope: .recordMeetings),
         .shortcuts: SettingsRouteMeta(titleKey: "Shortcuts", summaryKey: "The dictation and recording shortcuts that work from any app.", symbol: "command", scope: .shortcuts),
         .microphone: SettingsRouteMeta(titleKey: "Microphone", summaryKey: "Which input Parola records from, and what happens while recording.", symbol: "mic", scope: .microphone),
-        .liveCaptions: SettingsRouteMeta(titleKey: "Live Captions", summaryKey: "Live transcription of what you hear, in a floating window.", symbol: "captions.bubble", scope: .liveCaptions),
+        .liveCaptions: SettingsRouteMeta(titleKey: "Live Captions", summaryKey: "Captions of what you say, in a floating window.", symbol: "captions.bubble", scope: .liveCaptions),
         .dictation: SettingsRouteMeta(titleKey: "Dictation", summaryKey: "The hotkey that turns speech into text in any app.", symbol: "text.bubble", scope: .dictation),
         .snippets: SettingsRouteMeta(titleKey: "Snippets", summaryKey: "Short triggers that expand into longer text while you dictate.", symbol: "text.append", scope: .snippets),
         .corrections: SettingsRouteMeta(titleKey: "Corrections", summaryKey: "Word replacements applied to dictated text after each take.", symbol: "wand.and.rays", scope: .corrections),

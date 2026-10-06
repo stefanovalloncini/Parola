@@ -13,9 +13,18 @@ struct LiveCaptionsPane: View {
                 .foregroundStyle(DS.Color.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             SettingsSection {
-                SettingRow("Translate to English",
-                           description: "Translate captions live as you speak.",
+                SettingRow("Live captions",
+                           descriptionVerbatim: model.liveCaptionsUnavailableReason ?? String(localized: "Also in the Captions menu (⇧⌘L)."),
                            isFirst: true) {
+                    Button(liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
+                        model.toggleLiveCaptions()
+                    }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .disabled(!liveCaptions.isActive && model.liveCaptionsUnavailableReason != nil)
+                    .axLeaf("LiveCaptions.Button.StartStop")
+                }
+                SettingRow("Translate to English",
+                           description: "Translate captions live as you speak.") {
                     Toggle("", isOn: $model.liveCaptionsTranslate)
                         .labelsHidden()
                         .axLeaf("LiveCaptions.Toggle.Translate")
@@ -27,12 +36,7 @@ struct LiveCaptionsPane: View {
                         .padding(.top, DS.Spacing.hair)
                         .axLeaf("LiveCaptions.Label.TranslateWarning")
                 }
-                SettingRow("Status") {
-                    Text(liveCaptions.isActive ? "Running" : "Stopped")
-                        .foregroundStyle(DS.Color.secondaryText)
-                }
             }
-            SettingHelper(text: "Start and stop live captions from the Captions menu (⇧⌘L).")
             ResetPaneButton(scope: .liveCaptions)
         }
     }

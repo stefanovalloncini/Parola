@@ -1921,6 +1921,17 @@
         }
       }
     },
+    "Also in the Captions menu (⇧⌘L).": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anche nel menu Sottotitoli (⇧⌘L)."
+          }
+        }
+      }
+    },
     "Also write": {
       "localizations": {
         "it": {
@@ -3017,6 +3028,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli"
+          }
+        }
+      }
+    },
+    "Captions of what you say, in a floating window.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli di ciò che dici, in una finestra mobile."
           }
         }
       }
@@ -8031,17 +8053,6 @@
         }
       }
     },
-    "Live transcription of what you hear, in a floating window.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La trascrizione in tempo reale di quello che senti, in una finestra mobile."
-          }
-        }
-      }
-    },
     "Load the saved transcript": {
       "extractionState": "manual",
       "localizations": {
@@ -12758,17 +12769,6 @@
         }
       }
     },
-    "Running": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In esecuzione"
-          }
-        }
-      }
-    },
     "Running prompt…": {
       "extractionState": "manual",
       "localizations": {
@@ -14483,17 +14483,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Avviare una registrazione dell'audio di sistema? Finirà in libreria, tra le Riunioni."
-          }
-        }
-      }
-    },
-    "Start and stop live captions from the Captions menu (⇧⌘L).": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avvia e ferma i sottotitoli live dal menu Sottotitoli (⇧⌘L)."
           }
         }
       }
