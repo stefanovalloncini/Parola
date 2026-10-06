@@ -114,7 +114,8 @@ struct TranscriptMenuTests {
         let groups = [
             [#"Button("Back")"#, #"Button("Jump to Next Speaker")"#, #"Button("Jump to Time…")"#, #"Button("Show Outline")"#],
             [
-                #"Button("Rename…")"#, "TranscribeAgainMenu(model: model)", #"Button("Edit Segment") { model.editFocusedSegment() }"#,
+                #"Button("Rename…")"#, "TranscribeAgainMenu(model: model)", "TranslateMenu(model: model)",
+                #"Button("Edit Segment") { model.editFocusedSegment() }"#,
                 #"Button("Add Note…") { model.noteFocusedSegment() }"#, #"Button("Favorite Segment")"#,
                 #"Button("Delete Segment") { model.deleteFocusedSegment() }"#, #"Button("Rename Speakers…")"#,
                 #"Button("Manage People…")"#,
@@ -199,6 +200,25 @@ struct TranscriptMenuTests {
         #expect(inspector.contains(#"Button("Rename Speakers…") { model.showingSpeakersSheet = true }"#))
         let chat = try source("Views/Chat/ChatPane")
         #expect(chat.contains(#"Button("Manage Prompts…") { model.openSettings(route: .prompts) }"#))
+    }
+
+    @Test("translating has a menu path, and the inspector drops its bare character count")
+    func translationHasAMenuPath() throws {
+        let menu = try source("Views/Transcript/TranslateMenu")
+        #expect(menu.contains(#"Menu("Translate To") { ForEach(targets, id: \.code) { target in Button(target.name) { Task { await model.translateTranscript(to: target.code) } }"#))
+        #expect(menu.contains(#"Button("Remove Translation") { Task { await model.removeTranslation() } }"#))
+        #expect(menu.contains("TranslationSection.targets( from: model.translationCoordinator.knownTargets ?? SupportedLanguages.codes"))
+        let section = try source("Views/Transcript/TranslationSection")
+        #expect(!section.contains("characters"))
+        #expect(section.contains("Self.targets(from: targets, excluding: model.transcript?.language)"))
+    }
+
+    @Test("the translation targets leave out the transcript's own language and read in name order")
+    @MainActor
+    func translationTargetsSkipTheSource() {
+        let targets = TranslationSection.targets(from: ["it", "en", "fr"], excluding: "EN")
+        #expect(targets.map(\.code) == ["fr", "it"])
+        #expect(TranslationSection.targets(from: ["it", "en"], excluding: "auto").count == 2)
     }
 
     @Test("the Playback menu holds speed and Skip Silences, and names the keys the player owns")

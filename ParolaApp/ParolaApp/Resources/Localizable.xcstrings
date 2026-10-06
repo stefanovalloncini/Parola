@@ -358,17 +358,6 @@
         }
       }
     },
-    "%lld characters": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld caratteri"
-          }
-        }
-      }
-    },
     "%lld days left": {
       "extractionState": "manual",
       "localizations": {
@@ -16897,6 +16886,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Traduci"
+          }
+        }
+      }
+    },
+    "Translate To": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traduci in"
           }
         }
       }

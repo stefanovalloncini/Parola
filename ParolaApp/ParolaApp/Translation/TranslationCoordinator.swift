@@ -38,6 +38,8 @@ final class TranslationCoordinator {
     /// The language the last run aimed at, so Retry can repeat it.
     private(set) var activeTarget: String?
     private(set) var activeProvider: String?
+    /// The targets the last `supportedTargets()` found, for menus that can't wait on it.
+    private(set) var knownTargets: [String]?
 
     /// Test seam: when set, replaces the resolved translator so a test never touches the shared mock registry.
     @ObservationIgnored var translatorOverride: (any TranscriptTranslating)?
@@ -90,7 +92,9 @@ final class TranslationCoordinator {
     func supportedTargets() async -> [String] {
         if stubTranslator() != nil { return SupportedLanguages.codes }
         let codes = await Self.systemSupportedLanguages()
-        return codes.isEmpty ? SupportedLanguages.codes : codes
+        let targets = codes.isEmpty ? SupportedLanguages.codes : codes
+        if knownTargets != targets { knownTargets = targets }
+        return targets
     }
 
     // LanguageAvailability is not Sendable and its members run off the caller's actor, so it is

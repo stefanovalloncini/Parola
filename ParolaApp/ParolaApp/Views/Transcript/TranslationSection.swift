@@ -5,7 +5,6 @@ struct TranslationSection: View {
     @Environment(AppModel.self) private var model
     @State private var targets: [String] = SupportedLanguages.codes
     @State private var menuTargets: [(code: String, name: String)] = []
-    @State private var characterCount = 0
 
     var body: some View {
         InspectorSection(title: "Translation") {
@@ -28,21 +27,12 @@ struct TranslationSection: View {
             targets = await model.translationCoordinator.supportedTargets()
             rebuildMenuTargets()
         }
-        // The list is ~100 languages sorted by locale, and the count walks the whole transcript;
-        // neither belongs in a body pass the progress rows re-run per batch.
-        .task(id: model.transcriptTextVersion) {
-            characterCount = model.transcriptText.count
-            rebuildMenuTargets()
-        }
+        // The list is ~100 languages sorted by locale; it doesn't belong in a body pass the progress rows re-run per batch.
+        .task(id: model.transcriptTextVersion) { rebuildMenuTargets() }
     }
 
     private var idleRows: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            targetMenu(title: "Translate to…")
-            Text("\(characterCount) characters")
-                .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.secondaryText)
-        }
+        targetMenu(title: "Translate to…")
     }
 
     private func translatedRows(_ translation: TranscriptTranslation) -> some View {
@@ -111,8 +101,13 @@ struct TranslationSection: View {
     }
 
     private func rebuildMenuTargets() {
-        let source = model.transcript.flatMap { TranslationCoordinator.sourceLanguage(for: $0.language) }
-        menuTargets = targets
+        menuTargets = Self.targets(from: targets, excluding: model.transcript?.language)
+    }
+
+    /// Every target but the transcript's own language, by name; the inspector and Transcript ▸ Translate To share it.
+    static func targets(from codes: [String], excluding language: String?) -> [(code: String, name: String)] {
+        let source = language.flatMap { TranslationCoordinator.sourceLanguage(for: $0) }
+        return codes
             .filter { $0 != source }
             .map { (code: $0, name: SupportedLanguages.displayName(for: $0)) }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
