@@ -899,7 +899,7 @@ struct DictationCoordinatorTests {
         func setMuted(_ muted: Bool) async { current = muted }
     }
 
-    private actor LoggingPlayer: MediaPlaybackToggler {
+    private actor InertPlayer: MediaPlaybackToggler {
         func pause() async {}
         func play() async {}
     }
@@ -915,7 +915,7 @@ struct DictationCoordinatorTests {
     @Test("willListen runs before mediaSession.enterRecording and before recorder.start()")
     func willListenRunsBeforeSessionAndRecorder() async throws {
         let log = CallOrderRecorder()
-        let media = MediaSession(muter: LoggingMuter(log: log), player: LoggingPlayer())
+        let media = MediaSession(muter: LoggingMuter(log: log), player: InertPlayer())
         let coord = DictationCoordinator(
             hotkey: MockHotkey(),
             recorder: LoggingRecorder(log: log),
@@ -934,7 +934,7 @@ struct DictationCoordinatorTests {
     @Test("a nil willListen hook leaves today's start order unchanged")
     func nilWillListenLeavesOrderUnchanged() async throws {
         let log = CallOrderRecorder()
-        let media = MediaSession(muter: LoggingMuter(log: log), player: LoggingPlayer())
+        let media = MediaSession(muter: LoggingMuter(log: log), player: InertPlayer())
         let coord = DictationCoordinator(
             hotkey: MockHotkey(),
             recorder: LoggingRecorder(log: log),
@@ -949,17 +949,30 @@ struct DictationCoordinatorTests {
         #expect(events == ["mediaSession.enterRecording", "recorder.start"])
     }
 
+    /// Both `isOpen` and `hasEntered` latch, so a call that arrives after the matching signal already fired returns at once instead of parking forever.
     private actor Gate {
-        private var continuation: CheckedContinuation<Void, Never>?
-        private(set) var isWaiting = false
+        private var isOpen = false
+        private var hasEntered = false
+        private var openContinuation: CheckedContinuation<Void, Never>?
+        private var enteredContinuations: [CheckedContinuation<Void, Never>] = []
+
         func wait() async {
-            isWaiting = true
-            await withCheckedContinuation { continuation = $0 }
+            hasEntered = true
+            for continuation in enteredContinuations { continuation.resume() }
+            enteredContinuations = []
+            if isOpen { return }
+            await withCheckedContinuation { openContinuation = $0 }
         }
+
         func open() {
-            isWaiting = false
-            continuation?.resume()
-            continuation = nil
+            isOpen = true
+            openContinuation?.resume()
+            openContinuation = nil
+        }
+
+        func waitUntilEntered() async {
+            if hasEntered { return }
+            await withCheckedContinuation { enteredContinuations.append($0) }
         }
     }
 
@@ -977,21 +990,51 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
 
         let press = Task { await coord.simulatePress() }
-        var spins = 0
-        while await gate.isWaiting == false {
-            await Task.yield()
-            spins += 1
-            if spins > 100_000 { break }
-        }
+        let entered: Void? = await AsyncTimeout.run(.seconds(2)) { await gate.waitUntilEntered() }
+        #expect(entered != nil, "the willListen hook never started")
 
         let startsBeforeOpen = await recorder.startCalls
         #expect(startsBeforeOpen == 0, "recorder.start() must not run while the willListen hook is still awaiting")
 
         await gate.open()
-        await press.value
+        let finished: Void? = await AsyncTimeout.run(.seconds(2)) { await press.value }
+        #expect(finished != nil, "beginListening never returned after the gate opened")
 
         await #expect(coord.state == .listening)
         let startsAfterOpen = await recorder.startCalls
         #expect(startsAfterOpen == 1)
+    }
+
+    @Test("a teardown during the willListen hook rolls back before muting or starting the recorder")
+    func teardownDuringWillListenRollsBackFirst() async throws {
+        let gate = Gate()
+        let muter = SpyMuter()
+        let player = SpyPlayer()
+        let media = MediaSession(muter: muter, player: player)
+        let recorder = MockRecorder(outcome: .text("hi"))
+        let coord = DictationCoordinator(
+            hotkey: MockHotkey(),
+            recorder: recorder,
+            inserter: MockInserter(),
+            mediaSession: media,
+            mediaConfigProvider: { MediaSessionConfig(muteSystemAudio: true, pausePlayback: true) },
+            willListen: { await gate.wait() }
+        )
+        await coord.startMonitoring()
+
+        let press = Task { await coord.simulatePress() }
+        let entered: Void? = await AsyncTimeout.run(.seconds(2)) { await gate.waitUntilEntered() }
+        #expect(entered != nil, "the willListen hook never started")
+
+        await coord.abortMonitoring()
+        await gate.open()
+        let finished: Void? = await AsyncTimeout.run(.seconds(2)) { await press.value }
+        #expect(finished != nil, "beginListening never returned after the gate opened")
+
+        await #expect(coord.state == .idle)
+        let muted = await muter.current
+        let starts = await recorder.startCalls
+        #expect(muted == false, "a teardown during the hook must never mute system audio")
+        #expect(starts == 0, "a teardown during the hook must never open the mic")
     }
 }

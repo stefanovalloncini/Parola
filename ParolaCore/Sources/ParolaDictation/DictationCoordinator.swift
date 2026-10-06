@@ -303,9 +303,12 @@ public actor DictationCoordinator {
         startInFlight = true
         releaseDuringStart = false
         stopRequestedDuringStart = false
-        // After startInFlight so a press racing this await is deferred by `handle`'s own
-        // guard, not re-entering beginListening while state is still .idle/.failed.
+        // After startInFlight: a press during this await must hit handle's start-in-flight guard.
         await willListen?()
+        guard myGeneration == generation else {
+            startInFlight = false
+            return
+        }
         if let session = mediaSession {
             let config = await mediaConfigProvider?() ?? .none
             await session.enterRecording(config: config)
