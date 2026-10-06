@@ -92,6 +92,13 @@ extension AppModel {
         Array(peopleByUse.prefix(limit))
     }
 
+    /// A segment's speaker menu: this transcript's speakers, then the most used people who aren't one of them.
+    func segmentSpeakerChoices(peopleLimit: Int) -> (speakers: [String], people: [Person]) {
+        let speakers = transcriptSpeakers
+        let here = Set(speakers)
+        return (speakers, Array(peopleByUse.filter { !here.contains($0.name) }.prefix(peopleLimit)))
+    }
+
     /// The open entry's speaker map. A transcript that isn't in the library carries none.
     var speakerAssignments: [String: UUID] {
         guard let id = selectedEntryID else { return [:] }

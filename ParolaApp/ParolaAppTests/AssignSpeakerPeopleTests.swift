@@ -454,4 +454,17 @@ struct AssignSpeakerPeopleTests {
         #expect(rows.map(\.label) == ["SPEAKER_00", "SPEAKER_01"])
         #expect(rows.map(\.count) == [2, 1])
     }
+
+    @Test("a segment's speaker menu lists this transcript's speakers, then people who aren't one of them")
+    func segmentMenuListsSpeakersThenPeople() async throws {
+        let model = PeopleTestSupport.makeModel("segmentchoices")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+        await model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "Ada")
+        await model.addPerson(named: "Grace")
+
+        let choices = model.segmentSpeakerChoices(peopleLimit: 10)
+
+        #expect(Set(choices.speakers) == ["Ada", "SPEAKER_01"])
+        #expect(choices.people.map(\.name) == ["Grace"])
+    }
 }

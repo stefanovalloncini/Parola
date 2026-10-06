@@ -131,7 +131,7 @@ struct SpeakerPersonRow: View {
                 Button("Manage People…") { model.showingPeopleSheet = true }
                     .axLeaf("Inspector.MenuItem.ManagePeople")
                 if person != nil {
-                    Button("Clear speaker") { Task { await model.clearSpeaker(label: label) } }
+                    Button("No Speaker") { Task { await model.clearSpeaker(label: label) } }
                         .axLeaf("Inspector.MenuItem.ClearSpeaker")
                 }
             } label: {

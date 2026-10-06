@@ -108,7 +108,7 @@ struct AssignSpeakerPopover: View {
                 onRenameLabel()
             }
             .axLeaf("Assign.Button.RenameLabel")
-            footerButton("Clear speaker") {
+            footerButton("No Speaker") {
                 Task { await model.clearSpeaker(label: label) }
                 dismiss()
             }

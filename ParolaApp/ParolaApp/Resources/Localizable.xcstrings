@@ -2185,6 +2185,17 @@
         }
       }
     },
+    "Assign": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assegna"
+          }
+        }
+      }
+    },
     "Assign %@…": {
       "extractionState": "manual",
       "localizations": {
@@ -2214,6 +2225,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Assegna questo segmento a"
+          }
+        }
+      }
+    },
+    "Assign speaker": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assegna speaker"
           }
         }
       }
@@ -3487,17 +3509,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancella ricerca"
-          }
-        }
-      }
-    },
-    "Clear speaker": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Togli lo speaker"
           }
         }
       }
@@ -8955,6 +8966,17 @@
         }
       }
     },
+    "New Person…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuova persona…"
+          }
+        }
+      }
+    },
     "New Prompt": {
       "extractionState": "manual",
       "localizations": {
@@ -8995,17 +9017,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "I nuovi file aggiunti a una cartella monitorata vengono trascritti automaticamente, anche quelli arrivati mentre Parola era chiuso. I file già presenti quando aggiungi la cartella vengono ignorati."
-          }
-        }
-      }
-    },
-    "New person…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nuova persona…"
           }
         }
       }
@@ -9171,6 +9182,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun file recente"
+          }
+        }
+      }
+    },
+    "No Speaker": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuno speaker"
           }
         }
       }

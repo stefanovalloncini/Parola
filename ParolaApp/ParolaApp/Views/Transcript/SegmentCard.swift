@@ -186,7 +186,7 @@ struct SegmentCard: View {
             .help("Play from here")
             .axLeaf("Card.Button.SeekTimestamp")
             // A speakerless segment renders no chip, so the timestamp carries the assign menu too.
-            .contextMenu { assignSpeakerMenu }
+            .contextMenu { assignSegmentMenu }
         }
         .fixedSize()
     }
@@ -219,7 +219,7 @@ struct SegmentCard: View {
                 draftSpeakerName = label
                 renamingSpeaker = true
             }
-            assignSpeakerMenu
+            assignSegmentMenu
         }
         .axLeaf("Card.Button.Speaker")
     }
@@ -527,26 +527,11 @@ struct SegmentCard: View {
         model.transcript?.segments.last?.id == segment.id
     }
 
-    /// One segment's own people menu: the card's context menu and its ••• menu both show it, since
-    /// a right-click over selectable text can land on the system editing menu instead.
+    /// The ••• menu carries it too: a right-click over selectable text can land on the system editing menu instead.
     private var assignSegmentMenu: some View {
-        Menu("Assign This Segment to") {
-            ForEach(model.mostUsedPeople(limit: 10)) { person in
-                Button(person.name) { model.assignSpeaker(person.name, toSegmentID: segment.id) }
-                    .axLeaf("Card.MenuItem.AssignPerson.\(person.name)")
-            }
-            if !model.people.isEmpty { Divider() }
-            Button("New person…") {
-                draftAssignSpeakerName = ""
-                assigningSpeaker = true
-            }
-            .axLeaf("Card.MenuItem.AssignNewPerson")
-        }
-    }
-
-    private var assignSpeakerMenu: some View {
-        Menu("Assign Speaker") {
-            ForEach(model.transcriptSpeakers, id: \.self) { name in
+        let choices = model.segmentSpeakerChoices(peopleLimit: 10)
+        return Menu("Assign This Segment to") {
+            ForEach(choices.speakers, id: \.self) { name in
                 Button {
                     model.assignSpeaker(name, toSegmentID: segment.id)
                 } label: {
@@ -556,16 +541,22 @@ struct SegmentCard: View {
                         Text(name)
                     }
                 }
+                .axLeaf("Card.MenuItem.AssignSpeaker.\(name)")
             }
-            if !model.transcriptSpeakers.isEmpty { Divider() }
-            Button("New Speaker…") {
+            if !choices.speakers.isEmpty { Divider() }
+            ForEach(choices.people) { person in
+                Button(person.name) { model.assignSpeaker(person.name, toSegmentID: segment.id) }
+                    .axLeaf("Card.MenuItem.AssignPerson.\(person.name)")
+            }
+            Button("New Person…") {
                 draftAssignSpeakerName = ""
                 assigningSpeaker = true
             }
+            .axLeaf("Card.MenuItem.AssignNewPerson")
             if segment.speaker != nil {
-                Button("No Speaker") {
-                    model.assignSpeaker(nil, toSegmentID: segment.id)
-                }
+                Divider()
+                Button("No Speaker") { model.assignSpeaker(nil, toSegmentID: segment.id) }
+                    .axLeaf("Card.MenuItem.NoSpeaker")
             }
         }
     }
