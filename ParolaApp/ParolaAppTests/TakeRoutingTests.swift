@@ -320,7 +320,8 @@ struct TakeRoutingTests {
     @Test("a toast raised while the window is out of sight waits for the user before it counts down, and its window tells it, not a poll")
     func toastWaitsToBeSeen() async throws {
         let model = makeModel()
-        let notice = ArrivalNotice(failed: URL(fileURLWithPath: "/tmp/memo.wav"), reason: "unreadable")
+        let manifest = ParolaDocument.Manifest(originalAudioName: "memo.wav", title: "Memo", modelName: "stub", language: "en")
+        let notice = ArrivalNotice(landed: LibraryEntry(id: "memo", bundleURL: URL(fileURLWithPath: "/tmp/memo.parola"), manifest: manifest))
         model.arrivalNotice = notice
         let hosted = HostedWindow(ArrivalToast(notice: notice, dismissAfter: .milliseconds(300)).environment(model), width: 600, height: 120)
         defer { hosted.close() }

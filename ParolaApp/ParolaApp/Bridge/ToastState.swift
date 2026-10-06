@@ -4,7 +4,7 @@ import Foundation
 /// The toasts under the page as `getState` reports them; a button's id names its toast, so a press never reaches a newer one.
 extension ParolaAutomationServer {
     enum ToastButton: String {
-        case summarize, copy, open, stop, retry, dismiss
+        case summarize, copy, open, stop, retry, reveal, dismiss
     }
 
     static func toastActionID(_ toastID: UUID, _ button: ToastButton) -> String {
@@ -21,7 +21,7 @@ extension ParolaAutomationServer {
         case .saved: [.open, .dismiss]
         case .running: [.stop, .dismiss]
         case .paused, .unsaved: [.retry, .dismiss]
-        case .failed: [.dismiss]
+        case .failed: [.retry, .reveal, .dismiss]
         }
     }
 
@@ -64,7 +64,7 @@ extension ParolaAutomationServer {
                 return (true, pasteboard.string(forType: .string))
             case .dismiss:
                 model.dismissTakeSaved()
-            case .open, .stop, .retry:
+            case .open, .stop, .retry, .reveal:
                 return (false, nil)
             }
             return (true, nil)
@@ -76,7 +76,8 @@ extension ParolaAutomationServer {
         switch button {
         case .open: model.openArrivalNotice()
         case .stop: model.stopBackgroundArrival()
-        case .retry: model.resumeWatchedLane()
+        case .retry: model.retryArrivalNotice()
+        case .reveal: model.revealFailedArrival()
         case .dismiss: if shown.state == .running { model.hideRunningArrival() } else { model.dismissArrivalNotice() }
         case .summarize, .copy: return (false, nil)
         }
@@ -94,6 +95,7 @@ extension ParolaAutomationServer {
         case .open: String(localized: "Open")
         case .stop: String(localized: "Stop")
         case .retry: String(localized: "Retry")
+        case .reveal: String(localized: "Reveal")
         case .dismiss: String(localized: "Dismiss")
         }
     }

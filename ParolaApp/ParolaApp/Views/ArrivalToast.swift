@@ -53,13 +53,15 @@ struct ArrivalToast: View {
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf("Arrival.Button.Stop")
             case .paused, .unsaved:
-                Button("Retry") {
-                    model.resumeWatchedLane()
-                }
-                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
-                .axLeaf("Arrival.Button.Retry")
+                retryButton
             case .failed:
-                EmptyView()
+                retryButton
+                Button("Reveal") {
+                    model.revealFailedArrival()
+                }
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                .help("Reveal in Finder")
+                .axLeaf("Arrival.Button.Reveal")
             }
             Button {
                 if notice.state == .running {
@@ -95,6 +97,14 @@ struct ArrivalToast: View {
             await model.dismissArrivalNotice(notice, after: dismissAfter)
         }
         .axBranch("ArrivalToast")
+    }
+
+    private var retryButton: some View {
+        Button("Retry") {
+            model.retryArrivalNotice()
+        }
+        .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+        .axLeaf("Arrival.Button.Retry")
     }
 
     private var title: Text {

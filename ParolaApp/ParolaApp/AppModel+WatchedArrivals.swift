@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import ParolaCore
 
@@ -83,6 +84,10 @@ struct ArrivalNotice: Equatable, Identifiable {
     var origin: Origin = .watchedFolder
     /// The page a saved entry went to; nil for a file that never became one.
     var category: EntryCategory?
+    /// A failed watched file, and the folder it came from, for Retry and Reveal.
+    var file: URL?
+    var folderID: UUID?
+    var folderPath: String?
 
     var reason: String? {
         switch state {
@@ -91,11 +96,11 @@ struct ArrivalNotice: Equatable, Identifiable {
         }
     }
 
-    /// A running file and a stopped lane stay up until something changes; the rest go after a few seconds.
+    /// Only a landing goes after a few seconds: a running file, a stopped lane and a failure stay until something changes.
     var dismissesItself: Bool {
         switch state {
-        case .saved, .failed: true
-        case .running, .paused, .unsaved: false
+        case .saved: true
+        case .running, .paused, .unsaved, .failed: false
         }
     }
 
@@ -128,9 +133,12 @@ struct ArrivalNotice: Equatable, Identifiable {
         }
     }
 
-    init(failed url: URL, reason: String) {
+    init(failed url: URL, reason: String, folderID: UUID? = nil, folderPath: String? = nil) {
         name = url.deletingPathExtension().lastPathComponent
         state = .failed(reason)
+        file = url
+        self.folderID = folderID
+        self.folderPath = folderPath
     }
 
     init(paused url: URL, reason: String) {
@@ -459,7 +467,10 @@ extension AppModel {
                 backgroundArrivalID = nil
                 runningArrivalNotice = nil
             }
-            arrivalNotice = ArrivalNotice(failed: arrival.url, reason: Self.transcriptionFailureMessage(for: error))
+            arrivalNotice = ArrivalNotice(
+                failed: arrival.url, reason: Self.transcriptionFailureMessage(for: error),
+                folderID: arrival.folderID, folderPath: arrival.folderPath
+            )
         }
         if visibleArrivalID == arrival.id { visibleArrivalID = nil }
         watchedArrivals.removeAll { $0.id == arrival.id }
@@ -586,6 +597,26 @@ extension AppModel {
 
     func dismissArrivalNotice() {
         arrivalNotice = nil
+    }
+
+    /// Retry on the toast: a stopped lane starts again; a file that failed goes back in the line.
+    func retryArrivalNotice() {
+        guard let notice = arrivalNotice else { return }
+        switch notice.state {
+        case .paused, .unsaved:
+            resumeWatchedLane()
+        case .failed:
+            arrivalNotice = nil
+            guard let file = notice.file else { return }
+            enqueueWatchedArrival(WatchedArrival(url: file, folderID: notice.folderID, folderPath: notice.folderPath))
+        case .running, .saved:
+            break
+        }
+    }
+
+    func revealFailedArrival() {
+        guard case .failed = arrivalNotice?.state, let file = arrivalNotice?.file else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([file])
     }
 
     /// The toast's countdown; its view starts it only while its window is on screen.
