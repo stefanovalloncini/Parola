@@ -220,6 +220,32 @@ struct RouteLayoutTests {
         #expect(defaults.bool(forKey: InspectorVisibility.forcedAtNarrowWidthKey) == true)
     }
 
+    @Test("a hidden inspector comes back from the header, at either width", arguments: [1400, MainWindowLayout.minimumWidth])
+    func headerTogglesTheInspector(width: CGFloat) {
+        withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: InspectorVisibility.preferenceKey)
+            let model = makeReadyModel(defaults)
+            let hosted = HostedWindow(ContentView().environment(model), width: width, height: MainWindowLayout.minimumHeight)
+            defer { hosted.close() }
+            settle(hosted.host, width: width, height: MainWindowLayout.minimumHeight)
+            #expect(hasInspectorColumn(hosted.host) == false)
+
+            #expect(HostedAccessibility.press(endingWith: "HeaderBar.Button.Inspector", in: hosted.host))
+            settle(hosted.host, width: width, height: MainWindowLayout.minimumHeight)
+            #expect(hasInspectorColumn(hosted.host))
+
+            #expect(HostedAccessibility.press(endingWith: "HeaderBar.Button.Inspector", in: hosted.host))
+            settle(hosted.host, width: width, height: MainWindowLayout.minimumHeight)
+            #expect(hasInspectorColumn(hosted.host) == false)
+        }
+    }
+
+    @Test("the View menu names what the inspector command will do")
+    func inspectorCommandSaysShowOrHide() {
+        #expect(InspectorVisibility.commandTitle(showing: false) == "Show Inspector")
+        #expect(InspectorVisibility.commandTitle(showing: true) == "Hide Inspector")
+    }
+
     @Test(
         "a populated route asks for no more room than the smallest window has",
         arguments: [AppModel.Route.queue, .batch]

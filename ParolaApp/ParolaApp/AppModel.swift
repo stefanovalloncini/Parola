@@ -148,7 +148,7 @@ final class AppModel {
     private(set) var routeLandsTake = false
     var settingsPane: String = "general"
     var settingsRoutePreview = false  // test-mode only: renders SettingsView in the main window so the bridge can screenshot panes
-    // Published by TranscriptPane so the Toggle Inspector command knows which of the two visibility keys to flip.
+    // Published by TranscriptPane so the Show/Hide Inspector command knows which of the two visibility keys to flip.
     var transcriptPaneIsNarrow = false
     var dropDragPayload: DroppedFiles.Kind?
     var dropHighlight: DropHalf?

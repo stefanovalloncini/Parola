@@ -67,7 +67,7 @@ struct ShortcutCatalog {
                 Entry(label: text("Jump to Time…"),              keys: "⌘ J"),
                 Entry(label: text("Show Outline"),               keys: "⌘ ⇧ O"),
                 Entry(label: text("Favorite Segment"),           keys: "⌘ D"),
-                Entry(label: text("Toggle Inspector"),           keys: "⌘ ⇧ I"),
+                Entry(label: text("Show or Hide Inspector"),     keys: "⌘ ⇧ I"),
                 Entry(label: text("Focus Chat Composer"),        keys: "⌘ L", requires: .ai),
                 Entry(label: text("Open in New Window"),         keys: "⌘ ⇧ N"),
             ]),

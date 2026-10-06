@@ -148,6 +148,17 @@ struct RecordingCommands: View {
 
 struct ViewCommands: View {
     @Bindable var model: AppModel
+    @AppStorage(InspectorVisibility.preferenceKey, store: DefaultsStore.current) private var inspectorPreference = true
+    @AppStorage(InspectorVisibility.forcedAtNarrowWidthKey, store: DefaultsStore.current)
+    private var inspectorForcedAtNarrowWidth = false
+
+    private var inspectorShows: Bool {
+        InspectorVisibility.isVisible(
+            preference: inspectorPreference,
+            forcedAtNarrowWidth: inspectorForcedAtNarrowWidth,
+            isNarrow: model.transcriptPaneIsNarrow
+        )
+    }
 
     var body: some View {
         Button("Show Transcript") { model.setTranscriptPaneMode(.transcript) }
@@ -172,11 +183,12 @@ struct ViewCommands: View {
             .disabled(!model.mainTranscriptCommandsEnabled || model.transcriptDisplayMode != .segments)
             .axLeaf("Menu.View.SubtitleWarnings")
         Divider()
-        Button("Toggle Inspector") {
+        Button(InspectorVisibility.commandTitle(showing: inspectorShows)) {
             InspectorVisibility.toggle(in: DefaultsStore.current, isNarrow: model.transcriptPaneIsNarrow)
         }
         .keyboardShortcut("i", modifiers: [.command, .shift])
         .disabled(!model.mainTranscriptCommandsEnabled)
+        .axLeaf("Menu.View.Inspector")
         Toggle("Always on Top", isOn: $model.mainWindowAlwaysOnTop)
         MiniPlayerCommand()
         Divider()

@@ -20,6 +20,10 @@ enum InspectorVisibility {
 
     static let modeKey = "inspectorMode"
 
+    static func commandTitle(showing: Bool) -> String {
+        showing ? String(localized: "Hide Inspector") : String(localized: "Show Inspector")
+    }
+
     /// For actions whose result only lands in the inspector, so running one from elsewhere shows it.
     static func show(in defaults: UserDefaults, isNarrow: Bool) {
         defaults.set(true, forKey: isNarrow ? forcedAtNarrowWidthKey : preferenceKey)

@@ -5,6 +5,7 @@ struct TranscriptHeaderBar: View {
     @Environment(AppModel.self) private var model
     @State private var speaker = TranscriptSpeaker()
     let title: String
+    @Binding var inspectorVisible: Bool
 
     @State private var outlineOpen = false
     @State private var jumpOpen = false
@@ -102,6 +103,7 @@ struct TranscriptHeaderBar: View {
             }
 
             advanceButton
+            inspectorButton
         }
     }
 
@@ -202,6 +204,16 @@ struct TranscriptHeaderBar: View {
         .help("Next segment")
         .accessibilityLabel("Next segment")
         .axLeaf("HeaderBar.Button.Advance")
+    }
+
+    private var inspectorButton: some View {
+        Button { inspectorVisible.toggle() } label: {
+            Image(systemName: "sidebar.right")
+        }
+        .buttonStyle(GlyphButtonStyle(tinted: true))
+        .help(inspectorVisible ? "Hide inspector" : "Show inspector")
+        .accessibilityLabel(inspectorVisible ? "Hide inspector" : "Show inspector")
+        .axLeaf("HeaderBar.Button.Inspector")
     }
 
     private var paneModePicker: some View {

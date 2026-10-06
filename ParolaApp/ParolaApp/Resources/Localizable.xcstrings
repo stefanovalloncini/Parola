@@ -6677,6 +6677,17 @@
         }
       }
     },
+    "Hide Inspector": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nascondi inspector"
+          }
+        }
+      }
+    },
     "Hide Scratchpad": {
       "extractionState": "manual",
       "localizations": {
@@ -13446,6 +13457,17 @@
         }
       }
     },
+    "Show Inspector": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra inspector"
+          }
+        }
+      }
+    },
     "Show Introduction": {
       "extractionState": "manual",
       "localizations": {
@@ -13611,6 +13633,17 @@
         }
       }
     },
+    "Show inspector": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra inspector"
+          }
+        }
+      }
+    },
     "Show menu bar icon": {
       "extractionState": "manual",
       "localizations": {
@@ -13640,6 +13673,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra solo %@"
+          }
+        }
+      }
+    },
+    "Show or Hide Inspector": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra o nascondi inspector"
           }
         }
       }
@@ -15927,17 +15971,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alternato"
-          }
-        }
-      }
-    },
-    "Toggle Inspector": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostra/nascondi inspector"
           }
         }
       }

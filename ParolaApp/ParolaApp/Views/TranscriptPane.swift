@@ -77,7 +77,7 @@ struct TranscriptPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TranscriptHeaderBar(title: model.transcriptHeaderTitle)
+            TranscriptHeaderBar(title: model.transcriptHeaderTitle, inspectorVisible: inspectorVisibleBinding)
             Divider()
 
             if model.transcriptFindBarShows {
