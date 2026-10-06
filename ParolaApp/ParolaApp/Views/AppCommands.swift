@@ -79,9 +79,12 @@ struct FileCommands: View {
             .axLeaf("Menu.File.TranscribeLink")
         }
         if model.features.isEnabled(.batch) {
-            Button(NewMenuCommand.batchTranscribe.title) { model.presentBatchOpenPanel() }
-                .disabled(model.introduction.isPresented)
-                .axLeaf("Menu.File.BatchTranscribe")
+            Button(NewMenuCommand.batchTranscribe.title) {
+                model.showMainWindow { openWindow(id: MainWindowScene.id) }
+                model.presentBatchOpenPanel()
+            }
+            .disabled(model.introduction.isPresented)
+            .axLeaf("Menu.File.BatchTranscribe")
         }
         Menu("Open Recent") {
             let recents = model.recentFiles

@@ -83,4 +83,15 @@ struct MainWindowTests {
         ))
         #expect(try source("ParolaApp").contains("WindowGroup(id: MainWindowScene.id)"))
     }
+
+    @Test("File ▸ Transcribe Link… and Batch Transcribe… put the main window in front, or open it again, as the + menu runs inside it")
+    func fileIntakeShowsTheMainWindowFirst() throws {
+        let commands = try source("Views/AppCommands")
+        #expect(commands.contains(
+            "Button(NewMenuCommand.transcribeLink.title) { model.showMainWindow { openWindow(id: MainWindowScene.id) } model.openLinkSheet(prefill: nil) }"
+        ))
+        #expect(commands.contains(
+            "Button(NewMenuCommand.batchTranscribe.title) { model.showMainWindow { openWindow(id: MainWindowScene.id) } model.presentBatchOpenPanel() }"
+        ))
+    }
 }
