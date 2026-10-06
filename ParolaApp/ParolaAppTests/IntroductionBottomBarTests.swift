@@ -20,6 +20,7 @@ struct IntroductionBottomBarTests {
     }
 
     @Test("Back answers ⌘[, as Back does in the Transcript menu and in Settings")
+    @MainActor
     func backHasAKey() {
         #expect(IntroductionBottomBar.backShortcut == KeyboardShortcut("[", modifiers: .command))
     }
