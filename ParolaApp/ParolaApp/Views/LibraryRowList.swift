@@ -140,8 +140,13 @@ struct LibraryRowList<Top: View>: View {
         ))
         .onDeleteCommand(perform: deleteSelection)
         .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: itemIDs)
-        // Empty on purpose: each row keeps its own context menu, and the list takes only double-click and Return.
-        .contextMenu(forSelectionType: LibraryEntry.ID.self) { _ in
+        .contextMenu(forSelectionType: LibraryEntry.ID.self) { ids in
+            LibraryRowMenu(
+                model: model,
+                entries: LibraryRowsTarget.selectedEntries(ids, in: items),
+                rename: rename,
+                delete: delete
+            )
         } primaryAction: { ids in
             openFromList(ids)
         }
@@ -155,7 +160,11 @@ struct LibraryRowList<Top: View>: View {
     }
 
     private func deleteSelection() {
-        let ids = LibraryListItem.entries(in: selection, items: items)
+        delete(LibraryListItem.entries(in: selection, items: items))
+    }
+
+    /// Several rows ask first, and the alert deletes the selection, so they become it.
+    private func delete(_ ids: Set<LibraryEntry.ID>) {
         switch LibraryDeleteRequest.forSelection(count: ids.count) {
         case .none:
             break
@@ -163,6 +172,7 @@ struct LibraryRowList<Top: View>: View {
             selection.subtract(ids)
             model.deleteEntries(Array(ids))
         case .confirm:
+            selection = ids
             pendingBulkDelete = true
         }
     }
@@ -206,15 +216,12 @@ struct LibraryListRow: View, Equatable {
         return rowContent
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: LibraryRowFormat.spokenLabel(for: row, detail: spokenDetail)))
-            // The context menu stays on the row for VoiceOver too; these put its everyday items in the Actions rotor.
+            // The list's context menu reaches VoiceOver too; these put its everyday items in the Actions rotor, in its order.
             .accessibilityActions {
                 if let model { actions(for: entry, model: model) }
             }
             .contentShape(Rectangle())
             .draggable(entry.bundleURL)
-            .contextMenu {
-                if let model { menu(for: entry, model: model) }
-            }
             .accessibilityIdentifier("library.row.\(entry.id)")
     }
 
@@ -236,49 +243,11 @@ struct LibraryListRow: View, Equatable {
     private func actions(for entry: LibraryEntry, model: AppModel) -> some View {
         Button("Open") { model.openEntryFromLibrary(entry.id, inNewWindow: false) }
         Button("Open in New Window") { model.openEntryWindow(entry.id) }
+        Button("Export…") { model.exportEntryFromLibrary(entry.id) }
         Button(entry.pinned ? "Unpin" : "Pin") { model.togglePinned(for: entry.id) }
         Button("Rename…") { rename(entry) }
         Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL]) }
         Button("Delete") { model.deleteEntry(entry.id) }
-    }
-
-    @ViewBuilder
-    private func menu(for entry: LibraryEntry, model: AppModel) -> some View {
-        Button("Open") {
-            model.openEntryFromLibrary(entry.id, inNewWindow: false)
-        }
-        Button("Open in New Window") {
-            model.openEntryWindow(entry.id)
-        }
-        .accessibilityIdentifier("library.row.\(entry.id).openInNewWindow")
-        Button(entry.pinned ? "Unpin" : "Pin") {
-            model.togglePinned(for: entry.id)
-        }
-        .accessibilityIdentifier("library.row.\(entry.id).\(entry.pinned ? "unpin" : "pin")")
-        Menu("Move to") {
-            ForEach(EntryCategory.allCases.filter { $0 != entry.category }, id: \.self) { target in
-                Button(LocalizedStringKey(libraryCategoryName(target))) {
-                    model.moveEntry(entry.id, to: target)
-                }
-            }
-        }
-        .accessibilityIdentifier("library.row.\(entry.id).moveTo")
-        if model.destinationsEnabled {
-            SendToMenu(model: model, entryID: entry.id)
-                .accessibilityIdentifier("library.row.\(entry.id).sendTo")
-        }
-        Button("Reveal in Finder") {
-            NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL])
-        }
-        .accessibilityIdentifier("library.row.\(entry.id).revealInFinder")
-        Button("Rename…") {
-            rename(entry)
-        }
-        .accessibilityIdentifier("library.row.\(entry.id).rename")
-        Button("Delete", role: .destructive) {
-            model.deleteEntry(entry.id)
-        }
-        .accessibilityIdentifier("library.row.\(entry.id).delete")
     }
 
     @ViewBuilder
@@ -293,6 +262,125 @@ struct LibraryListRow: View, Equatable {
                 isSelected: isSelected,
                 showsTimestamp: showsTimestamp
             )
+        }
+    }
+}
+
+/// The right-click menu, for the selection when the clicked row is in it and for that row alone when it isn't.
+struct LibraryRowMenu: View {
+    let model: AppModel
+    let entries: [LibraryEntry]
+    let rename: (LibraryEntry) -> Void
+    let delete: (Set<LibraryEntry.ID>) -> Void
+
+    private var ids: [LibraryEntry.ID] { entries.map(\.id) }
+
+    /// A category every row already sits in isn't somewhere to move them.
+    static func moveTargets(for entries: [LibraryEntry]) -> [EntryCategory] {
+        let shared = Set(entries.map(\.category))
+        return EntryCategory.allCases.filter { shared != [$0] }
+    }
+
+    var body: some View {
+        if let entry = entries.first {
+            if entries.count == 1 {
+                single(entry)
+            } else {
+                several
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func single(_ entry: LibraryEntry) -> some View {
+        Button("Open") {
+            model.openEntryFromLibrary(entry.id, inNewWindow: false)
+        }
+        Button("Open in New Window") {
+            model.openEntryWindow(entry.id)
+        }
+        .accessibilityIdentifier("library.row.\(entry.id).openInNewWindow")
+        Divider()
+        Button("Export…") {
+            model.exportEntryFromLibrary(entry.id)
+        }
+        .accessibilityIdentifier("library.row.\(entry.id).export")
+        share
+        if model.destinationsEnabled {
+            SendToMenu(model: model, entryID: entry.id)
+                .accessibilityIdentifier("library.row.\(entry.id).sendTo")
+        }
+        Divider()
+        pin
+            .accessibilityIdentifier("library.row.\(entry.id).\(entry.pinned ? "unpin" : "pin")")
+        Button("Rename…") {
+            rename(entry)
+        }
+        .accessibilityIdentifier("library.row.\(entry.id).rename")
+        move
+            .accessibilityIdentifier("library.row.\(entry.id).moveTo")
+        Divider()
+        reveal
+            .accessibilityIdentifier("library.row.\(entry.id).revealInFinder")
+        Divider()
+        Button("Delete", role: .destructive) {
+            delete([entry.id])
+        }
+        .accessibilityIdentifier("library.row.\(entry.id).delete")
+    }
+
+    @ViewBuilder
+    private var several: some View {
+        Menu("Export") {
+            ForEach(ExportFormat.allCases) { format in
+                Button("\(format.displayName) (.\(format.fileExtension))") {
+                    model.bulkExportEntries(ids: Set(ids), format: format)
+                }
+            }
+        }
+        share
+        Divider()
+        pin
+        move
+        Divider()
+        reveal
+        Divider()
+        Button(role: .destructive) {
+            delete(Set(ids))
+        } label: {
+            Text(verbatim: RecentlyDeletedCopy.deleteSelection(entries.count))
+        }
+    }
+
+    private var share: some View {
+        let files = entries.map { entry in
+            LibraryEntryShareFile(
+                title: LibraryEntryDisplay.listTitle(for: entry, showsAITitle: model.showAITitles), bundleURL: entry.bundleURL
+            )
+        }
+        return ShareLink(items: files, preview: { SharePreview($0.title) })
+    }
+
+    private var pin: some View {
+        let pins = LibraryRowsTarget.pins(entries)
+        return Button(pins ? "Pin" : "Unpin") {
+            model.setPinned(pins, for: ids)
+        }
+    }
+
+    private var move: some View {
+        Menu("Move to") {
+            ForEach(Self.moveTargets(for: entries), id: \.self) { target in
+                Button(LocalizedStringKey(libraryCategoryName(target))) {
+                    model.moveEntries(ids, to: target)
+                }
+            }
+        }
+    }
+
+    private var reveal: some View {
+        Button("Reveal in Finder") {
+            NSWorkspace.shared.activateFileViewerSelecting(entries.map(\.bundleURL))
         }
     }
 }

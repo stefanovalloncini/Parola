@@ -90,6 +90,54 @@ struct LibraryRowCommandsTests {
         #expect(pinned)
     }
 
+    @Test("Move to offers every category but the one all the rows already share")
+    func moveOffersOtherCategories() {
+        func entry(_ id: String, _ category: EntryCategory) -> LibraryEntry {
+            let manifest = ParolaDocument.Manifest(originalAudioName: "\(id).m4a", modelName: "stub", language: "en", category: category)
+            return LibraryEntry(id: id, bundleURL: URL(fileURLWithPath: "/tmp/LibraryRowCommandsTests/\(id).parola"), manifest: manifest)
+        }
+
+        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .meeting)]) == [.transcription, .dictation])
+        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .meeting), entry("b", .meeting)]) == [.transcription, .dictation])
+        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .meeting), entry("b", .dictation)]) == EntryCategory.allCases)
+    }
+
+    @Test("a row's Export… opens it with the export sheet over it", .timeLimit(.minutes(1)))
+    func exportOpensTheSheet() async throws {
+        let model = makeModel("rowcommands-export")
+        let entry = try await add("export me", to: model)
+        await model.refreshLibraryAndWait()
+
+        model.exportEntryFromLibrary(entry.id)
+
+        let opened = await waitUntil { model.selectedEntryID == entry.id && model.exportSheetOpen }
+        #expect(opened)
+    }
+
+    @Test("right-click builds one menu from the clicked rows, grouped, with Export and Share")
+    func rowMenuIsGroupedForTheSelection() throws {
+        let list = try Self.source("Views/LibraryRowList").split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        #expect(list.contains("contextMenu(forSelectionType: LibraryEntry.ID.self) { ids in LibraryRowMenu("))
+        #expect(!list.contains(".contextMenu {"), "no row carries a menu of its own")
+        let order = [
+            #"Button("Open")"#, #"Button("Open in New Window")"#, "Divider()", #"Button("Export…")"#, "share",
+            "SendToMenu(", "Divider()", "pin", #"Button("Rename…")"#, "move", "Divider()", "reveal", "Divider()",
+            #"Button("Delete", role: .destructive)"#,
+        ]
+        let single = try #require(list.range(of: "private func single("))
+        var cursor = single.upperBound
+        for item in order {
+            let found = list.range(of: item, range: cursor..<list.endIndex)
+            #expect(found != nil, "\(item) after the one before it")
+            if let found { cursor = found.upperBound }
+        }
+        let actions = try #require(list.range(of: "private func actions(for entry"))
+        let export = try #require(list.range(of: #"Button("Export…")"#, range: actions.upperBound..<list.endIndex))
+        let rename = try #require(list.range(of: #"Button("Rename…")"#, range: actions.upperBound..<list.endIndex))
+        let reveal = try #require(list.range(of: #"Button("Reveal in Finder")"#, range: actions.upperBound..<list.endIndex))
+        #expect(export.lowerBound < rename.lowerBound && rename.lowerBound < reveal.lowerBound)
+    }
+
     @Test("both lists take Delete, the library list hands its rows to the File menu")
     func listsWireTheKeyboard() throws {
         let rows = try Self.source("Views/LibraryRowList")

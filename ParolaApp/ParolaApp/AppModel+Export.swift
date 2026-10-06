@@ -14,6 +14,15 @@ extension AppModel {
         exportSheetOpen = true
     }
 
+    /// A row's Export…: the entry opens in the main window with the export sheet over it.
+    func exportEntryFromLibrary(_ id: LibraryEntry.ID) {
+        let opening = loadEntry(id)
+        Task { [weak self] in
+            guard (try? await opening.value) != nil, let self, selectedEntryID == id else { return }
+            openExportSheet()
+        }
+    }
+
     func closeExportSheet() {
         exportSheetOpen = false
     }

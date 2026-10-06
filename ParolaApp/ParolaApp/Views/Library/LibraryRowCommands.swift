@@ -7,8 +7,12 @@ struct LibraryRowsTarget {
     let rename: (LibraryEntry) -> Void
     let delete: () -> Void
 
-    /// Pin unless every selected row is pinned already, as Mail's Flag does for a mixed selection.
-    var pins: Bool { entries.contains { !$0.pinned } }
+    var pins: Bool { Self.pins(entries) }
+
+    /// Pin unless every row is pinned already, as Mail's Flag does for a mixed selection.
+    static func pins(_ entries: [LibraryEntry]) -> Bool {
+        entries.contains { !$0.pinned }
+    }
 
     var renameTarget: LibraryEntry? { entries.count == 1 ? entries.first : nil }
 
