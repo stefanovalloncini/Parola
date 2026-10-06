@@ -1076,6 +1076,17 @@
         }
       }
     },
+    "A finished transcript is translated with Apple Translation, on your Mac, into any language it offers.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una trascrizione finita viene tradotta con Apple Translation, sul tuo Mac, in qualsiasi lingua disponibile."
+          }
+        }
+      }
+    },
     "A person carries a colour and a name across every transcript they speak in. Renaming or merging rewrites the name in the transcripts that point at them.": {
       "extractionState": "manual",
       "localizations": {
@@ -1715,6 +1726,17 @@
         }
       }
     },
+    "After transcribing": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dopo la trascrizione"
+          }
+        }
+      }
+    },
     "All": {
       "extractionState": "manual",
       "localizations": {
@@ -1985,17 +2007,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apple Speech"
-          }
-        }
-      }
-    },
-    "Apple Translation (on device)": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Traduzione Apple (sul dispositivo)"
           }
         }
       }
@@ -16838,17 +16849,6 @@
         }
       }
     },
-    "Translating a finished transcript runs on your Mac.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La traduzione di una trascrizione completata avviene sul tuo Mac."
-          }
-        }
-      }
-    },
     "Translation": {
       "extractionState": "manual",
       "localizations": {
@@ -16856,17 +16856,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Traduzione"
-          }
-        }
-      }
-    },
-    "Translation provider": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Servizio di traduzione"
           }
         }
       }
@@ -17638,6 +17627,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Durante la registrazione"
+          }
+        }
+      }
+    },
+    "While transcribing": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durante la trascrizione"
           }
         }
       }

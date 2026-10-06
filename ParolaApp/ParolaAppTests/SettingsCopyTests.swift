@@ -171,4 +171,19 @@ struct SettingsCopyTests {
         let active = words(ModelCardRow(variant: variant, kind: .active, primaryAction: {}), model: model)
         #expect(active.contains("Default"), "\(active)")
     }
+
+    @Test("Translation splits Apple Translation after transcribing from Whisper while transcribing, with no read-only provider row")
+    func translationNamesItsTwoEngines() {
+        let model = makeModel("settings-copy-translation")
+        let words = words(TranslationPane(), model: model)
+        #expect(!words.contains("Translation provider"), "\(words)")
+        let after = words.firstIndex(of: "After transcribing")
+        let sideBySide = words.firstIndex(of: "Show translations side by side")
+        let during = words.firstIndex(of: "While transcribing")
+        let byDefault = words.firstIndex(of: "Translate to English by default")
+        #expect(after != nil && during != nil, "\(words)")
+        if let after, let sideBySide, let during, let byDefault {
+            #expect(after < sideBySide && sideBySide < during && during < byDefault, "\(words)")
+        }
+    }
 }
