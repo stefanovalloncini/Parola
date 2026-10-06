@@ -817,6 +817,7 @@ struct StreamingRealtimeLoopTests {
 
     private func loadingLoop(
         maxWindowSeconds: Double = 60,
+        preModelSlackSeconds: Double = 5,
         load: @escaping @Sendable () async throws -> Void
     ) -> (loop: StreamingRealtimeLoop, capture: FakeCapture, decodedSampleCounts: Awaitable<[Int]>) {
         let capture = FakeCapture()
@@ -824,6 +825,7 @@ struct StreamingRealtimeLoopTests {
         var config = StreamingRealtimeLoop.Configuration()
         config.useVAD = false
         config.maxWindowSeconds = maxWindowSeconds
+        config.preModelSlackSeconds = preModelSlackSeconds
         let loop = StreamingRealtimeLoop(
             configuration: config,
             dependencies: .init(
@@ -846,15 +848,17 @@ struct StreamingRealtimeLoopTests {
         return (loop, capture, decoded)
     }
 
-    @Test("while the model loads the loop holds at most a window of audio, and decodes it once the model is in")
+    @Test("during the model load the loop holds at most a window of audio, cut in chunks, and decodes it once the model is in")
     func modelLoadHoldsAWindow() async throws {
         let loadGate = UninterruptibleGate()
-        let (loop, capture, decoded) = loadingLoop(maxWindowSeconds: 4) { await loadGate.wait() }
+        let (loop, capture, decoded) = loadingLoop(maxWindowSeconds: 4, preModelSlackSeconds: 1) { await loadGate.wait() }
         let runTask = LoopRun(loop)
         await loadGate.arrivals.wait(atLeast: 1, "the model load to start")
         #expect(capture.installed, "capture is up before the model")
 
-        capture.pushBuffers(count: 6, secondsEach: 1, value: 0.5)
+        capture.pushBuffers(count: 5, secondsEach: 1, value: 0.5)
+        #expect(loop.pendingSampleCount() == 5 * sampleRate, "held audio runs past the window until the slack is used up")
+        capture.pushBuffers(count: 1, secondsEach: 1, value: 0.5)
         #expect(loop.pendingSampleCount() == 4 * sampleRate)
         #expect(decoded.value.isEmpty)
 

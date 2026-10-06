@@ -201,6 +201,7 @@ struct StreamingLoggingTests {
             var config = StreamingRealtimeLoop.Configuration()
             config.useVAD = false
             config.maxWindowSeconds = 2
+            config.preModelSlackSeconds = 1
             let loop = StreamingRealtimeLoop(
                 configuration: config,
                 dependencies: .init(

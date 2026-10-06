@@ -19,6 +19,8 @@ actor StreamingRealtimeLoop {
         var maxWindowSeconds: Double = 60
         var sampleRate = WhisperKit.sampleRate
         var wantsConfirmedAudio = false
+        /// How far held audio may run past `maxWindowSeconds` during the model load before it's cut back, so the cut isn't paid per buffer.
+        var preModelSlackSeconds: Double = 5
     }
 
     typealias Transcribe = @Sendable ([Float], DecodingOptions, @escaping TranscriptionCallback) async throws -> TranscriptionResult
@@ -79,11 +81,16 @@ actor StreamingRealtimeLoop {
         case modelFailed(any Error)
     }
 
+    /// While the model loads, pending audio past `trimAbove` samples is cut back to its newest `keep`.
+    private struct PendingLimit: Sendable {
+        var keep: Int
+        var trimAbove: Int
+    }
+
     private struct Inbox: Sendable {
         var pending: [Float] = []
         var energies: [(rel: Float, avg: Float)] = []
-        /// Set while the model loads: pending audio past it drops its oldest samples.
-        var maxPending: Int?
+        var limit: PendingLimit?
         var dropped = 0
     }
 
@@ -137,8 +144,12 @@ actor StreamingRealtimeLoop {
         self.levelMeter = levelMeter
         var inbox = Inbox()
         if case .loading = dependencies.model {
+            let sampleRate = Double(configuration.sampleRate)
             // No decode keeps more than maxWindowSeconds, so older audio held for the model would only be dropped later.
-            inbox.maxPending = Int(configuration.maxWindowSeconds * Double(configuration.sampleRate))
+            inbox.limit = PendingLimit(
+                keep: Int(configuration.maxWindowSeconds * sampleRate),
+                trimAbove: Int((configuration.maxWindowSeconds + configuration.preModelSlackSeconds) * sampleRate)
+            )
         }
         self.inbox = OSAllocatedUnfairLock(initialState: inbox)
         (decoderReady, decoderReadySignal) = AsyncStream.makeStream()
@@ -215,9 +226,18 @@ actor StreamingRealtimeLoop {
             loading.cancel()
         }
         modelLoad = nil
-        let dropped = inbox.withLock { box -> Int in
-            box.maxPending = nil
-            return box.dropped
+        takeAudioHeldForModel()
+        return result
+    }
+
+    /// Moves what capture held during the load into the window and lets go of the room it took.
+    private func takeAudioHeldForModel() {
+        let (held, dropped) = inbox.withLock { box -> ([Float], Int) in
+            let taken = (box.pending, box.dropped)
+            box.pending = []
+            box.dropped = 0
+            box.limit = nil
+            return taken
         }
         if dropped > 0 {
             ParolaLog.notice(
@@ -225,7 +245,9 @@ actor StreamingRealtimeLoop {
                 [.audioSeconds: .seconds(Double(dropped) / Double(config.sampleRate))]
             )
         }
-        return result
+        windowStartSample += dropped
+        lastTranscribedTotal = max(lastTranscribedTotal, windowStartSample)
+        window.append(contentsOf: held)
     }
 
     /// Decodes audio that arrived after the last iteration — the 1-second cadence gate
@@ -321,8 +343,8 @@ actor StreamingRealtimeLoop {
             let baseline = box.energies.suffix(20).map(\.avg).min() ?? .infinity
             let rel = AudioProcessor.calculateRelativeEnergy(of: buffer, relativeTo: baseline)
             box.pending.append(contentsOf: buffer)
-            if let maxPending = box.maxPending, box.pending.count > maxPending {
-                let excess = box.pending.count - maxPending
+            if let limit = box.limit, box.pending.count > limit.trimAbove {
+                let excess = box.pending.count - limit.keep
                 box.pending.removeFirst(excess)
                 box.dropped += excess
             }
@@ -354,17 +376,10 @@ actor StreamingRealtimeLoop {
     }
 
     private func drainInbox() {
-        let (pending, dropped) = inbox.withLock { box -> ([Float], Int) in
-            let drained = (box.pending, box.dropped)
+        let pending = inbox.withLock { box -> [Float] in
+            let drained = box.pending
             box.pending.removeAll(keepingCapacity: true)
-            box.dropped = 0
             return drained
-        }
-        if dropped > 0 {
-            // The dropped audio sat between the window and what's pending, so the window can't run on into it.
-            windowStartSample += window.count + dropped
-            window.removeAll()
-            lastTranscribedTotal = max(lastTranscribedTotal, windowStartSample)
         }
         window.append(contentsOf: pending)
     }
