@@ -268,12 +268,34 @@ struct ReadingScriptBuilderTests {
         #expect(units.map { firstAnchorText(in: text, $0) } == units.map(\.text))
     }
 
-    @Test("an early space before an over-long word never leaves a tiny unit")
-    func capSkipsAnEarlySpace() {
-        let link = "https://example.com/" + String(repeating: "a", count: 230)
+    @Test("a short word before an over-long word stays its own unit, so only the long word passes the cap")
+    func capIsolatesAnOverlongWordAfterAShortOne() {
+        let link = "https://example.com/" + String(repeating: "a", count: 231)
         let text = "See " + link + " for the details."
         let units = ReadingScriptBuilder.transcript(transcript([segment(0, text, start: 0)]), language: "en")
-        #expect(units.map(\.text) == ["See " + link, "for the details."])
+        #expect(units.map(\.text) == ["See", link, "for the details."])
+        #expect(units.map { firstAnchorText(in: text, $0) } == units.map(\.text))
+    }
+
+    @Test("short words before an over-long token become one unit under the cap")
+    func capIsolatesAnOverlongTokenAfterShortWords() {
+        let words = Array(repeating: "a", count: 13).joined(separator: " ")
+        let token = String(repeating: "x", count: 250)
+        let text = words + " " + token + " end."
+        let units = ReadingScriptBuilder.transcript(transcript([segment(0, text, start: 0)]), language: "en")
+        #expect(units.map(\.text) == [words, token, "end."])
+        #expect(units.filter { $0.text.count > ReadingScriptBuilder.maxUnitLength }.map(\.text) == [token])
+    }
+
+    @Test("a prefix just under the floor before an over-long token stays its own unit")
+    func capIsolatesAnOverlongTokenAfterAShortPrefix() {
+        let prefix = "one two three four five six seven eight"
+        let token = String(repeating: "x", count: 250)
+        let text = prefix + " " + token + " tail."
+        let units = ReadingScriptBuilder.transcript(transcript([segment(0, text, start: 0)]), language: "en")
+        #expect(prefix.count == ReadingScriptBuilder.minPieceLength - 1)
+        #expect(units.map(\.text) == [prefix, token, "tail."])
+        #expect(units.filter { $0.text.count > ReadingScriptBuilder.maxUnitLength }.map(\.text) == [token])
     }
 
     @Test("a single word longer than the cap stays whole")

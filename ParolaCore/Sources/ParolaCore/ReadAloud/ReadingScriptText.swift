@@ -159,28 +159,30 @@ struct SentenceSplitter {
         return pieces
     }
 
-    /// The last clause mark, else the last space, between `minLength` and `limit`; else the first space past `limit`.
+    /// The last clause mark, else the last space, leaving `minLength` within `limit`; else the last shorter cut; else one whole word.
     private static func cut(in range: Range<String.Index>, limit: String.Index, minLength: Int, text: String) -> String.Index? {
         var clauseCut: String.Index?
         var spaceCut: String.Index?
+        var shortCut: String.Index?
         var index = range.lowerBound
         var length = 0
         while index <= limit {
             let character = text[index]
             let next = text.index(after: index)
             if character.isWhitespace {
-                if length >= minLength { spaceCut = index }
-            } else if index < limit, length + 1 >= minLength {
-                if fullWidthClauseMarks.contains(character) {
-                    clauseCut = next
-                } else if clauseMarks.contains(character), next < range.upperBound, text[next].isWhitespace {
-                    clauseCut = next
-                }
+                if length >= minLength { spaceCut = index } else { shortCut = index }
+            } else if index < limit, endsClause(character, next: next, in: range, text: text) {
+                if length + 1 >= minLength { clauseCut = next } else { shortCut = next }
             }
             index = next
             length += 1
         }
-        if let cut = clauseCut ?? spaceCut { return cut }
+        if let cut = clauseCut ?? spaceCut ?? shortCut { return cut }
         return text[limit..<range.upperBound].firstIndex(where: \.isWhitespace)
+    }
+
+    private static func endsClause(_ character: Character, next: String.Index, in range: Range<String.Index>, text: String) -> Bool {
+        if fullWidthClauseMarks.contains(character) { return true }
+        return clauseMarks.contains(character) && next < range.upperBound && text[next].isWhitespace
     }
 }
