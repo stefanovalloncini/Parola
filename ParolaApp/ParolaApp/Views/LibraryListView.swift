@@ -686,9 +686,9 @@ extension LibraryEmptyAction {
 
     var systemImage: String {
         switch self {
-        case .openFile: return "doc.badge.plus"
-        case .recordMicrophone: return "mic.fill"
-        case .recordSystemAudio: return "waveform.circle.fill"
+        case .openFile: return DS.Symbol.openFiles
+        case .recordMicrophone: return DS.Symbol.microphone
+        case .recordSystemAudio: return DS.Symbol.systemAudio
         case .startDictation: return DS.categorySymbol(for: .dictation)
         case .meetingSettings, .dictationSettings: return "gearshape"
         }

@@ -62,7 +62,7 @@ struct RecordControl: View {
             Group {
                 if model.features.isEnabled(.micRecording) {
                     Button { model.startRecording(source: .microphone) } label: {
-                        Label("Microphone", systemImage: "mic")
+                        Label("Microphone", systemImage: DS.Symbol.microphone)
                     }
                     .keyboardShortcut("n", modifiers: .command)
                     .disabled(!model.canStartTake(.microphone))
@@ -70,7 +70,7 @@ struct RecordControl: View {
                 }
                 if model.features.isEnabled(.meetings) {
                     Button { model.startRecording(source: .systemAudio) } label: {
-                        Label("System Audio", systemImage: "speaker.wave.2")
+                        Label("System Audio", systemImage: DS.Symbol.systemAudio)
                     }
                     .keyboardShortcut("n", modifiers: [.command, .option])
                     .disabled(!model.canStartTake(.systemAudio))

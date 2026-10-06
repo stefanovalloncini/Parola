@@ -301,6 +301,14 @@ struct LibraryListContentTests {
         #expect(!LibraryListContent.emptyActions(for: .transcription, features: .all).contains(.dictationSettings))
     }
 
+    @Test("an empty state's actions wear the outline glyphs the + and Record menus use")
+    func emptyActionsMatchTheMenus() {
+        #expect(LibraryEmptyAction.openFile.systemImage == DS.Symbol.openFiles)
+        #expect(LibraryEmptyAction.recordMicrophone.systemImage == DS.Symbol.microphone)
+        #expect(LibraryEmptyAction.recordSystemAudio.systemImage == DS.Symbol.systemAudio)
+        #expect([DS.Symbol.openFiles, DS.Symbol.microphone, DS.Symbol.systemAudio] == ["folder", "mic", "speaker.wave.2"])
+    }
+
     @Test("Start Dictation wears the dictation glyph the sidebar and rows use")
     func startDictationGlyph() {
         #expect(LibraryEmptyAction.startDictation.systemImage == DS.categorySymbol(for: .dictation))

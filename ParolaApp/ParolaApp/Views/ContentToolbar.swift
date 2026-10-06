@@ -51,7 +51,7 @@ enum NewMenuCommand {
 
     var label: Label<Text, Image> {
         switch self {
-        case .openFiles: Label(title, systemImage: "folder")
+        case .openFiles: Label(title, systemImage: DS.Symbol.openFiles)
         case .transcribeLink: Label(title, systemImage: "link")
         case .batchTranscribe: Label(title, systemImage: "square.stack.3d.up")
         }

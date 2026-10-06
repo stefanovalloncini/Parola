@@ -200,6 +200,13 @@ enum DS {
         static var neutralChip: (fill: SwiftUI.Color, text: SwiftUI.Color) { DS.resolved.neutralChip }
     }
 
+    /// One outline symbol per action, wherever the action is offered.
+    enum Symbol {
+        static let openFiles = "folder"
+        static let microphone = "mic"
+        static let systemAudio = "speaker.wave.2"
+    }
+
     enum Palette {
         static var canvas: SwiftUI.Color { DS.resolved.canvas }
         static var surface: SwiftUI.Color { DS.resolved.surface }
