@@ -29,6 +29,7 @@ struct RecordingSession: Equatable, Sendable {
     enum Permission: Equatable, Sendable {
         case microphone
         case screenRecording
+        case systemAudioRecording
     }
 
     /// What Retry needs of a take whose audio was saved but not transcribed.

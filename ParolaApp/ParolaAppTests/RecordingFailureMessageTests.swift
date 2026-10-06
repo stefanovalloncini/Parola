@@ -10,7 +10,7 @@ struct RecordingFailureMessageTests {
         return try #require(Bundle(path: path))
     }
 
-    @Test("a denied system-audio capture shows the localized Screen Recording guidance")
+    @Test("a denied system-audio capture shows the localized Screen & System Audio Recording guidance")
     func deniedSystemAudioShowsGuidance() throws {
         let message = AppModel.recordingFailureMessage(
             for: ParolaError.captureUnavailable("ScreenCaptureKit unavailable: declined"),
@@ -18,7 +18,55 @@ struct RecordingFailureMessageTests {
             screenRecordingGranted: false,
             bundle: try italianBundle()
         )
-        #expect(message == "Parola ha bisogno del permesso Registrazione schermo per catturare l'audio di sistema. Apri Impostazioni di Sistema → Privacy e sicurezza → Registrazione schermo e concedi l'accesso a Parola, poi avvia di nuovo la registrazione.")
+        #expect(message == "Parola ha bisogno del permesso Registrazione schermo e audio di sistema per registrare l'audio di sistema. Apri Impostazioni di Sistema → Privacy e sicurezza → Registrazione schermo e audio di sistema e consenti l'accesso a Parola, poi avvia di nuovo la registrazione.")
+    }
+
+    @Test("a whole-system capture refused for Screen Recording offers that pane, not the app-only one")
+    func wholeSystemRefusalOffersScreenRecording() {
+        let message = AppModel.recordingFailureMessage(
+            for: ParolaError.captureUnavailable("ScreenCaptureKit unavailable: declined"),
+            source: .systemAudio,
+            screenRecordingGranted: false,
+            hasCaptureTargets: false
+        )
+        #expect(message == "Parola needs Screen & System Audio Recording permission to capture system audio. Open System Settings → Privacy & Security → Screen & System Audio Recording and allow Parola, then start recording again.")
+        #expect(AppModel.missingPermission(
+            for: ParolaError.captureUnavailable("declined"), source: .systemAudio, screenRecordingGranted: false, hasCaptureTargets: false
+        ) == .screenRecording)
+    }
+
+    @Test("an app-only capture that couldn't start asks for System Audio Recording, not Screen Recording")
+    func appOnlyRefusalAsksForSystemAudioRecording() {
+        let message = AppModel.recordingFailureMessage(
+            for: ParolaError.captureUnavailable("could not create the audio process tap"),
+            source: .systemAudio,
+            screenRecordingGranted: false,
+            hasCaptureTargets: true
+        )
+        #expect(message == SystemAudioDidNotStart.message())
+        #expect(AppModel.missingPermission(
+            for: ParolaError.captureUnavailable("could not create the audio process tap"),
+            source: .systemAudio, screenRecordingGranted: false, hasCaptureTargets: true
+        ) == .systemAudioRecording)
+    }
+
+    @Test("the 20s system-audio consent timeout asks for System Audio Recording")
+    func consentTimeoutAsksForSystemAudioRecording() {
+        let message = AppModel.recordingFailureMessage(for: SystemAudioDidNotStart(), source: .systemAudio, screenRecordingGranted: false)
+        #expect(message == SystemAudioDidNotStart.message())
+        #expect(AppModel.missingPermission(for: SystemAudioDidNotStart(), source: .systemAudio, screenRecordingGranted: true) == .systemAudioRecording)
+    }
+
+    @Test("a whole-system capture failure with Screen Recording already granted keeps the raw reason, asking for no pane")
+    func wholeSystemFailureWithScreenRecordingGrantedFallsThrough() {
+        let error = ParolaError.captureUnavailable("no display available for system audio capture")
+        let message = AppModel.recordingFailureMessage(
+            for: error, source: .systemAudio, screenRecordingGranted: true, hasCaptureTargets: false
+        )
+        #expect(message == error.localizedDescription)
+        #expect(AppModel.missingPermission(
+            for: error, source: .systemAudio, screenRecordingGranted: true, hasCaptureTargets: false
+        ) == nil)
     }
 
     @Test("a system-audio capture failure with permission granted keeps the raw reason")

@@ -3578,22 +3578,32 @@ final class AppModel {
         for error: Error,
         source: RecordSource,
         screenRecordingGranted: Bool = CGPreflightScreenCaptureAccess(),
+        hasCaptureTargets: Bool = false,
         bundle: Bundle = .main
     ) -> String {
-        if missingPermission(for: error, source: source, screenRecordingGranted: screenRecordingGranted) == .screenRecording {
+        switch missingPermission(
+            for: error, source: source, screenRecordingGranted: screenRecordingGranted, hasCaptureTargets: hasCaptureTargets
+        ) {
+        case .screenRecording:
             return String(
-                localized: "Parola needs Screen Recording permission to capture system audio. Open System Settings → Privacy & Security → Screen Recording and grant Parola access, then start recording again.",
+                localized: "Parola needs Screen & System Audio Recording permission to capture system audio. Open System Settings → Privacy & Security → Screen & System Audio Recording and allow Parola, then start recording again.",
                 bundle: bundle
             )
+        case .systemAudioRecording:
+            return SystemAudioDidNotStart.message(bundle: bundle)
+        case .microphone, nil:
+            return transcriptionFailureMessage(for: error, bundle: bundle)
         }
-        return transcriptionFailureMessage(for: error, bundle: bundle)
     }
 
     nonisolated static func missingPermission(
-        for error: Error, source: RecordSource, screenRecordingGranted: Bool
+        for error: Error, source: RecordSource, screenRecordingGranted: Bool, hasCaptureTargets: Bool = false
     ) -> RecordingSession.Permission? {
-        guard source == .systemAudio, case ParolaError.captureUnavailable = error, !screenRecordingGranted else { return nil }
-        return .screenRecording
+        guard source == .systemAudio else { return nil }
+        if error is SystemAudioDidNotStart { return .systemAudioRecording }
+        guard case ParolaError.captureUnavailable = error else { return nil }
+        if hasCaptureTargets { return .systemAudioRecording }
+        return screenRecordingGranted ? nil : .screenRecording
     }
 
     nonisolated static func microphoneAccessOffMessage(bundle: Bundle = .main) -> String {
@@ -4069,8 +4079,13 @@ final class AppModel {
                 clearTakeReadouts(of: take.id)
                 activeTake = nil
                 let screenRecordingGranted = screenRecordingCheck()
-                let message = Self.recordingFailureMessage(for: error, source: source, screenRecordingGranted: screenRecordingGranted)
-                let permission = Self.missingPermission(for: error, source: source, screenRecordingGranted: screenRecordingGranted)
+                let hasCaptureTargets = !take.captureTargets.isEmpty
+                let message = Self.recordingFailureMessage(
+                    for: error, source: source, screenRecordingGranted: screenRecordingGranted, hasCaptureTargets: hasCaptureTargets
+                )
+                let permission = Self.missingPermission(
+                    for: error, source: source, screenRecordingGranted: screenRecordingGranted, hasCaptureTargets: hasCaptureTargets
+                )
                 reportTakeFailure(message, take: take.id, permission: permission)
                 recordingStartInFlight = false
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take.id)

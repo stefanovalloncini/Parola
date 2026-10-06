@@ -159,6 +159,7 @@ struct ErrorBanner: View {
         switch permission {
         case .microphone: openMicrophonePrivacySettings()
         case .screenRecording: SystemCapturePermissions.openSystemSettings(pane: "Privacy_ScreenCapture")
+        case .systemAudioRecording: SystemCapturePermissions.openSystemSettings(pane: "Privacy_AudioCapture")
         }
     }
 
