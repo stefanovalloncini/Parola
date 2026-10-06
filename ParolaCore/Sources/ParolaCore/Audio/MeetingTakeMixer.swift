@@ -78,8 +78,12 @@ public enum MeetingTakeMixer {
         (try? AVAudioFile(forReading: url))?.fileFormat.channelCount == 2
     }
 
-    static func clamped(_ sample: Float) -> Float {
-        min(1, max(-1, sample))
+    static func limited(_ sample: Float) -> Float {
+        guard !sample.isNaN else { return 0 }
+        let magnitude = abs(sample)
+        guard magnitude > 0.9 else { return sample }
+        let shaped = 0.9 + 0.1 * tanh((magnitude - 0.9) / 10)
+        return sample < 0 ? -shaped : shaped
     }
 }
 
@@ -244,9 +248,11 @@ struct MixWriter {
         let frames = min(left.count, right.count)
         guard frames > 0, let channels = stereoBuffer.floatChannelData, let mixed = monoBuffer.floatChannelData?[0] else { return }
         for frame in 0..<frames {
-            channels[0][frame] = MeetingTakeMixer.clamped(left[frame])
-            channels[1][frame] = MeetingTakeMixer.clamped(right[frame])
-            mixed[frame] = (MeetingTakeMixer.clamped(left[frame]) + MeetingTakeMixer.clamped(right[frame])) / 2
+            let leftLimited = MeetingTakeMixer.limited(left[frame])
+            let rightLimited = MeetingTakeMixer.limited(right[frame])
+            channels[0][frame] = leftLimited
+            channels[1][frame] = rightLimited
+            mixed[frame] = (leftLimited + rightLimited) / 2
         }
         stereoBuffer.frameLength = AVAudioFrameCount(frames)
         try stereo.write(from: stereoBuffer)

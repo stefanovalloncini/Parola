@@ -321,6 +321,49 @@ struct MeetingTakeMixerTests {
         #expect(downmixedPeak < 0.81)
     }
 
+    @Test("the limiter curve is identity below 0.9, monotonic, and keeps extreme bursts inside full scale")
+    func limiterCurveShapesOnlyAboveThreshold() {
+        #expect(MeetingTakeMixer.limited(0.5) == 0.5)
+        #expect(MeetingTakeMixer.limited(0.9) == 0.9)
+        #expect(MeetingTakeMixer.limited(-0.5) == -0.5)
+        #expect(MeetingTakeMixer.limited(-0.9) == -0.9)
+
+        var previous: Float = -1
+        for step in 0...760 {
+            let sample = -38 + Float(step) * (76 / 760)
+            let out = MeetingTakeMixer.limited(sample)
+            #expect(out >= previous, "\(sample)")
+            previous = out
+        }
+
+        #expect(abs(MeetingTakeMixer.limited(38)) < 1)
+        #expect(abs(MeetingTakeMixer.limited(-38)) < 1)
+        #expect(MeetingTakeMixer.limited(Float.nan) == 0)
+    }
+
+    @Test("a loud burst on the mic never hard-clips, and quiet speech beside it is untouched")
+    func burstIsSoftLimitedNotClipped() throws {
+        let dir = try folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let rate = 16_000.0
+        var micSamples = [Float](repeating: 0.05, count: Int(2 * rate))
+        let burstStart = Int(1 * rate)
+        let burstLength = Int(0.05 * rate)
+        for index in burstStart..<(burstStart + burstLength) { micSamples[index] = 20 }
+        let mic = try TestAudio.write(channels: [micSamples], sampleRate: rate, to: dir.appendingPathComponent("mic.wav"))
+        let mac = try TestAudio.write(
+            channels: [[Float](repeating: 0.05, count: Int(2 * rate))], sampleRate: rate, to: dir.appendingPathComponent("mac.wav")
+        )
+        let stereo = dir.appendingPathComponent("stereo.wav")
+        let start = Date()
+
+        try MeetingTakeMixer.mix(mac: mac, mic: mic, macStart: start, micStart: start, into: stereo, mono: nil)
+
+        let mixed = try TestAudio.read(stereo)
+        #expect(mixed.channels[1].filter({ abs($0) >= 0.9999 }).count == 0)
+        #expect(abs(mixed.rms(channel: 1, from: 0.1, to: 0.9) - 0.05) < 0.001)
+    }
+
     @Test("a microphone that recorded nothing leaves your side silent and the take as long as the Mac audio")
     func emptyMicIsSilence() throws {
         let dir = try folder()
