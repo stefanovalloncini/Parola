@@ -89,6 +89,23 @@ struct QueueListTests {
         #expect(model.batchJobs.map(\.status) == [.transcribing, .pending, .pending])
     }
 
+    @Test("VoiceOver finds the Queue's title and its sections as headings")
+    func queueHeadings() async {
+        let model = makeModel()
+        model.batchJobs = [Self.job("a", .transcribing), Self.job("b", .failed)]
+        let page = HostedWindow(QueueView().environment(model), width: 900, height: 600)
+        defer { page.close() }
+        _ = await waitUntil { page.rowCount >= 2 }
+
+        let headings = HostedAccessibility.elements(in: page.host)
+            .filter { $0.role == "AXHeading" }
+            .compactMap { $0.name?.lowercased() }
+
+        for title in ["queue", "in progress", "failed"] {
+            #expect(headings.contains(title), "\(title) in \(headings)")
+        }
+    }
+
     @Test("the Queue is a native list: arrow keys and several rows at once")
     func queueIsAList() async throws {
         let model = makeModel()

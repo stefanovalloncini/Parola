@@ -53,6 +53,7 @@ struct PageHeader<Leading: View, Trailing: View>: View {
                     .foregroundStyle(DS.Color.primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .accessibilityAddTraits(.isHeader)
                 leading
                 Spacer()
                 trailing

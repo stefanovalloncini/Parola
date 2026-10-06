@@ -135,6 +135,24 @@ struct StatisticsViewTests {
         }
     }
 
+    @Test("VoiceOver finds the page title and each section as a heading")
+    func sectionsAreHeadings() {
+        withIsolatedDefaults { defaults in
+            let entries = [entry("a", timing: 60), entry("b", timing: 30, daysAgo: 2)]
+            let model = makeModel(defaults, entries: entries)
+            let page = HostedWindow(StatisticsView(stats: LibraryStatistics.compute(entries: entries)).environment(model))
+            defer { page.close() }
+
+            let headings = HostedAccessibility.elements(in: page.host)
+                .filter { $0.role == "AXHeading" }
+                .compactMap { $0.name?.lowercased() }
+
+            for title in ["statistics", "activity", "by model", "records"] {
+                #expect(headings.contains(title), "\(title) in \(headings)")
+            }
+        }
+    }
+
     @Test("an empty library's page says so once and offers the library's first step")
     func emptyPageOffersOpenFiles() {
         withIsolatedDefaults { defaults in
