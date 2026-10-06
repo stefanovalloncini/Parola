@@ -4379,17 +4379,6 @@
         }
       }
     },
-    "Customizable": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Personalizzabili"
-          }
-        }
-      }
-    },
     "Customization": {
       "extractionState": "manual",
       "localizations": {
@@ -4920,17 +4909,6 @@
         }
       }
     },
-    "Dictation Hotkey": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scorciatoia per la dettatura"
-          }
-        }
-      }
-    },
     "Dictation Settings": {
       "extractionState": "manual",
       "localizations": {
@@ -4960,6 +4938,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pulizia della dettatura"
+          }
+        }
+      }
+    },
+    "Dictation shortcut": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scorciatoia per la dettatura"
           }
         }
       }
@@ -5625,6 +5614,17 @@
         }
       }
     },
+    "Every menu shortcut is listed under Help ▸ Keyboard Shortcuts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutte le scorciatoie dei menu sono elencate in Aiuto ▸ Scorciatoie da tastiera."
+          }
+        }
+      }
+    },
     "Every transcript": {
       "extractionState": "manual",
       "localizations": {
@@ -5770,17 +5770,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esporta come"
-          }
-        }
-      }
-    },
-    "Export As ▸ TXT…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esporta come ▸ TXT…"
           }
         }
       }
@@ -7640,17 +7629,6 @@
         }
       }
     },
-    "Keyboard shortcuts for the main window commands.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le scorciatoie da tastiera dei comandi della finestra principale."
-          }
-        }
-      }
-    },
     "Keystrokes": {
       "extractionState": "manual",
       "localizations": {
@@ -7889,6 +7867,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Permette a parola-mcp di pilotare l'app (trascrivere, cambiare modello, controllare la registrazione…). Ascolta solo su 127.0.0.1."
+          }
+        }
+      }
+    },
+    "Lets these shortcuts work while another app is in front.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permette a queste scorciatoie di funzionare quando un'altra app è in primo piano."
           }
         }
       }
@@ -8443,28 +8432,6 @@
         }
       }
     },
-    "Menu equivalents": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Equivalenti menu"
-          }
-        }
-      }
-    },
-    "Menu equivalents are fixed. Global hotkeys need Input Monitoring permission. The full list is under Help > Keyboard Shortcuts.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le voci di menu sono fisse. Le scorciatoie globali richiedono il permesso di Monitoraggio Input. L'elenco completo è in Aiuto > Scorciatoie da tastiera."
-          }
-        }
-      }
-    },
     "Merge": {
       "extractionState": "manual",
       "localizations": {
@@ -8538,17 +8505,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Microfono"
-          }
-        }
-      }
-    },
-    "Mic Recording Hotkey": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scorciatoia per la registrazione dal microfono"
           }
         }
       }
@@ -10494,17 +10450,6 @@
         }
       }
     },
-    "Open…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apri…"
-          }
-        }
-      }
-    },
     "Options": {
       "extractionState": "manual",
       "localizations": {
@@ -12044,6 +11989,17 @@
         }
       }
     },
+    "Recording shortcut": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scorciatoia per la registrazione"
+          }
+        }
+      }
+    },
     "Recording source": {
       "extractionState": "manual",
       "localizations": {
@@ -12908,17 +12864,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stesso modello e lingua"
-          }
-        }
-      }
-    },
-    "Same control as the Dictation pane. Records any key combo.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stesso controllo del pannello Dettatura. Registra qualunque combinazione di tasti."
           }
         }
       }
@@ -14542,17 +14487,6 @@
         }
       }
     },
-    "Start or stop mic recording from anywhere. Off by default.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avvia o ferma la registrazione del microfono da qualsiasi punto. Disattivato per default."
-          }
-        }
-      }
-    },
     "Start −1 frame": {
       "extractionState": "manual",
       "localizations": {
@@ -14560,17 +14494,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Inizio −1 fotogramma"
-          }
-        }
-      }
-    },
-    "Start/Stop Live Captions": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avvia/ferma sottotitoli live"
           }
         }
       }
@@ -14583,6 +14506,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Avvio in corso…"
+          }
+        }
+      }
+    },
+    "Starts dictation from any app. The Dictation pane shows the same shortcut.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvia la dettatura da qualsiasi app. Il pannello Dettatura mostra la stessa scorciatoia."
+          }
+        }
+      }
+    },
+    "Starts or stops a microphone recording from any app. Off by default.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvia o ferma una registrazione dal microfono da qualsiasi app. Disattivata per default."
           }
         }
       }
@@ -15388,6 +15333,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La trascrizione attuale, con preferiti, note, riassunto e traduzione, verrà sostituita."
+          }
+        }
+      }
+    },
+    "The dictation and recording shortcuts that work from any app.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le scorciatoie per dettatura e registrazione che funzionano da qualsiasi app."
           }
         }
       }

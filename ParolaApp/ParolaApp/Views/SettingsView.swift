@@ -106,7 +106,7 @@ private struct SettingsRouteMeta {
         .customization: SettingsRouteMeta(titleKey: "Customization", summaryKey: "Appearance, theme colors and timestamp font.", symbol: "paintbrush", scope: .customization),
         .watchedFolders: SettingsRouteMeta(titleKey: "Watched Folders", summaryKey: "Folders Parola watches, so anything dropped in is transcribed on its own.", symbol: "folder.badge.gearshape", scope: .watchedFolders),
         .recordMeetings: SettingsRouteMeta(titleKey: "Record Meetings", summaryKey: "Recording meeting audio, and what Parola does when a meeting app starts.", symbol: "video.bubble", scope: .recordMeetings),
-        .shortcuts: SettingsRouteMeta(titleKey: "Shortcuts", summaryKey: "Keyboard shortcuts for the main window commands.", symbol: "command", scope: .shortcuts),
+        .shortcuts: SettingsRouteMeta(titleKey: "Shortcuts", summaryKey: "The dictation and recording shortcuts that work from any app.", symbol: "command", scope: .shortcuts),
         .microphone: SettingsRouteMeta(titleKey: "Microphone", summaryKey: "Which input Parola records from, and what happens while recording.", symbol: "mic", scope: .microphone),
         .liveCaptions: SettingsRouteMeta(titleKey: "Live Captions", summaryKey: "Live transcription of what you hear, in a floating window.", symbol: "captions.bubble", scope: .liveCaptions),
         .dictation: SettingsRouteMeta(titleKey: "Dictation", summaryKey: "The hotkey that turns speech into text in any app.", symbol: "text.bubble", scope: .dictation),

@@ -97,7 +97,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .customization: return ["appearance", "theme", "light", "dark", "monospaced", "accent", "color", "slate", "terracotta", "sea", "sage", "indigo", "custom colors", "palette"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
         case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio", "permission", "screen recording", "consent", "microphone", "my voice"]
-        case .shortcuts: return ["hotkey", "key combo", "mic recording", "dictation key", "global", "keyboard"]
+        case .shortcuts: return ["hotkey", "shortcut", "key combo", "mic recording", "dictation key", "global", "keyboard", "accessibility"]
         case .microphone: return ["mic", "input device", "vu", "level", "preview", "count-in", "mute", "pause media", "music", "spotify", "auto-stop"] + Self.recordingControlsKeywords
         case .liveCaptions: return ["captions", "translate", "live"]
         case .dictation: return ["hotkey", "f5", "push to talk", "toggle", "indicator", "notch", "overlay", "cleanup", "workflows", "per-app", "hud", "opacity", "context", "clipboard", "screen", "ocr", "paste delay", "self-corrections", "url rule"]

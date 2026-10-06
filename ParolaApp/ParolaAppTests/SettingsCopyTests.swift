@@ -93,4 +93,18 @@ struct SettingsCopyTests {
         #expect(SettingsPaneScope.transcriptionDefaults.defaultsKeys.contains("initialPrompt"))
         #expect(!SettingsPaneScope.general.defaultsKeys.contains("initialPrompt"))
     }
+
+    @Test("Shortcuts holds the two shortcuts Parola lets you set and the permission they need, not a copy of the menus")
+    func shortcutsPaneHoldsWhatYouCanSet() {
+        let model = makeModel("settings-copy-shortcuts")
+        let shortcuts = elements(ShortcutsPane(), model: model)
+        let words = shortcuts.flatMap(\.words)
+        #expect(!words.contains("Menu equivalents"), "\(words)")
+        #expect(!words.contains("⌘O"), "\(words)")
+        let inputMonitoring = words.filter { $0.contains("Input Monitoring") }
+        #expect(inputMonitoring.isEmpty, "\(inputMonitoring)")
+        #expect(words.contains("Dictation shortcut"), "\(words)")
+        #expect(words.contains("Recording shortcut"), "\(words)")
+        #expect(words.contains("Accessibility"), "\(words)")
+    }
 }

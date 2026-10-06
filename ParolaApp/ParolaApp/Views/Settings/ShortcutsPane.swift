@@ -7,24 +7,17 @@ struct ShortcutsPane: View {
     var body: some View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: 12) {
-            SettingsSection("Menu equivalents") {
-                SettingRow("Open…", isFirst: true) { Text("⌘O").foregroundStyle(DS.Color.secondaryText) }
-                SettingRow("Save As Parola Document…") { Text("⌘S").foregroundStyle(DS.Color.secondaryText) }
-                SettingRow("Find…") { Text("⌘F").foregroundStyle(DS.Color.secondaryText) }
-                SettingRow("Start/Stop Live Captions") { Text("⇧⌘L").foregroundStyle(DS.Color.secondaryText) }
-                SettingRow("Export As ▸ TXT…") { Text("⌘E").foregroundStyle(DS.Color.secondaryText) }
-            }
-            SettingsSection("Customizable") {
-                SettingRow("Dictation Hotkey",
-                           description: "Same control as the Dictation pane. Records any key combo.",
+            SettingsSection {
+                SettingRow("Dictation shortcut",
+                           description: "Starts dictation from any app. The Dictation pane shows the same shortcut.",
                            isFirst: true) {
                     HotkeyRecorder(
                         keyCode: $model.dictationKeyCode,
                         modifierRawValue: $model.dictationKeyModifiers
                     )
                 }
-                SettingRow("Mic Recording Hotkey",
-                           description: "Start or stop mic recording from anywhere. Off by default.") {
+                SettingRow("Recording shortcut",
+                           description: "Starts or stops a microphone recording from any app. Off by default.") {
                     HStack(spacing: 8) {
                         Toggle("", isOn: $model.micHotkeyEnabled).labelsHidden()
                             .axLeaf("Shortcuts.Toggle.MicHotkeyEnabled")
@@ -36,7 +29,18 @@ struct ShortcutsPane: View {
                     }
                 }
             }
-            SettingHelper(text: "Menu equivalents are fixed. Global hotkeys need Input Monitoring permission. The full list is under Help > Keyboard Shortcuts.")
+            SettingsSection {
+                PermissionRow(
+                    title: String(localized: "Accessibility"),
+                    detail: String(localized: "Lets these shortcuts work while another app is in front."),
+                    granted: model.dictationPermissions.accessibilityGranted,
+                    isFirst: true,
+                    axID: "Shortcuts.Button.GrantAccessibility",
+                    action: { model.dictationPermissions.openAccessibilitySettings() },
+                    actionLabel: String(localized: "Open System Settings…")
+                )
+            }
+            SettingHelper(text: "Every menu shortcut is listed under Help ▸ Keyboard Shortcuts.")
             ResetPaneButton(scope: .shortcuts)
         }
     }
