@@ -15,6 +15,24 @@ struct AppInfoCommands: View {
     }
 }
 
+/// The App can't read `openWindow`; a command view can.
+struct AppInfoWindowCommands: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        AppInfoCommands { openWindow(id: AboutWindowScene.id) }
+    }
+}
+
+struct HelpWindowCommands: View {
+    let model: AppModel
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        HelpCommands(model: model) { openWindow(id: ShortcutsWindowScene.id) }
+    }
+}
+
 struct HelpCommands: View {
     let model: AppModel
     let showShortcuts: () -> Void

@@ -90,16 +90,15 @@ struct AboutInfoView: View {
     }
 }
 
-struct AboutSheet: View {
-    @Environment(\.dismiss) private var dismiss
+enum AboutWindowScene {
+    static let id = "about"
+}
 
+struct AboutWindow: View {
     var body: some View {
-        SheetFrame(icon: "waveform", title: "About Parola", onClose: { dismiss() }) {
-            AboutInfoView()
-                .padding(DS.Spacing.medium)
-        }
-        .sheetSize(width: 380, minHeight: 340, maxHeight: 420)
-        .closeLeaf("About.Button.Close")
-        .axBranch("About")
+        AboutInfoView()
+            .padding(DS.Spacing.large)
+            .frame(width: 380)
+            .axBranch("About")
     }
 }

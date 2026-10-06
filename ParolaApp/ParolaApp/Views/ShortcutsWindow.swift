@@ -122,22 +122,23 @@ struct ShortcutCatalog {
     }
 }
 
-struct ShortcutCheatSheet: View {
-    @Environment(\.dismiss) private var dismiss
+enum ShortcutsWindowScene {
+    static let id = "keyboard-shortcuts"
+}
+
+struct ShortcutsWindow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        SheetFrame(icon: "command", title: "Keyboard Shortcuts", onClose: { dismiss() }) {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 18) {
-                    ForEach(ShortcutCatalog.sections(features: model.features, exportPreset: model.exportPresets.first)) { section in
-                        sectionView(section)
-                    }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 18) {
+                ForEach(ShortcutCatalog.sections(features: model.features, exportPreset: model.exportPresets.first)) { section in
+                    sectionView(section)
                 }
-                .padding(DS.Spacing.medium)
             }
+            .padding(DS.Spacing.medium)
         }
-        .sheetSize(width: 420, minHeight: 480, maxHeight: 560)
+        .frame(width: 420, height: 520)
     }
 
     private func sectionView(_ section: ShortcutCatalog.Section) -> some View {

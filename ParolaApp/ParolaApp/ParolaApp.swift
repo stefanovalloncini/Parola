@@ -66,8 +66,6 @@ struct ParolaApp: App {
     @State private var model: AppModel
     @State private var liveCaptions = LiveCaptionsController()
     @State private var scratchpad = ScratchpadController()
-    @State private var shortcutSheetOpen = false
-    @State private var aboutSheetOpen = false
     @State private var micHotkey = MicHotkeyController()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
@@ -114,8 +112,6 @@ struct ParolaApp: App {
                     applyAlwaysOnTop(on)
                 }
                 .onOpenURL { url in handleParolaOpen(url, model: model) }
-                .sheet(isPresented: $shortcutSheetOpen) { ShortcutCheatSheet().environment(model) }
-                .sheet(isPresented: $aboutSheetOpen) { AboutSheet().environment(model) }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
@@ -123,10 +119,10 @@ struct ParolaApp: App {
         .defaultSize(width: 1180, height: 760)
         .commands {
             CommandGroup(replacing: .appInfo) {
-                AppInfoCommands { aboutSheetOpen = true }
+                AppInfoWindowCommands()
             }
             CommandGroup(replacing: .help) {
-                HelpCommands(model: model) { shortcutSheetOpen = true }
+                HelpWindowCommands(model: model)
             }
             CommandGroup(replacing: .newItem) {
                 FileCommands(model: model)
@@ -190,6 +186,26 @@ struct ParolaApp: App {
                 .preferredColorScheme(model.preferredColorScheme)
         }
         .defaultSize(width: 900, height: 640)
+
+        Window("About Parola", id: AboutWindowScene.id) {
+            AboutWindow()
+                .tint(DS.Color.accent)
+                .environment(model)
+                .preferredColorScheme(model.preferredColorScheme)
+        }
+        .windowResizability(.contentSize)
+        .restorationBehavior(.disabled)
+        .commandsRemoved()
+
+        Window("Keyboard Shortcuts", id: ShortcutsWindowScene.id) {
+            ShortcutsWindow()
+                .tint(DS.Color.accent)
+                .environment(model)
+                .preferredColorScheme(model.preferredColorScheme)
+        }
+        .windowResizability(.contentSize)
+        .restorationBehavior(.disabled)
+        .commandsRemoved()
 
         Window("Mini Player", id: "mini-player") {
             MiniPlayerWindow()
