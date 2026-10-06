@@ -21,13 +21,53 @@ actor StreamingRealtimeLoop {
         var wantsConfirmedAudio = false
     }
 
+    typealias Transcribe = @Sendable ([Float], DecodingOptions, @escaping TranscriptionCallback) async throws -> TranscriptionResult
+
+    struct Decoder: Sendable {
+        var options: DecodingOptions
+        var transcribe: Transcribe
+    }
+
     struct Dependencies: Sendable {
+        enum Model: Sendable {
+            case ready(Transcribe)
+            /// Loads once capture is up; decodes wait for it and use the options it brings.
+            case loading(@Sendable () async throws -> Decoder)
+        }
+
         var requestPermission: @Sendable () async -> Bool
         /// The callback's Bool reports whether it took the buffer, so a caller can gate another consumer on the same decision.
         var startCapture: @Sendable (@escaping @Sendable ([Float]) -> Bool) throws -> Void
         var stopCapture: @Sendable () -> Void
-        var transcribe: @Sendable ([Float], DecodingOptions, @escaping TranscriptionCallback) async throws -> TranscriptionResult
+        var model: Model
         var tick: @Sendable () async throws -> Void
+
+        init(
+            requestPermission: @escaping @Sendable () async -> Bool,
+            startCapture: @escaping @Sendable (@escaping @Sendable ([Float]) -> Bool) throws -> Void,
+            stopCapture: @escaping @Sendable () -> Void,
+            transcribe: @escaping Transcribe,
+            tick: @escaping @Sendable () async throws -> Void
+        ) {
+            self.init(
+                requestPermission: requestPermission, startCapture: startCapture, stopCapture: stopCapture,
+                model: .ready(transcribe), tick: tick
+            )
+        }
+
+        init(
+            requestPermission: @escaping @Sendable () async -> Bool,
+            startCapture: @escaping @Sendable (@escaping @Sendable ([Float]) -> Bool) throws -> Void,
+            stopCapture: @escaping @Sendable () -> Void,
+            model: Model,
+            tick: @escaping @Sendable () async throws -> Void
+        ) {
+            self.requestPermission = requestPermission
+            self.startCapture = startCapture
+            self.stopCapture = stopCapture
+            self.model = model
+            self.tick = tick
+        }
     }
 
     enum Outcome: Sendable {
@@ -35,16 +75,24 @@ actor StreamingRealtimeLoop {
         case cancelled
         case permissionDenied
         case failed(any Error)
+        /// Capture was up when the model failed to load, so nothing was decoded.
+        case modelFailed(any Error)
     }
 
     private struct Inbox: Sendable {
         var pending: [Float] = []
         var energies: [(rel: Float, avg: Float)] = []
+        /// Set while the model loads: pending audio past it drops its oldest samples.
+        var maxPending: Int?
+        var dropped = 0
     }
 
     // Trimming old entries is safe: VAD only reads a recent suffix (baseline over the last 20, voice check over the new-audio span).
     private static let maxEnergyEntries = 4096
     private static let waitingForSpeech = "Waiting for speech..."
+
+    /// Yields once decodes can run and finishes then, or as the run ends without them: a caller waits on it for the model.
+    nonisolated let decoderReady: AsyncStream<Void>
 
     private let config: Configuration
     private let baseDecodingOptions: DecodingOptions
@@ -53,8 +101,9 @@ actor StreamingRealtimeLoop {
     private let onEnergy: @Sendable (Float) -> Void
     private let onConfirmed: @Sendable (ConfirmedAudioBatch) -> Void
     private let levelMeter: LevelMeter
-    private let inbox = OSAllocatedUnfairLock(initialState: Inbox())
+    private let inbox: OSAllocatedUnfairLock<Inbox>
     private let paused = OSAllocatedUnfairLock(initialState: false)
+    private let decoderReadySignal: AsyncStream<Void>.Continuation
 
     private var window: [Float] = []
     private var windowStartSample = 0
@@ -67,10 +116,12 @@ actor StreamingRealtimeLoop {
     private var stopRequested = false
     private var flushesOnStop = true
     private var permissionWait: CheckedContinuation<Bool?, Never>?
+    private var modelLoad: Task<Decoder, any Error>?
 
+    /// `decodingOptions` go with a ready `transcribe`; a model that loads brings its own.
     init(
         configuration: Configuration,
-        decodingOptions: DecodingOptions,
+        decodingOptions: DecodingOptions = DecodingOptions(),
         dependencies: Dependencies,
         levelMeter: LevelMeter = LevelMeter(),
         onPartial: @escaping @Sendable (String) -> Void,
@@ -84,9 +135,17 @@ actor StreamingRealtimeLoop {
         self.onEnergy = onEnergy
         self.onConfirmed = onConfirmed
         self.levelMeter = levelMeter
+        var inbox = Inbox()
+        if case .loading = dependencies.model {
+            // No decode keeps more than maxWindowSeconds, so older audio held for the model would only be dropped later.
+            inbox.maxPending = Int(configuration.maxWindowSeconds * Double(configuration.sampleRate))
+        }
+        self.inbox = OSAllocatedUnfairLock(initialState: inbox)
+        (decoderReady, decoderReadySignal) = AsyncStream.makeStream()
     }
 
     func run() async -> Outcome {
+        defer { decoderReadySignal.finish() }
         guard let granted = await permission() else { return .stopped }
         guard granted else {
             ParolaLog.notice(.streaming, "microphone permission denied")
@@ -103,9 +162,28 @@ actor StreamingRealtimeLoop {
             return .failed(error)
         }
         isRunning = true
+        let decoder: Decoder
+        switch deps.model {
+        case .ready(let transcribe):
+            decoder = Decoder(options: baseDecodingOptions, transcribe: transcribe)
+        case .loading(let load):
+            markWaitingForSpeech()
+            let loaded = await loadedModel(load)
+            guard isRunning else { return flushesOnStop ? .stopped : .cancelled }
+            switch loaded {
+            case .success(let ready):
+                decoder = ready
+            case .failure(let error):
+                isRunning = false
+                stopCapture()
+                return Task.isCancelled ? .cancelled : .modelFailed(error)
+            }
+        }
+        decoderReadySignal.yield()
+        decoderReadySignal.finish()
         while isRunning {
             do {
-                try await iterate()
+                try await iterate(with: decoder)
             } catch is CancellationError {
                 isRunning = false
                 stopCapture()
@@ -123,21 +201,44 @@ actor StreamingRealtimeLoop {
         guard flushesOnStop else { return .cancelled }
         // Runs on this task, never from stop(): a flush entering the actor mid-iterate
         // would race the in-flight decode on the shared TranscribeTask.
-        await finalFlush()
+        await finalFlush(with: decoder)
         return .stopped
+    }
+
+    /// Waits for the model while capture fills the inbox; a stop or a cancel cancels the load.
+    private func loadedModel(_ load: @escaping @Sendable () async throws -> Decoder) async -> Result<Decoder, any Error> {
+        let loading = Task { try await load() }
+        modelLoad = loading
+        let result = await withTaskCancellationHandler {
+            await loading.result
+        } onCancel: {
+            loading.cancel()
+        }
+        modelLoad = nil
+        let dropped = inbox.withLock { box -> Int in
+            box.maxPending = nil
+            return box.dropped
+        }
+        if dropped > 0 {
+            ParolaLog.notice(
+                .streaming, "the model load outlasted the audio buffer, so its oldest audio was dropped",
+                [.audioSeconds: .seconds(Double(dropped) / Double(config.sampleRate))]
+            )
+        }
+        return result
     }
 
     /// Decodes audio that arrived after the last iteration — the 1-second cadence gate
     /// would otherwise drop the user's final word at stop — and promotes whatever ends
     /// up unconfirmed: with no further audio coming, the last hypothesis is final.
-    private func finalFlush() async {
+    private func finalFlush(with decoder: Decoder) async {
         drainInbox()
         enforceWindowCap()
         let totalSamples = windowStartSample + window.count
         let newSeconds = Float(totalSamples - lastTranscribedTotal) / Float(config.sampleRate)
         if newSeconds > 0.05, voiceDetectedInTail(newSeconds) {
             lastTranscribedTotal = totalSamples
-            try? await transcribeWindow(confirmAll: true)
+            try? await transcribeWindow(with: decoder, confirmAll: true)
         }
         guard !unconfirmedSegments.isEmpty else { return }
         if let last = unconfirmedSegments.last, last.end > lastConfirmedEndSeconds {
@@ -168,6 +269,7 @@ actor StreamingRealtimeLoop {
     func stop() {
         stopRequested = true
         isRunning = false
+        modelLoad?.cancel()
         stopCapture()
         answerPermission(nil)
     }
@@ -205,6 +307,8 @@ actor StreamingRealtimeLoop {
 
     func windowStartOffsetSamples() -> Int { windowStartSample }
 
+    nonisolated func pendingSampleCount() -> Int { inbox.withLock { $0.pending.count } }
+
     nonisolated func setPaused(_ value: Bool) {
         paused.withLock { $0 = value }
     }
@@ -217,6 +321,11 @@ actor StreamingRealtimeLoop {
             let baseline = box.energies.suffix(20).map(\.avg).min() ?? .infinity
             let rel = AudioProcessor.calculateRelativeEnergy(of: buffer, relativeTo: baseline)
             box.pending.append(contentsOf: buffer)
+            if let maxPending = box.maxPending, box.pending.count > maxPending {
+                let excess = box.pending.count - maxPending
+                box.pending.removeFirst(excess)
+                box.dropped += excess
+            }
             box.energies.append((rel: rel, avg: avgEnergy))
             if box.energies.count > Self.maxEnergyEntries {
                 box.energies.removeFirst(box.energies.count - Self.maxEnergyEntries)
@@ -227,7 +336,7 @@ actor StreamingRealtimeLoop {
         return true
     }
 
-    private func iterate() async throws {
+    private func iterate(with decoder: Decoder) async throws {
         drainInbox()
         enforceWindowCap()
         let totalSamples = windowStartSample + window.count
@@ -241,14 +350,21 @@ actor StreamingRealtimeLoop {
             return try await deps.tick()
         }
         lastTranscribedTotal = totalSamples
-        try await transcribeWindow()
+        try await transcribeWindow(with: decoder)
     }
 
     private func drainInbox() {
-        let pending = inbox.withLock { box -> [Float] in
-            let drained = box.pending
+        let (pending, dropped) = inbox.withLock { box -> ([Float], Int) in
+            let drained = (box.pending, box.dropped)
             box.pending.removeAll(keepingCapacity: true)
+            box.dropped = 0
             return drained
+        }
+        if dropped > 0 {
+            // The dropped audio sat between the window and what's pending, so the window can't run on into it.
+            windowStartSample += window.count + dropped
+            window.removeAll()
+            lastTranscribedTotal = max(lastTranscribedTotal, windowStartSample)
         }
         window.append(contentsOf: pending)
     }
@@ -268,16 +384,16 @@ actor StreamingRealtimeLoop {
         return min(Double(lastConfirmedEndSeconds), retainedStart)
     }
 
-    private func transcribeWindow(confirmAll: Bool = false) async throws {
+    private func transcribeWindow(with decoder: Decoder, confirmAll: Bool = false) async throws {
         let offsetSeconds = Double(windowStartSample) / Double(config.sampleRate)
         let decodedEndSeconds = Float(offsetSeconds + Double(window.count) / Double(config.sampleRate))
-        var options = baseDecodingOptions
+        var options = decoder.options
         // clipTimestamps is window-relative; everything emitted from here back out must be absolute.
         options.clipTimestamps = [Float(max(0, retainedFloorSeconds - offsetSeconds))]
         let emitProgressPartials = unconfirmedSegments.isEmpty
         let onPartial = self.onPartial
         let compressionCheckWindow = config.compressionCheckWindow
-        let result = try await deps.transcribe(window, options) { [options] progress in
+        let result = try await decoder.transcribe(window, options) { [options] progress in
             if emitProgressPartials {
                 onPartial(progress.text.trimmingCharacters(in: .whitespaces))
             }

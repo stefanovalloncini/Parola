@@ -815,6 +815,95 @@ struct StreamingRealtimeLoopTests {
         #expect(!capture.installed)
     }
 
+    private func loadingLoop(
+        maxWindowSeconds: Double = 60,
+        load: @escaping @Sendable () async throws -> Void
+    ) -> (loop: StreamingRealtimeLoop, capture: FakeCapture, decodedSampleCounts: Awaitable<[Int]>) {
+        let capture = FakeCapture()
+        let decoded = Awaitable<[Int]>([])
+        var config = StreamingRealtimeLoop.Configuration()
+        config.useVAD = false
+        config.maxWindowSeconds = maxWindowSeconds
+        let loop = StreamingRealtimeLoop(
+            configuration: config,
+            dependencies: .init(
+                requestPermission: { true },
+                startCapture: { capture.install($0) },
+                stopCapture: { capture.markStopped() },
+                model: .loading {
+                    try await load()
+                    return .init(options: DecodingOptions()) { samples, _, _ in
+                        decoded.update { $0.append(samples.count) }
+                        return TranscriptionResult(text: "", segments: [], language: "en", timings: TranscriptionTimings())
+                    }
+                },
+                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+            ),
+            onPartial: { _ in },
+            onEnergy: { _ in },
+            onConfirmed: { _ in }
+        )
+        return (loop, capture, decoded)
+    }
+
+    @Test("while the model loads the loop holds at most a window of audio, and decodes it once the model is in")
+    func modelLoadHoldsAWindow() async throws {
+        let loadGate = UninterruptibleGate()
+        let (loop, capture, decoded) = loadingLoop(maxWindowSeconds: 4) { await loadGate.wait() }
+        let runTask = LoopRun(loop)
+        await loadGate.arrivals.wait(atLeast: 1, "the model load to start")
+        #expect(capture.installed, "capture is up before the model")
+
+        capture.pushBuffers(count: 6, secondsEach: 1, value: 0.5)
+        #expect(loop.pendingSampleCount() == 4 * sampleRate)
+        #expect(decoded.value.isEmpty)
+
+        loadGate.open()
+        for await _ in loop.decoderReady {}
+        await decoded.wait(until: { !$0.isEmpty }, "the first decode")
+        #expect(decoded.value.first == 4 * sampleRate)
+        #expect(await loop.windowStartOffsetSamples() == 2 * sampleRate, "the dropped seconds still count on the timeline")
+
+        await loop.stop()
+        _ = await runTask.outcome()
+    }
+
+    @Test("a stop during the model load cancels it and ends the run without a decode")
+    func stopDuringModelLoad() async throws {
+        let loadStarted = TestSignal()
+        let (loop, capture, decoded) = loadingLoop {
+            loadStarted.fire()
+            try await Task.sleep(for: .seconds(3600))
+        }
+        let runTask = LoopRun(loop)
+        await loadStarted.wait("the model load to start")
+        capture.push(seconds: 2, value: 0.5)
+
+        await loop.stop()
+
+        let outcome = await runTask.outcome()
+        guard case .stopped = outcome else {
+            Issue.record("expected .stopped, got \(String(describing: outcome))")
+            return
+        }
+        #expect(capture.stopCount == 1)
+        #expect(decoded.value.isEmpty)
+    }
+
+    @Test("a model that fails to load ends the run and stops capture")
+    func modelLoadFailure() async throws {
+        let (loop, capture, decoded) = loadingLoop { throw ScriptError() }
+        let outcome = await LoopRun(loop).outcome()
+        guard case .modelFailed(let error) = outcome else {
+            Issue.record("expected .modelFailed, got \(String(describing: outcome))")
+            return
+        }
+        #expect(error is ScriptError)
+        #expect(capture.installed)
+        #expect(capture.stopCount == 1)
+        #expect(decoded.value.isEmpty)
+    }
+
     @Test("a transcription error fails the run and stops capture")
     func transcribeFailureStopsCapture() async throws {
         let (loop, capture, _, _) = makeLoop(responses: [], failure: ScriptError())

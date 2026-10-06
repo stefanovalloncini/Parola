@@ -190,6 +190,52 @@ struct StreamingLoggingTests {
         }
     }
 
+    @Test("a model load that outlasts the buffer is reported once, with how much audio it dropped")
+    func overflowedModelLoadReported() async throws {
+        try await withSink { sink in
+            let capture = FakeStreamingCapture()
+            let loadGate = UninterruptibleGate()
+            var config = StreamingRealtimeLoop.Configuration()
+            config.useVAD = false
+            config.maxWindowSeconds = 2
+            let loop = StreamingRealtimeLoop(
+                configuration: config,
+                dependencies: .init(
+                    requestPermission: { true },
+                    startCapture: { capture.install($0) },
+                    stopCapture: {},
+                    model: .loading {
+                        await loadGate.wait()
+                        return .init(options: DecodingOptions()) { _, _, _ in
+                            TranscriptionResult(text: "", segments: [], language: "en", timings: TranscriptionTimings())
+                        }
+                    },
+                    tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+                ),
+                onPartial: { _ in },
+                onEnergy: { _ in },
+                onConfirmed: { _ in }
+            )
+            let run = GuardedTask { await loop.run() }
+            await loadGate.arrivals.wait(atLeast: 1, "the model load to start")
+            capture.push(seconds: 3, value: 0.5)
+            capture.push(seconds: 1, value: 0.5)
+
+            loadGate.open()
+            for await _ in loop.decoderReady {}
+            capture.push(seconds: 3, value: 0.5)
+            await loop.stop()
+            _ = try await run.value("the run to end")
+
+            let records = streamingRecords(
+                sink, message: "the model load outlasted the audio buffer, so its oldest audio was dropped"
+            )
+            #expect(records.count == 1)
+            #expect(records.first?.level == .notice)
+            #expect(records.first?.fields[.audioSeconds] == .seconds(2))
+        }
+    }
+
     @Test("polling the capture leaves its callback one frame deep")
     func pollingDoesNotNestTheCallback() {
         let capture = FakeStreamingCapture()
@@ -294,15 +340,16 @@ struct StreamingLoggingTests {
         #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 7)
     }
 
-    @Test("the realtime loop logs the three run outcomes and nothing per-iteration")
+    @Test("the realtime loop logs the three run outcomes, a cut model-load buffer, and nothing per-iteration")
     func loopSites() throws {
         let source = try streamingSource("StreamingRealtimeLoop")
         expectCalls([
             #"ParolaLog.notice(.streaming, "microphone permission denied")"#,
             #"ParolaLog.error(.streaming, "streaming capture failed to start", [.error: .error(error)])"#,
             #"ParolaLog.error( .streaming, "streaming iteration failed", [.elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error)]"#,
+            #"ParolaLog.notice( .streaming, "the model load outlasted the audio buffer, so its oldest audio was dropped", [.audioSeconds: .seconds(Double(dropped) / Double(config.sampleRate))]"#,
         ], in: source)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 3)
+        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 4)
     }
 
     @Test("the model cache reports a swallowed load failure, each unload and a stray lease with the model and nothing else")

@@ -271,7 +271,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             switch outcome {
             case .stopped, .permissionDenied:
                 await self.handleStreamerEndedWithoutStop()
-            case .cancelled:
+            case .cancelled, .modelFailed:
                 await self.finishStream(failure: nil)
             case .failed(let error):
                 await self.handleStreamerFailure(error)
