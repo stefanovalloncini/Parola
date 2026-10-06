@@ -116,6 +116,34 @@ struct BridgeStateDetailTests {
         #expect(elapsed >= 12 && elapsed < 15)
     }
 
+    @Test("a failed take's bridge state carries its message and what it was doing")
+    func failedTakeCarriesFailureDetail() throws {
+        let (model, server) = try makeRig()
+        let wav = try tempWAV("state-detail-failed")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
+        model.updateSession(of: model.recording?.takeID) { session in
+            session.fail("The recording stopped.")
+        }
+
+        let take = try object(server.snapshotState(), "recording")
+        #expect(take["state"] == .string("failed"))
+        #expect(take["failure"] == .string("The recording stopped."))
+        #expect(take["failedWhile"] == .string("recording"))
+    }
+
+    @Test("a take that hasn't failed carries no failure detail")
+    func runningTakeHasNoFailureDetail() throws {
+        let (model, server) = try makeRig()
+        let wav = try tempWAV("state-detail-running")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: wav))
+
+        let take = try object(server.snapshotState(), "recording")
+        #expect(take["failure"] == .null)
+        #expect(take["failedWhile"] == .null)
+    }
+
     @Test("a notice reports its tone and its buttons, so an info notice no longer reads as a failure")
     func noticeCarriesToneAndButtons() throws {
         let (model, server) = try makeRig()

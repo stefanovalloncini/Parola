@@ -134,6 +134,11 @@ struct RecordingSession: Equatable, Sendable {
         }
     }
 
+    var failureMessage: String? {
+        guard case .failed(let message) = state else { return nil }
+        return message
+    }
+
     func elapsed(at now: Date) -> TimeInterval {
         if let endedElapsed { return endedElapsed }
         guard let startedAt else { return 0 }

@@ -653,6 +653,8 @@ final class ParolaAutomationServer {
             "stage": run.stage.map { .string(Self.stageName($0)) } ?? .null,
             "hasPartialText": .bool(run.hasPartialText),
             "macAudioStopped": .bool(model.takeMacAudioStopped),
+            "failure": take.failureMessage.map { .string($0) } ?? .null,
+            "failedWhile": take.failedWhile.map { .string(Self.failedWhileName($0)) } ?? .null,
         ])
     }
 
@@ -665,6 +667,14 @@ final class ParolaAutomationServer {
         case .transcribing: return "transcribing"
         case .done: return "done"
         case .failed: return "failed"
+        }
+    }
+
+    static func failedWhileName(_ failedWhile: RecordingSession.FailedWhile) -> String {
+        switch failedWhile {
+        case .starting: return "starting"
+        case .recording: return "recording"
+        case .transcribing: return "transcribing"
         }
     }
 
