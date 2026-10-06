@@ -363,7 +363,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         await consumerTask?.value
         if case .modelFailed = outcome {
             // start() throws the load failure, so the audio waits in recordingAudioURL() rather than in a .finished nobody reads.
-            failureAudioURL = await persister?.finish()
+            if let kept = await persister?.finish() { failureAudioURL = kept }
             continuation?.finish()
             await teardown()
             return
