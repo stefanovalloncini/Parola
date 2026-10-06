@@ -116,7 +116,7 @@ struct SettingsPaneScopeTests {
         for scope in lists {
             #expect(scope.resetKeys(features: .all).isEmpty, "\(scope.rawValue) still offers a reset")
         }
-        #expect(SettingsPaneScope.aiServices.resetKeys(features: .all) == ["languageModelSelection", "remoteAIAcknowledged"])
+        #expect(SettingsPaneScope.aiServices.resetKeys(features: .all) == ["languageModelSelection", "remoteAIAcknowledged", "parola.userPrivacyMode"])
     }
 
     @Test("a pane with persisted state always offers search keywords")

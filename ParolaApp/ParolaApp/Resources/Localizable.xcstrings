@@ -4986,17 +4986,6 @@
         }
       }
     },
-    "Disable all cloud LLM calls. Local models stay available.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Disabilita tutte le chiamate a LLM cloud. I modelli locali restano disponibili."
-          }
-        }
-      }
-    },
     "Disabled": {
       "extractionState": "manual",
       "localizations": {
@@ -7519,6 +7508,17 @@
         }
       }
     },
+    "Keep AI on this Mac": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantieni l'AI su questo Mac"
+          }
+        }
+      }
+    },
     "Keep Recording": {
       "extractionState": "manual",
       "localizations": {
@@ -9021,6 +9021,17 @@
         }
       }
     },
+    "Never send transcripts to an online service.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non inviare mai le trascrizioni a un servizio online."
+          }
+        }
+      }
+    },
     "New": {
       "extractionState": "manual",
       "localizations": {
@@ -9796,6 +9807,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Non supportata in questa versione di Parola."
+          }
+        }
+      }
+    },
+    "Not used while AI stays on this Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non usato finché l'AI resta su questo Mac."
           }
         }
       }
@@ -11477,28 +11499,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stampa trascrizione…"
-          }
-        }
-      }
-    },
-    "Privacy": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Privacy"
-          }
-        }
-      }
-    },
-    "Privacy mode": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modalità privacy"
           }
         }
       }
@@ -18041,6 +18041,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La traccia del tuo microfono è stata aggiunta a “%@”. Trascrivi di nuovo per includere le tue parole."
+          }
+        }
+      }
+    },
+    "Your organization keeps AI on this Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La tua organizzazione mantiene l'AI su questo Mac."
           }
         }
       }

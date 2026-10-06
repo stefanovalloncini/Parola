@@ -193,6 +193,22 @@ struct AIServicesPaneTests {
         }
     }
 
+    @Test("Keep AI on this Mac keeps every service row, pausing the remote ones; the pickers offer only what may run")
+    func userSwitchPausesRemoteRows() {
+        let model = makeModel(defaults: temporaryDefaults())
+        let cloud = openAI()
+        let ollama = AIServiceConfig(kind: .ollama, name: "Ollama", endpoint: ollamaEndpoint, model: "llama3.2:3b")
+        model.setAIServices([cloud, ollama])
+        #expect(!model.aiServicePaused(cloud))
+
+        model.userPrivacyMode = true
+        #expect(model.listedAIServices.map(\.id) == [cloud.id, ollama.id])
+        #expect(model.visibleAIServices.map(\.id) == [ollama.id])
+        #expect(model.aiServicePaused(cloud))
+        #expect(!model.aiServicePaused(ollama))
+        #expect(model.addableAIServiceKinds == [.ollama])
+    }
+
     @Test("managed policy hides the remote rows, tiles and picker options")
     func managedPolicyHidesRemote() throws {
         let model = makeModel(
@@ -211,6 +227,7 @@ struct AIServicesPaneTests {
         model.setLanguageModel(cloud.choice, for: .chat)
 
         #expect(model.allowsRemoteAIServices == false)
+        #expect(model.listedAIServices.map(\.id) == [ollama.id])
         #expect(model.visibleAIServices.map(\.id) == [ollama.id])
         #expect(model.addableAIServiceKinds == [.ollama])
         #expect(model.resolvedLanguageModelChoice(for: .chat) == .onDevice)

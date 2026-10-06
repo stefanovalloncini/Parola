@@ -81,8 +81,12 @@ public struct ManagedConfiguration: @unchecked Sendable {
     nonisolated(unsafe) public static var userSettingsStore: UserDefaults?
 
     public var disableCloudLLM: Bool {
-        if managedDict?[Key.disableCloudLLM.rawValue] as? Bool == true { return true }
-        return (Self.userSettingsStore ?? storage).bool(forKey: Self.userPrivacyModeKey)
+        policyDisablesCloudLLM || (Self.userSettingsStore ?? storage).bool(forKey: Self.userPrivacyModeKey)
+    }
+
+    /// The administrator's half of `disableCloudLLM`, without the user's own switch.
+    public var policyDisablesCloudLLM: Bool {
+        managedDict?[Key.disableCloudLLM.rawValue] as? Bool == true
     }
 
     public var disableModelDownloads: Bool {

@@ -61,15 +61,6 @@ struct TranscriptionDefaultsPane: View {
                 }
             }
 
-            SettingsSection("Privacy") {
-                SettingRow("Privacy mode",
-                           description: "Disable all cloud LLM calls. Local models stay available.",
-                           isFirst: true) {
-                    Toggle("", isOn: $model.userPrivacyMode).labelsHidden()
-                        .axLeaf("Privacy.Toggle.PrivacyMode")
-                }
-            }
-
             ResetPaneButton(scope: .transcriptionDefaults)
         }
     }

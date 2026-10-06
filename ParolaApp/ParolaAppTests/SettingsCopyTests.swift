@@ -61,4 +61,17 @@ struct SettingsCopyTests {
     func customizationSummary() {
         #expect(SettingsRoute.customization.summary == "Appearance, theme colors and timestamp font.")
     }
+
+    @Test("Keep AI on this Mac sits at the top of AI Services, not in Transcription Defaults")
+    func keepAIOnThisMacLivesWithTheServices() throws {
+        let model = makeModel("settings-copy-privacy")
+        let defaults = words(TranscriptionDefaultsPane(), model: model)
+        #expect(!defaults.contains("Privacy mode"), "\(defaults)")
+        let services = elements(AIServicesPane(), model: model)
+        let checkBox = services.first { $0.role == NSAccessibility.Role.checkBox.rawValue }
+        let firstSwitch = try #require(checkBox)
+        #expect(firstSwitch.name == "Keep AI on this Mac")
+        #expect(SettingsPaneScope.aiServices.defaultsKeys.contains(ManagedConfiguration.userPrivacyModeKey))
+        #expect(!SettingsPaneScope.transcriptionDefaults.defaultsKeys.contains(ManagedConfiguration.userPrivacyModeKey))
+    }
 }

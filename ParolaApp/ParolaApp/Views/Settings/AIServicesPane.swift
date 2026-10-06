@@ -32,6 +32,7 @@ struct AIServicesPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            privacySection
             onDeviceSection
             servicesSection
             addSection
@@ -57,6 +58,23 @@ struct AIServicesPane: View {
         }
     }
 
+    // MARK: - Privacy
+
+    private var privacySection: some View {
+        @Bindable var model = model
+        let policy = model.managedConfiguration.policyDisablesCloudLLM
+        return SettingsSection {
+            SettingRow("Keep AI on this Mac",
+                       description: policy ? "Your organization keeps AI on this Mac." : "Never send transcripts to an online service.",
+                       isFirst: true) {
+                Toggle("", isOn: policy ? .constant(true) : $model.userPrivacyMode)
+                    .labelsHidden()
+                    .disabled(policy)
+                    .axLeaf("Privacy.Toggle.PrivacyMode")
+            }
+        }
+    }
+
     // MARK: - On device
 
     private var onDeviceSection: some View {
@@ -78,7 +96,7 @@ struct AIServicesPane: View {
 
     private var servicesSection: some View {
         SettingsSection("Your services") {
-            let services = model.visibleAIServices
+            let services = model.listedAIServices
             if services.isEmpty {
                 InlineEmptyText("No services yet")
             } else {
@@ -86,6 +104,7 @@ struct AIServicesPane: View {
                     AIServiceRow(
                         service: service,
                         isFirst: position == 0,
+                        isPaused: model.aiServicePaused(service),
                         result: results[service.id],
                         isTesting: testing.contains(service.id),
                         onEdit: { editing = AIServiceDraft(service: service, isNew: false) },
@@ -114,7 +133,7 @@ struct AIServicesPane: View {
     }
 
     private func configured(_ kind: AIServiceConfig.Kind) -> AIServiceConfig? {
-        model.visibleAIServices.first { $0.kind == kind }
+        model.listedAIServices.first { $0.kind == kind }
     }
 
     /// One service per kind: a tile whose kind is already configured opens that row instead of
@@ -221,6 +240,7 @@ struct AIServicesPane: View {
 private struct AIServiceRow: View {
     let service: AIServiceConfig
     let isFirst: Bool
+    let isPaused: Bool
     let result: AIServiceTestResult?
     let isTesting: Bool
     let onEdit: () -> Void
@@ -232,6 +252,12 @@ private struct AIServiceRow: View {
             if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 6) {
                 header
+                if isPaused {
+                    Text("Not used while AI stays on this Mac.")
+                        .font(DS.Font.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .axLeaf(leaf("Label.Paused"))
+                }
                 if let result {
                     AIServiceTestLabel(result: result)
                         .axLeaf(leaf("Label.TestResult"))
@@ -251,6 +277,7 @@ private struct AIServiceRow: View {
             Image(systemName: service.kind.symbol)
                 .foregroundStyle(DS.Color.accent)
                 .frame(width: 20)
+                .opacity(isPaused ? 0.5 : 1)
                 // On the icon, not the row: an identifier on a container propagates to every
                 // control inside it, and each button here carries its own.
                 .axLeaf("AIServices.Row.\(service.kind.rawValue)")
@@ -264,11 +291,12 @@ private struct AIServiceRow: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            .opacity(isPaused ? 0.5 : 1)
             Spacer(minLength: 8)
             if isTesting { ProgressView().controlSize(.small) }
             Button("Test", action: onTest)
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                .disabled(isTesting)
+                .disabled(isTesting || isPaused)
                 .axLeaf(leaf("Button.Test"))
             Button("Edit…", action: onEdit)
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))

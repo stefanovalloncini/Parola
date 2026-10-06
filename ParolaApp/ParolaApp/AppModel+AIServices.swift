@@ -356,12 +356,21 @@ extension AppModel {
 
     // MARK: - What the pane may show
 
-    var allowsRemoteAIServices: Bool { !managedConfiguration.disableCloudLLM }
+    var allowsRemoteAIServices: Bool { !userPrivacyMode && !managedConfiguration.disableCloudLLM }
 
-    /// The rows the pane shows and the options its pickers offer: under `disableCloudLLM` everything
-    /// that would send text off this Mac is gone, an Ollama pointed at another host included.
+    /// The options the pickers offer: while AI stays on this Mac, nothing that would send text off it,
+    /// an Ollama pointed at another host included.
     var visibleAIServices: [AIServiceConfig] {
         allowsRemoteAIServices ? aiServices : aiServices.filter { !$0.choice.isRemote }
+    }
+
+    /// The rows the pane lists: the user's own switch pauses the remote ones, an administrator's policy hides them.
+    var listedAIServices: [AIServiceConfig] {
+        managedConfiguration.policyDisablesCloudLLM ? visibleAIServices : aiServices
+    }
+
+    func aiServicePaused(_ service: AIServiceConfig) -> Bool {
+        !allowsRemoteAIServices && service.choice.isRemote
     }
 
     var addableAIServiceKinds: [AIServiceConfig.Kind] {
