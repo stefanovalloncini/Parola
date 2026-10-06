@@ -5621,17 +5621,6 @@
         }
       }
     },
-    "Enable MCP automation bridge": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abilita bridge automazione MCP"
-          }
-        }
-      }
-    },
     "Enable dictation": {
       "extractionState": "manual",
       "localizations": {
@@ -8402,6 +8391,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "MCP e automazione"
+          }
+        }
+      }
+    },
+    "MCP automation bridge": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bridge automazione MCP"
           }
         }
       }

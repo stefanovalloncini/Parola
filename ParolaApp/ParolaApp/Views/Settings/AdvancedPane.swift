@@ -17,10 +17,12 @@ struct AdvancedPane: View {
                         Button("Export Settings…") {
                             transferFailure = SettingsExportService.presentExportPanel()
                         }
+                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                         .axLeaf("Advanced.Button.ExportSettings")
                         Button("Import Settings…") {
                             transferFailure = SettingsExportService.presentImportPanel()
                         }
+                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                         .axLeaf("Advanced.Button.ImportSettings")
                     }
                     .alert(
@@ -36,6 +38,7 @@ struct AdvancedPane: View {
                         Text(failure.message)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(DS.Spacing.medium)
             }
 
@@ -49,8 +52,10 @@ struct AdvancedPane: View {
                     } label: {
                         Text("Reset all settings…")
                     }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("Advanced.Button.ResetAll")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(DS.Spacing.medium)
             }
         }

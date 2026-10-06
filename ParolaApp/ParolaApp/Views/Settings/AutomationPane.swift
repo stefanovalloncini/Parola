@@ -49,112 +49,113 @@ struct AutomationPane: View {
 
     var body: some View {
         @Bindable var model = model
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                SettingsSection {
-                    SettingRow(
-                        "Enable MCP automation bridge",
-                        description: "Lets parola-mcp drive this app (transcribe, switch model, control recording…). Listens on 127.0.0.1 only.",
-                        isFirst: true
-                    ) {
-                        Toggle("", isOn: $model.automationBridgeEnabled)
-                            .labelsHidden()
-                            .onChange(of: model.automationBridgeEnabled) { _, isOn in
-                                if isOn {
-                                    model.startAutomationBridge()
-                                } else {
-                                    model.stopAutomationBridge()
-                                }
+        return VStack(alignment: .leading, spacing: 16) {
+            SettingsSection {
+                SettingRow(
+                    "MCP automation bridge",
+                    description: "Lets parola-mcp drive this app (transcribe, switch model, control recording…). Listens on 127.0.0.1 only.",
+                    isFirst: true
+                ) {
+                    Toggle("", isOn: $model.automationBridgeEnabled)
+                        .labelsHidden()
+                        .onChange(of: model.automationBridgeEnabled) { _, isOn in
+                            if isOn {
+                                model.startAutomationBridge()
+                            } else {
+                                model.stopAutomationBridge()
                             }
-                            .axLeaf("Automation.Toggle.BridgeEnabled")
-                    }
-                }
-
-                SettingsSection("Status") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        statusRow
-                        Text(bridgeBlurb)
-                            .font(DS.Font.secondary)
-                            .foregroundStyle(DS.Color.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(DS.Spacing.medium)
-                }
-
-                SettingsSection("parola-mcp binary") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if let path = Self.resolvedBinaryPath {
-                            Text(path)
-                                .font(DS.Font.mono)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .foregroundStyle(DS.Color.secondaryText)
-                            HStack(spacing: 8) {
-                                Button("Reveal in Finder") { reveal(path: path) }
-                                    .axLeaf("Automation.Button.RevealMcpBinary")
-                                Button("Copy Path") { copy(path, label: String(localized: "Path copied")) }
-                                    .axLeaf("Automation.Button.CopyMcpPath")
-                            }
-                        } else {
-                            HStack(spacing: 6) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(DS.Palette.warning)
-                                Text("parola-mcp isn't bundled in this build.")
-                                    .font(DS.Font.secondary)
-                            }
-                            #if DEBUG
-                            Text("Run `swift build --product parola-mcp` in ParolaCore and relaunch.")
-                                .font(DS.Font.mono)
-                                .foregroundStyle(DS.Color.secondaryText)
-                            #else
-                            Text("This build doesn't include parola-mcp. Reinstall from the official DMG, or build it from the Parola source.")
-                                .font(DS.Font.secondary)
-                                .foregroundStyle(DS.Color.secondaryText)
-                            #endif
                         }
-                    }
-                    .padding(DS.Spacing.medium)
+                        .axLeaf("Automation.Toggle.BridgeEnabled")
                 }
-
-                if let snippet = Self.mcpJSONSnippet {
-                    SettingsSection("MCP client snippet") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Drop this into your MCP client's config (Claude Code .mcp.json, Codex, etc.)")
-                                .font(DS.Font.secondary)
-                                .foregroundStyle(DS.Color.secondaryText)
-                            ScrollView {
-                                Text(snippet)
-                                    .font(DS.Font.mono)
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(DS.Spacing.small)
-                            }
-                            .frame(maxHeight: 160)
-                            .background(
-                                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                                    .fill(Color.primary.opacity(0.05))
-                            )
-                            Button("Copy Snippet") { copy(snippet, label: String(localized: "Snippet copied")) }
-                                .axLeaf("Automation.Button.CopySnippet")
-                        }
-                        .padding(DS.Spacing.medium)
-                    }
-                }
-
-                if let confirmation = copyConfirmation {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(DS.Color.successText)
-                        Text(confirmation)
-                            .font(DS.Font.secondary)
-                            .foregroundStyle(DS.Color.secondaryText)
-                    }
-                    .transition(.opacity)
-                }
-
-                ResetPaneButton(scope: .automation)
             }
-            .padding(DS.Spacing.medium)
+
+            SettingsSection("Status") {
+                VStack(alignment: .leading, spacing: 10) {
+                    statusRow
+                    Text(bridgeBlurb)
+                        .font(DS.Font.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(DS.Spacing.medium)
+            }
+
+            SettingsSection("parola-mcp binary") {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let path = Self.resolvedBinaryPath {
+                        Text(path)
+                            .font(DS.Font.mono)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .foregroundStyle(DS.Color.secondaryText)
+                        HStack(spacing: 8) {
+                            Button("Reveal in Finder") { reveal(path: path) }
+                                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                                .axLeaf("Automation.Button.RevealMcpBinary")
+                            Button("Copy Path") { copy(path, label: String(localized: "Path copied")) }
+                                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                                .axLeaf("Automation.Button.CopyMcpPath")
+                        }
+                    } else {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(DS.Palette.warning)
+                            Text("parola-mcp isn't bundled in this build.")
+                                .font(DS.Font.secondary)
+                        }
+                        #if DEBUG
+                        Text("Run `swift build --product parola-mcp` in ParolaCore and relaunch.")
+                            .font(DS.Font.mono)
+                            .foregroundStyle(DS.Color.secondaryText)
+                        #else
+                        Text("This build doesn't include parola-mcp. Reinstall from the official DMG, or build it from the Parola source.")
+                            .font(DS.Font.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
+                        #endif
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(DS.Spacing.medium)
+            }
+
+            if let snippet = Self.mcpJSONSnippet {
+                SettingsSection("MCP client snippet") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Drop this into your MCP client's config (Claude Code .mcp.json, Codex, etc.)")
+                            .font(DS.Font.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
+                        ScrollView {
+                            Text(snippet)
+                                .font(DS.Font.mono)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(DS.Spacing.small)
+                        }
+                        .frame(maxHeight: 160)
+                        .background(
+                            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                                .fill(Color.primary.opacity(0.05))
+                        )
+                        Button("Copy Snippet") { copy(snippet, label: String(localized: "Snippet copied")) }
+                            .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                            .axLeaf("Automation.Button.CopySnippet")
+                    }
+                    .padding(DS.Spacing.medium)
+                }
+            }
+
+            if let confirmation = copyConfirmation {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(DS.Color.successText)
+                    Text(confirmation)
+                        .font(DS.Font.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
+                }
+                .transition(.opacity)
+            }
+
+            ResetPaneButton(scope: .automation)
         }
     }
 
