@@ -191,4 +191,22 @@ struct AIPaneActionsTests {
         #expect(!items.contains("Re-Extract"))
         #expect(!items.contains("Extracting…"))
     }
+
+    @Test("the summary's meta line is plain words in the body font: no character count, no monospace")
+    func summaryMetaReadsPlainly() throws {
+        let model = makeModel()
+        var summary = Summary(text: "We ship the patch on Friday.")
+        summary.provider = "Apple Intelligence"
+        model.transcript?.summary = summary
+        let hosted = HostedWindow(SummaryPane().environment(model))
+        let words = HostedAccessibility.words(in: hosted.host)
+        hosted.close()
+        let counted = words.contains("6 words")
+        let abbreviated = words.contains { $0.contains("chars") || $0.contains("characters") }
+        #expect(counted)
+        #expect(!abbreviated)
+        let pane = try source("Views/Summary/SummaryPane")
+        #expect(!pane.contains("DS.Font.mono"))
+        #expect(pane.contains("DS.Font.secondary.monospacedDigit()"))
+    }
 }

@@ -42,13 +42,10 @@ struct SummaryPane: View {
 
     private func metadataStrip(summary: Summary) -> some View {
         let words = summary.text.split { $0.isWhitespace || $0.isNewline }.count
-        let chars = summary.text.count
         let provider = summary.provider
 
         return HStack(spacing: 6) {
             metaLabel(Text("\(words) words"))
-            dot
-            metaLabel(Text("\(chars) chars"))
             if !provider.isEmpty {
                 dot
                 metaLabel(Text(verbatim: provider))
@@ -61,13 +58,13 @@ struct SummaryPane: View {
 
     private var dot: some View {
         Text(verbatim: "·")
-            .font(DS.Font.mono)
+            .font(DS.Font.secondary)
             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
     }
 
     private func metaLabel(_ text: Text) -> some View {
         text
-            .font(DS.Font.mono)
+            .font(DS.Font.secondary.monospacedDigit())
             .foregroundStyle(DS.Color.secondaryText)
     }
 
