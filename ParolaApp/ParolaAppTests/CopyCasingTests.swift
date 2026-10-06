@@ -56,6 +56,19 @@ struct CopyCasingTests {
         }
     }
 
+    @Test("every sort and filter menu uses Title Case, in Italian too")
+    func sortAndFilterMenusAreTitleCase() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        let labels = LibrarySortOrder.allCases.map(\.label)
+            + QueueView.SortOption.allCases.map(\.rawValue)
+            + LibraryDateRangeFilter.allCases.map(\.title)
+        for label in labels {
+            #expect(isTitleCase(label), "menu item \(label)")
+            #expect(italian.localizedString(forKey: label, value: "MISSING", table: nil) != "MISSING", "Italian for \(label)")
+        }
+    }
+
     @Test("the casing rule itself rejects sentence case")
     func ruleRejectsSentenceCase() {
         #expect(isTitleCase("Nothing Queued"))

@@ -10,6 +10,15 @@ import ParolaTestSupport
 @Suite("Recently Deleted route")
 struct RecentlyDeletedRouteTests {
 
+    @Test("the kind menu ticks the kind on show, as the library's filters do")
+    func kindMenuTicksTheActiveKind() {
+        let menu = NSHostingMenu(rootView: RecentlyDeletedKindItems(selection: .constant(.meetings)))
+        menu.update()
+        let ticked = menu.items.filter { $0.state == .on }.map(\.title)
+
+        #expect(ticked == ["Meetings"])
+    }
+
     private func makeModel() -> AppModel {
         AppModel(
             skipBootstrap: true,

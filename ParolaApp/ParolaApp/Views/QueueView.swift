@@ -9,12 +9,12 @@ struct QueueView: View {
     @State private var confirmingCancelAll = false
 
     enum SortOption: String, CaseIterable, Identifiable {
-        case newestFirst = "Newest first"
-        case oldestFirst = "Oldest first"
+        case newestFirst = "Newest First"
+        case oldestFirst = "Oldest First"
         case nameAscending = "Name A→Z"
         case nameDescending = "Name Z→A"
-        case mostProgress = "Most progress"
-        case leastProgress = "Least progress"
+        case mostProgress = "Most Progress"
+        case leastProgress = "Least Progress"
 
         var id: String { rawValue }
     }
@@ -71,7 +71,7 @@ struct QueueView: View {
         Menu {
             Picker("Sort", selection: $sortOption) {
                 ForEach(SortOption.allCases) { option in
-                    Text(option.rawValue).tag(option)
+                    Text(LocalizedStringKey(option.rawValue)).tag(option)
                 }
             }
             .pickerStyle(.inline)

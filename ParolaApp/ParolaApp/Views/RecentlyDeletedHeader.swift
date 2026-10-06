@@ -101,13 +101,7 @@ struct RecentlyDeletedHeader: View {
 
     private var kindMenu: some View {
         Menu {
-            Button(LocalizedStringKey(RecentlyDeletedCategoryFilter.all.title)) { categoryFilter = .all }
-                .axLeaf("Filter.MenuItem.Kind.all")
-            Divider()
-            ForEach(RecentlyDeletedCategoryFilter.allCases.filter { $0 != .all }) { option in
-                Button(LocalizedStringKey(option.title)) { categoryFilter = option }
-                    .axLeaf("Filter.MenuItem.Kind.\(option.rawValue)")
-            }
+            RecentlyDeletedKindItems(selection: $categoryFilter)
         } label: {
             FilterPillLabel(systemImage: "square.grid.2x2", label: Text(LocalizedStringKey(categoryFilter.title)))
         }
@@ -158,5 +152,22 @@ private struct FilterPillLabel: View {
     var body: some View {
         Label { label } icon: { Image(systemName: systemImage) }
             .labelStyle(.titleAndIcon)
+    }
+}
+
+/// An inline picker, so the kind on show carries the tick.
+struct RecentlyDeletedKindItems: View {
+    @Binding var selection: RecentlyDeletedCategoryFilter
+
+    var body: some View {
+        Picker("Kind", selection: $selection) {
+            Text(LocalizedStringKey(RecentlyDeletedCategoryFilter.all.title)).tag(RecentlyDeletedCategoryFilter.all)
+            Divider()
+            ForEach(RecentlyDeletedCategoryFilter.allCases.filter { $0 != .all }) { option in
+                Text(LocalizedStringKey(option.title)).tag(option)
+            }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
     }
 }

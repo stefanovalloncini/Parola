@@ -1704,7 +1704,7 @@
         }
       }
     },
-    "Added first": {
+    "Added First": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -1715,7 +1715,7 @@
         }
       }
     },
-    "Added last": {
+    "Added Last": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -1989,7 +1989,7 @@
         }
       }
     },
-    "Any time": {
+    "Any Time": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -7709,6 +7709,17 @@
         }
       }
     },
+    "Kind": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tipo"
+          }
+        }
+      }
+    },
     "LRC Lyrics": {
       "extractionState": "manual",
       "localizations": {
@@ -7819,6 +7830,17 @@
         }
       }
     },
+    "Largest First": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dal più grande"
+          }
+        }
+      }
+    },
     "Largest first": {
       "extractionState": "manual",
       "localizations": {
@@ -7830,7 +7852,7 @@
         }
       }
     },
-    "Last 30 days": {
+    "Last 30 Days": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -7841,7 +7863,7 @@
         }
       }
     },
-    "Last 7 days": {
+    "Last 7 Days": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -7852,13 +7874,24 @@
         }
       }
     },
-    "Last opened": {
+    "Last Opened": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Ultima apertura"
+          }
+        }
+      }
+    },
+    "Last Year": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultimo anno"
           }
         }
       }
@@ -7870,17 +7903,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ultima apertura: %@"
-          }
-        }
-      }
-    },
-    "Last year": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ultimo anno"
           }
         }
       }
@@ -7903,6 +7925,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Anteprima dell'impaginazione non disponibile per questo formato"
+          }
+        }
+      }
+    },
+    "Least Progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meno avanzati"
           }
         }
       }
@@ -8217,6 +8250,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lunghi (film)"
+          }
+        }
+      }
+    },
+    "Longest First": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dal più lungo"
           }
         }
       }
@@ -8859,6 +8903,17 @@
         }
       }
     },
+    "Most Progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Più avanzati"
+          }
+        }
+      }
+    },
     "Most Time Left": {
       "extractionState": "manual",
       "localizations": {
@@ -9145,7 +9200,7 @@
         }
       }
     },
-    "Newest first": {
+    "Newest First": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -10133,7 +10188,7 @@
         }
       }
     },
-    "Oldest first": {
+    "Oldest First": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -13669,6 +13724,17 @@
         }
       }
     },
+    "Shortest First": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dal più breve"
+          }
+        }
+      }
+    },
     "Show": {
       "extractionState": "manual",
       "localizations": {
@@ -14116,6 +14182,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Piccola"
+          }
+        }
+      }
+    },
+    "Smallest First": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dal più piccolo"
           }
         }
       }

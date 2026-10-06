@@ -15,13 +15,13 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .newest: return "Newest first"
-        case .oldest: return "Oldest first"
+        case .newest: return "Newest First"
+        case .oldest: return "Oldest First"
         case .titleAZ: return "Title A→Z"
         case .titleZA: return "Title Z→A"
-        case .longest: return "Largest first"
-        case .shortest: return "Smallest first"
-        case .lastOpened: return "Last opened"
+        case .longest: return "Longest First"
+        case .shortest: return "Shortest First"
+        case .lastOpened: return "Last Opened"
         }
     }
 }
@@ -241,9 +241,9 @@ extension AppModel {
         case .titleZA:
             return entriesSortedByTitle(entries, ascending: false)
         case .longest:
-            return entries.sorted { (libraryBundleSizes[$0.id] ?? 0) > (libraryBundleSizes[$1.id] ?? 0) }
+            return entries.sorted { ($0.durationSeconds ?? 0) > ($1.durationSeconds ?? 0) }
         case .shortest:
-            return entries.sorted { (libraryBundleSizes[$0.id] ?? 0) < (libraryBundleSizes[$1.id] ?? 0) }
+            return entries.sorted { ($0.durationSeconds ?? 0) < ($1.durationSeconds ?? 0) }
         case .lastOpened:
             return entries.sorted { lhs, rhs in
                 switch (lhs.lastOpenedAt, rhs.lastOpenedAt) {
@@ -274,9 +274,6 @@ extension AppModel {
             var merged = self.libraryBundleSizes.filter { activeIDs.contains($0.key) }
             merged.merge(newSizes) { _, new in new }
             self.libraryBundleSizes = merged
-            if self.librarySortOrder == .longest || self.librarySortOrder == .shortest {
-                self.reapplyLibrarySort()
-            }
         }
     }
 

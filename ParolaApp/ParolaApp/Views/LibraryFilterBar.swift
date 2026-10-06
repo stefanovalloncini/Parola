@@ -4,13 +4,16 @@ import ParolaCore
 enum LibraryDateRangeFilter: String, CaseIterable, Identifiable {
     case all, today, week, month, year
     var id: String { rawValue }
-    var label: LocalizedStringKey {
+    var label: LocalizedStringKey { LocalizedStringKey(title) }
+
+    /// The source key, so the casing and the Italian can be read back.
+    var title: String {
         switch self {
-        case .all: return "Any time"
+        case .all: return "Any Time"
         case .today: return "Today"
-        case .week: return "Last 7 days"
-        case .month: return "Last 30 days"
-        case .year: return "Last year"
+        case .week: return "Last 7 Days"
+        case .month: return "Last 30 Days"
+        case .year: return "Last Year"
         }
     }
     var cutoff: Date? {

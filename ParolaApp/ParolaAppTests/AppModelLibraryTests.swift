@@ -471,26 +471,35 @@ struct AppModelLibraryTests {
         #expect(sorted == ["c", "a", "b"])
     }
 
-    @Test("longest sort uses bundle sizes, biggest first, zero for missing")
+    /// The length every row shows, not the audio's bytes: a short video outweighs a long voice memo.
+    private static func timedFixture() -> [LibraryEntry] {
+        Self.fixture().map { entry in
+            var manifest = entry.manifest
+            manifest.durationSeconds = ["a": 600, "b": 30, "c": nil][entry.id] ?? nil
+            return LibraryEntry(id: entry.id, bundleURL: entry.bundleURL, manifest: manifest)
+        }
+    }
+
+    @Test("longest sort goes by the length on the row, zero for missing")
     func sortLongest() {
         let model = makeModel()
         model.librarySortOrder = .longest
         model.libraryBundleSizes = ["a": 100, "b": 999, "c": 50]
 
-        let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
+        let sorted = model.sortedLibraryEntries(Self.timedFixture()).map(\.id)
 
-        #expect(sorted == ["b", "a", "c"])
+        #expect(sorted == ["a", "b", "c"])
     }
 
-    @Test("shortest sort uses bundle sizes, smallest first")
+    @Test("shortest sort goes by the length on the row")
     func sortShortest() {
         let model = makeModel()
         model.librarySortOrder = .shortest
         model.libraryBundleSizes = ["a": 100, "b": 999, "c": 50]
 
-        let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
+        let sorted = model.sortedLibraryEntries(Self.timedFixture()).map(\.id)
 
-        #expect(sorted == ["c", "a", "b"])
+        #expect(sorted == ["c", "b", "a"])
     }
 
     @Test("bundle sizing prefers the manifest's audio file and falls back to the listing")
@@ -868,8 +877,8 @@ struct AppModelLibraryTests {
             .oldest: "Dal meno recente",
             .titleAZ: "Titolo A→Z",
             .titleZA: "Titolo Z→A",
-            .longest: "Dal più grande",
-            .shortest: "Dal più piccolo",
+            .longest: "Dal più lungo",
+            .shortest: "Dal più breve",
             .lastOpened: "Ultima apertura",
         ]
         for order in LibrarySortOrder.allCases {

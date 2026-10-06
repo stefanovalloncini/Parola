@@ -270,8 +270,8 @@ struct LibraryPageHeaderTests {
         }
         let italianName = LanguageDisplay.name(for: "it") ?? "IT"
 
-        #expect(chipTitles(in: idle) == ["Labels", "People", "Any time", "Sort", "More"], "Language waits in More")
-        #expect(chipTitles(in: active) == ["Quarterly planning", "Giulia Rossi", italianName, "Last 30 days", "Sort", "More"])
+        #expect(chipTitles(in: idle) == ["Labels", "People", "Any Time", "Sort", "More"], "Language waits in More")
+        #expect(chipTitles(in: active) == ["Quarterly planning", "Giulia Rossi", italianName, "Last 30 Days", "Sort", "More"])
     }
 
     @Test("Language is a chip only while it filters; More holds it once the page has two languages")
@@ -314,14 +314,14 @@ struct LibraryPageHeaderTests {
     func narrowWindowWithRoom() {
         let hosted = hostedHeader(windowWidth: MainWindowLayout.minimumWidth, filtering: false, dimensions: false)
         defer { hosted.close() }
-        #expect(chipTitles(in: hosted) == ["Any time", "Sort", "More"])
+        #expect(chipTitles(in: hosted) == ["Any Time", "Sort", "More"])
     }
 
     @Test("at 920 points every everyday chip and More sit beside the subtitle")
     func everydayChipsAtTheSmallestWindow() {
         let hosted = hostedHeader(windowWidth: MainWindowLayout.minimumWidth, filtering: false)
         defer { hosted.close() }
-        #expect(chipTitles(in: hosted) == ["Labels", "People", "Any time", "Sort", "More"])
+        #expect(chipTitles(in: hosted) == ["Labels", "People", "Any Time", "Sort", "More"])
     }
 
     @Test("an empty page with nothing filtered shows no chips, not even More")
@@ -334,7 +334,7 @@ struct LibraryPageHeaderTests {
         }
         #expect(chipTitles(in: empty).isEmpty)
         let italianName = LanguageDisplay.name(for: "it") ?? "IT"
-        #expect(chipTitles(in: filtered) == ["Quarterly planning", "Giulia Rossi", italianName, "Last 30 days", "More"], "a filter on stays so it can be cleared")
+        #expect(chipTitles(in: filtered) == ["Quarterly planning", "Giulia Rossi", italianName, "Last 30 Days", "More"], "a filter on stays so it can be cleared")
     }
 
     @Test("with every filter on, the header's controls stay inside the page", arguments: [920.0, 1000, 1040, 1180, 1440])

@@ -239,24 +239,24 @@ enum BatchSortOrder: CaseIterable, Hashable {
 
     var title: LocalizedStringKey {
         switch self {
-        case .addedFirst: return "Added first"
-        case .addedLast: return "Added last"
+        case .addedFirst: return "Added First"
+        case .addedLast: return "Added Last"
         case .nameAsc: return "Name A→Z"
         case .nameDesc: return "Name Z→A"
-        case .largestFirst: return "Largest first"
-        case .smallestFirst: return "Smallest first"
+        case .largestFirst: return "Largest First"
+        case .smallestFirst: return "Smallest First"
         case .status: return "Status"
         }
     }
 
     var localizedTitle: String {
         switch self {
-        case .addedFirst: return String(localized: "Added first")
-        case .addedLast: return String(localized: "Added last")
+        case .addedFirst: return String(localized: "Added First")
+        case .addedLast: return String(localized: "Added Last")
         case .nameAsc: return String(localized: "Name A→Z")
         case .nameDesc: return String(localized: "Name Z→A")
-        case .largestFirst: return String(localized: "Largest first")
-        case .smallestFirst: return String(localized: "Smallest first")
+        case .largestFirst: return String(localized: "Largest First")
+        case .smallestFirst: return String(localized: "Smallest First")
         case .status: return String(localized: "Status")
         }
     }
