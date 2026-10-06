@@ -2261,8 +2261,8 @@ extension TranscriberMockSuites {
             let italian = try #require(Bundle(path: path))
             #expect(AppModel.meLabel(bundle: italian) == "Io")
             #expect(String(localized: "This Is Me", bundle: italian) == "Sono io")
-            #expect(AppModel.micTrackMissingMessage(bundle: italian) == "Il tuo microfono non è in questa registrazione. Contiene solo l'audio del Mac.")
-            #expect(AppModel.micTrackStoppedMessage(bundle: italian) == "Il tuo microfono si è fermato. Il resto della registrazione contiene solo l'audio del Mac.")
+            #expect(AppModel.micTrackMissingMessage(bundle: italian) == "Il tuo microfono non è in questa registrazione. Contiene solo l'audio di sistema.")
+            #expect(AppModel.micTrackStoppedMessage(bundle: italian) == "Il tuo microfono si è fermato. Il resto della registrazione contiene solo l'audio di sistema.")
         }
 
         // MARK: - The setting
@@ -2292,10 +2292,10 @@ extension TranscriberMockSuites {
             let italian = try #require(Bundle(path: path))
             #expect(String(localized: "Record my microphone in meetings", bundle: italian) == "Registra il mio microfono nelle riunioni")
             let description = String(
-                localized: "Keeps your voice on a track of its own beside the Mac audio, so the transcript marks what you said as Me.",
+                localized: "Keeps your voice on a track of its own beside the system audio, so the transcript marks what you said as Me.",
                 bundle: italian
             )
-            #expect(description == "Tiene la tua voce su una traccia a parte, accanto all'audio del Mac, così nella trascrizione quello che dici compare come Io.")
+            #expect(description == "Tiene la tua voce su una traccia a parte, accanto all'audio di sistema, così nella trascrizione quello che dici compare come Io.")
         }
 
         // MARK: - The checkpoint and the sweep
@@ -2535,7 +2535,7 @@ extension TranscriberMockSuites.MeetingSecondTrackTests {
 
             await mac.endByItself()
 
-            let warned = await waitUntil { item.face?.notice == "Mac audio stopped" }
+            let warned = await waitUntil { item.face?.notice == "System audio stopped" }
             #expect(warned)
             let asked = await waitUntil { asks.count == 1 }
             #expect(asked)

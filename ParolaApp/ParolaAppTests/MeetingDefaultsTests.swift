@@ -78,15 +78,15 @@ struct MeetingDefaultsTests {
         mac.append(0.5)
         mic.append(0.5)
         #expect(StageBand.stoppedMacNote(false) == nil)
-        #expect(StageBand.tape(levels: mac, micLevels: mic, micState: .recording, markers: [], paused: false, macStopped: true).macLost == "Mac audio stopped")
+        #expect(StageBand.tape(levels: mac, micLevels: mic, micState: .recording, markers: [], paused: false, macStopped: true).macLost == "System audio stopped")
         let before = StageTape(levels: [0.1], micLevels: [0.2], flags: [], newest: 4, paused: false)
-        #expect(before != StageTape(levels: [0.1], micLevels: [0.2], macLost: "Mac audio stopped", flags: [], newest: 4, paused: false))
+        #expect(before != StageTape(levels: [0.1], micLevels: [0.2], macLost: "System audio stopped", flags: [], newest: 4, paused: false))
 
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let it = try #require(Bundle(path: path))
-        #expect(StageBand.stoppedMacNote(true, bundle: it) == "Audio del Mac fermato")
-        #expect(AppModel.macAudioStoppedMessage(bundle: it) == "L'audio del Mac si è fermato. Il tuo microfono continua a registrare.")
-        #expect(AppModel.macAudioStoppedTakeMessage(bundle: it) == "L'audio del Mac si è fermato, quindi Parola ha fermato la registrazione.")
+        #expect(StageBand.stoppedMacNote(true, bundle: it) == "Audio di sistema fermato")
+        #expect(AppModel.macAudioStoppedMessage(bundle: it) == "L'audio di sistema si è fermato. Il tuo microfono continua a registrare.")
+        #expect(AppModel.macAudioStoppedTakeMessage(bundle: it) == "L'audio di sistema si è fermato, quindi Parola ha fermato la registrazione.")
     }
 
     @Test("the band follows the microphone's observed state even before its levels exist, so the lanes always get their names")
@@ -148,7 +148,7 @@ struct MeetingDefaultsTests {
         model.takeMicTrackState = .recording
         let meeting = stageElements(meetingTake(), model: model)
         let youLane = meeting.first { $0.label == "You" }
-        let macLane = meeting.first { $0.label == "Mac audio" }
+        let macLane = meeting.first { $0.label == "System audio" }
         let you = try #require(youLane)
         let mac = try #require(macLane)
         #expect(!meeting.contains { $0.label == "Input level" })
@@ -165,7 +165,7 @@ struct MeetingDefaultsTests {
         let youLane = elements.first { $0.label == "You" }
         let you = try #require(youLane)
         #expect(you.value == "Microphone not recorded")
-        #expect(elements.contains { $0.label == "Mac audio" })
+        #expect(elements.contains { $0.label == "System audio" })
 
         model.takeMicTrackState = .stopped
         let stopped = stageElements(meetingTake(), model: model)
@@ -179,7 +179,7 @@ struct MeetingDefaultsTests {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let it = try #require(Bundle(path: path))
         #expect(String(localized: "You", bundle: it) == "Tu")
-        #expect(String(localized: "Mac audio", bundle: it) == "Audio del Mac")
+        #expect(String(localized: "System audio", bundle: it) == "Audio di sistema")
         #expect(String(localized: "Microphone not recorded", bundle: it) == "Microfono non registrato")
         #expect(StageFacts.silenceWarning(source: .systemAudio, micTrack: .recording, bundle: it) == "Nessun suono dal Mac né dal microfono.")
     }
@@ -756,7 +756,7 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("the menu bar's Record System Audio records a meeting")
+        @Test("the menu bar's New System Audio Recording records a meeting")
         func menuBarSystemAudioIsAMeeting() async throws {
             try await withMocksCleared(.audioSource) {
                 let (model, audio) = try makeModel("meeting-default-menu-bar")
@@ -768,8 +768,7 @@ extension TranscriberMockSuites {
                     mode: .full, dictateTitle: "", showsDictation: false, showsMicRecording: true, showsSystemAudio: true
                 )
                 let items = MenuBarController.items(for: snapshot, target: controller)
-                let submenu = items.first { $0.title == "Record Meeting" }?.submenu
-                let found = submenu?.items.first { $0.title == "Record System Audio" }
+                let found = items.first { $0.title == "New System Audio Recording" }
                 let systemAudio = try #require(found)
                 let action = try #require(systemAudio.action)
 

@@ -550,13 +550,13 @@ struct MacAudioStoppedOutsideTests {
 
         model.takeMacAudioStopped = true
 
-        let inMenu = await waitUntil { item.face?.notice == "Mac audio stopped" }
+        let inMenu = await waitUntil { item.face?.notice == "System audio stopped" }
         #expect(inMenu)
         #expect(TakeRemote.warning(for: take, in: model)?.symbol == "waveform.slash")
         #expect(TakeRemote.warning(for: take, in: model)?.symbol == StageBand.stoppedMacSymbol, "one sign for it, on the lane and the warning line")
-        let onPill = await waitUntil { pillValue() == "Mac audio stopped" }
+        let onPill = await waitUntil { pillValue() == "System audio stopped" }
         #expect(onPill)
-        let onStage = await waitUntil { HostedAccessibility.words(in: stage.host).contains("Mac audio stopped") }
+        let onStage = await waitUntil { HostedAccessibility.words(in: stage.host).contains("System audio stopped") }
         #expect(onStage)
         model.recordingDiskSpaceLow = true
         #expect(TakeRemote.warning(for: take, in: model)?.symbol == "internaldrive", "low disk space ends the take, so it comes first")
@@ -628,12 +628,12 @@ struct MacAudioStoppedOutsideTests {
         model.takeMacAudioStopped = true
         var take = RecordingSession(takeID: 1, source: .systemAudio, category: .meeting, title: "R", isStreaming: false, arming: .startingCapture)
         take.markCapturing(at: .now)
-        #expect(TakeRemote.warning(for: take, in: model)?.message == "Mac audio stopped")
+        #expect(TakeRemote.warning(for: take, in: model)?.message == "System audio stopped")
         take.finish(at: .now)
         #expect(TakeRemote.warning(for: take, in: model) == nil)
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let italian = try #require(Bundle(path: path))
-        #expect(String(localized: "Mac audio stopped", bundle: italian) == "Audio del Mac fermato")
+        #expect(String(localized: "System audio stopped", bundle: italian) == "Audio di sistema fermato")
     }
 }
 

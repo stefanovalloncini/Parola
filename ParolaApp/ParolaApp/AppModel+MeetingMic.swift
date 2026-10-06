@@ -765,15 +765,15 @@ extension AppModel {
     }
 
     nonisolated static func macAudioStoppedMessage(bundle: Bundle = .main) -> String {
-        String(localized: "The Mac audio stopped. Your microphone is still recording.", bundle: bundle)
+        String(localized: "The system audio stopped. Your microphone is still recording.", bundle: bundle)
     }
 
     nonisolated static func macAudioStoppedTakeMessage(bundle: Bundle = .main) -> String {
-        String(localized: "The Mac audio stopped, so Parola stopped the recording.", bundle: bundle)
+        String(localized: "The system audio stopped, so Parola stopped the recording.", bundle: bundle)
     }
 
     nonisolated static func macAudioStoppedBeforeSoundMessage(bundle: Bundle = .main) -> String {
-        String(localized: "The Mac audio stopped before anything was recorded.", bundle: bundle)
+        String(localized: "The system audio stopped before anything was recorded.", bundle: bundle)
     }
 
     /// Says once per take that your microphone is not, or no longer, in the recording.
@@ -828,11 +828,11 @@ extension AppModel {
     }
 
     nonisolated static func micTrackMissingMessage(bundle: Bundle = .main) -> String {
-        String(localized: "Your microphone isn't in this recording. It has the Mac audio only.", bundle: bundle)
+        String(localized: "Your microphone isn't in this recording. It has the system audio only.", bundle: bundle)
     }
 
     nonisolated static func micTrackStoppedMessage(bundle: Bundle = .main) -> String {
-        String(localized: "Your microphone stopped. The rest of this recording has the Mac audio only.", bundle: bundle)
+        String(localized: "Your microphone stopped. The rest of this recording has the system audio only.", bundle: bundle)
     }
 
     nonisolated static func micTrackStoppedTooMessage(bundle: Bundle = .main) -> String {

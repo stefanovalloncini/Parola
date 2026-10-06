@@ -104,7 +104,8 @@ struct MenuBarItemsTests {
 
         #expect(titles(items) == [
             "Open Parola", "—",
-            "Record Meeting", "Start Live Captions", "Start Dictation", "Open Files…", "—",
+            "New Recording", "New System Audio Recording", "Record Zoom Meeting",
+            "Start Live Captions", "Start Dictation", "Open Files…", "—",
             "Microphone", "Settings…", "Check for Updates…", "—",
             "Pinned", "Pinned One", "—",
             "Recent", "Recent One", "—",
@@ -112,42 +113,23 @@ struct MenuBarItemsTests {
         ])
     }
 
-    @Test("Record Meeting is hidden when neither meetings nor mic recording is enabled")
-    func recordMeetingHiddenWhenBothFeaturesOff() {
-        let snapshot = fullSnapshot(showsMicRecording: false, showsSystemAudio: false)
-        let items = MenuBarController.items(for: snapshot, target: nil)
-        #expect(!titles(items).contains("Record Meeting"))
-    }
+    private static let recordTitles: Set<String> = ["New Recording", "New System Audio Recording", "Record Zoom Meeting"]
 
-    @Test("Record Meeting gates each entry by its own feature", arguments: [
-        (true, false, ["Record System Audio"]),
-        (true, true, ["Record System Audio", "Record Microphone"]),
+    @Test("the Record items sit at the top level under the File menu's names, each behind its own feature", arguments: [
+        (false, false, []),
+        (true, false, ["New System Audio Recording", "Record Zoom Meeting"]),
+        (false, true, ["New Recording"]),
+        (true, true, ["New Recording", "New System Audio Recording", "Record Zoom Meeting"]),
     ] as [(Bool, Bool, [String])])
-    func recordMeetingGatesEachEntry(showsSystemAudio: Bool, showsMicRecording: Bool, expected: [String]) {
-        let snapshot = fullSnapshot(showsMicRecording: showsMicRecording, showsSystemAudio: showsSystemAudio)
+    func recordItemsGateByFeature(showsSystemAudio: Bool, showsMicRecording: Bool, expected: [String]) {
+        let snapshot = fullSnapshot(
+            showsMicRecording: showsMicRecording, showsSystemAudio: showsSystemAudio, detectedMeetingApp: "Zoom"
+        )
         let items = MenuBarController.items(for: snapshot, target: nil)
-        let recordMeeting = items.first { $0.title == "Record Meeting" }
-        #expect(recordMeeting?.submenu?.items.map(\.title) == expected)
-    }
-
-    /// A build without meetings never shows the word, so a mic take is one flat item instead.
-    @Test("mic recording alone is a flat item, not a meeting submenu")
-    func micRecordingAloneIsFlat() {
-        let snapshot = fullSnapshot(showsMicRecording: true, showsSystemAudio: false)
-        let items = MenuBarController.items(for: snapshot, target: nil)
-
-        #expect(!titles(items).contains("Record Meeting"))
-        let record = items.first { $0.title == "Record Microphone" }
-        #expect(record != nil)
-        #expect(record?.submenu == nil)
-    }
-
-    @Test("the detected app leads the Record Meeting submenu")
-    func detectedAppEntryFirst() {
-        let snapshot = fullSnapshot(detectedMeetingApp: "Zoom")
-        let items = MenuBarController.items(for: snapshot, target: nil)
-        let recordMeeting = items.first { $0.title == "Record Meeting" }
-        #expect(recordMeeting?.submenu?.items.map(\.title) == ["Record Zoom", "Record System Audio", "Record Microphone"])
+        let record = titles(items).filter { Self.recordTitles.contains($0) }
+        let submenus = items.filter { $0.submenu != nil }.map(\.title)
+        #expect(record == expected)
+        #expect(submenus == ["Microphone"])
     }
 
     @Test("Live Captions is hidden when the feature is off")
@@ -221,7 +203,6 @@ struct MenuBarItemsTests {
         let snapshot = fullSnapshot(detectedMeetingApp: "Zoom", captionsUnavailableReason: reason)
         let menu = MenuBarController.menu(for: snapshot, target: nil)
         #expect(menu.autoenablesItems == false)
-        #expect(menu.items.first { $0.title == "Record Meeting" }?.submenu?.autoenablesItems == false)
         #expect(menu.items.first { $0.title == "Microphone" }?.submenu?.autoenablesItems == false)
 
         menu.update()
@@ -259,9 +240,8 @@ struct MenuBarItemsTests {
     func detectedAppUsesItsOwnAction() {
         let snapshot = fullSnapshot(detectedMeetingApp: "Zoom")
         let items = MenuBarController.items(for: snapshot, target: nil)
-        let recordMeeting = items.first { $0.title == "Record Meeting" }
-        let zoomItem = recordMeeting?.submenu?.items.first { $0.title == "Record Zoom" }
-        let systemAudioItem = recordMeeting?.submenu?.items.first { $0.title == "Record System Audio" }
+        let zoomItem = items.first { $0.title == "Record Zoom Meeting" }
+        let systemAudioItem = items.first { $0.title == "New System Audio Recording" }
         #expect(zoomItem?.action != systemAudioItem?.action)
         #expect(zoomItem?.representedObject as? String == "Zoom")
     }

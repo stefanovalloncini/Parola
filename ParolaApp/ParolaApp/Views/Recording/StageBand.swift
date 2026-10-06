@@ -143,7 +143,7 @@ struct StageBand: View {
 
     /// What the Mac audio lane says once its capture ended by itself while your microphone records on.
     nonisolated static func stoppedMacNote(_ stopped: Bool, bundle: Bundle = .main) -> String? {
-        stopped ? String(localized: "Mac audio stopped", bundle: bundle) : nil
+        stopped ? String(localized: "System audio stopped", bundle: bundle) : nil
     }
 
     /// The one sign for Mac audio that stopped, on its lane and on the warning line alike; the silence warning's speaker stays its own.
@@ -406,7 +406,7 @@ struct StageTape: Equatable {
             if let micLevels {
                 VStack {
                     level(micLevels, label: "You", lost: micLost)
-                    level(levels, label: "Mac audio", lost: macLost)
+                    level(levels, label: "System audio", lost: macLost)
                 }
             } else {
                 level(levels, label: "Input level")
@@ -424,7 +424,7 @@ struct StageTape: Equatable {
     }
 }
 
-/// "You" and "Mac audio" just past the playhead, each beside its lane; each says so once its side isn't in the take.
+/// "You" and "System audio" just past the playhead, each beside its lane; each says so once its side isn't in the take.
 private struct StageLaneNames: View {
     let micState: MicTrackState?
     let macStopped: Bool
@@ -463,7 +463,7 @@ private struct StageLaneNames: View {
         if let stopped = StageBand.stoppedMacNote(macStopped) {
             Label(stopped, systemImage: StageBand.stoppedMacSymbol)
         } else {
-            Text("Mac audio")
+            Text("System audio")
         }
     }
 }

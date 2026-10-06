@@ -214,7 +214,7 @@ struct StageLayoutTests {
         var message: String {
             switch self {
             case .turnedAway: "Finish the recording first."
-            case .stoppedOnItsOwn: "The Mac audio stopped, so Parola stopped the recording."
+            case .stoppedOnItsOwn: "The system audio stopped, so Parola stopped the recording."
             }
         }
 
@@ -303,10 +303,10 @@ struct StageLayoutTests {
         _ = take.markCapturing(at: Date())
         let turnedAway = ExportNotice(message: "Finish the recording first.", failures: [], folder: nil, tone: .info, whileTakeRuns: true)
         let other = ExportNotice(message: "Auto-export couldn't write to its folder.", failures: [], folder: nil, tone: .failure)
-        let reason = "The Mac audio stopped, so Parola stopped the recording."
+        let reason = "The system audio stopped, so Parola stopped the recording."
 
         let macAudio = ExportNotice(
-            message: "The Mac audio stopped. Your microphone is still recording.", failures: [], folder: nil, tone: .info,
+            message: "The system audio stopped. Your microphone is still recording.", failures: [], folder: nil, tone: .info,
             actions: [ExportNotice.Action(title: "Show", handler: .showTake(take.takeID))], whileTakeRuns: true
         )
 

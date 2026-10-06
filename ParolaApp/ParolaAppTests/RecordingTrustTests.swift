@@ -704,7 +704,7 @@ extension TranscriberMockSuites {
                 model.silenceRule = AppModel.SilenceRule(microphone: 0.5, macAudioBeforeSound: 0.5, macAudioAfterSound: 60)
                 model.startRecording(source: .systemAudio)
                 await waitUntil { model.recordingLevelMeter != nil && model.recordingStartedAt != nil }
-                #expect(AppModel.RecordSource.systemAudio.meterLabel == "Mac audio")
+                #expect(AppModel.RecordSource.systemAudio.meterLabel == "System audio")
 
                 // A few 750 ms ticks of the watch, and a slow host can stall the main actor for seconds.
                 await waitUntil(timeoutMs: 15_000) { model.recordingIsSilent }

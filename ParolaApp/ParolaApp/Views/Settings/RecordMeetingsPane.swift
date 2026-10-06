@@ -46,7 +46,7 @@ struct RecordMeetingsPane: View {
                         .axLeaf("RecordMeetings.Toggle.AppOnly")
                 }
                 SettingRow("Record my microphone in meetings",
-                           description: "Keeps your voice on a track of its own beside the Mac audio, so the transcript marks what you said as Me.") {
+                           description: "Keeps your voice on a track of its own beside the system audio, so the transcript marks what you said as Me.") {
                     Toggle("", isOn: $model.meetingRecordsMicrophone).labelsHidden()
                         .accessibilityLabel("Record my microphone in meetings")
                         .axLeaf("RecordMeetings.Toggle.Microphone")

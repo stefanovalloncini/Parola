@@ -58,7 +58,7 @@ final class AppModel {
         var meterLabel: String {
             switch self {
             case .microphone: return String(localized: "Microphone")
-            case .systemAudio: return String(localized: "Mac audio")
+            case .systemAudio: return String(localized: "System audio")
             }
         }
     }
@@ -265,7 +265,7 @@ final class AppModel {
     @ObservationIgnored let mainSidebar: MainSidebar
     /// The take's levels at ten a second, for as long as its session lasts; `takeLevelTick` moves with each one.
     @ObservationIgnored private(set) var takeLevels: TakeLevelHistory?
-    /// A meeting's microphone levels, sampled with `takeLevels` and as many: the "You" meter beside "Mac audio".
+    /// A meeting's microphone levels, sampled with `takeLevels` and as many: the "You" meter beside "System audio".
     @ObservationIgnored var takeMicLevels: TakeLevelHistory?
     /// Where a meeting's microphone track stands; nil for a take that records none.
     var takeMicTrackState: MicTrackState?

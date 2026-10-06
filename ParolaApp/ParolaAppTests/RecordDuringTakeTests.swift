@@ -9,11 +9,9 @@ import ParolaTestSupport
 @Suite("Record while a take runs", .serialized)
 struct RecordDuringTakeTests {
     private func recordItems(_ snapshot: MenuBarController.MenuSnapshot) -> [String: Bool] {
-        let items = MenuBarController.items(for: snapshot, target: nil)
-        let meeting = items.first { $0.title == "Record Meeting" }
-        var found = ["Record Meeting": meeting?.isEnabled ?? false]
-        for item in meeting?.submenu?.items ?? [] { found[item.title] = item.isEnabled }
-        return found
+        let titles: Set<String> = ["New Recording", "New System Audio Recording", "Record Zoom Meeting"]
+        let items = MenuBarController.items(for: snapshot, target: nil).filter { titles.contains($0.title) }
+        return Dictionary(uniqueKeysWithValues: items.map { ($0.title, $0.isEnabled) })
     }
 
     @Test("the menu bar's Record items are off while a take runs and back once it ends")
@@ -24,24 +22,24 @@ struct RecordDuringTakeTests {
         model.showMenuBarExtra = true
         model.detectedMeetingAppName = "Zoom"
         let before = MenuBarController.snapshot(for: model)
-        #expect(recordItems(before) == ["Record Meeting": true, "Record Zoom": true, "Record System Audio": true, "Record Microphone": true])
+        #expect(recordItems(before) == ["Record Zoom Meeting": true, "New System Audio Recording": true, "New Recording": true])
 
         model.installTestTake(source: .systemAudio, liveSource: StubSource(url: wav))
         let during = MenuBarController.snapshot(for: model)
 
         #expect(before != during, "the menu bar's Record items look the same while a take runs")
-        #expect(recordItems(during) == ["Record Meeting": false, "Record Zoom": false, "Record System Audio": false, "Record Microphone": false])
+        #expect(recordItems(during) == ["Record Zoom Meeting": false, "New System Audio Recording": false, "New Recording": false])
         model.endTestTake()
         #expect(MenuBarController.snapshot(for: model) == before)
     }
 
-    @Test("a mic-only build's Record Microphone is off while a take runs")
+    @Test("a mic-only build's New Recording is off while a take runs")
     func micOnlyRecordItem() {
         var snapshot = MenuBarController.MenuSnapshot(
             mode: .full, dictateTitle: "", showsDictation: false, showsMicRecording: true, showsSystemAudio: false
         )
         snapshot.canRecordMicrophone = false
-        let mic = MenuBarController.items(for: snapshot, target: nil).first { $0.title == "Record Microphone" }
+        let mic = MenuBarController.items(for: snapshot, target: nil).first { $0.title == "New Recording" }
         #expect(mic?.isEnabled == false)
     }
 

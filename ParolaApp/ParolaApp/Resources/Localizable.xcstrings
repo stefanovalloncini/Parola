@@ -7563,13 +7563,13 @@
         }
       }
     },
-    "Keeps your voice on a track of its own beside the Mac audio, so the transcript marks what you said as Me.": {
+    "Keeps your voice on a track of its own beside the system audio, so the transcript marks what you said as Me.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tiene la tua voce su una traccia a parte, accanto all'audio del Mac, così nella trascrizione quello che dici compare come Io."
+            "value": "Tiene la tua voce su una traccia a parte, accanto all'audio di sistema, così nella trascrizione quello che dici compare come Io."
           }
         }
       }
@@ -8247,28 +8247,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Snippet client MCP"
-          }
-        }
-      }
-    },
-    "Mac audio": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Audio del Mac"
-          }
-        }
-      }
-    },
-    "Mac audio stopped": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Audio del Mac fermato"
           }
         }
       }
@@ -10724,13 +10702,13 @@
         }
       }
     },
-    "Parola couldn't start recording your Mac's audio. Allow System Audio Recording for Parola in System Settings → Privacy & Security, then try again.": {
+    "Parola couldn't start recording system audio. Allow System Audio Recording for Parola in System Settings → Privacy & Security, then try again.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parola non è riuscita ad avviare la registrazione dell'audio del Mac. Consenti a Parola la Registrazione audio di sistema in Impostazioni di Sistema → Privacy e sicurezza, poi riprova."
+            "value": "Parola non è riuscita ad avviare la registrazione dell'audio di sistema. Consenti a Parola la Registrazione audio di sistema in Impostazioni di Sistema → Privacy e sicurezza, poi riprova."
           }
         }
       }
@@ -11885,17 +11863,6 @@
         }
       }
     },
-    "Record %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra %@"
-          }
-        }
-      }
-    },
     "Record %@ Meeting": {
       "extractionState": "manual",
       "localizations": {
@@ -11903,17 +11870,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra riunione %@"
-          }
-        }
-      }
-    },
-    "Record Meeting": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra riunione"
           }
         }
       }
@@ -11940,17 +11896,6 @@
         }
       }
     },
-    "Record Microphone": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra microfono"
-          }
-        }
-      }
-    },
     "Record System Audio": {
       "extractionState": "manual",
       "localizations": {
@@ -11958,17 +11903,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra audio di sistema"
-          }
-        }
-      }
-    },
-    "Record This Meeting": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra questa riunione"
           }
         }
       }
@@ -15231,6 +15165,17 @@
         }
       }
     },
+    "System audio stopped": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio di sistema fermato"
+          }
+        }
+      }
+    },
     "System default": {
       "extractionState": "manual",
       "localizations": {
@@ -15388,39 +15333,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il server MCP con cui altre app e agenti pilotano Parola."
-          }
-        }
-      }
-    },
-    "The Mac audio stopped before anything was recorded.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "L'audio del Mac si è fermato prima che venisse registrato qualcosa."
-          }
-        }
-      }
-    },
-    "The Mac audio stopped, so Parola stopped the recording.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "L'audio del Mac si è fermato, quindi Parola ha fermato la registrazione."
-          }
-        }
-      }
-    },
-    "The Mac audio stopped. Your microphone is still recording.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "L'audio del Mac si è fermato. Il tuo microfono continua a registrare."
           }
         }
       }
@@ -15696,6 +15608,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gli speaker a cui dai un nome, il colore di ciascuno e dove compaiono."
+          }
+        }
+      }
+    },
+    "The system audio stopped before anything was recorded.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'audio di sistema si è fermato prima che venisse registrato qualcosa."
+          }
+        }
+      }
+    },
+    "The system audio stopped, so Parola stopped the recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'audio di sistema si è fermato, quindi Parola ha fermato la registrazione."
+          }
+        }
+      }
+    },
+    "The system audio stopped. Your microphone is still recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'audio di sistema si è fermato. Il tuo microfono continua a registrare."
           }
         }
       }
@@ -18078,13 +18023,13 @@
         }
       }
     },
-    "Your microphone isn't in this recording. It has the Mac audio only.": {
+    "Your microphone isn't in this recording. It has the system audio only.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il tuo microfono non è in questa registrazione. Contiene solo l'audio del Mac."
+            "value": "Il tuo microfono non è in questa registrazione. Contiene solo l'audio di sistema."
           }
         }
       }
@@ -18100,13 +18045,13 @@
         }
       }
     },
-    "Your microphone stopped. The rest of this recording has the Mac audio only.": {
+    "Your microphone stopped. The rest of this recording has the system audio only.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il tuo microfono si è fermato. Il resto della registrazione contiene solo l'audio del Mac."
+            "value": "Il tuo microfono si è fermato. Il resto della registrazione contiene solo l'audio di sistema."
           }
         }
       }

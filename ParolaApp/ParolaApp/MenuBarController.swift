@@ -215,9 +215,7 @@ final class MenuBarController: NSObject {
             .separator(),
         ]
 
-        if let record = recordItem(for: snapshot, target: target) {
-            items.append(record)
-        }
+        items.append(contentsOf: recordItems(for: snapshot, target: target))
         if snapshot.captionsShown {
             items.append(liveCaptionsItem(for: snapshot, target: target))
         }
@@ -259,34 +257,27 @@ final class MenuBarController: NSObject {
         return items
     }
 
-    /// A meeting is what the system-audio takes are; mic recording alone has no submenu to hang under that word.
-    private static func recordItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem? {
-        guard snapshot.showsSystemAudio else {
-            guard snapshot.showsMicRecording else { return nil }
-            let mic = menuItem(title: String(localized: "Record Microphone"), action: #selector(recordMic), target: target)
+    /// The File menu's names, with the detected meeting after them as in the toolbar's Record menu.
+    static func recordItems(for snapshot: MenuSnapshot, target: AnyObject?) -> [NSMenuItem] {
+        var items: [NSMenuItem] = []
+        if snapshot.showsMicRecording {
+            let mic = menuItem(title: String(localized: "New Recording"), action: #selector(recordMic), target: target)
             mic.isEnabled = snapshot.canRecordMicrophone
-            return mic
+            items.append(mic)
         }
-        let submenu = NSMenu()
-        submenu.autoenablesItems = false
+        guard snapshot.showsSystemAudio else { return items }
+        let system = menuItem(title: String(localized: "New System Audio Recording"), action: #selector(recordSystem), target: target)
+        system.isEnabled = snapshot.canRecordSystemAudio
+        items.append(system)
         if let app = snapshot.detectedMeetingApp {
-            let detected = menuItem(title: String(localized: "Record \(app)"), action: #selector(recordDetectedMeeting(_:)), target: target)
+            let detected = menuItem(
+                title: String(localized: "Record \(app) Meeting"), action: #selector(recordDetectedMeeting(_:)), target: target
+            )
             detected.representedObject = app
             detected.isEnabled = snapshot.canRecordSystemAudio
-            submenu.addItem(detected)
+            items.append(detected)
         }
-        let system = menuItem(title: String(localized: "Record System Audio"), action: #selector(recordSystem), target: target)
-        system.isEnabled = snapshot.canRecordSystemAudio
-        submenu.addItem(system)
-        if snapshot.showsMicRecording {
-            let mic = menuItem(title: String(localized: "Record Microphone"), action: #selector(recordMic), target: target)
-            mic.isEnabled = snapshot.canRecordMicrophone
-            submenu.addItem(mic)
-        }
-        let item = NSMenuItem(title: String(localized: "Record Meeting"), action: nil, keyEquivalent: "")
-        item.submenu = submenu
-        item.isEnabled = submenu.items.contains(where: \.isEnabled)
-        return item
+        return items
     }
 
     private static func liveCaptionsItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem {
