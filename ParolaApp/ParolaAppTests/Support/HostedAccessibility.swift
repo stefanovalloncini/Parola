@@ -69,6 +69,8 @@ enum HostedAccessibility {
         let actions: [String]
         /// Whether VoiceOver reads it as the chosen one.
         let isSelected: Bool
+        /// False for a control VoiceOver reads as dimmed.
+        let isEnabled: Bool
 
         var words: [String] { [label, value].compactMap { $0 }.filter { !$0.isEmpty } }
         /// What VoiceOver calls the element: its label, or else its title element's.
@@ -134,7 +136,8 @@ enum HostedAccessibility {
                         ?? read("accessibilityRole", of: child) as? String,
                     frame: (read("accessibilityFrame", of: child) as? NSValue)?.rectValue ?? .zero,
                     actions: (read("accessibilityCustomActions", of: child) as? [NSAccessibilityCustomAction])?.map(\.name) ?? [],
-                    isSelected: (read("isAccessibilitySelected", of: child) as? Bool) ?? false
+                    isSelected: (read("isAccessibilitySelected", of: child) as? Bool) ?? false,
+                    isEnabled: (read("isAccessibilityEnabled", of: child) as? Bool) ?? true
                 ))
                 visit(child, depth: depth + 1)
             }
