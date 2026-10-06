@@ -88,6 +88,21 @@ private struct BusyMicRecorder: DictationRecorder {
     func stopAndTranscribe() async throws -> String { "" }
 }
 
+/// Hears "hello" and remembers whether its take was thrown away instead of transcribed.
+private actor SpeakingRecorder: DictationRecorder {
+    private(set) var discarded = false
+
+    func start() async throws {}
+    func stopAndTranscribe() async throws -> String { "hello" }
+    func stopAndDiscard() async { discarded = true }
+}
+
+/// Every line the controller said to VoiceOver, with its priority.
+@MainActor
+private final class SpokenLines {
+    var lines: [(text: String, priority: NSAccessibilityPriorityLevel)] = []
+}
+
 private struct IdentityPostProcessor: TextPostProcessor {
     func process(_ text: String) async -> String { text }
 }
@@ -156,6 +171,66 @@ struct DictationControllerLifecycleTests {
         controller.dismissFailure()
         await waitUntil { controller.state == .idle }
         #expect(!controller.hudIsUp)
+        controller.stop()
+    }
+
+    @Test("VoiceOver hears dictation listen, transcribe and fail")
+    func dictationIsAnnounced() async {
+        let log = MonitorLog()
+        let controller = DictationController()
+        let spoken = SpokenLines()
+        controller.speak = { spoken.lines.append(($0, $1)) }
+        let store = CapturedInsertionStore()
+        controller.hotkeyFactory = { _, _ in SpyHotkeyMonitor(id: 1, log: log) }
+        controller.recorderFactory = { _ in SpeakingRecorder() }
+        controller.inserterFactory = { CapturingTextInserter(store: store) }
+        controller.start(configuration: makeConfiguration())
+        await log.waitForOps(2)
+
+        controller.simulatePress()
+        await waitUntil { controller.state == .listening }
+        controller.simulateRelease()
+        await waitUntil { store.all() == ["hello"] }
+
+        #expect(spoken.lines.map(\.text) == ["Listening", "Transcribing"])
+        controller.stop()
+
+        let failing = DictationController()
+        failing.speak = { spoken.lines.append(($0, $1)) }
+        spoken.lines = []
+        failing.hotkeyFactory = { _, _ in SpyHotkeyMonitor(id: 2, log: log) }
+        failing.recorderFactory = { _ in BusyMicRecorder() }
+        failing.start(configuration: makeConfiguration())
+        await log.waitForOps(4)
+        failing.simulatePress()
+        await waitUntil { spoken.lines.count == 1 }
+        #expect(spoken.lines.first?.text == "The microphone is in use by another app.")
+        #expect(spoken.lines.first?.priority == .high)
+        failing.stop()
+    }
+
+    @Test("Escape drops what is being said, pastes nothing and arms again")
+    func escapeCancels() async {
+        let log = MonitorLog()
+        let controller = DictationController()
+        let recorder = SpeakingRecorder()
+        let store = CapturedInsertionStore()
+        let counter = Counter()
+        controller.hotkeyFactory = { _, _ in SpyHotkeyMonitor(id: counter.next(), log: log) }
+        controller.recorderFactory = { _ in recorder }
+        controller.inserterFactory = { CapturingTextInserter(store: store) }
+        controller.start(configuration: makeConfiguration())
+        await log.waitForOps(2)
+        controller.simulatePress()
+        await waitUntil { controller.state == .listening }
+
+        controller.cancelDictation()
+
+        #expect(controller.state == .idle)
+        await waitUntil { await recorder.discarded }
+        await settle()
+        #expect(store.all().isEmpty)
+        #expect(controller.isRunning, "dictation stays armed for the next press")
         controller.stop()
     }
 

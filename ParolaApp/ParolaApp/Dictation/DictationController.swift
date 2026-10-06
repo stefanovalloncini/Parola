@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Foundation
 import os
 import ParolaCore
@@ -47,6 +48,7 @@ final class DictationController {
         }
     }
 
+    @ObservationIgnored var speak: @MainActor (String, NSAccessibilityPriorityLevel) -> Void = { announce($0, priority: $1) }
     @ObservationIgnored var transcriptionStopGrace: Duration = .seconds(3)
     @ObservationIgnored var teardownBound: Duration = .seconds(30)
 
@@ -86,6 +88,7 @@ final class DictationController {
     private var levelTask: Task<Void, Never>?
     private var partialTask: Task<Void, Never>?
     private var repositionTask: Task<Void, Never>?
+    @ObservationIgnored private var escapeMonitors: [Any] = []
     @ObservationIgnored private(set) var monitorWork: Task<Void, Never>?
 
     /// The coordinator actor is reentrant, so an unordered stop can complete while a
@@ -113,6 +116,7 @@ final class DictationController {
         levelTask?.cancel()
         partialTask?.cancel()
         repositionTask?.cancel()
+        stopWatchingEscape()
     }
 
     func start(configuration: Configuration) {
@@ -187,6 +191,7 @@ final class DictationController {
         // A last utterance still lands and is inserted, however long its flush takes; only the next install stops waiting for it.
         enqueueMonitorWork(waitingAtMost: teardownBound) { await coord.stopMonitoring() }
         stopPartialStream()
+        stopWatchingEscape()
         modelDownloadProgress = nil
         hideHUD()
         state = .idle
@@ -216,6 +221,7 @@ final class DictationController {
         coordinator = nil
         enqueueMonitorWork { await coord.abortMonitoring() }
         stopPartialStream()
+        stopWatchingEscape()
         modelDownloadProgress = nil
         hideHUD()
         state = .idle
@@ -271,6 +277,57 @@ final class DictationController {
         }
     }
 
+    /// Escape, as with macOS Dictation: what is being said or transcribed is dropped, and nothing is pasted.
+    func cancelDictation() {
+        switch state {
+        case .listening:
+            guard let configuration else { return }
+            abort()
+            start(configuration: configuration)
+        case .transcribing:
+            cancelTranscription()
+        case .idle, .failed:
+            return
+        }
+        speak(String(localized: "Dictation cancelled"), .medium)
+    }
+
+    /// Only while a dictation runs, and only for a launch that owns the keyboard: Escape anywhere cancels it.
+    private func watchEscape() {
+        guard escapeMonitors.isEmpty, configuration?.listensForHotkey == true else { return }
+        let escape = UInt16(kVK_Escape)
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
+            guard event.keyCode == escape else { return }
+            MainActor.assumeIsolated { self?.cancelDictation() }
+        }) {
+            escapeMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
+            guard event.keyCode == escape else { return event }
+            MainActor.assumeIsolated { self?.cancelDictation() }
+            return nil
+        }) {
+            escapeMonitors.append(local)
+        }
+    }
+
+    private func stopWatchingEscape() {
+        for monitor in escapeMonitors { NSEvent.removeMonitor(monitor) }
+        escapeMonitors = []
+    }
+
+    nonisolated static func announcement(
+        from old: DictationCoordinator.State, to new: DictationCoordinator.State, bundle: Bundle = .main
+    ) -> (text: String, priority: NSAccessibilityPriorityLevel)? {
+        guard old != new else { return nil }
+        switch new {
+        case .listening: return (String(localized: "Listening", bundle: bundle), .high)
+        case .transcribing: return (String(localized: "Transcribing", bundle: bundle), .medium)
+        case .failed(let message): return (message.isEmpty ? String(localized: "Failed", bundle: bundle) : message, .high)
+        case .idle: return nil
+        }
+    }
+
     /// A failure's HUD waits for this, or for the next press, so its reason can be read.
     func dismissFailure() {
         guard case .failed = state else { return }
@@ -307,20 +364,25 @@ final class DictationController {
 
     private func handleStateChange(_ state: DictationCoordinator.State, generation: Int) {
         guard generation == coordinatorGeneration else { return }
+        if let line = Self.announcement(from: self.state, to: state) { speak(line.text, line.priority) }
         self.state = state
         appModel?.dictationState = state
         modelDownloadProgress = nil
         switch state {
         case .idle:
+            stopWatchingEscape()
             hideHUD()
         case .listening:
+            watchEscape()
             showHUD()
             startLevelStream()
             startPartialStream()
         case .transcribing:
+            watchEscape()
             showHUD()
             stopLevelStream()
         case .failed:
+            stopWatchingEscape()
             showHUD()
             stopLevelStream()
             stopPartialStream()

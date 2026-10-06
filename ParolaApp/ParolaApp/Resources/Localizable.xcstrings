@@ -4909,6 +4909,17 @@
         }
       }
     },
+    "Dictation cancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dettatura annullata"
+          }
+        }
+      }
+    },
     "Dictation cleanup": {
       "extractionState": "manual",
       "localizations": {
