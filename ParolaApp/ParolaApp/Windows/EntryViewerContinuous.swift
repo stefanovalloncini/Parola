@@ -24,7 +24,7 @@ struct EntryViewerContinuous: View {
                             chunkRow(chunk).id(chunk.id)
                         }
                     }
-                    .frame(maxWidth: 720, alignment: .leading)
+                    .frame(maxWidth: DS.Size.readingWidth, alignment: .leading)
                     .padding(.horizontal, DS.Spacing.large)
                     .padding(.vertical, DS.Spacing.large)
                     Spacer(minLength: 0)

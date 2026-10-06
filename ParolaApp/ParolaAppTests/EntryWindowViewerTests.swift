@@ -277,4 +277,39 @@ struct EntryWindowViewerTests {
         let commands = try source("Views/AppCommands")
         #expect(commands.contains(#"Button("Open in Main Window") { model.openKeyViewerInMainWindow() } .disabled(!model.keyWindowIsViewer)"#))
     }
+
+    @Test("the viewer's Segments layout keeps the main window's reading width")
+    func viewerSegmentsKeepTheReadingWidth() async throws {
+        let model = EntryWindowTestSupport.makeModel("viewer-width")
+        model.transcriptDisplayMode = .segments
+        let long = String(repeating: "word ", count: 300)
+        let entry = try await EntryWindowTestSupport.seed(model, texts: [long], speakers: [nil], audio: nil)
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        let hosted = HostedWindow(EntryViewerSegments(session: session, onEditAttempt: {}).environment(model), width: 1400, height: 600)
+        defer { hosted.close() }
+        let texts = HostedAccessibility.elements(in: hosted.host).filter { element in
+            element.words.contains { $0.hasPrefix("word word") }
+        }
+        let widest = texts.map(\.frame.width).max() ?? 0
+        #expect(!texts.isEmpty)
+        #expect(widest <= DS.Size.readingWidth, "the text runs \(widest) pt wide")
+    }
+
+    @Test("both windows show the language and the speed with the same controls")
+    func windowsShareLanguageAndSpeed() throws {
+        func source(_ name: String) throws -> String {
+            let path = #filePath.replacingOccurrences(of: "ParolaAppTests/EntryWindowViewerTests.swift", with: "ParolaApp/\(name).swift")
+            return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        }
+        let mainHeader = try source("Views/Transcript/TranscriptHeaderBar")
+        let viewerHeader = try source("Windows/EntryViewerHeader")
+        #expect(mainHeader.contains("LanguagePill(language: model.transcript?.language)"))
+        #expect(viewerHeader.contains("LanguagePill(language: session.transcript?.language)"))
+        #expect(!viewerHeader.contains("Text(verbatim: language)"))
+        let mainBar = try source("Views/Transcript/MediaBar")
+        let viewerBar = try source("Windows/EntryViewerPlayback")
+        #expect(mainBar.contains("PlaybackSpeedMenu(rate: playbackRate)"))
+        #expect(viewerBar.contains("PlaybackSpeedMenu(rate: session.rate)"))
+        #expect(!viewerBar.contains(#"Picker("Playback speed""#))
+    }
 }

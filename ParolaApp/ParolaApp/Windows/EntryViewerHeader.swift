@@ -21,15 +21,9 @@ struct EntryViewerHeader: View {
                 }
             }
 
-            if let language = languageLabel {
-                Text(verbatim: language)
-                    .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.accentInk)
-                    .padding(.horizontal, DS.Spacing.snug)
-                    .padding(.vertical, DS.Spacing.hair)
-                    .background(Capsule().fill(DS.Color.accentWash))
-                    .axLeaf("Label.Language")
-            }
+            LanguagePill(language: session.transcript?.language)
+                .help(Text(verbatim: LanguageDisplay.name(for: session.transcript?.language) ?? ""))
+                .axLeaf("Label.Language")
 
             Spacer(minLength: DS.Spacing.small)
 
@@ -71,9 +65,5 @@ struct EntryViewerHeader: View {
         }
         parts.append(SegmentCount.label(session.transcript?.segments.count ?? 0))
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    private var languageLabel: String? {
-        LanguageDisplay.name(for: session.transcript?.language)
     }
 }

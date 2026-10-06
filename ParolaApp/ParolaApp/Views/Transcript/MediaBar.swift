@@ -122,34 +122,10 @@ struct MediaBar: View {
     }
 
     private var speedMenu: some View {
-        Menu {
-            ForEach(PlaybackSpeed.all, id: \.self) { s in
-                Button {
-                    playbackRate = s
-                    applyRate()
-                } label: {
-                    if abs(s - playbackRate) < 0.001 {
-                        Label(speedLabel(s), systemImage: "checkmark")
-                    } else {
-                        Text(speedLabel(s))
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 3) {
-                Text(speedLabel(playbackRate))
-                    .monospacedDigit()
-                Image(systemName: "chevron.down")
-                    .font(DS.Font.caption)
-            }
+        PlaybackSpeedMenu(rate: playbackRate) { speed in
+            playbackRate = speed
+            applyRate()
         }
-        .menuStyle(.button)
-        .buttonStyle(SpeedPillStyle())
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Playback speed")
-        .accessibilityLabel("Playback speed")
-        .accessibilityValue(speedLabel(playbackRate))
         .accessibilityIdentifier("transcript.player.speed")
         .axLeaf("MediaBar.Menu.Speed")
     }
@@ -166,8 +142,41 @@ struct MediaBar: View {
         model.applyPlaybackRate(playbackRate)
     }
 
-    private func speedLabel(_ value: Double) -> String {
-        PlaybackSpeed.label(value)
+}
+
+/// The rate as both windows show it: an accent pill that opens the speeds, the current one checked.
+struct PlaybackSpeedMenu: View {
+    let rate: Double
+    let pick: (Double) -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(PlaybackSpeed.all, id: \.self) { speed in
+                Button {
+                    pick(speed)
+                } label: {
+                    if abs(speed - rate) < 0.001 {
+                        Label(PlaybackSpeed.label(speed), systemImage: "checkmark")
+                    } else {
+                        Text(PlaybackSpeed.label(speed))
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(PlaybackSpeed.label(rate))
+                    .monospacedDigit()
+                Image(systemName: "chevron.down")
+                    .font(DS.Font.caption)
+            }
+        }
+        .menuStyle(.button)
+        .buttonStyle(SpeedPillStyle())
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Playback speed")
+        .accessibilityLabel("Playback speed")
+        .accessibilityValue(PlaybackSpeed.label(rate))
     }
 }
 

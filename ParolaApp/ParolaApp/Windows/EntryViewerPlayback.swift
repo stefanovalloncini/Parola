@@ -50,17 +50,8 @@ struct EntryViewerPlaybackBar: View {
                 .foregroundStyle(DS.Color.secondaryText)
                 .axLeaf("Label.Time")
 
-                Picker("Playback speed", selection: $session.rate) {
-                    ForEach(PlaybackSpeed.all, id: \.self) { speed in
-                        Text(verbatim: PlaybackSpeed.label(speed)).tag(speed)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-                .help("Playback speed")
-                .accessibilityLabel("Playback speed")
-                .axLeaf("Picker.Rate")
+                PlaybackSpeedMenu(rate: session.rate) { session.rate = $0 }
+                    .axLeaf("Picker.Rate")
             }
         }
         .padding(.horizontal, DS.Spacing.regular)

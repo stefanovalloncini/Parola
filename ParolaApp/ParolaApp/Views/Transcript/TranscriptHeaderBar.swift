@@ -32,15 +32,8 @@ struct TranscriptHeaderBar: View {
                 }
                 .accessibilityAction(named: "Rename…") { beginRename() }
 
-            if let label = languageLabel {
-                Text(label)
-                    .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.accentInk)
-                    .padding(.horizontal, DS.Spacing.snug)
-                    .padding(.vertical, DS.Spacing.hair)
-                    .background(Capsule().fill(DS.Color.accentWash))
-                    .modifier(LanguagePillHelpModifier(isAssumed: model.assumedLanguageNotice != nil))
-            }
+            LanguagePill(language: model.transcript?.language)
+                .modifier(LanguagePillHelpModifier(isAssumed: model.assumedLanguageNotice != nil))
 
             Spacer()
 
@@ -346,10 +339,6 @@ struct TranscriptHeaderBar: View {
         }
     }
 
-    private var languageLabel: String? {
-        LanguageDisplay.code(for: model.transcript?.language)
-    }
-
     private var jumpPopover: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Jump to time").font(DS.Font.caption).foregroundStyle(DS.Color.secondaryText)
@@ -376,6 +365,23 @@ struct TranscriptHeaderBar: View {
         model.seekTo(seconds: seconds)
         jumpDraft = ""
         jumpOpen = false
+    }
+}
+
+/// The transcript's language as both windows show it: its code in a pill, its name for VoiceOver.
+struct LanguagePill: View {
+    let language: String?
+
+    var body: some View {
+        if let code = LanguageDisplay.code(for: language) {
+            Text(verbatim: code)
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.accentInk)
+                .padding(.horizontal, DS.Spacing.snug)
+                .padding(.vertical, DS.Spacing.hair)
+                .background(Capsule().fill(DS.Color.accentWash))
+                .accessibilityLabel(Text(verbatim: LanguageDisplay.name(for: language) ?? code))
+        }
     }
 }
 

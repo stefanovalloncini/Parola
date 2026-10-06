@@ -48,8 +48,10 @@ struct EntryViewerSegments: View {
                         .id(segment.id)
                     }
                 }
+                .frame(maxWidth: DS.Size.readingWidth, alignment: .leading)
                 .padding(.horizontal, DS.Spacing.large)
                 .padding(.vertical, DS.Spacing.regular)
+                .frame(maxWidth: .infinity)
             }
             // The window deliberately ignores model.favoritesOnly: a filter set in the main pane is
             // a transient view of that pane, not of a transcript opened in its own window.
