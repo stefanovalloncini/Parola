@@ -25,6 +25,12 @@ struct RecordingSession: Equatable, Sendable {
         case transcribing
     }
 
+    /// A privacy permission a take was refused for, so its banner can open the pane that grants it.
+    enum Permission: Equatable, Sendable {
+        case microphone
+        case screenRecording
+    }
+
     /// What Retry needs of a take whose audio was saved but not transcribed.
     struct Failure: Equatable, Sendable {
         let audioURL: URL
@@ -53,6 +59,7 @@ struct RecordingSession: Equatable, Sendable {
     var audioURL: URL?
     /// Set with a failure that kept audio, for its Retry; it lasts as long as the session.
     var failure: Failure?
+    var missingPermission: Permission?
     private(set) var state: State
     private(set) var startedAt: Date?
     private(set) var pausedTotal: TimeInterval
@@ -75,6 +82,7 @@ struct RecordingSession: Equatable, Sendable {
         self.isStreaming = isStreaming
         self.audioURL = nil
         self.failure = nil
+        self.missingPermission = nil
         self.state = .arming(arming)
         self.startedAt = nil
         self.pausedTotal = 0

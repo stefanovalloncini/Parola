@@ -90,7 +90,7 @@ final class SystemCapturePermissions {
         }
     }
 
-    nonisolated private static func openSystemSettings(pane: String) {
+    nonisolated static func openSystemSettings(pane: String) {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") else { return }
         NSWorkspace.shared.open(url)
     }

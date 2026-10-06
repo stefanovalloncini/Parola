@@ -284,6 +284,8 @@ final class AppModel {
     @ObservationIgnored private var captureStart: CaptureStart?
     /// Test seam: when set, stands in for the capture a take records to a file, so a test decides when it comes up and what it meters.
     @ObservationIgnored var takeCaptureOverride: (@MainActor (RecordSource) -> any LiveAudioSource)?
+    /// Test seam: whether Screen Recording is granted when a system-audio capture fails.
+    @ObservationIgnored var screenRecordingCheck: () -> Bool = { CGPreflightScreenCaptureAccess() }
     /// A meeting take's microphone track, from the moment it is asked for until Stop; nil for every other take.
     @ObservationIgnored var micTrack: MicTrack?
     /// Test seam: when set, stands in for a meeting's microphone track; nil from it means this process has no microphone.
@@ -3526,13 +3528,20 @@ final class AppModel {
         screenRecordingGranted: Bool = CGPreflightScreenCaptureAccess(),
         bundle: Bundle = .main
     ) -> String {
-        if source == .systemAudio, case ParolaError.captureUnavailable = error, !screenRecordingGranted {
+        if missingPermission(for: error, source: source, screenRecordingGranted: screenRecordingGranted) == .screenRecording {
             return String(
                 localized: "Parola needs Screen Recording permission to capture system audio. Open System Settings → Privacy & Security → Screen Recording and grant Parola access, then start recording again.",
                 bundle: bundle
             )
         }
         return transcriptionFailureMessage(for: error, bundle: bundle)
+    }
+
+    nonisolated static func missingPermission(
+        for error: Error, source: RecordSource, screenRecordingGranted: Bool
+    ) -> RecordingSession.Permission? {
+        guard source == .systemAudio, case ParolaError.captureUnavailable = error, !screenRecordingGranted else { return nil }
+        return .screenRecording
     }
 
     nonisolated static func microphoneAccessOffMessage(bundle: Bundle = .main) -> String {
@@ -3815,7 +3824,9 @@ final class AppModel {
     }
 
     /// A take's failure shows on its Stage, and in a notice when the Stage isn't on screen; with no take to hold it, the page's banner says it.
-    private func reportTakeFailure(_ message: String, take takeID: Int?, retry: RecordingSession.Failure? = nil) {
+    private func reportTakeFailure(
+        _ message: String, take takeID: Int?, retry: RecordingSession.Failure? = nil, permission: RecordingSession.Permission? = nil
+    ) {
         guard let takeID else {
             phase = .failed(message: message)
             if let retry { armTakeRetry(retry) }
@@ -3830,6 +3841,7 @@ final class AppModel {
             session.fail(message)
             guard case .failed = session.state else { return }
             session.failure = retry
+            session.missingPermission = permission
             failed = true
         }
         guard failed, !stageShows(takeID) else { return }
@@ -3948,7 +3960,7 @@ final class AppModel {
                 ParolaLog.notice(.appPermissions, "microphone access request was denied")
                 activeTake = nil
                 let message = Self.microphoneAccessOffMessage()
-                reportTakeFailure(message, take: take.id)
+                reportTakeFailure(message, take: take.id, permission: .microphone)
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take.id)
                 return
             }
@@ -4004,8 +4016,10 @@ final class AppModel {
                 stopRecordingWatch()
                 clearTakeReadouts(of: take.id)
                 activeTake = nil
-                let message = Self.recordingFailureMessage(for: error, source: source)
-                reportTakeFailure(message, take: take.id)
+                let screenRecordingGranted = screenRecordingCheck()
+                let message = Self.recordingFailureMessage(for: error, source: source, screenRecordingGranted: screenRecordingGranted)
+                let permission = Self.missingPermission(for: error, source: source, screenRecordingGranted: screenRecordingGranted)
+                reportTakeFailure(message, take: take.id, permission: permission)
                 recordingStartInFlight = false
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take.id)
             }

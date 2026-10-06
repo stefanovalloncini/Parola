@@ -55,6 +55,41 @@ struct RecordingFailureMessageTests {
     }
 }
 
+/// A capture that refuses to start, the way ScreenCaptureKit does without Screen Recording permission.
+private struct RefusedCapture: LiveAudioSource {
+    func start() async throws { throw ParolaError.captureUnavailable("ScreenCaptureKit unavailable: declined") }
+    func prepare() async throws -> URL { URL(fileURLWithPath: "/dev/null") }
+    func cancel() async {}
+}
+
+@MainActor
+@Suite("Refused recording permission")
+struct RefusedPermissionTests {
+    @Test("a system-audio take refused for Screen Recording offers that pane, and only then")
+    func screenRecordingRefusalOffersItsPane() {
+        let refused = ParolaError.captureUnavailable("ScreenCaptureKit unavailable: declined")
+        #expect(AppModel.missingPermission(for: refused, source: .systemAudio, screenRecordingGranted: false) == .screenRecording)
+        #expect(AppModel.missingPermission(for: refused, source: .systemAudio, screenRecordingGranted: true) == nil)
+        #expect(AppModel.missingPermission(for: refused, source: .microphone, screenRecordingGranted: false) == nil)
+    }
+
+    @Test("a take that couldn't start for want of Screen Recording leaves its Stage a way to the pane")
+    func refusedTakeKeepsThePermission() async {
+        let model = makeRecordingModel("refused-screen-recording")
+        model.useStreaming = false
+        model.screenRecordingCheck = { false }
+        model.takeCaptureOverride = { _ in RefusedCapture() }
+
+        model.startRecording(source: .systemAudio)
+
+        await waitUntil {
+            guard case .failed = model.recording?.state else { return false }
+            return true
+        }
+        #expect(model.recording?.missingPermission == .screenRecording)
+    }
+}
+
 @Suite("Microphone access message")
 struct MicrophoneAccessMessageTests {
     private func italianBundle() throws -> Bundle {

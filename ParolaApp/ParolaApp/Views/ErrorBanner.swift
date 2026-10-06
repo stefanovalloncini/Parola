@@ -42,6 +42,11 @@ struct ErrorBanner: View {
                     if updateLeads {
                         updateButton(updating: offer == .updating)
                     }
+                    if let permission = take?.missingPermission {
+                        Button("Open System Settings…") { Self.openSettings(for: permission) }
+                            .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                            .axLeaf("Error.Button.OpenSystemSettings")
+                    }
                     if canRetry {
                         Button("Retry") { retry() }
                             .buttonStyle(DSPillButtonStyle(kind: updateLeads ? .secondary : .primary, size: .compact))
@@ -147,6 +152,13 @@ struct ErrorBanner: View {
         case .starting: String(localized: "Couldn't start the recording", bundle: bundle)
         case .recording: String(localized: "The recording stopped", bundle: bundle)
         case .transcribing, nil: nil
+        }
+    }
+
+    private static func openSettings(for permission: RecordingSession.Permission) {
+        switch permission {
+        case .microphone: openMicrophonePrivacySettings()
+        case .screenRecording: SystemCapturePermissions.openSystemSettings(pane: "Privacy_ScreenCapture")
         }
     }
 
