@@ -168,9 +168,17 @@ struct Record: AsyncParsableCommand {
             }
         }
 
-        await awaitStop(seconds: seconds)
+        await awaitStop(seconds: Self.secondsLeft(of: seconds, capturingSince: session.levelMeter.firstReadingAt))
         await session.stop()
         await consumer.value
+    }
+
+    /// The mic is up while the model loads, so `--seconds` counts from its first buffer, not from when `start` returns.
+    static func secondsLeft(
+        of seconds: Double?, capturingSince firstBuffer: ContinuousClock.Instant?, now: ContinuousClock.Instant = .now
+    ) -> Double? {
+        guard let seconds, let firstBuffer else { return seconds }
+        return max(0, seconds - firstBuffer.duration(to: now) / .seconds(1))
     }
 }
 
