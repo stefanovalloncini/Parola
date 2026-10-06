@@ -254,9 +254,10 @@ struct SpokenTextNormalizerTests {
         #expect(SpokenTextNormalizer.normalize("333 1234567", language: "en") == expected)
     }
 
-    @Test("a glued 7+ digit run with no thousands separator reads digit by digit, not as a cardinal")
-    func gluedLongIntegerDigitByDigit() {
-        #expect(SpokenTextNormalizer.normalize("1234567", language: "en") == "one two three four five six seven")
+    @Test("a glued 7+ digit run with NO separator is a quantity and reads as a cardinal, never digit by digit")
+    func gluedLongIntegerReadsAsCardinal() {
+        let expected = "one million two hundred thirty-four thousand five hundred sixty-seven"
+        #expect(SpokenTextNormalizer.normalize("1234567", language: "en") == expected)
     }
 
     // MARK: - I1: negative numbers (adversarial)
@@ -380,5 +381,95 @@ struct SpokenTextNormalizerTests {
     func keycapEmojiStripped() {
         let keycap = "\u{31}\u{FE0F}\u{20E3}"
         #expect(SpokenTextNormalizer.normalize("Press \(keycap) to confirm.", language: "en") == "Press to confirm.")
+    }
+
+    // MARK: - A: a time range never leaks a literal colon (fix round 2, adversarial)
+
+    @Test("EN a dash-joined time range reads as a time range, dropping hundred on the bare-hour end")
+    func englishTimeRange() {
+        #expect(SpokenTextNormalizer.normalize("10:30-11:00", language: "en") == "ten thirty to eleven")
+    }
+
+    @Test("IT a dash-joined time range reads as a time range")
+    func italianTimeRange() {
+        #expect(SpokenTextNormalizer.normalize("10:30-11:00", language: "it") == "dieci e trenta a undici")
+    }
+
+    @Test("EN a time range inside a sentence never leaves a literal colon behind")
+    func englishTimeRangeInSentence() {
+        let result = SpokenTextNormalizer.normalize("Meeting from 10:30-11:00 tomorrow.", language: "en")
+        #expect(result == "Meeting from ten thirty to eleven tomorrow.")
+        #expect(!result.contains(":"))
+    }
+
+    // MARK: - B: a plain quantity with no separator is a cardinal, never digit by digit (fix round 2, adversarial)
+
+    @Test("IT a 7-digit quantity with no thousands separator reads as a cardinal, not digit by digit")
+    func italianLargeQuantityReadsAsCardinal() {
+        let expected = "nel duemilaventisei erano un milione cinquecentomila persone"
+        #expect(SpokenTextNormalizer.normalize("nel 2026 erano 1500000 persone", language: "it") == expected)
+    }
+
+    @Test("EN a 7-digit quantity with no thousands separator reads as a cardinal, not digit by digit")
+    func englishLargeQuantityReadsAsCardinal() {
+        let expected = "The year nineteen ninety-nine had one million people."
+        #expect(SpokenTextNormalizer.normalize("The year 1999 had 1000000 people.", language: "en") == expected)
+    }
+
+    // MARK: - C: a currency symbol glued to a separator-free 7+ digit amount never leaks the symbol (fix round 2, adversarial)
+
+    @Test("EN a dollar sign glued to a 7-digit amount spells the whole amount, not a stranded symbol")
+    func englishCurrencySymbolLongAmount() {
+        let expected = "one million two hundred thirty-four thousand five hundred sixty-seven dollars"
+        #expect(SpokenTextNormalizer.normalize("$1234567", language: "en") == expected)
+    }
+
+    @Test("IT a euro sign glued to a 7-digit amount spells the whole amount, not a stranded symbol")
+    func italianCurrencySymbolLongAmount() {
+        let expected = "un milione duecentotrentaquattromilacinquecentosessantasette euro"
+        #expect(SpokenTextNormalizer.normalize("€1234567", language: "it") == expected)
+    }
+
+    // MARK: - D: a negative separator-free 7+ digit number still reads minus (fix round 2, adversarial)
+
+    @Test("EN a bare negative 7-digit number reads minus, not a stranded dash")
+    func englishNegativeLongNumber() {
+        let expected = "minus one million two hundred thirty-four thousand five hundred sixty-seven"
+        #expect(SpokenTextNormalizer.normalize("-1234567", language: "en") == expected)
+    }
+
+    @Test("EN a negative 7-digit number followed by more words still reads minus")
+    func englishNegativeLongNumberInSentence() {
+        let expected = "It lost minus one million two hundred thirty-four thousand five hundred sixty-seven dollars."
+        #expect(SpokenTextNormalizer.normalize("It lost -1234567 dollars.", language: "en") == expected)
+    }
+
+    // MARK: - E: I1 and I4 compose (fix round 2, adversarial)
+
+    @Test("IT a negative one euro amount elides to meno un euro, not meno uno euro")
+    func italianNegativeOneEuroElides() {
+        #expect(SpokenTextNormalizer.normalize("-1 euro", language: "it") == "meno un euro")
+    }
+
+    // MARK: - ISO dates (fix round 2, adversarial)
+
+    @Test("EN an ISO date with a valid month and day reads as a spoken date")
+    func englishISODate() {
+        #expect(SpokenTextNormalizer.normalize("2026-10-06", language: "en") == "October sixth, twenty twenty-six")
+    }
+
+    @Test("IT an ISO date with a valid month and day reads as a spoken date")
+    func italianISODate() {
+        #expect(SpokenTextNormalizer.normalize("2026-10-06", language: "it") == "sei ottobre duemilaventisei")
+    }
+
+    @Test("IT an ISO date on the first of the month reads primo, not uno")
+    func italianISODateFirstOfMonth() {
+        #expect(SpokenTextNormalizer.normalize("2026-10-01", language: "it") == "primo ottobre duemilaventisei")
+    }
+
+    @Test("EN an ISO-shaped date with an invalid month falls through unchanged")
+    func englishInvalidISODateUnchanged() {
+        #expect(SpokenTextNormalizer.normalize("2026-13-06", language: "en") == "2026-13-06")
     }
 }

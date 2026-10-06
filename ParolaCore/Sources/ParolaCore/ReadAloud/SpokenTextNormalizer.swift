@@ -40,18 +40,19 @@ public enum SpokenTextNormalizer {
         let locale = Locale(identifier: "en_US")
         let numberPattern = "\\d[\\d,]*(?:\\.\\d+)?"
         var result = replacingAbbreviations(text, table: englishAbbreviations)
+        result = replacingISODates(result, language: "en", locale: locale)
         result = replacingDigitByDigitRuns(result, locale: locale)
+        result = replacingTimes(result, language: "en", locale: locale)
         result = replacingRanges(result, language: "en", locale: locale)
         result = replacingNegativeNumbers(result, language: "en", locale: locale, numberPattern: numberPattern)
         result = replacingCurrencySymbols(result, language: "en", locale: locale, numberPattern: numberPattern)
         result = replacingCurrencyWords(result, language: "en", locale: locale, numberPattern: numberPattern)
         result = replacingPercent(result, suffix: "percent", locale: locale, numberPattern: numberPattern)
         result = replacingVersionStrings(result, locale: locale, joiner: "point")
-        result = replacingTimes(result, language: "en", locale: locale)
         result = replacingEnglishDates(result, locale: locale)
         result = replacingEnglishYears(result, locale: locale)
         result = replacingPlainNumbers(result, locale: locale, numberPattern: numberPattern)
-        return finish(result)
+        return finish(restoringISOPlaceholders(result))
     }
 
     private static func replacingEnglishDates(_ text: String, locale: Locale) -> String {
@@ -126,7 +127,9 @@ public enum SpokenTextNormalizer {
         let locale = Locale(identifier: "it_IT")
         let numberPattern = "\\d[\\d.]*(?:,\\d+)?"
         var result = replacingAbbreviations(text, table: italianAbbreviations)
+        result = replacingISODates(result, language: "it", locale: locale)
         result = replacingDigitByDigitRuns(result, locale: locale)
+        result = replacingTimes(result, language: "it", locale: locale)
         result = replacingRanges(result, language: "it", locale: locale)
         result = replacingNegativeNumbers(result, language: "it", locale: locale, numberPattern: numberPattern)
         result = replacingCurrencySymbols(result, language: "it", locale: locale, numberPattern: numberPattern)
@@ -134,10 +137,9 @@ public enum SpokenTextNormalizer {
         result = replacingItalianMasculineOne(result)
         result = replacingPercent(result, suffix: "per cento", locale: locale, numberPattern: numberPattern)
         result = replacingVersionStrings(result, locale: locale, joiner: "punto")
-        result = replacingTimes(result, language: "it", locale: locale)
         result = replacingItalianDates(result)
         result = replacingPlainNumbers(result, locale: locale, numberPattern: numberPattern)
-        return finish(result)
+        return finish(restoringISOPlaceholders(result))
     }
 
     /// Italian elides "uno" to "un" before any of these masculine nouns, standing alone (not as the
@@ -169,11 +171,68 @@ public enum SpokenTextNormalizer {
         }
     }
 
+    // MARK: - Shared: ISO dates
+
+    /// "2026-10-06" reads as a date, not a dash-joined ID: a valid month (1–12) and day (1–31) read as
+    /// "October sixth, twenty twenty-six" (EN) / "sei ottobre duemilaventisei" (IT, day 1 → "primo").
+    /// An out-of-range month or day falls through unchanged: the whole span is parked behind
+    /// `isoDatePlaceholder`'s private-use characters so no later numeric rule (the digit-by-digit or
+    /// range passes would otherwise claim this exact shape) can touch it, then restored before `finish`.
+    private static func replacingISODates(_ text: String, language: String, locale: Locale) -> String {
+        replaceMatches(pattern: "\\b(\\d{4})-(\\d{2})-(\\d{2})\\b", in: text) { match, ns in
+            guard let year = Int(ns.substring(with: match.range(at: 1))),
+                  let month = Int(ns.substring(with: match.range(at: 2))),
+                  let day = Int(ns.substring(with: match.range(at: 3))),
+                  (1...12).contains(month), (1...31).contains(day) else {
+                return isoDatePlaceholder(ns.substring(with: match.range))
+            }
+            if language == "it" {
+                let monthName = italianMonths[month - 1]
+                let dayWords = day == 1 ? "primo" : spellOut(NSNumber(value: day), locale: locale)
+                let yearWords = spellOut(NSNumber(value: year), locale: locale)
+                return "\(dayWords) \(monthName) \(yearWords)"
+            }
+            let monthName = englishMonths[month - 1]
+            let dayWords = englishOrdinalDay(day, locale: locale)
+            let yearWords = spokenYear(year, locale: locale)
+            return "\(monthName) \(dayWords), \(yearWords)"
+        }
+    }
+
+    private static let isoPlaceholderBase: UInt32 = 0xE000
+    private static let isoPlaceholderDash: UInt32 = 0xE00A
+
+    /// Maps "2026-13-42" to private-use characters one-for-one (digit → `isoPlaceholderBase` + digit,
+    /// "-" → `isoPlaceholderDash`), so it reads as nothing to every other rule in the pipeline until
+    /// `restoringISOPlaceholders` maps it back, right before `finish`.
+    private static func isoDatePlaceholder(_ raw: String) -> String {
+        String(raw.compactMap { character -> Character? in
+            if let ascii = character.asciiValue, (0x30...0x39).contains(ascii) {
+                return Character(Unicode.Scalar(isoPlaceholderBase + UInt32(ascii - 0x30))!)
+            }
+            return Character(Unicode.Scalar(isoPlaceholderDash)!)
+        })
+    }
+
+    private static func restoringISOPlaceholders(_ text: String) -> String {
+        String(text.map { character -> Character in
+            guard character.unicodeScalars.count == 1, let scalar = character.unicodeScalars.first else { return character }
+            if (isoPlaceholderBase...isoPlaceholderBase + 9).contains(scalar.value) {
+                return Character(Unicode.Scalar(0x30 + (scalar.value - isoPlaceholderBase))!)
+            }
+            if scalar.value == isoPlaceholderDash {
+                return "-"
+            }
+            return character
+        })
+    }
+
     // MARK: - Shared: digit-by-digit runs (phone numbers and IDs)
 
-    /// A "+" country-code prefix, a run of space/dash-separated digit groups totalling 7+ digits, or a
-    /// bare 7+ digit run with no thousands separator reads as a phone number or an ID, not a cardinal:
-    /// each digit spelled on its own, groups paused with a comma.
+    /// A "+" country-code prefix, or a run of 2+ space/dash-separated digit groups totalling 7+ digits,
+    /// reads as a phone number or an ID, not a cardinal: each digit spelled on its own, groups paused
+    /// with a comma. A standalone digit run with no separator at all is a quantity, never digit by
+    /// digit — "1500000" is "one million five hundred thousand", handled by the plain-number pass.
     private static func replacingDigitByDigitRuns(_ text: String, locale: Locale) -> String {
         var result = replaceMatches(pattern: "\\+\\d(?:[\\d \\-]*\\d)?", in: text) { match, ns in
             let raw = ns.substring(with: match.range).dropFirst()
@@ -183,9 +242,6 @@ public enum SpokenTextNormalizer {
             let raw = ns.substring(with: match.range)
             guard raw.filter(\.isNumber).count >= 7 else { return nil }
             return spellingDigitGroups(Substring(raw), locale: locale)
-        }
-        result = replaceMatches(pattern: "(?<![\\d.,])\\d{7,}(?![\\d.,])", in: result) { match, ns in
-            spellingDigitGroups(Substring(ns.substring(with: match.range)), locale: locale)
         }
         return result
     }
@@ -227,7 +283,7 @@ public enum SpokenTextNormalizer {
         return replaceMatches(pattern: "(?<![\\w.,])[-\u{2212}](\(numberPattern))", in: text) { match, ns in
             let raw = ns.substring(with: match.range(at: 1))
             guard let amount = parseNumber(raw, locale: locale) else { return nil }
-            return word + " " + spellOut(amount, locale: locale)
+            return word + " " + numeralWords(amount, language: language, locale: locale)
         }
     }
 
@@ -308,8 +364,22 @@ public enum SpokenTextNormalizer {
 
     // MARK: - Shared: times
 
+    private static let timeComponent = "(2[0-4]|[01]?\\d):([0-5]\\d)"
+
+    /// Runs before the generic dash-range rule, so "10:30-11:00" reads as one time range instead of
+    /// the range regex cutting across the colon and leaving a bogus "10:"/":00" behind.
     private static func replacingTimes(_ text: String, language: String, locale: Locale) -> String {
-        var result = replaceMatches(pattern: "\\b(2[0-4]|[01]?\\d):([0-5]\\d)\\b", in: text) { match, ns in
+        let connector = language == "it" ? "a" : "to"
+        var result = replaceMatches(pattern: "\\b\(timeComponent)-\(timeComponent)\\b", in: text) { match, ns in
+            guard let hour1 = Int(ns.substring(with: match.range(at: 1))),
+                  let minute1 = Int(ns.substring(with: match.range(at: 2))),
+                  let hour2 = Int(ns.substring(with: match.range(at: 3))),
+                  let minute2 = Int(ns.substring(with: match.range(at: 4))) else { return nil }
+            let first = spokenTime(hour: hour1, minute: minute1, language: language, locale: locale, inRange: true)
+            let second = spokenTime(hour: hour2, minute: minute2, language: language, locale: locale, inRange: true)
+            return first + " " + connector + " " + second
+        }
+        result = replaceMatches(pattern: "\\b\(timeComponent)\\b", in: result) { match, ns in
             guard let hour = Int(ns.substring(with: match.range(at: 1))),
                   let minute = Int(ns.substring(with: match.range(at: 2))) else { return nil }
             return spokenTime(hour: hour, minute: minute, language: language, locale: locale)
@@ -324,13 +394,15 @@ public enum SpokenTextNormalizer {
         return result
     }
 
-    private static func spokenTime(hour: Int, minute: Int, language: String, locale: Locale) -> String {
+    /// `inRange` drops the EN on-the-hour "hundred" ("ten thirty to eleven", not "… to eleven hundred");
+    /// Italian already reads an on-the-hour time as the bare hour either way.
+    private static func spokenTime(hour: Int, minute: Int, language: String, locale: Locale, inRange: Bool = false) -> String {
         let hourWords = spellOut(NSNumber(value: hour), locale: locale)
         if language == "it" {
             guard minute != 0 else { return hourWords }
             return hourWords + " e " + spellOut(NSNumber(value: minute), locale: locale)
         }
-        guard minute != 0 else { return hourWords + " hundred" }
+        guard minute != 0 else { return inRange ? hourWords : hourWords + " hundred" }
         let minuteWords = spellOut(NSNumber(value: minute), locale: locale)
         return minute < 10 ? hourWords + " oh " + minuteWords : hourWords + " " + minuteWords
     }
