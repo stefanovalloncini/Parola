@@ -4848,13 +4848,13 @@
         }
       }
     },
-    "Detect speakers by default": {
+    "Detect speakers": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Identifica gli speaker per impostazione predefinita"
+            "value": "Identifica gli speaker"
           }
         }
       }
@@ -4877,17 +4877,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diagnostica"
-          }
-        }
-      }
-    },
-    "Diarize speakers": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Identifica gli speaker"
           }
         }
       }
@@ -7018,17 +7007,6 @@
         }
       }
     },
-    "Identify multiple speakers in the audio (slower).": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Identifica i diversi speaker nell'audio (più lento)."
-          }
-        }
-      }
-    },
     "Identify speakers": {
       "extractionState": "manual",
       "localizations": {
@@ -9109,17 +9087,6 @@
         }
       }
     },
-    "New transcriptions split the audio by speaker, so each one can be named.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le nuove trascrizioni dividono l'audio per speaker, così puoi dare un nome a ciascuno."
-          }
-        }
-      }
-    },
     "New versions": {
       "extractionState": "manual",
       "localizations": {
@@ -10323,6 +10290,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apri trascrizione"
+          }
+        }
+      }
+    },
+    "Open Transcription Defaults": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri Predefiniti trascrizione"
           }
         }
       }
@@ -12139,6 +12117,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra le riunioni e qualsiasi audio riprodotto dal Mac."
+          }
+        }
+      }
+    },
+    "Records when each word starts and ends, so the word highlight and a click on a word land exactly. Transcribing takes longer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra quando inizia e finisce ogni parola, così l'evidenziazione e il clic su una parola sono precisi. La trascrizione richiede più tempo."
           }
         }
       }
@@ -14326,6 +14315,17 @@
         }
       }
     },
+    "Speaker detection is in Transcription Defaults, with the other settings for new transcriptions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'identificazione degli speaker si trova in Predefiniti trascrizione, con le altre impostazioni per le nuove trascrizioni."
+          }
+        }
+      }
+    },
     "Speaker names": {
       "extractionState": "manual",
       "localizations": {
@@ -14405,6 +14405,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dividi segmento"
+          }
+        }
+      }
+    },
+    "Splits the transcript by speaker, so each one can be named. Slower, and loads a second model the first time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Divide la trascrizione per speaker, così puoi dare un nome a ciascuno. Più lento, e la prima volta carica un secondo modello."
           }
         }
       }
@@ -15194,17 +15205,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tag"
-          }
-        }
-      }
-    },
-    "Tags each segment with Speaker 1, Speaker 2, etc. Loads a second model on first use.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Marca ogni segmento con Speaker 1, Speaker 2, ecc. Carica un secondo modello al primo uso."
           }
         }
       }

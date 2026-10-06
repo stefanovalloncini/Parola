@@ -93,7 +93,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     /// Search keywords surfaced by the sidebar search beyond the label match.
     var searchKeywords: [String] {
         switch self {
-        case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "dock", "hide", "sound", "duplicate", "already transcribed", "login", "launch", "startup", "title", "window", "new window"]
+        case .general: return ["karaoke", "highlight", "streaming", "vocabulary", "prompt", "menu bar", "dock", "hide", "sound", "duplicate", "already transcribed", "login", "launch", "startup", "title", "window", "new window"]
         case .customization: return ["appearance", "theme", "light", "dark", "monospaced", "accent", "color", "slate", "terracotta", "sea", "sage", "indigo", "custom colors", "palette"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
         case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio", "permission", "screen recording", "consent", "microphone", "my voice"]
@@ -105,7 +105,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .corrections: return ["correction", "fix", "replace", "dictation", "vocabulary"]
         case .translation: return ["translate", "english", "side by side", "language"]
         case .people: return ["people", "person", "speaker", "diarize", "identify speakers", "name", "colour", "color", "merge"]
-        case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "privacy", "cloud", "llm", "speakers", "diarize", "word timestamps", "apple speech", "playback"]
+        case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "privacy", "cloud", "llm", "speakers", "detect speakers", "diarize", "word timestamps", "apple speech", "playback"]
         case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
         case .findReplace: return ["regex", "replace", "term pack", "substitution", "rule"]
         case .exportFormats: return ["preset", "txt", "srt", "vtt", "csv", "tsv", "docx", "pdf", "markdown", "html", "json", "jsonl", "fcpxml", "final cut", "lrc", "lyrics", "subtitles"]
@@ -151,7 +151,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return [
-                "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt", "diarize",
+                "useStreaming", "karaokeHighlight", "initialPrompt",
                 "generateCardMetadata", "showAITitles", "showAISummaries",
                 "customTitlePrompt", "customSummaryPrompt",
                 "openEntriesInNewWindow",
@@ -205,12 +205,8 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .translation:
             return ["translate", "translationSideBySide"]
         case .people:
-            // diarize is shared with the .general and .transcriptionDefaults scopes: all three
-            // show the toggle, and each pane's reset must cover what it shows.
-            return ["showMostUsedPeople", "diarize"]
+            return ["showMostUsedPeople"]
         case .transcriptionDefaults:
-            // wordTimestamps and diarize are shared with the .general scope: both panes
-            // show the toggles, and each pane's reset must cover what it shows.
             return [
                 "selectedModel", "selectedLanguageRaw", "expectedSpeakersRaw",
                 "pausePlayerOnAppHidden", "parola.userPrivacyMode",

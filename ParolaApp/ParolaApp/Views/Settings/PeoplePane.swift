@@ -8,11 +8,14 @@ struct PeoplePane: View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: 16) {
             SettingsSection {
-                SettingRow("Detect speakers by default",
-                           description: "New transcriptions split the audio by speaker, so each one can be named.",
+                SettingRow("Detect speakers",
+                           description: "Speaker detection is in Transcription Defaults, with the other settings for new transcriptions.",
                            isFirst: true) {
-                    Toggle("", isOn: $model.diarize).labelsHidden()
-                        .axLeaf("People.Toggle.Diarize")
+                    Button("Open Transcription Defaults") {
+                        model.settingsPane = SettingsRoute.transcriptionDefaults.rawValue
+                    }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .axLeaf("People.Button.TranscriptionDefaults")
                 }
                 SettingRow("Show most used people in the sidebar",
                            description: "Puts the five people you assign most under Library, each one a filter.") {

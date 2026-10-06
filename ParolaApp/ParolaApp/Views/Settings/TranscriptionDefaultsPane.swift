@@ -19,12 +19,12 @@ struct TranscriptionDefaultsPane: View {
                         .disabled(model.selectedModelCapabilities.supportedLanguages.isEnglishOnly)
                 }
                 SettingRow("Word timestamps",
-                           description: "Captures the start and end time of each word. Karaoke estimates timings without it.") {
+                           description: "Records when each word starts and ends, so the word highlight and a click on a word land exactly. Transcribing takes longer.") {
                     Toggle("", isOn: $model.wordTimestamps).labelsHidden()
                         .axLeaf("TranscriptionDefaults.Toggle.WordTimestamps")
                 }
-                SettingRow("Diarize speakers",
-                           description: "Identify multiple speakers in the audio (slower).") {
+                SettingRow("Detect speakers",
+                           description: "Splits the transcript by speaker, so each one can be named. Slower, and loads a second model the first time.") {
                     Toggle("", isOn: $model.diarize).labelsHidden()
                         .axLeaf("TranscriptionDefaults.Toggle.Diarize")
                 }

@@ -71,30 +71,12 @@ struct GeneralPane: View {
                         .labelsHidden()
                         .axLeaf("General.Toggle.KaraokeHighlight")
                 }
-                SettingRow("Word timestamps",
-                           description: "Captures the start and end time of each word. More accurate karaoke and word click-to-seek, but slower.") {
-                    Toggle("", isOn: $model.wordTimestamps)
-                        .labelsHidden()
-                        .axLeaf("General.Toggle.WordTimestamps")
-                }
                 if Self.showsStreamMicrophoneRow(features: model.features) {
                     SettingRow("Stream microphone in real time",
                                description: "Transcript appears as you speak — Whisper models only; other engines record the take first. Off always records first, then transcribes.") {
                         Toggle("", isOn: $model.useStreaming).labelsHidden()
                             .axLeaf("General.Toggle.UseStreaming")
                     }
-                }
-                SettingRow("Diarize speakers",
-                           description: "Tags each segment with Speaker 1, Speaker 2, etc. Loads a second model on first use.") {
-                    Toggle("", isOn: $model.diarize).labelsHidden()
-                        .axLeaf("General.Toggle.Diarize")
-                }
-                if let warning = model.diarizeMismatchWarning {
-                    Label(warning, systemImage: "exclamationmark.triangle.fill")
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.warningText)
-                        .padding(.top, DS.Spacing.hair)
-                        .axLeaf("General.Label.DiarizeWarning")
                 }
                 SettingRow("Always open transcripts in a new window",
                            description: "Double-clicking a library row opens its own window instead of taking over the main one. Hold Option to open a window either way.") {
