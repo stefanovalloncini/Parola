@@ -3849,6 +3849,17 @@
         }
       }
     },
+    "Code": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codice"
+          }
+        }
+      }
+    },
     "Color scheme of the exported page.": {
       "extractionState": "manual",
       "localizations": {
@@ -5655,6 +5666,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modifica…"
+          }
+        }
+      }
+    },
+    "Email": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email"
           }
         }
       }
@@ -8775,6 +8797,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Unisci al segmento successivo"
+          }
+        }
+      }
+    },
+    "Message": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Messaggio"
           }
         }
       }
@@ -17822,7 +17855,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Voice"
+            "value": "Voce"
           }
         }
       }
@@ -17833,7 +17866,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Voice inserisce la trascrizione così come l'hai detta; gli altri stili la riscrivono con il modello sul dispositivo."
+            "value": "Voce inserisce la trascrizione così come l'hai detta; gli altri stili la riscrivono con il modello sul dispositivo."
           }
         }
       }
