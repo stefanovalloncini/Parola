@@ -1712,17 +1712,6 @@
         }
       }
     },
-    "Add video URL": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi URL video"
-          }
-        }
-      }
-    },
     "Added": {
       "extractionState": "manual",
       "localizations": {
@@ -10864,17 +10853,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Incolla"
-          }
-        }
-      }
-    },
-    "Paste a link": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Incolla un link"
           }
         }
       }

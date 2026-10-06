@@ -100,7 +100,7 @@ struct EmptyLibraryHero: View {
                 .axLeaf("OpenFiles")
             if model.features.isEnabled(.youtube) {
                 separator
-                Button("Paste a link") { model.openLinkSheet(prefill: nil) }
+                Button("Transcribe Link…") { model.openLinkSheet(prefill: nil) }
                     .buttonStyle(.plain)
                     .foregroundStyle(DS.Color.accentInk)
                     .axLeaf("PasteLink")

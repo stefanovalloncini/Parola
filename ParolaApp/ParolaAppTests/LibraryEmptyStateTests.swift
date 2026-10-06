@@ -137,13 +137,26 @@ struct EmptyLibraryHeroTests {
         #expect(EmptyLibraryHero.dropPrompt(offersRecording: false) == "Drop audio and video anywhere")
     }
 
+    @Test("the hero's link button goes by the name the + and File menus give it")
+    func linkButtonName() {
+        let model = AppModel(bootstrap: AppBootstrap(
+            mode: .test, library: makeTempLibraryURL("hero-link"), defaultsOverride: temporaryDefaults(),
+            sideEffects: [], filePicker: TestFilePicker(), enabledFeaturesOverride: [.youtube]
+        ))
+        let hosted = HostedWindow(EmptyLibraryHero().environment(model))
+        defer { hosted.close() }
+        let words = HostedAccessibility.words(in: hosted.host)
+        #expect(words.contains("Transcribe Link…"), "\(words)")
+        #expect(!words.contains("Paste a link"), "\(words)")
+    }
+
     @Test("the hero reads in Italian")
     func italian() throws {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let italian = try #require(Bundle(path: path))
         #expect(EmptyLibraryHero.dropPrompt(offersRecording: true, bundle: italian) == "oppure trascina audio e video ovunque")
         #expect(EmptyLibraryHero.dropPrompt(offersRecording: false, bundle: italian) == "Trascina audio e video ovunque")
-        #expect(String(localized: "Paste a link", bundle: italian) == "Incolla un link")
+        #expect(String(localized: "Transcribe Link…", bundle: italian) == "Trascrivi link…")
         #expect(String(localized: "Recording source", bundle: italian) == "Sorgente di registrazione")
     }
 

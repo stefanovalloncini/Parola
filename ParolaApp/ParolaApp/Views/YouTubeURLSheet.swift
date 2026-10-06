@@ -9,9 +9,9 @@ struct YouTubeURLSheet: View {
 
     var body: some View {
         SheetFrame(
-            icon: "play.rectangle.fill",
+            icon: "link",
             iconTint: DS.Color.accent,
-            title: "Add video URL",
+            title: "Transcribe Link",
             onClose: { dismiss() },
             content: { contentBody },
             footer: { footerBody }
