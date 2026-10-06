@@ -111,8 +111,8 @@ struct MockSpeechRendererTests {
 
         await renderer.releaseStart()
         try await collector.task.value("the released render to finish")
+        try #require(await events.ended.wait(atLeast: 1, "the released render to end"))
         #expect(collector.samples.count == 4_800)
-        #expect(events.ended.value == 1)
     }
 
     @Test("a render started while another runs is recorded, not trapped")
