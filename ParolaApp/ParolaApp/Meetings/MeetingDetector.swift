@@ -88,12 +88,9 @@ final class MeetingDetector {
             Task { @MainActor in self?.quit(appName: display) }
         }
         observerTokens.append(quitToken)
-        for app in NSWorkspace.shared.runningApplications {
-            if let bundleID = app.bundleIdentifier,
-               let display = MeetingDetector.knownMeetingApps[bundleID] {
-                fire(appName: display)
-                break
-            }
+        for display in runningApps() {
+            fire(appName: display)
+            break
         }
     }
 
@@ -123,9 +120,12 @@ final class MeetingDetector {
         onQuit(appName)
     }
 
-    /// The known meeting apps running now, by name.
-    static func runningMeetingApps() -> Set<String> {
-        Set(NSWorkspace.shared.runningApplications.compactMap { app in
+    /// The known meeting apps running now, by name — empty under the unit-test host, so no test depends on what's running on the machine.
+    static func runningMeetingApps(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Set<String> {
+        guard !TestHostSandbox.isTestHost(environment) else { return [] }
+        return Set(NSWorkspace.shared.runningApplications.compactMap { app in
             guard !app.isTerminated, let bundleID = app.bundleIdentifier else { return nil }
             return knownMeetingApps[bundleID]
         })

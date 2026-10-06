@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Parola
+import ParolaTestSupport
 
 @Suite("MeetingDetector")
 @MainActor
@@ -115,6 +116,19 @@ struct MeetingDetectorTests {
         detector.fire(appName: "Zoom")
 
         #expect(recorder.calls == ["Zoom", "Zoom"])
+    }
+
+    @Test("the default runningApps reports nothing under the unit-test host")
+    func defaultRunningAppsIsEmptyUnderTestHost() {
+        let previous = DefaultsStore.current
+        DefaultsStore.current = temporaryDefaults("test-meeting-detector-")
+        defer { DefaultsStore.current = previous }
+
+        let recorder = Recorder()
+        let detector = MeetingDetector(onDetected: { name in recorder.calls.append(name) })
+        detector.isEnabled = true
+
+        #expect(recorder.calls.isEmpty)
     }
 
     @Test("knownMeetingApps maps the supported bundle IDs")
