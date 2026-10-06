@@ -126,6 +126,7 @@ struct ExportSheet: View {
                 options.endTimestamps = isOn
             }
             .disabled(!spec.options.timestamps)
+            .padding(.leading, DS.Spacing.large)
         case .milliseconds:
             toggleRow("Milliseconds", detail: "Write times down to the millisecond.", leaf: "Milliseconds") {
                 spec.options.milliseconds
@@ -133,6 +134,7 @@ struct ExportSheet: View {
                 options.milliseconds = isOn
             }
             .disabled(!spec.options.timestamps)
+            .padding(.leading, DS.Spacing.large)
         case .speakers:
             toggleRow("Speakers", detail: "Label each line with who is speaking.", leaf: "Speakers") {
                 spec.options.speakers
@@ -210,15 +212,15 @@ struct ExportSheet: View {
         get: @escaping @MainActor @Sendable () -> Bool,
         set: @escaping @MainActor @Sendable (inout ExportOptions, Bool) -> Void
     ) -> some View {
-        labelledRow(title, detail: detail) {
-            Toggle("", isOn: Binding(get: get, set: { isOn in
-                var options = spec.options
-                set(&options, isOn)
-                model.setExportSpec(ExportSpec(style: spec.style, format: spec.format, options: options))
-            }))
-            .labelsHidden()
-            .axLeaf("Export.Toggle.\(leaf)")
+        Toggle(isOn: Binding(get: get, set: { isOn in
+            var options = spec.options
+            set(&options, isOn)
+            model.setExportSpec(ExportSpec(style: spec.style, format: spec.format, options: options))
+        })) {
+            ExportOptionLabel(title: title, detail: detail)
         }
+        .toggleStyle(.checkbox)
+        .axLeaf("Export.Toggle.\(leaf)")
     }
 
     private func pickerRow(
@@ -231,7 +233,7 @@ struct ExportSheet: View {
             control()
                 .labelsHidden()
                 .pickerStyle(.menu)
-                .frame(width: 180, alignment: .trailing)
+                .fixedSize()
                 .axLeaf("Export.Picker.\(leaf)")
         }
     }
@@ -242,15 +244,7 @@ struct ExportSheet: View {
         @ViewBuilder control: () -> some View
     ) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(DS.Font.body)
-                    .foregroundStyle(DS.Color.primaryText)
-                Text(detail)
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            ExportOptionLabel(title: title, detail: detail)
             Spacer(minLength: DS.Spacing.small)
             control()
         }
@@ -281,5 +275,25 @@ struct ExportSheet: View {
                 model.setExportSpec(ExportSpec(style: spec.style, format: spec.format, options: options))
             }
         )
+    }
+}
+
+/// An option's name and what it does; it dims with its control when the option can't apply.
+private struct ExportOptionLabel: View {
+    @Environment(\.isEnabled) private var isEnabled
+    let title: LocalizedStringKey
+    let detail: LocalizedStringKey
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(DS.Font.body)
+                .foregroundStyle(DS.Color.primaryText)
+            Text(detail)
+                .font(DS.Font.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .opacity(isEnabled ? 1 : 0.5)
     }
 }
