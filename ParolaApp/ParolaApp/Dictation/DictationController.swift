@@ -18,6 +18,7 @@ final class DictationController {
         }
     }
     private(set) var recentDictation: String = ""
+    private(set) var hudIsUp = false
 
     private(set) var modelDownloadProgress: Double? {
         didSet {
@@ -84,7 +85,6 @@ final class DictationController {
     private var hud: NSPanel?
     private var levelTask: Task<Void, Never>?
     private var partialTask: Task<Void, Never>?
-    private var failedHideTask: Task<Void, Never>?
     private var repositionTask: Task<Void, Never>?
     @ObservationIgnored private(set) var monitorWork: Task<Void, Never>?
 
@@ -112,7 +112,6 @@ final class DictationController {
     isolated deinit {
         levelTask?.cancel()
         partialTask?.cancel()
-        failedHideTask?.cancel()
         repositionTask?.cancel()
     }
 
@@ -185,8 +184,6 @@ final class DictationController {
             return
         }
         coordinator = nil
-        failedHideTask?.cancel()
-        failedHideTask = nil
         // A last utterance still lands and is inserted, however long its flush takes; only the next install stops waiting for it.
         enqueueMonitorWork(waitingAtMost: teardownBound) { await coord.stopMonitoring() }
         stopPartialStream()
@@ -217,8 +214,6 @@ final class DictationController {
             return
         }
         coordinator = nil
-        failedHideTask?.cancel()
-        failedHideTask = nil
         enqueueMonitorWork { await coord.abortMonitoring() }
         stopPartialStream()
         modelDownloadProgress = nil
@@ -276,6 +271,18 @@ final class DictationController {
         }
     }
 
+    /// A failure's HUD waits for this, or for the next press, so its reason can be read.
+    func dismissFailure() {
+        guard case .failed = state else { return }
+        guard let coord = coordinator else {
+            state = .idle
+            appModel?.dictationState = .idle
+            hideHUD()
+            return
+        }
+        Task { await coord.stopListening() }
+    }
+
     /// The coordinator that gave up may still be stuck in its recorder, so a fresh pair takes over.
     private func rearm() {
         guard let configuration else { return }
@@ -303,8 +310,6 @@ final class DictationController {
         self.state = state
         appModel?.dictationState = state
         modelDownloadProgress = nil
-        failedHideTask?.cancel()
-        failedHideTask = nil
         switch state {
         case .idle:
             hideHUD()
@@ -319,11 +324,6 @@ final class DictationController {
             showHUD()
             stopLevelStream()
             stopPartialStream()
-            failedHideTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(3))
-                guard let self, !Task.isCancelled else { return }
-                if case .failed = self.state { self.hideHUD() }
-            }
         }
     }
 
@@ -367,6 +367,7 @@ final class DictationController {
     }
 
     private func showHUD() {
+        hudIsUp = true
         guard let model = appModel else { return }
         if hud == nil {
             hud = DictationHUD.make { [self] in
@@ -374,7 +375,8 @@ final class DictationController {
                     model: model,
                     controller: self,
                     onStop: { model.stopDictationFromIntent() },
-                    onCancel: { self.cancelTranscription() }
+                    onCancel: { self.cancelTranscription() },
+                    onDismiss: { self.dismissFailure() }
                 )
             }
         }
@@ -439,6 +441,7 @@ final class DictationController {
     }
 
     private func hideHUD() {
+        hudIsUp = false
         stopLevelStream()
         repositionTask?.cancel()
         repositionTask = nil

@@ -77,11 +77,15 @@ enum DictationHUDPlacement {
             let expanded = context.hasPartial || context.failedMessageVisible
             return NSSize(width: expanded ? 360 : 200, height: expanded ? 96 : 44)
         case .overlay:
+            if context.failedMessageVisible { return NSSize(width: 380, height: 84) }
             let compactWidth: CGFloat = context.listeningCompact ? 336 : 268
             return NSSize(width: context.hasPartial ? 380 : compactWidth, height: context.hasPartial ? overlayTallestHeight : 64)
         case .notch:
+            if context.failedMessageVisible { return NSSize(width: 372, height: 52) }
             return NSSize(width: context.hasPartial ? 372 : 252, height: 36)
         case .minimal:
+            // A failure borrows the near-field card: a lone dot can't say why.
+            if context.failedMessageVisible { return NSSize(width: 360, height: 96) }
             return NSSize(width: 44, height: 44)
         }
     }

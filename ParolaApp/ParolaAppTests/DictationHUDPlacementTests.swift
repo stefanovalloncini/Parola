@@ -113,6 +113,16 @@ struct DictationHUDPlacementTests {
         #expect(failed.size == NSSize(width: 360, height: 96))
     }
 
+    @Test("every style grows to show a failure's reason, and the minimal dot stays in its corner")
+    func everyStyleShowsTheFailure() {
+        let overlay = DictationHUDPlacement.frame(context(style: .overlay, failedMessageVisible: true))
+        #expect(overlay.size == NSSize(width: 380, height: 84))
+        let notch = DictationHUDPlacement.frame(context(style: .notch, failedMessageVisible: true))
+        #expect(notch.size == NSSize(width: 372, height: 52))
+        let minimal = DictationHUDPlacement.frame(context(style: .minimal, failedMessageVisible: true))
+        #expect(minimal == NSRect(x: 1512 - 360 - 24, y: 24, width: 360, height: 96))
+    }
+
     @Test("near field without an anchor falls back to the overlay spot")
     func nearFieldFallback() {
         let frame = DictationHUDPlacement.frame(context(style: .nearField))

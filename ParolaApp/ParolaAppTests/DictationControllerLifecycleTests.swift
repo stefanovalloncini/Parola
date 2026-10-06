@@ -79,6 +79,15 @@ private actor HeldFlushRecorder: DictationRecorder {
     }
 }
 
+private struct BusyMicRecorder: DictationRecorder {
+    struct Busy: LocalizedError {
+        var errorDescription: String? { "The microphone is in use by another app." }
+    }
+
+    func start() async throws { throw Busy() }
+    func stopAndTranscribe() async throws -> String { "" }
+}
+
 private struct IdentityPostProcessor: TextPostProcessor {
     func process(_ text: String) async -> String { text }
 }
@@ -124,6 +133,29 @@ struct DictationControllerLifecycleTests {
         }
         #expect(ops.last == "start2", "live monitor should arm last: \(ops)")
 
+        controller.stop()
+    }
+
+    @Test("a failure's HUD stays up until it is dismissed", .timeLimit(.minutes(1)))
+    func failureStaysUntilDismissed() async {
+        let log = MonitorLog()
+        let controller = DictationController()
+        controller.hotkeyFactory = { _, _ in SpyHotkeyMonitor(id: 1, log: log) }
+        controller.recorderFactory = { _ in BusyMicRecorder() }
+        controller.start(configuration: makeConfiguration())
+        await log.waitForOps(2)
+
+        controller.simulatePress()
+        await waitUntil {
+            guard case .failed = controller.state else { return false }
+            return true
+        }
+        await settle(for: .seconds(3.5))
+        #expect(controller.hudIsUp, "the reason left before it could be read")
+
+        controller.dismissFailure()
+        await waitUntil { controller.state == .idle }
+        #expect(!controller.hudIsUp)
         controller.stop()
     }
 

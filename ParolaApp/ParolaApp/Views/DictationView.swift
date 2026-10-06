@@ -7,6 +7,7 @@ struct DictationView: View {
     @Bindable var controller: DictationController
     var onStop: (() -> Void)?
     var onCancel: (() -> Void)?
+    var onDismiss: (() -> Void)?
 
     @State private var startedAt: Date = Date()
     @State private var cancelOffered = false
@@ -19,7 +20,8 @@ struct DictationView: View {
             case .nearField: nearFieldBody
             case .overlay: overlayBody
             case .notch:   notchBody
-            case .minimal: minimalBody
+            case .minimal:
+                if failureMessage == nil { minimalBody } else { nearFieldBody }
             }
         }
         .padding(DS.Spacing.tight)
@@ -67,14 +69,14 @@ struct DictationView: View {
                     .foregroundStyle(.white.opacity(0.7))
                 stopButton
             }
-            .frame(height: 32)
+            .frame(height: failureMessage == nil ? 32 : 52)
             if hasPartial {
                 runningTranscript
             }
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.vertical, DS.Spacing.regular)
-        .frame(width: hasPartial ? 344 : (isListening || isDownloadingModel ? 324 : 256), alignment: .leading)
+        .frame(width: hasPartial || failureMessage != nil ? 344 : (isListening || isDownloadingModel ? 324 : 256), alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: Self.overlayRadius, style: .continuous)
                 .fill(Color.black.opacity(0.85))
@@ -117,7 +119,7 @@ struct DictationView: View {
             Text(notchLabel)
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(.white.opacity(0.9))
-                .lineLimit(1)
+                .lineLimit(failureMessage == nil ? 1 : 2)
             Spacer(minLength: 0)
             timer
                 .font(DS.Font.mono)
@@ -126,7 +128,7 @@ struct DictationView: View {
         }
         .padding(.horizontal, Self.notchInset)
         .padding(.vertical, DS.Spacing.snug)
-        .frame(width: hasPartial ? 360 : 240, height: 28, alignment: .leading)
+        .frame(width: hasPartial || failureMessage != nil ? 360 : 240, height: failureMessage == nil ? 28 : 44, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: Self.barRadius, style: .continuous)
                 .fill(Color.black.opacity(0.9))
@@ -152,14 +154,15 @@ struct DictationView: View {
         .frame(width: 36, height: 36)
     }
 
-    private var hasFailureMessage: Bool {
-        if case .failed(let message) = state { return !message.isEmpty }
-        return false
+    private var failureMessage: String? {
+        if case .failed(let message) = state, !message.isEmpty { return message }
+        return nil
     }
 
+    private var hasFailureMessage: Bool { failureMessage != nil }
+
     private var nearFieldLabel: String {
-        if case .failed(let message) = state, !message.isEmpty { return message }
-        return label
+        failureMessage ?? label
     }
 
     private var nearFieldBody: some View {
@@ -197,6 +200,7 @@ struct DictationView: View {
     }
 
     private var notchLabel: String {
+        if let failureMessage { return failureMessage }
         guard hasPartial else { return label }
         let lastLine = controller.recentDictation
             .split(separator: "\n", omittingEmptySubsequences: true)
@@ -239,10 +243,17 @@ struct DictationView: View {
 
     @ViewBuilder
     private var statusLabel: some View {
-        Text(label)
-            .font(DS.Font.bodyStrong)
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
+        if let failureMessage {
+            Text(failureMessage)
+                .font(DS.Font.bodyStrong)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text(label)
+                .font(DS.Font.bodyStrong)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
     }
 
     @ViewBuilder
@@ -253,6 +264,9 @@ struct DictationView: View {
         } else if let onCancel, cancelOffered, case .transcribing = state {
             hudButton(systemName: "xmark", label: "Cancel transcription", action: onCancel)
                 .axLeaf("HUD.Button.Cancel")
+        } else if let onDismiss, case .failed = state {
+            hudButton(systemName: "xmark", label: "Dismiss", action: onDismiss)
+                .axLeaf("HUD.Button.Dismiss")
         }
     }
 
