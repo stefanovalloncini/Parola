@@ -187,6 +187,7 @@ struct DisplayModeCard: View {
             .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular))
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .axLeaf("Inspector.Button.DisplayMode.\(icon.replacingOccurrences(of: ".", with: ""))")
     }
 }

@@ -175,6 +175,14 @@ struct SegmentCard: View {
                     .accessibilityLabel("Favorite")
                     .axLeaf("Card.Badge.Favorite")
             }
+            if let note = Self.confidenceNote(confidenceBucket) {
+                Image(systemName: "exclamationmark")
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.confidenceColor(for: .low))
+                    .help(note)
+                    .accessibilityLabel(note)
+                    .axLeaf("Card.Badge.LowConfidence")
+            }
             Button {
                 if model.player != nil { model.seek(to: segment) }
             } label: {
@@ -262,6 +270,11 @@ struct SegmentCard: View {
 
     private func confidenceColor(_ bucket: SegmentConfidence.Bucket) -> Color {
         DS.confidenceColor(for: bucket).opacity(0.7)
+    }
+
+    /// The stripe is colour alone, so a low segment also says so in a glyph that VoiceOver reads.
+    static func confidenceNote(_ bucket: SegmentConfidence.Bucket?) -> String? {
+        bucket == .low ? String(localized: "Low confidence") : nil
     }
 
     @ViewBuilder

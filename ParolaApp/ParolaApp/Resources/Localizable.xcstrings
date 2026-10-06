@@ -8141,6 +8141,17 @@
         }
       }
     },
+    "Low confidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bassa confidenza"
+          }
+        }
+      }
+    },
     "Low disk space — recording stops automatically below 200 MB.": {
       "extractionState": "manual",
       "localizations": {
