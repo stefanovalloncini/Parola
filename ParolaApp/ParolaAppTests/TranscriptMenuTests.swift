@@ -65,6 +65,16 @@ struct TranscriptMenuTests {
         #expect(sheet.contains(#"TextField("Add a person…""#))
     }
 
+    @Test("both people menus go past ten, and the inspector's can name someone new")
+    func peopleMenusHaveMore() throws {
+        let card = try source("Views/Transcript/SegmentCard")
+        #expect(card.contains("MorePeopleMenu(people: choices.people.more)"))
+        let inspector = try source("Views/Transcript/FormatInspector")
+        #expect(inspector.contains("MorePeopleMenu(people: choices.more)"))
+        #expect(inspector.contains(#"Button("New Person…")"#))
+        #expect(inspector.contains("model.assignSpeaker(label: label, toNewPersonNamed: draftName)"))
+    }
+
     @Test("the display options are checked View menu items")
     func displayOptionsAreViewToggles() throws {
         let commands = try source("Views/AppCommands")

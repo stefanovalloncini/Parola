@@ -92,11 +92,17 @@ extension AppModel {
         Array(peopleByUse.prefix(limit))
     }
 
-    /// A segment's speaker menu: this transcript's speakers, then the most used people who aren't one of them.
-    func segmentSpeakerChoices(peopleLimit: Int) -> (speakers: [String], people: [Person]) {
+    /// A people menu's first `limit` by use, and everyone past them by name, so no one drops off a long directory.
+    func personMenuChoices(excluding names: Set<String> = [], limit: Int) -> (top: [Person], more: [Person]) {
+        let offered = peopleByUse.filter { !names.contains($0.name) }
+        let more = offered.dropFirst(limit).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return (Array(offered.prefix(limit)), more)
+    }
+
+    /// A segment's speaker menu: this transcript's speakers, then the people who aren't one of them.
+    func segmentSpeakerChoices(peopleLimit: Int) -> (speakers: [String], people: (top: [Person], more: [Person])) {
         let speakers = transcriptSpeakers
-        let here = Set(speakers)
-        return (speakers, Array(peopleByUse.filter { !here.contains($0.name) }.prefix(peopleLimit)))
+        return (speakers, personMenuChoices(excluding: Set(speakers), limit: peopleLimit))
     }
 
     /// The open entry's speaker map. A transcript that isn't in the library carries none.

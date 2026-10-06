@@ -97,6 +97,8 @@ struct SpeakerPersonRow: View {
     let segmentCount: Int
 
     @Environment(AppModel.self) private var model
+    @State private var naming = false
+    @State private var draftName = ""
 
     private var person: Person? { model.person(forSpeaker: label) }
 
@@ -123,11 +125,20 @@ struct SpeakerPersonRow: View {
             }
             Spacer(minLength: DS.Spacing.small)
             Menu {
-                ForEach(model.mostUsedPeople(limit: 10)) { candidate in
+                let choices = model.personMenuChoices(limit: 10)
+                ForEach(choices.top) { candidate in
                     Button(candidate.name) { Task { await model.assignSpeaker(label: label, to: candidate) } }
                         .axLeaf("Inspector.MenuItem.AssignPerson.\(candidate.name)")
                 }
-                if !model.people.isEmpty { Divider() }
+                MorePeopleMenu(people: choices.more) { candidate in
+                    Task { await model.assignSpeaker(label: label, to: candidate) }
+                }
+                Button("New Person…") {
+                    draftName = ""
+                    naming = true
+                }
+                .axLeaf("Inspector.MenuItem.NewPerson")
+                Divider()
                 Button("Manage People…") { model.showingPeopleSheet = true }
                     .axLeaf("Inspector.MenuItem.ManagePeople")
                 if person != nil {
@@ -145,6 +156,11 @@ struct SpeakerPersonRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .axLeaf("Inspector.People.Row.\(label)")
+        .alert("Assign speaker", isPresented: $naming) {
+            TextField("Name", text: $draftName)
+            Button("Cancel", role: .cancel) {}
+            Button("Assign") { Task { await model.assignSpeaker(label: label, toNewPersonNamed: draftName) } }
+        }
     }
 }
 

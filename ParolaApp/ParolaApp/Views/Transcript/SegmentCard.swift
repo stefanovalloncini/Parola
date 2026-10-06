@@ -544,10 +544,11 @@ struct SegmentCard: View {
                 .axLeaf("Card.MenuItem.AssignSpeaker.\(name)")
             }
             if !choices.speakers.isEmpty { Divider() }
-            ForEach(choices.people) { person in
+            ForEach(choices.people.top) { person in
                 Button(person.name) { model.assignSpeaker(person.name, toSegmentID: segment.id) }
                     .axLeaf("Card.MenuItem.AssignPerson.\(person.name)")
             }
+            MorePeopleMenu(people: choices.people.more) { model.assignSpeaker($0.name, toSegmentID: segment.id) }
             Button("New Person…") {
                 draftAssignSpeakerName = ""
                 assigningSpeaker = true

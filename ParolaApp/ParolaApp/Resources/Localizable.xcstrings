@@ -8724,6 +8724,17 @@
         }
       }
     },
+    "More People": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Altre persone"
+          }
+        }
+      }
+    },
     "More accurate. Downloads %@ once.": {
       "extractionState": "manual",
       "localizations": {

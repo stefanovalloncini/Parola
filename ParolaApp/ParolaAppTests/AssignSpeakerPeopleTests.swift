@@ -465,6 +465,22 @@ struct AssignSpeakerPeopleTests {
         let choices = model.segmentSpeakerChoices(peopleLimit: 10)
 
         #expect(Set(choices.speakers) == ["Ada", "SPEAKER_01"])
-        #expect(choices.people.map(\.name) == ["Grace"])
+        #expect(choices.people.top.map(\.name) == ["Grace"])
+        #expect(choices.people.more.isEmpty)
+    }
+
+    @Test("a people menu shows the first ten by use and keeps everyone else one level down, by name")
+    func peopleMenusReachEveryone() async {
+        let model = PeopleTestSupport.makeModel("peoplemore")
+        let names = ["Zoe", "Ada", "Mia", "Bea", "Kim", "Lou", "Max", "Ned", "Oli", "Pat", "Ray", "Sam"]
+        for name in names { await model.addPerson(named: name) }
+
+        let choices = model.personMenuChoices(limit: 10)
+
+        #expect(choices.top.map(\.name) == model.peopleByUse.prefix(10).map(\.name))
+        let more = choices.more.map(\.name)
+        #expect(more.count == 2)
+        #expect(more == more.sorted())
+        #expect(Set(choices.top.map(\.name) + more) == Set(names))
     }
 }
