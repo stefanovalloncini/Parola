@@ -131,6 +131,17 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         return defaultsKeys + Self.recordingControlsKeys
     }
 
+    /// The folders, rules, presets, destinations and services people make: a pane's Reset leaves them, and only Advanced's full reset clears them.
+    static let userListKeys: Set<String> = [
+        "watchedFolders", "snippets", "correctionRules", "ignoredSegmentRules", "findReplaceRules",
+        "exportPresets", "destinations", "aiServices", "autoExportRules", "autoExportFolder", "dictationPerAppOverridesJSON",
+    ]
+
+    /// What the pane's Reset to Defaults clears: its settings, never its lists.
+    func resetKeys(features: FeatureSet) -> [String] {
+        defaultsKeys(features: features).filter { !Self.userListKeys.contains($0) }
+    }
+
     func searchKeywords(features: FeatureSet) -> [String] {
         guard self == .recordMeetings, RecordMeetingsPane.showsRecordingControls(features: features) else { return searchKeywords }
         return searchKeywords + Self.recordingControlsKeywords
@@ -260,7 +271,7 @@ struct ResetPaneButton: View {
     @State private var confirming = false
 
     var body: some View {
-        if scope.defaultsKeys.isEmpty {
+        if scope.resetKeys(features: model.features).isEmpty {
             EmptyView()
         } else {
             HStack {
@@ -277,7 +288,6 @@ struct ResetPaneButton: View {
                 titleVisibility: .visible
             ) {
                 Button("Reset", role: .destructive) {
-                    if scope == .aiServices { model.forgetAIServiceKeys() }
                     SettingsResetService.reset(scope: scope, features: model.features)
                 }
                 Button("Cancel", role: .cancel) {}
@@ -292,7 +302,7 @@ enum SettingsResetService {
     @MainActor
     static func reset(scope: SettingsPaneScope, features: FeatureSet = .all) {
         let defaults = DefaultsStore.current
-        for key in scope.defaultsKeys(features: features) {
+        for key in scope.resetKeys(features: features) {
             defaults.removeObject(forKey: key)
         }
         NotificationCenter.default.post(name: .parolaSettingsReset, object: scope)

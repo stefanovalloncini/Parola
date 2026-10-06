@@ -78,7 +78,7 @@ struct AdvancedPane: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Every Settings pane returns to its defaults, including your correction, find & replace, ignored-segment, snippet, and auto-export rules. Library entries, models, and custom prompts are kept.")
+            Text("Every Settings pane returns to its defaults. This also deletes your watched folders, rules, snippets, export presets, Send To destinations, and AI services with their API keys. Library entries, models, and custom prompts are kept.")
         }
     }
 }

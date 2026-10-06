@@ -116,7 +116,7 @@ struct SendToPaneTests {
         #expect(model.sendableDestinations.isEmpty)
     }
 
-    @Test("the pane's reset scope clears the stored list")
+    @Test("the stored list belongs to the Send To pane")
     func resetScope() {
         #expect(SettingsPaneScope.sendTo.defaultsKeys == ["destinations"])
         #expect(SettingsRoute.sendTo.isVisible(features: .all))

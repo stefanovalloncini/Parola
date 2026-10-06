@@ -3535,13 +3535,13 @@
         }
       }
     },
-    "Clears the saved settings on this pane. Other panes are unaffected.": {
+    "Clears the saved settings on this pane, including any of them shown on another pane too.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cancella le impostazioni salvate in questo pannello. Gli altri pannelli non vengono toccati."
+            "value": "Cancella le impostazioni salvate in questo pannello, anche quelle che compaiono in un altro pannello."
           }
         }
       }
@@ -5577,6 +5577,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Errore"
+          }
+        }
+      }
+    },
+    "Every Settings pane returns to its defaults. This also deletes your watched folders, rules, snippets, export presets, Send To destinations, and AI services with their API keys. Library entries, models, and custom prompts are kept.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ogni pannello delle Impostazioni torna ai valori predefiniti. Vengono eliminati anche le cartelle monitorate, le regole, gli snippet, i preset di esportazione, le destinazioni di Invia a e i servizi AI con le loro chiavi API. Le voci della libreria, i modelli e i prompt personalizzati restano."
           }
         }
       }

@@ -84,7 +84,7 @@ struct SettingsPaneScopeTests {
         }
     }
 
-    @Test("the export presets pane resets its own library")
+    @Test("the export presets library belongs to its pane")
     func exportFormatsResetsThePresets() {
         #expect(SettingsPaneScope.exportFormats.defaultsKeys == ["exportPresets"])
     }
@@ -108,6 +108,15 @@ struct SettingsPaneScopeTests {
         #expect(SettingsPaneScope.integrations.defaultsKeys.isEmpty)
         #expect(SettingsPaneScope.prompts.defaultsKeys.isEmpty)
         #expect(SettingsPaneScope.advanced.defaultsKeys.isEmpty)
+    }
+
+    @Test("a pane that holds only a list people made has no Reset to Defaults")
+    func listPanesHaveNoReset() {
+        let lists: [SettingsPaneScope] = [.watchedFolders, .snippets, .corrections, .ignoredSegments, .findReplace, .exportFormats, .sendTo]
+        for scope in lists {
+            #expect(scope.resetKeys(features: .all).isEmpty, "\(scope.rawValue) still offers a reset")
+        }
+        #expect(SettingsPaneScope.aiServices.resetKeys(features: .all) == ["languageModelSelection", "remoteAIAcknowledged"])
     }
 
     @Test("a pane with persisted state always offers search keywords")
@@ -164,6 +173,28 @@ struct SettingsResetServiceTests {
 
             for key in scope.defaultsKeys {
                 #expect(defaults.object(forKey: key) == nil)
+            }
+        }
+    }
+
+    @Test("a pane's reset leaves the folders, rules, presets, destinations and services people made")
+    func resetKeepsUserLists() {
+        let lists = [
+            "watchedFolders", "snippets", "correctionRules", "ignoredSegmentRules", "findReplaceRules",
+            "exportPresets", "destinations", "aiServices", "autoExportRules", "autoExportFolder", "dictationPerAppOverridesJSON",
+        ]
+        withIsolatedDefaults { defaults in
+            for scope in SettingsPaneScope.allCases {
+                for key in scope.defaultsKeys(features: .all) {
+                    defaults.set("sentinel", forKey: key)
+                }
+
+                SettingsResetService.reset(scope: scope)
+
+                for key in scope.defaultsKeys(features: .all) {
+                    let kept = defaults.object(forKey: key) != nil
+                    #expect(kept == lists.contains(key), "\(scope.rawValue) reset \(kept ? "kept" : "cleared") \(key)")
+                }
             }
         }
     }
