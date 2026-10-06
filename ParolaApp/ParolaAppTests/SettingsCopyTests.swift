@@ -74,4 +74,23 @@ struct SettingsCopyTests {
         #expect(SettingsPaneScope.aiServices.defaultsKeys.contains(ManagedConfiguration.userPrivacyModeKey))
         #expect(!SettingsPaneScope.transcriptionDefaults.defaultsKeys.contains(ManagedConfiguration.userPrivacyModeKey))
     }
+
+    private static let textRoles: Set<String> = [NSAccessibility.Role.textField.rawValue, NSAccessibility.Role.textArea.rawValue]
+
+    @Test("the AI title and summary instructions are named fields under Library cards; vocabulary sits with the model it feeds")
+    func instructionsAreNamedAndVocabularyMoves() {
+        let model = makeModel("settings-copy-instructions")
+        let general = elements(GeneralPane(), model: model)
+        let generalFields = general.filter { Self.textRoles.contains($0.role ?? "") }.map { $0.name ?? "unnamed" }
+        #expect(generalFields == ["Title instructions", "Summary instructions"])
+        let generalWords = general.flatMap(\.words)
+        #expect(!generalWords.contains("Custom instructions"), "\(generalWords)")
+        #expect(!generalWords.contains("Custom vocabulary"), "\(generalWords)")
+
+        let defaults = elements(TranscriptionDefaultsPane(), model: model)
+        let defaultsFields = defaults.filter { Self.textRoles.contains($0.role ?? "") }.map { $0.name ?? "unnamed" }
+        #expect(defaultsFields == ["Custom vocabulary"])
+        #expect(SettingsPaneScope.transcriptionDefaults.defaultsKeys.contains("initialPrompt"))
+        #expect(!SettingsPaneScope.general.defaultsKeys.contains("initialPrompt"))
+    }
 }

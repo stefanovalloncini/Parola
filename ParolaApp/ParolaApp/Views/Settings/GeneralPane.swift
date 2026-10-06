@@ -107,42 +107,26 @@ struct GeneralPane: View {
                     Toggle("", isOn: $model.showAISummaries).labelsHidden()
                         .axLeaf("General.Toggle.ShowAISummaries")
                 }
-            }
-
-            SettingsSection("Custom instructions") {
-                VStack(alignment: .leading, spacing: 8) {
-                    TextField("For example, mention the client's name.",
-                              text: $model.customTitlePrompt, axis: .vertical)
+                SettingRow("Title instructions",
+                           description: "Replaces the built-in title instructions when set.") {
+                    TextField("Title instructions", text: $model.customTitlePrompt,
+                              prompt: Text("For example, mention the client's name."), axis: .vertical)
+                        .labelsHidden()
                         .lineLimit(1...3)
                         .textFieldStyle(.roundedBorder)
+                        .frame(width: 260)
                         .axLeaf("General.TextField.CustomTitlePrompt")
-                    Text("Replaces the built-in title instructions when set.")
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
-                    TextField("For example, keep numbers and dates.",
-                              text: $model.customSummaryPrompt, axis: .vertical)
+                }
+                SettingRow("Summary instructions",
+                           description: "Replaces the built-in summary instructions when set.") {
+                    TextField("Summary instructions", text: $model.customSummaryPrompt,
+                              prompt: Text("For example, keep numbers and dates."), axis: .vertical)
+                        .labelsHidden()
                         .lineLimit(1...3)
                         .textFieldStyle(.roundedBorder)
+                        .frame(width: 260)
                         .axLeaf("General.TextField.CustomSummaryPrompt")
-                    Text("Replaces the built-in summary instructions when set.")
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
                 }
-                .padding(DS.Spacing.medium)
-            }
-
-            SettingsSection("Custom vocabulary") {
-                VStack(alignment: .leading, spacing: 8) {
-                    TextField("Names or jargon, comma-separated",
-                              text: $model.initialPrompt, axis: .vertical)
-                        .lineLimit(2...6)
-                        .textFieldStyle(.roundedBorder)
-                        .axLeaf("General.TextField.InitialPrompt")
-                    Text("A short list of names or jargon helps Whisper get unusual words right. Other engines ignore it.")
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
-                }
-                .padding(DS.Spacing.medium)
             }
             ResetPaneButton(scope: .general)
         }

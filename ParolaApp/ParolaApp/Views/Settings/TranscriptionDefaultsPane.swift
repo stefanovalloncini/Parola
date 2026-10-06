@@ -52,6 +52,22 @@ struct TranscriptionDefaultsPane: View {
             }
             SettingHelper(text: "The Library page shows these same settings; a change in either place persists.")
 
+            SettingsSection("Custom vocabulary") {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Custom vocabulary", text: $model.initialPrompt,
+                              prompt: Text("Names or jargon, comma-separated"), axis: .vertical)
+                        .labelsHidden()
+                        .lineLimit(2...6)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Custom vocabulary")
+                        .axLeaf("TranscriptionDefaults.TextField.InitialPrompt")
+                    Text("A short list of names or jargon helps Whisper get unusual words right. Other engines ignore it.")
+                        .font(DS.Font.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
+                }
+                .padding(DS.Spacing.medium)
+            }
+
             SettingsSection("Playback") {
                 SettingRow("Pause when app is hidden",
                            description: "Pauses the player when you switch to another app.",

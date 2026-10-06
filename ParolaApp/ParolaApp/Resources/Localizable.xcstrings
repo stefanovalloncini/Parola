@@ -15099,6 +15099,17 @@
         }
       }
     },
+    "Summary instructions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Istruzioni per il riassunto"
+          }
+        }
+      }
+    },
     "Summary, chat, chapters and action items": {
       "extractionState": "manual",
       "localizations": {
@@ -16223,6 +16234,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Titolo Z→A"
+          }
+        }
+      }
+    },
+    "Title instructions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Istruzioni per il titolo"
           }
         }
       }
