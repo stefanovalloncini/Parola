@@ -300,6 +300,7 @@ struct SessionCapsuleToolbarTests {
     private static let meter = "Toolbar.Meter.SessionLevel"
     private static let record = "Toolbar.Button.Record"
     private static let newMenu = "Toolbar.Menu.New"
+    private static let share = "Toolbar.Transcript.Menu.Share"
     private static let stageStop = "Stage.Button.Stop"
 
     private func host(_ model: AppModel, width: CGFloat = 1180) -> HostedWindow {
@@ -338,6 +339,51 @@ struct SessionCapsuleToolbarTests {
         let hiddenAgain = await waitUntil { element(Self.time, in: hosted) == nil && element(Self.stageStop, in: hosted) != nil }
         #expect(hiddenAgain)
         #expect(element(Self.stop, in: hosted) == nil)
+    }
+
+    @Test(
+        "on a transcript the capsule sits just after the transcript's controls, whole and inside the window",
+        arguments: [1180, MainWindowLayout.minimumWidth]
+    )
+    func besideTheTranscriptControls(width: CGFloat) async throws {
+        let audio = try tempWAV("capsule-transcript")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("capsule-transcript")
+        model.libraryLoaded = true
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "a take runs behind this transcript")],
+            language: "en",
+            modelName: "stub"
+        )
+        model.phase = .ready
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -60))
+        defer { model.endTestTake() }
+        model.route = .transcript
+        #expect(model.transcriptToolbarShows)
+        let hosted = host(model, width: width)
+        defer { hosted.close() }
+
+        let drawn = await waitUntil { element(Self.share, in: hosted) != nil && element(Self.stop, in: hosted) != nil }
+        try #require(drawn)
+        if SessionCapsule.showsMeter(windowWidth: width) {
+            let metered = await waitUntil { element(Self.meter, in: hosted) != nil }
+            #expect(metered)
+        } else {
+            await settle()
+            #expect(element(Self.meter, in: hosted) == nil)
+        }
+        let share = try #require(element(Self.share, in: hosted)).frame
+        let time = try #require(element(Self.time, in: hosted)).frame
+        let stop = try #require(element(Self.stop, in: hosted)).frame
+        let window = hosted.window.frame
+        let gap = time.minX - share.maxX
+        #expect(gap >= 0 && gap <= 32, "\(width) pt: \(gap) pt from Share (\(share)) to the capsule (\(time))")
+        #expect(stop.minX >= time.maxX - 0.5, "\(width) pt: time \(time), Stop \(stop)")
+        #expect(abs(stop.midY - time.midY) < 1 && abs(time.midY - share.midY) < 1, "\(width) pt: share \(share), time \(time), Stop \(stop)")
+        #expect(time.minX >= window.minX && stop.maxX <= window.maxX, "\(width) pt: capsule \(time)–\(stop) outside \(window)")
+        if let plus = element(Self.newMenu, in: hosted)?.frame, plus.width > 0 {
+            #expect(plus.minX >= stop.maxX, "\(width) pt: + at \(plus) over Stop at \(stop)")
+        }
     }
 }
 
