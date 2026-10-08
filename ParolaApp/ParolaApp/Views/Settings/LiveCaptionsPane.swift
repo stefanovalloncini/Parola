@@ -8,11 +8,7 @@ struct LiveCaptionsPane: View {
     var body: some View {
         @Bindable var model = model
         SettingsForm {
-            Text("Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.")
-                .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-            SettingsSection {
+            Section {
                 SettingRow("Live captions",
                            descriptionVerbatim: model.liveCaptionsUnavailableReason ?? String(localized: "Also in the Captions menu (⇧⌘L).")) {
                     Button(liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
@@ -35,6 +31,10 @@ struct LiveCaptionsPane: View {
                         .padding(.top, DS.Spacing.hair)
                         .axLeaf("LiveCaptions.Label.TranslateWarning")
                 }
+            } footer: {
+                Text("Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             ResetPaneButton(scope: .liveCaptions)
         }
