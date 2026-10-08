@@ -539,6 +539,8 @@ final class AppModel {
     }
     /// Set by the app delegate at launch; nil in tests, which have no activation policy to change.
     @ObservationIgnored var activationPolicyApplier: (@MainActor (NSApplication.ActivationPolicy) -> Void)?
+    /// Set by the app delegate at launch; nil in tests, which must not put a Settings window up.
+    @ObservationIgnored var settingsWindowOpener: (@MainActor () -> Void)?
     /// A headless launch has no UI to show, so neither half of the mode is applied to it.
     @ObservationIgnored var isHeadless = CommandLine.arguments.contains("--headless")
 

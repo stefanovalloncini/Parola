@@ -435,7 +435,7 @@ final class MenuBarController: NSObject {
 
     @objc private func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        model?.showSettingsWindow()
     }
 
     @objc private func checkForUpdates() {

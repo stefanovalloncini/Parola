@@ -57,11 +57,7 @@ extension ParolaAutomationServer {
                         }
                     }
                     NSApp.activate(ignoringOtherApps: true)
-                    if #available(macOS 14.0, *) {
-                        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                    } else {
-                        NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-                    }
+                    ctx.model.showSettingsWindow()
 
                     var settingsWin = NSApp.windows.first(where: { $0.isVisible && isSettingsWindow($0) })
                     var waitedMs = 0

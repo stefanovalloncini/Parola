@@ -106,6 +106,38 @@ struct SettingsPaneRoutingTests {
         #expect(model.settingsPane == "dictation")
     }
 
+    @Test("a settings link picks its pane, then asks for the window")
+    func settingsLinksOpenTheWindow() {
+        let model = makeModel(mode: .normal, features: nil)
+        let opened = OpenCount()
+        model.settingsWindowOpener = { opened.count += 1 }
+
+        model.openSettings(route: .prompts)
+
+        #expect(model.settingsPane == "prompts")
+        #expect(opened.count == 1)
+    }
+
+    @Test("the bridge asks for the window the same way")
+    func bridgeOpensTheWindow() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let opened = OpenCount()
+        model.settingsWindowOpener = { opened.count += 1 }
+
+        let command = try #require(commands["openSettings"])
+        let args = try command.validate(AutomationArgs(["pane": .string("exportFormats")]))
+        _ = try await command.handler(args, context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.settingsPane == "exportFormats")
+        #expect(opened.count == 1)
+    }
+
+    @MainActor
+    private final class OpenCount {
+        var count = 0
+    }
+
     @Test("test mode: setRoute settings renders the Settings preview in the main window")
     func setRouteSettingsEnablesPreviewInTestMode() async throws {
         let (model, server, context, commands) = try makeRig(mode: .test)

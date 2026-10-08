@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         takeAnnouncer.bind(model)
         playbackKeys.bind(model)
         model.activationPolicyApplier = { NSApp.setActivationPolicy($0) }
+        model.settingsWindowOpener = { SettingsWindowOpener.open() }
         model.applyAppVisibilityMode()
         if dictationSubscription == nil, Self.hearsDictationSignal(model.activeSideEffects) {
             dictationSubscription = DictationSignal.subscribe { [weak self] name in

@@ -855,7 +855,11 @@ extension AppModel {
     func openSettings(route: SettingsRoute) {
         commitPaletteDraft()
         settingsPane = route.rawValue
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        showSettingsWindow()
+    }
+
+    func showSettingsWindow() {
+        settingsWindowOpener?()
     }
 
     private func openPage(_ page: Route, keepingTranscript: Bool) {

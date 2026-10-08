@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import ParolaCore
 
@@ -47,10 +46,8 @@ struct EngineScene: View {
     }
 
     private var moreModelsLink: some View {
-        // A SettingsLink can't carry an action, and the pane has to be set before the window opens.
         Button {
-            model.settingsPane = SettingsRoute.localModels.rawValue
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            model.openSettings(route: .localModels)
         } label: {
             Text("More models in Settings")
                 .font(DS.Font.secondary)
