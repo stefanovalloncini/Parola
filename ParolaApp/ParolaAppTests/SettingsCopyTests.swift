@@ -94,6 +94,22 @@ struct SettingsCopyTests {
         }
     }
 
+    @Test("four row notes and Local Models' Storage header read in Italian")
+    func rowNotesAreTranslated() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        let keys = [
+            "Opens Parola automatically when you sign in.",
+            "Used for recording, dictation, and live captions.",
+            "Applies to new file, mic, batch, and YouTube transcriptions. Live captions has its own toggle; dictation always keeps the spoken language.",
+            "Automatic updates aren't available in this build.",
+            "Storage",
+        ]
+        for key in keys {
+            #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING", "\(key)")
+        }
+    }
+
     @Test("the service editor's Test is off while Keep AI on this Mac pauses the service, and the editor says why")
     func pausedServiceEditor() throws {
         let model = makeModel("settings-copy-paused-editor")

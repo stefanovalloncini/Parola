@@ -2123,6 +2123,17 @@
         }
       }
     },
+    "Applies to new file, mic, batch, and YouTube transcriptions. Live captions has its own toggle; dictation always keeps the spoken language.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vale per le nuove trascrizioni da file, microfono, batch e YouTube. I sottotitoli in tempo reale hanno un interruttore a parte; la dettatura resta sempre nella lingua parlata."
+          }
+        }
+      }
+    },
     "Apply translation to every new transcription unless overridden.": {
       "extractionState": "manual",
       "localizations": {
@@ -2476,6 +2487,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Auto-update"
+          }
+        }
+      }
+    },
+    "Automatic updates aren't available in this build.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gli aggiornamenti automatici non sono disponibili in questa build."
           }
         }
       }
@@ -10787,6 +10809,17 @@
         }
       }
     },
+    "Opens Parola automatically when you sign in.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apre Parola automaticamente quando accedi al Mac."
+          }
+        }
+      }
+    },
     "Options": {
       "extractionState": "manual",
       "localizations": {
@@ -18005,6 +18038,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Usato per registrare e come fallback della dettatura."
+          }
+        }
+      }
+    },
+    "Used for recording, dictation, and live captions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serve per registrare, dettare e per i sottotitoli in tempo reale."
           }
         }
       }
