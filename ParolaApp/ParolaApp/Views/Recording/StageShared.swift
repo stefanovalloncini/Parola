@@ -106,14 +106,19 @@ struct RecDot: View {
         return layerTime - (elapsed - elapsed.rounded(.down))
     }
 
+    /// How many times a second the light changes strength.
+    nonisolated static let pulseSteps = 15
+
     static func pulseAnimation(beginTime: CFTimeInterval) -> CAKeyframeAnimation {
-        let steps = 60
+        let steps = pulseSteps
         let animation = CAKeyframeAnimation(keyPath: "opacity")
-        animation.values = (0...steps).map { pulse(at: Double($0) / Double(steps)) }
+        // Held steps, so the render server redraws the light fifteen times a second rather than every frame.
+        animation.calculationMode = .discrete
+        animation.values = (0..<steps).map { pulse(at: Double($0) / Double(steps)) }
         animation.keyTimes = (0...steps).map { NSNumber(value: Double($0) / Double(steps)) }
         animation.duration = 1
         animation.repeatCount = .infinity
-        animation.preferredFrameRateRange = .stage
+        animation.preferredFrameRateRange = .pulse
         animation.beginTime = beginTime
         animation.isRemovedOnCompletion = false
         return animation
@@ -187,6 +192,8 @@ struct RecDot: View {
 extension CAFrameRateRange {
     /// What the Stage's render-server motion runs at: about thirty frames a second, the cadence it was filmed at.
     static let stage = CAFrameRateRange(minimum: 15, maximum: 60, preferred: 30)
+    /// What the recording light's pulse runs at: its own fifteen steps a second, never more.
+    static let pulse = CAFrameRateRange(minimum: 15, maximum: 15, preferred: 15)
 }
 
 private struct PulsingLight: NSViewRepresentable {

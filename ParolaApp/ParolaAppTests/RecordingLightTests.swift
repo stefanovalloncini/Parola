@@ -59,24 +59,33 @@ private func loopGap(_ a: Double, _ b: Double) -> Double {
 @Suite("Recording light")
 struct RecordingLightTests {
     @MainActor
-    @Test("the render server loops one second of the light's curve, full as the second turns and 35 % halfway, at about 30 frames a second")
+    @Test("the render server loops one second of the light's curve, full as the second turns and about 35 % halfway, in fifteen held steps")
     func pulseCurve() {
         let pulse = RecDot.pulseAnimation(beginTime: 0)
         let values = pulse.values as? [Double] ?? []
         let times = pulse.keyTimes?.map(\.doubleValue) ?? []
         let offCurve = zip(times, values).filter { abs(RecDot.pulse(at: $0) - $1) > 0.0001 }
+        let steps = zip(times.dropFirst(), times).map { $0 - $1 }
         #expect(pulse.keyPath == "opacity")
         #expect(pulse.duration == 1)
         #expect(pulse.repeatCount == .infinity)
-        #expect(pulse.preferredFrameRateRange == CAFrameRateRange(minimum: 15, maximum: 60, preferred: 30))
-        #expect(values.count == times.count)
-        #expect(values.count > 30)
+        #expect(pulse.calculationMode == .discrete, "each strength holds until the next step")
+        #expect(values.count == 15)
+        #expect(times.count == values.count + 1)
+        #expect(steps.allSatisfy { abs($0 - 1.0 / 15) < 0.000_001 }, "\(steps)")
         #expect(times.first == 0)
         #expect(times.last == 1)
         #expect(values.first == 1)
-        #expect(values.last == 1)
-        #expect(abs((values.min() ?? 0) - 0.35) < 0.0001)
+        #expect(abs((values.min() ?? 0) - 0.35) < 0.01)
         #expect(offCurve.isEmpty)
+    }
+
+    @MainActor
+    @Test("the light asks the render server for at most fifteen frames a second")
+    func pulseFrameRate() {
+        let range = RecDot.pulseAnimation(beginTime: 0).preferredFrameRateRange
+        #expect(range.maximum <= 15 && range.maximum > 0, "\(range)")
+        #expect(range.preferred.map { $0 <= 15 } ?? true, "\(range)")
     }
 
     @Test("the loop begins where the take's current second began, however far into the take the light is built")
