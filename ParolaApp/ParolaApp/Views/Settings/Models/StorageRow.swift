@@ -27,13 +27,10 @@ struct StorageRow: View {
                     .truncationMode(.middle)
                 Spacer()
                 Button("Reveal in Finder") { model.revealCacheDirectory() }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("LocalModels.Button.RevealFolder")
                 Button("Choose…") { chooseStorage() }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 if overridePath != nil {
                     Button("Use Default") { resetStorage() }
-                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 }
             }
             if let pendingPath {

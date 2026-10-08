@@ -50,7 +50,6 @@ struct ModelsSettingsPane: View {
                 Section { modelErrorBanner(error) }
             }
             usageCard
-            Section { controls }
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -142,31 +141,26 @@ struct ModelsSettingsPane: View {
     // MARK: - Controls
 
     private var controls: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                SearchPill(text: $searchText, placeholder: "Search models…", leaf: "Models.TextField.Search")
-                sortMenu
+        HStack(spacing: 8) {
+            SearchPill(text: $searchText, placeholder: "Search models…", leaf: "Models.TextField.Search")
+            Picker("Show", selection: $installFilter) {
+                ForEach(InstallFilter.allCases) { filter in
+                    Text(LocalizedStringKey(filter.label)).tag(filter)
+                }
             }
-            chipsRow
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .axLeaf("Models.Picker.Filter")
+            sortMenu
         }
     }
 
     /// Not private: a direct accessibility test hosts it alone, since the pane's own `.task` scan keeps it out of the blanket walk.
     var sortMenu: some View {
-        Menu {
+        RuleListSortMenu(title: "Sort: \(sortOption.label)", leaf: "ModelsSettings.Menu.Sort") {
             sortPicker
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
         }
-        .menuStyle(.button)
-        .buttonStyle(DSIconChipButtonStyle(side: 28))
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Sort: \(sortOption.label)")
-        .accessibilityRepresentation {
-            Menu("Sort") { sortPicker }
-        }
-        .axLeaf("ModelsSettings.Menu.Sort")
     }
 
     private var sortPicker: some View {
@@ -178,55 +172,42 @@ struct ModelsSettingsPane: View {
         .pickerStyle(.inline)
     }
 
-    private var chipsRow: some View {
-        HStack(spacing: 6) {
-            ForEach(InstallFilter.allCases) { filter in
-                Chip(
-                    title: LocalizedStringKey(filter.label),
-                    isSelected: installFilter == filter,
-                    size: .regular,
-                    weight: .semibold
-                ) {
-                    installFilter = filter
-                }
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
     // MARK: - Content
 
     @ViewBuilder
     private var content: some View {
         let sections = self.sections
+        let first = sections.firstList(installFilter: installFilter)
 
-        if sections.isEmpty {
+        if sections.isEmpty || first == nil {
             Section {
                 ContentUnavailableView.search(text: searchText)
                     .frame(maxWidth: .infinity)
+            } header: {
+                controls
             }
         } else {
             Group {
-                if !sections.installed.isEmpty || installFilter == .installed {
-                    downloadedSection(sections.installed)
+                if sections.showsInstalled(installFilter: installFilter) {
+                    downloadedSection(sections.installed, leads: first == .installed)
                 }
                 if !sections.earlier.isEmpty {
-                    earlierDownloadsSection(sections.earlier)
+                    earlierDownloadsSection(sections.earlier, leads: first == .earlier)
                 }
                 if !sections.orphans.isEmpty {
-                    orphansSection(sections.orphans)
+                    orphansSection(sections.orphans, leads: first == .orphans)
                 }
-                if !sections.recommended.isEmpty || installFilter == .available {
-                    recommendedSection(sections.recommended)
+                if sections.showsRecommended(installFilter: installFilter) {
+                    recommendedSection(sections.recommended, leads: first == .recommended)
                 }
                 if !sections.categories.isEmpty {
-                    categoriesSection(sections.categories)
+                    categoriesSection(sections.categories, leads: first == .categories)
                 }
             }
         }
     }
 
-    private func earlierDownloadsSection(_ copies: [SupersededCopy]) -> some View {
+    private func earlierDownloadsSection(_ copies: [SupersededCopy], leads: Bool) -> some View {
         Section {
                 ForEach(copies) { copy in
                     EarlierDownloadRow(copy: copy, isDeleting: model.isReclaiming(copy)) {
@@ -239,14 +220,14 @@ struct ModelsSettingsPane: View {
                     }
                 }
         } header: {
-            sectionHeader("Earlier downloads", count: copies.count)
+            sectionHeader("Earlier downloads", count: copies.count, leads: leads)
         } footer: {
             Text("Newer versions of these models replaced them, and Parola no longer uses them.")
                 .foregroundStyle(.secondary)
         }
     }
 
-    private func orphansSection(_ entries: [ModelInfo]) -> some View {
+    private func orphansSection(_ entries: [ModelInfo], leads: Bool) -> some View {
         Section {
                 ForEach(entries) { entry in
                     let displaySize = model.modelSizes[entry.name]
@@ -264,7 +245,7 @@ struct ModelsSettingsPane: View {
                     }
                 }
         } header: {
-            sectionHeader("Other files on disk", count: entries.count)
+            sectionHeader("Other files on disk", count: entries.count, leads: leads)
         } footer: {
             Text("These directories aren't in the current model catalog — usually leftovers from older app versions. Safe to delete.")
                 .foregroundStyle(.secondary)
@@ -273,7 +254,7 @@ struct ModelsSettingsPane: View {
 
     // MARK: - Downloaded
 
-    private func downloadedSection(_ variants: [ModelVariant]) -> some View {
+    private func downloadedSection(_ variants: [ModelVariant], leads: Bool) -> some View {
         Section {
             if variants.isEmpty {
                 DownloadedEmpty()
@@ -300,19 +281,19 @@ struct ModelsSettingsPane: View {
                     }
             }
         } header: {
-            sectionHeader("On This Mac", count: variants.count)
+            sectionHeader("On This Mac", count: variants.count, leads: leads)
         }
     }
 
     // MARK: - Recommended
 
-    private func recommendedSection(_ variants: [ModelVariant]) -> some View {
+    private func recommendedSection(_ variants: [ModelVariant], leads: Bool) -> some View {
         Section {
             ForEach(variants) { variant in
                 LiveRecommendedRow(variant: variant)
             }
         } header: {
-            sectionHeader("Recommended models", count: variants.count)
+            sectionHeader("Recommended models", count: variants.count, leads: leads)
         }
     }
 
@@ -336,13 +317,13 @@ struct ModelsSettingsPane: View {
 
     // MARK: - Categories
 
-    private func categoriesSection(_ categories: [ModelsCategory]) -> some View {
+    private func categoriesSection(_ categories: [ModelsCategory], leads: Bool) -> some View {
         Section {
             ForEach(categories) { category in
                 ModelCategoryRow(category: category)
             }
         } header: {
-            sectionHeader("Engine families", count: nil)
+            sectionHeader("Engine families", count: nil, leads: leads)
         }
     }
 
@@ -355,8 +336,28 @@ struct ModelsSettingsPane: View {
         var orphans: [ModelInfo] = []
         var earlier: [SupersededCopy] = []
 
+        enum List { case installed, earlier, orphans, recommended, categories }
+
         var isEmpty: Bool {
             installed.isEmpty && recommended.isEmpty && categories.isEmpty && orphans.isEmpty && earlier.isEmpty
+        }
+
+        func showsInstalled(installFilter: InstallFilter) -> Bool {
+            !installed.isEmpty || installFilter == .installed
+        }
+
+        func showsRecommended(installFilter: InstallFilter) -> Bool {
+            !recommended.isEmpty || installFilter == .available
+        }
+
+        /// The list drawn first, in the order the pane draws them; nil when the search leaves none.
+        func firstList(installFilter: InstallFilter) -> List? {
+            if showsInstalled(installFilter: installFilter) { return .installed }
+            if !earlier.isEmpty { return .earlier }
+            if !orphans.isEmpty { return .orphans }
+            if showsRecommended(installFilter: installFilter) { return .recommended }
+            if !categories.isEmpty { return .categories }
+            return nil
         }
     }
 
@@ -423,15 +424,21 @@ struct ModelsSettingsPane: View {
         }
     }
 
-    private func sectionHeader(_ title: LocalizedStringKey, count: Int?) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(title)
-            if let count, count > 0 {
-                Text(verbatim: AppFormat.integer(count))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+    /// The first list carries the search, filter and sort that narrow every list under it.
+    private func sectionHeader(_ title: LocalizedStringKey, count: Int?, leads: Bool) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+            if leads {
+                controls
             }
-            Spacer()
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(title)
+                if let count, count > 0 {
+                    Text(verbatim: AppFormat.integer(count))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
         }
     }
 }

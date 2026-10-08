@@ -28,7 +28,7 @@ struct EarlierDownloadRow: View {
                 Button(action: onDelete) {
                     Image(systemName: "trash")
                 }
-                .buttonStyle(GlyphButtonStyle())
+                .buttonStyle(.borderless)
                 .foregroundStyle(DS.Color.secondaryText)
                 .help("Delete this folder from disk")
                 .accessibilityLabel("Delete \(copy.displayName)")

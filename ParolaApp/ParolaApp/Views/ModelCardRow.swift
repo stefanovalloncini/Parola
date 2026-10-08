@@ -83,9 +83,8 @@ struct ModelCardRow: View {
                     if let deleteAction {
                         Button(action: deleteAction) {
                             Image(systemName: "trash")
-                                .font(DS.Font.bodyStrong)
                         }
-                        .buttonStyle(GlyphButtonStyle())
+                        .buttonStyle(.borderless)
                         .foregroundStyle(DS.Color.secondaryText)
                         .help("Delete this model from disk")
                         .accessibilityLabel("Delete \(variant.displayName)")
@@ -95,18 +94,13 @@ struct ModelCardRow: View {
                     Button(action: primaryAction) {
                         Text("Use as Default")
                     }
-                    .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                     .accessibilityIdentifier("model.\(variant.id).activate")
                     .axLeaf("Card.Button.Activate")
                 }
             case .available:
                 Button(action: primaryAction) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "arrow.down")
-                        Text("Download")
-                    }
+                    Label("Download", systemImage: "arrow.down")
                 }
-                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                 .disabled(downloadDisabled)
                 .help(downloadDisabled ? "Another model is downloading. Wait or cancel it first." : "")
                 .accessibilityIdentifier("model.\(variant.id).download")
@@ -123,7 +117,7 @@ struct ModelCardRow: View {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(DS.Color.secondaryText)
                         }
-                        .buttonStyle(GlyphButtonStyle())
+                        .buttonStyle(.borderless)
                         .help("Cancel this download")
                         .accessibilityLabel("Cancel download of \(variant.displayName)")
                         .axLeaf("Card.Button.CancelDownload")
