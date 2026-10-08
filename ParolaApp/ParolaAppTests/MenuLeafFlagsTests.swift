@@ -57,7 +57,7 @@ struct MenuLeafFlagsTests {
         #expect(model.hasMatches == false)
     }
 
-    /// Everything the menu bar, the content route, the toolbar and the transcript header decide from.
+    /// Everything the menu bar, the content route and the toolbar decide from.
     private func readMenusAndRoute(_ model: AppModel) {
         _ = HelpCommands(model: model, showShortcuts: {}).body
         _ = FileCommands(model: model).body

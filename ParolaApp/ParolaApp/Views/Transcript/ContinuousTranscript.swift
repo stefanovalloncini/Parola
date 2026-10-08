@@ -69,6 +69,7 @@ struct ContinuousChunks: View {
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: DS.Spacing.regular) {
+            TranscriptTitleHeading()
             ForEach(chunks) { chunk in
                 chunkRow(chunk)
                     .id(chunk.id)

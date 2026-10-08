@@ -1,7 +1,7 @@
 import SwiftUI
 import ParolaCore
 
-/// The transcript's one way back: to the list it was opened from, or the whole library when it was opened from nowhere.
+/// The transcript's one way back, at the toolbar's leading edge: to the list it was opened from, or the whole library when it was opened from nowhere.
 struct TranscriptBackLink: View {
     @Environment(AppModel.self) private var model
 
@@ -13,36 +13,16 @@ struct TranscriptBackLink: View {
     }
 
     var body: some View {
+        let help = TranscriptBackCopy.help(for: origin, personName: personName)
         Button { model.returnToOrigin() } label: {
-            HStack(spacing: DS.Spacing.hair) {
-                Image(systemName: "chevron.left")
-                Text(TranscriptBackCopy.name(for: origin, personName: personName))
-                    .lineLimit(1)
-            }
-            .font(DS.Font.secondary)
-            .foregroundStyle(DS.Color.secondaryText)
+            Label(help, systemImage: "chevron.left")
         }
-        .buttonStyle(DSIconChipButtonStyle(fitsLabel: true))
-        .modifier(BackHelpModifier(text: TranscriptBackCopy.help(for: origin, personName: personName)))
-        .axLeaf("HeaderBar.Button.Back")
-    }
-}
-
-private struct BackHelpModifier: ViewModifier {
-    let text: String
-
-    func body(content: Content) -> some View {
-        content.help(text).accessibilityLabel(text)
+        .help(help)
+        .axLeaf("Toolbar.Transcript.Button.Back")
     }
 }
 
 enum TranscriptBackCopy {
-    /// The link's own words: the place the list was, and a person's page by the person's name.
-    static func name(for origin: LibraryOrigin, personName: String?, bundle: Bundle = .main) -> String {
-        if case .person = origin, let personName { return personName }
-        return String(localized: String.LocalizationValue(origin.name), bundle: bundle)
-    }
-
     /// Whole sentences per destination: Italian needs the article, which an interpolated name cannot carry; a person's name takes none.
     static func help(for origin: LibraryOrigin, personName: String? = nil, bundle: Bundle = .main) -> String {
         switch origin {

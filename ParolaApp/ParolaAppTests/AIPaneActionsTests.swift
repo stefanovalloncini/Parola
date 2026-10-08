@@ -109,16 +109,13 @@ struct AIPaneActionsTests {
         #expect(!model.isExtractingActionItems)
     }
 
-    @Test("a running prompt can be stopped from the Prompts menu, which stays open to it")
+    @Test("a running prompt can be stopped from Ask AI, which stays open to it")
     func promptRunStops() throws {
-        let path = #filePath.replacingOccurrences(
-            of: "ParolaAppTests/AIPaneActionsTests.swift",
-            with: "ParolaApp/Views/PromptsMenu.swift"
-        )
-        let menu = try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let menu = try source("Views/AskAIMenu")
         #expect(menu.contains(#"Button("Stop Prompt") { model.stopAIRun(.prompt) }"#))
-        let header = try String(contentsOfFile: path.replacingOccurrences(of: "PromptsMenu", with: "Transcript/TranscriptHeaderBar"), encoding: .utf8)
-        #expect(!header.contains(".disabled(model.isRunningPrompt)"))
+        #expect(!menu.contains(".disabled(model.isRunningPrompt)"))
+        let toolbar = try source("Views/Transcript/TranscriptToolbar")
+        #expect(!toolbar.contains(".disabled(model.isRunningPrompt)"))
     }
 
     @Test("a chat reply can be stopped, and a new message waits until the reply ends")
@@ -181,12 +178,8 @@ struct AIPaneActionsTests {
         let offeredOnFailure = failureIDs.contains { $0.hasSuffix("OpenAISettings") }
         #expect(!offeredOnFailure)
 
-        let path = #filePath.replacingOccurrences(
-            of: "ParolaAppTests/AIPaneActionsTests.swift",
-            with: "ParolaApp/Views/PromptsMenu.swift"
-        )
-        let menu = try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        #expect(menu.contains(#"Text(verbatim: reason) OpenAISettingsButton(leaf: "HeaderBar.MenuItem.OpenAISettings")"#))
+        let menu = try source("Views/AskAIMenu")
+        #expect(menu.contains(#"Text(verbatim: reason) OpenAISettingsButton(leaf: "Toolbar.Transcript.MenuItem.OpenAISettings")"#))
     }
 
     private func source(_ name: String) throws -> String {
@@ -194,18 +187,18 @@ struct AIPaneActionsTests {
         return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
-    @Test("each AI action keeps one verb: the first run's, then Regenerate or Again, in the panes and the ✨ menu")
+    @Test("each AI action keeps one verb: the first run's, then Regenerate or Again, in the panes and Ask AI")
     func aiActionsShareOneVerb() throws {
         let empty = try source("Views/Summary/SummaryEmpty")
         #expect(!empty.contains("onGenerate"))
         #expect(empty.contains("Choose Summarize"))
         let column = try source("Views/Summary/SummaryOptionsColumn")
         #expect(column.contains(#"String(localized: "Summarize") : String(localized: "Regenerate")"#))
-        let header = try source("Views/Transcript/TranscriptHeaderBar")
-        #expect(header.contains(#"model.smartChapters.isEmpty ? String(localized: "Generate Chapters") : String(localized: "Regenerate Chapters")"#))
-        #expect(header.contains(#"Button("Find Action Items") { runInInspector(model.extractActionItems) }"#))
-        #expect(!header.contains(#"Button("Chapters")"#))
-        #expect(!header.contains(#"Button("Action Items")"#))
+        let askAI = try source("Views/AskAIMenu")
+        #expect(askAI.contains(#"model.smartChapters.isEmpty ? String(localized: "Generate Chapters") : String(localized: "Regenerate Chapters")"#))
+        #expect(askAI.contains(#"Button("Find Action Items") { runInInspector(model.extractActionItems) }"#))
+        #expect(!askAI.contains(#"Button("Chapters")"#))
+        #expect(!askAI.contains(#"Button("Action Items")"#))
         let chapters = try source("Views/Transcript/ChaptersSection")
         #expect(chapters.contains(#"Button("Generate Chapters")"#))
         #expect(chapters.contains(#"Button("Regenerate")"#))

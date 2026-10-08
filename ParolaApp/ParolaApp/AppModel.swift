@@ -758,7 +758,7 @@ final class AppModel {
     var findFocusRequests: Int = 0
     /// Bumped by Edit › Find… while Chat shows; the chat pane opens its message filter on each.
     var chatSearchRequests: Int = 0
-    /// Bumped by the Transcript menu; the header bar opens the matching popover on each.
+    /// Bumped by the Transcript menu and the title's Rename…; the transcript page opens the matching popover or alert on each.
     var jumpToTimeRequests: Int = 0
     var outlineRequests: Int = 0
     var renameRequests: Int = 0

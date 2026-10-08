@@ -77,9 +77,6 @@ struct TranscriptPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TranscriptHeaderBar(title: model.transcriptHeaderTitle, inspectorVisible: inspectorVisibleBinding)
-            Divider()
-
             if model.transcriptFindBarShows {
                 FindBar()
             }
@@ -141,6 +138,7 @@ struct TranscriptPane: View {
             }
         }
         .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: model.visibleDeliveryNotice)
+        .modifier(TranscriptMenuPopovers())
     }
 
     @ViewBuilder

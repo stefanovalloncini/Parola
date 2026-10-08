@@ -274,7 +274,7 @@ struct LibraryOriginTests {
         #expect(sidebar(model) == .library)
     }
 
-    @Test("back from an entry opened on a person's page shows that person's page, and the link names them")
+    @Test("back from an entry opened on a person's page shows that person's page, and Back names them")
     func backToAPerson() async throws {
         let model = makeModel()
         await model.addPerson(named: "Giulia Rossi")
@@ -284,9 +284,8 @@ struct LibraryOriginTests {
         #expect(await openEntry(entry.id, in: model))
 
         #expect(model.transcriptOrigin == .person(giulia.id))
-        let name = TranscriptBackCopy.name(for: .person(giulia.id), personName: model.person(id: giulia.id)?.name)
-        #expect(name == "Giulia Rossi")
-        #expect(TranscriptBackCopy.help(for: .person(giulia.id), personName: "Giulia Rossi") == "Back to Giulia Rossi")
+        let name = model.person(id: giulia.id)?.name
+        #expect(TranscriptBackCopy.help(for: .person(giulia.id), personName: name) == "Back to Giulia Rossi")
 
         #expect(await goBack(in: model))
 
@@ -297,9 +296,8 @@ struct LibraryOriginTests {
         #expect(SidebarSelection.place(of: model.sidebarPage) == .person(giulia.id))
     }
 
-    @Test("a person who left the directory sends the link back to the Library's words")
+    @Test("a person who left the directory sends Back to the Library's words")
     func personWithoutAName() {
-        #expect(TranscriptBackCopy.name(for: .person(UUID()), personName: nil) == "Library")
         #expect(TranscriptBackCopy.help(for: .person(UUID()), personName: nil) == "Back to Library")
     }
 
@@ -513,11 +511,6 @@ struct LibraryOriginTests {
         #expect(TranscriptBackCopy.help(for: .search, bundle: italian) == "Torna ai risultati")
         #expect(TranscriptBackCopy.help(for: .all, bundle: italian) == "Torna alla libreria")
         #expect(TranscriptBackCopy.help(for: .person(UUID()), personName: "Giulia Rossi", bundle: italian) == "Torna a Giulia Rossi")
-    }
-
-    @Test("the link back to the whole library reads as the sidebar row does")
-    func linkNamesTheLibrary() {
-        #expect(LibraryOrigin.all.name == "Library")
     }
 
     // MARK: - Bridge

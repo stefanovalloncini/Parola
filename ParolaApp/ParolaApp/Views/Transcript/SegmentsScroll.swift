@@ -57,6 +57,7 @@ struct SegmentsScroll: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
                     if model.transcript != nil {
+                        TranscriptTitleHeading()
                         let speakers = model.transcriptSpeakers
                         let translations = model.transcript?.translation?.segments ?? [:]
                         if speakers.count >= 2 {

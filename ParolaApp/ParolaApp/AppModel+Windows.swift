@@ -113,6 +113,12 @@ extension AppModel {
         route == .transcript && hasTranscript && !isBrowsingLibrary
     }
 
+    /// The transcript page itself is up, not a run over it or the test Settings preview, so the toolbar carries its controls.
+    var transcriptToolbarShows: Bool {
+        guard transcriptIsOnScreen, case .ready = transcriptRoutePhase else { return false }
+        return !(mode == .test && settingsRoutePreview)
+    }
+
     /// With no transcript in front, ⌘F goes to the page's search field, as in Finder and Mail.
     var findCommandEnabled: Bool {
         if let session = keyViewerSession { return session.transcript != nil }

@@ -1,0 +1,222 @@
+import AppKit
+import Foundation
+import SwiftUI
+import Testing
+import ParolaCore
+@testable import Parola
+import ParolaTestSupport
+
+@MainActor
+@Suite("Transcript toolbar", .serialized)
+struct TranscriptToolbarTests {
+    private static let back = "Toolbar.Transcript.Button.Back"
+    private static let panes = "Toolbar.Transcript.Picker.PaneMode"
+    private static let format = "Toolbar.Transcript.Menu.Format"
+    private static let readAloud = "Toolbar.Transcript.Button.ReadAloud"
+    private static let askAI = "Toolbar.Transcript.Menu.AskAI"
+    private static let share = "Toolbar.Transcript.Menu.Share"
+    private static let inspector = "Toolbar.Transcript.Button.Inspector"
+    private static let controls = [back, panes, format, readAloud, askAI, share, inspector]
+
+    private func withIsolatedDefaults(_ body: (UserDefaults) async throws -> Void) async rethrows {
+        let previous = DefaultsStore.current
+        let suite = temporaryDefaults("test-transcript-toolbar-")
+        DefaultsStore.current = suite
+        defer { DefaultsStore.current = previous }
+        try await body(suite)
+    }
+
+    private func makeModel(
+        _ defaults: UserDefaults,
+        features: Set<ParolaFeature> = Set(ParolaFeature.allCases),
+        loaded: Bool = true
+    ) -> AppModel {
+        let model = AppModel(
+            skipBootstrap: true,
+            defaults: defaults,
+            libraryURL: makeTempLibraryURL("transcript-toolbar"),
+            features: features
+        )
+        model.libraryLoaded = true
+        if loaded { load(model) }
+        return model
+    }
+
+    private func load(_ model: AppModel) {
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "one toolbar on a transcript")],
+            language: "en",
+            modelName: "stub"
+        )
+        model.phase = .ready
+    }
+
+    private func host(_ model: AppModel, width: CGFloat = 1180) -> HostedWindow {
+        HostedWindow(ContentView().environment(model), width: width, height: MainWindowLayout.minimumHeight, toolbar: true)
+    }
+
+    private func toolbarIDs(_ hosted: HostedWindow) -> [String] {
+        hosted.host.layoutSubtreeIfNeeded()
+        return HostedAccessibility.elements(in: hosted.window).compactMap(\.identifier)
+    }
+
+    private func element(_ leaf: String, in hosted: HostedWindow) -> HostedAccessibility.Element? {
+        HostedAccessibility.elements(in: hosted.window).first { $0.identifier?.hasSuffix(leaf) == true }
+    }
+
+    private func shows(_ leaf: String, in ids: [String]) -> Bool {
+        ids.contains { $0.hasSuffix(leaf) }
+    }
+
+    @Test("a transcript's controls sit in the window toolbar, and there is no second bar under it")
+    func controlsLiveInTheWindowToolbar() async {
+        await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            let hosted = host(model)
+            defer { hosted.close() }
+            let drawn = await waitUntil { shows(Self.inspector, in: toolbarIDs(hosted)) }
+            #expect(drawn)
+            let ids = toolbarIDs(hosted)
+            for leaf in Self.controls {
+                #expect(shows(leaf, in: ids), "no \(leaf)")
+            }
+            let content = HostedAccessibility.elements(in: hosted.host).compactMap(\.identifier)
+            for leaf in Self.controls {
+                #expect(!shows(leaf, in: content), "\(leaf) is in the page, not the toolbar")
+            }
+            let headerBar = ids.filter { $0.contains("HeaderBar") }
+            #expect(headerBar.isEmpty, "still there: \(headerBar)")
+        }
+    }
+
+    @Test("only a transcript on screen puts its controls in the toolbar")
+    func onlyATranscriptGetsThem() async {
+        await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, loaded: false)
+            let hosted = host(model)
+            defer { hosted.close() }
+            await settle()
+            let onLibrary = Self.controls.filter { shows($0, in: toolbarIDs(hosted)) }
+            #expect(onLibrary.isEmpty, "on the library page: \(onLibrary)")
+
+            load(model)
+            let arrived = await waitUntil { shows(Self.format, in: toolbarIDs(hosted)) }
+            #expect(arrived)
+
+            model.route = .queue
+            await settle()
+            let onQueue = Self.controls.filter { shows($0, in: toolbarIDs(hosted)) }
+            #expect(onQueue.isEmpty, "on the queue: \(onQueue)")
+        }
+    }
+
+    @Test("with AI off there is no pane switch and no Ask AI; the rest stay")
+    func aiOffDropsThePaneSwitchAndAskAI() async {
+        await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, features: Set(ParolaFeature.allCases).subtracting([.ai]))
+            let hosted = host(model)
+            defer { hosted.close() }
+            let drawn = await waitUntil { shows(Self.format, in: toolbarIDs(hosted)) }
+            #expect(drawn)
+            let ids = toolbarIDs(hosted)
+            #expect(!shows(Self.panes, in: ids))
+            #expect(!shows(Self.askAI, in: ids))
+            for leaf in [Self.back, Self.readAloud, Self.share, Self.inspector] {
+                #expect(shows(leaf, in: ids), "no \(leaf)")
+            }
+        }
+    }
+
+    @Test("Aa is off on Summary and Chat, which have no text to lay out")
+    func formatIsOffOutsideTheTranscript() async {
+        await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            let hosted = host(model)
+            defer { hosted.close() }
+            let drawn = await waitUntil { element(Self.format, in: hosted) != nil }
+            #expect(drawn)
+            #expect(element(Self.format, in: hosted)?.isEnabled == true)
+            for mode in [AppModel.TranscriptPaneMode.summary, .chat] {
+                model.setTranscriptPaneMode(mode)
+                let off = await waitUntil { element(Self.format, in: hosted)?.isEnabled == false }
+                #expect(off, "Aa still on in \(mode)")
+            }
+        }
+    }
+
+    @Test("Aa's Compact Text is off in Segments, which it doesn't change, and Subtitle Warnings works only there")
+    func formatItemsFollowTheLayout() async {
+        await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            let hosted = HostedWindow(VStack { TranscriptFormatItems() }.environment(model), width: 420, height: 320)
+            defer { hosted.close() }
+            @MainActor func enabled(_ leaf: String) -> Bool? {
+                HostedAccessibility.elements(in: hosted.host).first { $0.identifier?.hasSuffix(leaf) == true }?.isEnabled
+            }
+            #expect(enabled("MenuItem.CompactText") == true)
+            #expect(enabled("MenuItem.SubtitleWarnings") == false)
+            #expect(enabled("MenuItem.TranslationSideBySide") == false, "no translation to show beside it")
+            model.transcriptDisplayMode = .segments
+            let flipped = await waitUntil { enabled("MenuItem.CompactText") == false }
+            #expect(flipped)
+            #expect(enabled("MenuItem.SubtitleWarnings") == true)
+        }
+    }
+
+    @Test("Back names where it goes and takes the transcript back there")
+    func backReturnsToTheList() async {
+        await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            let hosted = host(model)
+            defer { hosted.close() }
+            let drawn = await waitUntil { element(Self.back, in: hosted) != nil }
+            #expect(drawn)
+            #expect(element(Self.back, in: hosted)?.name == "Back to Library")
+            #expect(HostedAccessibility.press(endingWith: Self.back, in: hosted.window))
+            let back = await waitUntil { model.transcript == nil }
+            #expect(back)
+            #expect(model.isBrowsingLibrary)
+        }
+    }
+
+    @Test("a hidden inspector comes back from the toolbar, at either width", arguments: [1400, 1040] as [CGFloat])
+    func toolbarTogglesTheInspector(width: CGFloat) async {
+        await withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: InspectorVisibility.preferenceKey)
+            let model = makeModel(defaults)
+            let hosted = host(model, width: width)
+            defer { hosted.close() }
+            let drawn = await waitUntil { element(Self.inspector, in: hosted) != nil }
+            #expect(drawn)
+            #expect(model.transcriptPaneIsNarrow == (width < 1100))
+            #expect(!hasInspectorColumn(hosted.host))
+            #expect(element(Self.inspector, in: hosted)?.name == "Show Inspector")
+
+            #expect(HostedAccessibility.press(endingWith: Self.inspector, in: hosted.window))
+            let shown = await waitUntil { hasInspectorColumn(hosted.host) }
+            #expect(shown)
+            let renamed = await waitUntil { element(Self.inspector, in: hosted)?.name == "Hide Inspector" }
+            #expect(renamed)
+
+            #expect(HostedAccessibility.press(endingWith: Self.inspector, in: hosted.window))
+            let hidden = await waitUntil { !hasInspectorColumn(hosted.host) }
+            #expect(hidden)
+        }
+    }
+
+    private func hasInspectorColumn(_ host: NSView) -> Bool {
+        host.layoutSubtreeIfNeeded()
+        var found = false
+        func walk(_ view: NSView) {
+            for sub in view.subviews {
+                let frame = sub.convert(sub.bounds, to: host)
+                if abs(frame.width - MainWindowLayout.inspectorWidth) < 0.5, abs(frame.maxX - host.bounds.width) < 0.5 {
+                    found = true
+                }
+                walk(sub)
+            }
+        }
+        walk(host)
+        return found
+    }
+}

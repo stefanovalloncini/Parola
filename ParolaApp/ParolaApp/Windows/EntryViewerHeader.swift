@@ -68,3 +68,20 @@ struct EntryViewerHeader: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
+
+/// The transcript's language as the viewer shows it: its code in a pill, its name for VoiceOver.
+struct LanguagePill: View {
+    let language: String?
+
+    var body: some View {
+        if let code = LanguageDisplay.code(for: language) {
+            Text(verbatim: code)
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.accentInk)
+                .padding(.horizontal, DS.Spacing.snug)
+                .padding(.vertical, DS.Spacing.hair)
+                .background(Capsule().fill(DS.Color.accentWash))
+                .accessibilityLabel(Text(verbatim: LanguageDisplay.name(for: language) ?? code))
+        }
+    }
+}

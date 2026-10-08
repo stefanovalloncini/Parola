@@ -32,7 +32,7 @@ struct EntryTitle: Equatable, Sendable {
     var source: TitleSource?
 }
 
-/// The list a transcript was opened from, so the header can offer the way back.
+/// The list a transcript was opened from, so the toolbar's Back can go there.
 enum LibraryOrigin: Equatable {
     case all
     case category(EntryCategory)
@@ -49,15 +49,6 @@ enum LibraryOrigin: Equatable {
         case .category(let category)?: return .category(category)
         case .person(let id)?: return .person(id)
         case .recording?, .activity?, .recentlyDeleted?, nil: return nil
-        }
-    }
-
-    /// The source key, so the back link can show it and say "Back to <name>"; a person's page goes by the person's name instead.
-    var name: String {
-        switch self {
-        case .all, .person: return "Library"
-        case .category(let category): return libraryCategoryName(category)
-        case .search: return "Results"
         }
     }
 
@@ -709,7 +700,7 @@ extension AppModel {
                 guard generation == loadEntryGeneration else { throw CancellationError() }
                 // Recently Deleted reads trashed bundles on purpose; opening one here would send its edits into the trash.
                 guard loaded.entry.deletedAt == nil else { throw LibraryStore.LibraryError.inTrash(id) }
-                // Opened before the library's list has it, as Spotlight or Shortcuts can at launch: Transcribe Again and the header read the list.
+                // Opened before the library's list has it, as Spotlight or Shortcuts can at launch: Transcribe Again and the title read the list.
                 if libraryEntry(id: id) == nil { landLibraryEntry(loaded.entry) }
                 installStoredTranscript(loaded.document.transcript)
                 closeFind()
@@ -792,7 +783,7 @@ extension AppModel {
         libraryOriginEntryID = nil
     }
 
-    /// The transcript header's back link: leaves the list the entry was opened from exactly as it was.
+    /// The transcript toolbar's Back: leaves the list the entry was opened from exactly as it was.
     func returnToOrigin() {
         switch transcriptOrigin {
         case .category(let category):

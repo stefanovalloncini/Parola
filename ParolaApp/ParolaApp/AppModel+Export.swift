@@ -216,7 +216,7 @@ extension AppModel {
         )
     }
 
-    /// The header's name while the main window shows a transcript; nil on any other page.
+    /// The transcript's name while the main window shows it; nil on any other page.
     var shownTranscriptTitle: String? {
         guard route == .transcript, hasTranscript, !isBrowsingLibrary, case .ready = transcriptRoutePhase else { return nil }
         return transcriptHeaderTitle

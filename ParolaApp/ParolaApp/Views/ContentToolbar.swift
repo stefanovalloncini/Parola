@@ -11,16 +11,31 @@ struct ContentToolbar: ToolbarContent {
             }
             .sharedBackgroundVisibility(.hidden)
         }
+        if model.transcriptToolbarShows {
+            TranscriptLeadingItems()
+        }
         ToolbarSpacer(.flexible)
+        if model.transcriptToolbarShows {
+            TranscriptActionItems()
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+        }
         if RecordControl.primarySource(features: model.features) != nil {
             // Its own item with no shared glass behind it, so the red capsule isn't set inside a second pill.
             ToolbarItem(placement: .primaryAction) {
                 RecordControl()
             }
             .sharedBackgroundVisibility(.hidden)
+            .keepsOutOfOverflow()
         }
         ToolbarItem(placement: .primaryAction) {
             newMenu
+        }
+        .foldsFirst()
+        if model.transcriptToolbarShows {
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+            ToolbarItem(placement: .primaryAction) {
+                InspectorToolbarToggle()
+            }
         }
     }
 
@@ -77,5 +92,27 @@ struct NewMenuItems: View {
             }
         }
         .labelStyle(.titleAndIcon)
+    }
+}
+
+extension ToolbarContent {
+    /// Folded into » first when the window is narrow; File repeats everything in +.
+    @ToolbarContentBuilder
+    func foldsFirst() -> some ToolbarContent {
+        if #available(macOS 26.1, *) {
+            visibilityPriority(.low)
+        } else {
+            self
+        }
+    }
+
+    /// Folded into » last.
+    @ToolbarContentBuilder
+    func keepsOutOfOverflow() -> some ToolbarContent {
+        if #available(macOS 26.1, *) {
+            visibilityPriority(.high)
+        } else {
+            self
+        }
     }
 }
