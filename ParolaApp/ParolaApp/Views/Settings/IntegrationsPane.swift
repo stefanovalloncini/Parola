@@ -71,13 +71,11 @@ private struct ToolStatusRow: View {
                         installButton
                     } else if installChoice == .download {
                         Button("Get yt-dlp") { NSWorkspace.shared.open(SupportLinks.ytDlpReleases) }
-                            .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                             .axLeaf("Integrations.Button.Download.\(name)")
                     } else if isStale, case .homebrew? = updateRoute {
                         updateButton
                         if updating {
                             Button("Cancel", action: cancelUpdate)
-                                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                                 .axLeaf("Integrations.Button.CancelUpdate.\(name)")
                         }
                     }
@@ -155,7 +153,6 @@ private struct ToolStatusRow: View {
                 Label("Install with Homebrew", systemImage: "arrow.down.circle")
             }
         }
-        .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
         .disabled(installing)
         .axLeaf("Integrations.Button.Install.\(name)")
     }
@@ -171,7 +168,6 @@ private struct ToolStatusRow: View {
                 Label("Update with Homebrew", systemImage: "arrow.triangle.2.circlepath")
             }
         }
-        .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
         .disabled(updating)
         .axLeaf("Integrations.Button.Update.\(name)")
     }
@@ -209,7 +205,6 @@ struct YtDlpManualUpdate: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(command, forType: .string)
                 }
-                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf("\(axPrefix).Button.CopyYtDlpUpdateCommand")
             }
         }

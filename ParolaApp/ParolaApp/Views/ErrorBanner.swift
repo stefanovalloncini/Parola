@@ -92,6 +92,7 @@ struct ErrorBanner: View {
             .axLeaf("Error.Label.YtDlpUpdated")
         case .command(let command):
             YtDlpManualUpdate(command: command, axPrefix: "Error")
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
         case .manual:
             YtDlpManualUpdate(command: nil, axPrefix: "Error")
         case .update:

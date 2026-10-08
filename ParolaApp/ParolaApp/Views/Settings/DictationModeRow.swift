@@ -6,21 +6,14 @@ struct DictationModeRow: View {
     @Binding var selectedID: String
 
     var body: some View {
-        HStack(spacing: 6) {
+        Picker("Cleanup style", selection: $selectedID) {
             ForEach(DictationModePreset.builtIns) { preset in
-                let targetID = preset.promptID?.uuidString ?? ""
-                Chip(
-                    title: LocalizedStringKey(preset.name),
-                    isSelected: selectedID == targetID,
-                    size: .prominent,
-                    style: .subtle,
-                    selectedFill: DS.Color.selectionProminent
-                ) {
-                    selectedID = targetID
-                }
-                .accessibilityLabel("\(preset.name) dictation mode")
+                Text(LocalizedStringKey(preset.name)).tag(preset.promptID?.uuidString ?? "")
             }
-            Spacer(minLength: 0)
         }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .axLeaf("Dictation.Picker.CleanupStyle")
     }
 }

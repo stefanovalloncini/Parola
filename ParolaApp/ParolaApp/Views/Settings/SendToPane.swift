@@ -135,7 +135,6 @@ private struct DestinationRow: View {
                 .help("Move down")
                 .axLeaf(leaf("Button.MoveDown"))
                 Button("Edit…", action: onEdit)
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf(leaf("Button.Edit"))
             }
         }
@@ -151,7 +150,7 @@ private struct DestinationRow: View {
             .axLeaf(leaf("Toggle.AutoSend"))
 
             ForEach(EntryCategory.allCases, id: \.self) { category in
-                CategoryChip(
+                CategoryToggle(
                     category: category,
                     isSelected: stored.categories.contains(category),
                     leaf: leaf("Chip.Category.\(category.rawValue)"),
@@ -223,19 +222,16 @@ private struct DestinationRow: View {
     }
 }
 
-/// Its own view so the chip's ax id resolves against the pane's branch, the way every leaf does.
-private struct CategoryChip: View {
+/// Its own view so the toggle's ax id resolves against the pane's branch, the way every leaf does.
+private struct CategoryToggle: View {
     let category: EntryCategory
     let isSelected: Bool
     let leaf: String
     let toggle: () -> Void
 
     var body: some View {
-        Chip(
-            title: LocalizedStringKey(libraryCategoryName(category)),
-            isSelected: isSelected,
-            action: toggle
-        )
-        .axLeaf(leaf)
+        Toggle(LocalizedStringKey(libraryCategoryName(category)), isOn: Binding(get: { isSelected }, set: { _ in toggle() }))
+            .toggleStyle(.button)
+            .axLeaf(leaf)
     }
 }

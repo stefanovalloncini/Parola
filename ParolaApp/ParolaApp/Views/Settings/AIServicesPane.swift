@@ -308,11 +308,9 @@ private struct AIServiceRow: View {
             Spacer(minLength: 8)
             if isTesting { ProgressView().controlSize(.small) }
             Button("Test", action: onTest)
-                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .disabled(isTesting || isPaused)
                 .axLeaf(leaf("Button.Test"))
             Button("Edit…", action: onEdit)
-                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf(leaf("Button.Edit"))
             Button(role: .destructive, action: onRemove) {
                 Image(systemName: "trash")

@@ -13,7 +13,6 @@ struct PeoplePane: View {
                     Button("Open Transcription Defaults") {
                         model.settingsPane = SettingsRoute.transcriptionDefaults.rawValue
                     }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("People.Button.TranscriptionDefaults")
                 }
                 SettingRow("Show most used people in the sidebar",

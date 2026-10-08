@@ -31,7 +31,6 @@ struct UpdatesPane: View {
                         Button("Check for Updates…") {
                             SparkleUpdater.shared.checkForUpdates()
                         }
-                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                         .axLeaf("Updates.Button.CheckNow")
                     }
                 }
@@ -44,7 +43,6 @@ struct UpdatesPane: View {
                         Button("Open Releases Page") {
                             NSWorkspace.shared.open(SupportLinks.releases)
                         }
-                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                         .axLeaf("Updates.Button.Releases")
                     }
                 }

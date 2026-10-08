@@ -68,7 +68,6 @@ struct DictationPane: View {
                     Button("Change…") {
                         model.settingsPane = SettingsRoute.transcriptionDefaults.rawValue
                     }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("Dictation.Button.ChangeModel")
                 }
             }

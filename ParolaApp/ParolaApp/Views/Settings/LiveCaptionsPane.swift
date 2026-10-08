@@ -14,7 +14,6 @@ struct LiveCaptionsPane: View {
                     Button(liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
                         model.toggleLiveCaptions()
                     }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .disabled(!liveCaptions.isActive && model.liveCaptionsUnavailableReason != nil)
                     .axLeaf("LiveCaptions.Button.StartStop")
                 }

@@ -23,6 +23,19 @@ struct SettingsNativeControlsTests {
         "Views/Settings/Models/UsageRow",
     ]
 
+    /// Every file Settings draws from: the panes, their rows and editors, and the Local Models files outside the folder.
+    nonisolated static var settingsFiles: [String] {
+        let app = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("ParolaApp")
+        let folder = app.appendingPathComponent("Views/Settings")
+        let found = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL }
+            .filter { $0.pathExtension == "swift" }
+            .map { "Views/Settings/" + $0.path.dropFirst(folder.path.count + 1).dropLast(".swift".count) } ?? []
+        return (found + ["Views/SettingsView"] + localModelsFiles).sorted()
+    }
+
     private static func source(_ name: String) throws -> String {
         let path = #filePath.replacingOccurrences(
             of: "ParolaAppTests/SettingsNativeControlsTests.swift", with: "ParolaApp/\(name).swift"
@@ -35,6 +48,16 @@ struct SettingsNativeControlsTests {
         let text = try Self.source(file)
         let drawn = Self.appButtonStyles.filter { text.contains($0) }
         #expect(drawn.isEmpty, "\(file) still draws \(drawn)")
+    }
+
+    @Test("every Settings pane draws the system's buttons, toggles and pickers, so a pane has one button style",
+          arguments: settingsFiles)
+    func settingsControlsAreNative(_ file: String) throws {
+        let text = try Self.source(file)
+        let drawn = Self.appButtonStyles.filter { text.contains($0) }
+        #expect(drawn.isEmpty, "\(file) still draws \(drawn)")
+        let chips = text.ranges(of: /\bChip\(/).count
+        #expect(chips == 0, "\(file) still draws \(chips) app chips")
     }
 
     @Test("Local Models: search, the filter and sort sit on one line right above the first list, not in a box of their own")

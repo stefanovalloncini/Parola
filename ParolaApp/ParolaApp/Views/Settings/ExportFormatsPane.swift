@@ -170,23 +170,23 @@ private struct ExportPresetRow: View {
     private var controls: some View {
         HStack(spacing: DS.Spacing.tight) {
             Button(action: onMoveUp) { Image(systemName: "chevron.up") }
-                .buttonStyle(DSIconChipButtonStyle(side: 24))
+                .buttonStyle(.borderless)
                 .disabled(!canMoveUp)
                 .help("Move up")
                 .axLeaf("ExportFormats.Button.MoveUp.\(ExportPresetChecks.slug(preset))")
             Button(action: onMoveDown) { Image(systemName: "chevron.down") }
-                .buttonStyle(DSIconChipButtonStyle(side: 24))
+                .buttonStyle(.borderless)
                 .disabled(!canMoveDown)
                 .help("Move down")
                 .axLeaf("ExportFormats.Button.MoveDown.\(ExportPresetChecks.slug(preset))")
             Button(action: isRenaming ? onCommitRename : onStartRename) {
                 Image(systemName: isRenaming ? "checkmark" : "pencil")
             }
-            .buttonStyle(DSIconChipButtonStyle(side: 24))
+            .buttonStyle(.borderless)
             .help(isRenaming ? "Save the name" : "Rename")
             .axLeaf("ExportFormats.Button.Rename.\(ExportPresetChecks.slug(preset))")
             Button(role: .destructive, action: onDelete) { Image(systemName: "trash") }
-                .buttonStyle(DSIconChipButtonStyle(side: 24))
+                .buttonStyle(.borderless)
                 .disabled(preset.isBuiltIn)
                 .help("Delete this preset")
                 .axLeaf("ExportFormats.Button.Delete.\(ExportPresetChecks.slug(preset))")
@@ -225,7 +225,6 @@ struct BatchExportSettingsPane: View {
                             break
                         }
                     }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("BatchExport.Button.OpenBatch")
                 }
             }
