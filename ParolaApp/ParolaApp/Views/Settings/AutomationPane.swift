@@ -3,8 +3,10 @@ import AppKit
 import ParolaCore
 
 struct AutomationPane: View {
+    private enum Copied { case path, snippet }
+
     @Environment(AppModel.self) private var model
-    @State private var copyConfirmation: String?
+    @State private var copied: Copied?
     @State private var confirmationTask: Task<Void, Never>?
 
     // Probed once per launch; the fallback copy below tells you to relaunch after building parola-mcp.
@@ -50,7 +52,7 @@ struct AutomationPane: View {
     var body: some View {
         @Bindable var model = model
         return SettingsForm {
-            SettingsSection {
+            Section {
                 SettingRow(
                     "MCP automation bridge",
                     description: "Lets parola-mcp drive this app (transcribe, switch model, control recording…). Listens on 127.0.0.1 only."
@@ -66,93 +68,76 @@ struct AutomationPane: View {
                         }
                         .axLeaf("Automation.Toggle.BridgeEnabled")
                 }
-            }
-
-            SettingsSection("Status") {
-                VStack(alignment: .leading, spacing: 10) {
+                LabeledContent("Status") {
                     statusRow
-                    Text(bridgeBlurb)
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
+            } footer: {
+                Text(bridgeBlurb)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            SettingsSection("parola-mcp binary") {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let path = Self.resolvedBinaryPath {
-                        Text(path)
+            Section {
+                if let path = Self.resolvedBinaryPath {
+                    LabeledContent {
+                        HStack(spacing: 8) {
+                            Button("Reveal in Finder") { reveal(path: path) }
+                                .axLeaf("Automation.Button.RevealMcpBinary")
+                            Button("Copy Path") { copy(path, as: .path) }
+                                .axLeaf("Automation.Button.CopyMcpPath")
+                        }
+                    } label: {
+                        Text(verbatim: path)
                             .font(DS.Font.mono)
                             .lineLimit(1)
                             .truncationMode(.middle)
-                            .foregroundStyle(DS.Color.secondaryText)
-                        HStack(spacing: 8) {
-                            Button("Reveal in Finder") { reveal(path: path) }
-                                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                                .axLeaf("Automation.Button.RevealMcpBinary")
-                            Button("Copy Path") { copy(path, label: String(localized: "Path copied")) }
-                                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                                .axLeaf("Automation.Button.CopyMcpPath")
-                        }
-                    } else {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(DS.Palette.warning)
-                            Text("parola-mcp isn't bundled in this build.")
-                                .font(DS.Font.secondary)
-                        }
+                            .textSelection(.enabled)
+                    }
+                } else {
+                    LabeledContent {
+                        EmptyView()
+                    } label: {
+                        Label("parola-mcp isn't bundled in this build.", systemImage: "exclamationmark.triangle.fill")
                         #if DEBUG
                         Text("Run `swift build --product parola-mcp` in ParolaCore and relaunch.")
-                            .font(DS.Font.mono)
-                            .foregroundStyle(DS.Color.secondaryText)
                         #else
                         Text("This build doesn't include parola-mcp. Reinstall from the official DMG, or build it from the Parola source.")
-                            .font(DS.Font.secondary)
-                            .foregroundStyle(DS.Color.secondaryText)
                         #endif
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            } header: {
+                Text("parola-mcp binary")
+            } footer: {
+                if copied == .path { copiedNote("Path copied") }
             }
 
             if let snippet = Self.mcpJSONSnippet {
-                SettingsSection("MCP client snippet") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Drop this into your MCP client's config (Claude Code .mcp.json, Codex, etc.)")
-                            .font(DS.Font.secondary)
-                            .foregroundStyle(DS.Color.secondaryText)
-                        ScrollView {
-                            Text(snippet)
-                                .font(DS.Font.mono)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(DS.Spacing.small)
-                        }
-                        .frame(maxHeight: 160)
-                        .background(
-                            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                                .fill(Color.primary.opacity(0.05))
-                        )
-                        Button("Copy Snippet") { copy(snippet, label: String(localized: "Snippet copied")) }
-                            .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                Section {
+                    LabeledContent {
+                        Button("Copy Snippet") { copy(snippet, as: .snippet) }
                             .axLeaf("Automation.Button.CopySnippet")
+                    } label: {
+                        Text("Drop this into your MCP client's config (Claude Code .mcp.json, Codex, etc.)")
                     }
+                    Text(verbatim: snippet)
+                        .font(DS.Font.mono)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } header: {
+                    Text("MCP client snippet")
+                } footer: {
+                    if copied == .snippet { copiedNote("Snippet copied") }
                 }
-            }
-
-            if let confirmation = copyConfirmation {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(DS.Color.successText)
-                    Text(confirmation)
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
-                }
-                .transition(.opacity)
             }
 
             ResetPaneButton(scope: .automation)
         }
+    }
+
+    private func copiedNote(_ text: LocalizedStringKey) -> some View {
+        Label(text, systemImage: "checkmark.circle.fill")
+            .foregroundStyle(.secondary)
+            .transition(.opacity)
     }
 
     private var statusRow: some View {
@@ -172,7 +157,6 @@ struct AutomationPane: View {
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
             }
-            Spacer()
         }
     }
 
@@ -191,15 +175,15 @@ struct AutomationPane: View {
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
 
-    private func copy(_ text: String, label: String) {
+    private func copy(_ text: String, as target: Copied) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-        withAnimation { copyConfirmation = label }
+        withAnimation { copied = target }
         confirmationTask?.cancel()
         confirmationTask = Task {
             try? await Task.sleep(for: .seconds(2))
             if Task.isCancelled { return }
-            withAnimation { copyConfirmation = nil }
+            withAnimation { copied = nil }
         }
     }
 }

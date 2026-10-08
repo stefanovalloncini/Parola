@@ -1893,6 +1893,17 @@
         }
       }
     },
+    "All settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutte le impostazioni"
+          }
+        }
+      }
+    },
     "Allow…": {
       "extractionState": "manual",
       "localizations": {
@@ -5147,6 +5158,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diagnostica"
+          }
+        }
+      }
+    },
+    "Diagnostics log": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registro di diagnostica"
           }
         }
       }
@@ -14043,6 +14065,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Imposta le chiavi SUFeedURL e SUPublicEDKey in Info.plist prima del rilascio. Genera la keypair una volta con lo strumento generate_keys di Sparkle."
+          }
+        }
+      }
+    },
+    "Settings file": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File delle impostazioni"
           }
         }
       }

@@ -39,10 +39,12 @@ struct DictationPane: View {
     @ViewBuilder
     private var settings: some View {
         @Bindable var model = model
-        DictationHUDPreview(
-            style: model.dictationIndicatorStyle,
-            modeName: currentModeName
-        )
+        SettingsSection("Preview") {
+            DictationHUDPreview(
+                style: model.dictationIndicatorStyle,
+                modeName: currentModeName
+            )
+        }
         SettingsSection {
             SettingRow("Mode",
                        descriptionVerbatim: model.dictationMode.description) {

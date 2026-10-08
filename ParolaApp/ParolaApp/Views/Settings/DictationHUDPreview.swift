@@ -5,7 +5,6 @@ struct DictationHUDPreview: View {
     let style: DictationIndicatorStyle
     let modeName: String?
 
-    private static let stageRadius: CGFloat = 10
     private static let fieldRadius: CGFloat = 4
     private static let hudRadius: CGFloat = 10
     private static let notchRadius: CGFloat = 12
@@ -15,17 +14,9 @@ struct DictationHUDPreview: View {
     private static let badgeVerticalInset: CGFloat = 1
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Preview")
-                .font(DS.Font.bodyStrong)
-                .foregroundStyle(DS.Color.secondaryText)
-            ZStack {
-                RoundedRectangle(cornerRadius: Self.stageRadius)
-                    .fill(Color.primary.opacity(0.04))
-                    .frame(height: 92)
-                hudMock
-            }
-        }
+        hudMock
+            .frame(maxWidth: .infinity)
+            .frame(height: 92)
     }
 
     @ViewBuilder

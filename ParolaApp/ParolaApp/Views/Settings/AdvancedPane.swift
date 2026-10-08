@@ -9,54 +9,45 @@ struct AdvancedPane: View {
     var body: some View {
         SettingsForm {
             SettingsSection("Backup & restore") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Save your settings to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.")
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
+                SettingRow("Settings file",
+                           description: "Save your settings to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.") {
                     HStack(spacing: 8) {
-                        Button("Export Settings…") {
+                        Button("Export…") {
                             transferFailure = SettingsExportService.presentExportPanel()
                         }
-                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                        .accessibilityLabel("Export Settings…")
                         .axLeaf("Advanced.Button.ExportSettings")
-                        Button("Import Settings…") {
+                        Button("Import…") {
                             transferFailure = SettingsExportService.presentImportPanel()
                         }
-                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                        .accessibilityLabel("Import Settings…")
                         .axLeaf("Advanced.Button.ImportSettings")
                     }
-                    .alert(
-                        transferFailure?.operation == .export ? Text("Couldn't export settings") : Text("Couldn't import settings"),
-                        isPresented: Binding(
-                            get: { transferFailure != nil },
-                            set: { if !$0 { transferFailure = nil } }
-                        ),
-                        presenting: transferFailure
-                    ) { _ in
-                        Button("OK") {}
-                    } message: { failure in
-                        Text(failure.message)
-                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .alert(
+                    transferFailure?.operation == .export ? Text("Couldn't export settings") : Text("Couldn't import settings"),
+                    isPresented: Binding(
+                        get: { transferFailure != nil },
+                        set: { if !$0 { transferFailure = nil } }
+                    ),
+                    presenting: transferFailure
+                ) { _ in
+                    Button("OK") {}
+                } message: { failure in
+                    Text(failure.message)
+                }
             }
 
             DiagnosticsSection()
 
             SettingsSection("Reset") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Returns every setting to its default. Models on disk are untouched.")
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
-                    Button(role: .destructive) {
+                SettingRow("All settings",
+                           description: "Returns every setting to its default. Models on disk are untouched.") {
+                    Button("Reset all settings…", role: .destructive) {
                         resetAllConfirming = true
-                    } label: {
-                        Text("Reset all settings…")
                     }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("Advanced.Button.ResetAll")
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .confirmationDialog(
