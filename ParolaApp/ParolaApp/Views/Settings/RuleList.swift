@@ -25,6 +25,7 @@ struct RuleListRows<Item: Identifiable, Row: View>: View where Item.ID: Sendable
     private let items: [Item]
     @Binding private var selection: Item.ID?
     private let leaf: String
+    private let label: (Item) -> String
     private let removeLabel: LocalizedStringKey
     private let asksBeforeRemoving: Bool
     private let onRemove: (Item.ID) -> Void
@@ -35,13 +36,14 @@ struct RuleListRows<Item: Identifiable, Row: View>: View where Item.ID: Sendable
     @State private var anchor: Item.ID?
 
     init(
-        _ items: [Item], selection: Binding<Item.ID?>, leaf: String, removeLabel: LocalizedStringKey,
-        asksBeforeRemoving: Bool = false, onRemove: @escaping (Item.ID) -> Void,
+        _ items: [Item], selection: Binding<Item.ID?>, leaf: String, label: @escaping (Item) -> String,
+        removeLabel: LocalizedStringKey, asksBeforeRemoving: Bool = false, onRemove: @escaping (Item.ID) -> Void,
         @ViewBuilder row: @escaping (Item) -> Row
     ) {
         self.items = items
         self._selection = selection
         self.leaf = leaf
+        self.label = label
         self.removeLabel = removeLabel
         self.asksBeforeRemoving = asksBeforeRemoving
         self.onRemove = onRemove
@@ -76,6 +78,7 @@ struct RuleListRows<Item: Identifiable, Row: View>: View where Item.ID: Sendable
                     Button(removeLabel) { onRemove(id) }
                 }
                 .accessibilityElement(children: .contain)
+                .accessibilityLabel(Text(verbatim: label(item)))
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
                 .accessibilityAction { selection = id }
                 .accessibilityAction(named: Text(removeLabel)) { onRemove(id) }

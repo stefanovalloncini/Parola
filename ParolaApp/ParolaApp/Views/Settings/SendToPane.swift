@@ -14,8 +14,8 @@ struct SendToPane: View {
                     InlineEmptyText("No destinations yet")
                 } else {
                     RuleListRows(
-                        model.destinations, selection: $selection, leaf: "SendTo.Row", removeLabel: "Remove Destination",
-                        onRemove: remove
+                        model.destinations, selection: $selection, leaf: "SendTo.Row", label: \.name,
+                        removeLabel: "Remove Destination", onRemove: remove
                     ) { stored in
                         let position = model.destinations.firstIndex { $0.id == stored.id } ?? 0
                         DestinationRow(

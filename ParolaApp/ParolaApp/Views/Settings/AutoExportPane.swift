@@ -15,7 +15,11 @@ struct AutoExportPane: View {
                 } else if displayed.isEmpty {
                     InlineEmptyText("No matches")
                 } else {
-                    RuleListRows(displayed, selection: $selection, leaf: "AutoExport.Row", removeLabel: "Remove Rule", onRemove: remove) { rule in
+                    RuleListRows(
+                        displayed, selection: $selection, leaf: "AutoExport.Row",
+                        label: { $0.summary(presets: model.exportPresets) },
+                        removeLabel: "Remove Rule", onRemove: remove
+                    ) { rule in
                         if let binding = binding(for: rule.id) {
                             AutoExportRuleRow(rule: binding, presets: model.exportPresets)
                                 // Row state (the extensions draft) must follow the rule, not the slot index.
@@ -107,7 +111,7 @@ private struct AutoExportRuleRow: View {
             HStack {
                 Toggle("Use this rule", isOn: $rule.enabled).labelsHidden()
                     .axLeaf("AutoExport.Toggle.RuleEnabled")
-                Text(summary).font(DS.Font.bodyStrong)
+                Text(rule.summary(presets: presets)).font(DS.Font.bodyStrong)
                 Spacer()
             }
             HStack {
@@ -146,10 +150,12 @@ private struct AutoExportRuleRow: View {
             extensionsText = rule.sourceExtensions.sorted().joined(separator: ", ")
         }
     }
+}
 
-    private var summary: String {
-        let exts = rule.sourceExtensions.sorted().joined(separator: ", ")
-        let names = rule.presetIDs.compactMap { id in presets.first { $0.id == id }?.name }
+private extension AutoExportRule {
+    func summary(presets: [ExportPreset]) -> String {
+        let exts = sourceExtensions.sorted().joined(separator: ", ")
+        let names = presetIDs.compactMap { id in presets.first { $0.id == id }?.name }
         let left = exts.isEmpty ? String(localized: "any") : exts
         let right = names.isEmpty ? String(localized: "nothing") : names.joined(separator: ", ")
         return "\(left) → \(right)"

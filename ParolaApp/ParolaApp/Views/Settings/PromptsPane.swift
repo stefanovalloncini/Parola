@@ -19,7 +19,7 @@ struct PromptsPane: View {
                     InlineEmptyText(isSearching ? "No prompts match." : "No custom prompts yet")
                 } else {
                     RuleListRows(
-                        custom, selection: $selection, leaf: "Prompts.Row", removeLabel: "Delete prompt",
+                        custom, selection: $selection, leaf: "Prompts.Row", label: \.name, removeLabel: "Delete prompt",
                         asksBeforeRemoving: true, onRemove: { id in pendingDelete = custom.first { $0.id == id } }
                     ) { prompt in
                         PromptRow(prompt: prompt, onOpen: { editing = PromptEditDraft(prompt: prompt) })

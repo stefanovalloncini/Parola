@@ -15,7 +15,10 @@ struct FindReplacePane: View {
                 } else if visible.isEmpty {
                     InlineEmptyText("No rules match.")
                 } else {
-                    RuleListRows(visible, selection: $selection, leaf: "FindReplace.Row", removeLabel: "Remove Rule", onRemove: remove) { rule in
+                    RuleListRows(
+                        visible, selection: $selection, leaf: "FindReplace.Row", label: { "\($0.find) → \($0.replace)" },
+                        removeLabel: "Remove Rule", onRemove: remove
+                    ) { rule in
                         if let binding = binding(for: rule.id) {
                             FindReplaceRuleRow(rule: binding)
                         }

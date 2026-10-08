@@ -20,8 +20,8 @@ private struct WatchedFoldersPaneBody: View {
                     InlineEmptyText("No watched folders yet")
                 } else {
                     RuleListRows(
-                        store.folders, selection: $selection, leaf: "WatchedFolders.Row", removeLabel: "Remove Folder",
-                        onRemove: remove
+                        store.folders, selection: $selection, leaf: "WatchedFolders.Row", label: \.displayName,
+                        removeLabel: "Remove Folder", onRemove: remove
                     ) { folder in
                         WatchedFolderRow(store: store, folder: folder)
                     }

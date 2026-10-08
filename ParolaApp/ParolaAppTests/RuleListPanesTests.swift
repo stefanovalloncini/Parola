@@ -417,6 +417,20 @@ struct RuleListPanesTests {
         await hosted.close()
     }
 
+    @Test("VoiceOver names each rule row by what it holds", arguments: EditableList.allCases)
+    func rowsAreNamed(_ list: EditableList) async throws {
+        let hosted = try await host(list, words: ["alpha", "beta"])
+        let expected: [String] = switch list {
+        case .snippets, .corrections, .findReplace: ["alpha → ALPHA", "beta → BETA"]
+        case .autoExport:
+            ["alpha", "beta"].map { "\($0) → \(String(localized: "nothing"))" }
+        case .ignoredSegments, .watchedFolders, .sendTo, .prompts: ["alpha", "beta"]
+        }
+        let names = rows(list, in: hosted).map { $0.label ?? "" }
+        #expect(names == expected, "\(list.prefix): rows read \(names)")
+        await hosted.close()
+    }
+
     @Test("+ adds an empty rule and chooses it, clearing a search that would hide it", arguments: Pane.allCases)
     func addChoosesTheNewRule(_ pane: Pane) async throws {
         let list = pane.list

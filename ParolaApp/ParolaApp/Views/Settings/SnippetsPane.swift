@@ -16,7 +16,10 @@ struct SnippetsPane: View {
                 } else if visible.isEmpty {
                     InlineEmptyText("No snippets match.")
                 } else {
-                    RuleListRows(visible, selection: $selection, leaf: "Snippets.Row", removeLabel: "Remove Snippet", onRemove: remove) { snippet in
+                    RuleListRows(
+                        visible, selection: $selection, leaf: "Snippets.Row", label: { "\($0.trigger) → \($0.replacement)" },
+                        removeLabel: "Remove Snippet", onRemove: remove
+                    ) { snippet in
                         if let binding = binding(for: snippet.id) {
                             SnippetRow(snippet: binding)
                         }

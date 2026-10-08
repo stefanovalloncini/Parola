@@ -15,7 +15,10 @@ struct IgnoredSegmentsPane: View {
                 } else if displayed.isEmpty {
                     InlineEmptyText("No matches")
                 } else {
-                    RuleListRows(displayed, selection: $selection, leaf: "IgnoredSegments.Row", removeLabel: "Remove Pattern", onRemove: remove) { rule in
+                    RuleListRows(
+                        displayed, selection: $selection, leaf: "IgnoredSegments.Row", label: \.pattern,
+                        removeLabel: "Remove Pattern", onRemove: remove
+                    ) { rule in
                         if let binding = binding(for: rule.id) {
                             IgnoredRuleRow(rule: binding)
                         }
