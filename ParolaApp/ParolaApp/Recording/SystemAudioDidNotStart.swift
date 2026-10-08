@@ -6,7 +6,7 @@ struct SystemAudioDidNotStart: LocalizedError {
 
     static func message(bundle: Bundle = .main) -> String {
         String(
-            localized: "Parola couldn't start recording system audio. Allow System Audio Recording for Parola in System Settings → Privacy & Security, then try again.",
+            localized: "Parola couldn't start recording system audio. Open System Settings → Privacy & Security → Screen & System Audio Recording → System Audio Recording Only and allow Parola, then try again.",
             bundle: bundle
         )
     }

@@ -26,7 +26,7 @@ struct RecordMeetingsPane: View {
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection("Permissions") {
                 PermissionRow(
-                    title: String(localized: "Screen Recording"),
+                    title: String(localized: "Screen & System Audio Recording"),
                     detail: String(localized: "Captures the system-wide audio mix. Every system audio recording uses it, except a detected meeting when “Record only the meeting app's audio” is on."),
                     granted: model.capturePermissions.screenRecordingGranted,
                     isFirst: true,
@@ -36,7 +36,7 @@ struct RecordMeetingsPane: View {
                     needed: needed.screenRecording
                 )
                 PermissionRow(
-                    title: String(localized: "System Audio Recording"),
+                    title: String(localized: "System Audio Recording Only"),
                     detail: String(localized: "Captures a single app's audio. Used for a detected meeting when “Record only the meeting app's audio” is on."),
                     granted: model.capturePermissions.systemAudioGranted,
                     isFirst: false,

@@ -10994,13 +10994,13 @@
         }
       }
     },
-    "Parola couldn't start recording system audio. Allow System Audio Recording for Parola in System Settings → Privacy & Security, then try again.": {
+    "Parola couldn't start recording system audio. Open System Settings → Privacy & Security → Screen & System Audio Recording → System Audio Recording Only and allow Parola, then try again.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parola non è riuscita ad avviare la registrazione dell'audio di sistema. Consenti a Parola la Registrazione audio di sistema in Impostazioni di Sistema → Privacy e sicurezza, poi riprova."
+            "value": "Parola non è riuscita ad avviare la registrazione dell'audio di sistema. Apri Impostazioni di Sistema → Privacy e sicurezza → Registrazione schermo e audio di sistema → Solo registrazione audio di sistema e consenti l'accesso a Parola, poi riprova."
           }
         }
       }
@@ -13441,13 +13441,13 @@
         }
       }
     },
-    "Screen Recording": {
+    "Screen & System Audio Recording": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Registrazione schermo"
+            "value": "Registrazione schermo e audio di sistema"
           }
         }
       }
@@ -15508,6 +15508,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione audio di sistema"
+          }
+        }
+      }
+    },
+    "System Audio Recording Only": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo registrazione audio di sistema"
           }
         }
       }
