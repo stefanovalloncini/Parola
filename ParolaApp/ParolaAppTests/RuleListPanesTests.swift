@@ -321,6 +321,27 @@ struct RuleListPanesTests {
         await hosted.close()
     }
 
+    @Test("− removes the row whose field has the keyboard", arguments: Pane.allCases)
+    func removeTakesTheRowBeingEdited(_ pane: Pane) async throws {
+        let list = pane.list
+        let hosted = try await host(list, words: ["alpha", "beta", "gamma"])
+        let fields = elements(hosted)
+            .filter { $0.identifier?.hasSuffix(pane.firstField) == true }
+            .sorted { $0.frame.maxY > $1.frame.maxY }
+        try #require(fields.count == 3, "\(pane.prefix) shows \(fields.count) fields")
+        let found = fields[1].object as? NSTextField ?? (fields[1].object as? NSCell)?.controlView as? NSTextField
+        let field = try #require(found)
+        #expect(hosted.window.window.makeFirstResponder(field))
+        let on = await waitUntil { element("\(list.prefix).Button.Remove", in: hosted)?.isEnabled == true }
+        #expect(on, "\(pane.prefix): − stays off while row 2's field has the keyboard")
+
+        #expect(HostedAccessibility.press(endingWith: "\(list.prefix).Button.Remove", in: hosted.window.host))
+        let removed = await waitUntil { await list.names(hosted.model) == ["alpha", "gamma"] }
+        let left = await list.names(hosted.model)
+        #expect(removed, "\(pane.prefix): left \(left)")
+        await hosted.close()
+    }
+
     @Test("Tab stops on the list once: ↓ chooses a row, ⌫ removes it, and a second ⌫ takes nothing more",
           arguments: EditableList.allCases)
     func keyboardChoosesAndRemoves(_ list: EditableList) async throws {

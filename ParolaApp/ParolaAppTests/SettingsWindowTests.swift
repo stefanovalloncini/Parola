@@ -31,6 +31,17 @@ struct SettingsWindowTests {
         )
     }
 
+    /// The key as the window hands it to whatever has the keyboard.
+    private func press(_ characters: String, code: UInt16, in hosted: HostedWindow) async {
+        let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: hosted.window.windowNumber, context: nil, characters: characters,
+            charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code
+        )
+        if let event { hosted.window.sendEvent(event) }
+        await settle(for: .milliseconds(60))
+    }
+
     private func views(in view: NSView) -> [NSView] {
         [view] + view.subviews.flatMap { views(in: $0) }
     }
@@ -131,6 +142,29 @@ struct SettingsWindowTests {
             type("", into: field)
             let restored = await waitUntil { sidebarRoutes(in: hosted).count == all.count }
             #expect(restored, "\(sidebarRoutes(in: hosted))")
+        }
+    }
+
+    @Test("the sidebar takes the arrow keys and type-select, and the pane follows")
+    func sidebarKeyboard() async throws {
+        try await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            let hosted = hostWindow(model)
+            defer { hosted.close() }
+            let table = try #require(views(in: hosted.host).lazy.compactMap { $0 as? NSTableView }.first, "no sidebar list")
+            #expect(hosted.window.makeFirstResponder(table))
+            let onGeneral = await waitUntil { model.settingsPane == SettingsRoute.general.rawValue }
+            #expect(onGeneral, "opened on \(model.settingsPane)")
+
+            let down = String(UnicodeScalar(UInt16(NSDownArrowFunctionKey)).map(Character.init) ?? " ")
+            await press(down, code: 125, in: hosted)
+            let moved = await waitUntil { model.settingsPane == SettingsRoute.customization.rawValue }
+            #expect(moved, "↓ from General chose \(model.settingsPane)")
+
+            await press("l", code: 37, in: hosted)
+            await press("o", code: 31, in: hosted)
+            let typed = await waitUntil { model.settingsPane == SettingsRoute.localModels.rawValue }
+            #expect(typed, "typing “lo” chose \(model.settingsPane)")
         }
     }
 
