@@ -182,7 +182,7 @@ struct IntakeSettingsPopover: View {
                         popoverWidth: 400,
                         leaf: "Intake.Button.Model"
                     ) {
-                        ModelPickerPopover(searchText: $modelSearch, installedOnly: $installedOnly, offersDownloads: true)
+                        ModelPickerPopover(searchText: $modelSearch, installedOnly: $installedOnly)
                     }
                 }
                 GridRow {

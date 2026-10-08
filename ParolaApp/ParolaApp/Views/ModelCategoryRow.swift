@@ -34,22 +34,6 @@ struct ModelsCategory: Identifiable {
     ]
 }
 
-struct ModelCategorySection: View {
-    let categories: [ModelsCategory]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(categories) { category in
-                ModelCategoryRow(category: category)
-                if category.id != categories.last?.id {
-                    Divider().padding(.leading, 56)
-                }
-            }
-        }
-        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
-    }
-}
-
 struct ModelCategoryRow: View {
     let category: ModelsCategory
 

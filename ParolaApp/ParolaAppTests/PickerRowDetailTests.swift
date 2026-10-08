@@ -133,7 +133,7 @@ struct ModelRowDetailTests {
     func noRefreshRow() {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("model-popover"))
         let popover = HostedWindow(
-            ModelPickerPopover(searchText: .constant(""), installedOnly: .constant(false), offersDownloads: false).environment(model),
+            ModelPickerPopover(searchText: .constant(""), installedOnly: .constant(false)).environment(model),
             width: 400, height: 600
         )
         defer { popover.close() }

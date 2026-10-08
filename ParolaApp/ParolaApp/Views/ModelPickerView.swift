@@ -68,12 +68,11 @@ struct ModelPickerView: View {
     }
 }
 
-/// A picker that offers downloads lists the whole catalog; one that does not (Settings) only lists what is installed.
+/// The whole catalog, so a pick can start a download; Installed only narrows it.
 struct ModelPickerPopover: View {
     @Environment(AppModel.self) private var model
     @Binding var searchText: String
     @Binding var installedOnly: Bool
-    let offersDownloads: Bool
 
     private var groups: [(ModelCategory, [ModelVariant])] {
         let installed = Set(model.availableModels.filter(\.isInstalled).map(\.name))
@@ -91,11 +90,9 @@ struct ModelPickerPopover: View {
                 .padding(.top, DS.Spacing.tight)
                 .padding(.bottom, DS.Spacing.snug)
 
-            if offersDownloads {
-                installedOnlyToggle
-                    .padding(.horizontal, DS.Spacing.regular)
-                    .padding(.bottom, DS.Spacing.tight)
-            }
+            installedOnlyToggle
+                .padding(.horizontal, DS.Spacing.regular)
+                .padding(.bottom, DS.Spacing.tight)
 
             PillPopoverList {
                 let filtered = filteredGroups
@@ -191,7 +188,7 @@ struct ModelPickerPopover: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return groups.compactMap { category, variants in
             let matches = variants.filter { variant in
-                if (installedOnly || !offersDownloads) && !isInstalled(variant) { return false }
+                if installedOnly && !isInstalled(variant) { return false }
                 if query.isEmpty { return true }
                 return variant.displayName.lowercased().contains(query)
             }
