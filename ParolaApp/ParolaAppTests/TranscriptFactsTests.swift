@@ -4,8 +4,8 @@ import Testing
 import ParolaCore
 import ParolaTestSupport
 
-@Suite("Info inspector derived stats")
-struct InfoInspectorDerivedTests {
+@Suite("Inspector facts")
+struct TranscriptFactsTests {
     private func segment(
         id: Int,
         start: Double,
@@ -43,7 +43,7 @@ struct InfoInspectorDerivedTests {
     @Test("one pass covers speakers, confidence, speech rate and text stats")
     func derivesEverythingInOnePass() throws {
         let transcript = makeTranscript()
-        let derived = try InfoInspector.derive(transcript: transcript, textVersion: 1, knownText: nil)
+        let derived = try TranscriptFacts.derive(transcript: transcript, textVersion: 1, knownText: nil)
         #expect(derived.speakers.map(\.speaker) == ["Speaker 1", "Speaker 2"])
         #expect(abs((derived.confidenceAverage ?? 0) - 0.75) < 0.001)
         #expect(derived.lowConfidence.map(\.id) == [2])
@@ -59,14 +59,14 @@ struct InfoInspectorDerivedTests {
     @Test("an unchanged text reuses its counts while timing and speakers refresh")
     func reusesTheTextCounts() throws {
         let transcript = makeTranscript()
-        let first = try InfoInspector.derive(transcript: transcript, textVersion: 1, knownText: nil)
+        let first = try TranscriptFacts.derive(transcript: transcript, textVersion: 1, knownText: nil)
         var nudged = transcript
         nudged.segments[2].start = 30
         nudged.segments[1].speaker = "Speaker 3"
         var marked = first.text
         marked.fillerCount = 99
 
-        let second = try InfoInspector.derive(transcript: nudged, textVersion: 1, knownText: marked)
+        let second = try TranscriptFacts.derive(transcript: nudged, textVersion: 1, knownText: marked)
 
         #expect(second.text == marked)
         #expect(second.speechRate == SpeechRateSeries.compute(segments: nudged.segments, binSeconds: 30))
@@ -81,12 +81,23 @@ struct InfoInspectorDerivedTests {
             language: "en",
             modelName: "test"
         )
-        let derived = try InfoInspector.derive(transcript: transcript, textVersion: 1, knownText: nil)
+        let derived = try TranscriptFacts.derive(transcript: transcript, textVersion: 1, knownText: nil)
         #expect(derived.speakers.isEmpty)
         #expect(derived.confidenceAverage == nil)
         #expect(derived.lowConfidence.isEmpty)
         #expect(derived.speechRate.count == 1)
         #expect(derived.text.wordCount == 2)
+    }
+
+    @Test("Insights shows only when one of its sections has something to draw")
+    func insightsNeedSomethingToDraw() throws {
+        let talk = try TranscriptFacts.derive(transcript: makeTranscript(), textVersion: 1, knownText: nil)
+        #expect(talk.hasInsights)
+        let silent = Transcript(segments: [TranscriptSegment(id: 1, start: 0, end: 5, text: " ")], language: "en", modelName: "test")
+        let nothing = try TranscriptFacts.derive(transcript: silent, textVersion: 1, knownText: nil)
+        #expect(nothing.speakers.isEmpty && nothing.confidenceAverage == nil && nothing.text.topWords.isEmpty)
+        #expect(!nothing.hasInsights)
+        #expect(!TranscriptFacts().hasInsights)
     }
 }
 

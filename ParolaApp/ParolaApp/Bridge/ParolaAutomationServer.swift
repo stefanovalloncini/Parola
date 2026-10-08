@@ -375,7 +375,7 @@ final class ParolaAutomationServer {
         "dictationIndicatorStyleRaw", "automationBridgeEnabled",
         "transcriptDisplayMode", "generateCardMetadata", "showAITitles", "showAISummaries",
         "customTitlePrompt", "customSummaryPrompt", "appAccentColor",
-        "inspectorMode", "introductionComplete", "autostartSummary",
+        "inspectorDetailsExpanded", "inspectorInsightsExpanded", "introductionComplete", "autostartSummary",
         "translationSideBySide", "remoteAIAcknowledged", "showMostUsedPeople",
         "openEntriesInNewWindow", "playSoundWhenFinished", "appVisibilityMode",
         "duplicateImportPolicy", "libraryGroupsByDate",

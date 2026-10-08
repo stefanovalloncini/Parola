@@ -1,6 +1,6 @@
 import Foundation
 
-/// What the Info inspector counts in a transcript's text, gathered in one walk over it.
+/// What the transcript inspector counts in a transcript's text, gathered in one walk over it.
 public struct TranscriptTextStats: Equatable, Sendable {
     public var charCount = 0
     public var wordCount = 0

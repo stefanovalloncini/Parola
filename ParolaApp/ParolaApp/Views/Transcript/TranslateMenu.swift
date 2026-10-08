@@ -6,7 +6,7 @@ struct TranslateMenu: View {
     let model: AppModel
 
     var body: some View {
-        let targets = TranslationSection.targets(
+        let targets = TranslationTargets.named(
             from: model.translationCoordinator.knownTargets ?? SupportedLanguages.codes,
             excluding: model.transcript?.language
         )

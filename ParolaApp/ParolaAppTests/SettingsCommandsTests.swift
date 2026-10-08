@@ -114,19 +114,19 @@ struct SettingsCommandsTests {
         withExtendedLifetime(server) {}
     }
 
-    @Test("the inspector tab is writable through the bridge")
-    func inspectorModeIsWritable() async throws {
+    @Test("whether the inspector's Details and Insights are open is writable through the bridge, and the old tab key is gone")
+    func inspectorDisclosuresAreWritable() async throws {
         let (model, server, context, commands) = try makeRig()
 
-        _ = try await run(
-            commands,
-            "setSetting",
-            ["key": .string("inspectorMode"), "value": .string("info")],
-            context
-        )
+        for key in [InspectorVisibility.detailsExpandedKey, InspectorVisibility.insightsExpandedKey] {
+            _ = try await run(commands, "setSetting", ["key": .string(key), "value": .bool(true)], context)
+            #expect(model.defaults.bool(forKey: key), "\(key)")
+        }
+        do {
+            _ = try await run(commands, "setSetting", ["key": .string("inspectorMode"), "value": .string("info")], context)
+            Issue.record("inspectorMode was accepted with no tab left to pick")
+        } catch {}
         withExtendedLifetime(server) {}
-
-        #expect(model.defaults.string(forKey: "inspectorMode") == "info")
     }
 
     @Test("the bridge can turn the library's date groups off, and a backup keeps the choice")

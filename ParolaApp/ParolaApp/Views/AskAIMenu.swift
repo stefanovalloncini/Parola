@@ -56,11 +56,11 @@ struct AskAIItems: View {
             Divider()
         }
         Button(model.smartChapters.isEmpty ? String(localized: "Generate Chapters") : String(localized: "Regenerate Chapters")) {
-            runInInspector(model.extractSmartChapters)
+            runInInspector(.chapters, model.extractSmartChapters)
         }
         .disabled(!model.isAIAvailable(for: .summary))
         .axLeaf("Toolbar.Transcript.MenuItem.Chapters")
-        Button("Find Action Items") { runInInspector(model.extractActionItems) }
+        Button("Find Action Items") { runInInspector(.actionItems, model.extractActionItems) }
             .disabled(!model.isAIAvailable(for: .prompts))
             .axLeaf("Toolbar.Transcript.MenuItem.ActionItems")
         Divider()
@@ -87,9 +87,9 @@ struct AskAIItems: View {
             .axLeaf("Toolbar.Transcript.MenuItem.ManagePrompts")
     }
 
-    /// Chapters and action items land in the Info inspector, so a run started here has to open it there.
-    private func runInInspector(_ run: () -> Void) {
-        InspectorVisibility.showInfo(in: DefaultsStore.current, isNarrow: model.transcriptPaneIsNarrow)
+    /// Chapters and action items land in the inspector, so a run started here opens it at its section.
+    private func runInInspector(_ section: InspectorAnchor, _ run: () -> Void) {
+        model.revealInInspector(section)
         run()
     }
 

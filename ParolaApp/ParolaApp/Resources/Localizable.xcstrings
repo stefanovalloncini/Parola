@@ -1347,6 +1347,17 @@
         }
       }
     },
+    "Action Item Options": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opzioni delle azioni"
+          }
+        }
+      }
+    },
     "Action Items": {
       "extractionState": "manual",
       "localizations": {
@@ -2285,6 +2296,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Assegnato"
+          }
+        }
+      }
+    },
+    "Assign…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assegna…"
           }
         }
       }
@@ -3309,6 +3331,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Canale"
+          }
+        }
+      }
+    },
+    "Chapter Options": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opzioni dei capitoli"
           }
         }
       }
@@ -5114,6 +5147,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancellazione…"
+          }
+        }
+      }
+    },
+    "Details": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dettagli"
           }
         }
       }
@@ -7482,6 +7526,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Inserisci con"
+          }
+        }
+      }
+    },
+    "Insights": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analisi"
           }
         }
       }
@@ -11393,6 +11448,17 @@
         }
       }
     },
+    "People Options": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opzioni delle persone"
+          }
+        }
+      }
+    },
     "People: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -14112,6 +14178,28 @@
         }
       }
     },
+    "Show All": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra tutto"
+          }
+        }
+      }
+    },
+    "Show Chapters": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra capitoli"
+          }
+        }
+      }
+    },
     "Show Chat": {
       "extractionState": "manual",
       "localizations": {
@@ -14152,6 +14240,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra l'introduzione"
+          }
+        }
+      }
+    },
+    "Show Less": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra meno"
           }
         }
       }

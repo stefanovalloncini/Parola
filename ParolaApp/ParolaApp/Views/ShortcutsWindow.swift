@@ -67,7 +67,7 @@ struct ShortcutCatalog {
                 Entry(label: text("Previous Segment"),           keys: "⌘ ⌥ ↑"),
                 Entry(label: text("Jump to Next Speaker"),       keys: "⌘ ⇧ J"),
                 Entry(label: text("Jump to Time…"),              keys: "⌘ J"),
-                Entry(label: text("Show Outline"),               keys: "⌘ ⇧ O"),
+                Entry(label: text("Show Chapters"),              keys: "⌘ ⇧ O"),
                 Entry(label: text("Favorite Segment"),           keys: "⌘ D"),
                 Entry(label: text("Auto-Detect Language"),       keys: "⌘ ⇧ D"),
                 Entry(label: text("Show or Hide Inspector"),     keys: "⌘ ⇧ I"),

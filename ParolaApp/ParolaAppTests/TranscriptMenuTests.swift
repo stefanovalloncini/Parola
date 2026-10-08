@@ -12,11 +12,12 @@ struct TranscriptMenuTests {
         return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
-    @Test("Jump to Time… and Show Outline are Transcript menu commands, with keys")
+    @Test("Jump to Time… and Show Chapters are Transcript menu commands, with keys")
     func pagePopoversHaveMenuCommands() throws {
         let commands = try source("Views/AppCommands")
         #expect(commands.contains(#"Button("Jump to Time…") { model.jumpToTimeRequests &+= 1 } .keyboardShortcut("j", modifiers: [.command])"#))
-        #expect(commands.contains(#"Button("Show Outline") { model.outlineRequests &+= 1 } .keyboardShortcut("o", modifiers: [.command, .shift])"#))
+        #expect(commands.contains(#"Button("Show Chapters") { model.revealInInspector(.chapters) } .keyboardShortcut("o", modifiers: [.command, .shift])"#))
+        #expect(!commands.contains("Show Outline"))
     }
 
     @Test("Rename… sits in the Transcript menu and asks for the page's one rename")
@@ -25,14 +26,14 @@ struct TranscriptMenuTests {
         #expect(commands.contains(#"Button("Rename…") { model.renameRequests &+= 1 } .disabled(!model.canRenameOpenTranscript)"#))
     }
 
-    @Test("Transcribe Again runs the same settings from the Transcript menu and the Info tab, through one alert")
+    @Test("Transcribe Again runs the same settings from the Transcript menu and the inspector's Details, through one alert")
     func transcribeAgainHasMenuAndInfoDoors() throws {
         let menu = try source("Views/Transcript/TranscribeAgainMenus")
         let same = try #require(menu.range(of: #"Menu("Transcribe Again") { Button("Same Model and Language") { model.askToTranscribeAgain() }"#))
         let models = try #require(menu.range(of: "TranscribeAgainModelChoices(model: model, variants: variants)"))
         let languages = try #require(menu.range(of: #"Menu("Language") { TranscribeAgainLanguageChoices("#))
         #expect(same.lowerBound < models.lowerBound && models.lowerBound < languages.lowerBound)
-        let info = try source("Views/Transcript/InfoInspector")
+        let info = try source("Views/Transcript/TranscriptDetails")
         #expect(info.contains(#"Button("Transcribe Again") { model.askToTranscribeAgain() }"#))
         #expect(info.contains("TranscribeAgainModelChoices(model: model, variants: variants)"))
         #expect(info.contains("TranscribeAgainLanguageChoices(model: model, variants: variants)"))
@@ -43,14 +44,14 @@ struct TranscriptMenuTests {
         #expect(speakers.contains("Transcript ▸ Transcribe Again"))
     }
 
-    @Test("the layouts are a checked pair in the View menu, with keys, named as the inspector names them")
+    @Test("the layouts are a checked pair in the View menu, with keys, named as the toolbar's Aa names them")
     func layoutsAreViewCommands() throws {
         let commands = try source("Views/AppCommands")
         #expect(commands.contains(#"Toggle("Paragraphs", isOn: layoutBinding(.transcript)) .keyboardShortcut("1", modifiers: [.command, .control])"#))
         #expect(commands.contains(#"Toggle("Segments", isOn: layoutBinding(.segments)) .keyboardShortcut("2", modifiers: [.command, .control])"#))
-        let inspector = try source("Views/Transcript/FormatInspector")
-        #expect(inspector.contains(#"DisplayModeCard( title: "Paragraphs", icon: "text.alignleft""#))
-        #expect(!inspector.contains(#"title: "Transcript""#))
+        let format = try source("Views/Transcript/TranscriptToolbar")
+        #expect(format.contains(#"Text("Paragraphs").tag(TranscriptDisplayMode.transcript)"#))
+        #expect(format.contains(#"Text("Segments").tag(TranscriptDisplayMode.segments)"#))
     }
 
     @Test("a segment has one speaker menu wherever it shows, and No Speaker names the empty choice everywhere")
@@ -61,17 +62,18 @@ struct TranscriptMenuTests {
         #expect(card.components(separatedBy: "assignSegmentMenu").count == 6)
         #expect(card.contains(#"Button("New Person…")"#))
         #expect(card.contains(#"Button("No Speaker") { model.assignSpeaker(nil, toSegmentID: segment.id) }"#))
-        let inspector = try source("Views/Transcript/FormatInspector")
+        let inspector = try source("Views/Transcript/OverviewPeople")
         #expect(inspector.contains(#"Button("No Speaker") { Task { await model.clearSpeaker(label: label) } }"#))
         let popover = try source("Views/People/AssignSpeakerPopover")
         #expect(popover.contains(#"footerButton("No Speaker")"#))
     }
 
-    @Test("the inspector's field adds a person, as the People sheet's does; only the speaker popover adds a speaker")
+    @Test("the People sheet's field adds a person; the inspector names someone new only through a row's New Person…")
     func addAPersonMeansOneThing() throws {
-        let inspector = try source("Views/Transcript/FormatInspector")
-        #expect(inspector.contains(#"TextField("Add a person…", text: $newPerson)"#))
+        let inspector = try source("Views/Transcript/OverviewPeople")
+        #expect(!inspector.contains("TextField(\"Add"))
         #expect(!inspector.contains("Add a speaker…"))
+        #expect(inspector.contains("model.assignSpeaker(label: label, toNewPersonNamed: draftName)"))
         let sheet = try source("Views/People/ManagePeopleSheet")
         #expect(sheet.contains(#"TextField("Add a person…""#))
     }
@@ -80,7 +82,7 @@ struct TranscriptMenuTests {
     func peopleMenusHaveMore() throws {
         let card = try source("Views/Transcript/SegmentCard")
         #expect(card.contains("MorePeopleMenu(people: choices.people.more)"))
-        let inspector = try source("Views/Transcript/FormatInspector")
+        let inspector = try source("Views/Transcript/OverviewPeople")
         #expect(inspector.contains("MorePeopleMenu(people: choices.more)"))
         #expect(inspector.contains(#"Button("New Person…")"#))
         #expect(inspector.contains("model.assignSpeaker(label: label, toNewPersonNamed: draftName)"))
@@ -105,7 +107,7 @@ struct TranscriptMenuTests {
     func transcriptMenuIsGrouped() throws {
         let menu = try transcriptMenu()
         let groups = [
-            [#"Button("Back")"#, #"Button("Jump to Next Speaker")"#, #"Button("Jump to Time…")"#, #"Button("Show Outline")"#],
+            [#"Button("Back")"#, #"Button("Jump to Next Speaker")"#, #"Button("Jump to Time…")"#, #"Button("Show Chapters")"#],
             [
                 #"Button("Rename…")"#, "TranscribeAgainMenu(model: model)", "TranslateMenu(model: model)",
                 #"Button("Edit Segment") { model.editFocusedSegment() }"#,
@@ -158,39 +160,42 @@ struct TranscriptMenuTests {
     func renameSpeakersSitsWithTheTranscript() throws {
         let commands = try transcriptMenu()
         #expect(commands.contains(#"Button("Rename Speakers…") { model.showingSpeakersSheet = true }"#))
-        let inspector = try source("Views/Transcript/FormatInspector")
+        let inspector = try source("Views/Transcript/OverviewPeople")
         #expect(inspector.contains(#"Button("Rename Speakers…") { model.showingSpeakersSheet = true }"#))
         let chat = try source("Views/Chat/ChatPane")
         #expect(chat.contains(#"Button("Manage Prompts…") { model.openSettings(route: .prompts) }"#))
     }
 
-    @Test("translating has a menu path, and the inspector drops its bare character count")
+    @Test("translating has a menu path, and the strip and the Details row offer the same targets")
     func translationHasAMenuPath() throws {
         let menu = try source("Views/Transcript/TranslateMenu")
         #expect(menu.contains(#"Menu("Translate To") { ForEach(targets, id: \.code) { target in Button(target.name) { Task { await model.translateTranscript(to: target.code) } }"#))
         #expect(menu.contains(#"Button("Remove Translation") { Task { await model.removeTranslation() } }"#))
-        #expect(menu.contains("TranslationSection.targets( from: model.translationCoordinator.knownTargets ?? SupportedLanguages.codes"))
-        let section = try source("Views/Transcript/TranslationSection")
-        #expect(!section.contains("characters"))
-        #expect(section.contains("Self.targets(from: targets, excluding: model.transcript?.language)"))
+        #expect(menu.contains("TranslationTargets.named( from: model.translationCoordinator.knownTargets ?? SupportedLanguages.codes"))
+        let strip = try source("Views/Transcript/TranslationStrip")
+        #expect(!strip.contains("characters"))
+        #expect(strip.contains("TranslationTargets.named(from: targets, excluding: model.transcript?.language)"))
+        let details = try source("Views/Transcript/TranscriptDetails")
+        #expect(details.contains("TranslationTargets.named( from: model.translationCoordinator.knownTargets ?? SupportedLanguages.codes"))
+        #expect(details.contains(#"Button("Remove Translation") { Task { await model.removeTranslation() } }"#))
     }
 
     @Test("the translation targets leave out the transcript's own language and read in name order")
     @MainActor
     func translationTargetsSkipTheSource() {
-        let targets = TranslationSection.targets(from: ["it", "en", "fr"], excluding: "EN")
+        let targets = TranslationTargets.named(from: ["it", "en", "fr"], excluding: "EN")
         #expect(targets.map(\.code) == ["fr", "it"])
-        #expect(TranslationSection.targets(from: ["it", "en"], excluding: "auto").count == 2)
+        #expect(TranslationTargets.named(from: ["it", "en"], excluding: "auto").count == 2)
     }
 
     @Test("the transcript view says things in plain words: no QC, no Re-Extract, no Engine, no chars")
     func plainWordsForJargon() throws {
-        let format = try source("Views/Transcript/FormatInspector")
-        #expect(format.contains(#"Text("Subtitle Warnings")"#))
+        let format = try source("Views/Transcript/TranscriptToolbar")
+        #expect(format.contains(#"Toggle("Subtitle Warnings", isOn: $model.showSubtitleQC)"#))
         #expect(!format.contains("Subtitle QC"))
-        let info = try source("Views/Transcript/InfoInspector")
+        let info = try source("Views/Transcript/TranscriptDetails")
         #expect(!info.contains(#"label: "Engine""#))
-        let items = try source("Views/Transcript/ActionItemsSection")
+        let items = try source("Views/Transcript/OverviewActionItems")
         #expect(!items.contains("Re-Extract"))
         let summary = try source("Views/Summary/SummaryPane")
         #expect(!summary.contains("chars"))

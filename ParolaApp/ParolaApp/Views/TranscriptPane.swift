@@ -46,26 +46,11 @@ enum TranscriptDisplayMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum InspectorMode: String, CaseIterable, Identifiable {
-    case format
-    case info
-    var id: String { rawValue }
-
-    /// "actions" was a third tab whose sections now live in Info; a value stored by that build still has to land somewhere.
-    init(stored raw: String) {
-        switch raw {
-        case InspectorMode.info.rawValue, "actions": self = .info
-        default: self = .format
-        }
-    }
-}
-
 struct TranscriptPane: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.arrivesFromStage) private var arrivesFromStage
     @Environment(AppModel.self) private var model
     @AppStorage(InspectorVisibility.preferenceKey, store: DefaultsStore.current) private var inspectorVisible: Bool = true
-    @AppStorage(InspectorVisibility.modeKey, store: DefaultsStore.current) private var inspectorModeRaw: String = InspectorMode.format.rawValue
     // Persisted: the pane is rebuilt on every phase and route change, and the ask has to outlive that.
     @AppStorage(InspectorVisibility.forcedAtNarrowWidthKey, store: DefaultsStore.current)
     private var inspectorForcedAtNarrowWidth = false
@@ -88,11 +73,8 @@ struct TranscriptPane: View {
 
                 if showsInspector {
                     Divider()
-                    TranscriptInspector(
-                        mode: inspectorModeBinding,
-                        inspectorVisible: inspectorVisibleBinding
-                    )
-                    .frame(width: MainWindowLayout.inspectorWidth)
+                    TranscriptInspector()
+                        .frame(width: MainWindowLayout.inspectorWidth)
                 }
             }
             // Measured on the whole pane, not the reading column, so hiding the inspector can't re-widen it into a loop.
@@ -110,6 +92,11 @@ struct TranscriptPane: View {
         VStack(spacing: 0) {
             if let notice = model.assumedLanguageNotice {
                 AssumedLanguageNote(text: notice)
+                Divider()
+            }
+
+            if TranslationStrip.shows(model.translationState) {
+                TranslationStrip()
                 Divider()
             }
 
@@ -170,30 +157,10 @@ struct TranscriptPane: View {
         )
     }
 
-    private var inspectorVisibleBinding: Binding<Bool> {
-        Binding(
-            get: { showsInspector },
-            set: { shown in
-                if paneIsNarrow {
-                    inspectorForcedAtNarrowWidth = shown
-                } else {
-                    inspectorVisible = shown
-                }
-            }
-        )
-    }
-
     private func applyPaneWidth(_ width: CGFloat) {
         let narrow = width < MainWindowLayout.inspectorCollapseWidth
         if paneIsNarrow != narrow { paneIsNarrow = narrow }
         if model.transcriptPaneIsNarrow != narrow { model.transcriptPaneIsNarrow = narrow }
         if !narrow, inspectorForcedAtNarrowWidth { inspectorForcedAtNarrowWidth = false }
-    }
-
-    private var inspectorModeBinding: Binding<InspectorMode> {
-        Binding(
-            get: { InspectorMode(stored: inspectorModeRaw) },
-            set: { inspectorModeRaw = $0.rawValue }
-        )
     }
 }

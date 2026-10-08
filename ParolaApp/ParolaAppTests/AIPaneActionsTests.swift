@@ -86,12 +86,50 @@ struct AIPaneActionsTests {
         #expect(model.transcript?.summary?.text == "older")
     }
 
+    @Test("the inspector's Summary offers Summarize, then Stop while one is written, Retry after a failure, and Show Summary once there is one")
+    func overviewSummaryStates() async {
+        let model = makeModel()
+        model.aiUnavailableReason = nil
+        let hosted = HostedWindow(OverviewSummary().environment(model), width: MainWindowLayout.inspectorWidth, height: 300)
+        defer { hosted.close() }
+        #expect(item("Overview.Button.Summarize", in: hosted)?.name == "Summarize")
+
+        blockedRun(.summary, on: model)
+        let stoppable = await waitUntil { item("Overview.Button.StopSummary", in: hosted) != nil }
+        #expect(stoppable)
+        #expect(item("Overview.Button.Summarize", in: hosted) == nil)
+        #expect(HostedAccessibility.press(endingWith: "Overview.Button.StopSummary", in: hosted.host))
+        #expect(!model.isSummarising)
+
+        model.summaryError = "The model stopped answering."
+        let failed = await waitUntil { item("Overview.Button.RetrySummary", in: hosted)?.name == "Retry" }
+        #expect(failed)
+        #expect(HostedAccessibility.words(in: hosted.host).contains("The model stopped answering."))
+
+        model.summaryError = nil
+        model.transcript?.summary = Summary(text: "We ship the patch on Friday.")
+        let summarised = await waitUntil { item("Overview.Button.ShowSummary", in: hosted)?.name == "Show Summary" }
+        #expect(summarised)
+        #expect(HostedAccessibility.words(in: hosted.host).contains("We ship the patch on Friday."))
+
+        blockedRun(.summary, on: model)
+        let regenerating = await waitUntil { item("Overview.Button.StopSummary", in: hosted) != nil }
+        #expect(regenerating, "a summary being written again shows its progress, not the one it replaces")
+        model.stopAIRun(.summary)
+
+        model.aiUnavailableReason = "Apple Intelligence is turned off."
+        model.transcript?.summary = nil
+        let unavailable = await waitUntil { HostedAccessibility.words(in: hosted.host).contains("Apple Intelligence is turned off.") }
+        #expect(unavailable)
+        #expect(item("Overview.Button.Summarize", in: hosted) == nil)
+    }
+
     @Test("chapters and action items being found can be stopped beside their progress line")
     func inspectorRunsStop() async {
         let model = makeModel()
         let hosted = HostedWindow(VStack {
-            ChaptersSection()
-            ActionItemsSection()
+            OverviewChapters()
+            OverviewActionItems()
         }.environment(model), width: 320)
         defer { hosted.close() }
 
@@ -282,15 +320,41 @@ struct AIPaneActionsTests {
         #expect(firstRun == "Generate Chapters")
         #expect(rerun == "Regenerate Chapters")
         #expect(findItems == "Find Action Items")
-        let chapters = try source("Views/Transcript/ChaptersSection")
-        #expect(chapters.contains(#"Button("Generate Chapters")"#))
-        #expect(chapters.contains(#"Button("Regenerate")"#))
-        let items = try source("Views/Transcript/ActionItemsSection")
-        #expect(items.contains(#"Button("Find Action Items")"#))
-        #expect(items.contains(#"Button("Find Again")"#))
-        #expect(items.contains(#"Text("Finding action items…")"#))
-        #expect(!items.contains("Re-Extract"))
-        #expect(!items.contains("Extracting…"))
+    }
+
+    @Test("the inspector's chapters and action items keep the same verbs: Generate and Find first, then Regenerate and Find Again")
+    func inspectorActionsShareOneVerb() async {
+        let model = makeModel()
+        model.aiUnavailableReason = nil
+        model.transcript?.summary = Summary(text: "We ship the patch on Friday.")
+        let empty = HostedWindow(OverviewSections().environment(model), width: MainWindowLayout.inspectorWidth, height: 900)
+        let generate = item("Chapters.Button.Generate", in: empty)?.name
+        let find = item("ActionItems.Button.Find", in: empty)?.name
+        empty.close()
+        #expect(generate == "Generate Chapters")
+        #expect(find == "Find Action Items")
+
+        model.smartChapters = [Chapter(title: "The budget", start: 0)]
+        model.actionItems = [ActionItem(task: "Ship the patch")]
+        let menus = HostedWindow(VStack(alignment: .leading) {
+            ChapterActions()
+            ActionItemActions()
+        }.environment(model), width: 320, height: 400)
+        let regenerate = item("Chapters.Button.Regenerate", in: menus)?.name
+        let again = item("ActionItems.Button.Reextract", in: menus)?.name
+        menus.close()
+        #expect(regenerate == "Regenerate")
+        #expect(again == "Find Again")
+
+        blockedRun(.actionItems, on: model)
+        let running = HostedWindow(OverviewActionItems().environment(model), width: 320, height: 300)
+        defer { running.close() }
+        let finding = await waitUntil { HostedAccessibility.words(in: running.host).contains("Finding action items…") }
+        #expect(finding)
+        let words = HostedAccessibility.words(in: running.host)
+        let jargon = words.filter { $0.contains("Re-Extract") || $0.contains("Extracting…") }
+        #expect(jargon.isEmpty)
+        model.stopAIRun(.actionItems)
     }
 
     @Test("the summary's meta line is plain words in the body font: no character count, no monospace")

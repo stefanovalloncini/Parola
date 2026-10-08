@@ -187,25 +187,26 @@ struct RouteLayoutTests {
         }
     }
 
-    @Test("showInfo reveals the inspector and selects the pane that renders the result")
-    func showInfoOpensTheInfoPane() {
-        let defaults = temporaryDefaults("test-inspector-info-")
+    @Test("revealing a section shows a hidden inspector and asks it to scroll there", arguments: [false, true])
+    func revealShowsTheInspector(narrow: Bool) {
+        let previous = DefaultsStore.current
+        let defaults = temporaryDefaults("test-inspector-reveal-")
+        DefaultsStore.current = defaults
+        defer { DefaultsStore.current = previous }
         defaults.set(false, forKey: InspectorVisibility.preferenceKey)
-        defaults.set(InspectorMode.format.rawValue, forKey: InspectorVisibility.modeKey)
+        let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("inspector-reveal"))
+        model.transcriptPaneIsNarrow = narrow
 
-        InspectorVisibility.showInfo(in: defaults, isNarrow: false)
+        model.revealInInspector(.actionItems)
 
-        #expect(InspectorVisibility.preference(in: defaults) == true)
-        #expect(InspectorMode(stored: defaults.string(forKey: InspectorVisibility.modeKey) ?? "") == .info)
-    }
-
-    @Test("showInfo at a narrow width writes the key that width answers to")
-    func showInfoAtANarrowWidth() {
-        let defaults = temporaryDefaults("test-inspector-info-narrow-")
-        InspectorVisibility.showInfo(in: defaults, isNarrow: true)
-
-        #expect(defaults.bool(forKey: InspectorVisibility.forcedAtNarrowWidthKey) == true)
-        #expect(InspectorMode(stored: defaults.string(forKey: InspectorVisibility.modeKey) ?? "") == .info)
+        let showing = InspectorVisibility.isVisible(
+            preference: InspectorVisibility.preference(in: defaults),
+            forcedAtNarrowWidth: defaults.bool(forKey: InspectorVisibility.forcedAtNarrowWidthKey),
+            isNarrow: narrow
+        )
+        #expect(showing)
+        #expect(InspectorVisibility.preference(in: defaults) == !narrow, "only the key this width answers to changes")
+        #expect(model.inspectorReveal == .actionItems)
     }
 
     @Test("the toggle flips the key that the current width answers to")

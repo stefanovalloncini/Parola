@@ -4,6 +4,8 @@ import Foundation
 enum InspectorVisibility {
     static let preferenceKey = "inspectorVisible"
     static let forcedAtNarrowWidthKey = "inspectorForcedAtNarrowWidth"
+    static let detailsExpandedKey = "inspectorDetailsExpanded"
+    static let insightsExpandedKey = "inspectorInsightsExpanded"
 
     static func isVisible(preference: Bool, forcedAtNarrowWidth: Bool, isNarrow: Bool) -> Bool {
         isNarrow ? forcedAtNarrowWidth : preference
@@ -18,8 +20,6 @@ enum InspectorVisibility {
         defaults.set(!showing, forKey: isNarrow ? forcedAtNarrowWidthKey : preferenceKey)
     }
 
-    static let modeKey = "inspectorMode"
-
     static func commandTitle(showing: Bool) -> String {
         showing ? String(localized: "Hide Inspector") : String(localized: "Show Inspector")
     }
@@ -29,14 +29,22 @@ enum InspectorVisibility {
         defaults.set(true, forKey: isNarrow ? forcedAtNarrowWidthKey : preferenceKey)
     }
 
-    /// Info is the only pane that renders chapters and action items, so showing the inspector is not enough.
-    static func showInfo(in defaults: UserDefaults, isNarrow: Bool) {
-        show(in: defaults, isNarrow: isNarrow)
-        defaults.set(InspectorMode.info.rawValue, forKey: modeKey)
-    }
-
     /// An unset key means visible, matching the pane's `@AppStorage` default.
     static func preference(in defaults: UserDefaults) -> Bool {
         (defaults.object(forKey: preferenceKey) as? Bool) ?? true
+    }
+}
+
+/// The inspector sections a command can scroll to.
+enum InspectorAnchor: Hashable {
+    case chapters
+    case actionItems
+}
+
+extension AppModel {
+    /// Shows the inspector and scrolls it to `section`: Show Chapters, and the runs whose results land there.
+    func revealInInspector(_ section: InspectorAnchor) {
+        InspectorVisibility.show(in: DefaultsStore.current, isNarrow: transcriptPaneIsNarrow)
+        inspectorReveal = section
     }
 }

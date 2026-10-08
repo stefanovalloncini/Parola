@@ -272,7 +272,7 @@ extension AppModel {
         return await writeCardMetadata(for: id, transcript: transcript).written
     }
 
-    /// An explicit user request from the Info inspector: bypasses the generation toggle, still needs the AI feature.
+    /// An explicit user request from the inspector's Details: bypasses the generation toggle, still needs the AI feature.
     func regenerateCardMetadata() {
         guard let id = selectedEntryID, let transcript else { return }
         Task { [weak self] in await self?.regenerateCardMetadata(for: id, transcript: transcript) }

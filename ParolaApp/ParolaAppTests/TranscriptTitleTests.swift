@@ -199,8 +199,8 @@ struct TranscriptTitleTests {
         return view.subviews.lazy.compactMap { editableField(in: $0) }.first
     }
 
-    @Test("Show Outline and Jump to Time… open their popovers with no header bar to hang them from")
-    func menuRequestsOpenThePopovers() async {
+    @Test("Jump to Time… opens its popover with no header bar to hang it from")
+    func menuRequestOpensThePopover() async {
         await withIsolatedDefaults { defaults in
             let model = makeModel(defaults)
             let hosted = HostedWindow(ContentView().environment(model), width: 1180, height: 760)
@@ -211,11 +211,6 @@ struct TranscriptTitleTests {
             let drawn = await waitUntil { headingElement(in: hosted.host) != nil }
             #expect(drawn)
 
-            model.outlineRequests &+= 1
-            let outline = await waitUntil { popoverWords(except: hosted.window).contains("Outline") }
-            #expect(outline)
-            closePopovers(except: hosted.window)
-
             model.jumpToTimeRequests &+= 1
             let jump = await waitUntil { popoverIDs(except: hosted.window).contains { $0.hasSuffix("JumpToTime.TextField.Time") } }
             #expect(jump)
@@ -224,10 +219,6 @@ struct TranscriptTitleTests {
 
     private func popovers(except window: NSWindow) -> [NSWindow] {
         NSApp.windows.filter { $0 !== window && $0.isVisible && String(describing: type(of: $0)).contains("Popover") }
-    }
-
-    private func popoverWords(except window: NSWindow) -> [String] {
-        popovers(except: window).flatMap { HostedAccessibility.words(in: $0) }
     }
 
     private func popoverIDs(except window: NSWindow) -> [String] {

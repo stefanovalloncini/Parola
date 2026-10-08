@@ -760,8 +760,9 @@ final class AppModel {
     var chatSearchRequests: Int = 0
     /// Bumped by the Transcript menu and the title's Rename…; the transcript page opens the matching popover or alert on each.
     var jumpToTimeRequests: Int = 0
-    var outlineRequests: Int = 0
     var renameRequests: Int = 0
+    /// The section the inspector scrolls to once it shows; it clears the request when it has.
+    var inspectorReveal: InspectorAnchor?
     /// Bumped by every replacement, so the find bar lets go of its field and the next ⌘Z reaches the transcript.
     var findReplacements: Int = 0
     var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }

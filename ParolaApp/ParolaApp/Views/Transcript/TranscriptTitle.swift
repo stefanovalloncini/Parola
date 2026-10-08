@@ -62,10 +62,9 @@ struct TranscriptTitleHeading: View {
     }
 }
 
-/// What Transcript ▸ Show Outline, Jump to Time… and Rename… open: the popovers hang from the top of the reading column.
+/// What Transcript ▸ Jump to Time… and Rename… open: the popover hangs from the top of the reading column.
 struct TranscriptMenuPopovers: ViewModifier {
     @Environment(AppModel.self) private var model
-    @State private var outlineOpen = false
     @State private var jumpOpen = false
     @State private var jumpDraft = ""
     @FocusState private var jumpFocused: Bool
@@ -75,21 +74,11 @@ struct TranscriptMenuPopovers: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .top) {
-                HStack(spacing: 0) {
-                    anchor.popover(isPresented: $outlineOpen, arrowEdge: .bottom) {
-                        OutlinePopover { seconds in
-                            model.seekTo(seconds: seconds)
-                            outlineOpen = false
-                        }
-                        .environment(model)
-                    }
-                    anchor.popover(isPresented: $jumpOpen, arrowEdge: .bottom) {
-                        jumpPopover
-                    }
+                anchor.popover(isPresented: $jumpOpen, arrowEdge: .bottom) {
+                    jumpPopover
                 }
             }
             .onChange(of: model.jumpToTimeRequests) { _, _ in jumpOpen = true }
-            .onChange(of: model.outlineRequests) { _, _ in outlineOpen = true }
             .onChange(of: model.renameRequests) { _, _ in beginRename() }
             .alert("Rename entry", isPresented: $renaming) {
                 TextField("Title", text: $renameDraft)

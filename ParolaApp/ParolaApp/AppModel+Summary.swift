@@ -197,7 +197,7 @@ extension Transcript {
         self.summary = summary
     }
 
-    /// The chapters outlive the summary, so the Outline and the Info inspector keep showing them.
+    /// The chapters outlive the summary, so the inspector's Chapters keeps showing them.
     mutating func removeSummary() {
         if chapters == nil { chapters = summary?.chapters }
         summary = nil

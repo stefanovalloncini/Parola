@@ -3,7 +3,7 @@ import Testing
 import ParolaCore
 @testable import Parola
 
-@Suite("Confidence and display tiles read without colour")
+@Suite("Confidence reads without colour")
 struct ConfidenceCueTests {
     private func source(_ name: String) throws -> String {
         let path = #filePath.replacingOccurrences(
@@ -21,12 +21,10 @@ struct ConfidenceCueTests {
         #expect(SegmentCard.confidenceNote(nil) == nil)
     }
 
-    @Test("the note is a labelled glyph beside the time, and the display tiles say which one is selected")
+    @Test("the note is a labelled glyph beside the time")
     func cuesReachVoiceOver() throws {
         let card = try source("Views/Transcript/SegmentCard")
         #expect(card.contains(#"if let note = Self.confidenceNote(confidenceBucket) { Image(systemName: "exclamationmark")"#))
         #expect(card.contains(".help(note) .accessibilityLabel(note)"))
-        let format = try source("Views/Transcript/FormatInspector")
-        #expect(format.contains(".accessibilityAddTraits(isSelected ? .isSelected : [])"))
     }
 }

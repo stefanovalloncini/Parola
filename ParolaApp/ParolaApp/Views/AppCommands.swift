@@ -414,10 +414,10 @@ struct TranscriptCommands: View {
             .keyboardShortcut("j", modifiers: [.command])
             .disabled(!model.mainTranscriptCommandsEnabled)
             .axLeaf("Menu.Transcript.JumpToTime")
-        Button("Show Outline") { model.outlineRequests &+= 1 }
+        Button("Show Chapters") { model.revealInInspector(.chapters) }
             .keyboardShortcut("o", modifiers: [.command, .shift])
             .disabled(!model.mainTranscriptCommandsEnabled)
-            .axLeaf("Menu.Transcript.ShowOutline")
+            .axLeaf("Menu.Transcript.ShowChapters")
         Divider()
         Button("Rename…") { model.renameRequests &+= 1 }
             .disabled(!model.canRenameOpenTranscript)

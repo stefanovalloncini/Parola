@@ -148,7 +148,7 @@ struct AssignSpeakerPeopleTests {
         #expect(DS.speakerColor(for: "SPEAKER_01", colorIndex: nil) == DS.speakerColor(for: "SPEAKER_01"))
     }
 
-    /// SpeakerFilterRow, SegmentCard and FormatInspector all wear `model.speakerColor(for:)`, so this checks that one function rather than retyping its expression.
+    /// SpeakerFilterRow, SegmentCard and the inspector's People rows all wear `model.speakerColor(for:)`, so this checks that one function rather than retyping its expression.
     @Test("an assigned speaker's colour is the palette entry their person owns")
     func assignedSpeakerColorsAgreeAcrossSurfaces() async throws {
         let model = PeopleTestSupport.makeModel("assignspeakerchips")
@@ -198,7 +198,7 @@ struct AssignSpeakerPeopleTests {
         #expect(model.transcript?.segments.map(\.speaker) == ["Ada L.", "SPEAKER_01", "Ada L."])
         #expect(model.speakerAssignments == ["Ada L.": ada.id])
         #expect(model.person(forSpeaker: "Ada L.")?.id == ada.id)
-        #expect(SpeakerPillState.of(person: model.person(forSpeaker: "Ada L."), label: "Ada L.") == .person("Ada"))
+        #expect(SpeakerRowState.of(person: model.person(forSpeaker: "Ada L."), label: "Ada L.") == .person("Ada"))
         #expect(model.speakerColorIndices["Ada L."] == ada.colorIndex)
         #expect(model.entries(withPerson: ada.id).map(\.id) == [entry.id])
         // The rename carried the person over instead of minting one under the new text.
@@ -453,12 +453,12 @@ struct AssignSpeakerPeopleTests {
         #expect(model.usageCount(of: ada) == 0)
     }
 
-    @Test("the pill names the person only when the label differs")
+    @Test("the row names the person only when the label differs")
     func pillStates() {
         let ada = Person(name: "Ada")
-        #expect(SpeakerPillState.of(person: nil, label: "SPEAKER_00") == .unassigned)
-        #expect(SpeakerPillState.of(person: ada, label: "Ada") == .assigned)
-        #expect(SpeakerPillState.of(person: ada, label: "SPEAKER_00") == .person("Ada"))
+        #expect(SpeakerRowState.of(person: nil, label: "SPEAKER_00") == .unassigned)
+        #expect(SpeakerRowState.of(person: ada, label: "Ada") == .assigned)
+        #expect(SpeakerRowState.of(person: ada, label: "SPEAKER_00") == .person("Ada"))
     }
 
     @Test("the inspector counts the segments behind each speaker")

@@ -16,11 +16,7 @@ struct LabelsSection: View {
     var body: some View {
         if entry != nil {
             InspectorSection(title: "Labels") {
-                if labels.isEmpty {
-                    Text("No labels yet")
-                        .font(DS.Font.body)
-                        .foregroundStyle(DS.Color.secondaryText)
-                } else {
+                if !labels.isEmpty {
                     chipFlow
                 }
                 composer

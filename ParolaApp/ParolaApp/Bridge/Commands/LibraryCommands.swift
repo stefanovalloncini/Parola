@@ -48,7 +48,7 @@ extension ParolaAutomationServer {
                         name: "force",
                         kind: .boolean,
                         required: false,
-                        summary: "Ignore the generation toggle, the way the Info inspector's Regenerate does",
+                        summary: "Ignore the generation toggle, the way Regenerate title and summary in the inspector does",
                         defaultValue: .bool(false)
                     ),
                 ],
@@ -98,7 +98,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "retranscribeEntry",
                 area: .library,
-                summary: "Runs a library entry's own audio again into the same entry, the way the Info inspector's Model and Language menus do. Omitted arguments keep what the entry already carries; an empty language means Auto. Favorites, notes, summary, translation, the speaker map and the card metadata are replaced. Refused for an entry with no audio.",
+                summary: "Runs a library entry's own audio again into the same entry, the way the Model and Language menus in the inspector's Details do. Omitted arguments keep what the entry already carries; an empty language means Auto. Favorites, notes, summary, translation, the speaker map and the card metadata are replaced. Refused for an entry with no audio.",
                 kind: .mutating,
                 args: [
                     .init(name: "entryID", kind: .string(), required: true, summary: "Library entry ID"),
