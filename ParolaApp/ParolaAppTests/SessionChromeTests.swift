@@ -380,12 +380,7 @@ private final class SwiftUIStandIn: NSObject, NSWindowDelegate {
 /// Titled and closable, far off screen, kept after it closes so a test can read it back.
 @MainActor
 private func closableWindow() -> NSWindow {
-    let window = NSWindow(
-        contentRect: NSRect(x: -12_000, y: -12_000, width: 400, height: 300),
-        styleMask: [.titled, .closable, .resizable],
-        backing: .buffered,
-        defer: false
-    )
+    let window = OffscreenWindow(width: 400, height: 300, styleMask: [.titled, .closable, .resizable])
     window.isReleasedWhenClosed = false
     window.orderFront(nil)
     return window

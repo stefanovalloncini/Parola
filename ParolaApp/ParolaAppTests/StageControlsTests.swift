@@ -81,9 +81,7 @@ extension TranscriberMockSuites {
 
         @Test("with a Stage control focused, Space is the control's: the take records on and the player stays still")
         func focusedControlKeepsSpace() async throws {
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 240, height: 120), styleMask: [.titled], backing: .buffered, defer: false
-            )
+            let window = OffscreenWindow(width: 240, height: 120, styleMask: [.titled])
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: FocusedDiscard())
             window.orderFront(nil)
