@@ -8324,6 +8324,17 @@
         }
       }
     },
+    "Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I sottotitoli in tempo reale trascrivono il microfono mentre parli e mostrano le parole in un pannello mobile che resta sopra le altre finestre."
+          }
+        }
+      }
+    },
     "Live preview": {
       "extractionState": "manual",
       "localizations": {
@@ -8864,6 +8875,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Microfono"
+          }
+        }
+      }
+    },
+    "Microphone access is off": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'accesso al microfono è disattivato"
           }
         }
       }
@@ -11068,6 +11090,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola ha bisogno del permesso Registrazione schermo e audio di sistema per registrare l'audio di sistema. Apri Impostazioni di Sistema → Privacy e sicurezza → Registrazione schermo e audio di sistema e consenti l'accesso a Parola, poi avvia di nuovo la registrazione."
+          }
+        }
+      }
+    },
+    "Parola needs the microphone to record and dictate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola ha bisogno del microfono per registrare e dettare."
           }
         }
       }
@@ -18520,6 +18553,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Whisper traduce dalla lingua sorgente rilevata in inglese."
+          }
+        }
+      }
+    },
+    "Whisper translates from the detected source language into English. Only multilingual Whisper models can translate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whisper traduce dalla lingua sorgente rilevata in inglese. Solo i modelli Whisper multilingue sanno tradurre."
           }
         }
       }

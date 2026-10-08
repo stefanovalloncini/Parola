@@ -110,6 +110,21 @@ struct SettingsCopyTests {
         }
     }
 
+    @Test("the notes that moved into Settings footers and rows read in Italian")
+    func movedNotesAreTranslated() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        let keys = [
+            "Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.",
+            "Microphone access is off",
+            "Parola needs the microphone to record and dictate.",
+            "Whisper translates from the detected source language into English. Only multilingual Whisper models can translate.",
+        ]
+        for key in keys {
+            #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING", "\(key)")
+        }
+    }
+
     @Test("the service editor's Test is off while Keep AI on this Mac pauses the service, and the editor says why")
     func pausedServiceEditor() throws {
         let model = makeModel("settings-copy-paused-editor")
