@@ -18,6 +18,7 @@ struct SheetButtonsTests {
         "Views/PromptOutputSheet",
         "Views/Settings/AIServiceEditor",
         "Views/Settings/ObsidianDestinationEditor",
+        "Views/Settings/PromptsPane",
         "Views/Settings/RemoteAIAcknowledgementSheet",
         "Views/SpeakersSheet",
         "Views/Transcript/SegmentNoteSheet",

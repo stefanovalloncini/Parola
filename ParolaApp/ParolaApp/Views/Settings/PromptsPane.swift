@@ -314,50 +314,61 @@ final class PromptEditDraft: Identifiable {
     }
 }
 
-private struct PromptEditor: View {
+struct PromptEditor: View {
     @Bindable var draft: PromptEditDraft
     let onCommit: (PromptEditDraft) -> Void
     let onDuplicate: (PromptEditDraft) -> Void
     let onCancel: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if draft.isReadOnly {
-                Text("Built-in Prompt").font(DS.Font.heading)
-            } else if draft.isExisting {
-                Text("Edit Prompt").font(DS.Font.heading)
-            } else {
-                Text("New Prompt").font(DS.Font.heading)
+        SheetFrame(title: title, onClose: onCancel) {
+            VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+                fields
             }
+            .disabled(draft.isReadOnly)
+            .padding(DS.Spacing.regular)
+        } footer: {
+            footer
+        }
+        .sheetDescription(Text(description))
+        .footerHasCancel()
+    }
 
-            fields
-                .disabled(draft.isReadOnly)
+    private var title: LocalizedStringKey {
+        if draft.isReadOnly { return "Built-in Prompt" }
+        return draft.isExisting ? "Edit Prompt" : "New Prompt"
+    }
 
-            HStack {
-                Spacer()
-                if draft.isReadOnly {
-                    Button("Close", role: .cancel, action: onCancel)
-                        .sheetSecondaryAction()
-                        .axLeaf("PromptEditor.Button.Close")
-                    Button("Duplicate") { onDuplicate(draft) }
-                        .sheetPrimaryAction()
-                        .keyboardShortcut(.defaultAction)
-                        .axLeaf("PromptEditor.Button.Duplicate")
-                } else {
-                    Button("Cancel", role: .cancel, action: onCancel)
-                        .sheetSecondaryAction()
-                        .axLeaf("PromptEditor.Button.Cancel")
-                    Button("Save") { onCommit(draft) }
-                        .sheetPrimaryAction()
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .axLeaf("PromptEditor.Button.Save")
-                }
+    private var description: LocalizedStringKey {
+        draft.isReadOnly
+            ? "Built-in prompts are read-only. Duplicate this one to change it."
+            : "Parola sends these instructions to the model along with the text."
+    }
+
+    private var footer: some View {
+        HStack {
+            Spacer()
+            if draft.isReadOnly {
+                Button("Close", action: onCancel)
+                    .sheetSecondaryAction()
+                    .keyboardShortcut(.cancelAction)
+                    .axLeaf("PromptEditor.Button.Close")
+                Button("Duplicate") { onDuplicate(draft) }
+                    .sheetPrimaryAction()
+                    .keyboardShortcut(.defaultAction)
+                    .axLeaf("PromptEditor.Button.Duplicate")
+            } else {
+                Button("Cancel", action: onCancel)
+                    .sheetSecondaryAction()
+                    .keyboardShortcut(.cancelAction)
+                    .axLeaf("PromptEditor.Button.Cancel")
+                Button("Save") { onCommit(draft) }
+                    .sheetPrimaryAction()
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .axLeaf("PromptEditor.Button.Save")
             }
         }
-        .padding(DS.Spacing.medium)
-        .frame(width: 480)
-        .tint(DS.Color.accent)
     }
 
     @ViewBuilder private var fields: some View {

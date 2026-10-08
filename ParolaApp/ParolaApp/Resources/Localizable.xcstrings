@@ -2867,6 +2867,17 @@
         }
       }
     },
+    "Built-in prompts are read-only. Duplicate this one to change it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I prompt integrati sono di sola lettura. Duplica questo per modificarlo."
+          }
+        }
+      }
+    },
     "Bullet points": {
       "extractionState": "manual",
       "localizations": {
@@ -11078,6 +11089,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola riconosce un file dal contenuto, quindi una copia rinominata conta come la stessa registrazione. In un batch, con “Chiedimelo” il file viene saltato."
+          }
+        }
+      }
+    },
+    "Parola sends these instructions to the model along with the text.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola invia queste istruzioni al modello insieme al testo."
           }
         }
       }

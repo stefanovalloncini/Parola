@@ -13,6 +13,7 @@ struct SheetKeysTests {
     private final class Calls {
         var cancelled = 0
         var saved = 0
+        var duplicated = 0
     }
 
     private func makeModel(_ label: String) -> AppModel {
@@ -104,6 +105,38 @@ struct SheetKeysTests {
         let hostedReturn = hosted.press(.return)
         #expect(hostedReturn)
         #expect(calls.saved == 1)
+    }
+
+    @Test("the Prompts pane's editor: ⎋ cancels and ↩ saves; for a built-in, ⎋ closes and ↩ duplicates")
+    func promptEditorKeys() throws {
+        let calls = Calls()
+        let model = makeModel("sheet-keys-prompt-editor")
+        func editor(_ draft: PromptEditDraft) -> PromptEditor {
+            PromptEditor(
+                draft: draft,
+                onCommit: { _ in calls.saved += 1 },
+                onDuplicate: { _ in calls.duplicated += 1 },
+                onCancel: { calls.cancelled += 1 }
+            )
+        }
+        let custom = host(editor(PromptEditDraft(prompt: Prompt(name: "Recap", instructions: "Sum it up.", isBuiltIn: false))), model: model)
+        let customEscape = custom.press(.escape)
+        #expect(customEscape)
+        #expect(calls.cancelled == 1)
+        let customReturn = custom.press(.return)
+        #expect(customReturn)
+        #expect(calls.saved == 1)
+        custom.close()
+        let first = Prompt.builtIns.first
+        let builtIn = try #require(first)
+        let viewing = host(editor(PromptEditDraft(viewing: builtIn)), model: model)
+        defer { viewing.close() }
+        let viewingEscape = viewing.press(.escape)
+        #expect(viewingEscape)
+        #expect(calls.cancelled == 2)
+        let viewingReturn = viewing.press(.return)
+        #expect(viewingReturn)
+        #expect(calls.duplicated == 1)
     }
 
     @Test("Transcripts leave this Mac: ⎋ cancels and ↩ is I understand")

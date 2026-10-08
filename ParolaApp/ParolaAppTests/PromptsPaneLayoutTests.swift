@@ -27,6 +27,32 @@ struct PromptsPaneLayoutTests {
         }
     }
 
+    @Test("the prompt editor is drawn like the other sheets: a title heading, a line under it, Cancel beside Save")
+    func editorIsASheetFrame() throws {
+        let editor = PromptEditor(
+            draft: PromptEditDraft(prompt: Prompt(name: "", instructions: "", isBuiltIn: false)),
+            onCommit: { _ in },
+            onDuplicate: { _ in },
+            onCancel: {}
+        )
+        let hosted = HostedWindow(editor, width: 480, height: 640)
+        defer { hosted.close() }
+        let elements = HostedAccessibility.elements(in: hosted.host)
+        func element(_ leaf: String) throws -> HostedAccessibility.Element {
+            let found = elements.first { $0.identifier?.hasSuffix(leaf) == true }
+            return try #require(found, "no \(leaf)")
+        }
+        let title = try element("Sheet.Text.Title")
+        let description = try element("Sheet.Text.Description")
+        let cancel = try element("PromptEditor.Button.Cancel").frame
+        let save = try element("PromptEditor.Button.Save").frame
+        #expect(title.role == "AXHeading")
+        #expect(title.name == String(localized: "New Prompt"))
+        #expect(description.frame.maxY <= title.frame.minY)
+        #expect(cancel.maxX <= save.minX)
+        #expect(save.minX - cancel.maxX < 24)
+    }
+
     @Test("Add Prompt sits above the built-in prompts, under the custom ones")
     func addPromptComesBeforeTheBuiltIns() throws {
         let model = makeModel()
