@@ -255,6 +255,18 @@ struct StageStateTests {
         #expect(StageClock.roll == .easeOut(duration: 0.2))
     }
 
+    @Test("a running, starting or paused clock never shrinks to fit; only one a landing can carry into the media bar does")
+    func clockShrinksOnlyToLand() {
+        let still: [RecordingSession.State] = [
+            .arming(.startingCapture), .recording, .paused(since: Date()), .failed(message: "The microphone stopped."),
+        ]
+        let landing: [RecordingSession.State] = [.finishing, .transcribing(progress: 0.5), .done(entryID: "E")]
+        let stillScales = still.map(StageClock.minimumScale)
+        let landingScales = landing.map(StageClock.minimumScale)
+        #expect(stillScales == [1, 1, 1, 1])
+        #expect(landingScales == [0.1, 0.1, 0.1])
+    }
+
     @Test("the entrance starts from 30 %, so its first frame is never an empty window")
     func entranceStartsInSight() {
         #expect(StagePage.entranceOpacity(entered: false) == 0.3)

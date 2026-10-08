@@ -26,6 +26,11 @@ struct StageClock: View {
         text.enumerated().map { (text.count - 1 - $0.offset, $0.element) }
     }
 
+    /// Only a clock a landing can carry into the media bar's duration shrinks with its frame; a running one keeps its size and skips the shrink-to-fit measuring.
+    nonisolated static func minimumScale(_ state: RecordingSession.State) -> CGFloat {
+        StageLanding.stageOffers(state) ? 0.1 : 1
+    }
+
     var body: some View {
         if ticks, take.state == .recording, let origin = take.clockOrigin {
             TimelineView(.periodic(from: origin, by: 1)) { context in
@@ -51,9 +56,8 @@ struct StageClock: View {
             }
         }
         .font(font)
-        // Shrinks with its frame as a landing carries it into the media bar's duration.
         .lineLimit(1)
-        .minimumScaleFactor(0.1)
+        .minimumScaleFactor(Self.minimumScale(take.state))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Recording time")
         .accessibilityValue(AppFormat.spokenDuration(seconds: seconds))
