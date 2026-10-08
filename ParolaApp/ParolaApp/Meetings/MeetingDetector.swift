@@ -21,11 +21,15 @@ final class MeetingDetector {
     }
 
     var isEnabled: Bool {
-        didSet { DefaultsStore.current.set(isEnabled, forKey: Self.defaultsKey) }
+        didSet {
+            DefaultsStore.current.set(isEnabled, forKey: Self.defaultsKey)
+            if oldValue, !isEnabled { onDisabled() }
+        }
     }
 
     @ObservationIgnored private let onDetected: @MainActor (String) -> Void
     @ObservationIgnored private let onQuit: @MainActor (String) -> Void
+    @ObservationIgnored private let onDisabled: @MainActor () -> Void
     @ObservationIgnored private let clock: @MainActor () -> Date
     @ObservationIgnored private let runningApps: @MainActor () -> Set<String>
     @ObservationIgnored private var lastFiredApp: String?
@@ -43,11 +47,13 @@ final class MeetingDetector {
     init(
         onDetected: @escaping @MainActor (String) -> Void,
         onQuit: @escaping @MainActor (String) -> Void = { _ in },
+        onDisabled: @escaping @MainActor () -> Void = {},
         clock: @escaping @MainActor () -> Date = { Date() },
         runningApps: @escaping @MainActor () -> Set<String> = { MeetingDetector.runningMeetingApps() }
     ) {
         self.onDetected = onDetected
         self.onQuit = onQuit
+        self.onDisabled = onDisabled
         self.clock = clock
         self.runningApps = runningApps
         self.isEnabled = (DefaultsStore.current.object(forKey: Self.defaultsKey) as? Bool) ?? true

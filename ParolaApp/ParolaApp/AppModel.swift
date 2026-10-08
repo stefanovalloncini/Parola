@@ -1579,6 +1579,8 @@ final class AppModel {
             if prompts, self.meetingDetectedApp == nil { self.meetingDetectedApp = appName }
         } onQuit: { [weak self] appName in
             self?.meetingAppQuit(appName)
+        } onDisabled: { [weak self] in
+            self?.meetingDetectedApp = nil
         }
     }
 

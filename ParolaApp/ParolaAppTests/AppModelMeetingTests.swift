@@ -76,6 +76,23 @@ extension TranscriberMockSuites {
             #expect(model.meetingDetectedApp == "Zoom")
         }
 
+        @Test("turning meeting detection off takes a waiting prompt down, and no detection raises one while it's off")
+        func turningDetectionOffTakesThePromptDown() {
+            let model = makeModel()
+            model.meetingDetector.isEnabled = true
+            model.meetingDetector.fire(appName: "Acme Conference")
+            #expect(model.meetingDetectedApp == "Acme Conference")
+
+            model.meetingDetector.isEnabled = false
+            #expect(model.meetingDetectedApp == nil)
+            model.meetingDetector.fire(appName: "Other Conference")
+            #expect(model.meetingDetectedApp == nil)
+
+            model.meetingDetector.isEnabled = true
+            model.meetingDetector.fire(appName: "Other Conference")
+            #expect(model.meetingDetectedApp == "Other Conference")
+        }
+
         @Test("dismissing the prompt clears the detected app")
         func dismissClearsDetectedApp() {
             let model = makeModel()
