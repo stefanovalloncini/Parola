@@ -92,19 +92,26 @@ struct StageBand: View {
 
     @ViewBuilder
     private var bars: some View {
-        switch Self.cadence(reduceMotion: reduceMotion) {
-        case .steps(let interval):
-            TimelineView(.animation(minimumInterval: interval, paused: !drawsLive)) { _ in tape.drawn(.still) }
-        case .glides:
-            let _ = drawsLive ? model.takeLevelTick : 0
-            tape.drawn(drawsLive ? .from(model.takeLevelTickAt) : .held)
-        }
+        let _ = Self.swiftUIFollowsSamples(live: drawsLive, voiceOver: model.voiceOverIsRunning) ? model.takeLevelTick : 0
+        let cadence = Self.cadence(reduceMotion: reduceMotion)
+        tape.drawn(cadence == .glides ? .held : .still, following: drawsLive ? feed(cadence) : nil)
+    }
+
+    /// Whether the band's body reads each new sample: only while VoiceOver reads the stand-in's level, since the layer view follows a live take by itself.
+    nonisolated static func swiftUIFollowsSamples(live: Bool, voiceOver: Bool) -> Bool {
+        live && voiceOver
     }
 
     private var tape: StageTape {
         Self.tape(
             levels: model.takeLevels, micLevels: model.takeMicLevels, micState: model.takeMicTrackState,
             markers: take.markers, paused: take.isPaused, macStopped: model.takeMacAudioStopped
+        )
+    }
+
+    private func feed(_ cadence: Cadence) -> TapeFeed {
+        TapeFeed(
+            model: model, cadence: cadence, markers: take.markers, micState: model.takeMicTrackState, macStopped: model.takeMacAudioStopped
         )
     }
 
@@ -245,6 +252,8 @@ struct StageBand: View {
         private var accent: CGColor?
         private var slide: Slide?
         private var builtSize: CGSize?
+        private var feed: TapeFeed?
+        private var following: Task<Void, Never>?
 
         init() {
             super.init(frame: .zero)
@@ -261,6 +270,10 @@ struct StageBand: View {
 
         @available(*, unavailable)
         required init?(coder: NSCoder) { fatalError("not used") }
+
+        isolated deinit {
+            following?.cancel()
+        }
 
         // The band takes no clicks; one lands on whatever is under it.
         override func hitTest(_ point: NSPoint) -> NSView? {
@@ -291,6 +304,52 @@ struct StageBand: View {
                 if newBars || slide != self.slide {
                     self.slide = slide
                     place(slide)
+                }
+            }
+        }
+
+        /// Follows a live take on its own: each new sample, or under Reduce Motion four times a second, builds the bars without a SwiftUI update.
+        func follow(_ feed: TapeFeed, ink: CGColor, accent: CGColor) {
+            let changed = feed != self.feed || ink != self.ink || accent != self.accent
+            let cadenceChanged = feed.cadence != self.feed?.cadence || feed.model !== self.feed?.model
+            self.feed = feed
+            if changed || following == nil {
+                showFeed(ink: ink, accent: accent)
+            }
+            if cadenceChanged || following == nil {
+                startFollowing(feed)
+            }
+        }
+
+        func stopFollowing() {
+            following?.cancel()
+            following = nil
+            feed = nil
+        }
+
+        private func showFeed(ink: CGColor? = nil, accent: CGColor? = nil) {
+            guard let feed, let ink = ink ?? self.ink, let accent = accent ?? self.accent else { return }
+            show(feed.tape(), slide: feed.slide(), ink: ink, accent: accent)
+        }
+
+        private func startFollowing(_ feed: TapeFeed) {
+            following?.cancel()
+            let model = feed.model
+            switch feed.cadence {
+            case .glides:
+                following = Task { [weak self] in
+                    for await _ in Observations({ @MainActor in model.takeLevelTick }) {
+                        guard !Task.isCancelled, let self else { return }
+                        self.showFeed()
+                    }
+                }
+            case .steps(let interval):
+                following = Task { [weak self] in
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(interval))
+                        guard !Task.isCancelled, let self else { return }
+                        self.showFeed()
+                    }
                 }
             }
         }
@@ -363,6 +422,7 @@ struct StageBand: View {
 private struct TapeLayer: NSViewRepresentable {
     let tape: StageTape
     let slide: StageBand.Slide
+    let feed: TapeFeed?
 
     func makeNSView(context: Context) -> StageBand.TapeView {
         StageBand.TapeView()
@@ -370,12 +430,46 @@ private struct TapeLayer: NSViewRepresentable {
 
     func updateNSView(_ view: StageBand.TapeView, context: Context) {
         let environment = context.environment
-        view.show(
-            tape,
-            slide: slide,
-            ink: DS.Color.primaryText.resolve(in: environment).cgColor,
-            accent: DS.Color.accent.resolve(in: environment).cgColor
+        let ink = DS.Color.primaryText.resolve(in: environment).cgColor
+        let accent = DS.Color.accent.resolve(in: environment).cgColor
+        if let feed {
+            view.follow(feed, ink: ink, accent: accent)
+        } else {
+            view.stopFollowing()
+            view.show(tape, slide: slide, ink: ink, accent: accent)
+        }
+    }
+
+    static func dismantleNSView(_ view: StageBand.TapeView, coordinator: ()) {
+        view.stopFollowing()
+    }
+}
+
+/// What the band's layer view reads from a live take between SwiftUI's updates: the take's levels as they come in, with the rest as SwiftUI last saw it.
+struct TapeFeed: Equatable {
+    let model: AppModel
+    let cadence: StageBand.Cadence
+    let markers: [TimeInterval]
+    let micState: MicTrackState?
+    let macStopped: Bool
+
+    @MainActor
+    func tape() -> StageTape {
+        StageBand.tape(
+            levels: model.takeLevels, micLevels: model.takeMicLevels, micState: micState, markers: markers, paused: false,
+            macStopped: macStopped
         )
+    }
+
+    /// Sliding from the newest sample's moment, or under Reduce Motion standing against the playhead.
+    @MainActor
+    func slide() -> StageBand.Slide {
+        cadence == .glides ? .from(model.takeLevelTickAt) : .still
+    }
+
+    nonisolated static func == (lhs: TapeFeed, rhs: TapeFeed) -> Bool {
+        lhs.model === rhs.model && lhs.cadence == rhs.cadence && lhs.markers == rhs.markers && lhs.micState == rhs.micState
+            && lhs.macStopped == rhs.macStopped
     }
 }
 
@@ -397,10 +491,10 @@ struct StageTape: Equatable {
             && (lhs.micLevels == nil) == (rhs.micLevels == nil) && lhs.micLost == rhs.micLost && lhs.macLost == rhs.macLost
     }
 
-    /// The bars on their layers, sliding as `slide` says.
+    /// The bars on their layers, sliding as `slide` says, or with a feed following a live take on their own.
     @MainActor
-    func drawn(_ slide: StageBand.Slide) -> some View {
-        TapeLayer(tape: self, slide: slide)
+    func drawn(_ slide: StageBand.Slide, following feed: TapeFeed? = nil) -> some View {
+        TapeLayer(tape: self, slide: slide, feed: feed)
         // A layer view carries no value; a text stand-in per lane reads its level the way the clock reads its time.
         .accessibilityRepresentation {
             if let micLevels {

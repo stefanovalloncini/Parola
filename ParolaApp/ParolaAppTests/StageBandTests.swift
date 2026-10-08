@@ -92,6 +92,13 @@ struct StageBandTests {
         #expect(StageBand.cadence(reduceMotion: true) == .steps(every: 0.25))
     }
 
+    @Test("only for VoiceOver does the band's body read each new sample of a live take; its layer view follows them alone")
+    func swiftUIFollowsOnlyForVoiceOver() {
+        #expect(StageBand.swiftUIFollowsSamples(live: true, voiceOver: true))
+        #expect(!StageBand.swiftUIFollowsSamples(live: true, voiceOver: false))
+        #expect(!StageBand.swiftUIFollowsSamples(live: false, voiceOver: true))
+    }
+
     @Test("the bars are built again when a sample, a marker or a pause comes in, and only then")
     func tapeRedrawsPerSample() {
         let tape = StageTape(levels: [0.1, 0.2], flags: [], newest: 41, paused: false)
@@ -487,6 +494,36 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("the band's layer view follows a live take's samples by itself, sliding from each, with no SwiftUI update; let go, it builds nothing more")
+        func followsTheTakeAlone() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeRecordingModel("stage-band-follow")
+                model.selectedModel = "openai_whisper-tiny"
+                try await startFixtureTake(model, seconds: 5)
+                let view = StageBand.TapeView()
+                let window = OffscreenWindow(width: 1180, height: StageBand.height, styleMask: [.borderless])
+                window.contentView = view
+                window.orderFront(nil)
+                defer { window.orderOut(nil) }
+                let feed = TapeFeed(model: model, cadence: .glides, markers: [], micState: nil, macStopped: false)
+                view.follow(feed, ink: CGColor(gray: 0, alpha: 0.85), accent: CGColor(srgbRed: 0.2, green: 0.4, blue: 0.9, alpha: 1))
+                let first = view.built?.newest ?? -1
+                let followed = await waitUntil {
+                    (view.built?.newest ?? -1) >= first + 3 && view.built?.newest == newestSample(model)
+                        && view.tape.animation(forKey: StageBand.slideKey) != nil
+                }
+                #expect(followed, "the bars keep up with the take and slide from its newest sample")
+
+                view.stopFollowing()
+                let lastBars = view.built?.newest
+                let tick = model.takeLevelTick
+                let movedOn = await waitUntil { model.takeLevelTick >= tick + 3 }
+                #expect(movedOn)
+                #expect(view.built?.newest == lastBars, "let go, the band keeps the bars it had")
+                await model.discardTake()
+            }
+        }
+
         @Test("under Reduce Motion the band follows the take at most four times a second and never slides")
         func reduceMotionSteps() async throws {
             try await withMocksCleared(.audioSource) {
@@ -515,5 +552,61 @@ extension TranscriberMockSuites {
                 await model.discardTake()
             }
         }
+    }
+}
+
+/// A capture whose level the test sets.
+private actor BandLevelCapture: LiveAudioSource {
+    nonisolated let levelMeter = LevelMeter()
+    private let file: URL
+
+    init(file: URL) { self.file = file }
+
+    func start() async throws {}
+    func prepare() async throws -> URL { file }
+    func cancel() async {}
+}
+
+@MainActor
+@Suite("Stage band under VoiceOver", .serialized)
+struct StageBandVoiceOverTests {
+    private func spokenLevel(in hosted: HostedWindow) -> String? {
+        HostedAccessibility.elements(in: hosted.host).first { $0.label == "Input level" }?.value
+    }
+
+    @Test("with VoiceOver running the band says each new level as it comes in, while its layer view draws the bars")
+    func saysEachLevel() async throws {
+        let audio = try tempWAV("band-voiceover")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("band-voiceover")
+        model.useStreaming = false
+        model.selectedModel = "openai_whisper-tiny"
+        model.voiceOverIsRunning = true
+        let capture = BandLevelCapture(file: audio)
+        model.takeCaptureOverride = { _ in capture }
+        defer { await model.discardTake() }
+        model.startRecording(source: .microphone)
+        let up = await waitUntil { model.liveSource != nil }
+        try #require(up)
+        capture.levelMeter.record(0.2)
+        let recording = await waitUntil { model.recording?.state == .recording }
+        try #require(recording)
+
+        let sight = BandSight()
+        sight.shown = true
+        let hosted = HostedWindow(BandInSight(model: model, sight: sight).environment(model), width: 1180, height: StageBand.height)
+        defer { hosted.close() }
+        let drawn = await waitUntil { spokenLevel(in: hosted) != nil }
+        try #require(drawn)
+
+        let loud = Task { @MainActor in
+            while !Task.isCancelled {
+                capture.levelMeter.record(0.8)
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        defer { loud.cancel() }
+        let said = await waitUntil { spokenLevel(in: hosted) == AppFormat.percent(0.8) }
+        #expect(said, "the band still says \(spokenLevel(in: hosted) ?? "nothing")")
     }
 }

@@ -364,8 +364,8 @@ final class AppModel {
     }
     /// Test seam: how long the saved-take toast stays once nothing holds it.
     @ObservationIgnored var takeSavedLifetime: Duration = TakeSavedNotice.lifetime
-    /// VoiceOver running keeps the saved-take toast up until it is dismissed. The app delegate follows the system's setting; a model it doesn't bind, as a test's, starts with it off.
-    @ObservationIgnored var voiceOverIsRunning = false {
+    /// VoiceOver running keeps the saved-take toast up until it is dismissed, and has the Stage's band say each new level. The app delegate follows the system's setting; a model it doesn't bind, as a test's, starts with it off.
+    var voiceOverIsRunning = false {
         didSet { if voiceOverIsRunning != oldValue { restartTakeSavedExpiry() } }
     }
     @ObservationIgnored private var takeSavedExpiry: Task<Void, Never>?
