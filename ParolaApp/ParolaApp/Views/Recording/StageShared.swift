@@ -26,7 +26,7 @@ struct StageClock: View {
         text.enumerated().map { (text.count - 1 - $0.offset, $0.element) }
     }
 
-    /// Only a clock a landing can carry into the media bar's duration shrinks with its frame; a running one keeps its size and skips the shrink-to-fit measuring.
+    /// Only a clock a landing can carry into the media bar's duration shrinks with its frame; a running one keeps its size.
     nonisolated static func minimumScale(_ state: RecordingSession.State) -> CGFloat {
         StageLanding.stageOffers(state) ? 0.1 : 1
     }
