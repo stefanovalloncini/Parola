@@ -2917,6 +2917,17 @@
         }
       }
     },
+    "Burn subtitles into video": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imprimi i sottotitoli nel video"
+          }
+        }
+      }
+    },
     "Burning subtitles into %@": {
       "extractionState": "manual",
       "localizations": {
@@ -3133,6 +3144,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli"
+          }
+        }
+      }
+    },
+    "Captions are rendered permanently into a copy of the video.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I sottotitoli vengono impressi in modo permanente in una copia del video."
           }
         }
       }
@@ -3503,6 +3525,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scegli Riassumi per avere una panoramica breve con dei capitoli a cui puoi saltare."
+          }
+        }
+      }
+    },
+    "Choose Video…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli video…"
           }
         }
       }
@@ -6655,6 +6688,17 @@
         }
       }
     },
+    "Font size": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimensione font"
+          }
+        }
+      }
+    },
     "For example, keep numbers and dates.": {
       "extractionState": "manual",
       "localizations": {
@@ -9496,6 +9540,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun messaggio"
+          }
+        }
+      }
+    },
+    "No Output": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna risposta"
           }
         }
       }
@@ -15728,6 +15783,17 @@
         }
       }
     },
+    "Text color": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Colore del testo"
+          }
+        }
+      }
+    },
     "That URL isn't on a host yt-dlp can fetch.": {
       "extractionState": "manual",
       "localizations": {
@@ -15900,6 +15966,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il modello e la lingua con cui parte ogni nuova trascrizione."
+          }
+        }
+      }
+    },
+    "The model didn't return any text.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il modello non ha restituito alcun testo."
           }
         }
       }
@@ -18283,6 +18360,17 @@
         }
       }
     },
+    "White": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bianco"
+          }
+        }
+      }
+    },
     "With Homebrew, Parola installs and updates it for you:": {
       "extractionState": "manual",
       "localizations": {
@@ -18487,6 +18575,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scritta in %@"
+          }
+        }
+      }
+    },
+    "Yellow": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giallo"
           }
         }
       }
