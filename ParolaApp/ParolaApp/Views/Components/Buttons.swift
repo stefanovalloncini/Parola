@@ -86,17 +86,6 @@ extension View {
     }
 }
 
-/// The switch every settings row's trailing accessory wears. Checkboxes stay for inline labelled
-/// options inside a rule editor, where the label sits next to the box.
-struct DSSwitchToggleStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        Toggle(configuration)
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .tint(DS.Color.accent)
-    }
-}
-
 /// A drawn icon chip for a pull-down: `.borderlessButton` hands the label to AppKit, which drops it.
 struct DSIconChipButtonStyle: ButtonStyle {
     var side: CGFloat = 22

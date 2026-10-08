@@ -19,7 +19,7 @@ private struct WatchedFoldersPaneBody: View {
                     InlineEmptyText("No watched folders yet")
                 } else {
                     ForEach(Array(store.folders.enumerated()), id: \.element.id) { idx, folder in
-                        WatchedFolderRow(store: store, folder: folder, isFirst: idx == 0)
+                        WatchedFolderRow(store: store, folder: folder)
                     }
                 }
             }
@@ -62,13 +62,11 @@ private struct WatchedFoldersPaneBody: View {
 private struct WatchedFolderRow: View {
     let store: WatchedFoldersStore
     let folder: WatchedFolder
-    let isFirst: Bool
 
     var body: some View {
         let unavailable = store.isUnavailable(folder.id)
         SettingRow(titleVerbatim: folder.displayName,
-                   descriptionVerbatim: folder.displayPath,
-                   isFirst: isFirst) {
+                   descriptionVerbatim: folder.displayPath) {
             HStack(spacing: 6) {
                 if unavailable {
                     Label("Unavailable", systemImage: "exclamationmark.triangle.fill")

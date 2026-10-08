@@ -58,7 +58,7 @@ struct ObsidianDestinationEditor: View {
 
     private var folderSection: some View {
         SettingsSection("Vault") {
-            SettingRow("Name", description: "What this destination is called in the Send to menu.", isFirst: true) {
+            SettingRow("Name", description: "What this destination is called in the Send to menu.") {
                 TextField("", text: $draft.name)
                     .labelsHidden()
                     .textFieldStyle(.roundedBorder)
@@ -82,7 +82,7 @@ struct ObsidianDestinationEditor: View {
 
     private var namingSection: some View {
         SettingsSection("Note name") {
-            SettingRow("Filename", descriptionVerbatim: filenameHelp, isFirst: true) {
+            SettingRow("Filename", descriptionVerbatim: filenameHelp) {
                 TextField("", text: $draft.filenameTemplate, prompt: Text(verbatim: ObsidianVaultFolderDestination.defaultFilenameTemplate))
                     .labelsHidden()
                     .textFieldStyle(.roundedBorder)
@@ -105,7 +105,7 @@ struct ObsidianDestinationEditor: View {
 
     private var frontmatterSection: some View {
         SettingsSection("Frontmatter") {
-            toggleRow("Title", isOn: $draft.frontmatter.title, leaf: "Title", isFirst: true)
+            toggleRow("Title", isOn: $draft.frontmatter.title, leaf: "Title")
             toggleRow("Date", isOn: $draft.frontmatter.date, leaf: "Date")
             toggleRow("Duration", isOn: $draft.frontmatter.duration, leaf: "Duration")
             toggleRow("Source", isOn: $draft.frontmatter.source, leaf: "Source")
@@ -119,7 +119,7 @@ struct ObsidianDestinationEditor: View {
 
     private var bodySection: some View {
         SettingsSection("Note body") {
-            toggleRow("Summary", isOn: $draft.body.summary, leaf: "BodySummary", isFirst: true)
+            toggleRow("Summary", isOn: $draft.body.summary, leaf: "BodySummary")
             toggleRow("Transcript", isOn: $draft.body.transcript, leaf: "BodyTranscript")
             toggleRow("Timestamps", isOn: $draft.body.timestamps, leaf: "BodyTimestamps")
             toggleRow("Speaker names", isOn: $draft.body.speakers, leaf: "BodySpeakers")
@@ -173,10 +173,9 @@ struct ObsidianDestinationEditor: View {
     private func toggleRow(
         _ title: LocalizedStringKey,
         isOn: Binding<Bool>,
-        leaf: String,
-        isFirst: Bool = false
+        leaf: String
     ) -> some View {
-        SettingRow(title, isFirst: isFirst) {
+        SettingRow(title) {
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .axLeaf("SendTo.Toggle.\(leaf)")

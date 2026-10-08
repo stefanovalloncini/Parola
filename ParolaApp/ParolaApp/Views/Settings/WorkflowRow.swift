@@ -4,7 +4,6 @@ import ParolaDictation
 
 struct WorkflowRow: View {
     let app: (bundleID: String, name: String)
-    let isFirst: Bool
     let isRemovable: Bool
     @Environment(AppModel.self) private var model
     @State private var isAddingRule = false
@@ -17,7 +16,7 @@ struct WorkflowRow: View {
     }
 
     var body: some View {
-        SettingRow(titleVerbatim: app.name, isFirst: isFirst) {
+        SettingRow(titleVerbatim: app.name) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
                     promptPicker

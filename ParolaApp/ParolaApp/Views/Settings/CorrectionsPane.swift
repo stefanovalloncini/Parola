@@ -24,7 +24,7 @@ struct CorrectionsPane: View {
                 } else {
                     ForEach(Array(visible.enumerated()), id: \.element.id) { idx, rule in
                         if let binding = binding(for: rule.id) {
-                            CorrectionRow(rule: binding, isFirst: idx == 0) {
+                            CorrectionRow(rule: binding) {
                                 model.correctionRules.removeAll { $0.id == rule.id }
                             }
                         }
@@ -65,7 +65,6 @@ struct CorrectionsPane: View {
 
 private struct CorrectionRow: View {
     @Binding var rule: CorrectionRule
-    let isFirst: Bool
     let onDelete: () -> Void
 
     private var canEnable: Bool {

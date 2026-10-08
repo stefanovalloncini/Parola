@@ -28,7 +28,7 @@ struct AutoExportPane: View {
                 } else {
                     ForEach(Array(displayedRules.enumerated()), id: \.element.id) { position, rule in
                         if let binding = binding(for: rule.id) {
-                            AutoExportRuleRow(rule: binding, presets: model.exportPresets, isFirst: position == 0) {
+                            AutoExportRuleRow(rule: binding, presets: model.exportPresets) {
                                 model.autoExportRules.removeAll { $0.id == rule.id }
                             }
                             // Row state (the extensions draft) must follow the rule, not the slot index.
@@ -59,8 +59,7 @@ struct AutoExportPane: View {
                 SettingRow(
                     "Auto-export folder",
                     descriptionVerbatim: model.autoExportFolder.map { ($0.path as NSString).abbreviatingWithTildeInPath }
-                        ?? String(localized: "Not chosen: recordings and links skip auto-export."),
-                    isFirst: true
+                        ?? String(localized: "Not chosen: recordings and links skip auto-export.")
                 ) {
                     Button("Choose…") { model.chooseAutoExportFolder() }
                         .axLeaf("AutoExport.Button.ChooseFolder")
@@ -177,7 +176,6 @@ enum AutoExportSort: CaseIterable {
 private struct AutoExportRuleRow: View {
     @Binding var rule: AutoExportRule
     let presets: [ExportPreset]
-    let isFirst: Bool
     let onDelete: () -> Void
     @State private var extensionsText: String = ""
 

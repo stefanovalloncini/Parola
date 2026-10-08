@@ -11,8 +11,7 @@ struct UpdatesPane: View {
             if feedConfigured {
                 SettingsSection {
                     SettingRow("Check automatically",
-                               description: "Looks for updates in the background once a day.",
-                               isFirst: true) {
+                               description: "Looks for updates in the background once a day.") {
                         Toggle("", isOn: $model.sparkleAutomatic).labelsHidden()
                             .axLeaf("Updates.Toggle.Automatic")
                     }
@@ -41,8 +40,7 @@ struct UpdatesPane: View {
             } else {
                 SettingsSection {
                     SettingRow("New versions",
-                               description: "Automatic updates aren't available in this build.",
-                               isFirst: true) {
+                               description: "Automatic updates aren't available in this build.") {
                         Button("Open Releases Page") {
                             NSWorkspace.shared.open(SupportLinks.releases)
                         }

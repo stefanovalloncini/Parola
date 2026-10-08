@@ -15,7 +15,6 @@ struct ExportFormatsPane: View {
                 ForEach(Array(model.exportPresets.enumerated()), id: \.element.id) { index, preset in
                     ExportPresetRow(
                         preset: preset,
-                        isFirst: index == 0,
                         isRenaming: renaming == preset.id,
                         draftName: $draftName,
                         onStartRename: {
@@ -45,8 +44,7 @@ struct ExportFormatsPane: View {
 
             SettingsSection("Export options") {
                 SettingRow("Subtitle line length",
-                           description: "Applied to SRT and VTT exports and to the subtitle length warnings in the transcript view.",
-                           isFirst: true) {
+                           description: "Applied to SRT and VTT exports and to the subtitle length warnings in the transcript view.") {
                     Picker("", selection: $model.subtitleCaptionLengthRaw) {
                         ForEach(CaptionLength.allCases) { preset in
                             Text(preset.displayName).tag(preset.rawValue)
@@ -130,7 +128,6 @@ struct ExportFormatsPane: View {
 
 private struct ExportPresetRow: View {
     let preset: ExportPreset
-    let isFirst: Bool
     let isRenaming: Bool
     @Binding var draftName: String
     let onStartRename: () -> Void
@@ -219,8 +216,7 @@ struct BatchExportSettingsPane: View {
 
             SettingsSection {
                 SettingRow("Batch view",
-                           description: "Pick presets in the Batch view too. Parola writes them as each transcription finishes.",
-                           isFirst: true) {
+                           description: "Pick presets in the Batch view too. Parola writes them as each transcription finishes.") {
                     Button("Open Batch") {
                         model.route = .batch
                         NSApp.activate(ignoringOtherApps: true)

@@ -15,7 +15,6 @@ struct SendToPane: View {
                     ForEach(Array(model.destinations.enumerated()), id: \.element.id) { position, stored in
                         DestinationRow(
                             stored: stored,
-                            isFirst: position == 0,
                             canMoveUp: position > 0,
                             canMoveDown: position < model.destinations.count - 1,
                             onEdit: { edit(stored) }
@@ -78,7 +77,6 @@ struct SendToPane: View {
 private struct DestinationRow: View {
     @Environment(AppModel.self) private var model
     let stored: AnyDestination
-    let isFirst: Bool
     let canMoveUp: Bool
     let canMoveDown: Bool
     let onEdit: () -> Void
@@ -103,7 +101,7 @@ private struct DestinationRow: View {
         HStack(spacing: 8) {
             Toggle("Use this destination", isOn: enabledBinding)
                 .labelsHidden()
-                .toggleStyle(DSSwitchToggleStyle())
+                .toggleStyle(.switch)
                 .disabled(stored.destination == nil)
                 .axLeaf(leaf("Toggle.Enabled"))
             VStack(alignment: .leading, spacing: 2) {
@@ -156,7 +154,7 @@ private struct DestinationRow: View {
                 Text("Send automatically")
                     .font(DS.Font.secondary)
             }
-            .toggleStyle(DSSwitchToggleStyle())
+            .toggleStyle(.switch)
             .axLeaf(leaf("Toggle.AutoSend"))
 
             ForEach(EntryCategory.allCases, id: \.self) { category in

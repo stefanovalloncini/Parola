@@ -24,7 +24,7 @@ struct SnippetsPane: View {
                 } else {
                     ForEach(Array(visible.enumerated()), id: \.element.id) { idx, snippet in
                         if let binding = binding(for: snippet.id) {
-                            SnippetRow(snippet: binding, isFirst: idx == 0) {
+                            SnippetRow(snippet: binding) {
                                 model.snippets.removeAll { $0.id == snippet.id }
                             }
                         }
@@ -85,7 +85,6 @@ struct SnippetsPane: View {
 
 private struct SnippetRow: View {
     @Binding var snippet: Snippet
-    let isFirst: Bool
     let onDelete: () -> Void
 
     private var canEnable: Bool {

@@ -23,7 +23,7 @@ struct IgnoredSegmentsPane: View {
                 } else {
                     ForEach(Array(displayedRules.enumerated()), id: \.element.id) { position, rule in
                         if let binding = binding(for: rule.id) {
-                            IgnoredRuleRow(rule: binding, isFirst: position == 0) {
+                            IgnoredRuleRow(rule: binding) {
                                 model.ignoredSegmentRules.removeAll { $0.id == rule.id }
                             }
                         }
@@ -64,7 +64,6 @@ struct IgnoredSegmentsPane: View {
 
 private struct IgnoredRuleRow: View {
     @Binding var rule: IgnoredSegmentRule
-    let isFirst: Bool
     let onDelete: () -> Void
 
     private var canEnable: Bool {

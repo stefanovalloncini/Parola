@@ -9,8 +9,7 @@ struct TranslationPane: View {
         return SettingsForm {
             SettingsSection("After transcribing") {
                 SettingRow("Show translations side by side",
-                           description: "Off puts the translation under each segment instead of beside it.",
-                           isFirst: true) {
+                           description: "Off puts the translation under each segment instead of beside it.") {
                     Toggle("", isOn: $model.translationSideBySide).labelsHidden()
                         .axLeaf("Translation.Toggle.SideBySide")
                 }
@@ -18,8 +17,7 @@ struct TranslationPane: View {
             SettingHelper(text: "A finished transcript is translated with Apple Translation, on your Mac, into any language it offers.")
             SettingsSection("While transcribing") {
                 SettingRow("Translate to English by default",
-                           description: "Applies to new file, mic, batch, and YouTube transcriptions. Live captions has its own toggle; dictation always keeps the spoken language.",
-                           isFirst: true) {
+                           description: "Applies to new file, mic, batch, and YouTube transcriptions. Live captions has its own toggle; dictation always keeps the spoken language.") {
                     Toggle("", isOn: $model.translate).labelsHidden()
                         .axLeaf("Translation.Toggle.TranslateByDefault")
                 }

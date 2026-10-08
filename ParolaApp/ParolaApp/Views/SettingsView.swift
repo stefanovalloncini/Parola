@@ -318,25 +318,25 @@ struct SettingRow<Trailing: View>: View {
     private let descriptionText: Text?
     @ViewBuilder var trailing: Trailing
 
-    init(_ title: LocalizedStringKey, description: LocalizedStringKey? = nil, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+    init(_ title: LocalizedStringKey, description: LocalizedStringKey? = nil, @ViewBuilder trailing: () -> Trailing) {
         self.titleText = Text(title)
         self.descriptionText = description.map { Text($0) }
         self.trailing = trailing()
     }
 
-    init(_ title: LocalizedStringKey, descriptionVerbatim: String?, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+    init(_ title: LocalizedStringKey, descriptionVerbatim: String?, @ViewBuilder trailing: () -> Trailing) {
         self.titleText = Text(title)
         self.descriptionText = descriptionVerbatim.map { Text($0) }
         self.trailing = trailing()
     }
 
-    init(titleVerbatim: String, description: LocalizedStringKey? = nil, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+    init(titleVerbatim: String, description: LocalizedStringKey? = nil, @ViewBuilder trailing: () -> Trailing) {
         self.titleText = Text(titleVerbatim)
         self.descriptionText = description.map { Text($0) }
         self.trailing = trailing()
     }
 
-    init(titleVerbatim: String, descriptionVerbatim: String?, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+    init(titleVerbatim: String, descriptionVerbatim: String?, @ViewBuilder trailing: () -> Trailing) {
         self.titleText = Text(titleVerbatim)
         self.descriptionText = descriptionVerbatim.map { Text($0) }
         self.trailing = trailing()

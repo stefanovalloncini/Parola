@@ -9,8 +9,7 @@ struct TranscriptionDefaultsPane: View {
         return SettingsForm {
             SettingsSection {
                 SettingRow("Default model",
-                           description: "Applies to every new transcription and to dictation. The model picker on the Library page edits this same setting.",
-                           isFirst: true) {
+                           description: "Applies to every new transcription and to dictation. The model picker on the Library page edits this same setting.") {
                     ModelPickerView(leaf: "TranscriptionDefaults.Picker.Model")
                 }
                 SettingRow("Default language",
@@ -68,8 +67,7 @@ struct TranscriptionDefaultsPane: View {
 
             SettingsSection("Playback") {
                 SettingRow("Pause when app is hidden",
-                           description: "Pauses the player when you switch to another app.",
-                           isFirst: true) {
+                           description: "Pauses the player when you switch to another app.") {
                     Toggle("", isOn: $model.pausePlayerOnAppHidden).labelsHidden()
                         .axLeaf("Playback.Toggle.PauseOnHidden")
                 }

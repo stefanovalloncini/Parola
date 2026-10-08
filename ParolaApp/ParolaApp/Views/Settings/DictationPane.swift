@@ -15,8 +15,7 @@ struct DictationPane: View {
         return SettingsForm {
             SettingsSection {
                 SettingRow("Enable dictation",
-                           descriptionVerbatim: enableDescription,
-                           isFirst: true) {
+                           descriptionVerbatim: enableDescription) {
                     Toggle("", isOn: $model.dictationEnabled).labelsHidden()
                         .axLeaf("Dictation.Toggle.Enabled")
                 }
@@ -46,8 +45,7 @@ struct DictationPane: View {
         )
         SettingsSection {
             SettingRow("Mode",
-                       descriptionVerbatim: model.dictationMode.description,
-                       isFirst: true) {
+                       descriptionVerbatim: model.dictationMode.description) {
                 Picker("", selection: $model.dictationModeRaw) {
                     ForEach(DictationMode.allCases, id: \.rawValue) { mode in
                         Text(mode.displayName).tag(mode.rawValue)
@@ -145,8 +143,7 @@ struct DictationPane: View {
         }
         SettingsSection("Context (optional)") {
             SettingRow("Include selected text",
-                       description: "Sends the highlighted text in the frontmost app to the cleanup model so proper nouns spell right. Requires Accessibility permission.",
-                       isFirst: true) {
+                       description: "Sends the highlighted text in the frontmost app to the cleanup model so proper nouns spell right. Requires Accessibility permission.") {
                 Toggle("", isOn: $model.dictationContextSelection).labelsHidden()
                     .axLeaf("Dictation.Toggle.ContextSelection")
             }
@@ -166,10 +163,10 @@ struct DictationPane: View {
         SettingsSection("Per-app workflows") {
             let seeds = AppModel.dictationOverrideApps
             ForEach(Array(seeds.enumerated()), id: \.element.bundleID) { idx, app in
-                WorkflowRow(app: app, isFirst: idx == 0, isRemovable: false)
+                WorkflowRow(app: app, isRemovable: false)
             }
             ForEach(Array(customApps.enumerated()), id: \.element.bundleID) { _, app in
-                WorkflowRow(app: app, isFirst: false, isRemovable: true)
+                WorkflowRow(app: app, isRemovable: true)
             }
         }
         HStack {
@@ -226,7 +223,6 @@ struct DictationPermissionsSection: View {
                 title: String(localized: "Accessibility"),
                 detail: String(localized: "Lets Parola watch the hotkey outside the app and insert text. The near-field indicator also uses it to find your text field."),
                 granted: permissions.accessibilityGranted,
-                isFirst: true,
                 axID: "Dictation.Button.GrantAccessibility",
                 action: { permissions.openAccessibilitySettings() },
                 actionLabel: String(localized: "Open System Settings…")
@@ -235,7 +231,6 @@ struct DictationPermissionsSection: View {
                 title: String(localized: "Microphone"),
                 detail: String(localized: "Captures your voice while dictating."),
                 granted: permissions.microphoneAuthorized,
-                isFirst: false,
                 axID: "Dictation.Button.GrantMicrophone",
                 action: {
                     if permissions.microphoneUndetermined {

@@ -23,7 +23,7 @@ struct FindReplacePane: View {
                 } else {
                     ForEach(Array(visible.enumerated()), id: \.element.id) { idx, rule in
                         if let binding = binding(for: rule.id) {
-                            FindReplaceRuleRow(rule: binding, isFirst: idx == 0) {
+                            FindReplaceRuleRow(rule: binding) {
                                 model.findReplaceRules.removeAll { $0.id == rule.id }
                             }
                         }
@@ -97,7 +97,6 @@ struct FindReplacePane: View {
 
 private struct FindReplaceRuleRow: View {
     @Binding var rule: FindReplaceRule
-    let isFirst: Bool
     let onDelete: () -> Void
 
     @State private var cachedRegexError: String?

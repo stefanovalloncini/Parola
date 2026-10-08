@@ -10,8 +10,7 @@ struct CustomizationPane: View {
         return SettingsForm {
             SettingsSection("Theme and colors") {
                 SettingRow("Appearance",
-                           description: "Follows the system unless you pick light or dark.",
-                           isFirst: true) {
+                           description: "Follows the system unless you pick light or dark.") {
                     Picker("", selection: $model.appTheme) {
                         Text("Match system").tag("system")
                         Text("Light").tag("light")
@@ -49,8 +48,7 @@ struct CustomizationPane: View {
 
             SettingsSection("Text") {
                 SettingRow("Monospaced timestamps",
-                           description: "Use a fixed-width font for timestamps in the transcript.",
-                           isFirst: true) {
+                           description: "Use a fixed-width font for timestamps in the transcript.") {
                     Toggle("", isOn: $model.monospacedTimestamps).labelsHidden()
                         .axLeaf("Customization.Toggle.MonospacedTimestamps")
                 }
@@ -140,7 +138,7 @@ private struct CustomThemeEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             ForEach(CustomPaletteWell.all, id: \.label) { well in
-                colorRow(well, isFirst: well.label == CustomPaletteWell.all.first?.label)
+                colorRow(well)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
@@ -149,8 +147,8 @@ private struct CustomThemeEditor: View {
         .onDisappear { model.commitPaletteDraft() }
     }
 
-    private func colorRow(_ well: CustomPaletteWell, isFirst: Bool) -> some View {
-        SettingRow(LocalizedStringKey(well.label), isFirst: isFirst) {
+    private func colorRow(_ well: CustomPaletteWell) -> some View {
+        SettingRow(LocalizedStringKey(well.label)) {
             ColorPicker("", selection: well.binding(model), supportsOpacity: well.supportsOpacity)
                 .labelsHidden()
                 .axLeaf("Customization.ColorPicker.\(well.label.replacingOccurrences(of: " ", with: ""))")

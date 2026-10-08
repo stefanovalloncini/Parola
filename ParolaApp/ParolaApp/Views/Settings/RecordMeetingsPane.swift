@@ -29,7 +29,6 @@ struct RecordMeetingsPane: View {
                     title: String(localized: "Screen & System Audio Recording"),
                     detail: String(localized: "Captures the system-wide audio mix. Every system audio recording uses it, except a detected meeting when “Record only the meeting app's audio” is on."),
                     granted: model.capturePermissions.screenRecordingGranted,
-                    isFirst: true,
                     axID: "RecordMeetings.Button.GrantScreenRecording",
                     action: { model.capturePermissions.requestScreenRecording() },
                     actionLabel: String(localized: "Allow…"),
@@ -39,7 +38,6 @@ struct RecordMeetingsPane: View {
                     title: String(localized: "System Audio Recording Only"),
                     detail: String(localized: "Captures a single app's audio. Used for a detected meeting when “Record only the meeting app's audio” is on."),
                     granted: model.capturePermissions.systemAudioGranted,
-                    isFirst: false,
                     axID: "RecordMeetings.Button.GrantSystemAudio",
                     action: { model.capturePermissions.requestSystemAudio() },
                     actionLabel: String(localized: "Allow…"),
@@ -48,8 +46,7 @@ struct RecordMeetingsPane: View {
             }
             SettingsSection {
                 SettingRow("Auto-detect meeting apps",
-                           description: "Offers to record system audio when you open or switch to a meeting app like Zoom, Teams, or Webex. Meetings in a browser aren't detected. Parola only looks at which apps are running, and nothing leaves your Mac.",
-                           isFirst: true) {
+                           description: "Offers to record system audio when you open or switch to a meeting app like Zoom, Teams, or Webex. Meetings in a browser aren't detected. Parola only looks at which apps are running, and nothing leaves your Mac.") {
                     Toggle("", isOn: $detector.isEnabled).labelsHidden()
                         .axLeaf("RecordMeetings.Toggle.Enabled")
                 }

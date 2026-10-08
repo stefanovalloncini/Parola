@@ -29,7 +29,6 @@ struct IntegrationsPane: View {
                     installing: model.ytDlpInstalling,
                     updating: model.ytDlpUpdating,
                     error: model.ytDlpInstallError ?? model.ytDlpUpdateError,
-                    isFirst: true,
                     install: { model.installYtDlpViaBrew() },
                     update: { model.updateYtDlpViaBrew() },
                     cancelUpdate: { model.cancelYtDlpUpdate() }
@@ -52,7 +51,6 @@ private struct ToolStatusRow: View {
     let installing: Bool
     let updating: Bool
     let error: String?
-    let isFirst: Bool
     let install: () -> Void
     let update: () -> Void
     let cancelUpdate: () -> Void

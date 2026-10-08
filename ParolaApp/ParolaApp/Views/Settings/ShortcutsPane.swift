@@ -9,8 +9,7 @@ struct ShortcutsPane: View {
         return SettingsForm {
             SettingsSection {
                 SettingRow("Dictation shortcut",
-                           description: "Starts dictation from any app. The Dictation pane shows the same shortcut.",
-                           isFirst: true) {
+                           description: "Starts dictation from any app. The Dictation pane shows the same shortcut.") {
                     HotkeyRecorder(
                         keyCode: $model.dictationKeyCode,
                         modifierRawValue: $model.dictationKeyModifiers
@@ -34,7 +33,6 @@ struct ShortcutsPane: View {
                     title: String(localized: "Accessibility"),
                     detail: String(localized: "Lets these shortcuts work while another app is in front."),
                     granted: model.dictationPermissions.accessibilityGranted,
-                    isFirst: true,
                     axID: "Shortcuts.Button.GrantAccessibility",
                     action: { model.dictationPermissions.openAccessibilitySettings() },
                     actionLabel: String(localized: "Open System Settings…")

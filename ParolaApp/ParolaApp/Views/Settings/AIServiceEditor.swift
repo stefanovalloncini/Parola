@@ -61,7 +61,7 @@ struct AIServiceEditor: View {
 
     private var detailsSection: some View {
         SettingsSection("Service") {
-            SettingRow("Name", description: "What this service is called in the pickers.", isFirst: true) {
+            SettingRow("Name", description: "What this service is called in the pickers.") {
                 TextField("", text: $service.name)
                     .labelsHidden()
                     .textFieldStyle(.roundedBorder)
@@ -106,7 +106,7 @@ struct AIServiceEditor: View {
 
     private var keySection: some View {
         SettingsSection("API key") {
-            SettingRow("Key", descriptionVerbatim: keyHelp, isFirst: true) {
+            SettingRow("Key", descriptionVerbatim: keyHelp) {
                 SecureField("", text: $apiKey, prompt: Text(verbatim: service.kind.apiKeyPlaceholder))
                     .labelsHidden()
                     .textFieldStyle(.roundedBorder)

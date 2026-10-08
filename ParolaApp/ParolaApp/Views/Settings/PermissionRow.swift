@@ -4,7 +4,6 @@ struct PermissionRow: View {
     let title: String
     let detail: String
     let granted: Bool
-    let isFirst: Bool
     let axID: String
     let action: () -> Void
     let actionLabel: String
@@ -12,7 +11,7 @@ struct PermissionRow: View {
     var needed: Bool = true
 
     var body: some View {
-        SettingRow(titleVerbatim: title, descriptionVerbatim: detail, isFirst: isFirst) {
+        SettingRow(titleVerbatim: title, descriptionVerbatim: detail) {
             HStack(spacing: 8) {
                 if needed {
                     status

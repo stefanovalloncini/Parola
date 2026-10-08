@@ -64,8 +64,7 @@ struct AIServicesPane: View {
         let policy = model.managedConfiguration.policyDisablesCloudLLM
         return SettingsSection {
             SettingRow("Keep AI on this Mac",
-                       description: policy ? "Your organization keeps AI on this Mac." : "Never send transcripts to an online service.",
-                       isFirst: true) {
+                       description: policy ? "Your organization keeps AI on this Mac." : "Never send transcripts to an online service.") {
                 Toggle("", isOn: policy ? .constant(true) : $model.userPrivacyMode)
                     .labelsHidden()
                     .disabled(policy)
@@ -78,7 +77,7 @@ struct AIServicesPane: View {
 
     private var onDeviceSection: some View {
         SettingsSection {
-            SettingRow("Apple Intelligence", descriptionVerbatim: onDeviceStatus, isFirst: true) {
+            SettingRow("Apple Intelligence", descriptionVerbatim: onDeviceStatus) {
                 Image(systemName: onDevice?.isAvailable == true ? "checkmark.circle.fill" : "exclamationmark.circle")
                     .foregroundStyle(onDevice?.isAvailable == true ? DS.Palette.success : DS.Color.secondaryText)
                     .axLeaf("AIServices.Row.onDevice")
@@ -115,7 +114,6 @@ struct AIServicesPane: View {
                 ForEach(Array(services.enumerated()), id: \.element.id) { position, service in
                     AIServiceRow(
                         service: service,
-                        isFirst: position == 0,
                         isPaused: model.aiServicePaused(service),
                         result: results[service.id],
                         isTesting: testing.contains(service.id),
@@ -178,7 +176,7 @@ struct AIServicesPane: View {
     private var useForSection: some View {
         SettingsSection("Use for") {
             ForEach(Array(LanguageModelTask.allCases.enumerated()), id: \.element) { position, task in
-                SettingRow(AIServicesPane.taskTitle(task), isFirst: position == 0) {
+                SettingRow(AIServicesPane.taskTitle(task)) {
                     Picker("", selection: binding(for: task)) {
                         Text("Apple Intelligence").tag(LanguageModelProviderChoice.onDevice)
                         ForEach(model.visibleAIServices) { service in
@@ -258,7 +256,6 @@ struct AIServicesPane: View {
 
 private struct AIServiceRow: View {
     let service: AIServiceConfig
-    let isFirst: Bool
     let isPaused: Bool
     let result: AIServiceTestResult?
     let isTesting: Bool

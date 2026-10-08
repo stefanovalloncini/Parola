@@ -14,8 +14,7 @@ struct LiveCaptionsPane: View {
                 .fixedSize(horizontal: false, vertical: true)
             SettingsSection {
                 SettingRow("Live captions",
-                           descriptionVerbatim: model.liveCaptionsUnavailableReason ?? String(localized: "Also in the Captions menu (⇧⌘L)."),
-                           isFirst: true) {
+                           descriptionVerbatim: model.liveCaptionsUnavailableReason ?? String(localized: "Also in the Captions menu (⇧⌘L).")) {
                     Button(liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
                         model.toggleLiveCaptions()
                     }

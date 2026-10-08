@@ -104,15 +104,11 @@ struct RowChromeTests {
             == appearance(selected: true, hovered: false, PillPopoverRow.selectionStyle))
     }
 
-    @Test("the popover row and the sidebar row are chosen with the same fill")
-    func popoverRowMatchesTheSidebar() {
+    @Test("a chosen popover row takes the prominent selection fill and inks its label for it")
+    func popoverRowSelection() {
         let popover = appearance(selected: true, hovered: false, PillPopoverRow.selectionStyle)
-        let sidebar = appearance(selected: true, hovered: false, SidebarRowLabel.selectionStyle)
-        #expect(popover.fill == sidebar.fill)
         #expect(popover.fill == DS.Color.selectionProminent)
         #expect(DS.Color.selectionProminent != DS.Color.accent)
-        // The sidebar's labels name their own onAccent tiers; the popover row lets the chrome paint the first one.
-        #expect(sidebar.foreground == nil)
         #expect(popover.foreground == DS.Color.onAccent)
     }
 

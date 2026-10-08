@@ -28,8 +28,7 @@ struct MicrophonePane: View {
                 SettingRow("Input device",
                            description: savedDeviceDisconnected
                                ? "This microphone is disconnected. Recordings use the system default until it returns."
-                               : "Used for recording, dictation, and live captions.",
-                           isFirst: true) {
+                               : "Used for recording, dictation, and live captions.") {
                     Picker("", selection: $model.inputDeviceUID) {
                         Text("System default").tag("")
                         ForEach(devices ?? []) { device in
@@ -88,8 +87,7 @@ struct MicrophonePane: View {
 
             SettingsSection("While recording") {
                 SettingRow("Mute your Mac's sound while recording",
-                           description: "So playback doesn't end up in the transcript. The sound comes back when the recording stops.",
-                           isFirst: true) {
+                           description: "So playback doesn't end up in the transcript. The sound comes back when the recording stops.") {
                     Toggle("", isOn: $model.autoMuteWhileRecording).labelsHidden()
                         .axLeaf("Microphone.Toggle.AutoMute")
                 }
@@ -293,8 +291,7 @@ struct RecordingControlsSection: View {
         @Bindable var model = model
         SettingsSection("Recording controls") {
             SettingRow("Show the recording in the menu bar",
-                       description: "The time stays in the menu bar while you record, with the recording's controls in its menu.",
-                       isFirst: true) {
+                       description: "The time stays in the menu bar while you record, with the recording's controls in its menu.") {
                 Toggle("", isOn: $model.showRecordingStatusItem).labelsHidden()
                     .accessibilityLabel("Show the recording in the menu bar")
                     .axLeaf("\(pane).Toggle.ShowRecordingStatusItem")

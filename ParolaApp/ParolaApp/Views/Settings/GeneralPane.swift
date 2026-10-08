@@ -15,8 +15,7 @@ struct GeneralPane: View {
         return SettingsForm {
             SettingsSection("Startup") {
                 SettingRow("Open at login",
-                           descriptionVerbatim: launchAtLoginError ?? String(localized: "Opens Parola automatically when you sign in."),
-                           isFirst: true) {
+                           descriptionVerbatim: launchAtLoginError ?? String(localized: "Opens Parola automatically when you sign in.")) {
                     Toggle("", isOn: $launchAtLogin)
                         .labelsHidden()
                         .onChange(of: launchAtLogin) { _, newValue in
@@ -49,8 +48,7 @@ struct GeneralPane: View {
 
             SettingsSection("Files you add") {
                 SettingRow("When a file was already transcribed",
-                           description: "Parola recognises a file by its contents, so a renamed copy counts as the same recording. In a batch, “Ask me” skips the file.",
-                           isFirst: true) {
+                           description: "Parola recognises a file by its contents, so a renamed copy counts as the same recording. In a batch, “Ask me” skips the file.") {
                     Picker("", selection: $model.duplicateImportPolicy) {
                         ForEach(DuplicateImportPolicy.allCases) { policy in
                             Text(policy.label).tag(policy)
@@ -65,8 +63,7 @@ struct GeneralPane: View {
 
             SettingsSection("Every transcript") {
                 SettingRow("Highlight the word being spoken",
-                           description: "Bolds and tints the current word as audio plays.",
-                           isFirst: true) {
+                           description: "Bolds and tints the current word as audio plays.") {
                     Toggle("", isOn: $model.karaokeHighlight)
                         .labelsHidden()
                         .axLeaf("General.Toggle.KaraokeHighlight")
@@ -92,8 +89,7 @@ struct GeneralPane: View {
 
             SettingsSection("Library cards") {
                 SettingRow("Generate an AI title and summary",
-                           description: "Writes a short title and a one-line summary from the transcript, on device, when a transcription finishes.",
-                           isFirst: true) {
+                           description: "Writes a short title and a one-line summary from the transcript, on device, when a transcription finishes.") {
                     Toggle("", isOn: $model.generatesCardMetadata).labelsHidden()
                         .axLeaf("General.Toggle.GenerateCardMetadata")
                 }

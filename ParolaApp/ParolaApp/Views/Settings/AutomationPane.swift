@@ -53,8 +53,7 @@ struct AutomationPane: View {
             SettingsSection {
                 SettingRow(
                     "MCP automation bridge",
-                    description: "Lets parola-mcp drive this app (transcribe, switch model, control recording…). Listens on 127.0.0.1 only.",
-                    isFirst: true
+                    description: "Lets parola-mcp drive this app (transcribe, switch model, control recording…). Listens on 127.0.0.1 only."
                 ) {
                     Toggle("", isOn: $model.automationBridgeEnabled)
                         .labelsHidden()

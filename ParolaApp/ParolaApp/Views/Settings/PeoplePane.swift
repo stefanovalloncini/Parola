@@ -9,8 +9,7 @@ struct PeoplePane: View {
         return SettingsForm {
             SettingsSection {
                 SettingRow("Detect speakers",
-                           description: "Speaker detection is in Transcription Defaults, with the other settings for new transcriptions.",
-                           isFirst: true) {
+                           description: "Speaker detection is in Transcription Defaults, with the other settings for new transcriptions.") {
                     Button("Open Transcription Defaults") {
                         model.settingsPane = SettingsRoute.transcriptionDefaults.rawValue
                     }

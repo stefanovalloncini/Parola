@@ -26,7 +26,6 @@ struct PromptsPane: View {
                     ForEach(Array(custom.enumerated()), id: \.element.id) { idx, prompt in
                         PromptRow(
                             prompt: prompt,
-                            isFirst: idx == 0,
                             onEdit: { editing = PromptEditDraft(prompt: prompt) },
                             onDelete: { pendingDelete = prompt }
                         )
@@ -52,7 +51,6 @@ struct PromptsPane: View {
                     ForEach(Array(builtIns.enumerated()), id: \.element.id) { idx, prompt in
                         PromptRow(
                             prompt: prompt,
-                            isFirst: idx == 0,
                             onEdit: { editing = PromptEditDraft(viewing: prompt) },
                             onDelete: {}
                         )
@@ -222,12 +220,11 @@ struct PromptsPane: View {
 
 private struct PromptRow: View {
     let prompt: Prompt
-    let isFirst: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
-        SettingRow(titleVerbatim: prompt.name, isFirst: isFirst) {
+        SettingRow(titleVerbatim: prompt.name) {
             HStack(spacing: 6) {
                 if prompt.isBuiltIn {
                     Button {
