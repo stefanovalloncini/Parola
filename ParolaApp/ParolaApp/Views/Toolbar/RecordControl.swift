@@ -1,7 +1,7 @@
 import SwiftUI
 import ParolaCore
 
-/// "● Record ⌄" in the toolbar; a running take puts its session capsule in the same item.
+/// "● Record ⌄" in the toolbar; a running take puts its session capsule in the same item, away from the Stage.
 struct RecordControl: View {
     @Environment(AppModel.self) private var model
 
@@ -25,7 +25,9 @@ struct RecordControl: View {
 
     var body: some View {
         if let take = model.recording, take.isRunning, model.recordingCountdown == nil {
-            SessionCapsule(take: take)
+            if SessionCapsule.shows(on: model) {
+                SessionCapsule(take: take)
+            }
         } else if let source = Self.primarySource(features: model.features) {
             recordButton(source)
         }

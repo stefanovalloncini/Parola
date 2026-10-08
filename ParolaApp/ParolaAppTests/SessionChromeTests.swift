@@ -292,6 +292,55 @@ struct SessionCapsuleHostedTests {
     }
 }
 
+@MainActor
+@Suite("Session capsule in the window toolbar", .serialized)
+struct SessionCapsuleToolbarTests {
+    private static let time = "Toolbar.Button.SessionTime"
+    private static let stop = "Toolbar.Button.SessionStop"
+    private static let meter = "Toolbar.Meter.SessionLevel"
+    private static let record = "Toolbar.Button.Record"
+    private static let newMenu = "Toolbar.Menu.New"
+    private static let stageStop = "Stage.Button.Stop"
+
+    private func host(_ model: AppModel, width: CGFloat = 1180) -> HostedWindow {
+        HostedWindow(ContentView().environment(model), width: width, height: MainWindowLayout.minimumHeight, toolbar: true)
+    }
+
+    private func element(_ leaf: String, in hosted: HostedWindow) -> HostedAccessibility.Element? {
+        hosted.host.layoutSubtreeIfNeeded()
+        return HostedAccessibility.elements(in: hosted.window).first { $0.identifier?.hasSuffix(leaf) == true }
+    }
+
+    @Test("on the Stage the toolbar leaves the take to the Stage's own clock and Stop; the capsule is back once another page shows")
+    func stageHidesTheCapsule() async throws {
+        let audio = try tempWAV("capsule-stage")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("capsule-stage")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -60))
+        defer { model.endTestTake() }
+        #expect(model.route == .recording)
+        let hosted = host(model)
+        defer { hosted.close() }
+
+        let staged = await waitUntil { element(Self.stageStop, in: hosted) != nil && element(Self.newMenu, in: hosted) != nil }
+        try #require(staged)
+        for leaf in [Self.time, Self.stop, Self.meter, Self.record] {
+            #expect(element(leaf, in: hosted) == nil, "\(leaf) on the Stage")
+        }
+
+        model.goHome()
+        let back = await waitUntil { element(Self.time, in: hosted) != nil && element(Self.stop, in: hosted) != nil }
+        #expect(back)
+        #expect(element(Self.stageStop, in: hosted) == nil)
+        #expect(element(Self.record, in: hosted) == nil)
+
+        #expect(model.showStage())
+        let hiddenAgain = await waitUntil { element(Self.time, in: hosted) == nil && element(Self.stageStop, in: hosted) != nil }
+        #expect(hiddenAgain)
+        #expect(element(Self.stop, in: hosted) == nil)
+    }
+}
+
 // Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
 extension TranscriberMockSuites {
     @MainActor

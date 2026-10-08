@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The running take on every page: "● 12:34 | Stop". The time goes back to the Stage; a narrow window drops the meter, never Stop.
+/// The running take on every page but the Stage: "● 12:34 | Stop". The time goes back to the Stage; a narrow window drops the meter, never Stop.
 struct SessionCapsule: View {
     let take: RecordingSession
     @Environment(AppModel.self) private var model
@@ -20,6 +20,11 @@ struct SessionCapsule: View {
 
     nonisolated static func showsMeter(windowWidth: CGFloat) -> Bool {
         windowWidth >= meterMinimumWindowWidth
+    }
+
+    /// The Stage has its own clock and Stop, so the toolbar leaves the take to it.
+    static func shows(on model: AppModel) -> Bool {
+        ContentRoutes.routeID(for: model) != .stage
     }
 
     var body: some View {
