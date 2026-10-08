@@ -1546,7 +1546,15 @@ final class AppModel {
 
     // MARK: - Meeting detection
 
-    var meetingDetectedApp: String?
+    var meetingDetectedApp: String? {
+        didSet {
+            guard meetingDetectedApp != oldValue else { return }
+            if oldValue != nil { meetingNotifier?.promptLowered() }
+            if let meetingDetectedApp { meetingNotifier?.promptRaised(meetingDetectedApp) }
+        }
+    }
+    /// Tells about the prompt in a notification when the window can't show it; nil unless the launch watches for meetings for real.
+    @ObservationIgnored var meetingNotifier: MeetingNotifier?
     /// The meeting app the detector saw last, for the Record menu and the menu bar; it outlives the alert `meetingDetectedApp` raises.
     var detectedMeetingAppName: String?
     var meetingCaptureAppOnly: Bool = false { didSet { defaults.set(meetingCaptureAppOnly, forKey: "meetingCaptureAppOnly") } }

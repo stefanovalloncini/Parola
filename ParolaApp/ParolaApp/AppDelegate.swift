@@ -53,6 +53,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Task { @MainActor [weak self] in self?.model?.reloadSettings() }
             }
         }
+        if Self.postsMeetingNotifications(model.activeSideEffects) {
+            let notifier = MeetingNotifier(
+                center: SystemMeetingNotificationCenter(),
+                promptInView: { [weak model] in model?.mainWindowIsKey ?? false }
+            )
+            notifier.bind(model)
+        }
         if let startRecordingSubscription { NotificationCenter.default.removeObserver(startRecordingSubscription) }
         startRecordingSubscription = Self.observeStartRecording(for: model)
         voiceOverObservation = Self.followVoiceOver(for: model)
@@ -76,6 +83,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The signal reaches every process on the Mac, so only a launch that owns dictation's outside triggers answers it; a test sandbox never does.
     nonisolated static func hearsDictationSignal(_ sideEffects: Set<BootstrapSideEffect>) -> Bool {
         sideEffects.contains(.dictationHotkey)
+    }
+
+    /// Only a launch that watches for meeting apps for real reaches the notification center, so no test host or sandbox asks for permission.
+    nonisolated static func postsMeetingNotifications(_ sideEffects: Set<BootstrapSideEffect>) -> Bool {
+        sideEffects.contains(.meetingDetector)
     }
 
     /// The test host shares the app's own defaults domain, so only a normal launch rewrites it.
@@ -194,6 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         ParolaLog.info(.appLifecycle, "app terminating in phase \(model?.phase)")
+        model?.meetingNotifier?.withdraw()
         let diagnostics = DiagnosticsInstaller.current
         diagnostics?.stopPeriodicFlush()
         let pending = model?.cancelAndDrainPendingTranscriptSave()

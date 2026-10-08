@@ -18,6 +18,12 @@ extension AppModel {
         return mainWindow.isVisible ? .onScreen : .hidden
     }
 
+    /// Whether an alert the main window raises now is seen: the window is key and on screen.
+    var mainWindowIsKey: Bool {
+        guard appIsActive(), let mainWindow else { return false }
+        return mainWindow.isKeyWindow && mainWindow.isVisible
+    }
+
     /// A take's Stop and Cancel are in the main window: it comes forward, or `open` makes a new one after it closed.
     func showMainWindow(activate: () -> Void = { NSApp.activate(ignoringOtherApps: true) }, orOpen open: () -> Void) {
         activate()

@@ -12188,6 +12188,17 @@
         }
       }
     },
+    "Record Meeting": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra riunione"
+          }
+        }
+      }
+    },
     "Record Meetings": {
       "extractionState": "manual",
       "localizations": {
@@ -12283,6 +12294,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra l'audio di sistema"
+          }
+        }
+      }
+    },
+    "Record this meeting with Parola?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrare questa riunione con Parola?"
           }
         }
       }
