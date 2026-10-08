@@ -61,9 +61,38 @@ struct SettingsWindowTests {
             let items = hosted.window.toolbar?.items.map(\.itemIdentifier.rawValue) ?? []
             let navigation = items.filter {
                 $0.localizedCaseInsensitiveContains("back") || $0.localizedCaseInsensitiveContains("forward")
-                    || $0 == NSToolbarItem.Identifier.toggleSidebar.rawValue
             }
             #expect(navigation.isEmpty, "\(items)")
+        }
+    }
+
+    @Test("the window keeps the sidebar toggle, so it has a toolbar that stacks the title over the summary")
+    func sidebarToggleGivesTheWindowAToolbar() async {
+        await withIsolatedDefaults { defaults in
+            let hosted = hostWindow(makeModel(defaults))
+            defer { hosted.close() }
+            let toggled = await waitUntil {
+                let items = hosted.window.toolbar?.items.map(\.itemIdentifier.rawValue) ?? []
+                return items.contains { $0.localizedCaseInsensitiveContains("toggleSidebar") }
+            }
+            let items = hosted.window.toolbar?.items.map(\.itemIdentifier.rawValue) ?? []
+            #expect(toggled, "\(items)")
+            #expect(hosted.window.toolbar?.isVisible == true)
+        }
+    }
+
+    @Test("the sidebar opens at its own width, never under its 200 pt minimum")
+    func sidebarWidth() async throws {
+        try await withIsolatedDefaults { defaults in
+            let hosted = hostWindow(makeModel(defaults))
+            defer { hosted.close() }
+            let frameView = try #require(hosted.window.contentView?.superview)
+            let split = views(in: frameView).compactMap { $0 as? NSSplitView }.first
+            let splitView = try #require(split)
+            let laidOut = await waitUntil { (splitView.arrangedSubviews.first?.frame.width ?? 0) >= 200 }
+            let width = splitView.arrangedSubviews.first?.frame.width ?? 0
+            #expect(laidOut, "the sidebar is \(width) pt wide")
+            #expect(width <= 280, "the sidebar is \(width) pt wide")
         }
     }
 

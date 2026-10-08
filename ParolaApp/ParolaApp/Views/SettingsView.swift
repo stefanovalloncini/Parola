@@ -30,7 +30,6 @@ struct SettingsView: View {
         NavigationSplitView {
             SettingsSidebar(selection: selection, search: search, features: model.features)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
-                .toolbar(removing: .sidebarToggle)
         } detail: {
             SettingsDetail(route: route.wrappedValue)
         }
