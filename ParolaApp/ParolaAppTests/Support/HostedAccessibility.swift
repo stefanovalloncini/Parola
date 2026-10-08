@@ -1,7 +1,26 @@
 import AppKit
 import SwiftUI
 
-/// A view ordered in far off screen, laid out twice around a run loop turn, so it is drawn as a window would draw it.
+/// A window that keeps the frame it is given; AppKit otherwise pulls a titled one back onto a screen.
+final class OffscreenWindow: NSWindow {
+    static let origin = NSPoint(x: -12_000, y: -12_000)
+
+    convenience init(width: CGFloat, height: CGFloat, styleMask: NSWindow.StyleMask) {
+        self.init(
+            contentRect: NSRect(origin: Self.origin, size: NSSize(width: width, height: height)),
+            styleMask: styleMask,
+            backing: .buffered,
+            defer: false
+        )
+        setFrameOrigin(Self.origin)
+    }
+
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        frameRect
+    }
+}
+
+/// A view ordered in far off every screen, laid out twice around a run loop turn, so it is drawn as a window would draw it.
 @MainActor
 struct HostedWindow {
     let host: NSView
@@ -12,11 +31,10 @@ struct HostedWindow {
         let hosting = NSHostingView(rootView: view)
         if toolbar { hosting.sceneBridgingOptions = [.toolbars] }
         host = hosting
-        window = NSWindow(
-            contentRect: NSRect(x: -12_000, y: -12_000, width: width, height: height),
-            styleMask: toolbar ? [.titled, .closable, .resizable] : [.borderless],
-            backing: .buffered,
-            defer: false
+        window = OffscreenWindow(
+            width: width,
+            height: height,
+            styleMask: toolbar ? [.titled, .closable, .resizable] : [.borderless]
         )
         window.contentView = host
         window.orderFront(nil)

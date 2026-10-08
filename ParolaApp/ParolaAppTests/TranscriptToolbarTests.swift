@@ -68,6 +68,31 @@ struct TranscriptToolbarTests {
         ids.contains { $0.hasSuffix(leaf) }
     }
 
+    @Test("the titled test window stays off every screen, through a resize, and its toolbar still reads and presses")
+    func hostedWindowStaysOffScreen() async {
+        await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            let hosted = host(model)
+            defer { hosted.close() }
+            #expect(hosted.window.isVisible)
+            #expect(isOffScreen(hosted.window), "on screen at \(hosted.window.frame)")
+            let drawn = await waitUntil { element(Self.back, in: hosted) != nil }
+            #expect(drawn)
+            #expect(isOffScreen(hosted.window), "on screen at \(hosted.window.frame)")
+
+            hosted.window.setContentSize(NSSize(width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight))
+            hosted.host.layoutSubtreeIfNeeded()
+            #expect(isOffScreen(hosted.window), "on screen at \(hosted.window.frame) after a resize")
+            #expect(HostedAccessibility.press(endingWith: Self.back, in: hosted.window))
+            let back = await waitUntil { model.transcript == nil }
+            #expect(back)
+        }
+    }
+
+    private func isOffScreen(_ window: NSWindow) -> Bool {
+        window.screen == nil && !NSScreen.screens.contains { $0.frame.intersects(window.frame) }
+    }
+
     @Test("a transcript's controls sit in the window toolbar, and there is no second bar under it")
     func controlsLiveInTheWindowToolbar() async {
         await withIsolatedDefaults { defaults in
