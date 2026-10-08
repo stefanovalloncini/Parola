@@ -4,7 +4,8 @@ import ParolaCore
 
 /// True only for the SwiftUI `Settings` scene window. The main `WindowGroup` window has a
 /// `com.apple.SwiftUI.Window`-style identifier and can become the main window; Settings carries a
-/// `com.apple.SwiftUI.Settings` identifier (titled "<App> Settings"). Width is not a reliable
+/// `com.apple.SwiftUI.Settings` identifier and is titled with its pane ("General"), so only the identifier
+/// finds it; the title fallback is for untagged windows titled "Settings". Width is not a reliable
 /// discriminator — the panes can be wider than the default main window — so we never key off it,
 /// and we hard-guard against ever matching the main/key content window.
 @MainActor

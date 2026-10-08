@@ -25,14 +25,20 @@ struct SettingsWindowClassifierTests {
         ) == false)
     }
 
-    @Test("the SwiftUI Settings scene window is classified by its identifier")
+    @Test("the SwiftUI Settings scene window, titled with its pane, is classified by its identifier alone")
     func settingsIdentifierMatches() {
         #expect(SettingsWindowClassifier.isSettings(
             identifier: "com.apple.SwiftUI.Settings",
-            title: "Parola Settings",
+            title: "General",
             isMainWindow: false,
             isTitled: true
         ))
+        #expect(SettingsWindowClassifier.isSettings(
+            identifier: nil,
+            title: "General",
+            isMainWindow: false,
+            isTitled: true
+        ) == false)
     }
 
     @Test("a titled Settings window matches by title when the identifier is untagged")
