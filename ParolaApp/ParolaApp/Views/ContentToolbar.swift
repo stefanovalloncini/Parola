@@ -20,7 +20,7 @@ struct ContentToolbar: ToolbarContent {
             ToolbarSpacer(.fixed, placement: .primaryAction)
         }
         if RecordControl.primarySource(features: model.features) != nil {
-            // Its own item with no shared glass behind it, so the red capsule isn't set inside a second pill.
+            // Its own item with no shared glass behind it: Record and the capsule each wear their own.
             ToolbarItem(placement: .primaryAction) {
                 RecordControl()
             }

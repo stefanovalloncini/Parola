@@ -35,7 +35,7 @@ struct SessionCapsule: View {
     }
 }
 
-/// The capsule as drawn. Its red is a solid fill under white text: a glass tint greys out while the window is inactive.
+/// The capsule as drawn: the Record button's plain glass, with only the dot in red.
 struct SessionCapsuleFace: View {
     let take: RecordingSession
     let showsMeter: Bool
@@ -43,6 +43,8 @@ struct SessionCapsuleFace: View {
     let showStage: () -> Void
     /// Told whether the button read Cancel when it was clicked.
     let stop: (_ cancels: Bool) -> Void
+
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         if isOnScreen, take.state == .recording, let origin = take.clockOrigin {
@@ -63,6 +65,7 @@ struct SessionCapsuleFace: View {
                         .font(DS.Font.takeTimerCompact)
                     if take.isPaused {
                         Text("Paused")
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.leading, 14)
@@ -81,15 +84,21 @@ struct SessionCapsuleFace: View {
                     .padding(.trailing, 10)
             }
             Capsule()
-                .fill(.white.opacity(0.4))
+                .fill(.primary.opacity(contrast == .increased ? 0.5 : 0.25))
                 .frame(width: 1, height: 14)
                 .accessibilityHidden(true)
             stopButton
         }
-        .font(DS.Font.bodyStrong)
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .frame(height: SessionCapsule.height)
-        .background(Capsule().fill(DS.Color.recordingFill))
+        .glassEffect(.regular, in: .capsule)
+        .overlay {
+            if contrast == .increased {
+                Capsule()
+                    .strokeBorder(.primary.opacity(0.5), lineWidth: 1)
+                    .accessibilityHidden(true)
+            }
+        }
         .fixedSize()
     }
 
@@ -119,17 +128,16 @@ struct SessionCapsuleFace: View {
     private var dot: some View {
         switch take.state {
         case .recording:
-            RecDot(color: .white, pulsesFrom: isOnScreen ? take.clockOrigin : nil)
+            RecDot(color: RecordButtonLabel.dotColor, pulsesFrom: isOnScreen ? take.clockOrigin : nil)
         case .paused:
             RecDot(color: DS.Palette.warning)
-                .overlay(Circle().strokeBorder(.white, lineWidth: 1))
         default:
-            RecDot(color: .white.opacity(0.5))
+            RecDot(color: .secondary)
         }
     }
 }
 
-/// White labels on the red that dim while pressed or disabled.
+/// The glass holds still; the labels dim while pressed or disabled.
 private struct SessionCapsuleButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
@@ -139,11 +147,12 @@ private struct SessionCapsuleButtonStyle: ButtonStyle {
     }
 }
 
-/// The take's last two seconds of level, in the capsule's white, on the Stage band's curve.
+/// The take's last two seconds of level, on the Stage band's curve.
 private struct SessionMeter: View {
     let isOnScreen: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
 
     nonisolated static let barCount = 20
     nonisolated static let barWidth: CGFloat = 2
@@ -175,7 +184,7 @@ private struct SessionMeter: View {
                 )
                 path.addRoundedRect(in: rect, cornerSize: CGSize(width: 1, height: 1), style: .continuous)
             }
-            context.fill(path, with: .color(.white.opacity(0.85)))
+            context.fill(path, with: .color(.primary.opacity(contrast == .increased ? 0.85 : 0.5)))
         }
         .frame(width: width, height: Self.height)
         .accessibilityRepresentation {

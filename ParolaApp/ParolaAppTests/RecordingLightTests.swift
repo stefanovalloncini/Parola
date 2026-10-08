@@ -232,6 +232,29 @@ struct RecordingLightSurfaceTests {
         #expect(finishing == [0, 0, 0])
     }
 
+    @Test("the capsule's light pulses in the recording red on its glass, and holds still under Reduce Motion")
+    func capsuleLightIsRedAndRestsUnderReduceMotion() throws {
+        let audio = try tempWAV("light-capsule")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("light-capsule")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -30))
+        defer { model.endTestTake() }
+        let take = try #require(model.recording)
+        let sRGB = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+
+        let face = SessionCapsuleFace(take: take, showsMeter: false, isOnScreen: true, showStage: {}, stop: { _ in })
+        let moving = HostedWindow(face.environment(\.colorScheme, .light), width: 400, height: 80)
+        defer { moving.close() }
+        let light = try #require(lights(in: moving).first)
+        let red = light.dot.backgroundColor?.converted(to: sRGB, intent: .defaultIntent, options: nil)?.components ?? []
+        #expect(red.count == 4 && abs(red[0] - 0.769) < 0.01 && abs(red[1] - 0.137) < 0.01, "light \(red)")
+        #expect(pulsingLights(in: moving) == 1)
+
+        let reduced = HostedWindow(face.environment(\._accessibilityReduceMotion, true), width: 400, height: 80)
+        defer { reduced.close() }
+        #expect(lights(in: reduced).isEmpty)
+    }
+
     @Test("a click on the light reaches the button it sits in, once, on the capsule and on the pill")
     func clickOnTheLight() async throws {
         let audio = try tempWAV("light-click")

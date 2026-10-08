@@ -16,26 +16,52 @@ private func capturingTake(at start: Date) -> RecordingSession {
     return take
 }
 
-/// The pixel halfway down the capsule, 6 pt in from its left end: fill, clear of the dot and the digits.
+/// The capsule drawn at 2x, in one appearance and contrast.
 @MainActor
-private func capsuleFill(_ take: RecordingSession) throws -> NSColor {
+private func renderedCapsule(
+    _ take: RecordingSession, scheme: ColorScheme = .light, contrast: ColorSchemeContrast = .standard
+) throws -> NSBitmapImageRep {
     let face = SessionCapsuleFace(take: take, showsMeter: false, isOnScreen: false, showStage: {}, stop: { _ in })
-        .environment(\.colorScheme, .light)
+        .environment(\.colorScheme, scheme)
+        .environment(\._colorSchemeContrast, contrast)
     let renderer = ImageRenderer(content: face)
     renderer.scale = 2
     var image: CGImage?
-    let appearance = try #require(NSAppearance(named: .aqua))
+    let appearance = try #require(NSAppearance(named: scheme == .dark ? .darkAqua : .aqua))
     appearance.performAsCurrentDrawingAppearance { image = renderer.cgImage }
     let rendered = try #require(image)
     #expect(rendered.colorSpace?.name == CGColorSpace.sRGB)
     // The renderer draws in sRGB; the bitmap only labels it calibrated, so its components are read as they are.
-    let bitmap = NSBitmapImageRep(cgImage: rendered)
-    return try #require(bitmap.colorAt(x: 12, y: bitmap.pixelsHigh / 2))
+    return NSBitmapImageRep(cgImage: rendered)
+}
+
+/// The pixel halfway down the capsule, `x` points in from its left end.
+private func capsulePixel(_ bitmap: NSBitmapImageRep, at x: CGFloat) throws -> NSColor {
+    try #require(bitmap.colorAt(x: Int(x * 2), y: bitmap.pixelsHigh / 2))
+}
+
+private enum CapsulePoint {
+    static let edge: CGFloat = 0.5
+    /// Clear of the dot and the digits.
+    static let fill: CGFloat = 6
+    static let dot: CGFloat = 18
 }
 
 private func matches(_ color: NSColor, _ rgba: RGBA) -> Bool {
     abs(color.redComponent - rgba.r) < 0.04 && abs(color.greenComponent - rgba.g) < 0.04
         && abs(color.blueComponent - rgba.b) < 0.04 && color.alphaComponent > 0.97
+}
+
+private func isRed(_ color: NSColor) -> Bool {
+    color.alphaComponent > 0.5 && color.redComponent - max(color.greenComponent, color.blueComponent) > 0.3
+}
+
+/// How far a pixel stands from the window behind it, white in light and black in dark, once laid over it.
+private func standOut(_ color: NSColor, in scheme: ColorScheme) -> Double {
+    let page: CGFloat = scheme == .dark ? 0 : 1
+    let alpha = color.alphaComponent
+    let shown = [color.redComponent, color.greenComponent, color.blueComponent].map { $0 * alpha + page * (1 - alpha) }
+    return Double(shown.map { abs($0 - page) }.reduce(0, +) / 3)
 }
 
 @MainActor
@@ -78,16 +104,44 @@ struct SessionCapsuleTests {
             == "Paused, 12 minutes, 34 seconds")
     }
 
-    @Test("the capsule paints the recording red itself, rather than tinting glass")
+    @Test("the capsule is plain glass: only its dot is the recording red, in either appearance", arguments: [ColorScheme.light, .dark])
     @MainActor
-    func paintsTheRecordingRedItself() throws {
-        let take = capturingTake(at: Date(timeIntervalSinceNow: -754))
-        guard case .dynamic(let light, _) = DS.Color.recordingFillTheme else {
+    func onlyTheDotIsRed(scheme: ColorScheme) throws {
+        guard case .dynamic(let light, let dark) = DS.Color.recordingFillTheme else {
             Issue.record("the recording red is not a fixed pair")
             return
         }
-        let fill = try capsuleFill(take)
-        #expect(matches(fill, light), "fill \(fill)")
+        let capsule = try renderedCapsule(capturingTake(at: Date(timeIntervalSinceNow: -754)), scheme: scheme)
+        let fill = try capsulePixel(capsule, at: CapsulePoint.fill)
+        let dot = try capsulePixel(capsule, at: CapsulePoint.dot)
+        #expect(!isRed(fill), "fill \(fill)")
+        #expect(matches(dot, scheme == .dark ? dark : light), "dot \(dot)")
+    }
+
+    @Test("a paused take's dot turns amber on the glass")
+    @MainActor
+    func pausedDotIsAmber() throws {
+        guard case .dynamic(let amber, _) = ThemePreset.defaultPreset.palette.warning else {
+            Issue.record("the warning amber is not a fixed pair")
+            return
+        }
+        let start = Date(timeIntervalSinceNow: -754)
+        var take = capturingTake(at: start)
+        _ = take.pause(at: start.addingTimeInterval(754))
+        let capsule = try renderedCapsule(take)
+        let fill = try capsulePixel(capsule, at: CapsulePoint.fill)
+        let dot = try capsulePixel(capsule, at: CapsulePoint.dot)
+        #expect(!isRed(fill), "fill \(fill)")
+        #expect(matches(dot, amber), "dot \(dot)")
+    }
+
+    @Test("under Increase Contrast a ring outlines the capsule's glass, in either appearance", arguments: [ColorScheme.light, .dark])
+    @MainActor
+    func increaseContrastRingsTheGlass(scheme: ColorScheme) throws {
+        let take = capturingTake(at: Date(timeIntervalSinceNow: -754))
+        let standard = try capsulePixel(renderedCapsule(take, scheme: scheme), at: CapsulePoint.edge)
+        let increased = try capsulePixel(renderedCapsule(take, scheme: scheme, contrast: .increased), at: CapsulePoint.edge)
+        #expect(standOut(increased, in: scheme) > standOut(standard, in: scheme) + 0.15, "standard \(standard), increased \(increased)")
     }
 
     @Test("the meter goes below a 1000 pt window; the time and Stop stay at every width")
@@ -201,6 +255,40 @@ struct SessionCapsuleHostedTests {
         #expect(HostedAccessibility.press(endingWith: "Toolbar.Button.SessionStop", in: hosted.host))
 
         #expect(model.recording?.state == .recording, "the Cancel it showed never becomes a Stop")
+    }
+
+    @Test("VoiceOver hears the time, Stop and the level as before; paused, the meter goes, and finishing dims Stop")
+    func spokenThroughPauseAndFinish() async throws {
+        let audio = try tempWAV("capsule-spoken")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("capsule-spoken")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -754))
+        defer { model.endTestTake() }
+        let takeID = model.recording?.takeID
+        model.goHome()
+        let hosted = HostedWindow(RecordControl().environment(model).frame(maxWidth: .infinity, maxHeight: .infinity), width: 1180, height: 120)
+        defer { hosted.close() }
+        @MainActor func element(_ suffix: String) -> HostedAccessibility.Element? {
+            HostedAccessibility.elements(in: hosted.host).first { $0.identifier?.hasSuffix(suffix) == true }
+        }
+
+        let drawn = await waitUntil { element("Toolbar.Meter.SessionLevel") != nil }
+        try #require(drawn)
+        #expect(element("Toolbar.Button.SessionTime")?.label?.hasPrefix("Recording, 12 minutes, ") == true)
+        #expect(element("Toolbar.Button.SessionStop")?.name == "Stop Recording")
+        #expect(element("Toolbar.Button.SessionStop")?.isEnabled == true)
+        #expect(element("Toolbar.Meter.SessionLevel")?.label == "Input level")
+
+        model.updateSession(of: takeID) { $0.pause(at: Date()) }
+        let paused = await waitUntil { element("Toolbar.Button.SessionTime")?.label?.hasPrefix("Paused, 12 minutes, ") == true }
+        #expect(paused)
+        #expect(element("Toolbar.Meter.SessionLevel") == nil)
+        #expect(element("Toolbar.Button.SessionStop")?.isEnabled == true)
+
+        model.updateSession(of: takeID) { $0.finish(at: Date()) }
+        let dimmed = await waitUntil { element("Toolbar.Button.SessionStop")?.isEnabled == false }
+        #expect(dimmed)
+        #expect(element("Toolbar.Button.SessionStop")?.name == "Stop Recording")
     }
 }
 
