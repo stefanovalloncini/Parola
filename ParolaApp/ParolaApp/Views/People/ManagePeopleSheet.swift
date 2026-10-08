@@ -152,7 +152,7 @@ struct PeopleDirectoryList: View {
                 .onSubmit { add() }
                 .axLeaf("People.TextField.Add")
             Button("Add") { add() }
-                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                .buttonStyle(.bordered)
                 .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .axLeaf("People.Button.Add")
         }

@@ -137,7 +137,7 @@ private struct YtDlpBanner: View {
                         Label("Install with Homebrew", systemImage: "arrow.down.circle")
                     }
                 }
-                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                .buttonStyle(.borderedProminent)
                 .disabled(model.ytDlpInstalling)
                 .axLeaf("YouTube.Button.InstallYtDlp")
 

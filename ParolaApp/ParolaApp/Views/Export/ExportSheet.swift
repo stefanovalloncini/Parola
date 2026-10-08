@@ -69,7 +69,7 @@ struct ExportSheet: View {
                     Button(LocalizedStringKey(style.displayName)) {
                         model.setExportSpec(spec.changing(style: style))
                     }
-                    .buttonStyle(DSPillButtonStyle(kind: spec.style == style ? .primary : .secondary, size: .compact))
+                    .chip(chosen: spec.style == style)
                     .accessibilityAddTraits(spec.style == style ? .isSelected : [])
                     .axLeaf("Export.Button.Style.\(style.rawValue)")
                 }
@@ -85,7 +85,7 @@ struct ExportSheet: View {
                     Button(LocalizedStringKey(format.displayName)) {
                         model.setExportSpec(spec.changing(format: format))
                     }
-                    .buttonStyle(DSPillButtonStyle(kind: spec.format == format ? .primary : .secondary, size: .compact))
+                    .chip(chosen: spec.format == format)
                     .accessibilityAddTraits(spec.format == format ? .isSelected : [])
                     .axLeaf("Export.Button.Format.\(format.fileExtension)")
                 }
@@ -177,7 +177,7 @@ struct ExportSheet: View {
             presetName = ""
             namingPreset = true
         }
-        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+        .buttonStyle(.bordered)
         .axLeaf("Export.Button.SavePreset")
     }
 
@@ -308,6 +308,17 @@ struct ExportSheet: View {
                 model.setExportSpec(ExportSpec(style: spec.style, format: spec.format, options: options))
             }
         )
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func chip(chosen: Bool) -> some View {
+        if chosen {
+            buttonStyle(.borderedProminent)
+        } else {
+            buttonStyle(.bordered)
+        }
     }
 }
 

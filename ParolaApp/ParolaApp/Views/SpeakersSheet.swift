@@ -136,14 +136,10 @@ private struct FlowChips: View {
     let onTap: (String) -> Void
 
     var body: some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 60), spacing: 4)],
-            alignment: .leading,
-            spacing: 4
-        ) {
+        LeadingFlow(spacing: DS.Spacing.tight) {
             ForEach(items, id: \.self) { item in
                 Button(item) { onTap(item) }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .buttonStyle(.bordered)
                     .axLeaf("Speakers.Button.Suggestion")
             }
         }

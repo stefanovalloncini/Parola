@@ -63,7 +63,7 @@ struct ExportSheetLayoutTests {
         #expect(!sheet.contains(".frame(width: 180"))
     }
 
-    @Test("Style and Format keep their pills, and VoiceOver hears which one is chosen")
+    @Test("Style and Format keep their chips, and VoiceOver hears which one is chosen")
     func chosenPillsReadAsSelected() throws {
         let model = makeModel()
         let hosted = host(model)
