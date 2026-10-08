@@ -274,7 +274,7 @@ struct TranscriptToolbarTests {
         }
     }
 
-    @Test("a hidden inspector comes back from the toolbar, at either width", arguments: [1400, 1040] as [CGFloat])
+    @Test("a hidden inspector comes back from the toolbar, wide and at 1040, the narrow width where its toggle still fits", arguments: [1400, 1040] as [CGFloat])
     func toolbarTogglesTheInspector(width: CGFloat) async {
         await withIsolatedDefaults { defaults in
             defaults.set(false, forKey: InspectorVisibility.preferenceKey)
@@ -294,6 +294,38 @@ struct TranscriptToolbarTests {
             #expect(renamed)
 
             #expect(HostedAccessibility.press(endingWith: Self.inspector, in: hosted.window))
+            let hidden = await waitUntil { !hasInspectorColumn(hosted.host) }
+            #expect(hidden)
+        }
+    }
+
+    @Test("at the narrowest window, where the toolbar's toggle folds into », View ▸ Show Inspector brings a hidden inspector back")
+    func viewMenuTogglesTheInspectorAtTheMinimumWidth() async {
+        await withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: InspectorVisibility.preferenceKey)
+            let model = makeModel(defaults)
+            let hosted = host(model, width: MainWindowLayout.minimumWidth)
+            let menu = HostedWindow(VStack(alignment: .leading) { ViewCommands(model: model) }.environment(model), width: 420, height: 640)
+            defer {
+                hosted.close()
+                menu.close()
+            }
+            @MainActor func command() -> String? {
+                HostedAccessibility.elements(in: menu.host).first { $0.identifier?.hasSuffix("Menu.View.Inspector") == true }?.name
+            }
+            let drawn = await waitUntil { shows(Self.format, in: toolbarIDs(hosted)) }
+            #expect(drawn)
+            #expect(model.transcriptPaneIsNarrow)
+            #expect(!hasInspectorColumn(hosted.host))
+            #expect(command() == "Show Inspector")
+
+            #expect(HostedAccessibility.press(endingWith: "Menu.View.Inspector", in: menu.host))
+            let shown = await waitUntil { hasInspectorColumn(hosted.host) }
+            #expect(shown)
+            let renamed = await waitUntil { command() == "Hide Inspector" }
+            #expect(renamed)
+
+            #expect(HostedAccessibility.press(endingWith: "Menu.View.Inspector", in: menu.host))
             let hidden = await waitUntil { !hasInspectorColumn(hosted.host) }
             #expect(hidden)
         }
