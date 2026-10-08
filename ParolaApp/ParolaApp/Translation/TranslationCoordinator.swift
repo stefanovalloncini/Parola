@@ -44,6 +44,9 @@ final class TranslationCoordinator {
     /// Test seam: when set, replaces the resolved translator so a test never touches the shared mock registry.
     @ObservationIgnored var translatorOverride: (any TranscriptTranslating)?
 
+    /// Test seam: when set, stands in for the languages the system translator offers.
+    @ObservationIgnored var systemLanguagesOverride: [String]?
+
     /// How long a run waits for ``TranslationHostView`` to hand back a live session.
     @ObservationIgnored var sessionWaitBudget: Duration = .seconds(10)
 
@@ -90,8 +93,14 @@ final class TranslationCoordinator {
     /// The languages a translation can target, falling back to the app's own table when the system
     /// offers none.
     func supportedTargets() async -> [String] {
-        if stubTranslator() != nil { return SupportedLanguages.codes }
-        let codes = await Self.systemSupportedLanguages()
+        let codes: [String]
+        if let systemLanguagesOverride {
+            codes = systemLanguagesOverride
+        } else if stubTranslator() != nil {
+            return SupportedLanguages.codes
+        } else {
+            codes = await Self.systemSupportedLanguages()
+        }
         let targets = codes.isEmpty ? SupportedLanguages.codes : codes
         if knownTargets != targets { knownTargets = targets }
         return targets

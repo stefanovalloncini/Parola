@@ -140,11 +140,7 @@ struct TranscriptDetails: View {
             isEnabled: model.canTranslateTranscript,
             leaf: "Info.Menu.Translation"
         ) {
-            let targets = TranslationTargets.named(
-                from: model.translationCoordinator.knownTargets ?? SupportedLanguages.codes,
-                excluding: model.transcript?.language
-            )
-            ForEach(targets, id: \.code) { target in
+            ForEach(TranslationTargets.offered(by: model), id: \.code) { target in
                 Button(target.name) { Task { await model.translateTranscript(to: target.code) } }
             }
             Divider()

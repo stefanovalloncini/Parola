@@ -4,8 +4,6 @@ import ParolaCore
 /// A translation on its way, or one that failed, above the text it is for. Transcript ▸ Translate To starts and removes one.
 struct TranslationStrip: View {
     @Environment(AppModel.self) private var model
-    @State private var targets: [String] = SupportedLanguages.codes
-    @State private var menuTargets: [(code: String, name: String)] = []
 
     static func shows(_ state: TranslationState) -> Bool {
         if case .idle = state { return false }
@@ -29,10 +27,6 @@ struct TranslationStrip: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
-        .task {
-            targets = await model.translationCoordinator.supportedTargets()
-            rebuildMenuTargets()
-        }
         .accessibilityElement(children: .contain)
         .axLeaf("Strip.Translation")
     }
@@ -65,14 +59,15 @@ struct TranslationStrip: View {
             Button("Remove translation") { Task { await model.removeTranslation() } }
                 .axLeaf("Translation.Button.Remove")
         }
+        let targets = TranslationTargets.offered(by: model)
         Menu("Translate to…") {
-            ForEach(menuTargets, id: \.code) { target in
+            ForEach(targets, id: \.code) { target in
                 Button(target.name) { translate(to: target.code) }
                     .axLeaf("Translation.MenuItem.Target.\(target.code)")
             }
         }
         .fixedSize()
-        .disabled(!model.canTranslateTranscript || menuTargets.isEmpty)
+        .disabled(!model.canTranslateTranscript || targets.isEmpty)
         .axLeaf("Translation.Menu.TranslateTo")
         Button { model.dismissTranslationFailure() } label: {
             Image(systemName: "xmark")
@@ -82,10 +77,6 @@ struct TranslationStrip: View {
         .help("Dismiss")
         .accessibilityLabel("Dismiss")
         .axLeaf("Translation.Button.Dismiss")
-    }
-
-    private func rebuildMenuTargets() {
-        menuTargets = TranslationTargets.named(from: targets, excluding: model.transcript?.language)
     }
 
     private func progressLabel(completed: Int?, total: Int?) -> String {
@@ -110,6 +101,11 @@ struct TranslationStrip: View {
 
 @MainActor
 enum TranslationTargets {
+    /// What every Translate To menu offers: the system's languages once the transcript pane has asked for them, the app's own table until then.
+    static func offered(by model: AppModel) -> [(code: String, name: String)] {
+        named(from: model.translationCoordinator.knownTargets ?? SupportedLanguages.codes, excluding: model.transcript?.language)
+    }
+
     /// Every target but the transcript's own language, by name; the strip, the Details row and Transcript ▸ Translate To share it.
     static func named(from codes: [String], excluding language: String?) -> [(code: String, name: String)] {
         let source = language.flatMap { TranslationCoordinator.sourceLanguage(for: $0) }

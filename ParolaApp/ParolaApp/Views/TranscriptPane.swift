@@ -84,7 +84,10 @@ struct TranscriptPane: View {
                 applyPaneWidth(width)
             }
         }
-        .task { model.refreshAIAvailability() }
+        .task {
+            model.refreshAIAvailability()
+            _ = await model.translationCoordinator.supportedTargets()
+        }
         .axBranch("Transcript")
     }
 

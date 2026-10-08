@@ -6,10 +6,7 @@ struct TranslateMenu: View {
     let model: AppModel
 
     var body: some View {
-        let targets = TranslationTargets.named(
-            from: model.translationCoordinator.knownTargets ?? SupportedLanguages.codes,
-            excluding: model.transcript?.language
-        )
+        let targets = TranslationTargets.offered(by: model)
         Menu("Translate To") {
             ForEach(targets, id: \.code) { target in
                 Button(target.name) { Task { await model.translateTranscript(to: target.code) } }

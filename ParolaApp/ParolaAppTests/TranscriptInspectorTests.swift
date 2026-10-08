@@ -447,6 +447,35 @@ struct TranslationStripTests {
         ids(hosted).contains { $0.hasSuffix(leaf) }
     }
 
+    private func translateMenu(_ model: AppModel) -> [NSMenuItem] {
+        let menu = NSHostingMenu(rootView: TranslateMenu(model: model))
+        menu.update()
+        return menu.items
+    }
+
+    private func translateToItems(_ model: AppModel) -> [String] {
+        translateMenu(model).first { $0.title == "Translate To" }?.submenu?.items.map(\.title) ?? []
+    }
+
+    @Test("Transcript ▸ Translate To offers every language the system translator has, not just the app's own table")
+    func translateToOffersTheSystemsLanguages() async throws {
+        try await withIsolatedDefaults { defaults in
+            let model = try await openItalian(defaults)
+            model.translationCoordinator.systemLanguagesOverride = SupportedLanguages.codes + ["pl", "uk"]
+            let hosted = HostedWindow(ContentView().environment(model), width: 1180, height: 760)
+            defer { hosted.close() }
+            let drawn = await waitUntil { has("Transcript.Heading.Title", hosted) }
+            #expect(drawn)
+
+            let polish = SupportedLanguages.displayName(for: "pl")
+            #expect(!SupportedLanguages.codes.contains("pl"))
+            let offered = await waitUntil { translateToItems(model).contains(polish) }
+            #expect(offered, "\(translateToItems(model))")
+            #expect(!translateToItems(model).contains(SupportedLanguages.displayName(for: "it")), "not the transcript's own language")
+            #expect(translateMenu(model).map(\.title) == ["Translate To", "Remove Translation"])
+        }
+    }
+
     @Test("a running translation shows above the text with Cancel, and goes once it lands")
     func runningTranslationShowsAboveTheText() async throws {
         try await withIsolatedDefaults { defaults in

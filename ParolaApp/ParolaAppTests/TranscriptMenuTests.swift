@@ -166,20 +166,6 @@ struct TranscriptMenuTests {
         #expect(chat.contains(#"Button("Manage Prompts…") { model.openSettings(route: .prompts) }"#))
     }
 
-    @Test("translating has a menu path, and the strip and the Details row offer the same targets")
-    func translationHasAMenuPath() throws {
-        let menu = try source("Views/Transcript/TranslateMenu")
-        #expect(menu.contains(#"Menu("Translate To") { ForEach(targets, id: \.code) { target in Button(target.name) { Task { await model.translateTranscript(to: target.code) } }"#))
-        #expect(menu.contains(#"Button("Remove Translation") { Task { await model.removeTranslation() } }"#))
-        #expect(menu.contains("TranslationTargets.named( from: model.translationCoordinator.knownTargets ?? SupportedLanguages.codes"))
-        let strip = try source("Views/Transcript/TranslationStrip")
-        #expect(!strip.contains("characters"))
-        #expect(strip.contains("TranslationTargets.named(from: targets, excluding: model.transcript?.language)"))
-        let details = try source("Views/Transcript/TranscriptDetails")
-        #expect(details.contains("TranslationTargets.named( from: model.translationCoordinator.knownTargets ?? SupportedLanguages.codes"))
-        #expect(details.contains(#"Button("Remove Translation") { Task { await model.removeTranslation() } }"#))
-    }
-
     @Test("the translation targets leave out the transcript's own language and read in name order")
     @MainActor
     func translationTargetsSkipTheSource() {
