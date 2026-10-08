@@ -268,19 +268,18 @@ enum DS {
         }
     }
 
-    /// One hue per Settings sidebar group, mid-luminance so the badge reads on both schemes.
+    /// One system colour per Settings sidebar group, as System Settings tints its tiles; never red, which means "recording now".
     static func settingsGroupTint(for groupID: String) -> SwiftUI.Color {
         switch groupID {
-        case "start": return SwiftUI.Color(red: 0.38, green: 0.48, blue: 0.82)
-        case "capture": return SwiftUI.Color(red: 0.82, green: 0.38, blue: 0.36)
-        case "dictation": return SwiftUI.Color(red: 0.82, green: 0.50, blue: 0.18)
-        case "sources": return SwiftUI.Color(red: 0.56, green: 0.42, blue: 0.80)
-        case "transcription": return SwiftUI.Color(red: 0.20, green: 0.62, blue: 0.62)
-        case "export": return SwiftUI.Color(red: 0.34, green: 0.62, blue: 0.36)
-        case "ai": return SwiftUI.Color(red: 0.78, green: 0.38, blue: 0.62)
-        case "automation": return SwiftUI.Color(red: 0.24, green: 0.55, blue: 0.80)
-        case "end": return SwiftUI.Color(red: 0.45, green: 0.46, blue: 0.52)
-        default: return SwiftUI.Color(red: 0.45, green: 0.46, blue: 0.52)
+        case "start": return .gray
+        case "capture": return .indigo
+        case "dictation": return .orange
+        case "sources": return .blue
+        case "transcription": return .teal
+        case "export": return .green
+        case "ai": return .purple
+        case "automation": return .cyan
+        default: return .gray
         }
     }
 

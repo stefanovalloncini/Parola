@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
@@ -14,11 +15,25 @@ struct SettingsSidebarCatalogTests {
         #expect(first.map(\.routes) == second.map(\.routes))
     }
 
-    @Test("every sidebar group carries its own tint")
+    @Test("App and Support wear grey, every other group a colour of its own")
     func everyGroupHasATint() {
         let ids = SettingsSidebarCatalog.all.map(\.id)
-        let tints = ids.map { DS.settingsGroupTint(for: $0) }
-        #expect(Set(tints).count == ids.count)
+        let coloured = ids.filter { $0 != "start" && $0 != "end" }
+        let tints = coloured.map { DS.settingsGroupTint(for: $0) }
+        #expect(Set(tints).count == coloured.count)
+        #expect(!tints.contains(.gray))
+        #expect(DS.settingsGroupTint(for: "start") == .gray)
+        #expect(DS.settingsGroupTint(for: "end") == .gray)
+    }
+
+    @Test("no group's tile is red, the colour that means recording")
+    func noGroupIsRed() {
+        for id in SettingsSidebarCatalog.all.map(\.id) {
+            let tint = NSColor(DS.settingsGroupTint(for: id)).usingColorSpace(.sRGB)
+            let hue = tint?.hueComponent ?? 0
+            let saturation = tint?.saturationComponent ?? 0
+            #expect(saturation < 0.3 || (hue > 0.04 && hue < 0.94), "\(id): hue \(hue)")
+        }
     }
 
     @Test("an id the catalog never uses falls back to the neutral tint")
