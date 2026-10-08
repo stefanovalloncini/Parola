@@ -119,6 +119,55 @@ struct SettingsPaneRoutingTests {
         #expect(model.settingsRoutePreview == true)
     }
 
+    @Test("test mode: setRoute settings with a pane opens the preview on that pane")
+    func setRouteSettingsPicksThePane() async throws {
+        let (model, server, context, commands) = try makeRig(mode: .test)
+        let command = try #require(commands["setRoute"])
+        let args = try command.validate(AutomationArgs(["route": .string("settings"), "pane": .string("dictation")]))
+        let reply = try await command.handler(args, context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.settingsRoutePreview)
+        #expect(model.settingsPane == "dictation")
+        guard case .object(let fields) = reply else {
+            Issue.record("expected an object reply, got \(reply)")
+            return
+        }
+        #expect(fields["pane"] == .string("dictation"))
+    }
+
+    @Test("test mode: setRoute settings refuses an unknown or hidden pane and keeps the current one")
+    func setRouteSettingsRefusesABadPane() async throws {
+        let (model, server, context, commands) = try makeRig(mode: .test, features: [.batch])
+        let command = try #require(commands["setRoute"])
+        for pane in ["nonsense-pane", "dictation"] {
+            let args = try command.validate(AutomationArgs(["route": .string("settings"), "pane": .string(pane)]))
+            do {
+                _ = try await command.handler(args, context)
+                Issue.record("\(pane) was accepted")
+            } catch {
+                #expect(error is AutomationError, "\(error)")
+            }
+        }
+        withExtendedLifetime(server) {}
+        #expect(model.settingsPane == "general")
+    }
+
+    @Test("a pane only goes with the settings route")
+    func setRoutePaneNeedsTheSettingsRoute() async throws {
+        let (model, server, context, commands) = try makeRig(mode: .test)
+        let command = try #require(commands["setRoute"])
+        let args = try command.validate(AutomationArgs(["route": .string("queue"), "pane": .string("dictation")]))
+        do {
+            _ = try await command.handler(args, context)
+            Issue.record("a pane was taken with the queue route")
+        } catch {
+            #expect(error is AutomationError, "\(error)")
+        }
+        withExtendedLifetime(server) {}
+        #expect(model.settingsPane == "general")
+    }
+
     @Test("test mode: switching to a real route clears the Settings preview")
     func setRouteRealRouteClearsPreview() async throws {
         let (model, server, context, commands) = try makeRig(mode: .test)
@@ -144,12 +193,16 @@ struct SettingsPaneRoutingTests {
         withExtendedLifetime(server) {}
     }
 
-    @Test("settings route is advertised only in test mode")
+    @Test("settings route and its pane are advertised only in test mode")
     func settingsRouteAdvertisedOnlyInTestMode() throws {
         let prod = try makeRig(mode: .normal).3["setRoute"]
         let test = try makeRig(mode: .test).3["setRoute"]
         #expect(routeEnum(prod)?.isEmpty == false)
         #expect(routeEnum(prod)?.contains("settings") == false)
         #expect(routeEnum(test)?.contains("settings") == true)
+        let prodTakesPane = prod?.args.contains { $0.name == "pane" }
+        let testTakesPane = test?.args.contains { $0.name == "pane" }
+        #expect(prodTakesPane == false)
+        #expect(testTakesPane == true)
     }
 }

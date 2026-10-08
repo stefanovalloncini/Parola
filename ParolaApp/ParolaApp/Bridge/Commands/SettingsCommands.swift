@@ -130,15 +130,30 @@ extension ParolaAutomationServer {
                         required: true,
                         summary: "Route name"
                     ),
-                ],
+                ] + (isTestMode ? [
+                    .init(name: "pane", kind: .string(), required: false, summary: "With route settings: the Settings pane the preview shows (e.g. 'dictation')"),
+                ] : []),
                 handler: { args, ctx in
                     let raw = try args.string("route")
+                    let pane = try args.optionalString("pane") ?? ""
                     if raw == "settings" {
                         guard ctx.model.mode == .test else {
                             throw AutomationError.invalidArgs(field: "route", reason: "unknown route: settings")
                         }
+                        if !pane.isEmpty {
+                            guard let settingsRoute = SettingsRoute(rawValue: pane) else {
+                                throw AutomationError.invalidArgs(field: "pane", reason: "unknown settings pane: \(pane)")
+                            }
+                            guard settingsRoute.isVisible(features: ctx.model.features) else {
+                                throw AutomationError.invalidArgs(field: "pane", reason: "settings pane hidden in this deployment: \(pane)")
+                            }
+                            ctx.model.settingsPane = pane
+                        }
                         ctx.model.settingsRoutePreview = true
-                        return .object(["route": .string("settings")])
+                        return .object(["route": .string("settings"), "pane": .string(ctx.model.settingsPane)])
+                    }
+                    guard pane.isEmpty else {
+                        throw AutomationError.invalidArgs(field: "pane", reason: "a pane goes with route settings only")
                     }
                     guard let route = AppModel.Route(rawValue: raw) else {
                         throw AutomationError.invalidArgs(field: "route", reason: "unknown route: \(raw)")
