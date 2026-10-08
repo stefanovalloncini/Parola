@@ -13,14 +13,17 @@ struct SendToPane: View {
                 if model.destinations.isEmpty {
                     InlineEmptyText("No destinations yet")
                 } else {
-                    ForEach(Array(model.destinations.enumerated()), id: \.element.id) { position, stored in
+                    RuleListRows(
+                        model.destinations, selection: $selection, leaf: "SendTo.Row", removeLabel: "Remove Destination",
+                        onRemove: remove
+                    ) { stored in
+                        let position = model.destinations.firstIndex { $0.id == stored.id } ?? 0
                         DestinationRow(
                             stored: stored,
                             canMoveUp: position > 0,
                             canMoveDown: position < model.destinations.count - 1,
                             onEdit: { edit(stored) }
                         )
-                        .ruleListRow(stored.id, selection: $selection, leaf: "SendTo.Row")
                     }
                 }
                 RuleListBar(
@@ -65,8 +68,12 @@ struct SendToPane: View {
 
     private func removeSelected() {
         guard let selection else { return }
-        model.removeDestination(id: selection)
-        self.selection = nil
+        remove(selection)
+    }
+
+    private func remove(_ id: AnyDestination.ID) {
+        model.removeDestination(id: id)
+        if selection == id { selection = nil }
     }
 
     private func edit(_ stored: AnyDestination) {

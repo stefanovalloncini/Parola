@@ -14,43 +14,99 @@ extension EnvironmentValues {
 }
 
 extension View {
-    /// A row of an editable list: a click in it selects it, and the selection shows to the eye and to VoiceOver.
-    func ruleListRow<ID: Hashable & Sendable>(_ id: ID, selection: Binding<ID?>, leaf: String) -> some View {
-        modifier(RuleListRow(id: id, selection: selection, leaf: leaf))
-    }
-
-    /// A field in a rule-list row selects its row when it takes the keyboard.
+    /// A field in a rule-list row chooses its row when it takes the keyboard.
     func selectsRuleRowOnFocus() -> some View {
         modifier(SelectsRuleRowOnFocus())
     }
 }
 
-private struct RuleListRow<ID: Hashable & Sendable>: ViewModifier {
-    let id: ID
-    @Binding var selection: ID?
-    let leaf: String
+/// An editable list's rows as one keyboard stop: Tab lands on the chosen row, ↑ and ↓ choose, ⌫ removes.
+struct RuleListRows<Item: Identifiable, Row: View>: View where Item.ID: Sendable {
+    private let items: [Item]
+    @Binding private var selection: Item.ID?
+    private let leaf: String
+    private let removeLabel: LocalizedStringKey
+    private let asksBeforeRemoving: Bool
+    private let onRemove: (Item.ID) -> Void
+    private let row: (Item) -> Row
 
-    func body(content: Content) -> some View {
-        let isSelected = selection == id
+    @FocusState private var focused: Item.ID?
+    /// The row that keeps the keyboard after its neighbour was removed, with nothing chosen.
+    @State private var anchor: Item.ID?
+
+    init(
+        _ items: [Item], selection: Binding<Item.ID?>, leaf: String, removeLabel: LocalizedStringKey,
+        asksBeforeRemoving: Bool = false, onRemove: @escaping (Item.ID) -> Void,
+        @ViewBuilder row: @escaping (Item) -> Row
+    ) {
+        self.items = items
+        self._selection = selection
+        self.leaf = leaf
+        self.removeLabel = removeLabel
+        self.asksBeforeRemoving = asksBeforeRemoving
+        self.onRemove = onRemove
+        self.row = row
+    }
+
+    var body: some View {
+        let ids = items.map(\.id)
+        let stop = [selection, anchor].lazy.compactMap { $0 }.first { ids.contains($0) } ?? ids.first
         let binding = $selection
-        let id = id
-        content
-            .contentShape(Rectangle())
-            .onTapGesture { selection = id }
-            .environment(\.selectRuleRow, { binding.wrappedValue = id })
-            // A grouped form ignores listRowBackground, so the wash reaches into the row's own margins.
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(DS.Color.selectionWash)
-                        .padding(.horizontal, -6)
-                        .padding(.vertical, -5)
+        ForEach(items) { item in
+            let id = item.id
+            let isSelected = selection == id
+            row(item)
+                .contentShape(Rectangle())
+                .onTapGesture { selection = id }
+                .environment(\.selectRuleRow, { binding.wrappedValue = id })
+                // A grouped form ignores listRowBackground, so the wash reaches into the row's own margins.
+                .background {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                            .fill(DS.Color.selectionWash)
+                            .padding(.horizontal, -6)
+                            .padding(.vertical, -5)
+                    }
                 }
-            }
-            .accessibilityElement(children: .contain)
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-            .accessibilityAction { selection = id }
-            .axLeaf(leaf)
+                .focusable(id == stop)
+                .focused($focused, equals: id)
+                .onMoveCommand { move($0, from: id, in: ids) }
+                .onDeleteCommand { removeFromKeyboard(id, in: ids) }
+                .contextMenu {
+                    Button(removeLabel) { onRemove(id) }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityAction { selection = id }
+                .accessibilityAction(named: Text(removeLabel)) { onRemove(id) }
+                .axLeaf(leaf)
+        }
+    }
+
+    /// With nothing chosen, the first arrow chooses the row that has the keyboard.
+    private func move(_ direction: MoveCommandDirection, from id: Item.ID, in ids: [Item.ID]) {
+        guard let index = ids.firstIndex(of: id) else { return }
+        let target: Int
+        switch direction {
+        case .up: target = selection == id ? index - 1 : index
+        case .down: target = selection == id ? index + 1 : index
+        default: return
+        }
+        guard ids.indices.contains(target) else { return }
+        selection = ids[target]
+        focused = ids[target]
+    }
+
+    /// The keyboard stays on the next row, unchosen, so a second ⌫ can't take another rule.
+    private func removeFromKeyboard(_ id: Item.ID, in ids: [Item.ID]) {
+        guard selection == id else { return }
+        onRemove(id)
+        guard !asksBeforeRemoving, let index = ids.firstIndex(of: id) else { return }
+        let rest = ids.filter { $0 != id }
+        let next = rest.isEmpty ? nil : rest[min(index, rest.count - 1)]
+        selection = nil
+        anchor = next
+        focused = next
     }
 }
 

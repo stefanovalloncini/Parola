@@ -16,10 +16,9 @@ struct CorrectionsPane: View {
                 } else if visible.isEmpty {
                     InlineEmptyText("No corrections match.")
                 } else {
-                    ForEach(visible) { rule in
+                    RuleListRows(visible, selection: $selection, leaf: "Corrections.Row", removeLabel: "Remove Correction", onRemove: remove) { rule in
                         if let binding = binding(for: rule.id) {
                             CorrectionRow(rule: binding)
-                                .ruleListRow(rule.id, selection: $selection, leaf: "Corrections.Row")
                         }
                     }
                 }
@@ -48,8 +47,12 @@ struct CorrectionsPane: View {
 
     private func removeSelected() {
         guard let selection else { return }
-        model.correctionRules.removeAll { $0.id == selection }
-        self.selection = nil
+        remove(selection)
+    }
+
+    private func remove(_ id: CorrectionRule.ID) {
+        model.correctionRules.removeAll { $0.id == id }
+        if selection == id { selection = nil }
     }
 
     private var visibleRules: [CorrectionRule] {

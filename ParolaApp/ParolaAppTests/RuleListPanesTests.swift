@@ -24,6 +24,17 @@ struct RuleListPanesTests {
         }
 
         var list: EditableList { EditableList(rawPane: self) }
+
+        /// The field each row starts with.
+        var firstField: String {
+            switch self {
+            case .snippets: "Snippets.TextField.Trigger"
+            case .corrections: "Corrections.TextField.From"
+            case .ignoredSegments: "IgnoredSegments.TextField.Pattern"
+            case .findReplace: "FindReplace.TextField.Find"
+            case .autoExport: "AutoExport.TextField.Extensions"
+            }
+        }
     }
 
     /// Every pane whose list is edited with + and −.
@@ -50,6 +61,18 @@ struct RuleListPanesTests {
             case .watchedFolders: "WatchedFolders"
             case .sendTo: "SendTo"
             case .prompts: "Prompts"
+            }
+        }
+
+        var removeLabel: String {
+            switch self {
+            case .snippets: String(localized: "Remove Snippet")
+            case .corrections: String(localized: "Remove Correction")
+            case .ignoredSegments: String(localized: "Remove Pattern")
+            case .findReplace, .autoExport: String(localized: "Remove Rule")
+            case .watchedFolders: String(localized: "Remove Folder")
+            case .sendTo: String(localized: "Remove Destination")
+            case .prompts: String(localized: "Delete prompt")
             }
         }
 
@@ -209,6 +232,188 @@ struct RuleListPanesTests {
         #expect(after == Array(before.dropFirst()), "\(list.prefix): left \(after) of \(before)")
         let off = await waitUntil { element("\(list.prefix).Button.Remove", in: hosted)?.isEnabled == false }
         #expect(off, "\(list.prefix): − stays on after the rule went")
+        await hosted.close()
+    }
+
+    private enum Key {
+        case up, down, delete, tab, backTab
+
+        var code: UInt16 {
+            switch self {
+            case .up: 126
+            case .down: 125
+            case .delete: 51
+            case .tab, .backTab: 48
+            }
+        }
+
+        var characters: String {
+            switch self {
+            case .up: String(UnicodeScalar(UInt16(NSUpArrowFunctionKey)).map(Character.init) ?? " ")
+            case .down: String(UnicodeScalar(UInt16(NSDownArrowFunctionKey)).map(Character.init) ?? " ")
+            case .delete: "\u{7f}"
+            case .tab, .backTab: "\t"
+            }
+        }
+    }
+
+    /// The key as the window hands it to whatever has the keyboard.
+    private func press(_ key: Key, in hosted: Hosted) async {
+        let window = hosted.window.window
+        let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: key == .backTab ? [.shift] : [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: key.characters,
+            charactersIgnoringModifiers: key.characters, isARepeat: false, keyCode: key.code
+        )
+        if let event { window.sendEvent(event) }
+        await settle(for: .milliseconds(100))
+    }
+
+    /// True when the keyboard is on the row itself: the view that has it covers the row, not one of its controls.
+    private func keyboardIsOn(_ row: CGRect, in hosted: Hosted) -> Bool {
+        let window = hosted.window.window
+        guard let view = window.firstResponder as? NSView, !(view is NSText), view !== hosted.window.host else { return false }
+        let frame = window.convertToScreen(view.convert(view.bounds, to: nil))
+        return frame.width > row.width * 0.8 && abs(frame.midY - row.midY) < row.height / 2
+    }
+
+    private func chosen(_ list: EditableList, in hosted: Hosted) -> [Bool] {
+        rows(list, in: hosted).map(\.isSelected)
+    }
+
+    private func button(_ title: String, in view: NSView) -> NSButton? {
+        if let button = view as? NSButton, button.title == title { return button }
+        return view.subviews.lazy.compactMap { self.button(title, in: $0) }.first
+    }
+
+    @Test("in a row's field ⌫ and ↑ edit the text; Shift-Tab then ⌫ removes that row and only that one",
+          arguments: Pane.allCases)
+    func keyboardRemovesTheRowBeingEdited(_ pane: Pane) async throws {
+        let list = pane.list
+        let hosted = try await host(list, words: ["alpha", "beta", "gamma"])
+        let fields = elements(hosted)
+            .filter { $0.identifier?.hasSuffix(pane.firstField) == true }
+            .sorted { $0.frame.maxY > $1.frame.maxY }
+        try #require(fields.count == 3, "\(pane.prefix) shows \(fields.count) fields")
+        let found = fields[1].object as? NSTextField ?? (fields[1].object as? NSCell)?.controlView as? NSTextField
+        let field = try #require(found)
+        #expect(hosted.window.window.makeFirstResponder(field))
+        let editing = await waitUntil { chosen(list, in: hosted) == [false, true, false] }
+        #expect(editing, "\(pane.prefix): the keyboard in row 2's field didn't choose row 2")
+
+        await press(.delete, in: hosted)
+        await press(.up, in: hosted)
+        let cleared = await waitUntil { await list.names(hosted.model) == ["alpha", "", "gamma"] }
+        let afterTyping = await list.names(hosted.model)
+        #expect(cleared, "\(pane.prefix): ⌫ in the field left \(afterTyping)")
+        #expect(chosen(list, in: hosted) == [false, true, false], "\(pane.prefix): ↑ in the field chose another row")
+
+        let row = rows(list, in: hosted)[1].frame
+        for _ in 0..<3 where !keyboardIsOn(row, in: hosted) {
+            await press(.backTab, in: hosted)
+        }
+        let responder = String(describing: hosted.window.window.firstResponder)
+        #expect(keyboardIsOn(row, in: hosted), "\(pane.prefix): Shift-Tab never reached row 2, the keyboard is on \(responder)")
+        await press(.delete, in: hosted)
+        let removed = await waitUntil { await list.names(hosted.model) == ["alpha", "gamma"] }
+        let left = await list.names(hosted.model)
+        #expect(removed, "\(pane.prefix): left \(left)")
+        await hosted.close()
+    }
+
+    @Test("Tab stops on the list once: ↓ chooses a row, ⌫ removes it, and a second ⌫ takes nothing more",
+          arguments: EditableList.allCases)
+    func keyboardChoosesAndRemoves(_ list: EditableList) async throws {
+        let hosted = try await host(list, words: ["alpha", "beta", "gamma"])
+        let window = hosted.window.window
+        let first = try #require(rows(list, in: hosted).first).frame
+        window.makeFirstResponder(nil)
+        for _ in 0..<8 where !keyboardIsOn(first, in: hosted) {
+            if window.firstResponder === window {
+                window.selectNextKeyView(nil)
+            } else {
+                await press(.tab, in: hosted)
+            }
+        }
+        let responder = String(describing: window.firstResponder)
+        try #require(keyboardIsOn(first, in: hosted), "\(list.prefix): Tab never stopped on the list, the keyboard is on \(responder)")
+
+        await press(.delete, in: hosted)
+        let untouched = await list.names(hosted.model)
+        #expect(untouched == ["alpha", "beta", "gamma"], "\(list.prefix): ⌫ took a rule with none chosen")
+        await press(.down, in: hosted)
+        #expect(chosen(list, in: hosted) == [true, false, false], "\(list.prefix): the first ↓ didn't choose the row it is on")
+        await press(.down, in: hosted)
+        await press(.down, in: hosted)
+        await press(.up, in: hosted)
+        let second = await waitUntil { chosen(list, in: hosted) == [false, true, false] }
+        #expect(second, "\(list.prefix): ↓ ↓ ↑ chose \(chosen(list, in: hosted))")
+
+        await press(.delete, in: hosted)
+        if list == .prompts {
+            let kept = await list.names(hosted.model)
+            #expect(kept == ["alpha", "beta", "gamma"], "Prompts removed before the answer")
+        }
+        try await confirmIfAsked(list, in: hosted)
+        let removed = await waitUntil { await list.names(hosted.model) == ["alpha", "gamma"] }
+        let left = await list.names(hosted.model)
+        #expect(removed, "\(list.prefix): left \(left)")
+        guard list != .prompts else { return await hosted.close() }
+
+        await press(.delete, in: hosted)
+        let afterSecond = await list.names(hosted.model)
+        #expect(afterSecond == ["alpha", "gamma"], "\(list.prefix): a second ⌫ took another rule")
+        await press(.down, in: hosted)
+        let next = await waitUntil { chosen(list, in: hosted) == [false, true] }
+        #expect(next, "\(list.prefix): the keyboard left the list; ↓ chose \(chosen(list, in: hosted))")
+        await hosted.close()
+    }
+
+    /// Prompts asks before it removes; the answer is Delete.
+    private func confirmIfAsked(_ list: EditableList, in hosted: Hosted) async throws {
+        guard list == .prompts else { return }
+        let window = hosted.window.window
+        let asked = await waitUntil { window.attachedSheet != nil }
+        let alert = try #require(window.attachedSheet, "Prompts removed without asking")
+        #expect(asked)
+        let delete = try #require(alert.contentView.flatMap { button(String(localized: "Delete"), in: $0) })
+        delete.performClick(nil)
+        await waitUntil { window.attachedSheet == nil }
+    }
+
+    @Test("each row offers its Remove to VoiceOver and in its right-click menu, and it takes that row, not the chosen one",
+          arguments: EditableList.allCases)
+    func rowRemoveAction(_ list: EditableList) async throws {
+        let hosted = try await host(list, words: ["alpha", "beta", "gamma"])
+        #expect(HostedAccessibility.press(endingWith: "\(list.prefix).Row", in: hosted.window.host))
+        let first = await waitUntil { chosen(list, in: hosted) == [true, false, false] }
+        #expect(first)
+
+        let listed = rows(list, in: hosted)
+        for row in listed {
+            #expect(row.actions.contains(list.removeLabel), "\(list.prefix): VoiceOver lists \(row.actions)")
+        }
+        #expect(HostedAccessibility.perform(list.removeLabel, on: listed[2]))
+        try await confirmIfAsked(list, in: hosted)
+        let third = await waitUntil { await list.names(hosted.model) == ["alpha", "beta"] }
+        let afterVoiceOver = await list.names(hosted.model)
+        #expect(third, "\(list.prefix): VoiceOver's Remove on the third row left \(afterVoiceOver)")
+
+        let window = hosted.window.window
+        let second = try #require(rows(list, in: hosted).last).frame
+        let point = window.convertPoint(fromScreen: NSPoint(x: second.minX + 4, y: second.midY))
+        let click = try #require(NSEvent.mouseEvent(
+            with: .rightMouseDown, location: point, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+            context: nil, eventNumber: 0, clickCount: 1, pressure: 1
+        ))
+        let menu = try #require(hosted.window.host.menu(for: click), "\(list.prefix): a right-click on a row shows no menu")
+        let index = menu.indexOfItem(withTitle: list.removeLabel)
+        try #require(index >= 0, "\(list.prefix): the row's menu holds \(menu.items.map(\.title))")
+        menu.performActionForItem(at: index)
+        try await confirmIfAsked(list, in: hosted)
+        let secondGone = await waitUntil { await list.names(hosted.model) == ["alpha"] }
+        let afterMenu = await list.names(hosted.model)
+        #expect(secondGone, "\(list.prefix): the menu's Remove on the second row left \(afterMenu)")
         await hosted.close()
     }
 

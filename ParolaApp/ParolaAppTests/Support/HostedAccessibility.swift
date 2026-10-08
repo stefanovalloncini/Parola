@@ -151,6 +151,19 @@ enum HostedAccessibility {
         }
     }
 
+    /// Runs the named action VoiceOver lists for this element; false when it has none by that name.
+    @discardableResult
+    static func perform(_ actionName: String, on element: Element) -> Bool {
+        withAssistiveApp {
+            let actions = read("accessibilityCustomActions", of: element.object) as? [NSAccessibilityCustomAction] ?? []
+            guard let action = actions.first(where: { $0.name == actionName }) else { return false }
+            if let handler = action.handler { return handler() }
+            guard let target = action.target, let selector = action.selector else { return false }
+            _ = (target as AnyObject).perform(selector, with: action)
+            return true
+        }
+    }
+
     private static func withAssistiveApp<T>(_ body: () -> T) -> T {
         setAssistiveApp(true)
         defer { setAssistiveApp(false) }

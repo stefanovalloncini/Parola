@@ -15,10 +15,9 @@ struct FindReplacePane: View {
                 } else if visible.isEmpty {
                     InlineEmptyText("No rules match.")
                 } else {
-                    ForEach(visible) { rule in
+                    RuleListRows(visible, selection: $selection, leaf: "FindReplace.Row", removeLabel: "Remove Rule", onRemove: remove) { rule in
                         if let binding = binding(for: rule.id) {
                             FindReplaceRuleRow(rule: binding)
-                                .ruleListRow(rule.id, selection: $selection, leaf: "FindReplace.Row")
                         }
                     }
                 }
@@ -61,8 +60,12 @@ struct FindReplacePane: View {
 
     private func removeSelected() {
         guard let selection else { return }
-        model.findReplaceRules.removeAll { $0.id == selection }
-        self.selection = nil
+        remove(selection)
+    }
+
+    private func remove(_ id: FindReplaceRule.ID) {
+        model.findReplaceRules.removeAll { $0.id == id }
+        if selection == id { selection = nil }
     }
 
     private var visibleRules: [FindReplaceRule] {

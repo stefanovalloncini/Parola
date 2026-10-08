@@ -16,10 +16,9 @@ struct SnippetsPane: View {
                 } else if visible.isEmpty {
                     InlineEmptyText("No snippets match.")
                 } else {
-                    ForEach(visible) { snippet in
+                    RuleListRows(visible, selection: $selection, leaf: "Snippets.Row", removeLabel: "Remove Snippet", onRemove: remove) { snippet in
                         if let binding = binding(for: snippet.id) {
                             SnippetRow(snippet: binding)
-                                .ruleListRow(snippet.id, selection: $selection, leaf: "Snippets.Row")
                         }
                     }
                 }
@@ -60,8 +59,12 @@ struct SnippetsPane: View {
 
     private func removeSelected() {
         guard let selection else { return }
-        model.snippets.removeAll { $0.id == selection }
-        self.selection = nil
+        remove(selection)
+    }
+
+    private func remove(_ id: Snippet.ID) {
+        model.snippets.removeAll { $0.id == id }
+        if selection == id { selection = nil }
     }
 
     private var visibleSnippets: [Snippet] {

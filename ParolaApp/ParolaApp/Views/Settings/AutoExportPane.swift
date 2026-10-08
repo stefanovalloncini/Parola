@@ -15,12 +15,11 @@ struct AutoExportPane: View {
                 } else if displayed.isEmpty {
                     InlineEmptyText("No matches")
                 } else {
-                    ForEach(displayed) { rule in
+                    RuleListRows(displayed, selection: $selection, leaf: "AutoExport.Row", removeLabel: "Remove Rule", onRemove: remove) { rule in
                         if let binding = binding(for: rule.id) {
                             AutoExportRuleRow(rule: binding, presets: model.exportPresets)
                                 // Row state (the extensions draft) must follow the rule, not the slot index.
                                 .id(rule.id)
-                                .ruleListRow(rule.id, selection: $selection, leaf: "AutoExport.Row")
                         }
                     }
                 }
@@ -72,8 +71,12 @@ struct AutoExportPane: View {
 
     private func removeSelected() {
         guard let selection else { return }
-        model.autoExportRules.removeAll { $0.id == selection }
-        self.selection = nil
+        remove(selection)
+    }
+
+    private func remove(_ id: AutoExportRule.ID) {
+        model.autoExportRules.removeAll { $0.id == id }
+        if selection == id { selection = nil }
     }
 
     // Resolved by id on every access: an index captured at render time can go stale

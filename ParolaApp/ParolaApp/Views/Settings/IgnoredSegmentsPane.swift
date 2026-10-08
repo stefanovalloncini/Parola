@@ -15,10 +15,9 @@ struct IgnoredSegmentsPane: View {
                 } else if displayed.isEmpty {
                     InlineEmptyText("No matches")
                 } else {
-                    ForEach(displayed) { rule in
+                    RuleListRows(displayed, selection: $selection, leaf: "IgnoredSegments.Row", removeLabel: "Remove Pattern", onRemove: remove) { rule in
                         if let binding = binding(for: rule.id) {
                             IgnoredRuleRow(rule: binding)
-                                .ruleListRow(rule.id, selection: $selection, leaf: "IgnoredSegments.Row")
                         }
                     }
                 }
@@ -47,8 +46,12 @@ struct IgnoredSegmentsPane: View {
 
     private func removeSelected() {
         guard let selection else { return }
-        model.ignoredSegmentRules.removeAll { $0.id == selection }
-        self.selection = nil
+        remove(selection)
+    }
+
+    private func remove(_ id: IgnoredSegmentRule.ID) {
+        model.ignoredSegmentRules.removeAll { $0.id == id }
+        if selection == id { selection = nil }
     }
 
     private var displayedRules: [IgnoredSegmentRule] {

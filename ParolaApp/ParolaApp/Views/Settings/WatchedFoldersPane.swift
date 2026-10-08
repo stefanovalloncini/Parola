@@ -19,9 +19,11 @@ private struct WatchedFoldersPaneBody: View {
                 if store.folders.isEmpty {
                     InlineEmptyText("No watched folders yet")
                 } else {
-                    ForEach(store.folders) { folder in
+                    RuleListRows(
+                        store.folders, selection: $selection, leaf: "WatchedFolders.Row", removeLabel: "Remove Folder",
+                        onRemove: remove
+                    ) { folder in
                         WatchedFolderRow(store: store, folder: folder)
-                            .ruleListRow(folder.id, selection: $selection, leaf: "WatchedFolders.Row")
                     }
                 }
                 RuleListBar(
@@ -54,8 +56,12 @@ private struct WatchedFoldersPaneBody: View {
 
     private func removeSelected() {
         guard let selection else { return }
-        store.removeFolder(selection)
-        self.selection = nil
+        remove(selection)
+    }
+
+    private func remove(_ id: WatchedFolder.ID) {
+        store.removeFolder(id)
+        if selection == id { selection = nil }
     }
 }
 
