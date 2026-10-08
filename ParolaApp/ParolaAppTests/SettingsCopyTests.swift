@@ -176,8 +176,10 @@ struct SettingsCopyTests {
         let model = makeModel("settings-copy-meetings")
         for appOnly in [false, true] {
             model.meetingCaptureAppOnly = appOnly
-            let words = words(RecordMeetingsPane(), model: model)
-            let notNeeded = words.filter { $0 == "Not needed" }.count
+            let pane = elements(RecordMeetingsPane(), model: model)
+            let words = pane.flatMap(\.words)
+            let notNeededTexts = pane.filter { $0.role == NSAccessibility.Role.staticText.rawValue && $0.words == ["Not needed"] }
+            let notNeeded = Set(notNeededTexts.map { "\($0.frame)" }).count
             #expect(notNeeded == (appOnly ? 0 : 1), "\(appOnly): \(words)")
             #expect(!words.contains("Parola watches running applications; nothing leaves your Mac."))
         }

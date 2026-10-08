@@ -6,7 +6,7 @@ struct FindReplacePane: View {
     @State private var query = RuleListQuery()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        SettingsForm {
             if query.showsToolbar(ruleCount: model.findReplaceRules.count) {
                 RuleListToolbar(query: $query, placeholder: "Search rules…", leafPrefix: "FindReplace")
             }
@@ -20,7 +20,6 @@ struct FindReplacePane: View {
                         Text("No rules match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
-                    .padding(DS.Spacing.medium)
                 } else {
                     ForEach(Array(visible.enumerated()), id: \.element.id) { idx, rule in
                         if let binding = binding(for: rule.id) {
@@ -123,14 +122,14 @@ private struct FindReplaceRuleRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Toggle("Use this rule", isOn: enabledBinding)
                         .labelsHidden()
                         .disabled(!canEnable)
                         .axLeaf("FindReplace.Toggle.RuleEnabled")
-                    TextField("find", text: $rule.find)
+                    TextField("find", text: $rule.find, prompt: Text("find"))
+                        .labelsHidden()
                         .textFieldStyle(.roundedBorder)
                         .overlay(
                             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
@@ -138,7 +137,9 @@ private struct FindReplaceRuleRow: View {
                         )
                         .axLeaf("FindReplace.TextField.Find")
                     Text("→").foregroundStyle(DS.Color.secondaryText)
-                    TextField("replace with", text: $rule.replace).textFieldStyle(.roundedBorder)
+                    TextField("replace with", text: $rule.replace, prompt: Text("replace with"))
+                        .labelsHidden()
+                        .textFieldStyle(.roundedBorder)
                         .axLeaf("FindReplace.TextField.Replace")
                     Button(role: .destructive, action: onDelete) {
                         Image(systemName: "trash")
@@ -163,8 +164,6 @@ private struct FindReplaceRuleRow: View {
                     .font(DS.Font.secondary)
                 }
             }
-            .padding(.horizontal, DS.Spacing.medium)
-            .padding(.vertical, DS.Spacing.small)
         }
         .onAppear { cachedRegexError = GlobalFindReplace.validate(rule) }
         .onChange(of: rule.find) { cachedRegexError = GlobalFindReplace.validate(rule) }

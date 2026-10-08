@@ -28,16 +28,14 @@ struct ObsidianDestinationEditor: View {
             title: isNew ? "New Destination" : "Edit Destination",
             onClose: onCancel
         ) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    folderSection
-                    namingSection
-                    frontmatterSection
-                    bodySection
-                    testSection
-                }
-                .padding(DS.Spacing.regular)
+            Form {
+                folderSection
+                namingSection
+                frontmatterSection
+                bodySection
+                testSection
             }
+            .formStyle(.grouped)
         } footer: {
             HStack {
                 Spacer()
@@ -62,6 +60,7 @@ struct ObsidianDestinationEditor: View {
         SettingsSection("Vault") {
             SettingRow("Name", description: "What this destination is called in the Send to menu.", isFirst: true) {
                 TextField("", text: $draft.name)
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 220)
                     .axLeaf("SendTo.TextField.Name")
@@ -72,7 +71,8 @@ struct ObsidianDestinationEditor: View {
                     .axLeaf("SendTo.Button.ChooseFolder")
             }
             SettingRow("Subfolder", description: "Relative to the vault. Leave empty to write into the vault root.") {
-                TextField("Transcripts", text: $draft.subfolder)
+                TextField("", text: $draft.subfolder, prompt: Text("Transcripts"))
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 220)
                     .axLeaf("SendTo.TextField.Subfolder")
@@ -83,7 +83,8 @@ struct ObsidianDestinationEditor: View {
     private var namingSection: some View {
         SettingsSection("Note name") {
             SettingRow("Filename", descriptionVerbatim: filenameHelp, isFirst: true) {
-                TextField(ObsidianVaultFolderDestination.defaultFilenameTemplate, text: $draft.filenameTemplate)
+                TextField("", text: $draft.filenameTemplate, prompt: Text(verbatim: ObsidianVaultFolderDestination.defaultFilenameTemplate))
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 220)
                     .axLeaf("SendTo.TextField.FilenameTemplate")

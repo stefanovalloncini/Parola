@@ -7,7 +7,7 @@ struct CorrectionsPane: View {
     @State private var query = RuleListQuery()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        SettingsForm {
             if query.showsToolbar(ruleCount: model.correctionRules.count) {
                 RuleListToolbar(query: $query, placeholder: "Search corrections…", leafPrefix: "Corrections")
             }
@@ -21,7 +21,6 @@ struct CorrectionsPane: View {
                         Text("No corrections match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
-                    .padding(DS.Spacing.medium)
                 } else {
                     ForEach(Array(visible.enumerated()), id: \.element.id) { idx, rule in
                         if let binding = binding(for: rule.id) {
@@ -86,18 +85,19 @@ private struct CorrectionRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             HStack(spacing: 8) {
                 Toggle("Use this rule", isOn: enabledBinding)
                     .labelsHidden()
                     .disabled(!canEnable)
                     .axLeaf("Corrections.Toggle.RuleEnabled")
-                TextField("heard", text: $rule.from)
+                TextField("heard", text: $rule.from, prompt: Text("heard"))
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 180)
                     .axLeaf("Corrections.TextField.From")
                 Text("→").foregroundStyle(DS.Color.secondaryText)
-                TextField("write", text: $rule.to)
+                TextField("write", text: $rule.to, prompt: Text("write"))
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
                     .axLeaf("Corrections.TextField.To")
                 Toggle("Case-sensitive", isOn: $rule.caseSensitive)
@@ -111,8 +111,6 @@ private struct CorrectionRow: View {
                 .buttonStyle(.borderless)
                 .axLeaf("Corrections.Button.Delete")
             }
-            .padding(.horizontal, DS.Spacing.medium)
-            .padding(.vertical, DS.Spacing.small)
         }
     }
 }

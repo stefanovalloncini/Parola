@@ -6,7 +6,7 @@ struct PeoplePane: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 16) {
+        return SettingsForm {
             SettingsSection {
                 SettingRow("Detect speakers",
                            description: "Speaker detection is in Transcription Defaults, with the other settings for new transcriptions.",

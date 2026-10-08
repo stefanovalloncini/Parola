@@ -7,7 +7,7 @@ struct SendToPane: View {
     @State private var isNew = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        SettingsForm {
             SettingsSection {
                 if model.destinations.isEmpty {
                     InlineEmptyText("No destinations yet")
@@ -85,15 +85,12 @@ private struct DestinationRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 8) {
                 header
                 if stored.destination != nil {
                     controls
                 }
             }
-            .padding(.horizontal, DS.Spacing.medium)
-            .padding(.vertical, DS.Spacing.small)
         }
     }
 

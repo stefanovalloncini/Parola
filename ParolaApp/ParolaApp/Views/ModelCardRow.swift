@@ -21,9 +21,9 @@ struct ModelCardRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             iconTile
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(variant.displayName)
-                    .font(DS.Font.heading)
+                    .font(DS.Font.bodyStrong)
                 Text(meta)
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
@@ -39,12 +39,7 @@ struct ModelCardRow: View {
             Spacer(minLength: 12)
             trailing
         }
-        .padding(DS.Spacing.regular)
-        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                .strokeBorder(borderColor, lineWidth: borderWidth)
-        )
+        .padding(.vertical, DS.Spacing.hair)
         .contextMenu {
             if canDelete, let deleteAction {
                 Button(role: .destructive, action: deleteAction) {
@@ -160,16 +155,6 @@ struct ModelCardRow: View {
             result.append(.init(label: "English-only", tokens: DS.Color.neutralChip))
         }
         return result
-    }
-
-    private var borderColor: Color {
-        if case .active = kind { return DS.Color.accent.opacity(0.55) }
-        return DS.Color.separator.opacity(0.6)
-    }
-
-    private var borderWidth: CGFloat {
-        if case .active = kind { return 1.5 }
-        return 0.5
     }
 
     private func progressPercent(_ value: Double) -> String {

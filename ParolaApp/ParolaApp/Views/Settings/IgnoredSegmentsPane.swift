@@ -7,7 +7,7 @@ struct IgnoredSegmentsPane: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 12) {
+        return SettingsForm {
             if query.showsToolbar(ruleCount: model.ignoredSegmentRules.count) {
                 RuleListToolbar(query: $query, placeholder: "Search patterns…", leafPrefix: "IgnoredSegments")
             }
@@ -20,7 +20,6 @@ struct IgnoredSegmentsPane: View {
                         Text("No matches").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
-                    .padding(DS.Spacing.medium)
                 } else {
                     ForEach(Array(displayedRules.enumerated()), id: \.element.id) { position, rule in
                         if let binding = binding(for: rule.id) {
@@ -85,13 +84,13 @@ private struct IgnoredRuleRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             HStack(spacing: 10) {
                 Toggle("Use this rule", isOn: enabledBinding)
                     .labelsHidden()
                     .disabled(!canEnable)
                     .axLeaf("IgnoredSegments.Toggle.RuleEnabled")
-                TextField("e.g. uh", text: $rule.pattern)
+                TextField("e.g. uh", text: $rule.pattern, prompt: Text("e.g. uh"))
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
                     .axLeaf("IgnoredSegments.TextField.Pattern")
                 Button(role: .destructive, action: onDelete) {
@@ -100,8 +99,6 @@ private struct IgnoredRuleRow: View {
                 .buttonStyle(.borderless)
                 .axLeaf("IgnoredSegments.Button.Delete")
             }
-            .padding(.horizontal, DS.Spacing.medium)
-            .padding(.vertical, DS.Spacing.small)
         }
     }
 }

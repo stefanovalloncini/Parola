@@ -12,7 +12,7 @@ struct GeneralPane: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 16) {
+        return SettingsForm {
             SettingsSection("Startup") {
                 SettingRow("Open at login",
                            descriptionVerbatim: launchAtLoginError ?? String(localized: "Opens Parola automatically when you sign in."),

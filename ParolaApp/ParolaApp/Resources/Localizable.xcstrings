@@ -1292,28 +1292,6 @@
         }
       }
     },
-    "APP": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "APP"
-          }
-        }
-      }
-    },
-    "AUTOMATION": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AUTOMAZIONE"
-          }
-        }
-      }
-    },
     "About Parola": {
       "extractionState": "manual",
       "localizations": {
@@ -2968,17 +2946,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Per modello"
-          }
-        }
-      }
-    },
-    "CAPTURE": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ACQUISIZIONE"
           }
         }
       }
@@ -4655,17 +4622,6 @@
         }
       }
     },
-    "DICTATION": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "DETTATURA"
-          }
-        }
-      }
-    },
     "Daily builds": {
       "extractionState": "manual",
       "localizations": {
@@ -5568,17 +5524,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Solo EN"
-          }
-        }
-      }
-    },
-    "EXPORT": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "EXPORT"
           }
         }
       }
@@ -13260,17 +13205,6 @@
         }
       }
     },
-    "SOURCES": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SORGENTI"
-          }
-        }
-      }
-    },
     "SRT": {
       "extractionState": "manual",
       "localizations": {
@@ -13289,17 +13223,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "FERMATA"
-          }
-        }
-      }
-    },
-    "SUPPORT": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SUPPORTO"
           }
         }
       }
@@ -14021,6 +13944,168 @@
           "stringUnit": {
             "state": "translated",
             "value": "Imposta le chiavi SUFeedURL e SUPublicEDKey in Info.plist prima del rilascio. Genera la keypair una volta con lo strumento generate_keys di Sparkle."
+          }
+        }
+      }
+    },
+    "Settings.Group.AI": {
+      "comment": "A group header in the Settings sidebar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI"
+          }
+        }
+      }
+    },
+    "Settings.Group.App": {
+      "comment": "A group header in the Settings sidebar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App"
+          }
+        }
+      }
+    },
+    "Settings.Group.Automation": {
+      "comment": "A group header in the Settings sidebar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automation"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automazione"
+          }
+        }
+      }
+    },
+    "Settings.Group.Capture": {
+      "comment": "A group header in the Settings sidebar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capture"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acquisizione"
+          }
+        }
+      }
+    },
+    "Settings.Group.Dictation": {
+      "comment": "A group header in the Settings sidebar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dictation"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dettatura"
+          }
+        }
+      }
+    },
+    "Settings.Group.Export": {
+      "comment": "A group header in the Settings sidebar: the noun, not the command.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esportazione"
+          }
+        }
+      }
+    },
+    "Settings.Group.Sources": {
+      "comment": "A group header in the Settings sidebar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sources"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sorgenti"
+          }
+        }
+      }
+    },
+    "Settings.Group.Support": {
+      "comment": "A group header in the Settings sidebar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supporto"
+          }
+        }
+      }
+    },
+    "Settings.Group.Transcription": {
+      "comment": "A group header in the Settings sidebar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione"
           }
         }
       }
@@ -15342,6 +15427,18 @@
         }
       }
     },
+    "Storage": {
+      "comment": "The Local Models pane's section with the models folder and the space models and the library take.",
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archiviazione"
+          }
+        }
+      }
+    },
     "Stored in your keychain, never in the settings file.": {
       "extractionState": "manual",
       "localizations": {
@@ -15674,17 +15771,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Predefinito di sistema"
-          }
-        }
-      }
-    },
-    "TRANSCRIPTION": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "TRASCRIZIONE"
           }
         }
       }

@@ -275,25 +275,27 @@ struct ResetPaneButton: View {
         if scope.resetKeys(features: model.features).isEmpty {
             EmptyView()
         } else {
-            HStack {
-                Button("Reset to Defaults") {
-                    confirming = true
+            Section {
+            } footer: {
+                HStack {
+                    Spacer()
+                    Button("Reset to Defaults") {
+                        confirming = true
+                    }
+                    .axLeaf("Pane.Button.ResetToDefaults.\(scope.rawValue)")
+                    .confirmationDialog(
+                        String(localized: "Reset \(scope.localizedLabel) to defaults?"),
+                        isPresented: $confirming,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Reset", role: .destructive) {
+                            SettingsResetService.reset(scope: scope, features: model.features)
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("Clears the saved settings on this pane, including any of them shown on another pane too.")
+                    }
                 }
-                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                .axLeaf("Pane.Button.ResetToDefaults.\(scope.rawValue)")
-                Spacer()
-            }
-            .confirmationDialog(
-                String(localized: "Reset \(scope.localizedLabel) to defaults?"),
-                isPresented: $confirming,
-                titleVisibility: .visible
-            ) {
-                Button("Reset", role: .destructive) {
-                    SettingsResetService.reset(scope: scope, features: model.features)
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Clears the saved settings on this pane, including any of them shown on another pane too.")
             }
         }
     }

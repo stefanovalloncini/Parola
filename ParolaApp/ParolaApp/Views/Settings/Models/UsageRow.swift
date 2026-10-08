@@ -17,7 +17,5 @@ struct UsageRow: View {
                 .foregroundStyle(.primary)
             Spacer()
         }
-        .padding(.horizontal, DS.Spacing.medium)
-        .padding(.vertical, DS.Spacing.small)
     }
 }

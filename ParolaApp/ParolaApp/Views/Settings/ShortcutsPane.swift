@@ -6,7 +6,7 @@ struct ShortcutsPane: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 12) {
+        return SettingsForm {
             SettingsSection {
                 SettingRow("Dictation shortcut",
                            description: "Starts dictation from any app. The Dictation pane shows the same shortcut.",

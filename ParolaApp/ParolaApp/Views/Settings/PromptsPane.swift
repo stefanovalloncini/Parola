@@ -11,7 +11,7 @@ struct PromptsPane: View {
     @State private var saveFailed = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        SettingsForm {
             HStack(spacing: 8) {
                 SearchPill(text: $searchText, placeholder: "Search prompts…", leaf: "Prompts.TextField.Search")
                 sortMenu

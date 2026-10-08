@@ -7,7 +7,7 @@ struct CustomizationPane: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 12) {
+        return SettingsForm {
             SettingsSection("Theme and colors") {
                 SettingRow("Appearance",
                            description: "Follows the system unless you pick light or dark.",

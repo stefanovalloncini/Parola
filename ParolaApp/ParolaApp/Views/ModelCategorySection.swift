@@ -62,14 +62,13 @@ struct ModelCategoryRow: View {
                 .background(category.tint.opacity(0.15), in: RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(category.title)
-                    .font(DS.Font.heading)
+                    .font(DS.Font.bodyStrong)
                 Text(category.description)
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
             }
             Spacer()
         }
-        .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.hair)
     }
 }

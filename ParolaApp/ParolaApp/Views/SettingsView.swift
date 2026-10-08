@@ -19,14 +19,22 @@ struct SettingsView: View {
         )
     }
 
+    private var selection: Binding<SettingsRoute?> {
+        Binding(
+            get: { route.wrappedValue },
+            set: { if let picked = $0 { route.wrappedValue = picked } }
+        )
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
-            SettingsSidebar(route: route, search: $search, features: model.features)
-                .frame(width: 220)
-            Divider()
+        NavigationSplitView {
+            SettingsSidebar(selection: selection, search: search, features: model.features)
+                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
+                .toolbar(removing: .sidebarToggle)
+        } detail: {
             SettingsDetail(route: route.wrappedValue)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .searchable(text: $search, placement: .sidebar, prompt: Text("Search Settings…"))
         .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity,
                minHeight: 600, idealHeight: 640, maxHeight: .infinity)
         .axBranch("Settings")
@@ -132,22 +140,24 @@ private struct SettingsRouteMeta {
 
 struct SidebarGroup: Identifiable {
     let id: String
-    let title: LocalizedStringKey?
+    let titleKey: String
     let routes: [SettingsRoute]
+
+    var title: LocalizedStringKey { LocalizedStringKey(titleKey) }
 }
 
 enum SettingsSidebarCatalog {
     static var all: [SidebarGroup] {
         [
-            SidebarGroup(id: "start", title: "APP", routes: [.general, .customization, .shortcuts, .updates]),
-            SidebarGroup(id: "capture", title: "CAPTURE", routes: [.microphone, .recordMeetings, .liveCaptions]),
-            SidebarGroup(id: "dictation", title: "DICTATION", routes: [.dictation, .snippets, .corrections]),
-            SidebarGroup(id: "sources", title: "SOURCES", routes: [.watchedFolders, .integrations]),
-            SidebarGroup(id: "transcription", title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .people, .ignoredSegments, .findReplace]),
-            SidebarGroup(id: "export", title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .sendTo]),
-            SidebarGroup(id: "ai", title: "AI", routes: [.aiServices, .prompts]),
-            SidebarGroup(id: "automation", title: "AUTOMATION", routes: [.automation]),
-            SidebarGroup(id: "end", title: "SUPPORT", routes: [.advanced])
+            SidebarGroup(id: "start", titleKey: "Settings.Group.App", routes: [.general, .customization, .shortcuts, .updates]),
+            SidebarGroup(id: "capture", titleKey: "Settings.Group.Capture", routes: [.microphone, .recordMeetings, .liveCaptions]),
+            SidebarGroup(id: "dictation", titleKey: "Settings.Group.Dictation", routes: [.dictation, .snippets, .corrections]),
+            SidebarGroup(id: "sources", titleKey: "Settings.Group.Sources", routes: [.watchedFolders, .integrations]),
+            SidebarGroup(id: "transcription", titleKey: "Settings.Group.Transcription", routes: [.localModels, .transcriptionDefaults, .translation, .people, .ignoredSegments, .findReplace]),
+            SidebarGroup(id: "export", titleKey: "Settings.Group.Export", routes: [.exportFormats, .batchExport, .autoExport, .sendTo]),
+            SidebarGroup(id: "ai", titleKey: "Settings.Group.AI", routes: [.aiServices, .prompts]),
+            SidebarGroup(id: "automation", titleKey: "Settings.Group.Automation", routes: [.automation]),
+            SidebarGroup(id: "end", titleKey: "Settings.Group.Support", routes: [.advanced])
         ]
     }
 
@@ -157,7 +167,7 @@ enum SettingsSidebarCatalog {
             let routes = group.routes.filter { route in
                 route.isVisible(features: features) && (query.isEmpty || matches(route: route, query: query, features: features))
             }
-            return routes.isEmpty ? nil : SidebarGroup(id: group.id, title: group.title, routes: routes)
+            return routes.isEmpty ? nil : SidebarGroup(id: group.id, titleKey: group.titleKey, routes: routes)
         }
     }
 
@@ -176,52 +186,44 @@ enum SettingsSidebarCatalog {
 // MARK: - Sidebar
 
 private struct SettingsSidebar: View {
-    @Binding var route: SettingsRoute
-    @Binding var search: String
+    @Binding var selection: SettingsRoute?
+    let search: String
     let features: FeatureSet
-    @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(spacing: 0) {
-            SearchPill(text: $search, placeholder: "Search Settings…", leaf: "Sidebar.TextField.Search")
-                .padding(.horizontal, DS.Spacing.regular)
-                .padding(.top, DS.Spacing.regular)
-                .padding(.bottom, DS.Spacing.small)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    ForEach(filteredGroups) { group in
-                        if let title = group.title {
-                            SectionCaption(title)
-                                .padding(.horizontal, DS.Spacing.medium)
-                                .padding(.top, DS.Spacing.tight)
+        List(selection: $selection) {
+            ForEach(SettingsSidebarCatalog.visibleGroups(features: features, search: search)) { group in
+                Section(group.title) {
+                    ForEach(group.routes) { route in
+                        Label {
+                            Text(route.localizedLabelKey)
+                        } icon: {
+                            SettingsIconTile(symbol: route.symbol, color: DS.settingsGroupTint(for: group.id))
                         }
-                        VStack(spacing: 2) {
-                            ForEach(group.routes) { r in
-                                SidebarRow(
-                                    title: r.localizedLabelKey,
-                                    systemImage: r.symbol,
-                                    isSelected: route == r,
-                                    height: 28,
-                                    iconTint: DS.settingsGroupTint(for: group.id)
-                                ) {
-                                    route = r
-                                }
-                                .axLeaf("Sidebar.Button.\(r.rawValue)")
-                                .accessibilityLabel(r.label)
-                                .padding(.horizontal, DS.Spacing.small)
-                            }
-                        }
+                        .tag(route)
+                        .axLeaf("Sidebar.Button.\(route.rawValue)")
                     }
                 }
-                .padding(.bottom, DS.Spacing.medium)
-                .id(model.themeRevision)
             }
         }
-        .background(DS.Palette.canvas)
+        .listStyle(.sidebar)
     }
+}
 
-    private var filteredGroups: [SidebarGroup] {
-        SettingsSidebarCatalog.visibleGroups(features: features, search: search)
+/// System Settings' sidebar tile: a filled glyph in white on a rounded square of one system colour.
+private struct SettingsIconTile: View {
+    let symbol: String
+    let color: Color
+    var side: CGFloat = 20
+
+    var body: some View {
+        Image(systemName: symbol)
+            .symbolVariant(.fill)
+            .font(.system(size: side * 0.55, weight: .medium))
+            .foregroundStyle(.white)
+            .frame(width: side, height: side)
+            .background(color.gradient, in: RoundedRectangle(cornerRadius: side * 0.25, style: .continuous))
+            .accessibilityHidden(true)
     }
 }
 
@@ -232,30 +234,17 @@ private struct SettingsDetail: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(route.localizedLabelKey)
-                        .font(DS.Font.heading)
-                    Text(route.localizedSummaryKey)
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.top, DS.Spacing.medium)
-                content
-                Spacer(minLength: 24)
-            }
-            .padding(.horizontal, DS.Spacing.large)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        route.pane
+            .navigationTitle(route.label)
+            .navigationSubtitle(route.summary)
             .id(model.themeRevision)
-        }
-        .background(DS.Palette.surface)
     }
+}
 
-    @ViewBuilder
-    private var content: some View {
-        switch route {
+extension SettingsRoute {
+    @MainActor @ViewBuilder
+    var pane: some View {
+        switch self {
         case .general: GeneralPane()
         case .customization: CustomizationPane()
         case .watchedFolders: WatchedFoldersPane()
@@ -266,8 +255,7 @@ private struct SettingsDetail: View {
         case .dictation: DictationPane()
         case .snippets: SnippetsPane()
         case .corrections: CorrectionsPane()
-        case .localModels:
-            ModelsSettingsPane()
+        case .localModels: ModelsSettingsPane()
         case .transcriptionDefaults: TranscriptionDefaultsPane()
         case .translation: TranslationPane()
         case .people: PeoplePane()
@@ -289,6 +277,22 @@ private struct SettingsDetail: View {
 
 // MARK: - Section & row primitives
 
+/// A pane's page: one grouped form, so its sections and rows take the system's type, spacing and row height.
+struct SettingsForm<Content: View>: View {
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        Form {
+            content
+        }
+        .formStyle(.grouped)
+    }
+}
+
 struct SettingsSection<Content: View>: View {
     let title: LocalizedStringKey?
     @ViewBuilder var content: Content
@@ -299,19 +303,12 @@ struct SettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Section {
+            content
+        } header: {
             if let title {
                 Text(title)
-                    .font(DS.Font.heading)
-                    .padding(.bottom, DS.Spacing.hair)
             }
-            VStack(spacing: 0) {
-                content
-            }
-            .background(
-                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                    .fill(DS.Color.surfaceElevated)
-            )
         }
     }
 }
@@ -320,71 +317,53 @@ struct SettingRow<Trailing: View>: View {
     private let titleText: Text
     private let descriptionText: Text?
     @ViewBuilder var trailing: Trailing
-    let isFirst: Bool
-    @Namespace private var pair
 
     init(_ title: LocalizedStringKey, description: LocalizedStringKey? = nil, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
         self.titleText = Text(title)
         self.descriptionText = description.map { Text($0) }
         self.trailing = trailing()
-        self.isFirst = isFirst
     }
 
     init(_ title: LocalizedStringKey, descriptionVerbatim: String?, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
         self.titleText = Text(title)
         self.descriptionText = descriptionVerbatim.map { Text($0) }
         self.trailing = trailing()
-        self.isFirst = isFirst
     }
 
     init(titleVerbatim: String, description: LocalizedStringKey? = nil, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
         self.titleText = Text(titleVerbatim)
         self.descriptionText = description.map { Text($0) }
         self.trailing = trailing()
-        self.isFirst = isFirst
     }
 
     init(titleVerbatim: String, descriptionVerbatim: String?, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
         self.titleText = Text(titleVerbatim)
         self.descriptionText = descriptionVerbatim.map { Text($0) }
         self.trailing = trailing()
-        self.isFirst = isFirst
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if !isFirst {
-                Divider().padding(.leading, DS.Spacing.medium)
+        LabeledContent {
+            trailing
+                .toggleStyle(.switch)
+        } label: {
+            titleText
+            if let descriptionText {
+                descriptionText
             }
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    titleText
-                        .font(DS.Font.body)
-                        .foregroundStyle(DS.Color.primaryText)
-                        .accessibilityLabeledPair(role: .label, id: "row", in: pair)
-                    if let descriptionText {
-                        descriptionText
-                            .font(DS.Font.secondary)
-                            .foregroundStyle(DS.Color.secondaryText)
-                    }
-                }
-                Spacer(minLength: 12)
-                trailing
-                    .toggleStyle(DSSwitchToggleStyle())
-                    .accessibilityLabeledPair(role: .content, id: "row", in: pair)
-            }
-            .padding(.horizontal, DS.Spacing.medium)
-            .padding(.vertical, DS.Spacing.small)
         }
     }
 }
 
+/// A note under the section before it, where a grouped form puts a footer.
 struct SettingHelper: View {
     let text: LocalizedStringKey
     var body: some View {
-        Text(text)
-            .font(DS.Font.secondary)
-            .foregroundStyle(DS.Color.secondaryText)
-            .padding(.horizontal, DS.Spacing.tight)
+        Section {
+        } footer: {
+            Text(text)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

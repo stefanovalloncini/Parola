@@ -8,7 +8,7 @@ struct AutoExportPane: View {
     @State private var sort: AutoExportSort = .originalOrder
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        SettingsForm {
             HStack(spacing: 8) {
                 SearchPill(text: $searchText, placeholder: "Search rules…", leaf: "AutoExport.TextField.Search")
                     .frame(maxWidth: 240)
@@ -25,7 +25,6 @@ struct AutoExportPane: View {
                         Text("No matches").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
-                    .padding(DS.Spacing.medium)
                 } else {
                     ForEach(Array(displayedRules.enumerated()), id: \.element.id) { position, rule in
                         if let binding = binding(for: rule.id) {
@@ -184,7 +183,6 @@ private struct AutoExportRuleRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Toggle("", isOn: $rule.enabled).labelsHidden()
@@ -199,7 +197,8 @@ private struct AutoExportRuleRow: View {
                 }
                 HStack {
                     Text("When source is").font(DS.Font.secondary).foregroundStyle(DS.Color.secondaryText)
-                    TextField("Any file", text: $extensionsText)
+                    TextField("Any file", text: $extensionsText, prompt: Text("Any file"))
+                        .labelsHidden()
                         .textFieldStyle(.roundedBorder)
                         .axLeaf("AutoExport.TextField.Extensions")
                         .onChange(of: extensionsText) { _, new in
@@ -227,8 +226,6 @@ private struct AutoExportRuleRow: View {
                     )
                 }
             }
-            .padding(.horizontal, DS.Spacing.medium)
-            .padding(.vertical, DS.Spacing.small)
         }
         .onAppear {
             extensionsText = rule.sourceExtensions.sorted().joined(separator: ", ")

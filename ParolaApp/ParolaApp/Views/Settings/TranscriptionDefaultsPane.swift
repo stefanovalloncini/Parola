@@ -6,7 +6,7 @@ struct TranscriptionDefaultsPane: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 12) {
+        return SettingsForm {
             SettingsSection {
                 SettingRow("Default model",
                            description: "Applies to every new transcription and to dictation. The model picker on the Library page edits this same setting.",
@@ -59,13 +59,11 @@ struct TranscriptionDefaultsPane: View {
                         .labelsHidden()
                         .lineLimit(2...6)
                         .textFieldStyle(.roundedBorder)
-                        .accessibilityLabel("Custom vocabulary")
                         .axLeaf("TranscriptionDefaults.TextField.InitialPrompt")
                     Text("A short list of names or jargon helps Whisper get unusual words right. Other engines ignore it.")
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                 }
-                .padding(DS.Spacing.medium)
             }
 
             SettingsSection("Playback") {

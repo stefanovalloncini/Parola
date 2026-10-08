@@ -38,8 +38,5 @@ struct OrphansRow: View {
                 .accessibilityIdentifier("orphan.\(entry.name).delete")
             }
         }
-        .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, DS.Spacing.small)
-        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
     }
 }

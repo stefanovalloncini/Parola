@@ -16,7 +16,7 @@ struct IntegrationsPane: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        SettingsForm {
             SettingsSection {
                 ToolStatusRow(
                     name: "yt-dlp",
@@ -59,7 +59,6 @@ private struct ToolStatusRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: statusSymbol)
@@ -127,8 +126,6 @@ private struct ToolStatusRow: View {
                         .axLeaf("Integrations.Text.Error.\(name)")
                 }
             }
-            .padding(.horizontal, DS.Spacing.medium)
-            .padding(.vertical, DS.Spacing.small)
         }
     }
 

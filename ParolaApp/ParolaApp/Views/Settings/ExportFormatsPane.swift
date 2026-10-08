@@ -10,7 +10,7 @@ struct ExportFormatsPane: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 12) {
+        return SettingsForm {
             SettingsSection {
                 ForEach(Array(model.exportPresets.enumerated()), id: \.element.id) { index, preset in
                     ExportPresetRow(
@@ -39,20 +39,6 @@ struct ExportFormatsPane: View {
                         }
                     )
                 }
-            }
-            .confirmationDialog(
-                pendingDeleteTitle,
-                isPresented: isConfirmingDelete,
-                titleVisibility: .visible,
-                presenting: pendingDelete
-            ) { preset in
-                Button("Delete", role: .destructive) {
-                    model.deleteExportPreset(id: preset.id)
-                    pendingDelete = nil
-                }
-                Button("Cancel", role: .cancel) { pendingDelete = nil }
-            } message: { preset in
-                Text(verbatim: model.exportPresetUse(id: preset.id).deleteMessage)
             }
 
             SettingHelper(text: "Presets are what the Export As menu, the auto-export rules and the batch runs write. Add one from the Export sheet with Save as Preset.")
@@ -99,6 +85,20 @@ struct ExportFormatsPane: View {
 
             ResetPaneButton(scope: .exportFormats)
         }
+        .confirmationDialog(
+            pendingDeleteTitle,
+            isPresented: isConfirmingDelete,
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { preset in
+            Button("Delete", role: .destructive) {
+                model.deleteExportPreset(id: preset.id)
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        } message: { preset in
+            Text(verbatim: model.exportPresetUse(id: preset.id).deleteMessage)
+        }
     }
 
     private var isConfirmingDelete: Binding<Bool> {
@@ -143,7 +143,6 @@ private struct ExportPresetRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             HStack(alignment: .top, spacing: DS.Spacing.regular) {
                 VStack(alignment: .leading, spacing: 2) {
                     if isRenaming {
@@ -168,8 +167,6 @@ private struct ExportPresetRow: View {
                 }
                 controls
             }
-            .padding(.horizontal, DS.Spacing.medium)
-            .padding(.vertical, DS.Spacing.small)
         }
     }
 
@@ -204,7 +201,7 @@ struct BatchExportSettingsPane: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        SettingsForm {
             SettingsSection("Export Presets") {
                 VStack(alignment: .leading, spacing: DS.Spacing.small) {
                     Text("Parola writes these presets beside every file a batch transcribes.")
@@ -218,7 +215,6 @@ struct BatchExportSettingsPane: View {
                     )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(DS.Spacing.medium)
             }
 
             SettingsSection {

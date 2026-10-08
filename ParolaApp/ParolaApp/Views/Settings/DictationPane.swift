@@ -12,7 +12,7 @@ struct DictationPane: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 16) {
+        return SettingsForm {
             SettingsSection {
                 SettingRow("Enable dictation",
                            descriptionVerbatim: enableDescription,

@@ -7,7 +7,7 @@ struct SnippetsPane: View {
     @State private var query = RuleListQuery()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        SettingsForm {
             if query.showsToolbar(ruleCount: model.snippets.count) {
                 RuleListToolbar(query: $query, placeholder: "Search snippets…", leafPrefix: "Snippets")
             }
@@ -21,7 +21,6 @@ struct SnippetsPane: View {
                         Text("No snippets match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
-                    .padding(DS.Spacing.medium)
                 } else {
                     ForEach(Array(visible.enumerated()), id: \.element.id) { idx, snippet in
                         if let binding = binding(for: snippet.id) {
@@ -106,19 +105,20 @@ private struct SnippetRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Toggle("Use this snippet", isOn: enabledBinding)
                         .labelsHidden()
                         .disabled(!canEnable)
                         .axLeaf("Snippets.Toggle.SnippetEnabled")
-                    TextField("trigger phrase", text: $snippet.trigger)
+                    TextField("trigger phrase", text: $snippet.trigger, prompt: Text("trigger phrase"))
+                        .labelsHidden()
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 200)
                         .axLeaf("Snippets.TextField.Trigger")
                     Text("→").foregroundStyle(DS.Color.secondaryText)
-                    TextField("replacement", text: $snippet.replacement)
+                    TextField("replacement", text: $snippet.replacement, prompt: Text("replacement"))
+                        .labelsHidden()
                         .textFieldStyle(.roundedBorder)
                         .axLeaf("Snippets.TextField.Replacement")
                     Button(role: .destructive, action: onDelete) {
@@ -128,8 +128,6 @@ private struct SnippetRow: View {
                     .axLeaf("Snippets.Button.Delete")
                 }
             }
-            .padding(.horizontal, DS.Spacing.medium)
-            .padding(.vertical, DS.Spacing.small)
         }
     }
 }

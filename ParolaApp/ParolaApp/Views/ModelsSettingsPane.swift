@@ -45,12 +45,12 @@ struct ModelsSettingsPane: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        SettingsForm {
             if let error = model.modelActionError {
-                modelErrorBanner(error)
+                Section { modelErrorBanner(error) }
             }
             usageCard
-            controls
+            Section { controls }
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,22 +112,17 @@ struct ModelsSettingsPane: View {
     }
 
     private var usageCard: some View {
-        VStack(spacing: 0) {
+        SettingsSection("Storage") {
             StorageRow()
             modelsUsageRow
             libraryUsageRow
         }
-        .background(
-            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                .fill(DS.Color.surfaceElevated)
-        )
     }
 
     @ViewBuilder
     private var modelsUsageRow: some View {
         let summary = model.modelsOnDiskSummary
         if summary.bytes > 0 {
-            Divider()
             UsageRow(icon: "cpu", label: "Models:", value: summary.usageText)
         }
     }
@@ -136,7 +131,6 @@ struct ModelsSettingsPane: View {
     private var libraryUsageRow: some View {
         let totalBytes = model.libraryBundleSizes.values.reduce(Int64(0), +)
         if !model.libraryEntries.isEmpty {
-            Divider()
             UsageRow(
                 icon: "tray.full",
                 label: "Library:",
@@ -207,11 +201,12 @@ struct ModelsSettingsPane: View {
         let sections = self.sections
 
         if sections.isEmpty {
-            ContentUnavailableView.search(text: searchText)
-                .frame(maxWidth: .infinity)
-                .padding(.top, DS.Spacing.xlarge)
+            Section {
+                ContentUnavailableView.search(text: searchText)
+                    .frame(maxWidth: .infinity)
+            }
         } else {
-            VStack(alignment: .leading, spacing: 28) {
+            Group {
                 if !sections.installed.isEmpty || installFilter == .installed {
                     downloadedSection(sections.installed)
                 }
@@ -232,12 +227,7 @@ struct ModelsSettingsPane: View {
     }
 
     private func earlierDownloadsSection(_ copies: [SupersededCopy]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Earlier downloads", count: copies.count)
-            Text("Newer versions of these models replaced them, and Parola no longer uses them.")
-                .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.secondaryText)
-            LazyVStack(spacing: 8) {
+        Section {
                 ForEach(copies) { copy in
                     EarlierDownloadRow(copy: copy, isDeleting: model.isReclaiming(copy)) {
                         pendingDeletion = PendingDeletion(
@@ -248,17 +238,16 @@ struct ModelsSettingsPane: View {
                         )
                     }
                 }
-            }
+        } header: {
+            sectionHeader("Earlier downloads", count: copies.count)
+        } footer: {
+            Text("Newer versions of these models replaced them, and Parola no longer uses them.")
+                .foregroundStyle(.secondary)
         }
     }
 
     private func orphansSection(_ entries: [ModelInfo]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Other files on disk", count: entries.count)
-            Text("These directories aren't in the current model catalog — usually leftovers from older app versions. Safe to delete.")
-                .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.secondaryText)
-            LazyVStack(spacing: 8) {
+        Section {
                 ForEach(entries) { entry in
                     let displaySize = model.modelSizes[entry.name]
                         ?? entry.approximateSizeBytes.map { Int64($0) }
@@ -274,19 +263,21 @@ struct ModelsSettingsPane: View {
                         )
                     }
                 }
-            }
+        } header: {
+            sectionHeader("Other files on disk", count: entries.count)
+        } footer: {
+            Text("These directories aren't in the current model catalog — usually leftovers from older app versions. Safe to delete.")
+                .foregroundStyle(.secondary)
         }
     }
 
     // MARK: - Downloaded
 
     private func downloadedSection(_ variants: [ModelVariant]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("On This Mac", count: variants.count)
+        Section {
             if variants.isEmpty {
                 DownloadedEmpty()
             } else {
-                LazyVStack(spacing: 10) {
                     ForEach(variants) { variant in
                         let isActive = model.selectedModel == variant.id
                         DownloadedRow(
@@ -307,21 +298,21 @@ struct ModelsSettingsPane: View {
                             }
                         )
                     }
-                }
             }
+        } header: {
+            sectionHeader("On This Mac", count: variants.count)
         }
     }
 
     // MARK: - Recommended
 
     private func recommendedSection(_ variants: [ModelVariant]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Recommended models", count: variants.count)
-            LazyVStack(spacing: 10) {
-                ForEach(variants) { variant in
-                    LiveRecommendedRow(variant: variant)
-                }
+        Section {
+            ForEach(variants) { variant in
+                LiveRecommendedRow(variant: variant)
             }
+        } header: {
+            sectionHeader("Recommended models", count: variants.count)
         }
     }
 
@@ -346,9 +337,12 @@ struct ModelsSettingsPane: View {
     // MARK: - Categories
 
     private func categoriesSection(_ categories: [ModelsCategory]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        Section {
+            ForEach(categories) { category in
+                ModelCategoryRow(category: category)
+            }
+        } header: {
             sectionHeader("Engine families", count: nil)
-            ModelCategorySection(categories: categories)
         }
     }
 
@@ -430,13 +424,12 @@ struct ModelsSettingsPane: View {
     }
 
     private func sectionHeader(_ title: LocalizedStringKey, count: Int?) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(title)
-                .font(DS.Font.heading)
             if let count, count > 0 {
                 Text(verbatim: AppFormat.integer(count))
-                    .font(DS.Font.mono)
-                    .foregroundStyle(DS.Color.secondaryText)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
             Spacer()
         }

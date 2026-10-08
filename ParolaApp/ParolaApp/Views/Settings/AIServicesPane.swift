@@ -31,7 +31,7 @@ struct AIServicesPane: View {
     @State private var testing: Set<UUID> = []
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        SettingsForm {
             privacySection
             onDeviceSection
             servicesSection
@@ -94,14 +94,20 @@ struct AIServicesPane: View {
     // MARK: - Configured services
 
     private var servicesSection: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+        Section {
             servicesList
-            addMenu
+        } header: {
+            Text("Your services")
+        } footer: {
+            HStack {
+                Spacer()
+                addMenu
+            }
         }
     }
 
     private var servicesList: some View {
-        SettingsSection("Your services") {
+        Group {
             let services = model.listedAIServices
             if services.isEmpty {
                 InlineEmptyText("No services yet")
@@ -262,7 +268,6 @@ private struct AIServiceRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 6) {
                 header
                 if isPaused {
@@ -276,8 +281,6 @@ private struct AIServiceRow: View {
                         .axLeaf(leaf("Label.TestResult"))
                 }
             }
-            .padding(.horizontal, DS.Spacing.medium)
-            .padding(.vertical, DS.Spacing.small)
         }
     }
 

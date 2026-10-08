@@ -49,7 +49,7 @@ struct AutomationPane: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 16) {
+        return SettingsForm {
             SettingsSection {
                 SettingRow(
                     "MCP automation bridge",
@@ -77,7 +77,6 @@ struct AutomationPane: View {
                         .foregroundStyle(DS.Color.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(DS.Spacing.medium)
             }
 
             SettingsSection("parola-mcp binary") {
@@ -115,7 +114,6 @@ struct AutomationPane: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(DS.Spacing.medium)
             }
 
             if let snippet = Self.mcpJSONSnippet {
@@ -140,7 +138,6 @@ struct AutomationPane: View {
                             .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                             .axLeaf("Automation.Button.CopySnippet")
                     }
-                    .padding(DS.Spacing.medium)
                 }
             }
 

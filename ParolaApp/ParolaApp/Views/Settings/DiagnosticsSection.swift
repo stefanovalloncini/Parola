@@ -48,7 +48,6 @@ struct DiagnosticsSection: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(DS.Spacing.medium)
         }
         .task {
             hasDiagnostics = await model.diagnosticsRecordsExist(directory: directory)

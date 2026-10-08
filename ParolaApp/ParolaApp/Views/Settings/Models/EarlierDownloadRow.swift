@@ -36,9 +36,6 @@ struct EarlierDownloadRow: View {
                 .axLeaf("Models.Button.DeleteEarlierDownload.\(copy.variantID)")
             }
         }
-        .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, DS.Spacing.small)
-        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
     }
 
     private var caption: Text {

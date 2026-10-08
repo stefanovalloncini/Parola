@@ -32,14 +32,12 @@ struct AIServiceEditor: View {
             titleVerbatim: service.kind.displayName,
             onClose: onCancel
         ) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    detailsSection
-                    if service.kind.keyProviderID != nil { keySection }
-                    testSection
-                }
-                .padding(DS.Spacing.regular)
+            Form {
+                detailsSection
+                if service.kind.keyProviderID != nil { keySection }
+                testSection
             }
+            .formStyle(.grouped)
         } footer: {
             HStack {
                 Spacer()
@@ -65,13 +63,15 @@ struct AIServiceEditor: View {
         SettingsSection("Service") {
             SettingRow("Name", description: "What this service is called in the pickers.", isFirst: true) {
                 TextField("", text: $service.name)
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 240)
                     .axLeaf("AIServices.TextField.Name")
             }
             if service.kind.usesEndpoint {
                 SettingRow("Endpoint", descriptionVerbatim: endpointHelp) {
-                    TextField(AIServiceConfig.defaultOllamaEndpoint.absoluteString, text: $endpointText)
+                    TextField("", text: $endpointText, prompt: Text(verbatim: AIServiceConfig.defaultOllamaEndpoint.absoluteString))
+                        .labelsHidden()
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 240)
                         .axLeaf("AIServices.TextField.Endpoint")
@@ -96,7 +96,8 @@ struct AIServiceEditor: View {
             .frame(width: 240, alignment: .trailing)
             .axLeaf("AIServices.Picker.OllamaModel")
         } else {
-            TextField(service.kind.defaultModel, text: $service.model)
+            TextField("", text: $service.model, prompt: Text(verbatim: service.kind.defaultModel))
+                .labelsHidden()
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 240)
                 .axLeaf("AIServices.TextField.Model")
@@ -106,7 +107,8 @@ struct AIServiceEditor: View {
     private var keySection: some View {
         SettingsSection("API key") {
             SettingRow("Key", descriptionVerbatim: keyHelp, isFirst: true) {
-                SecureField(service.kind.apiKeyPlaceholder, text: $apiKey)
+                SecureField("", text: $apiKey, prompt: Text(verbatim: service.kind.apiKeyPlaceholder))
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 240)
                     .axLeaf("AIServices.SecureField.APIKey")

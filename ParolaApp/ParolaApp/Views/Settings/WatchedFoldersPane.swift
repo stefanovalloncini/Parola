@@ -13,7 +13,7 @@ private struct WatchedFoldersPaneBody: View {
     let store: WatchedFoldersStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        SettingsForm {
             SettingsSection {
                 if store.folders.isEmpty {
                     InlineEmptyText("No watched folders yet")

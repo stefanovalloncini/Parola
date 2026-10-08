@@ -7,7 +7,7 @@ struct AdvancedPane: View {
     @State private var transferFailure: SettingsTransferFailure?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        SettingsForm {
             SettingsSection("Backup & restore") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Save your settings to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.")
@@ -39,7 +39,6 @@ struct AdvancedPane: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(DS.Spacing.medium)
             }
 
             DiagnosticsSection()
@@ -58,7 +57,6 @@ struct AdvancedPane: View {
                     .axLeaf("Advanced.Button.ResetAll")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(DS.Spacing.medium)
             }
         }
         .confirmationDialog(

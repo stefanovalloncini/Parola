@@ -93,12 +93,12 @@ struct DictationPaneLayoutTests {
     @Test("Permissions show only while one is missing")
     func permissionsOnlyWhenMissing() {
         let granted = DictationPermissions(trustCheck: { true }, microphoneStatus: { .authorized })
-        let allSet = HostedWindow(DictationPermissionsSection(permissions: granted), width: 700, height: 300)
+        let allSet = HostedWindow(SettingsForm { DictationPermissionsSection(permissions: granted) }, width: 700, height: 300)
         defer { allSet.close() }
         #expect(HostedAccessibility.words(in: allSet.host).contains(String(localized: "Accessibility")) == false)
 
         let missing = DictationPermissions(trustCheck: { false }, microphoneStatus: { .authorized })
-        let shown = HostedWindow(DictationPermissionsSection(permissions: missing), width: 700, height: 300)
+        let shown = HostedWindow(SettingsForm { DictationPermissionsSection(permissions: missing) }, width: 700, height: 300)
         defer { shown.close() }
         let ids = HostedAccessibility.elements(in: shown.host).compactMap(\.identifier)
         #expect(ids.contains { $0.hasSuffix("Dictation.Button.GrantAccessibility") })

@@ -6,7 +6,7 @@ struct TranslationPane: View {
 
     var body: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 12) {
+        return SettingsForm {
             SettingsSection("After transcribing") {
                 SettingRow("Show translations side by side",
                            description: "Off puts the translation under each segment instead of beside it.",

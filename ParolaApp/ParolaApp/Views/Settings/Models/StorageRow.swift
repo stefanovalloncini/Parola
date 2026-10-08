@@ -44,8 +44,6 @@ struct StorageRow: View {
                     .truncationMode(.middle)
             }
         }
-        .padding(.horizontal, DS.Spacing.medium)
-        .padding(.vertical, DS.Spacing.small)
         .onAppear { overridePath = currentOverride() }
         .alert("Restart required", isPresented: $showingRestartAlert) {
             Button("OK") {}

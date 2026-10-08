@@ -23,7 +23,7 @@ struct RecordMeetingsPane: View {
         @Bindable var model = model
         @Bindable var detector = model.meetingDetector
         let needed = Self.neededPermissions(appOnly: model.meetingCaptureAppOnly)
-        return VStack(alignment: .leading, spacing: 12) {
+        return SettingsForm {
             SettingsSection("Permissions") {
                 PermissionRow(
                     title: String(localized: "Screen & System Audio Recording"),

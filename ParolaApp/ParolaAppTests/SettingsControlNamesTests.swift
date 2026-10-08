@@ -83,6 +83,28 @@ struct SettingsControlNamesTests {
         #expect(walked > 60, "the walk found \(walked) controls; the panes didn't render")
     }
 
+    @Test("a Settings row's title names its control, so VoiceOver reads the setting with its state")
+    func rowTitlesNameTheirControls() throws {
+        let model = AppModel(bootstrap: AppBootstrap(
+            mode: .test, library: makeTempLibraryURL("settings-row-names"), defaultsOverride: temporaryDefaults(),
+            sideEffects: [], filePicker: TestFilePicker(), clock: ContinuousClock()
+        ))
+        let expected: [(SettingsRoute, String, String)] = [
+            (.general, "General.Toggle.LaunchAtLogin", "Open at login"),
+            (.general, "General.Picker.AppVisibility", "Show Parola in"),
+            (.transcriptionDefaults, "TranscriptionDefaults.Toggle.Diarize", "Detect speakers"),
+            (.automation, "Automation.Toggle.BridgeEnabled", "MCP automation bridge"),
+        ]
+        for (route, identifier, title) in expected {
+            let hosted = HostedWindow(route.pane.environment(model), width: 760, height: 1600)
+            defer { hosted.close() }
+            let elements = HostedAccessibility.elements(in: hosted.host)
+            let match = elements.first { $0.identifier?.hasSuffix(identifier) == true }
+            let control = try #require(match, "\(identifier)")
+            #expect(control.name == String(localized: String.LocalizationValue(title)), "\(identifier)")
+        }
+    }
+
     /// Local Models stays out of the walk above (its `.task` scans the model store), so its Sort chip is checked here.
     @Test("the Local Models sort chip is named for VoiceOver on its own")
     func localModelsSortChipIsNamed() {

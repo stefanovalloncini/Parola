@@ -7,7 +7,7 @@ struct LiveCaptionsPane: View {
 
     var body: some View {
         @Bindable var model = model
-        VStack(alignment: .leading, spacing: 12) {
+        SettingsForm {
             Text("Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.")
                 .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
