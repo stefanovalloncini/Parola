@@ -76,10 +76,7 @@ final class MeetingNotifier: NSObject {
         windowLostSight()
     }
 
-    /// Catches a prompt the window never showed: the launch scan ran before this notifier existed, or Zoom opened
-    /// while the window was key and `promptRaised` skipped it. Called once at bind, and again whenever the window
-    /// stops being able to show the prompt (`NSApplication.didResignActiveNotification`). Posting once sets
-    /// `postedApp`, so a later call for the same detection is a no-op.
+    /// Catches a prompt the window never showed: called once at bind, and again whenever the window resigns active.
     func windowLostSight() {
         guard !promptInView(), let app = model?.meetingDetectedApp, postedApp == nil, posting == nil else { return }
         posting = Task { [weak self] in await self?.post(app) }
@@ -156,8 +153,7 @@ final class MeetingNotifier: NSObject {
         return UNNotificationRequest(identifier: requestID, content: content, trigger: nil)
     }
 
-    /// No `.foreground`: Record starts the take in place, as the menu bar's Record does — activating Parola would
-    /// pull the user out of a full-screen call to a Space with the Stage, with no way back but a swipe.
+    /// No `.foreground`: Record starts the take in place, as the menu bar's Record does, instead of activating Parola.
     nonisolated static func category(bundle: Bundle = .main) -> UNNotificationCategory {
         let record = UNNotificationAction(
             identifier: recordActionID, title: String(localized: "Record Meeting", bundle: bundle), options: []

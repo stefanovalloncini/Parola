@@ -195,7 +195,6 @@ final class MenuBarController: NSObject {
     }
 
     /// A dot in `accentInk` after the icon, raised to its top; the icon stays a template, so it keeps the menu bar's ink.
-    /// The raw accent is near-invisible for some presets against the menu bar's chrome; `accentInk` is already tuned for it.
     static func meetingCue(font: NSFont = .menuBarFont(ofSize: 0)) -> NSAttributedString {
         let diameter: CGFloat = 6
         let accentInk = DS.theme.accentInk.nsColor
