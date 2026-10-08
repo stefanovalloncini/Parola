@@ -17,6 +17,7 @@ struct TranscriptToolbarTests {
     private static let share = "Toolbar.Transcript.Menu.Share"
     private static let inspector = "Toolbar.Transcript.Button.Inspector"
     private static let controls = [back, panes, format, readAloud, askAI, share, inspector]
+    private static let newMenu = "Toolbar.Menu.New"
 
     private func withIsolatedDefaults(_ body: (UserDefaults) async throws -> Void) async rethrows {
         let previous = DefaultsStore.current
@@ -114,25 +115,71 @@ struct TranscriptToolbarTests {
         }
     }
 
-    @Test("only a transcript on screen puts its controls in the toolbar")
+    @Test("only a transcript on screen puts its controls in the toolbar: not the Library, Queue, Statistics or results over it")
     func onlyATranscriptGetsThem() async {
         await withIsolatedDefaults { defaults in
             let model = makeModel(defaults, loaded: false)
             let hosted = host(model)
             defer { hosted.close() }
-            await settle()
-            let onLibrary = Self.controls.filter { shows($0, in: toolbarIDs(hosted)) }
-            #expect(onLibrary.isEmpty, "on the library page: \(onLibrary)")
+            let bridged = await waitUntil { shows(Self.newMenu, in: toolbarIDs(hosted)) }
+            #expect(bridged)
+            await expectNoTranscriptControls(in: hosted, "on the library page")
 
             load(model)
             let arrived = await waitUntil { shows(Self.format, in: toolbarIDs(hosted)) }
             #expect(arrived)
 
-            model.route = .queue
-            await settle()
-            let onQueue = Self.controls.filter { shows($0, in: toolbarIDs(hosted)) }
-            #expect(onQueue.isEmpty, "on the queue: \(onQueue)")
+            for route in [AppModel.Route.queue, .statistics] {
+                model.route = route
+                await expectNoTranscriptControls(in: hosted, "on \(route)")
+                model.route = .transcript
+                let back = await waitUntil { shows(Self.format, in: toolbarIDs(hosted)) }
+                #expect(back, "not back from \(route)")
+            }
+
+            model.searchRanking = []
+            #expect(model.isBrowsingLibrary)
+            await expectNoTranscriptControls(in: hosted, "under search results over the transcript")
+            model.searchRanking = nil
+            let cleared = await waitUntil { shows(Self.format, in: toolbarIDs(hosted)) }
+            #expect(cleared)
         }
+    }
+
+    @Test("the test-mode Settings preview over a transcript leaves the transcript's controls out")
+    func settingsPreviewGetsNone() async {
+        await withIsolatedDefaults { defaults in
+            let model = AppModel(bootstrap: AppBootstrap(
+                mode: .test,
+                library: makeTempLibraryURL("transcript-toolbar"),
+                defaultsOverride: defaults,
+                sideEffects: [],
+                filePicker: TestFilePicker(),
+                enabledFeaturesOverride: Set(ParolaFeature.allCases)
+            ))
+            model.libraryLoaded = true
+            load(model)
+            let hosted = host(model)
+            defer { hosted.close() }
+            let arrived = await waitUntil { shows(Self.format, in: toolbarIDs(hosted)) }
+            #expect(arrived)
+
+            model.settingsRoutePreview = true
+            await expectNoTranscriptControls(in: hosted, "over the Settings preview")
+        }
+    }
+
+    /// Waits for every transcript control to leave a toolbar that is still there.
+    private func expectNoTranscriptControls(
+        in hosted: HostedWindow, _ place: String, sourceLocation: SourceLocation = #_sourceLocation
+    ) async {
+        let gone = await waitUntil(sourceLocation: sourceLocation) {
+            let ids = toolbarIDs(hosted)
+            return shows(Self.newMenu, in: ids) && Self.controls.allSatisfy { !shows($0, in: ids) }
+        }
+        let ids = toolbarIDs(hosted)
+        let left = Self.controls.filter { shows($0, in: ids) }
+        #expect(gone, "\(place): toolbar \(shows(Self.newMenu, in: ids) ? "keeps \(left)" : "is gone")", sourceLocation: sourceLocation)
     }
 
     @Test("with AI off there is no pane switch and no Ask AI; the rest stay")
