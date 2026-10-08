@@ -48,20 +48,20 @@ struct SegmentNoteSheet: View {
     private var footer: some View {
         HStack(spacing: DS.Spacing.small) {
             if target.note != nil {
-                Button(action: delete) {
+                Button(role: .destructive, action: delete) {
                     Text("Delete")
                         .foregroundStyle(DS.Color.dangerText)
                 }
-                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                .sheetSecondaryAction()
                 .axLeaf("Button.Delete")
             }
             Spacer(minLength: DS.Spacing.small)
             Button("Cancel") { dismiss() }
-                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                .sheetSecondaryAction()
                 .keyboardShortcut(.cancelAction)
                 .axLeaf("Button.Cancel")
             Button("Save", action: save)
-                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                .sheetPrimaryAction()
                 .keyboardShortcut(.defaultAction)
                 .axLeaf("Button.Save")
         }

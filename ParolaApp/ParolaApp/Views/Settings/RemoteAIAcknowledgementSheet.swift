@@ -26,11 +26,11 @@ struct RemoteAIAcknowledgementSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel", action: onCancel)
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .sheetSecondaryAction()
                     .keyboardShortcut(.cancelAction)
                     .axLeaf("AIServices.Button.CancelAcknowledge")
                 Button("I understand", action: onAccept)
-                    .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                    .sheetPrimaryAction()
                     .keyboardShortcut(.defaultAction)
                     .axLeaf("AIServices.Button.Acknowledge")
             }

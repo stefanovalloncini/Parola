@@ -44,11 +44,11 @@ struct AIServiceEditor: View {
             HStack {
                 Spacer()
                 Button("Cancel", action: onCancel)
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .sheetSecondaryAction()
                     .keyboardShortcut(.cancelAction)
                     .axLeaf("AIServices.Button.Cancel")
                 Button("Save") { onSave(saved(), apiKey) }
-                    .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                    .sheetPrimaryAction()
                     .keyboardShortcut(.defaultAction)
                     .disabled(!canSave)
                     .axLeaf("AIServices.Button.Save")

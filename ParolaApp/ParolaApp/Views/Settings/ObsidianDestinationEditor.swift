@@ -42,11 +42,11 @@ struct ObsidianDestinationEditor: View {
             HStack {
                 Spacer()
                 Button("Cancel", action: onCancel)
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .sheetSecondaryAction()
                     .keyboardShortcut(.cancelAction)
                     .axLeaf("SendTo.Button.CancelEdit")
                 Button("Save") { onSave(draft) }
-                    .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                    .sheetPrimaryAction()
                     .keyboardShortcut(.defaultAction)
                     .disabled(draft.vaultBookmark.isEmpty)
                     .axLeaf("SendTo.Button.Save")

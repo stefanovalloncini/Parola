@@ -337,6 +337,7 @@ private struct PromptEditor: View {
                 Spacer()
                 if draft.isReadOnly {
                     Button("Close", role: .cancel, action: onCancel)
+                        .sheetSecondaryAction()
                         .axLeaf("PromptEditor.Button.Close")
                     Button("Duplicate") { onDuplicate(draft) }
                         .sheetPrimaryAction()
@@ -344,6 +345,7 @@ private struct PromptEditor: View {
                         .axLeaf("PromptEditor.Button.Duplicate")
                 } else {
                     Button("Cancel", role: .cancel, action: onCancel)
+                        .sheetSecondaryAction()
                         .axLeaf("PromptEditor.Button.Cancel")
                     Button("Save") { onCommit(draft) }
                         .sheetPrimaryAction()

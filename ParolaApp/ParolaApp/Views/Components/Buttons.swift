@@ -73,11 +73,11 @@ struct DSPillButtonStyle: ButtonStyle {
 
 extension View {
     func sheetPrimaryAction() -> some View {
-        buttonStyle(DSPillButtonStyle(kind: .primary))
+        buttonStyle(.borderedProminent).controlSize(.large)
     }
 
     func sheetSecondaryAction() -> some View {
-        buttonStyle(DSPillButtonStyle(kind: .secondary))
+        buttonStyle(.bordered).controlSize(.large)
     }
 }
 
