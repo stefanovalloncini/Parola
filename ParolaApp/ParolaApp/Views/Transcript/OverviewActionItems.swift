@@ -32,9 +32,9 @@ struct OverviewActionItems: View {
         return (lead, rest)
     }
 
-    /// Up to three words of letters, not starting lowercase: "Sam", "Ana María", "Jean-Luc", but not "10" or "https".
+    /// Up to three words of letters, in either case: "Sam", "maria", "Ana María", "Jean-Luc", but not "10" or "Q3".
     private static func looksLikeAName(_ lead: String) -> Bool {
-        guard let first = lead.first, first.isLetter, !first.isLowercase else { return false }
+        guard let first = lead.first, first.isLetter else { return false }
         let nameMarks: Set<Character> = [" ", "-", "'", "’", "."]
         return lead.split(separator: " ").count <= 3 && lead.allSatisfy { $0.isLetter || nameMarks.contains($0) }
     }

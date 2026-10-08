@@ -656,6 +656,15 @@ struct OverviewSectionRulesTests {
         #expect(OverviewActionItems.split("Jean-Luc: book the room").assignee == "Jean-Luc")
     }
 
+    @Test("a name the summary gives in lowercase is still who does it")
+    func lowercaseNamesAreAssignees() {
+        for (line, name) in [("sam: ship the feature", "sam"), ("maria: send the notes", "maria"), ("иван: book the room", "иван")] {
+            let split = OverviewActionItems.split(line)
+            #expect(split.assignee == name, "\(line)")
+            #expect(split.task == String(line.dropFirst(name.count + 2)))
+        }
+    }
+
     @Test("a time or a link before the first colon is part of the task, not someone's name")
     func timesAndLinksAreNotAssignees() {
         for line in [
