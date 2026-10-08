@@ -68,7 +68,7 @@ struct ObsidianDestinationEditor: View {
             }
             SettingRow("Folder", descriptionVerbatim: draft.vaultPath.isEmpty ? String(localized: "No folder picked") : draft.vaultPath) {
                 Button("Choose…", action: pickFolder)
-                    .buttonStyle(.bordered)
+                    .sheetButton()
                     .axLeaf("SendTo.Button.ChooseFolder")
             }
             SettingRow("Subfolder", description: "Relative to the vault. Leave empty to write into the vault root.") {
@@ -135,7 +135,7 @@ struct ObsidianDestinationEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Button("Send a Test Note", action: sendTestNote)
-                    .buttonStyle(.bordered)
+                    .sheetButton()
                     .disabled(draft.vaultBookmark.isEmpty || isSendingTestNote)
                     .axLeaf("SendTo.Button.TestNote")
                 if isSendingTestNote {

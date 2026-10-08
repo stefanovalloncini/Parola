@@ -118,7 +118,7 @@ struct AIServiceEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Button("Test", action: runTest)
-                    .buttonStyle(.bordered)
+                    .sheetButton()
                     .disabled(!canSave || isTesting || isPaused)
                     .axLeaf("AIServices.Button.Test")
                 if isTesting { ProgressView().controlSize(.small) }

@@ -177,7 +177,7 @@ struct ExportSheet: View {
             presetName = ""
             namingPreset = true
         }
-        .buttonStyle(.bordered)
+        .sheetButton()
         .axLeaf("Export.Button.SavePreset")
     }
 
@@ -317,7 +317,7 @@ private extension View {
         if chosen {
             buttonStyle(.borderedProminent)
         } else {
-            buttonStyle(.bordered)
+            sheetButton()
         }
     }
 }

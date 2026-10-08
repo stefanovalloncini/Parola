@@ -145,6 +145,7 @@ private struct YtDlpBanner: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString("brew install yt-dlp", forType: .string)
                 }
+                .sheetButton()
                 .disabled(model.ytDlpInstalling)
                 .axLeaf("YouTube.Button.CopyBrewCommand")
             }

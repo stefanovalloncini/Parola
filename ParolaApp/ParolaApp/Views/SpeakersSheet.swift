@@ -139,7 +139,7 @@ private struct FlowChips: View {
         LeadingFlow(spacing: DS.Spacing.tight) {
             ForEach(items, id: \.self) { item in
                 Button(item) { onTap(item) }
-                    .buttonStyle(.bordered)
+                    .sheetButton()
                     .axLeaf("Speakers.Button.Suggestion")
             }
         }

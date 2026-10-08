@@ -77,7 +77,12 @@ extension View {
     }
 
     func sheetSecondaryAction() -> some View {
-        buttonStyle(.bordered).controlSize(.large)
+        sheetButton().controlSize(.large)
+    }
+
+    /// A key window would draw the sheet's accent tint into a bordered button's label; the system's grey reads native.
+    func sheetButton() -> some View {
+        buttonStyle(.bordered).tint(nil)
     }
 }
 
