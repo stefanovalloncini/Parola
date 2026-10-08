@@ -151,7 +151,8 @@ struct SettingsWindowTests {
             let model = makeModel(defaults)
             let hosted = hostWindow(model)
             defer { hosted.close() }
-            let table = try #require(views(in: hosted.host).lazy.compactMap { $0 as? NSTableView }.first, "no sidebar list")
+            let sidebar = views(in: hosted.host).lazy.compactMap { $0 as? NSTableView }.first
+            let table = try #require(sidebar, "no sidebar list")
             #expect(hosted.window.makeFirstResponder(table))
             let onGeneral = await waitUntil { model.settingsPane == SettingsRoute.general.rawValue }
             #expect(onGeneral, "opened on \(model.settingsPane)")
