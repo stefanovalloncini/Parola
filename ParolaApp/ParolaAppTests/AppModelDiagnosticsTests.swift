@@ -230,6 +230,7 @@ struct AppModelDiagnosticsTests {
         )
         let folder = scratchDirectory()
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
         let destination = folder.appendingPathComponent("direct.txt")
 
         let reply = try await command.handler(AutomationArgs(["path": .string(destination.path)]), context)
