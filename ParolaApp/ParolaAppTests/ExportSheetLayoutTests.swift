@@ -100,6 +100,44 @@ struct ExportSheetLayoutTests {
         #expect(model.exportSheetSpec.style == .subtitles)
     }
 
+    /// Where Tab stops for the control VoiceOver sees at this frame.
+    private func keyView(at frame: CGRect, in hosted: HostedWindow) -> NSView? {
+        var seen: Set<ObjectIdentifier> = []
+        var next = hosted.host.nextKeyView
+        while let view = next, seen.insert(ObjectIdentifier(view)).inserted {
+            let onScreen = hosted.window.convertToScreen(view.convert(view.bounds, to: nil))
+            if abs(onScreen.midX - frame.midX) < 1, abs(onScreen.midY - frame.midY) < 1 { return view }
+            next = view.nextKeyView
+        }
+        return nil
+    }
+
+    @Test("choosing a chip leaves the keyboard and VoiceOver on it")
+    func choosingAChipKeepsFocus() throws {
+        let model = makeModel()
+        let hosted = host(model)
+        defer { hosted.close() }
+        let leaf = "Export.Button.Format.md"
+        let before = HostedAccessibility.elements(in: hosted.host).first { $0.identifier?.hasSuffix(leaf) == true }
+        let markdown = try #require(before, "no \(leaf)")
+        let found = keyView(at: markdown.frame, in: hosted)
+        let chip = try #require(found, "Tab never stops on \(leaf)")
+        let focused = hosted.window.makeFirstResponder(chip)
+        #expect(focused)
+        let pressed = HostedAccessibility.press(endingWith: leaf, in: hosted.host)
+        #expect(pressed)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        hosted.host.layoutSubtreeIfNeeded()
+        #expect(model.exportSheetSpec.format == .md)
+        let responder = hosted.window.firstResponder
+        #expect(responder === chip, "the keyboard moved to \(String(describing: responder))")
+        let after = HostedAccessibility.elements(in: hosted.host).first { $0.identifier?.hasSuffix(leaf) == true }
+        let sameElement = after?.object === markdown.object
+        #expect(sameElement, "VoiceOver's element for \(leaf) was replaced")
+        #expect(after?.isSelected == true)
+        #expect(after?.role == NSAccessibility.Role.checkBox.rawValue)
+    }
+
     @Test("the chosen Style and Format still stand out while the sheet's window isn't key")
     func chosenChipsShowInAnInactiveWindow() throws {
         let model = makeModel()

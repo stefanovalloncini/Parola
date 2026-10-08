@@ -70,7 +70,7 @@ struct ExportSheet: View {
                         get: { spec.style == style },
                         set: { if $0 { model.setExportSpec(spec.changing(style: style)) } }
                     ))
-                    .chip(chosen: spec.style == style)
+                    .chip()
                     .accessibilityAddTraits(spec.style == style ? .isSelected : [])
                     .axLeaf("Export.Button.Style.\(style.rawValue)")
                 }
@@ -87,7 +87,7 @@ struct ExportSheet: View {
                         get: { spec.format == format },
                         set: { if $0 { model.setExportSpec(spec.changing(format: format)) } }
                     ))
-                    .chip(chosen: spec.format == format)
+                    .chip()
                     .accessibilityAddTraits(spec.format == format ? .isSelected : [])
                     .axLeaf("Export.Button.Format.\(format.fileExtension)")
                 }
@@ -314,14 +314,9 @@ struct ExportSheet: View {
 }
 
 private extension View {
-    /// A push-on button: the chosen one fills with the accent, and still reads as pressed in a window that isn't key.
-    @ViewBuilder
-    func chip(chosen: Bool) -> some View {
-        if chosen {
-            toggleStyle(.button).buttonStyle(.borderedProminent)
-        } else {
-            toggleStyle(.button).sheetButton()
-        }
+    /// One style whether chosen or not: swapping styles on a choice rebuilds the chip, and its keyboard focus goes with it.
+    func chip() -> some View {
+        toggleStyle(.button).sheetButton()
     }
 }
 
