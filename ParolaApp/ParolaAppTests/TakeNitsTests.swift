@@ -212,7 +212,7 @@ struct TakeFailureItalianTests {
         }
         #expect(!english.contains("Audio capture unavailable"))
         #expect(SystemAudioDidNotStart.message(bundle: try italian())
-            == "Parola non è riuscita ad avviare la registrazione dell'audio di sistema. Consenti a Parola la Registrazione audio di sistema in Impostazioni di Sistema → Privacy e sicurezza, poi riprova.")
+            == "Parola non è riuscita ad avviare la registrazione dell'audio di sistema. Apri Impostazioni di Sistema → Privacy e sicurezza → Registrazione schermo e audio di sistema → Solo registrazione audio di sistema e consenti l'accesso a Parola, poi riprova.")
     }
 
     @Test("the take's start throws that failure when Mac audio never comes up")
