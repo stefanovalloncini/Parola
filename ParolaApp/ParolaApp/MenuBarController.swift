@@ -32,6 +32,8 @@ final class MenuBarController: NSObject {
         var showsMicRecording: Bool
         var showsSystemAudio: Bool
         var detectedMeetingApp: String? = nil
+        /// The meeting whose prompt waits for an answer: the icon carries a dot and the menu offers it first.
+        var pendingMeetingApp: String? = nil
         var captionsShown: Bool = false
         var captionsActive: Bool = false
         var captionsUnavailableReason: String? = nil
@@ -51,6 +53,8 @@ final class MenuBarController: NSObject {
     private(set) var lastSnapshot: MenuSnapshot?
     private var lastInputDevices: [AudioInputDevice] = []
     private var takeBlocksRecord: Bool?
+    /// The meeting the icon's dot stands for; nil while the icon is plain.
+    private(set) var cuedMeetingApp: String?
 
     func bind(_ model: AppModel) {
         self.model = model
@@ -82,6 +86,7 @@ final class MenuBarController: NSObject {
             _ = model.inputDeviceUID
             if model.features.isEnabled(.meetings) {
                 _ = model.detectedMeetingAppName
+                _ = model.meetingDetectedApp
             }
             if model.features.isEnabled(.liveCaptions) {
                 _ = model.selectedModel
@@ -106,6 +111,7 @@ final class MenuBarController: NSObject {
         guard mode == .full else { return snapshot }
         if model.features.isEnabled(.meetings) {
             snapshot.detectedMeetingApp = model.detectedMeetingAppName
+            snapshot.pendingMeetingApp = model.meetingDetectedApp
         }
         if model.features.isEnabled(.liveCaptions) {
             snapshot.captionsShown = true
@@ -135,7 +141,7 @@ final class MenuBarController: NSObject {
             applyVisibility(snapshot.mode != .hidden)
         }
         guard snapshot.mode != .hidden else { return }
-        applyIcon()
+        applyIcon(meetingCue: snapshot.pendingMeetingApp)
         guard snapshot != lastSnapshot else { return }
         rebuildMenu(snapshot)
     }
@@ -144,11 +150,11 @@ final class MenuBarController: NSObject {
         if visible {
             if statusItem == nil {
                 statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-                applyIcon()
             }
         } else if let item = statusItem {
             NSStatusBar.system.removeStatusItem(item)
             statusItem = nil
+            cuedMeetingApp = nil
         }
     }
 
@@ -162,7 +168,7 @@ final class MenuBarController: NSObject {
         }
     }
 
-    private func applyIcon() {
+    private func applyIcon(meetingCue app: String?) {
         guard let model, let button = statusItem?.button else { return }
         let symbol = Self.symbolName(
             dictationEnabled: model.dictationEnabled && model.features.isEnabled(.dictation),
@@ -171,6 +177,26 @@ final class MenuBarController: NSObject {
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Parola")
         image?.isTemplate = true
         button.image = image
+        button.imagePosition = app == nil ? .imageOnly : .imageLeading
+        button.imageHugsTitle = true
+        button.attributedTitle = app == nil ? NSAttributedString() : Self.meetingCue()
+        button.setAccessibilityValue(app.map { String(localized: "\($0) is running") })
+        cuedMeetingApp = app
+    }
+
+    /// A dot in the accent after the icon, raised to its top; the icon stays a template, so it keeps the menu bar's ink.
+    static func meetingCue(font: NSFont = .menuBarFont(ofSize: 0)) -> NSAttributedString {
+        let diameter: CGFloat = 6
+        let accent = DS.theme.accent.nsColor
+        let dot = NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
+            accent.setFill()
+            NSBezierPath(ovalIn: rect).fill()
+            return true
+        }
+        let attachment = NSTextAttachment()
+        attachment.image = dot
+        attachment.bounds = NSRect(x: 0, y: font.capHeight - diameter, width: diameter, height: diameter)
+        return NSAttributedString(attachment: attachment)
     }
 
     private func rebuildMenu(_ snapshot: MenuSnapshot) {
@@ -210,12 +236,16 @@ final class MenuBarController: NSObject {
             break
         }
 
-        var items: [NSMenuItem] = [
-            menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: target),
-            .separator(),
-        ]
+        var items: [NSMenuItem] = []
+        if let app = snapshot.pendingMeetingApp {
+            items.append(detectedMeetingItem(app, enabled: snapshot.canRecordSystemAudio, target: target))
+            items.append(menuItem(title: String(localized: "Not Now"), action: #selector(dismissMeetingPrompt), target: target))
+            items.append(.separator())
+        }
+        items.append(menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: target))
+        items.append(.separator())
 
-        items.append(contentsOf: recordItems(for: snapshot, target: target))
+        items.append(contentsOf: recordItems(for: snapshot, target: target, offeredAbove: snapshot.pendingMeetingApp))
         if snapshot.captionsShown {
             items.append(liveCaptionsItem(for: snapshot, target: target))
         }
@@ -257,8 +287,8 @@ final class MenuBarController: NSObject {
         return items
     }
 
-    /// The File menu's names, with the detected meeting after them as in the toolbar's Record menu.
-    static func recordItems(for snapshot: MenuSnapshot, target: AnyObject?) -> [NSMenuItem] {
+    /// The File menu's names, with the detected meeting after them as in the toolbar's Record menu, unless the menu already offers it above.
+    static func recordItems(for snapshot: MenuSnapshot, target: AnyObject?, offeredAbove: String? = nil) -> [NSMenuItem] {
         var items: [NSMenuItem] = []
         if snapshot.showsMicRecording {
             let mic = menuItem(title: String(localized: "New Recording"), action: #selector(recordMic), target: target)
@@ -269,15 +299,17 @@ final class MenuBarController: NSObject {
         let system = menuItem(title: String(localized: "New System Audio Recording"), action: #selector(recordSystem), target: target)
         system.isEnabled = snapshot.canRecordSystemAudio
         items.append(system)
-        if let app = snapshot.detectedMeetingApp {
-            let detected = menuItem(
-                title: String(localized: "Record \(app) Meeting"), action: #selector(recordDetectedMeeting(_:)), target: target
-            )
-            detected.representedObject = app
-            detected.isEnabled = snapshot.canRecordSystemAudio
-            items.append(detected)
+        if let app = snapshot.detectedMeetingApp, app != offeredAbove {
+            items.append(detectedMeetingItem(app, enabled: snapshot.canRecordSystemAudio, target: target))
         }
         return items
+    }
+
+    private static func detectedMeetingItem(_ app: String, enabled: Bool, target: AnyObject?) -> NSMenuItem {
+        let item = menuItem(title: String(localized: "Record \(app) Meeting"), action: #selector(recordDetectedMeeting(_:)), target: target)
+        item.representedObject = app
+        item.isEnabled = enabled
+        return item
     }
 
     /// The Dock icon's menu, whatever the menu bar shows; a nil target leaves every item unwired.
@@ -380,6 +412,10 @@ final class MenuBarController: NSObject {
     @objc private func recordDetectedMeeting(_ sender: NSMenuItem) {
         guard let app = sender.representedObject as? String else { return }
         model?.startMeetingRecording(appName: app)
+    }
+
+    @objc private func dismissMeetingPrompt() {
+        model?.dismissMeetingPrompt()
     }
 
     @objc private func openFile() {

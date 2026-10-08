@@ -3,6 +3,7 @@ import Testing
 @testable import Parola
 import ParolaCore
 import ParolaDictation
+import ParolaTestSupport
 import AppKit
 
 @MainActor
@@ -60,6 +61,7 @@ struct MenuBarItemsTests {
         showsMicRecording: Bool = true,
         showsSystemAudio: Bool = true,
         detectedMeetingApp: String? = nil,
+        pendingMeetingApp: String? = nil,
         captionsShown: Bool = true,
         captionsActive: Bool = false,
         captionsUnavailableReason: String? = nil,
@@ -77,6 +79,7 @@ struct MenuBarItemsTests {
             showsMicRecording: showsMicRecording,
             showsSystemAudio: showsSystemAudio,
             detectedMeetingApp: detectedMeetingApp,
+            pendingMeetingApp: pendingMeetingApp,
             captionsShown: captionsShown,
             captionsActive: captionsActive,
             captionsUnavailableReason: captionsUnavailableReason,
@@ -251,6 +254,40 @@ struct MenuBarItemsTests {
         #expect(topLevelMicrophoneEntries.isEmpty == !showsMicrophonePicker)
     }
 
+    @Test("a meeting whose prompt waits leads the menu with Record and Not Now, and isn't offered twice")
+    func waitingMeetingLeadsTheMenu() {
+        let snapshot = fullSnapshot(
+            detectedMeetingApp: "Zoom", pendingMeetingApp: "Zoom", recents: [.init(id: "r1", title: "Recent One")]
+        )
+        let items = MenuBarController.items(for: snapshot, target: nil)
+
+        #expect(titles(items) == [
+            "Record Zoom Meeting", "Not Now", "—",
+            "Open Parola", "—",
+            "New Recording", "New System Audio Recording",
+            "Start Live Captions", "Start Dictation", "Open Files…", "—",
+            "Microphone", "Settings…", "Check for Updates…", "—",
+            "Recent", "Recent One", "—",
+            "Quit Parola",
+        ])
+        let detected = MenuBarController.items(for: fullSnapshot(detectedMeetingApp: "Zoom"), target: nil)
+            .first { $0.title == "Record Zoom Meeting" }
+        #expect(items.first?.action == detected?.action)
+        #expect(items.first?.representedObject as? String == "Zoom")
+        let dock = MenuBarController.dockItems(for: snapshot, endTitle: nil, target: nil)
+        #expect(titles(dock).contains("Record Zoom Meeting"), "the Dock menu keeps its own Record items")
+        #expect(!titles(dock).contains("Not Now"))
+    }
+
+    @Test("a second meeting app detected while the first prompt waits stays under the Record items")
+    func otherMeetingStaysUnderRecord() {
+        let snapshot = fullSnapshot(detectedMeetingApp: "Microsoft Teams", pendingMeetingApp: "Zoom")
+        let items = MenuBarController.items(for: snapshot, target: nil)
+
+        #expect(Array(titles(items).prefix(3)) == ["Record Zoom Meeting", "Not Now", "—"])
+        #expect(titles(items).filter { $0.hasPrefix("Record ") } == ["Record Zoom Meeting", "Record Microsoft Teams Meeting"])
+    }
+
     @Test("the detected app records as a meeting, not a plain system-audio capture")
     func detectedAppUsesItsOwnAction() {
         let snapshot = fullSnapshot(detectedMeetingApp: "Zoom")
@@ -259,5 +296,147 @@ struct MenuBarItemsTests {
         let systemAudioItem = items.first { $0.title == "New System Audio Recording" }
         #expect(zoomItem?.action != systemAudioItem?.action)
         #expect(zoomItem?.representedObject as? String == "Zoom")
+    }
+}
+
+@MainActor
+@Suite("Menu bar meeting cue")
+struct MenuBarMeetingCueTests {
+    enum Exit: String, CaseIterable, CustomTestStringConvertible {
+        case appQuits, takeStarts, recordInWindow, notNowInWindow, detectionOff
+        var testDescription: String { rawValue }
+    }
+
+    private func makeModel(_ label: String) -> AppModel {
+        let model = makeRecordingModel("menubar-cue-\(label)")
+        model.useStreaming = false
+        model.meetingRecordsMicrophone = false
+        model.takeCaptureOverride = { _ in StubSource(url: URL(fileURLWithPath: "/dev/null")) }
+        model.showMenuBarExtra = true
+        model.meetingDetector.isEnabled = true
+        return model
+    }
+
+    private func pending(_ model: AppModel) -> String? {
+        MenuBarController.snapshot(for: model).pendingMeetingApp
+    }
+
+    @Test("the menu bar holds a meeting's prompt while it waits, and lets go when the prompt goes", arguments: Exit.allCases)
+    func cueFollowsThePrompt(_ exit: Exit) async {
+        let model = makeModel("exit-\(exit.rawValue)")
+        #expect(pending(model) == nil)
+
+        model.meetingDetector.fire(appName: "Acme Conference")
+        #expect(pending(model) == "Acme Conference")
+
+        switch exit {
+        case .appQuits: model.meetingDetector.quit(appName: "Acme Conference")
+        case .takeStarts: model.startRecording(source: .microphone)
+        case .recordInWindow: model.startMeetingRecording()
+        case .notNowInWindow: model.dismissMeetingPrompt()
+        case .detectionOff: model.meetingDetector.isEnabled = false
+        }
+
+        #expect(pending(model) == nil)
+        if model.recordingActive {
+            await model.discardTake()
+            await waitUntil { !model.recordingActive }
+        }
+        model.meetingDetector.isEnabled = true
+    }
+
+    @Test("the menu's Record and Not Now answer the prompt as the alert's buttons do")
+    func menuAnswersThePrompt() async {
+        let model = makeModel("answers")
+        model.showMenuBarExtra = false
+        let controller = MenuBarController()
+        controller.bind(model)
+        func firstItems() -> [NSMenuItem] {
+            Array(MenuBarController.items(for: MenuBarController.snapshot(for: model, mode: .full), target: controller).prefix(2))
+        }
+
+        model.meetingDetector.fire(appName: "Acme Conference")
+        let notNow = firstItems()[1]
+        _ = controller.perform(notNow.action, with: notNow)
+        #expect(model.meetingDetectedApp == nil)
+        #expect(model.recording == nil)
+
+        model.meetingDetector.fire(appName: "Other Conference")
+        let record = firstItems()[0]
+        #expect(record.title == "Record Other Conference Meeting")
+        _ = controller.perform(record.action, with: record)
+        #expect(model.meetingDetectedApp == nil)
+        #expect(model.activeTake?.category == .meeting)
+        await model.discardTake()
+        await waitUntil { !model.recordingActive }
+    }
+
+    @Test("dictation-only mode and a build without meetings show no cue")
+    func noCueWithoutTheFullMenu() {
+        let dictationOnly = makeModel("dictation-only")
+        dictationOnly.meetingDetectedApp = "Zoom"
+        #expect(MenuBarController.snapshot(for: dictationOnly, mode: .dictationOnly).pendingMeetingApp == nil)
+
+        let noMeetings = AppModel(
+            skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("menubar-cue-no-meetings"),
+            features: [.micRecording]
+        )
+        noMeetings.showMenuBarExtra = true
+        noMeetings.meetingDetectedApp = "Zoom"
+        #expect(MenuBarController.snapshot(for: noMeetings).pendingMeetingApp == nil)
+    }
+
+    @Test("the menu bar icon shows the cue while the prompt waits and drops it once answered")
+    func iconFollowsThePrompt() async {
+        let model = makeModel("icon")
+        let controller = MenuBarController()
+        controller.bind(model)
+
+        model.meetingDetector.fire(appName: "Acme Conference")
+        let shown = await waitUntil { controller.cuedMeetingApp == "Acme Conference" }
+        model.dismissMeetingPrompt()
+        let cleared = await waitUntil { controller.cuedMeetingApp == nil }
+
+        #expect(shown)
+        #expect(cleared)
+        model.showMenuBarExtra = false
+        await waitUntil { controller.lastSnapshot?.mode == .hidden }
+    }
+
+    @Test("the cue is a dot in the accent, beside an icon that stays a template")
+    func cueIsAnAccentDot() throws {
+        let cue = MenuBarController.meetingCue()
+        let attachment = try #require(cue.attribute(.attachment, at: 0, effectiveRange: nil) as? NSTextAttachment)
+        let dot = try #require(attachment.image)
+        #expect(!dot.isTemplate, "a template would draw the dot in the menu bar's ink")
+
+        let center = try #require(Self.color(at: NSPoint(x: dot.size.width / 2, y: dot.size.height / 2), of: dot))
+        let accentInAqua = Self.inAqua { DS.theme.accent.nsColor.usingColorSpace(.sRGB) }
+        let accent = try #require(accentInAqua ?? nil)
+        #expect(abs(center.redComponent - accent.redComponent) < 0.03)
+        #expect(abs(center.greenComponent - accent.greenComponent) < 0.03)
+        #expect(abs(center.blueComponent - accent.blueComponent) < 0.03)
+        #expect(cue.string == "\u{FFFC}", "nothing but the dot reaches the title")
+    }
+
+    private static func inAqua<T>(_ body: () -> T) -> T? {
+        guard let aqua = NSAppearance(named: .aqua) else { return nil }
+        var result: T?
+        aqua.performAsCurrentDrawingAppearance { result = body() }
+        return result
+    }
+
+    private static func color(at point: NSPoint, of image: NSImage) -> NSColor? {
+        let width = Int(image.size.width.rounded(.up)), height = Int(image.size.height.rounded(.up))
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .calibratedRGB, bytesPerRow: 0, bitsPerPixel: 0
+        ), let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        rep.size = image.size
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        _ = inAqua { image.draw(in: NSRect(origin: .zero, size: image.size)) }
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.colorAt(x: Int(point.x), y: height - 1 - Int(point.y))?.usingColorSpace(.sRGB)
     }
 }
