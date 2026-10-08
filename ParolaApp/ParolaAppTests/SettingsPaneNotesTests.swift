@@ -159,4 +159,18 @@ struct SettingsPaneNotesTests {
         let found = elements(SettingsForm { Section { MicrophoneAccessRow() } }, model: makeModel(), height: 300)
         expectRow(note: "Parola needs the microphone to record", button: "Microphone.Button.OpenAccessSettings", in: found)
     }
+
+    @Test("General's Title and Summary instructions are full-width fields under their labels", arguments: [
+        ("Title instructions", "General.TextField.CustomTitlePrompt"),
+        ("Summary instructions", "General.TextField.CustomSummaryPrompt"),
+    ])
+    func instructionFieldsSpanTheRow(_ title: String, _ field: String) throws {
+        let found = elements(GeneralPane(), model: makeModel(), height: 2000)
+        let label = try #require(found.first { $0.words.contains(String(localized: String.LocalizationValue(title))) && $0.role == "AXStaticText" })
+        let input = try #require(leaf(field, in: found))
+        let toggle = try #require(leaf("General.Toggle.ShowAISummaries", in: found))
+        #expect(input.frame.maxY <= label.frame.minY, "\(field) isn't under its label")
+        #expect(abs(input.frame.minX - label.frame.minX) < 4, "\(field) doesn't start at its label's edge")
+        #expect(input.frame.maxX >= toggle.frame.maxX - 4, "\(field) stops short of the row's trailing edge")
+    }
 }

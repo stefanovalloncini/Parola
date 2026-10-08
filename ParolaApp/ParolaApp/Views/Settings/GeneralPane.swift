@@ -103,28 +103,48 @@ struct GeneralPane: View {
                     Toggle("", isOn: $model.showAISummaries).labelsHidden()
                         .axLeaf("General.Toggle.ShowAISummaries")
                 }
-                SettingRow("Title instructions",
-                           description: "Replaces the built-in title instructions when set.") {
-                    TextField("Title instructions", text: $model.customTitlePrompt,
-                              prompt: Text("For example, mention the client's name."), axis: .vertical)
-                        .labelsHidden()
-                        .lineLimit(1...3)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 260)
-                        .axLeaf("General.TextField.CustomTitlePrompt")
-                }
-                SettingRow("Summary instructions",
-                           description: "Replaces the built-in summary instructions when set.") {
-                    TextField("Summary instructions", text: $model.customSummaryPrompt,
-                              prompt: Text("For example, keep numbers and dates."), axis: .vertical)
-                        .labelsHidden()
-                        .lineLimit(1...3)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 260)
-                        .axLeaf("General.TextField.CustomSummaryPrompt")
-                }
+                InstructionsField(
+                    title: "Title instructions",
+                    description: "Replaces the built-in title instructions when set.",
+                    prompt: "For example, mention the client's name.",
+                    text: $model.customTitlePrompt,
+                    leaf: "General.TextField.CustomTitlePrompt"
+                )
+                InstructionsField(
+                    title: "Summary instructions",
+                    description: "Replaces the built-in summary instructions when set.",
+                    prompt: "For example, keep numbers and dates.",
+                    text: $model.customSummaryPrompt,
+                    leaf: "General.TextField.CustomSummaryPrompt"
+                )
             }
             ResetPaneButton(scope: .general)
+        }
+    }
+}
+
+/// A few lines of free text: the label and its note on top, the field across the whole row under them.
+private struct InstructionsField: View {
+    let title: LocalizedStringKey
+    let description: LocalizedStringKey
+    let prompt: LocalizedStringKey
+    @Binding var text: String
+    let leaf: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.tight) {
+            VStack(alignment: .leading, spacing: DS.Spacing.hair) {
+                Text(title)
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            TextField(title, text: $text, prompt: Text(prompt), axis: .vertical)
+                .labelsHidden()
+                .lineLimit(2...4)
+                .multilineTextAlignment(.leading)
+                .textFieldStyle(.roundedBorder)
+                .axLeaf(leaf)
         }
     }
 }
