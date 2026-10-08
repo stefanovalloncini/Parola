@@ -78,11 +78,16 @@ public enum MeetingTakeMixer {
         (try? AVAudioFile(forReading: url))?.fileFormat.channelCount == 2
     }
 
+    static let limiterKnee: Float = 0.9
+    // Below 16-bit full scale, so the take file never holds a clipped sample.
+    static let limiterCeiling: Float = 0.99
+
     static func limited(_ sample: Float) -> Float {
         guard !sample.isNaN else { return 0 }
         let magnitude = abs(sample)
-        guard magnitude > 0.9 else { return sample }
-        let shaped = 0.9 + 0.1 * tanh((magnitude - 0.9) / 10)
+        guard magnitude > limiterKnee else { return sample }
+        let headroom = limiterCeiling - limiterKnee
+        let shaped = limiterKnee + headroom * tanh((magnitude - limiterKnee) / headroom)
         return sample < 0 ? -shaped : shaped
     }
 }

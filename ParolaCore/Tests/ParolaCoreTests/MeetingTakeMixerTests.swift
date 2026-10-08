@@ -341,6 +341,13 @@ struct MeetingTakeMixerTests {
         #expect(MeetingTakeMixer.limited(Float.nan) == 0)
     }
 
+    @Test("the knee is smooth, not a near-hard clip at 0.9")
+    func limiterKneeStaysSmooth() {
+        #expect(abs(MeetingTakeMixer.limited(0.901) - 0.901) < 1e-5)
+        #expect(MeetingTakeMixer.limited(0.98) > 0.95)
+        #expect(MeetingTakeMixer.limited(.infinity) < 0.9999)
+    }
+
     @Test("a loud burst on the mic never hard-clips, and quiet speech beside it is untouched")
     func burstIsSoftLimitedNotClipped() throws {
         let dir = try folder()
