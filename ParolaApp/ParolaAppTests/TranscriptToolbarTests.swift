@@ -188,6 +188,29 @@ struct TranscriptToolbarTests {
         }
     }
 
+    @Test("Share starts with Export…, then the copies, then the ways to send it on")
+    func shareItemsReadInOrder() {
+        let model = makeModel(temporaryDefaults("test-transcript-toolbar-share-"))
+        let hosted = HostedWindow(VStack(alignment: .leading) { TranscriptShareItems() }.environment(model), width: 420, height: 480)
+        let elements = HostedAccessibility.elements(in: hosted.host)
+        hosted.close()
+        let titles = ["Export…", "Export As", "Copy Transcript", "Copy with Timestamps", "Share…", "Send via Mail…", "Print Transcript…"]
+        var seen: Set<String> = []
+        let order = elements
+            .sorted { $0.frame.midY > $1.frame.midY }
+            .compactMap { $0.name ?? Self.attributedTitle(of: $0.object) }
+            .filter { titles.contains($0) && seen.insert($0).inserted }
+        let copy = elements.first { $0.identifier?.hasSuffix("MenuItem.CopyTranscript") == true }
+        #expect(order == titles)
+        #expect(copy?.name == "Copy Transcript")
+    }
+
+    /// A menu button's title, which AppKit hands over styled.
+    private static func attributedTitle(of object: NSObject) -> String? {
+        guard object.responds(to: NSSelectorFromString("accessibilityTitle")) else { return nil }
+        return (object.value(forKey: "accessibilityTitle") as? NSAttributedString)?.string
+    }
+
     @Test("Back names where it goes and takes the transcript back there")
     func backReturnsToTheList() async {
         await withIsolatedDefaults { defaults in

@@ -109,13 +109,79 @@ struct AIPaneActionsTests {
         #expect(!model.isExtractingActionItems)
     }
 
-    @Test("a running prompt can be stopped from Ask AI, which stays open to it")
-    func promptRunStops() throws {
-        let menu = try source("Views/AskAIMenu")
-        #expect(menu.contains(#"Button("Stop Prompt") { model.stopAIRun(.prompt) }"#))
-        #expect(!menu.contains(".disabled(model.isRunningPrompt)"))
-        let toolbar = try source("Views/Transcript/TranscriptToolbar")
-        #expect(!toolbar.contains(".disabled(model.isRunningPrompt)"))
+    private func askAI(_ model: AppModel, userPrompts: [Prompt] = [Prompt(name: "Shorter", instructions: "Make it shorter.")]) -> HostedWindow {
+        HostedWindow(VStack(alignment: .leading) { AskAIItems(userPrompts: userPrompts) }.environment(model), width: 420, height: 900)
+    }
+
+    private func item(_ leaf: String, in hosted: HostedWindow) -> HostedAccessibility.Element? {
+        HostedAccessibility.elements(in: hosted.host).first { $0.identifier?.hasSuffix(leaf) == true }
+    }
+
+    /// Ask AI's items top to bottom, each once.
+    private func askAIItems(in hosted: HostedWindow) -> [HostedAccessibility.Element] {
+        var seen: Set<String> = []
+        return HostedAccessibility.elements(in: hosted.host)
+            .filter { $0.identifier?.contains("Toolbar.Transcript.MenuItem.") == true }
+            .sorted { $0.frame.midY > $1.frame.midY }
+            .filter { seen.insert($0.identifier ?? "").inserted }
+    }
+
+    /// The items that run a prompt: the built-ins, YouTube Chapters and the user's own.
+    private func promptItems(in hosted: HostedWindow) -> [HostedAccessibility.Element] {
+        askAIItems(in: hosted).filter { element in
+            let id = element.identifier ?? ""
+            return id.contains("MenuItem.BuiltinPrompt.") || id.contains("MenuItem.UserPrompt.") || id.hasSuffix("MenuItem.YouTubeChapters")
+        }
+    }
+
+    @Test("while a prompt runs, Ask AI offers Stop Prompt and holds every prompt back until it stops")
+    func promptRunStops() async {
+        let model = makeModel()
+        model.aiUnavailableReason = nil
+        let hosted = askAI(model)
+        defer { hosted.close() }
+        let idle = promptItems(in: hosted)
+        let idleOn = idle.allSatisfy(\.isEnabled)
+        #expect(item("MenuItem.StopPrompt", in: hosted) == nil)
+        #expect(idle.count == Prompt.builtIns.count - ChatPane.excludedBuiltInIDs.count + 2)
+        #expect(idleOn)
+
+        blockedRun(.prompt, on: model)
+        #expect(model.isRunningPrompt)
+        let stoppable = await waitUntil { item("MenuItem.StopPrompt", in: hosted)?.isEnabled == true }
+        #expect(stoppable)
+        let held = promptItems(in: hosted)
+        let stillOn = held.filter(\.isEnabled).compactMap(\.name)
+        #expect(held.count == idle.count)
+        #expect(stillOn.isEmpty, "still on while a prompt runs: \(stillOn)")
+        #expect(item("MenuItem.ManagePrompts", in: hosted)?.isEnabled == true)
+
+        #expect(HostedAccessibility.press(endingWith: "MenuItem.StopPrompt", in: hosted.host))
+        #expect(!model.isRunningPrompt)
+        let released = await waitUntil {
+            item("MenuItem.StopPrompt", in: hosted) == nil && promptItems(in: hosted).allSatisfy(\.isEnabled)
+        }
+        #expect(released)
+    }
+
+    @Test("with AI unavailable, Ask AI says why above Open AI Settings… and holds back everything that needs a model")
+    func unavailableAskAISaysWhy() {
+        let model = makeModel()
+        let reason = "Apple Intelligence is turned off."
+        model.aiUnavailableReason = reason
+        let hosted = askAI(model)
+        let words = HostedAccessibility.words(in: hosted.host)
+        let items = askAIItems(in: hosted)
+        hosted.close()
+        let names = items.compactMap(\.name)
+        let settings = items.first { $0.identifier?.hasSuffix("MenuItem.OpenAISettings") == true }
+        let alwaysOn = ["MenuItem.OpenAISettings", "MenuItem.ManagePrompts"]
+        let needModel = items.filter { item in !alwaysOn.contains { item.identifier?.hasSuffix($0) == true } }
+        let stillOn = needModel.filter(\.isEnabled).compactMap(\.name)
+        #expect(words.contains(reason))
+        #expect(settings?.isEnabled == true, "no Open AI Settings… in \(names)")
+        #expect(needModel.count == Prompt.builtIns.count - ChatPane.excludedBuiltInIDs.count + 4, "\(names)")
+        #expect(stillOn.isEmpty, "on with no model to run them: \(stillOn)")
     }
 
     @Test("a chat reply can be stopped, and a new message waits until the reply ends")
@@ -156,7 +222,7 @@ struct AIPaneActionsTests {
     }
 
     @Test("every AI-unavailable state offers Open AI Settings…, and a plain failure note doesn't")
-    func unavailableStatesOfferSettings() throws {
+    func unavailableStatesOfferSettings() {
         let model = makeModel()
         let reason = "Apple Intelligence is turned off."
         let states: [(AnyView, String)] = [
@@ -177,14 +243,23 @@ struct AIPaneActionsTests {
         failure.close()
         let offeredOnFailure = failureIDs.contains { $0.hasSuffix("OpenAISettings") }
         #expect(!offeredOnFailure)
-
-        let menu = try source("Views/AskAIMenu")
-        #expect(menu.contains(#"Text(verbatim: reason) OpenAISettingsButton(leaf: "Toolbar.Transcript.MenuItem.OpenAISettings")"#))
     }
 
     private func source(_ name: String) throws -> String {
         let path = #filePath.replacingOccurrences(of: "ParolaAppTests/AIPaneActionsTests.swift", with: "ParolaApp/\(name).swift")
         return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    @Test("Ask AI lists the prompts that read a transcript, then the user's own, and ends with Manage Prompts…")
+    func askAIListsTranscriptPrompts() {
+        let model = makeModel()
+        model.aiUnavailableReason = nil
+        let hosted = askAI(model)
+        let names = askAIItems(in: hosted).compactMap(\.name)
+        hosted.close()
+        let transcriptPrompts = Prompt.builtIns.filter { !ChatPane.excludedBuiltInIDs.contains($0.id) }.map(\.name)
+        let expected = ["Generate Chapters", "Find Action Items"] + transcriptPrompts + ["YouTube Chapters", "Shorter", "Manage Prompts…"]
+        #expect(names == expected)
     }
 
     @Test("each AI action keeps one verb: the first run's, then Regenerate or Again, in the panes and Ask AI")
@@ -194,11 +269,19 @@ struct AIPaneActionsTests {
         #expect(empty.contains("Choose Summarize"))
         let column = try source("Views/Summary/SummaryOptionsColumn")
         #expect(column.contains(#"String(localized: "Summarize") : String(localized: "Regenerate")"#))
-        let askAI = try source("Views/AskAIMenu")
-        #expect(askAI.contains(#"model.smartChapters.isEmpty ? String(localized: "Generate Chapters") : String(localized: "Regenerate Chapters")"#))
-        #expect(askAI.contains(#"Button("Find Action Items") { runInInspector(model.extractActionItems) }"#))
-        #expect(!askAI.contains(#"Button("Chapters")"#))
-        #expect(!askAI.contains(#"Button("Action Items")"#))
+        let model = makeModel()
+        model.aiUnavailableReason = nil
+        let fresh = askAI(model)
+        let firstRun = item("MenuItem.Chapters", in: fresh)?.name
+        let findItems = item("MenuItem.ActionItems", in: fresh)?.name
+        fresh.close()
+        model.smartChapters = [Chapter(title: "The budget", start: 0)]
+        let again = askAI(model)
+        let rerun = item("MenuItem.Chapters", in: again)?.name
+        again.close()
+        #expect(firstRun == "Generate Chapters")
+        #expect(rerun == "Regenerate Chapters")
+        #expect(findItems == "Find Action Items")
         let chapters = try source("Views/Transcript/ChaptersSection")
         #expect(chapters.contains(#"Button("Generate Chapters")"#))
         #expect(chapters.contains(#"Button("Regenerate")"#))

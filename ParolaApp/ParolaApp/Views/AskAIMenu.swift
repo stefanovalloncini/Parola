@@ -8,54 +8,13 @@ struct AskAIMenu: View {
 
     var body: some View {
         Menu {
-            Group {
-                if model.isRunningPrompt {
-                    Button("Stop Prompt") { model.stopAIRun(.prompt) }
-                        .axLeaf("Toolbar.Transcript.MenuItem.StopPrompt")
-                    Divider()
+            AskAIItems(userPrompts: userPrompts)
+                // The toolbar keeps this view alive, so .task runs once; re-read on every
+                // open or prompts added/renamed/deleted in Settings never show up here.
+                .onAppear {
+                    Task { userPrompts = await model.promptLibrary.userPrompts }
+                    model.refreshAIAvailability()
                 }
-                if !model.isAIAvailable(for: .prompts), let reason = model.aiUnavailableReason {
-                    Text(verbatim: reason)
-                    OpenAISettingsButton(leaf: "Toolbar.Transcript.MenuItem.OpenAISettings")
-                    Divider()
-                }
-                Button(model.smartChapters.isEmpty ? String(localized: "Generate Chapters") : String(localized: "Regenerate Chapters")) {
-                    runInInspector(model.extractSmartChapters)
-                }
-                .disabled(!model.isAIAvailable(for: .summary))
-                .axLeaf("Toolbar.Transcript.MenuItem.Chapters")
-                Button("Find Action Items") { runInInspector(model.extractActionItems) }
-                    .disabled(!model.isAIAvailable(for: .prompts))
-                    .axLeaf("Toolbar.Transcript.MenuItem.ActionItems")
-                Divider()
-                Group {
-                    ForEach(Self.transcriptPrompts) { prompt in
-                        Button(prompt.name) { model.runPrompt(prompt) }
-                            .axLeaf("Toolbar.Transcript.MenuItem.BuiltinPrompt.\(Self.identifierSlug(prompt.name))")
-                    }
-                    Divider()
-                    Button("YouTube Chapters") { model.generateYouTubeChapters() }
-                        .axLeaf("Toolbar.Transcript.MenuItem.YouTubeChapters")
-                }
-                .disabled(!model.isAIAvailable(for: .prompts) || model.isRunningPrompt)
-                if !userPrompts.isEmpty {
-                    Divider()
-                    ForEach(userPrompts) { prompt in
-                        Button(prompt.name) { model.runPrompt(prompt) }
-                            .axLeaf("Toolbar.Transcript.MenuItem.UserPrompt.\(Self.identifierSlug(prompt.name))")
-                    }
-                    .disabled(!model.isAIAvailable(for: .prompts) || model.isRunningPrompt)
-                }
-                Divider()
-                Button("Manage Prompts…") { model.openSettings(route: .prompts) }
-                    .axLeaf("Toolbar.Transcript.MenuItem.ManagePrompts")
-            }
-            // The toolbar keeps this view alive, so .task runs once; re-read on every
-            // open or prompts added/renamed/deleted in Settings never show up here.
-            .onAppear {
-                Task { userPrompts = await model.promptLibrary.userPrompts }
-                model.refreshAIAvailability()
-            }
         } label: {
             Label {
                 Text("Ask AI")
@@ -77,6 +36,55 @@ struct AskAIMenu: View {
             userPrompts = await model.promptLibrary.userPrompts
             model.refreshAIAvailability()
         }
+    }
+}
+
+/// Ask AI's items: Stop Prompt while one runs, why AI is off, chapters and action items, then the prompts.
+struct AskAIItems: View {
+    @Environment(AppModel.self) private var model
+    let userPrompts: [Prompt]
+
+    var body: some View {
+        if model.isRunningPrompt {
+            Button("Stop Prompt") { model.stopAIRun(.prompt) }
+                .axLeaf("Toolbar.Transcript.MenuItem.StopPrompt")
+            Divider()
+        }
+        if !model.isAIAvailable(for: .prompts), let reason = model.aiUnavailableReason {
+            Text(verbatim: reason)
+            OpenAISettingsButton(leaf: "Toolbar.Transcript.MenuItem.OpenAISettings")
+            Divider()
+        }
+        Button(model.smartChapters.isEmpty ? String(localized: "Generate Chapters") : String(localized: "Regenerate Chapters")) {
+            runInInspector(model.extractSmartChapters)
+        }
+        .disabled(!model.isAIAvailable(for: .summary))
+        .axLeaf("Toolbar.Transcript.MenuItem.Chapters")
+        Button("Find Action Items") { runInInspector(model.extractActionItems) }
+            .disabled(!model.isAIAvailable(for: .prompts))
+            .axLeaf("Toolbar.Transcript.MenuItem.ActionItems")
+        Divider()
+        Group {
+            ForEach(Self.transcriptPrompts) { prompt in
+                Button(prompt.name) { model.runPrompt(prompt) }
+                    .axLeaf("Toolbar.Transcript.MenuItem.BuiltinPrompt.\(Self.identifierSlug(prompt.name))")
+            }
+            Divider()
+            Button("YouTube Chapters") { model.generateYouTubeChapters() }
+                .axLeaf("Toolbar.Transcript.MenuItem.YouTubeChapters")
+        }
+        .disabled(!model.isAIAvailable(for: .prompts) || model.isRunningPrompt)
+        if !userPrompts.isEmpty {
+            Divider()
+            ForEach(userPrompts) { prompt in
+                Button(prompt.name) { model.runPrompt(prompt) }
+                    .axLeaf("Toolbar.Transcript.MenuItem.UserPrompt.\(Self.identifierSlug(prompt.name))")
+            }
+            .disabled(!model.isAIAvailable(for: .prompts) || model.isRunningPrompt)
+        }
+        Divider()
+        Button("Manage Prompts…") { model.openSettings(route: .prompts) }
+            .axLeaf("Toolbar.Transcript.MenuItem.ManagePrompts")
     }
 
     /// Chapters and action items land in the Info inspector, so a run started here has to open it there.

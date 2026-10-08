@@ -311,16 +311,13 @@ struct EntryWindowViewerTests {
         #expect(widest <= DS.Size.readingWidth, "the text runs \(widest) pt wide")
     }
 
-    @Test("the viewer shows the language as a pill, and the main window names it under the title")
+    @Test("the viewer shows the language as a pill")
     func windowsShowTheLanguage() throws {
         func source(_ name: String) throws -> String {
             let path = #filePath.replacingOccurrences(of: "ParolaAppTests/EntryWindowViewerTests.swift", with: "ParolaApp/\(name).swift")
             return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
         }
-        let mainTitle = try source("Views/Transcript/TranscriptTitle")
         let viewerHeader = try source("Windows/EntryViewerHeader")
-        #expect(mainTitle.contains("language: model.transcript?.language"))
-        #expect(mainTitle.contains("LanguageDisplay.name(for: language)"))
         #expect(viewerHeader.contains("LanguagePill(language: session.transcript?.language)"))
         #expect(!viewerHeader.contains("Text(verbatim: language)"))
     }
@@ -337,14 +334,12 @@ struct EntryWindowViewerTests {
         #expect(speed.role == NSAccessibility.Role.popUpButton.rawValue, "the speed reads as \(speed.role ?? "nothing")")
     }
 
-    @Test("a long title wraps whole over the main window's text, and the viewer cuts it at its end and reads it whole on hover")
+    @Test("the viewer cuts a long title at its end and reads it whole on hover")
     func longTitlesCutAtTheEnd() throws {
         func source(_ name: String) throws -> String {
             let path = #filePath.replacingOccurrences(of: "ParolaAppTests/EntryWindowViewerTests.swift", with: "ParolaApp/\(name).swift")
             return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
         }
-        let main = try source("Views/Transcript/TranscriptTitle")
-        #expect(main.contains("Text(verbatim: model.transcriptHeaderTitle) .font(DS.Font.display) .tracking(DS.Tracking.display) .foregroundStyle(DS.Color.primaryText) .fixedSize(horizontal: false, vertical: true)"))
         let viewer = try source("Windows/EntryViewerHeader")
         #expect(viewer.contains("Text(verbatim: session.title) .font(DS.Font.heading) .lineLimit(1) .truncationMode(.tail) .help(Text(verbatim: session.title))"))
     }

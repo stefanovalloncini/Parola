@@ -12,24 +12,17 @@ struct TranscriptMenuTests {
         return try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
-    @Test("Jump to Time… and Show Outline open the transcript page's popovers from the menu, with keys")
+    @Test("Jump to Time… and Show Outline are Transcript menu commands, with keys")
     func pagePopoversHaveMenuCommands() throws {
         let commands = try source("Views/AppCommands")
         #expect(commands.contains(#"Button("Jump to Time…") { model.jumpToTimeRequests &+= 1 } .keyboardShortcut("j", modifiers: [.command])"#))
         #expect(commands.contains(#"Button("Show Outline") { model.outlineRequests &+= 1 } .keyboardShortcut("o", modifiers: [.command, .shift])"#))
-        let page = try source("Views/Transcript/TranscriptTitle")
-        #expect(page.contains(".onChange(of: model.jumpToTimeRequests) { _, _ in jumpOpen = true }"))
-        #expect(page.contains(".onChange(of: model.outlineRequests) { _, _ in outlineOpen = true }"))
     }
 
-    @Test("Rename… sits in the Transcript menu and on the title, and both raise the page's one rename alert")
-    func renameHasMenuAndTitleDoors() throws {
+    @Test("Rename… sits in the Transcript menu and asks for the page's one rename")
+    func renameIsATranscriptCommand() throws {
         let commands = try source("Views/AppCommands")
         #expect(commands.contains(#"Button("Rename…") { model.renameRequests &+= 1 } .disabled(!model.canRenameOpenTranscript)"#))
-        let title = try source("Views/Transcript/TranscriptTitle")
-        #expect(title.contains(".onChange(of: model.renameRequests) { _, _ in beginRename() }"))
-        #expect(title.contains(#".contextMenu { Button("Rename…") { model.renameRequests &+= 1 } .disabled(!model.canRenameOpenTranscript)"#))
-        #expect(title.contains("model.renameOpenTranscript(to: renameDraft)"))
     }
 
     @Test("Transcribe Again runs the same settings from the Transcript menu and the Info tab, through one alert")
@@ -154,45 +147,15 @@ struct TranscriptMenuTests {
         }
     }
 
-    @Test("Copy has one name, and the menu copies what the toolbar's Share ▸ Copy Transcript copies")
+    @Test("Copy has one name in the Transcript menu, Copy Transcript, as in Share")
     func copyHasOneName() throws {
         let menu = try transcriptMenu()
         #expect(!menu.contains("Copy Plain Text"))
         #expect(menu.contains(#"Button("Copy Transcript") { Task { await model.copyTranscript() } }"#))
-        let toolbar = try source("Views/Transcript/TranscriptToolbar")
-        #expect(toolbar.contains(#"Button("Copy Transcript") { Task { await model.copyTranscript() } }"#))
     }
 
-    @Test("the toolbar's Share opens a menu that starts with Export…, not a share sheet of a .txt")
-    func toolbarShareLeadsToExport() throws {
-        let toolbar = try source("Views/Transcript/TranscriptToolbar")
-        #expect(!toolbar.contains("ShareLink("))
-        let start = try #require(toolbar.range(of: "struct TranscriptShareMenu: View"))
-        let menu = String(toolbar[start.lowerBound...])
-        let items = [
-            #"Button("Export…") { model.openExportSheet() }"#, #"Menu("Export As")"#, "model.exportWithPreset(preset.id)",
-            #"Button("Copy Transcript") { Task { await model.copyTranscript() } }"#, #"Button("Copy with Timestamps")"#,
-            #"Button("Share…") { model.shareTranscriptAsTextFile() }"#,
-            #"Button("Send via Mail…") { model.shareTranscriptViaMail() }"#,
-            #"Button("Print Transcript…") { model.printTranscript() }"#,
-            #"Label("Share", systemImage: "square.and.arrow.up")"#,
-        ]
-        var offsets: [Int] = []
-        for item in items {
-            let range = try #require(menu.range(of: item), "missing \(item)")
-            offsets.append(menu.distance(from: menu.startIndex, to: range.lowerBound))
-        }
-        #expect(offsets == offsets.sorted(), "items out of order")
-        #expect(menu.contains(#".help("Export and share")"#))
-    }
-
-    @Test("Ask AI lists transcript prompts and ends with Manage Prompts…; Rename Speakers… sits with the transcript")
-    func askAIHoldsTranscriptPrompts() throws {
-        let menu = try source("Views/AskAIMenu")
-        #expect(!menu.contains("Speakers…"))
-        #expect(!menu.contains("ForEach(Prompt.builtIns)"))
-        #expect(menu.contains("Prompt.builtIns.filter { !ChatPane.excludedBuiltInIDs.contains($0.id) }"))
-        #expect(menu.contains(#"Divider() Button("Manage Prompts…") { model.openSettings(route: .prompts) }"#))
+    @Test("Rename Speakers… sits with the transcript, and Chat ends with Manage Prompts…")
+    func renameSpeakersSitsWithTheTranscript() throws {
         let commands = try transcriptMenu()
         #expect(commands.contains(#"Button("Rename Speakers…") { model.showingSpeakersSheet = true }"#))
         let inspector = try source("Views/Transcript/FormatInspector")

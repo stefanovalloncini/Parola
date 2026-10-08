@@ -148,25 +148,7 @@ struct TranscriptShareMenu: View {
 
     var body: some View {
         Menu {
-            Button("Export…") { model.openExportSheet() }
-                .axLeaf("Toolbar.Transcript.MenuItem.Export")
-            Menu("Export As") {
-                ForEach(model.exportPresets) { preset in
-                    Button { model.exportWithPreset(preset.id) } label: {
-                        ExportPresetChecks.label(preset)
-                    }
-                }
-            }
-            Divider()
-            Button("Copy Transcript") { Task { await model.copyTranscript() } }
-                .axLeaf("Toolbar.Transcript.MenuItem.CopyTranscript")
-            Button("Copy with Timestamps") {
-                model.copyTranscriptToPasteboard(withTimestamps: true, pasteboard: .general)
-            }
-            Divider()
-            Button("Share…") { model.shareTranscriptAsTextFile() }
-            Button("Send via Mail…") { model.shareTranscriptViaMail() }
-            Button("Print Transcript…") { model.printTranscript() }
+            TranscriptShareItems()
         } label: {
             Label("Share", systemImage: "square.and.arrow.up")
         }
@@ -174,6 +156,33 @@ struct TranscriptShareMenu: View {
         .disabled(model.transcript == nil)
         .help("Export and share")
         .axLeaf("Toolbar.Transcript.Menu.Share")
+    }
+}
+
+/// Share's items: export first, then the copies, then the ways to send it on.
+struct TranscriptShareItems: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button("Export…") { model.openExportSheet() }
+            .axLeaf("Toolbar.Transcript.MenuItem.Export")
+        Menu("Export As") {
+            ForEach(model.exportPresets) { preset in
+                Button { model.exportWithPreset(preset.id) } label: {
+                    ExportPresetChecks.label(preset)
+                }
+            }
+        }
+        Divider()
+        Button("Copy Transcript") { Task { await model.copyTranscript() } }
+            .axLeaf("Toolbar.Transcript.MenuItem.CopyTranscript")
+        Button("Copy with Timestamps") {
+            model.copyTranscriptToPasteboard(withTimestamps: true, pasteboard: .general)
+        }
+        Divider()
+        Button("Share…") { model.shareTranscriptAsTextFile() }
+        Button("Send via Mail…") { model.shareTranscriptViaMail() }
+        Button("Print Transcript…") { model.printTranscript() }
     }
 }
 

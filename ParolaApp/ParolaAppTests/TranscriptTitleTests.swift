@@ -20,7 +20,7 @@ struct TranscriptTitleTests {
         try await body(suite)
     }
 
-    private func makeModel(_ defaults: UserDefaults, segments: [TranscriptSegment]? = nil) -> AppModel {
+    private func makeModel(_ defaults: UserDefaults, title: String = Self.title, segments: [TranscriptSegment]? = nil) -> AppModel {
         let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("transcript-title"))
         model.libraryLoaded = true
         model.transcript = Transcript(
@@ -32,7 +32,7 @@ struct TranscriptTitleTests {
             modelName: "stub",
             durationSeconds: 38 * 60
         )
-        model.sourceFileURL = URL(fileURLWithPath: "/tmp/\(Self.title).m4a")
+        model.sourceFileURL = URL(fileURLWithPath: "/tmp/\(title).m4a")
         model.phase = .ready
         return model
     }
@@ -72,8 +72,10 @@ struct TranscriptTitleTests {
             let drawn = await waitUntil { headingElement(in: hosted.host) != nil }
             #expect(drawn)
             let heading = headingElement(in: hosted.host)
+            let english = LanguageDisplay.name(for: "en") ?? "English"
             #expect(heading?.label?.contains(Self.title) == true, "reads \(heading?.label ?? "nothing")")
             #expect(heading?.label?.contains("38 min") == true)
+            #expect(heading?.label?.contains(english) == true, "no language in \(heading?.label ?? "nothing")")
             #expect(heading?.role == "AXHeading")
             #expect(heading?.actions.contains("Rename…") == true)
 
@@ -86,6 +88,25 @@ struct TranscriptTitleTests {
             }
             #expect(holder != nil, "the heading isn't in the scroll that holds the text")
         }
+    }
+
+    @Test("a long name wraps whole over more than two lines in a narrow column")
+    func longNameWraps() async {
+        await withIsolatedDefaults { defaults in
+            let long = "Quarterly planning review with the design, research and support teams about the launch in March and next year's budget"
+            let line = NSHostingView(rootView: Text(verbatim: "Hxg").font(DS.Font.display)).fittingSize.height
+            let short = heading(of: makeModel(defaults, title: "Sync"))
+            let wrapped = heading(of: makeModel(defaults, title: long))
+            #expect(wrapped.label?.contains(long) == true, "reads \(wrapped.label ?? "nothing")")
+            #expect(wrapped.height - short.height > 1.5 * line, "\(wrapped.height) pt tall against \(short.height) for one line")
+        }
+    }
+
+    private func heading(of model: AppModel) -> (label: String?, height: CGFloat) {
+        let hosted = HostedWindow(TranscriptTitleHeading().frame(width: 320).environment(model), width: 320, height: 900)
+        defer { hosted.close() }
+        let element = headingElement(in: hosted.host)
+        return (element?.label, element?.frame.height ?? 0)
     }
 
     @Test("a transcript with no words still shows its name")
@@ -109,18 +130,73 @@ struct TranscriptTitleTests {
             #expect(model.canRenameOpenTranscript)
             let hosted = HostedWindow(TranscriptTitleHeading().environment(model), width: 600, height: 200)
             defer { hosted.close() }
-            let element = try #require(headingElement(in: hosted.host))
-            let actions = element.object.value(forKey: "accessibilityCustomActions") as? [NSAccessibilityCustomAction] ?? []
-            let offered = actions.first { $0.name == "Rename…" }
-            let rename = try #require(offered)
             let before = model.renameRequests
-            if let handler = rename.handler {
-                _ = handler()
-            } else if let target = rename.target as? NSObject, let selector = rename.selector {
-                _ = target.perform(selector, with: rename)
-            }
+            try renameFromTheHeading(in: hosted.host)
             #expect(model.renameRequests == before &+ 1)
         }
+    }
+
+    /// Sends the heading's Rename… action, as VoiceOver's Actions rotor does.
+    private func renameFromTheHeading(in root: NSObject) throws {
+        let element = try #require(headingElement(in: root))
+        let actions = element.object.value(forKey: "accessibilityCustomActions") as? [NSAccessibilityCustomAction] ?? []
+        let offered = actions.first { $0.name == "Rename…" }
+        let rename = try #require(offered)
+        if let handler = rename.handler {
+            _ = handler()
+        } else if let target = rename.target as? NSObject, let selector = rename.selector {
+            _ = target.perform(selector, with: rename)
+        }
+    }
+
+    @Test("the heading's Rename… raises the rename alert, and confirming it renames the entry")
+    func renameRequestRaisesTheAlert() async throws {
+        try await withIsolatedDefaults { defaults in
+            let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("transcript-title-rename"))
+            model.libraryLoaded = true
+            let store = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+            let seeded = try await store.add(
+                transcript: Transcript(
+                    segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "then the budget for next quarter")],
+                    language: "en",
+                    modelName: "stub"
+                ),
+                audioSource: nil,
+                category: .transcription
+            )
+            await model.refreshLibraryAndWait()
+            _ = try await model.openEntry(seeded.id)
+            let hosted = HostedWindow(ContentView().environment(model), width: 1180, height: 760, toolbar: true)
+            defer { hosted.close() }
+            let drawn = await waitUntil { headingElement(in: hosted.host) != nil }
+            #expect(drawn)
+            #expect(model.canRenameOpenTranscript)
+
+            try renameFromTheHeading(in: hosted.host)
+            let raised = await waitUntil { hosted.window.attachedSheet != nil }
+            #expect(raised)
+            let alert = try #require(hosted.window.attachedSheet)
+            let ids = HostedAccessibility.elements(in: alert).compactMap(\.identifier)
+            let field = try #require(editableField(in: alert.contentView), "no title field in \(ids)")
+            let focused = alert.makeFirstResponder(field)
+            #expect(focused)
+            let editor = try #require(field.currentEditor() as? NSTextView)
+            editor.selectAll(nil)
+            editor.insertText("Budget review", replacementRange: editor.selectedRange())
+            let confirmed = HostedAccessibility.press(endingWith: "alert.rename.confirm", in: alert)
+            #expect(confirmed, "no confirm in \(ids)")
+            let renamed = await waitUntil { model.libraryEntry(id: seeded.id)?.manifest.title == "Budget review" }
+            #expect(renamed)
+            let closed = await waitUntil { hosted.window.attachedSheet == nil }
+            #expect(closed)
+            #expect(model.transcriptHeaderTitle == "Budget review")
+        }
+    }
+
+    private func editableField(in view: NSView?) -> NSTextField? {
+        guard let view else { return nil }
+        if let field = view as? NSTextField, field.isEditable { return field }
+        return view.subviews.lazy.compactMap { editableField(in: $0) }.first
     }
 
     @Test("Show Outline and Jump to Time… open their popovers with no header bar to hang them from")
