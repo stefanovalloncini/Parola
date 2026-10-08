@@ -56,6 +56,10 @@ final class MenuBarController: NSObject {
     /// The meeting the icon's dot stands for; nil while the icon is plain.
     private(set) var cuedMeetingApp: String?
 
+    /// Testing seam: what VoiceOver would read off the status button.
+    var statusButtonAccessibilityLabel: String? { statusItem?.button?.accessibilityLabel() }
+    var statusButtonAccessibilityValue: String? { statusItem?.button?.accessibilityValue() as? String }
+
     func bind(_ model: AppModel) {
         self.model = model
         observeAndRefresh()
@@ -180,8 +184,14 @@ final class MenuBarController: NSObject {
         button.imagePosition = app == nil ? .imageOnly : .imageLeading
         button.imageHugsTitle = true
         button.attributedTitle = app == nil ? NSAttributedString() : Self.meetingCue()
-        button.setAccessibilityValue(app.map { String(localized: "\($0) is running") })
+        button.setAccessibilityLabel(app == nil ? nil : "Parola")
+        button.setAccessibilityValue(app.map(Self.meetingCueSpokenValue))
         cuedMeetingApp = app
+    }
+
+    /// The alert's own title and body, said together — the dot's attachment carries no title of its own for VoiceOver to read.
+    static func meetingCueSpokenValue(for app: String) -> String {
+        "\(String(localized: "\(app) is running")). \(String(localized: "Record this meeting with Parola?"))"
     }
 
     /// A dot in `accentInk` after the icon, raised to its top; the icon stays a template, so it keeps the menu bar's ink.

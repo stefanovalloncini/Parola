@@ -394,11 +394,14 @@ struct MenuBarMeetingCueTests {
 
         model.meetingDetector.fire(appName: "Acme Conference")
         let shown = await waitUntil { controller.cuedMeetingApp == "Acme Conference" }
+        #expect(controller.statusButtonAccessibilityLabel == "Parola")
+        #expect(controller.statusButtonAccessibilityValue == "Acme Conference is running. Record this meeting with Parola?")
         model.dismissMeetingPrompt()
         let cleared = await waitUntil { controller.cuedMeetingApp == nil }
 
         #expect(shown)
         #expect(cleared)
+        #expect(controller.statusButtonAccessibilityValue == nil)
         model.showMenuBarExtra = false
         await waitUntil { controller.lastSnapshot?.mode == .hidden }
     }
