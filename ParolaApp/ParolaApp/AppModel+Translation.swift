@@ -54,6 +54,12 @@ extension AppModel {
         translationCoordinator.cancel()
     }
 
+    /// Lets go of a failed run's note; a translation the entry already had stays.
+    func dismissTranslationFailure() {
+        guard let entryID = selectedEntryID, case .failed = translationState else { return }
+        translationCoordinator.remove(entryID: entryID)
+    }
+
     private func persistTranslation(_ translation: TranscriptTranslation?, for entryID: LibraryEntry.ID) async {
         do {
             try await library.setTranslation(translation, for: entryID)

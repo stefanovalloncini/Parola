@@ -474,10 +474,12 @@ struct TranslationStripTests {
         }
     }
 
-    @Test("a failed translation stays above the text with Retry until it is dealt with")
+    @Test("a failed translation stays above the text with Retry until it is retried or dismissed, and Dismiss keeps the stored one")
     func failedTranslationOffersRetry() async throws {
         try await withIsolatedDefaults { defaults in
             let model = try await openItalian(defaults)
+            let kept = TranscriptTranslation(targetLanguage: "fr", segments: [0: "bonjour"], createdAt: Date(), provider: "mock")
+            model.transcript?.translation = kept
             model.translationCoordinator.translatorOverride = FailingInspectorTranslator()
             let hosted = HostedWindow(ContentView().environment(model), width: 1180, height: 760)
             defer { hosted.close() }
@@ -486,6 +488,13 @@ struct TranslationStripTests {
             let failed = await waitUntil { has("Translation.Button.Retry", hosted) && has(Self.strip, hosted) }
             #expect(failed)
             #expect(has("Translation.Menu.TranslateTo", hosted))
+            #expect(has("Translation.Button.Dismiss", hosted))
+
+            #expect(HostedAccessibility.press(endingWith: "Translation.Button.Dismiss", in: hosted.host))
+            let dismissed = await waitUntil { !has(Self.strip, hosted) }
+            #expect(dismissed)
+            #expect(model.translationState == .idle)
+            #expect(model.transcript?.translation == kept)
         }
     }
 }

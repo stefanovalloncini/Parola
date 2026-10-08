@@ -74,6 +74,14 @@ struct TranslationStrip: View {
         .fixedSize()
         .disabled(!model.canTranslateTranscript || menuTargets.isEmpty)
         .axLeaf("Translation.Menu.TranslateTo")
+        Button { model.dismissTranslationFailure() } label: {
+            Image(systemName: "xmark")
+                .font(DS.Font.caption)
+        }
+        .buttonStyle(GlyphButtonStyle(side: 20))
+        .help("Dismiss")
+        .accessibilityLabel("Dismiss")
+        .axLeaf("Translation.Button.Dismiss")
     }
 
     private func rebuildMenuTargets() {
