@@ -1,18 +1,43 @@
 import SwiftUI
 import ParolaCore
 
+/// The default model as a native pop-up: the installed models, grouped as the catalog groups them.
 struct ModelPickerView: View {
     @Environment(AppModel.self) private var model
-    let leaf: String?
-
-    @State private var searchText = ""
-    @State private var installedOnly = false
+    let leaf: String
 
     var body: some View {
-        PillPickerButton(icon: "cpu", caption: String(localized: "Model"), value: currentLabel, popoverWidth: 400, leaf: leaf) {
-            ModelPickerPopover(searchText: $searchText, installedOnly: $installedOnly, offersDownloads: false)
+        let groups = installedGroups
+        Picker("Default model", selection: selection) {
+            ForEach(groups, id: \.0) { category, variants in
+                Section(category.displayName) {
+                    ForEach(variants, id: \.id) { variant in
+                        Text(verbatim: variant.displayName).tag(variant.id)
+                    }
+                }
+            }
+            if !groups.contains(where: { $0.1.contains { $0.id == model.selectedModel } }) {
+                Text(verbatim: currentLabel).tag(model.selectedModel)
+            }
         }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .fixedSize()
         .help("Default model. Installed models only.")
+        .task { model.refreshModelList() }
+        .axLeaf(leaf)
+    }
+
+    private var selection: Binding<String> {
+        Binding(get: { model.selectedModel }, set: { model.activateModel($0) })
+    }
+
+    private var installedGroups: [(ModelCategory, [ModelVariant])] {
+        let installed = Set(model.availableModels.filter(\.isInstalled).map(\.name))
+        return ModelCatalog.groupedForPicker(isInstalled: { installed.contains($0) }).compactMap { category, variants in
+            let kept = variants.filter { installed.contains($0.id) }
+            return kept.isEmpty ? nil : (category, kept)
+        }
     }
 
     private var currentLabel: String {

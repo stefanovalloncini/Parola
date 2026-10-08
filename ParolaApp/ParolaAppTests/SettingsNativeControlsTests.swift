@@ -62,4 +62,27 @@ struct SettingsNativeControlsTests {
         #expect(search.frame.minY > first.frame.maxY, "the controls aren't above the first list")
         #expect(search.frame.minY - first.frame.maxY < 24, "the controls sit \(search.frame.minY - first.frame.maxY) pt above the first list")
     }
+
+    @Test("Transcription Defaults' model and language are native pop-ups, named by their rows, showing the current pick")
+    func transcriptionDefaultsPopUps() async throws {
+        let model = AppModel(bootstrap: AppBootstrap(
+            mode: .test, library: makeTempLibraryURL("defaults-popups"), defaultsOverride: temporaryDefaults(),
+            sideEffects: [], filePicker: TestFilePicker(), clock: ContinuousClock()
+        ))
+        await model.awaitModelListRefresh()
+        model.selectedLanguage = "it"
+        let hosted = HostedWindow(TranscriptionDefaultsPane().environment(model), width: 760, height: 1400)
+        defer { hosted.close() }
+        let found = HostedAccessibility.elements(in: hosted.host)
+        let popUp = NSAccessibility.Role.popUpButton.rawValue
+        let modelPicker = try #require(found.first { $0.identifier?.hasSuffix("TranscriptionDefaults.Picker.Model") == true })
+        let languagePicker = try #require(found.first { $0.identifier?.hasSuffix("TranscriptionDefaults.Picker.Language") == true })
+        #expect(modelPicker.role == popUp, "the model picker reads as \(modelPicker.role ?? "nothing")")
+        #expect(languagePicker.role == popUp, "the language picker reads as \(languagePicker.role ?? "nothing")")
+        #expect(modelPicker.name == String(localized: "Default model"))
+        #expect(languagePicker.name == String(localized: "Default language"))
+        let current = ModelCatalog.variant(id: model.selectedModel)?.displayName ?? model.selectedModel
+        #expect(modelPicker.value == current)
+        #expect(languagePicker.value == SupportedLanguages.displayName(for: "it"))
+    }
 }

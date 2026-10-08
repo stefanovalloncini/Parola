@@ -14,7 +14,7 @@ struct TranscriptionDefaultsPane: View {
                 }
                 SettingRow("Default language",
                            description: "Auto detects the language from the audio with Whisper models. Pick one when the audio language is known.") {
-                    LanguagePickerView(leaf: "TranscriptionDefaults.Picker.Language")
+                    DefaultLanguagePicker(leaf: "TranscriptionDefaults.Picker.Language")
                         .disabled(model.selectedModelCapabilities.supportedLanguages.isEnglishOnly)
                 }
                 SettingRow("Word timestamps",

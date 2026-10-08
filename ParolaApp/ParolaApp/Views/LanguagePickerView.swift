@@ -23,6 +23,66 @@ struct LanguagePickerView: View {
     }
 }
 
+/// The default language as a native pop-up: Auto-detect, then the languages the language popover leads with, then the rest.
+struct DefaultLanguagePicker: View {
+    @Environment(AppModel.self) private var model
+    let leaf: String
+
+    var body: some View {
+        let scope = LanguageChoices.scope(model: model)
+        let sections = LanguageChoices.sections(
+            scope: scope,
+            leading: LanguageChoices.leading(model: model),
+            query: "",
+            name: SupportedLanguages.displayName(for:)
+        )
+        Picker("Default language", selection: selection) {
+            Text(LanguagePickerPopover.autoLabel).tag(String?.none)
+            Divider()
+            ForEach(sections.top, id: \.self) { code in
+                Text(verbatim: title(code, scope: scope)).tag(Optional(code))
+            }
+            if !sections.top.isEmpty, !sections.rest.isEmpty {
+                Divider()
+            }
+            ForEach(sections.rest, id: \.self) { code in
+                Text(verbatim: title(code, scope: scope)).tag(Optional(code))
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .fixedSize()
+        .task(id: model.selectedModel) {
+            guard LanguageChoices.engine(of: model.selectedModel) == .appleSpeech else { return }
+            await model.loadAppleSpeechLanguages()
+        }
+        .axLeaf(leaf)
+    }
+
+    /// Auto on an English-only model runs as English, so that is what the pop-up shows.
+    private var selection: Binding<String?> {
+        Binding(
+            get: {
+                guard model.selectedLanguage == nil,
+                      model.selectedModelCapabilities.supportedLanguages.isEnglishOnly else { return model.selectedLanguage }
+                return "en"
+            },
+            set: { model.selectedLanguage = $0 }
+        )
+    }
+
+    private func title(_ code: String, scope: ParolaCore.SupportedLanguages) -> String {
+        let name = SupportedLanguages.displayName(for: code)
+        guard let note = LanguagePickerPopover.supportNote(for: code, scope: scope, modelName: modelName) else { return name }
+        return "\(name) — \(note)"
+    }
+
+    private var modelName: String {
+        guard let variant = ModelCatalog.variant(id: model.selectedModel) else { return model.selectedModel }
+        return ModelPickerView.shortLabel(for: variant.displayName)
+    }
+}
+
 /// The model's own languages, led by the Mac's and the library's recent ones, with a search field as the model popover has.
 struct LanguagePickerPopover: View {
     @Environment(AppModel.self) private var model
