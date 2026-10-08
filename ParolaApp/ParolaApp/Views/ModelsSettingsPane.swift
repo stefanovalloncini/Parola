@@ -180,123 +180,126 @@ struct ModelsSettingsPane: View {
     @ViewBuilder
     private var content: some View {
         let sections = self.sections
-        let first = sections.firstList(installFilter: installFilter)
+        let shown = sections.isEmpty ? [] : sections.lists(installFilter: installFilter)
 
-        if sections.isEmpty || first == nil {
-            Section {
+        // Always the same section, so the search field keeps the keyboard when a query changes the first list.
+        Section {
+            if let first = shown.first {
+                rows(first, in: sections)
+            } else {
                 ContentUnavailableView.search(text: searchText)
                     .frame(maxWidth: .infinity)
-            } header: {
+            }
+        } header: {
+            VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                 controls
-            }
-        } else {
-            Group {
-                if sections.showsInstalled(installFilter: installFilter) {
-                    downloadedSection(sections.installed, leads: first == .installed)
-                }
-                if !sections.earlier.isEmpty {
-                    earlierDownloadsSection(sections.earlier, leads: first == .earlier)
-                }
-                if !sections.orphans.isEmpty {
-                    orphansSection(sections.orphans, leads: first == .orphans)
-                }
-                if sections.showsRecommended(installFilter: installFilter) {
-                    recommendedSection(sections.recommended, leads: first == .recommended)
-                }
-                if !sections.categories.isEmpty {
-                    categoriesSection(sections.categories, leads: first == .categories)
+                if let first = shown.first {
+                    sectionHeader(first, in: sections)
                 }
             }
-        }
-    }
-
-    private func earlierDownloadsSection(_ copies: [SupersededCopy], leads: Bool) -> some View {
-        Section {
-                ForEach(copies) { copy in
-                    EarlierDownloadRow(copy: copy, isDeleting: model.isReclaiming(copy)) {
-                        pendingDeletion = PendingDeletion(
-                            id: copy.variantID,
-                            displayName: copy.displayName,
-                            sizeBytes: copy.bytes,
-                            kind: .earlierDownload
-                        )
-                    }
-                }
-        } header: {
-            sectionHeader("Earlier downloads", count: copies.count, leads: leads)
         } footer: {
-            Text("Newer versions of these models replaced them, and Parola no longer uses them.")
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func orphansSection(_ entries: [ModelInfo], leads: Bool) -> some View {
-        Section {
-                ForEach(entries) { entry in
-                    let displaySize = model.modelSizes[entry.name]
-                        ?? entry.approximateSizeBytes.map { Int64($0) }
-                    OrphansRow(
-                        entry: entry,
-                        displaySize: displaySize,
-                        isDeleting: model.modelsBeingDeleted.contains(entry.name)
-                    ) {
-                        pendingDeletion = PendingDeletion(
-                            id: entry.name,
-                            displayName: entry.name,
-                            sizeBytes: displaySize
-                        )
-                    }
-                }
-        } header: {
-            sectionHeader("Other files on disk", count: entries.count, leads: leads)
-        } footer: {
-            Text("These directories aren't in the current model catalog — usually leftovers from older app versions. Safe to delete.")
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    // MARK: - Downloaded
-
-    private func downloadedSection(_ variants: [ModelVariant], leads: Bool) -> some View {
-        Section {
-            if variants.isEmpty {
-                DownloadedEmpty()
-            } else {
-                    ForEach(variants) { variant in
-                        let isActive = model.selectedModel == variant.id
-                        DownloadedRow(
-                            variant: variant,
-                            isActive: isActive,
-                            actualSizeBytes: model.modelSizes[variant.id],
-                            isDeleting: model.isDeletingModel(variant.id),
-                            onActivate: { model.activateModel(variant.id) },
-                            onRequestDelete: (isActive || variant.engineID == .appleSpeech) ? nil : {
-                                let earlier = model.earlierCopies(of: variant.id)
-                                let modelBytes = model.modelSizes[variant.id] ?? Int64(variant.sizeBytes)
-                                pendingDeletion = PendingDeletion(
-                                    id: variant.id,
-                                    displayName: variant.displayName,
-                                    sizeBytes: earlier.reduce(modelBytes) { $0 + $1.bytes },
-                                    kind: earlier.isEmpty ? .model : .modelAndEarlierDownload
-                                )
-                            }
-                        )
-                    }
+            if let first = shown.first {
+                sectionFooter(first)
             }
-        } header: {
-            sectionHeader("On This Mac", count: variants.count, leads: leads)
+        }
+        ForEach(shown.dropFirst(), id: \.self) { list in
+            Section {
+                rows(list, in: sections)
+            } header: {
+                sectionHeader(list, in: sections)
+            } footer: {
+                sectionFooter(list)
+            }
         }
     }
 
-    // MARK: - Recommended
-
-    private func recommendedSection(_ variants: [ModelVariant], leads: Bool) -> some View {
-        Section {
-            ForEach(variants) { variant in
+    @ViewBuilder
+    private func rows(_ list: Sections.List, in sections: Sections) -> some View {
+        switch list {
+        case .installed: downloadedRows(sections.installed)
+        case .earlier: earlierDownloadRows(sections.earlier)
+        case .orphans: orphanRows(sections.orphans)
+        case .recommended:
+            ForEach(sections.recommended) { variant in
                 LiveRecommendedRow(variant: variant)
             }
-        } header: {
-            sectionHeader("Recommended models", count: variants.count, leads: leads)
+        case .categories:
+            ForEach(sections.categories) { category in
+                ModelCategoryRow(category: category)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sectionFooter(_ list: Sections.List) -> some View {
+        switch list {
+        case .earlier:
+            Text("Newer versions of these models replaced them, and Parola no longer uses them.")
+                .foregroundStyle(.secondary)
+        case .orphans:
+            Text("These directories aren't in the current model catalog — usually leftovers from older app versions. Safe to delete.")
+                .foregroundStyle(.secondary)
+        case .installed, .recommended, .categories:
+            EmptyView()
+        }
+    }
+
+    private func earlierDownloadRows(_ copies: [SupersededCopy]) -> some View {
+        ForEach(copies) { copy in
+            EarlierDownloadRow(copy: copy, isDeleting: model.isReclaiming(copy)) {
+                pendingDeletion = PendingDeletion(
+                    id: copy.variantID,
+                    displayName: copy.displayName,
+                    sizeBytes: copy.bytes,
+                    kind: .earlierDownload
+                )
+            }
+        }
+    }
+
+    private func orphanRows(_ entries: [ModelInfo]) -> some View {
+        ForEach(entries) { entry in
+            let displaySize = model.modelSizes[entry.name]
+                ?? entry.approximateSizeBytes.map { Int64($0) }
+            OrphansRow(
+                entry: entry,
+                displaySize: displaySize,
+                isDeleting: model.modelsBeingDeleted.contains(entry.name)
+            ) {
+                pendingDeletion = PendingDeletion(
+                    id: entry.name,
+                    displayName: entry.name,
+                    sizeBytes: displaySize
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func downloadedRows(_ variants: [ModelVariant]) -> some View {
+        if variants.isEmpty {
+            DownloadedEmpty()
+        } else {
+            ForEach(variants) { variant in
+                let isActive = model.selectedModel == variant.id
+                DownloadedRow(
+                    variant: variant,
+                    isActive: isActive,
+                    actualSizeBytes: model.modelSizes[variant.id],
+                    isDeleting: model.isDeletingModel(variant.id),
+                    onActivate: { model.activateModel(variant.id) },
+                    onRequestDelete: (isActive || variant.engineID == .appleSpeech) ? nil : {
+                        let earlier = model.earlierCopies(of: variant.id)
+                        let modelBytes = model.modelSizes[variant.id] ?? Int64(variant.sizeBytes)
+                        pendingDeletion = PendingDeletion(
+                            id: variant.id,
+                            displayName: variant.displayName,
+                            sizeBytes: earlier.reduce(modelBytes) { $0 + $1.bytes },
+                            kind: earlier.isEmpty ? .model : .modelAndEarlierDownload
+                        )
+                    }
+                )
+            }
         }
     }
 
@@ -312,18 +315,6 @@ struct ModelsSettingsPane: View {
         }
     }
 
-    // MARK: - Categories
-
-    private func categoriesSection(_ categories: [ModelsCategory], leads: Bool) -> some View {
-        Section {
-            ForEach(categories) { category in
-                ModelCategoryRow(category: category)
-            }
-        } header: {
-            sectionHeader("Engine families", count: nil, leads: leads)
-        }
-    }
-
     // MARK: - Data
 
     private struct Sections {
@@ -333,7 +324,29 @@ struct ModelsSettingsPane: View {
         var orphans: [ModelInfo] = []
         var earlier: [SupersededCopy] = []
 
-        enum List { case installed, earlier, orphans, recommended, categories }
+        enum List {
+            case installed, earlier, orphans, recommended, categories
+
+            var title: LocalizedStringKey {
+                switch self {
+                case .installed: "On This Mac"
+                case .earlier: "Earlier downloads"
+                case .orphans: "Other files on disk"
+                case .recommended: "Recommended models"
+                case .categories: "Engine families"
+                }
+            }
+        }
+
+        func count(of list: List) -> Int? {
+            switch list {
+            case .installed: installed.count
+            case .earlier: earlier.count
+            case .orphans: orphans.count
+            case .recommended: recommended.count
+            case .categories: nil
+            }
+        }
 
         var isEmpty: Bool {
             installed.isEmpty && recommended.isEmpty && categories.isEmpty && orphans.isEmpty && earlier.isEmpty
@@ -347,14 +360,15 @@ struct ModelsSettingsPane: View {
             !recommended.isEmpty || installFilter == .available
         }
 
-        /// The list drawn first, in the order the pane draws them; nil when the search leaves none.
-        func firstList(installFilter: InstallFilter) -> List? {
-            if showsInstalled(installFilter: installFilter) { return .installed }
-            if !earlier.isEmpty { return .earlier }
-            if !orphans.isEmpty { return .orphans }
-            if showsRecommended(installFilter: installFilter) { return .recommended }
-            if !categories.isEmpty { return .categories }
-            return nil
+        /// The lists to draw, top to bottom; empty when the search leaves none.
+        func lists(installFilter: InstallFilter) -> [List] {
+            var lists: [List] = []
+            if showsInstalled(installFilter: installFilter) { lists.append(.installed) }
+            if !earlier.isEmpty { lists.append(.earlier) }
+            if !orphans.isEmpty { lists.append(.orphans) }
+            if showsRecommended(installFilter: installFilter) { lists.append(.recommended) }
+            if !categories.isEmpty { lists.append(.categories) }
+            return lists
         }
     }
 
@@ -421,21 +435,15 @@ struct ModelsSettingsPane: View {
         }
     }
 
-    /// The first list carries the search, filter and sort that narrow every list under it.
-    private func sectionHeader(_ title: LocalizedStringKey, count: Int?, leads: Bool) -> some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.regular) {
-            if leads {
-                controls
+    private func sectionHeader(_ list: Sections.List, in sections: Sections) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(list.title)
+            if let count = sections.count(of: list), count > 0 {
+                Text(verbatim: AppFormat.integer(count))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(title)
-                if let count, count > 0 {
-                    Text(verbatim: AppFormat.integer(count))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
+            Spacer()
         }
     }
 }

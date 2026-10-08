@@ -86,6 +86,72 @@ struct SettingsNativeControlsTests {
         #expect(search.frame.minY - first.frame.maxY < 24, "the controls sit \(search.frame.minY - first.frame.maxY) pt above the first list")
     }
 
+    @Test("Local Models' search keeps the keyboard while a query empties On This Mac, and while it matches nothing")
+    func localModelsSearchKeepsTheKeyboard() async throws {
+        let model = AppModel(bootstrap: AppBootstrap(
+            mode: .test, library: makeTempLibraryURL("local-models-search-focus"), defaultsOverride: temporaryDefaults(),
+            sideEffects: [], filePicker: TestFilePicker(), clock: ContinuousClock()
+        ))
+        let hosted = HostedWindow(ModelsSettingsPane().environment(model), width: 760, height: 2400)
+        defer { hosted.close() }
+        await model.awaitModelListRefresh()
+        let installed: Set<String> = ["openai_whisper-tiny", "apple-speech-analyzer"]
+        model.availableModels = model.availableModels.map { info in
+            var info = info
+            info.isInstalled = installed.contains(info.name)
+            return info
+        }
+        let onThisMac = String(localized: "On This Mac")
+        func shows(_ words: String) -> Bool {
+            hosted.host.layoutSubtreeIfNeeded()
+            return HostedAccessibility.words(in: hosted.host).contains(words)
+        }
+        func searchField() -> NSTextField? {
+            hosted.host.layoutSubtreeIfNeeded()
+            let object = HostedAccessibility.elements(in: hosted.host)
+                .first { $0.identifier?.hasSuffix("Models.TextField.Search") == true }?.object
+            return object as? NSTextField ?? (object as? NSCell)?.controlView as? NSTextField
+        }
+        func editedField() -> NSTextField? {
+            (hosted.window.firstResponder as? NSTextView)?.delegate as? NSTextField
+        }
+        func type(_ text: String) async {
+            for letter in text {
+                guard let editor = hosted.window.firstResponder as? NSTextView else { return }
+                editor.insertText(String(letter), replacementRange: editor.selectedRange())
+                await settle(for: .milliseconds(60))
+            }
+        }
+        let listed = await waitUntil { shows(onThisMac) }
+        try #require(listed)
+        let field = try #require(searchField())
+        #expect(hosted.window.makeFirstResponder(field))
+        try #require(editedField() === field, "the search field never took the keyboard")
+
+        await type("l")
+        #expect(shows(onThisMac), "“l” should still match Apple Speech")
+        await type("a")
+        let emptied = await waitUntil { !shows(onThisMac) }
+        #expect(emptied, "“la” should leave On This Mac with nothing")
+        await type("rge")
+        let afterEmptying = editedField()
+        #expect(afterEmptying != nil && afterEmptying === searchField(), "the keyboard left the search field: \(String(describing: hosted.window.firstResponder))")
+        #expect(searchField()?.stringValue == "large", "the field reads \(searchField()?.stringValue ?? "nothing")")
+
+        await type("qq")
+        let unmatched = await waitUntil { !shows(String(localized: "Recommended models")) }
+        #expect(unmatched, "“largeqq” still matches a model")
+        let afterNothing = editedField()
+        #expect(afterNothing != nil && afterNothing === searchField(), "the keyboard left the search field: \(String(describing: hosted.window.firstResponder))")
+        for _ in 0..<2 {
+            (hosted.window.firstResponder as? NSTextView)?.deleteBackward(nil)
+            await settle(for: .milliseconds(60))
+        }
+        #expect(searchField()?.stringValue == "large", "Backspace didn't reach the field: \(searchField()?.stringValue ?? "nothing")")
+        let back = await waitUntil { shows(String(localized: "Recommended models")) }
+        #expect(back)
+    }
+
     @Test("Transcription Defaults' model and language are native pop-ups, named by their rows, showing the current pick")
     func transcriptionDefaultsPopUps() async throws {
         let model = AppModel(bootstrap: AppBootstrap(
