@@ -184,12 +184,13 @@ final class MenuBarController: NSObject {
         cuedMeetingApp = app
     }
 
-    /// A dot in the accent after the icon, raised to its top; the icon stays a template, so it keeps the menu bar's ink.
+    /// A dot in `accentInk` after the icon, raised to its top; the icon stays a template, so it keeps the menu bar's ink.
+    /// The raw accent is near-invisible for some presets against the menu bar's chrome; `accentInk` is already tuned for it.
     static func meetingCue(font: NSFont = .menuBarFont(ofSize: 0)) -> NSAttributedString {
         let diameter: CGFloat = 6
-        let accent = DS.theme.accent.nsColor
+        let accentInk = DS.theme.accentInk.nsColor
         let dot = NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
-            accent.setFill()
+            accentInk.setFill()
             NSBezierPath(ovalIn: rect).fill()
             return true
         }

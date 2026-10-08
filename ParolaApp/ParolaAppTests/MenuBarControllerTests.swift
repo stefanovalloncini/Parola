@@ -411,11 +411,11 @@ struct MenuBarMeetingCueTests {
         #expect(!dot.isTemplate, "a template would draw the dot in the menu bar's ink")
 
         let center = try #require(Self.color(at: NSPoint(x: dot.size.width / 2, y: dot.size.height / 2), of: dot))
-        let accentInAqua = Self.inAqua { DS.theme.accent.nsColor.usingColorSpace(.sRGB) }
-        let accent = try #require(accentInAqua ?? nil)
-        #expect(abs(center.redComponent - accent.redComponent) < 0.03)
-        #expect(abs(center.greenComponent - accent.greenComponent) < 0.03)
-        #expect(abs(center.blueComponent - accent.blueComponent) < 0.03)
+        let accentInkInAqua = Self.inAqua { DS.theme.accentInk.nsColor.usingColorSpace(.sRGB) }
+        let accentInk = try #require(accentInkInAqua ?? nil)
+        #expect(abs(center.redComponent - accentInk.redComponent) < 0.03)
+        #expect(abs(center.greenComponent - accentInk.greenComponent) < 0.03)
+        #expect(abs(center.blueComponent - accentInk.blueComponent) < 0.03)
         #expect(cue.string == "\u{FFFC}", "nothing but the dot reaches the title")
     }
 
