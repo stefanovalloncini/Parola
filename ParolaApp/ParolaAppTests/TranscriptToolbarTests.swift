@@ -331,6 +331,63 @@ struct TranscriptToolbarTests {
         }
     }
 
+    @Test(
+        "typing a search over an open transcript keeps the caret and the words in the field as the toolbar's items leave and come back",
+        arguments: [1180, MainWindowLayout.minimumWidth]
+    )
+    func searchKeepsTheFieldWhileTheToolbarChanges(width: CGFloat) async throws {
+        try await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            let hosted = host(model, width: width)
+            defer { hosted.close() }
+            let drawn = await waitUntil { shows(Self.format, in: toolbarIDs(hosted)) }
+            #expect(drawn)
+            let item = try #require(searchItem(in: hosted.window))
+            item.beginSearchInteraction()
+            let focused = await waitUntil { isEditing(item.searchField, in: hosted.window) }
+            #expect(focused, "the field never took the caret")
+
+            try type("l", in: hosted.window)
+            let resultsUp = await waitUntil { model.isBrowsingLibrary && !shows(Self.format, in: toolbarIDs(hosted)) }
+            #expect(resultsUp)
+            for letter in "aunch" {
+                try type(String(letter), in: hosted.window)
+                await settle(for: .milliseconds(40))
+            }
+            let typed = await waitUntil { model.searchQuery == "launch" }
+            #expect(typed)
+            let current = searchItem(in: hosted.window)
+            #expect(current === item, "the toolbar rebuilt the search item")
+            #expect(current?.searchField.stringValue == "launch")
+            #expect(isEditing(item.searchField, in: hosted.window), "the caret left the field: \(String(describing: hosted.window.firstResponder))")
+
+            for _ in 0..<6 {
+                let editor = try #require(hosted.window.firstResponder as? NSTextView)
+                editor.deleteBackward(nil)
+                await settle(for: .milliseconds(40))
+            }
+            let back = await waitUntil { model.searchQuery.isEmpty && shows(Self.format, in: toolbarIDs(hosted)) }
+            #expect(back)
+            #expect(searchItem(in: hosted.window) === item, "the toolbar rebuilt the search item")
+            #expect(item.searchField.stringValue.isEmpty)
+            #expect(isEditing(item.searchField, in: hosted.window), "the caret left the field: \(String(describing: hosted.window.firstResponder))")
+        }
+    }
+
+    private func searchItem(in window: NSWindow) -> NSSearchToolbarItem? {
+        window.toolbar?.items.lazy.compactMap { $0 as? NSSearchToolbarItem }.first
+    }
+
+    private func isEditing(_ field: NSSearchField, in window: NSWindow) -> Bool {
+        guard let editor = field.currentEditor() else { return false }
+        return window.firstResponder === editor
+    }
+
+    private func type(_ text: String, in window: NSWindow) throws {
+        let editor = try #require(window.firstResponder as? NSTextView, "nothing to type into: \(String(describing: window.firstResponder))")
+        editor.insertText(text, replacementRange: editor.selectedRange())
+    }
+
     private func hasInspectorColumn(_ host: NSView) -> Bool {
         host.layoutSubtreeIfNeeded()
         var found = false
