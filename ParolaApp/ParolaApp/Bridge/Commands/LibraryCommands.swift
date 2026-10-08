@@ -249,7 +249,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "resolveDuplicateImport",
                 area: .library,
-                summary: "Presses one of the duplicate sheet's buttons: openExisting, transcribeAgain or dismiss. With remember: true the choice becomes the duplicateImportPolicy setting, the way the sheet's checkbox does.",
+                summary: "Presses one of the duplicate sheet's buttons: openExisting, transcribeAgain or dismiss (Cancel). With remember: true the choice becomes the duplicateImportPolicy setting, the way the sheet's checkbox does.",
                 kind: .mutating,
                 args: [
                     .init(
