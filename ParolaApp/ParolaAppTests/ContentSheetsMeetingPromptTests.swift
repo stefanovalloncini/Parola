@@ -1,6 +1,7 @@
 import Testing
 @testable import Parola
 
+@MainActor
 @Suite("Meeting prompt name")
 struct ContentSheetsMeetingPromptTests {
     @Test("the live detected name wins over a stale snapshot")
