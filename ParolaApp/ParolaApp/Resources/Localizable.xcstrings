@@ -16542,6 +16542,17 @@
         }
       }
     },
+    "This transcript has no chapters.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa trascrizione non ha capitoli."
+          }
+        }
+      }
+    },
     "This transcript has no speakers. Turn on Detect speakers in Settings › Transcription Defaults, then choose Transcript ▸ Transcribe Again.": {
       "extractionState": "manual",
       "localizations": {

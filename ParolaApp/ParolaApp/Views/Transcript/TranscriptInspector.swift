@@ -79,13 +79,15 @@ struct TranscriptInspector: View {
 /// The gist, where things are, what to do, who spoke and how it's filed, in that order.
 struct OverviewSections: View {
     @Environment(AppModel.self) private var model
+    /// Show Chapters keeps the section up for this transcript after its request clears, even with nothing to list.
+    @State private var chaptersAsked = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {
             if showsSummary {
                 OverviewSummary()
             }
-            if OverviewChapters.shows(model) {
+            if showsChapters {
                 OverviewChapters()
                     .id(InspectorAnchor.chapters)
             }
@@ -98,6 +100,14 @@ struct OverviewSections: View {
             }
             LabelsSection()
         }
+        .onChange(of: model.inspectorReveal, initial: true) { _, reveal in
+            if reveal == .chapters { chaptersAsked = true }
+        }
+        .onChange(of: model.selectedEntryID) { chaptersAsked = false }
+    }
+
+    private var showsChapters: Bool {
+        chaptersAsked || model.inspectorReveal == .chapters || OverviewChapters.shows(model)
     }
 
     /// The Summary pane already shows the whole summary, and a transcript with no words has nothing to sum up.

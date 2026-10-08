@@ -312,6 +312,55 @@ struct TranscriptInspectorTests {
         }
     }
 
+    private func pressShowChapters(_ model: AppModel) -> Bool {
+        let menu = HostedWindow(VStack(alignment: .leading) { TranscriptCommands(model: model) }.environment(model), width: 420, height: 900)
+        defer { menu.close() }
+        return HostedAccessibility.press(endingWith: "Menu.Transcript.ShowChapters", in: menu.host)
+    }
+
+    @Test("Show Chapters on a dictation with no chapters shows the section with Generate Chapters, and it stays")
+    func showChaptersOnADictationOffersToGenerate() async throws {
+        try await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            _ = try await open(Self.dictation(), in: model)
+            let hosted = host(model, height: 760)
+            defer { hosted.close() }
+            let drawn = await waitUntil { headings(hosted).contains("labels") }
+            #expect(drawn, "\(dump(hosted))")
+            #expect(!headings(hosted).contains("chapters"))
+
+            #expect(pressShowChapters(model))
+            let shown = await waitUntil { headings(hosted).contains("chapters") && model.inspectorReveal == nil }
+            #expect(shown, "\(dump(hosted))")
+            #expect(element("Chapters.Button.Generate", in: hosted)?.name == "Generate Chapters", "\(dump(hosted))")
+            await settle()
+            #expect(headings(hosted).contains("chapters"), "the section stays once the request has cleared")
+
+            _ = try await open(Self.dictation(), in: model)
+            let next = await waitUntil { !headings(hosted).contains("chapters") && headings(hosted).contains("labels") }
+            #expect(next, "another transcript starts without it: \(dump(hosted))")
+        }
+    }
+
+    @Test("Show Chapters with AI off and nothing to list says there are no chapters")
+    func showChaptersWithNothingToListSaysSo() async throws {
+        try await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, features: Set(ParolaFeature.allCases).subtracting([.ai]))
+            _ = try await open(Self.dictation(), in: model)
+            let hosted = host(model, height: 760)
+            defer { hosted.close() }
+            let drawn = await waitUntil { headings(hosted).contains("labels") }
+            #expect(drawn, "\(dump(hosted))")
+
+            #expect(pressShowChapters(model))
+            let shown = await waitUntil { headings(hosted).contains("chapters") }
+            #expect(shown, "\(dump(hosted))")
+            let words = inspector(hosted).flatMap(\.words)
+            #expect(words.contains("This transcript has no chapters."), "\(dump(hosted))")
+            #expect(element("Chapters.Button.Generate", in: hosted) == nil)
+        }
+    }
+
     @Test("Details and Insights open in place and stay open")
     func referenceRowsOpenInPlace() async throws {
         try await withIsolatedDefaults { defaults in

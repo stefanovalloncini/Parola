@@ -81,6 +81,10 @@ struct OverviewChapters: View {
             } else if let error = model.chaptersError {
                 AIStatusNote(message: error, kind: .failure)
             }
+        } else if outline.count < 2 {
+            Text("This transcript has no chapters.")
+                .font(DS.Font.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
         }
     }
 }
