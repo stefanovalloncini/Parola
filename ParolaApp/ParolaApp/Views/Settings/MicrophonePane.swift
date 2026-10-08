@@ -21,10 +21,10 @@ struct MicrophonePane: View {
     var body: some View {
         @Bindable var model = model
         return SettingsForm {
-            if micStatus == .denied || micStatus == .restricted {
-                micPermissionBanner
-            }
-            SettingsSection {
+            Section {
+                if micStatus == .denied || micStatus == .restricted {
+                    MicrophoneAccessRow()
+                }
                 SettingRow("Input device",
                            description: savedDeviceDisconnected
                                ? "This microphone is disconnected. Recordings use the system default until it returns."
@@ -80,9 +80,10 @@ struct MicrophonePane: View {
                     .frame(width: 140, alignment: .trailing)
                     .axLeaf("Microphone.Picker.CountIn")
                 }
-            }
-            if let startError {
-                MicErrorBanner(message: startError, status: micStatus)
+            } footer: {
+                if let startError {
+                    MicErrorBanner(message: startError, status: micStatus)
+                }
             }
 
             SettingsSection("While recording") {
@@ -159,29 +160,23 @@ struct MicrophonePane: View {
         previewMeter = nil
     }
 
-    private var micPermissionBanner: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "mic.slash.fill")
-                .foregroundStyle(DS.Palette.warning)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Microphone access is off")
-                    .font(DS.Font.bodyStrong)
-                Text("Parola needs the microphone to record and dictate.")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
-            }
-            Spacer()
+}
+
+/// Shown while the microphone is denied: what is wrong, and the way to fix it.
+struct MicrophoneAccessRow: View {
+    var body: some View {
+        LabeledContent {
             Button("Open System Settings…") { openMicrophonePrivacySettings() }
-                .controlSize(.small)
                 .axLeaf("Microphone.Button.OpenAccessSettings")
+        } label: {
+            Label {
+                Text("Microphone access is off")
+            } icon: {
+                Image(systemName: "mic.slash.fill")
+                    .foregroundStyle(DS.Palette.warning)
+            }
+            Text("Parola needs the microphone to record and dictate.")
         }
-        .padding(DS.Spacing.regular)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(DS.Palette.warning.opacity(0.12))
-        )
     }
 }
 
@@ -224,32 +219,19 @@ struct MicErrorBanner: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(DS.Palette.warning)
-                Text("Couldn't open microphone")
-                    .font(DS.Font.bodyStrong)
-            }
+        VStack(alignment: .leading, spacing: DS.Spacing.hair) {
+            SettingsWarning(String(localized: "Couldn't open microphone"))
             Text(message)
-                .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.secondaryText)
                 .textSelection(.enabled)
             Text(hint)
-                .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.secondaryText)
             if Self.offersSystemSettings(for: status) {
                 Button("Open System Settings…") { openMicrophonePrivacySettings() }
-                .controlSize(.small)
-                .axLeaf("Microphone.Button.OpenSystemSettings")
+                    .controlSize(.small)
+                    .axLeaf("Microphone.Button.OpenSystemSettings")
             }
         }
-        .padding(DS.Spacing.regular)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(DS.Palette.warning.opacity(0.10))
-        )
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

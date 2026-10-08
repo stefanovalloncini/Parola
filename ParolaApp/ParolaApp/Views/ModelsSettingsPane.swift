@@ -46,9 +46,6 @@ struct ModelsSettingsPane: View {
 
     var body: some View {
         SettingsForm {
-            if let error = model.modelActionError {
-                Section { modelErrorBanner(error) }
-            }
             usageCard
             content
         }
@@ -111,10 +108,16 @@ struct ModelsSettingsPane: View {
     }
 
     private var usageCard: some View {
-        SettingsSection("Storage") {
+        Section {
             StorageRow()
             modelsUsageRow
             libraryUsageRow
+        } header: {
+            Text("Storage")
+        } footer: {
+            if let error = model.modelActionError {
+                modelError(error)
+            }
         }
     }
 
@@ -297,13 +300,9 @@ struct ModelsSettingsPane: View {
         }
     }
 
-    private func modelErrorBanner(_ message: String) -> some View {
-        HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(DS.Palette.warning)
-            Text(message)
-                .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.secondaryText)
+    private func modelError(_ message: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            SettingsWarning(message)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
@@ -311,8 +310,6 @@ struct ModelsSettingsPane: View {
                 .controlSize(.small)
                 .axLeaf("Models.Button.DismissError")
         }
-        .padding(DS.Spacing.small)
-        .background(DS.Palette.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
     }
 
     // MARK: - Categories

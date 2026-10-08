@@ -7,7 +7,7 @@ struct TranscriptionDefaultsPane: View {
     var body: some View {
         @Bindable var model = model
         return SettingsForm {
-            SettingsSection {
+            Section {
                 SettingRow("Default model",
                            description: "Applies to every new transcription and to dictation. The model picker on the Library page edits this same setting.") {
                     ModelPickerView(leaf: "TranscriptionDefaults.Picker.Model")
@@ -27,29 +27,25 @@ struct TranscriptionDefaultsPane: View {
                     Toggle("", isOn: $model.diarize).labelsHidden()
                         .axLeaf("TranscriptionDefaults.Toggle.Diarize")
                 }
+            } footer: {
+                VStack(alignment: .leading, spacing: DS.Spacing.hair) {
+                    if let warning = model.languageMismatchWarning {
+                        SettingsWarning(warning)
+                            .axLeaf("TranscriptionDefaults.Label.LanguageWarning")
+                    }
+                    if let notice = model.englishOnlyAutoNotice {
+                        SettingsWarning(notice)
+                            .axLeaf("TranscriptionDefaults.Label.EnglishOnlyAutoNotice")
+                    }
+                    if let warning = model.diarizeMismatchWarning {
+                        SettingsWarning(warning)
+                            .axLeaf("TranscriptionDefaults.Label.DiarizeWarning")
+                    }
+                    Text("The Library page shows these same settings; a change in either place persists.")
+                        .foregroundStyle(.secondary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
-            if let warning = model.languageMismatchWarning {
-                Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.warningText)
-                    .padding(.top, DS.Spacing.hair)
-                    .axLeaf("TranscriptionDefaults.Label.LanguageWarning")
-            }
-            if let notice = model.englishOnlyAutoNotice {
-                Label(notice, systemImage: "exclamationmark.triangle.fill")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.warningText)
-                    .padding(.top, DS.Spacing.hair)
-                    .axLeaf("TranscriptionDefaults.Label.EnglishOnlyAutoNotice")
-            }
-            if let warning = model.diarizeMismatchWarning {
-                Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.warningText)
-                    .padding(.top, DS.Spacing.hair)
-                    .axLeaf("TranscriptionDefaults.Label.DiarizeWarning")
-            }
-            SettingHelper(text: "The Library page shows these same settings; a change in either place persists.")
 
             SettingsSection("Custom vocabulary") {
                 VStack(alignment: .leading, spacing: 8) {

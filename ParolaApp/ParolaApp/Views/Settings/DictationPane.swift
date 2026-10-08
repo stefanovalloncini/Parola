@@ -58,8 +58,7 @@ struct DictationPane: View {
                 .frame(width: 200, alignment: .trailing)
                 .axLeaf("Dictation.Picker.Mode")
             }
-            SettingRow("Model",
-                       description: "Dictation uses the model set in Transcription Defaults or on the Library page.") {
+            LabeledContent {
                 HStack(spacing: 8) {
                     Text(AppModel.modelLabel(model.selectedModel))
                         .font(DS.Font.secondary)
@@ -70,15 +69,14 @@ struct DictationPane: View {
                     }
                     .axLeaf("Dictation.Button.ChangeModel")
                 }
-            }
-            ForEach(model.dictationModelWarnings, id: \.self) { warning in
-                Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.warningText)
-                    .padding(.horizontal, DS.Spacing.regular)
-                    .padding(.vertical, DS.Spacing.tight)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .axLeaf("Dictation.Label.ModelWarning")
+            } label: {
+                Text("Model")
+                Text("Dictation uses the model set in Transcription Defaults or on the Library page.")
+                ForEach(model.dictationModelWarnings, id: \.self) { warning in
+                    SettingsWarning(warning)
+                        .font(.subheadline)
+                        .axLeaf("Dictation.Label.ModelWarning")
+                }
             }
             SettingRow("Activation key",
                        descriptionVerbatim: activationDescription) {

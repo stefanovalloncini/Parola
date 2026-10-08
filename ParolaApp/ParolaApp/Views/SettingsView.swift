@@ -354,6 +354,20 @@ struct SettingRow<Trailing: View>: View {
     }
 }
 
+/// A warning line for a section's footer or a row's notes: the triangle and the text in the warning colour.
+struct SettingsWarning: View {
+    private let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Label(text, systemImage: "exclamationmark.triangle.fill")
+            .foregroundStyle(DS.Color.warningText)
+    }
+}
+
 /// A note under the section before it, where a grouped form puts a footer.
 struct SettingHelper: View {
     let text: LocalizedStringKey

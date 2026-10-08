@@ -15,20 +15,25 @@ struct TranslationPane: View {
                 }
             }
             SettingHelper(text: "A finished transcript is translated with Apple Translation, on your Mac, into any language it offers.")
-            SettingsSection("While transcribing") {
+            Section {
                 SettingRow("Translate to English by default",
                            description: "Applies to new file, mic, batch, and YouTube transcriptions. Live captions has its own toggle; dictation always keeps the spoken language.") {
                     Toggle("", isOn: $model.translate).labelsHidden()
                         .axLeaf("Translation.Toggle.TranslateByDefault")
                 }
+            } header: {
+                Text("While transcribing")
+            } footer: {
+                VStack(alignment: .leading, spacing: DS.Spacing.hair) {
+                    if let warning = model.translateMismatchWarning {
+                        SettingsWarning(warning)
+                            .axLeaf("Translation.Label.TranslateWarning")
+                    }
+                    Text("Whisper translates from the detected source language into English. Only multilingual Whisper models can translate.")
+                        .foregroundStyle(.secondary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
-            if let warning = model.translateMismatchWarning {
-                Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.warningText)
-                    .axLeaf("Translation.Label.TranslateWarning")
-            }
-            SettingHelper(text: "Whisper translates from the detected source language into English. Only multilingual Whisper models can translate.")
             ResetPaneButton(scope: .translation)
         }
     }

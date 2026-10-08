@@ -90,4 +90,73 @@ struct SettingsPaneNotesTests {
         let preview = try #require(found.first { $0.words.contains(String(localized: "Preview")) })
         #expect(preview.role == "AXHeading", "Preview reads as \(preview.role ?? "nothing")")
     }
+
+    /// A warning sits right under the row it is about, as a footer or part of that row, never a box of its own.
+    private func expectUnder(_ warning: String, row prefix: String, in found: [HostedAccessibility.Element],
+                             sourceLocation: SourceLocation = #_sourceLocation) {
+        guard let note = text(startingWith: warning, in: found) else {
+            Issue.record("no warning starting \(warning)", sourceLocation: sourceLocation)
+            return
+        }
+        guard let row = text(startingWith: prefix, in: found) else {
+            Issue.record("no row note starting \(prefix)", sourceLocation: sourceLocation)
+            return
+        }
+        let gap = row.frame.minY - note.frame.maxY
+        #expect(gap >= 0, "\(warning) sits above its row", sourceLocation: sourceLocation)
+        #expect(gap < 28, "\(warning) sits \(gap) pt under its row", sourceLocation: sourceLocation)
+    }
+
+    @Test("Transcription Defaults' warnings sit under its box, beside the note there")
+    func transcriptionDefaultsWarnings() throws {
+        let model = makeModel()
+        model.diarize = true
+        let warning = try #require(model.diarizeMismatchWarning)
+        let found = elements(TranscriptionDefaultsPane(), model: model)
+        expectUnder(warning, row: "Splits the transcript by speaker", in: found)
+        expectUnder("The Library page shows these same settings", row: warning, in: found)
+    }
+
+    @Test("Translation's warning sits under the switch it is about")
+    func translationWarning() {
+        let model = makeModel()
+        model.translate = true
+        let warning = model.translateMismatchWarning ?? "missing"
+        let found = elements(TranslationPane(), model: model)
+        expectUnder(warning, row: "Applies to new file, mic, batch", in: found)
+    }
+
+    @Test("Live Captions' translate warning sits under its box with the intro")
+    func liveCaptionsWarning() {
+        let model = makeModel()
+        model.translate = true
+        let warning = model.translateMismatchWarning ?? "missing"
+        let found = elements(LiveCaptionsPane(), model: model)
+        expectUnder(warning, row: "Translate captions live as you speak", in: found)
+    }
+
+    @Test("Dictation's model warning is part of the Model row, beside Change…")
+    func dictationModelWarning() throws {
+        let model = makeModel()
+        let warning = try #require(model.dictationModelWarnings.first)
+        let found = elements(DictationPane(), model: model, height: 2400)
+        expectUnder(warning, row: "Dictation uses the model set", in: found)
+        expectRow(note: warning, button: "Dictation.Button.ChangeModel", in: found)
+    }
+
+    @Test("Local Models' error sits under the Storage box, with its Dismiss")
+    func localModelsError() async throws {
+        let model = makeModel()
+        await model.awaitModelListRefresh()
+        model.modelActionError = "Couldn't delete the model: the folder is locked."
+        let found = elements(ModelsSettingsPane(), model: model, height: 2400)
+        expectUnder("Couldn't delete the model", row: "Models folder:", in: found)
+        #expect(leaf("Models.Button.DismissError", in: found) != nil)
+    }
+
+    @Test("Microphone access is a row of the pane's first box: the note at the leading edge, the fix at the trailing edge")
+    func microphoneAccessRow() {
+        let found = elements(SettingsForm { Section { MicrophoneAccessRow() } }, model: makeModel(), height: 300)
+        expectRow(note: "Parola needs the microphone to record", button: "Microphone.Button.OpenAccessSettings", in: found)
+    }
 }

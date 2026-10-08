@@ -23,17 +23,16 @@ struct LiveCaptionsPane: View {
                         .labelsHidden()
                         .axLeaf("LiveCaptions.Toggle.Translate")
                 }
-                if let warning = model.translateMismatchWarning {
-                    Label(warning, systemImage: "exclamationmark.triangle.fill")
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.warningText)
-                        .padding(.top, DS.Spacing.hair)
-                        .axLeaf("LiveCaptions.Label.TranslateWarning")
-                }
             } footer: {
-                Text("Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: DS.Spacing.hair) {
+                    if let warning = model.translateMismatchWarning {
+                        SettingsWarning(warning)
+                            .axLeaf("LiveCaptions.Label.TranslateWarning")
+                    }
+                    Text("Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.")
+                        .foregroundStyle(.secondary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
             ResetPaneButton(scope: .liveCaptions)
         }
