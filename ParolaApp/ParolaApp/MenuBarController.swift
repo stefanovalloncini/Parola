@@ -184,7 +184,7 @@ final class MenuBarController: NSObject {
         button.imagePosition = app == nil ? .imageOnly : .imageLeading
         button.imageHugsTitle = true
         button.attributedTitle = app == nil ? NSAttributedString() : Self.meetingCue()
-        button.setAccessibilityLabel(app == nil ? nil : "Parola")
+        button.setAccessibilityLabel("Parola")
         button.setAccessibilityValue(app.map(Self.meetingCueSpokenValue))
         cuedMeetingApp = app
     }

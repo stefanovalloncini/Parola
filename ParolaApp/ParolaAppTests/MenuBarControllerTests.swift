@@ -402,6 +402,7 @@ struct MenuBarMeetingCueTests {
         #expect(shown)
         #expect(cleared)
         #expect(controller.statusButtonAccessibilityValue == nil)
+        #expect(controller.statusButtonAccessibilityLabel == "Parola")
         model.showMenuBarExtra = false
         await waitUntil { controller.lastSnapshot?.mode == .hidden }
     }
