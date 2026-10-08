@@ -73,6 +73,16 @@ final class MeetingNotifier: NSObject {
         model.meetingNotifier = self
         center.register(Self.category(), delegate: self)
         withdraw()
+        windowLostSight()
+    }
+
+    /// Catches a prompt the window never showed: the launch scan ran before this notifier existed, or Zoom opened
+    /// while the window was key and `promptRaised` skipped it. Called once at bind, and again whenever the window
+    /// stops being able to show the prompt (`NSApplication.didResignActiveNotification`). Posting once sets
+    /// `postedApp`, so a later call for the same detection is a no-op.
+    func windowLostSight() {
+        guard !promptInView(), let app = model?.meetingDetectedApp, postedApp == nil, posting == nil else { return }
+        posting = Task { [weak self] in await self?.post(app) }
     }
 
     /// Takes the notification out of Notification Center, as a quit must: no prompt is left for its buttons to answer.

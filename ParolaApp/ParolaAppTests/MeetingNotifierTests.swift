@@ -127,6 +127,65 @@ struct MeetingNotifierTests {
         #expect(rig.center.asks == 0)
     }
 
+    @Test("a prompt the launch scan raised before this notifier existed posts once bind catches up")
+    func launchScanPostsAtBind() async {
+        let center = FakeNotificationCenter()
+        let model = makeRecordingModel("meeting-notifier-launch-scan")
+        model.meetingDetectedApp = "Acme Conference"
+        let notifier = MeetingNotifier(center: center, promptInView: { false })
+
+        notifier.bind(model)
+        let posted = await waitUntil { center.posted.count == 1 }
+
+        #expect(posted)
+        #expect(notifier.postedApp == "Acme Conference")
+    }
+
+    @Test("bind checks nothing when the window can already show the waiting prompt")
+    func bindPostsNothingWithTheWindowKey() async {
+        let center = FakeNotificationCenter()
+        let model = makeRecordingModel("meeting-notifier-launch-scan-key")
+        model.meetingDetectedApp = "Acme Conference"
+        let notifier = MeetingNotifier(center: center, promptInView: { true })
+
+        notifier.bind(model)
+        await settle()
+
+        #expect(center.posted.isEmpty)
+        #expect(notifier.postedApp == nil)
+    }
+
+    @Test("a prompt raised while the window was key posts once the window stops showing it")
+    func windowLostSightPostsALatePrompt() async {
+        let rig = rig("lost-sight", inView: true)
+        rig.model.meetingDetector.fire(appName: "Acme Conference")
+        await settle()
+        #expect(rig.center.posted.isEmpty, "the window could show it, so nothing posted yet")
+
+        rig.inView.value = false
+        rig.notifier.windowLostSight()
+        let posted = await waitUntil { rig.center.posted.count == 1 }
+
+        #expect(posted)
+        #expect(rig.notifier.postedApp == "Acme Conference")
+    }
+
+    @Test("leaving the front twice posts only once for the same detection")
+    func windowLostSightPostsOnlyOnce() async {
+        let rig = rig("lost-sight-twice", inView: true)
+        rig.model.meetingDetector.fire(appName: "Acme Conference")
+        await settle()
+
+        rig.inView.value = false
+        rig.notifier.windowLostSight()
+        let posted = await waitUntil { rig.center.posted.count == 1 }
+        rig.notifier.windowLostSight()
+        await settle()
+
+        #expect(posted)
+        #expect(rig.center.posted.count == 1)
+    }
+
     @Test("a prompt raised behind Parola's back posts one notification for it, and a second detection posts no other")
     func backgroundedPostsOnce() async {
         let rig = rig("backgrounded")
