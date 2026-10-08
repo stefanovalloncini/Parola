@@ -609,4 +609,44 @@ struct StageBandVoiceOverTests {
         let said = await waitUntil { spokenLevel(in: hosted) == AppFormat.percent(0.8) }
         #expect(said, "the band still says \(spokenLevel(in: hosted) ?? "nothing")")
     }
+
+    @Test("with VoiceOver off the stand-in holds its first level while the band's layer view keeps following")
+    func holdsItsFirstLevelWithoutVoiceOver() async throws {
+        let audio = try tempWAV("band-no-voiceover")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("band-no-voiceover")
+        model.useStreaming = false
+        model.selectedModel = "openai_whisper-tiny"
+        model.voiceOverIsRunning = false
+        let capture = BandLevelCapture(file: audio)
+        model.takeCaptureOverride = { _ in capture }
+        defer { await model.discardTake() }
+        model.startRecording(source: .microphone)
+        let up = await waitUntil { model.liveSource != nil }
+        try #require(up)
+        capture.levelMeter.record(0.2)
+        let recording = await waitUntil { model.recording?.state == .recording }
+        try #require(recording)
+
+        let sight = BandSight()
+        sight.shown = true
+        let hosted = HostedWindow(BandInSight(model: model, sight: sight).environment(model), width: 1180, height: StageBand.height)
+        defer { hosted.close() }
+        let drawn = await waitUntil { spokenLevel(in: hosted) != nil }
+        try #require(drawn)
+        let first = spokenLevel(in: hosted)
+
+        let tick = model.takeLevelTick
+        let loud = Task { @MainActor in
+            while !Task.isCancelled {
+                capture.levelMeter.record(0.8)
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        defer { loud.cancel() }
+        let movedOn = await waitUntil { model.takeLevelTick >= tick + 3 }
+        #expect(movedOn)
+        let held = spokenLevel(in: hosted)
+        #expect(held == first, "the stand-in followed a tick SwiftUI never reads: \(held ?? "nothing")")
+    }
 }
