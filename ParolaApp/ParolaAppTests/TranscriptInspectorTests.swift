@@ -652,6 +652,23 @@ struct OverviewSectionRulesTests {
         #expect(sentence.task == "Remember what we said about this: ship it")
         #expect(OverviewActionItems.split("Book the room").assignee == nil)
         #expect(OverviewActionItems.split("Sam:").assignee == nil)
+        #expect(OverviewActionItems.split("Ana María: send the notes").assignee == "Ana María")
+        #expect(OverviewActionItems.split("Jean-Luc: book the room").assignee == "Jean-Luc")
+    }
+
+    @Test("a time or a link before the first colon is part of the task, not someone's name")
+    func timesAndLinksAreNotAssignees() {
+        for line in [
+            "10:30 standup with design",
+            "Standup at 10:30 with design",
+            "https://example.com/notes has the deck",
+            "See https://example.com/notes for the deck",
+            "Q3: close the budget",
+        ] {
+            let split = OverviewActionItems.split(line)
+            #expect(split.assignee == nil, "\(line)")
+            #expect(split.task == line)
+        }
     }
 
     @Test("with nothing extracted, Action Items shows and copies the summary's; extracted items win once there are any")

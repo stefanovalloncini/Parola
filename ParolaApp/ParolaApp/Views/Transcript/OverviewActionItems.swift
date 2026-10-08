@@ -23,13 +23,20 @@ struct OverviewActionItems: View {
         (model.transcript?.summary?.actionItems ?? []).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
     }
 
-    /// "Sam: render the first screen" names who does it; a longer lead-in is part of the task.
+    /// "Sam: render the first screen" names who does it; a time, a link or a longer lead-in is part of the task.
     static func split(_ line: String) -> (assignee: String?, task: String) {
         guard let colon = line.firstIndex(of: ":") else { return (nil, line) }
         let lead = line[..<colon].trimmingCharacters(in: .whitespaces)
         let rest = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
-        guard !lead.isEmpty, !rest.isEmpty, lead.split(separator: " ").count <= 3 else { return (nil, line) }
+        guard !rest.isEmpty, !rest.hasPrefix("//"), looksLikeAName(lead) else { return (nil, line) }
         return (lead, rest)
+    }
+
+    /// Up to three words of letters, not starting lowercase: "Sam", "Ana María", "Jean-Luc", but not "10" or "https".
+    private static func looksLikeAName(_ lead: String) -> Bool {
+        guard let first = lead.first, first.isLetter, !first.isLowercase else { return false }
+        let nameMarks: Set<Character> = [" ", "-", "'", "’", "."]
+        return lead.split(separator: " ").count <= 3 && lead.allSatisfy { $0.isLetter || nameMarks.contains($0) }
     }
 
     /// The list Copy puts on the pasteboard, one "- " line per item, whichever list shows.
