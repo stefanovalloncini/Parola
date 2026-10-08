@@ -2289,17 +2289,6 @@
         }
       }
     },
-    "Assigned": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Assegnato"
-          }
-        }
-      }
-    },
     "Assign…": {
       "extractionState": "manual",
       "localizations": {
@@ -5366,16 +5355,6 @@
         }
       }
     },
-    "Display Modes": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modalità di visualizzazione"
-          }
-        }
-      }
-    },
     "Dock and menu bar": {
       "extractionState": "manual",
       "localizations": {
@@ -6298,17 +6277,6 @@
         }
       }
     },
-    "Favorites only (%lld)": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Solo preferiti (%lld)"
-          }
-        }
-      }
-    },
     "Filename": {
       "extractionState": "manual",
       "localizations": {
@@ -7097,17 +7065,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nascondi info"
-          }
-        }
-      }
-    },
-    "Hide inspector": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nascondi inspector"
           }
         }
       }
@@ -9786,17 +9743,6 @@
         }
       }
     },
-    "No labels yet": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ancora nessuna etichetta"
-          }
-        }
-      }
-    },
     "No languages match": {
       "extractionState": "manual",
       "localizations": {
@@ -9849,17 +9795,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun modello sul disco. Scegline uno dai consigliati qui sotto."
-          }
-        }
-      }
-    },
-    "No outline available": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Outline non disponibile"
           }
         }
       }
@@ -14266,17 +14201,6 @@
         }
       }
     },
-    "Show Outline": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostra outline"
-          }
-        }
-      }
-    },
     "Show Parola in": {
       "extractionState": "manual",
       "localizations": {
@@ -17523,17 +17447,6 @@
         }
       }
     },
-    "Translate again": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Traduci di nuovo"
-          }
-        }
-      }
-    },
     "Translate captions live as you speak.": {
       "extractionState": "manual",
       "localizations": {
@@ -17585,17 +17498,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tradotta in"
-          }
-        }
-      }
-    },
-    "Translated to %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tradotto in %@"
           }
         }
       }
@@ -17675,17 +17577,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riprova più tardi."
-          }
-        }
-      }
-    },
-    "Unassigned": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Non assegnato"
           }
         }
       }
@@ -18120,17 +18011,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "In attesa della voce…"
-          }
-        }
-      }
-    },
-    "Warn about segments that read too fast or fall outside caption limits.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avvisa sui segmenti che si leggono troppo in fretta o escono dai limiti dei sottotitoli."
           }
         }
       }
