@@ -136,6 +136,23 @@ struct RefusedPermissionTests {
         }
         #expect(model.recording?.missingPermission == .screenRecording)
     }
+
+    @Test("a refused non-tap capture keeps the Screen Recording permission even with capture targets")
+    func refusedNonTapCaptureKeepsScreenRecordingPermission() async {
+        let model = makeRecordingModel("refused-non-tap-with-targets")
+        model.useStreaming = false
+        model.pendingCaptureBundleIDs = ["us.zoom.xos"]
+        model.screenRecordingCheck = { false }
+        model.takeCaptureOverride = { _ in RefusedCapture() }
+
+        model.startRecording(source: .systemAudio)
+
+        await waitUntil {
+            guard case .failed = model.recording?.state else { return false }
+            return true
+        }
+        #expect(model.recording?.missingPermission == .screenRecording)
+    }
 }
 
 @Suite("Microphone access message")

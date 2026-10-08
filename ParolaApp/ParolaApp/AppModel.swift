@@ -4041,6 +4041,7 @@ final class AppModel {
             }
             await mediaSession.enterRecording(config: config)
             guard takeIsCurrent(take) else { return }
+            var tapsApps = false
             do {
                 beginTakeArming(.startingCapture, take: take, streaming: false)
                 activeTake?.captureRequested = true
@@ -4051,6 +4052,7 @@ final class AppModel {
                     guard await adoptLiveSource(mic, take: take) else { return }
                 case .systemAudio:
                     let sys = await makeTakeCapture(.systemAudio, take: take)
+                    tapsApps = sys is ProcessTapAudioSource
                     await sys.whenCaptureEnds(macCaptureEndHandler(take: take.id))
                     // Tap setup blocks indefinitely while macOS waits for the System Audio
                     // Recording consent; abandon it after 20s so Stop never goes dead.
@@ -4079,7 +4081,7 @@ final class AppModel {
                 clearTakeReadouts(of: take.id)
                 activeTake = nil
                 let screenRecordingGranted = screenRecordingCheck()
-                let hasCaptureTargets = !take.captureTargets.isEmpty
+                let hasCaptureTargets = tapsApps
                 let message = Self.recordingFailureMessage(
                     for: error, source: source, screenRecordingGranted: screenRecordingGranted, hasCaptureTargets: hasCaptureTargets
                 )
