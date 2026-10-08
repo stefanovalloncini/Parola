@@ -444,9 +444,10 @@ private struct GatedInspectorTranslator: TranscriptTranslating {
 
 private struct FailingInspectorTranslator: TranscriptTranslating {
     let providerName = "stub"
+    var reason = "translator went down"
 
     func translate(_ texts: [(id: Int, text: String)], from source: String?, to target: String) async throws -> [Int: String] {
-        throw ParolaError.ioError("translator went down")
+        throw ParolaError.ioError(reason)
     }
 }
 
@@ -494,6 +495,44 @@ struct TranslationStripTests {
 
     private func has(_ leaf: String, _ hosted: HostedWindow) -> Bool {
         ids(hosted).contains { $0.hasSuffix(leaf) }
+    }
+
+    @Test("at the narrowest window with the inspector open, a failed translation's note keeps its width and every control shows")
+    func failedStripFitsTheNarrowestWindow() async throws {
+        try await withIsolatedDefaults { defaults in
+            defaults.set(true, forKey: InspectorVisibility.forcedAtNarrowWidthKey)
+            let model = try await openItalian(defaults)
+            model.transcript?.translation = TranscriptTranslation(targetLanguage: "fr", segments: [0: "bonjour"], createdAt: Date(), provider: "mock")
+            model.translationCoordinator.translatorOverride = FailingInspectorTranslator(reason: "The system translator stopped.")
+            let hosted = HostedWindow(ContentView().environment(model), width: MainWindowLayout.minimumWidth, height: 760)
+            defer { hosted.close() }
+
+            await model.translateTranscript(to: "en")
+            let failed = await waitUntil { has("Translation.Button.Dismiss", hosted) }
+            #expect(failed)
+            guard case .failed(let message) = model.translationState else {
+                Issue.record("expected a failed run, got \(model.translationState)")
+                return
+            }
+            hosted.host.layoutSubtreeIfNeeded()
+            let elements = HostedAccessibility.elements(in: hosted.host)
+            func frame(_ leaf: String) -> CGRect? { elements.first { $0.identifier?.hasSuffix(leaf) == true }?.frame }
+            let inspectorLeft = hosted.window.frame.maxX - MainWindowLayout.inspectorWidth
+            let inspectorShows = elements.contains { $0.role == "AXHeading" && $0.frame.minX >= inspectorLeft }
+            #expect(inspectorShows, "the inspector is forced open beside the strip")
+
+            let strip = try #require(frame(Self.strip))
+            let noteElement = elements.first { $0.words.contains(message) }
+            let note = try #require(noteElement?.frame, "\(elements.map(\.words))")
+            let retry = try #require(frame("Translation.Button.Retry"))
+            #expect(note.width >= strip.width / 2, "note \(note) in strip \(strip)")
+            #expect(note.height <= 2 * retry.height, "note \(note), Retry \(retry)")
+            for leaf in ["Translation.Button.Retry", "Translation.Button.Remove", "Translation.Menu.TranslateTo", "Translation.Button.Dismiss"] {
+                let control = try #require(frame(leaf), "\(leaf)")
+                #expect(strip.insetBy(dx: -0.5, dy: -0.5).contains(control), "\(leaf) \(control) outside the strip \(strip)")
+                #expect(control.maxX <= inspectorLeft, "\(leaf) \(control) under the inspector")
+            }
+        }
     }
 
     private func translateMenu(_ model: AppModel) -> [NSMenuItem] {
@@ -567,6 +606,12 @@ struct TranslationStripTests {
             #expect(failed)
             #expect(has("Translation.Menu.TranslateTo", hosted))
             #expect(has("Translation.Button.Dismiss", hosted))
+            let elements = HostedAccessibility.elements(in: hosted.host)
+            let retryFrame = elements.first { $0.identifier?.hasSuffix("Translation.Button.Retry") == true }?.frame
+            let dismissFrame = elements.first { $0.identifier?.hasSuffix("Translation.Button.Dismiss") == true }?.frame
+            let retry = try #require(retryFrame)
+            let dismiss = try #require(dismissFrame)
+            #expect(abs(retry.midY - dismiss.midY) < 1, "a wide column keeps the strip on one row")
 
             #expect(HostedAccessibility.press(endingWith: "Translation.Button.Dismiss", in: hosted.host))
             let dismissed = await waitUntil { !has(Self.strip, hosted) }

@@ -47,10 +47,30 @@ struct TranslationStrip: View {
             .axLeaf("Translation.Button.Cancel")
     }
 
-    @ViewBuilder
+    /// One row when it fits; otherwise the actions wrap under the note instead of squeezing it.
     private func failureRow(_ message: String) -> some View {
-        AIStatusNote(message: message, kind: .failure)
-        Spacer()
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: DS.Spacing.small) {
+                AIStatusNote(message: message, kind: .failure)
+                Spacer()
+                failureActions
+                dismissButton
+            }
+            VStack(alignment: .leading, spacing: DS.Spacing.small) {
+                HStack(alignment: .top, spacing: DS.Spacing.small) {
+                    AIStatusNote(message: message, kind: .failure)
+                    Spacer(minLength: 0)
+                    dismissButton
+                }
+                HStack(spacing: DS.Spacing.small) {
+                    failureActions
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var failureActions: some View {
         Button("Retry") { retry() }
             .disabled(model.translationCoordinator.activeTarget == nil)
             .axLeaf("Translation.Button.Retry")
@@ -69,6 +89,9 @@ struct TranslationStrip: View {
         .fixedSize()
         .disabled(!model.canTranslateTranscript || targets.isEmpty)
         .axLeaf("Translation.Menu.TranslateTo")
+    }
+
+    private var dismissButton: some View {
         Button { model.dismissTranslationFailure() } label: {
             Image(systemName: "xmark")
                 .font(DS.Font.caption)
