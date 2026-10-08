@@ -7,11 +7,14 @@ struct HostedWindow {
     let host: NSView
     let window: NSWindow
 
-    init(_ view: some View, width: CGFloat = 1180, height: CGFloat = 760) {
-        host = NSHostingView(rootView: view)
+    /// With `toolbar`, a titled window that hands the view's `.toolbar` to AppKit, so its items are read from `window`.
+    init(_ view: some View, width: CGFloat = 1180, height: CGFloat = 760, toolbar: Bool = false) {
+        let hosting = NSHostingView(rootView: view)
+        if toolbar { hosting.sceneBridgingOptions = [.toolbars] }
+        host = hosting
         window = NSWindow(
             contentRect: NSRect(x: -12_000, y: -12_000, width: width, height: height),
-            styleMask: [.borderless],
+            styleMask: toolbar ? [.titled, .closable, .resizable] : [.borderless],
             backing: .buffered,
             defer: false
         )
