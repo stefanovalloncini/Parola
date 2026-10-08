@@ -513,6 +513,41 @@ struct TakeRoutingTests {
         #expect(model.detectedMeetingAppName == "Acme Conference", "the Record menu still offers it")
     }
 
+    @Test("a take started from anywhere but the meeting prompt takes the prompt down, so its Record can't start a second take later")
+    func takeStartTakesThePromptDown() async {
+        let model = makeRecordingModel("meeting-prompt-take-start")
+        model.useStreaming = false
+        model.takeCaptureOverride = { _ in StubSource(url: URL(fileURLWithPath: "/dev/null")) }
+        model.meetingDetector.isEnabled = true
+        model.meetingDetector.fire(appName: "Acme Conference")
+        #expect(model.meetingDetectedApp == "Acme Conference")
+
+        model.startRecording(source: .microphone)
+        let take = model.recording?.takeID
+
+        #expect(take != nil)
+        #expect(model.meetingDetectedApp == nil)
+        #expect(!model.sheetIsUp)
+        #expect(model.detectedMeetingAppName == "Acme Conference", "the Record menu still offers the meeting")
+        await model.discardTake()
+        await waitUntil { !model.recordingActive }
+
+        #expect(model.meetingDetectedApp == nil, "no prompt is left whose Record would start a take nobody asked for")
+    }
+
+    @Test("a take the guards refuse leaves the meeting prompt up")
+    func refusedTakeKeepsThePrompt() {
+        let model = makeRecordingModel("meeting-prompt-refused-take")
+        model.meetingDetector.isEnabled = true
+        model.meetingDetector.fire(appName: "Acme Conference")
+        model.quitPending = true
+
+        model.startRecording(source: .microphone)
+
+        #expect(model.recording == nil)
+        #expect(model.meetingDetectedApp == "Acme Conference")
+    }
+
     @Test("Live Captions that can't start during a take leave the phase alone")
     func liveCaptionsRefusalWaitsForTheTake() {
         let model = makeModel()

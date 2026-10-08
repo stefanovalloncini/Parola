@@ -3669,6 +3669,7 @@ final class AppModel {
             refusalBeep?()
             return
         }
+        meetingDetectedApp = nil
         let diskCheck = startDiskSpaceCheck()
         let countIn = max(0, recordingCountInSeconds)
         // The count-in shows only in a main window Parola has in front; anywhere else it would delay the take unseen.
