@@ -9,14 +9,13 @@ struct YouTubeURLSheet: View {
 
     var body: some View {
         SheetFrame(
-            icon: "link",
-            iconTint: DS.Color.accent,
             title: "Transcribe Link",
             onClose: { dismiss() },
             content: { contentBody },
             footer: { footerBody }
         )
-        .hidesCloseButton()
+        .sheetDescription(Text("Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any supported site. Parola downloads the audio locally."))
+        .footerHasCancel()
         .onAppear {
             model.youtubeURLError = nil
             model.refreshYtDlpAvailability()
@@ -30,11 +29,6 @@ struct YouTubeURLSheet: View {
     private var contentBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.regular) {
-                Text("Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any supported site. Parola downloads the audio locally.")
-                    .font(DS.Font.body)
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-
                 TextField("https://www.youtube.com/watch?v=…", text: $urlDraft)
                     .textFieldStyle(.plain)
                     .focused($fieldFocused)

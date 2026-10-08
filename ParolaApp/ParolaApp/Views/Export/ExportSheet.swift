@@ -10,14 +10,13 @@ struct ExportSheet: View {
 
     var body: some View {
         SheetFrame(
-            icon: "square.and.arrow.up",
             title: "Export",
             onClose: { model.closeExportSheet() },
             content: { contentBody },
             footer: { footerBody }
         )
         .sheetSize(width: 760, minHeight: 460, maxHeight: 620)
-        .hidesCloseButton()
+        .footerHasCancel()
         .onDisappear { copiedReset?.cancel() }
         .alert("Save as Preset", isPresented: $namingPreset) {
             TextField("Preset name", text: $presetName)

@@ -7,23 +7,18 @@ struct BurnStyleSheet: View {
 
     var body: some View {
         SheetFrame(
-            icon: "film",
             title: "Burn subtitles into video",
             onClose: { dismiss() },
             content: { contentBody },
             footer: { footerBody }
         )
-        .hidesCloseButton()
+        .sheetDescription(Text("Captions are rendered permanently into a copy of the video."))
+        .footerHasCancel()
     }
 
     private var contentBody: some View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: DS.Spacing.regular) {
-            Text("Captions are rendered permanently into a copy of the video.")
-                .font(DS.Font.body)
-                .foregroundStyle(DS.Color.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
             optionRow("Font size") {
                 Picker("", selection: $model.burnFontSizeRaw) {
                     ForEach(BurnFontSize.allCases) { size in

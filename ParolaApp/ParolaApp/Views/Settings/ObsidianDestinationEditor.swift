@@ -25,7 +25,6 @@ struct ObsidianDestinationEditor: View {
 
     var body: some View {
         SheetFrame(
-            icon: "paperplane",
             title: isNew ? "New Destination" : "Edit Destination",
             onClose: onCancel
         ) {
@@ -54,7 +53,7 @@ struct ObsidianDestinationEditor: View {
             }
         }
         .sheetSize(width: 560, minHeight: 520, maxHeight: 720)
-        .hidesCloseButton()
+        .footerHasCancel()
     }
 
     // MARK: - Sections

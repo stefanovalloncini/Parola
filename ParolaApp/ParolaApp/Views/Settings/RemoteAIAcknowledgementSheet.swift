@@ -8,7 +8,6 @@ struct RemoteAIAcknowledgementSheet: View {
 
     var body: some View {
         SheetFrame(
-            icon: "arrow.up.forward.app",
             title: "Transcripts leave this Mac",
             onClose: onCancel
         ) {
@@ -37,7 +36,7 @@ struct RemoteAIAcknowledgementSheet: View {
             }
         }
         .sheetSize(width: 460, minHeight: 200, maxHeight: 300)
-        .hidesCloseButton()
+        .footerHasCancel()
     }
 
     private var explanation: String {

@@ -55,7 +55,7 @@ enum DS {
         static let display: CGFloat = -0.5
     }
 
-    /// Fifteen fixed tiers, ours rather than the system text styles, so a tier means the same thing
+    /// Sixteen fixed tiers, ours rather than the system text styles, so a tier means the same thing
     /// on every surface. Pick by role — page title, section heading, row title, meta line, caption.
     /// Three faces: SF for the chrome, New York for the reading surface (`transcript`, `transcriptEmphasis`,
     /// `transcriptCompact`, and a row's `excerpt` of it), SF Rounded for the timer.
@@ -65,6 +65,8 @@ enum DS {
         static let hero = SwiftUI.Font.system(size: 40, weight: .bold)
         static let display = SwiftUI.Font.system(size: 28, weight: .bold)
         static let title = SwiftUI.Font.system(size: 22, weight: .semibold)
+        /// One step above `heading`, so a sheet's title still leads the sections inside it.
+        static let sheetTitle = SwiftUI.Font.system(size: 17, weight: .bold)
         static let heading = SwiftUI.Font.system(size: 15, weight: .semibold)
         static let body = SwiftUI.Font.system(size: 13)
         static let bodyStrong = SwiftUI.Font.system(size: 13, weight: .medium)

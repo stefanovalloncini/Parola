@@ -36,6 +36,8 @@ struct HostedWindow {
             height: height,
             styleMask: toolbar ? [.titled, .closable, .resizable] : [.borderless]
         )
+        // A view's dismiss closes the window it sits in; ARC still holds it then.
+        window.isReleasedWhenClosed = false
         window.contentView = host
         window.orderFront(nil)
         host.layoutSubtreeIfNeeded()

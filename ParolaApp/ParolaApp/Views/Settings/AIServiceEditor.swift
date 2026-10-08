@@ -29,7 +29,6 @@ struct AIServiceEditor: View {
 
     var body: some View {
         SheetFrame(
-            icon: service.kind.symbol,
             titleVerbatim: service.kind.displayName,
             onClose: onCancel
         ) {
@@ -56,7 +55,7 @@ struct AIServiceEditor: View {
             }
         }
         .sheetSize(width: 560, minHeight: 380, maxHeight: 620)
-        .hidesCloseButton()
+        .footerHasCancel()
         .task(id: endpointText) { await reloadOllamaModels() }
     }
 

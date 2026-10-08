@@ -18,6 +18,7 @@ struct TypeScaleTests {
             DS.Font.hero,
             DS.Font.display,
             DS.Font.title,
+            DS.Font.sheetTitle,
             DS.Font.heading,
             DS.Font.body,
             DS.Font.secondary,
@@ -55,6 +56,12 @@ struct TypeScaleTests {
         #expect(measured(DS.Font.title) == measured(.system(size: 22, weight: .semibold)))
         #expect(measured(DS.Font.hero) != measured(.system(size: 40, weight: .semibold)))
         #expect(measured(DS.Font.display) != measured(.system(size: 28, weight: .semibold)))
+    }
+
+    @Test("a sheet's title is 17 pt bold, a step above the section headings a sheet can hold")
+    func sheetTitleLeadsItsSections() {
+        #expect(measured(DS.Font.sheetTitle) == measured(.system(size: 17, weight: .bold)))
+        #expect(height(DS.Font.sheetTitle) > height(DS.Font.heading))
     }
 
     @Test("the reading tier is New York, the chrome around it is SF")

@@ -23,12 +23,8 @@ struct SegmentNoteSheet: View {
     }
 
     var body: some View {
-        SheetFrame(icon: "note.text", title: "Segment note", onClose: { dismiss() }) {
+        SheetFrame(title: "Segment note", onClose: { dismiss() }) {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                Text(verbatim: "\(Timecode.format(target.segment.start))  \(SegmentCard.displayText(target.segment.text))")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .lineLimit(2)
                 TextField("Note", text: $draft, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(4...10)
@@ -42,8 +38,9 @@ struct SegmentNoteSheet: View {
         } footer: {
             footer
         }
+        .sheetDescription(Text(verbatim: "\(Timecode.format(target.segment.start))  \(SegmentCard.displayText(target.segment.text))"))
         .sheetSize(width: 440)
-        .hidesCloseButton()
+        .footerHasCancel()
         .onAppear { fieldFocused = true }
         .axBranch("SegmentNote")
     }

@@ -8,26 +8,22 @@ struct DuplicateImportSheet: View {
 
     var body: some View {
         SheetFrame(
-            icon: "doc.on.doc",
-            iconTint: DS.Color.accent,
             title: "Already in your library",
             onClose: { model.dismissDuplicateImport() },
             content: { contentBody },
             footer: { footerBody }
         )
+        .sheetDescription(
+            Text("\(pending.fileURL.lastPathComponent) matches a transcript you already have."),
+            leaf: "Duplicate.Text.Summary"
+        )
         .sheetSize(width: 500, minHeight: 200, maxHeight: 360)
-        .hidesCloseButton()
+        .footerHasCancel()
         .axBranch("Duplicate")
     }
 
     private var contentBody: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
-            Text("\(pending.fileURL.lastPathComponent) matches a transcript you already have.")
-                .font(DS.Font.body)
-                .foregroundStyle(DS.Color.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-                .axLeaf("Duplicate.Text.Summary")
-
             VStack(alignment: .leading, spacing: DS.Spacing.snug) {
                 Text(pending.entryTitle)
                     .font(DS.Font.heading)

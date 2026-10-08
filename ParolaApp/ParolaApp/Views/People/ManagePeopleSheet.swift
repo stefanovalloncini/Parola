@@ -6,8 +6,6 @@ struct ManagePeopleSheet: View {
 
     var body: some View {
         SheetFrame(
-            icon: "person.2.fill",
-            iconTint: DS.Color.accent,
             title: "Manage People",
             onClose: { dismiss() },
             content: {
@@ -26,7 +24,6 @@ struct ManagePeopleSheet: View {
                 }
             }
         )
-        .hidesCloseButton()
         .sheetSize(width: 460, minHeight: 300)
     }
 }

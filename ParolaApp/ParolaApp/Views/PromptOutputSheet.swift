@@ -9,14 +9,12 @@ struct PromptOutputSheet: View {
 
     var body: some View {
         SheetFrame(
-            icon: iconName,
-            iconTint: output.failure == nil ? DS.Color.accent : DS.Color.danger,
             titleVerbatim: output.promptName,
             onClose: { dismiss() },
             content: { contentBody },
             footer: { footerBody }
         )
-        .hidesCloseButton()
+        .footerHasCancel(output.failure == nil)
         .onDisappear {
             resetTask?.cancel()
             resetTask = nil
@@ -84,16 +82,6 @@ struct PromptOutputSheet: View {
                 .axLeaf("PromptOutput.Button.Copy")
             }
         }
-    }
-
-    private var iconName: String {
-        if output.failure != nil { return "exclamationmark.triangle" }
-        let lower = output.promptName.lowercased()
-        if lower.contains("chapter") { return "list.bullet.rectangle" }
-        if lower.contains("summary") || lower.contains("summar") { return "text.alignleft" }
-        if lower.contains("translate") || lower.contains("translat") { return "character.bubble" }
-        if lower.contains("action") || lower.contains("todo") { return "checklist" }
-        return "sparkles"
     }
 
     private func copy() {

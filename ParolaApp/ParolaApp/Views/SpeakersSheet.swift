@@ -12,14 +12,12 @@ struct SpeakersSheet: View {
 
     var body: some View {
         SheetFrame(
-            icon: "person.2.fill",
-            iconTint: DS.Color.accent,
             title: "Speakers",
             onClose: { dismiss() },
             content: { contentBody },
             footer: { footerBody }
         )
-        .hidesCloseButton()
+        .footerHasCancel()
         .task {
             suggestions = await model.peopleStore.suggestions(limit: 8)
         }

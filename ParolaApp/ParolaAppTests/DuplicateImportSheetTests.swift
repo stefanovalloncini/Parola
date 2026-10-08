@@ -43,7 +43,8 @@ struct DuplicateImportSheetTests {
         let model = makeModel("duplicate-sheet-cancel")
         let hosted = host(model)
         defer { hosted.close() }
-        #expect(HostedAccessibility.press(endingWith: "Duplicate.Toggle.Remember", in: hosted.host))
+        let ticked = HostedAccessibility.press(endingWith: "Duplicate.Toggle.Remember", in: hosted.host)
+        #expect(ticked)
         let pressed = HostedAccessibility.press(endingWith: "Duplicate.Button.Cancel", in: hosted.host)
         #expect(pressed)
         #expect(model.duplicateImport == nil)
@@ -56,8 +57,10 @@ struct DuplicateImportSheetTests {
     func keys() throws {
         let escaping = makeModel("duplicate-sheet-escape")
         let first = host(escaping)
-        #expect(HostedAccessibility.press(endingWith: "Duplicate.Toggle.Remember", in: first.host))
-        #expect(first.press(.escape))
+        let firstTicked = HostedAccessibility.press(endingWith: "Duplicate.Toggle.Remember", in: first.host)
+        #expect(firstTicked)
+        let firstEscape = first.press(.escape)
+        #expect(firstEscape)
         first.close()
         #expect(escaping.duplicateImport == nil)
         #expect(escaping.duplicateImportPolicy == .alwaysAsk)
@@ -65,10 +68,30 @@ struct DuplicateImportSheetTests {
         let returning = makeModel("duplicate-sheet-return")
         let second = host(returning)
         defer { second.close() }
-        #expect(HostedAccessibility.press(endingWith: "Duplicate.Toggle.Remember", in: second.host))
-        #expect(second.press(.return))
+        let secondTicked = HostedAccessibility.press(endingWith: "Duplicate.Toggle.Remember", in: second.host)
+        #expect(secondTicked)
+        let secondReturn = second.press(.return)
+        #expect(secondReturn)
         #expect(returning.duplicateImport == nil)
         #expect(returning.duplicateImportPolicy == .openExisting)
+    }
+
+    @Test("the summary names the file right under the title, and VoiceOver reads it after the heading")
+    func summaryUnderTheTitle() throws {
+        let model = makeModel("duplicate-sheet-summary")
+        let hosted = host(model)
+        defer { hosted.close() }
+        let elements = HostedAccessibility.elements(in: hosted.host)
+        let title = try element("Sheet.Text.Title", in: elements)
+        let summary = try element("Duplicate.Text.Summary", in: elements)
+        #expect(title.name == "Already in your library")
+        #expect(summary.words == ["Board meeting.m4a matches a transcript you already have."])
+        #expect(summary.frame.maxY <= title.frame.minY)
+        let titleIndex = elements.firstIndex { $0.identifier?.hasSuffix("Sheet.Text.Title") == true }
+        let summaryIndex = elements.firstIndex { $0.identifier?.hasSuffix("Duplicate.Text.Summary") == true }
+        let read = try #require(titleIndex)
+        let next = try #require(summaryIndex)
+        #expect(read < next)
     }
 
     @Test("Remember this choice sits above the buttons, and the footer reads Transcribe Again · Cancel · Open Existing")
@@ -94,6 +117,7 @@ struct DuplicateImportSheetTests {
         let hosted = host(model, locale: locale)
         defer { hosted.close() }
         let elements = HostedAccessibility.elements(in: hosted.host)
+        let leadingEdge = hosted.window.frame.minX
         let buttons: [(leaf: String, title: LocalizedStringKey, primary: Bool)] = [
             ("Duplicate.Button.TranscribeAgain", "Transcribe Again", false),
             ("Duplicate.Button.Cancel", "Cancel", false),
@@ -103,7 +127,7 @@ struct DuplicateImportSheetTests {
             let frame = try element(button.leaf, in: elements).frame
             let whole = SheetButtonSize.natural(button.title, primary: button.primary, locale: locale)
             #expect(frame.width >= whole.width - 0.5, "\(button.leaf) is \(frame.width) pt of \(whole.width)")
-            #expect(frame.minX >= hosted.window.frame.minX, "\(button.leaf) starts past the sheet's leading edge")
+            #expect(frame.minX >= leadingEdge, "\(button.leaf) starts past the sheet's leading edge")
         }
     }
 }

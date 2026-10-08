@@ -1,18 +1,19 @@
 import SwiftUI
 
+/// A sheet as macOS 26 draws one: a bold title and its line, the content, a hairline over the buttons, no fill.
 struct SheetFrame<Content: View, Footer: View>: View {
-    let icon: String
-    let iconTint: Color
     private let titleText: Text
     let onClose: () -> Void
     let content: Content
-    let footer: Footer?
+    let footer: Footer
     private var width: CGFloat = 480
     private var minHeight: CGFloat = 220
     private var maxHeight: CGFloat = 640
-    private var closeAXLeaf = "Sheet.Button.Close"
-    private var accessory: AnyView?
-    private var showsClose = true
+    private var description: Text?
+    private var descriptionLeaf = "Sheet.Text.Description"
+    private var footerCancels = false
+
+    static var margin: CGFloat { 20 }
 
     func sheetSize(width: CGFloat, minHeight: CGFloat = 220, maxHeight: CGFloat = 640) -> SheetFrame {
         var copy = self
@@ -22,35 +23,26 @@ struct SheetFrame<Content: View, Footer: View>: View {
         return copy
     }
 
-    /// For sheets whose footer already ends in Cancel: two dismiss controls and two `.cancelAction`s.
-    func hidesCloseButton() -> SheetFrame {
+    /// The footer carries its own Cancel or Close for ⎋; without one, the frame closes the sheet on ⎋.
+    func footerHasCancel(_ hasCancel: Bool = true) -> SheetFrame {
         var copy = self
-        copy.showsClose = false
+        copy.footerCancels = hasCancel
         return copy
     }
 
-    func closeLeaf(_ id: String) -> SheetFrame {
+    func sheetDescription(_ text: Text, leaf: String = "Sheet.Text.Description") -> SheetFrame {
         var copy = self
-        copy.closeAXLeaf = id
-        return copy
-    }
-
-    func headerAccessory<A: View>(@ViewBuilder _ build: () -> A) -> SheetFrame {
-        var copy = self
-        copy.accessory = AnyView(build())
+        copy.description = text
+        copy.descriptionLeaf = leaf
         return copy
     }
 
     init(
-        icon: String,
-        iconTint: Color = DS.Color.accent,
         title: LocalizedStringKey,
         onClose: @escaping () -> Void,
         @ViewBuilder content: () -> Content,
         @ViewBuilder footer: () -> Footer
     ) {
-        self.icon = icon
-        self.iconTint = iconTint
         self.titleText = Text(title)
         self.onClose = onClose
         self.content = content()
@@ -58,15 +50,11 @@ struct SheetFrame<Content: View, Footer: View>: View {
     }
 
     init(
-        icon: String,
-        iconTint: Color = DS.Color.accent,
         titleVerbatim: String,
         onClose: @escaping () -> Void,
         @ViewBuilder content: () -> Content,
         @ViewBuilder footer: () -> Footer
     ) {
-        self.icon = icon
-        self.iconTint = iconTint
         self.titleText = Text(titleVerbatim)
         self.onClose = onClose
         self.content = content()
@@ -74,93 +62,50 @@ struct SheetFrame<Content: View, Footer: View>: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
             content
+                .padding(.horizontal, Self.margin - DS.Spacing.regular)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            if let footer {
-                Divider()
-                footer
-                    .padding(.horizontal, DS.Spacing.regular)
-                    .padding(.vertical, DS.Spacing.regular)
-            }
+            Divider()
+            footer
+                .padding(.horizontal, Self.margin)
+                .padding(.top, DS.Spacing.medium)
+                .padding(.bottom, Self.margin)
         }
+        .background { if !footerCancels { escapeCloses } }
         .frame(width: width)
         .frame(minHeight: minHeight, maxHeight: maxHeight)
-        .background(DS.Color.surface)
         .tint(DS.Color.accent)
     }
 
     private var header: some View {
-        HStack(spacing: DS.Spacing.regular) {
-            Image(systemName: icon)
-                .font(DS.Font.bodyStrong)
-                .foregroundStyle(iconTint)
-                .frame(width: 28, height: 28)
-                .background(iconTint.opacity(0.16))
-                .clipShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
-
+        VStack(alignment: .leading, spacing: DS.Spacing.hair) {
             titleText
-                .font(DS.Font.heading)
+                .font(DS.Font.sheetTitle)
                 .lineLimit(1)
-
-            Spacer(minLength: DS.Spacing.small)
-
-            if let accessory {
-                accessory
-            }
-
-            if showsClose {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(DS.Font.bodyStrong)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .frame(width: 22, height: 22)
-                        .background(DS.Color.surfaceElevated)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.cancelAction)
-                .help("Close")
-                .accessibilityLabel("Close")
-                .axLeaf(closeAXLeaf)
+                .accessibilityAddTraits(.isHeader)
+                .axLeaf("Sheet.Text.Title")
+            if let description {
+                description
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .axLeaf(descriptionLeaf)
             }
         }
-        .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, DS.Spacing.regular)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Self.margin)
+        .padding(.top, Self.margin)
+        .padding(.bottom, DS.Spacing.tight)
+    }
+
+    private var escapeCloses: some View {
+        Button("Close", action: onClose)
+            .keyboardShortcut(.cancelAction)
+            .opacity(0)
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
     }
 }
-
-extension SheetFrame where Footer == EmptyView {
-    init(
-        icon: String,
-        iconTint: Color = DS.Color.accent,
-        title: LocalizedStringKey,
-        onClose: @escaping () -> Void,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.icon = icon
-        self.iconTint = iconTint
-        self.titleText = Text(title)
-        self.onClose = onClose
-        self.content = content()
-        self.footer = nil
-    }
-
-    init(
-        icon: String,
-        iconTint: Color = DS.Color.accent,
-        titleVerbatim: String,
-        onClose: @escaping () -> Void,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.icon = icon
-        self.iconTint = iconTint
-        self.titleText = Text(titleVerbatim)
-        self.onClose = onClose
-        self.content = content()
-        self.footer = nil
-    }
-}
-
