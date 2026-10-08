@@ -117,7 +117,7 @@ struct TranscriptFormatItems: View {
     }
 }
 
-/// Reads the whole transcript out; T40's `ReadAloudButton(source:)` takes this slot as a unit.
+/// Reads the whole transcript out; a source-aware Read Aloud button replaces this view as a unit.
 struct ReadAloudToolbarButton: View {
     @Environment(AppModel.self) private var model
     @State private var speaker = TranscriptSpeaker()
