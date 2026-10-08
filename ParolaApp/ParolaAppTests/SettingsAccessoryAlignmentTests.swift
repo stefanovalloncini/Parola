@@ -66,6 +66,14 @@ struct SettingsAccessoryAlignmentTests {
         }
     }
 
+    @Test("People: each person's menu ends on the form's trailing edge, not inside a card of its own")
+    func people() async {
+        let model = PeopleTestSupport.makeModel("people-pane-alignment")
+        await model.addPerson(named: "Ada")
+        await model.addPerson(named: "Grace")
+        expectFlush(PeoplePane().environment(model), count: 3, "people")
+    }
+
     @Test("the Microphone pane's level preview opens the real microphone in the app, never in the test host")
     func microphonePreviewStaysShutInTheTestHost() {
         #expect(MicrophonePane.opensPreview(environment: [:]))

@@ -32,6 +32,8 @@ struct ManagePeopleSheet: View {
 struct PeopleDirectoryList: View {
     /// Only the sheet asks what a sidebar person's menu wanted; the People pane in Settings leaves it.
     var takesRequests = false
+    /// In a grouped form each person is a row of the form's own box, not a card inside it.
+    var inForm = false
     @Environment(AppModel.self) private var model
     @State private var newName: String = ""
     @FocusState private var addFocused: Bool
@@ -50,21 +52,49 @@ struct PeopleDirectoryList: View {
     private var people: [Person] { model.peopleByUse }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            if people.isEmpty {
-                InlineEmptyText("No people yet")
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(people.enumerated()), id: \.element.id) { position, person in
-                        if position > 0 { Divider() }
-                        row(person)
-                    }
-                }
-                .cardBackground()
-            }
-            addRow
+        if inForm {
+            formRows
+        } else {
+            stack
         }
-        .onAppear { if takesRequests { takeRequest() } }
+    }
+
+    @ViewBuilder private var formRows: some View {
+        if people.isEmpty {
+            InlineEmptyText("No people yet")
+        } else {
+            ForEach(people) { person in
+                row(person)
+            }
+        }
+        // The alerts hang off the one row that is always there.
+        withAlerts(addRow)
+    }
+
+    private var stack: some View {
+        withAlerts(
+            VStack(alignment: .leading, spacing: DS.Spacing.small) {
+                if people.isEmpty {
+                    InlineEmptyText("No people yet")
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(people.enumerated()), id: \.element.id) { position, person in
+                            if position > 0 { Divider() }
+                            row(person)
+                                .padding(.horizontal, DS.Spacing.medium)
+                                .padding(.vertical, DS.Spacing.small)
+                        }
+                    }
+                    .cardBackground()
+                }
+                addRow
+            }
+            .onAppear { if takesRequests { takeRequest() } }
+        )
+    }
+
+    private func withAlerts(_ content: some View) -> some View {
+        content
         .alert("Rename person", isPresented: isRenaming, presenting: renaming) { person in
             TextField("Name", text: $renameDraft)
             Button("Cancel", role: .cancel) { renaming = nil }
@@ -131,30 +161,40 @@ struct PeopleDirectoryList: View {
                 Button("Delete", role: .destructive) { deleting = person }
                     .axLeaf("People.MenuItem.Delete.\(person.name)")
             } label: {
-                Image(systemName: "ellipsis")
+                Image(systemName: "ellipsis.circle")
             }
             .menuStyle(.button)
-            .buttonStyle(DSIconChipButtonStyle())
+            .buttonStyle(.borderless)
             .menuIndicator(.hidden)
             .fixedSize()
+            .help("More")
+            .accessibilityLabel("More")
             .axLeaf("People.Menu.Row.\(person.name)")
         }
-        .padding(.horizontal, DS.Spacing.medium)
-        .padding(.vertical, DS.Spacing.small)
     }
 
     private var addRow: some View {
         HStack(spacing: DS.Spacing.small) {
-            TextField("Add a person…", text: $newName)
-                .textFieldStyle(.plain)
-                .focused($addFocused)
-                .fieldChrome(focused: addFocused)
+            addField
                 .onSubmit { add() }
                 .axLeaf("People.TextField.Add")
             Button("Add") { add() }
                 .sheetButton()
                 .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .axLeaf("People.Button.Add")
+        }
+    }
+
+    @ViewBuilder private var addField: some View {
+        if inForm {
+            TextField("Add a person…", text: $newName, prompt: Text("Add a person…"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+        } else {
+            TextField("Add a person…", text: $newName)
+                .textFieldStyle(.plain)
+                .focused($addFocused)
+                .fieldChrome(focused: addFocused)
         }
     }
 

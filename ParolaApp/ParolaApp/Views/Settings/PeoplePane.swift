@@ -23,9 +23,13 @@ struct PeoplePane: View {
                 }
             }
 
-            PeopleDirectoryList()
-
-            SettingHelper(text: "A person carries a colour and a name across every transcript they speak in. Renaming or merging rewrites the name in the transcripts that point at them.")
+            Section {
+                PeopleDirectoryList(inForm: true)
+            } footer: {
+                Text("A person carries a colour and a name across every transcript they speak in. Renaming or merging rewrites the name in the transcripts that point at them.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             ResetPaneButton(scope: .people)
         }
