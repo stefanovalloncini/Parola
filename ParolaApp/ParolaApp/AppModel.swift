@@ -1608,11 +1608,15 @@ final class AppModel {
             if badges != libraryCounts { libraryCounts = badges }
             let usual = LibraryRowFormat.usualLanguage(codes: libraryEntries.compactMap { LanguageDisplay.code(for: $0.language) })
             if usual != usualLanguage { usualLanguage = usual }
+            let recent = LanguageChoices.recent(in: libraryEntries)
+            if recent != recentLanguages { recentLanguages = recent }
             updateSelectedEntryHasFavorites()
         }
     }
     /// The language most of the library is in, as a code; a row names its own language only when it differs.
     private(set) var usualLanguage: String?
+    /// The library's last few languages, newest first, for the language pickers to lead with.
+    private(set) var recentLanguages: [String] = []
     /// How many speaker labels across the library stand for each person. Read off the maps, so an assignment an undo takes back stops counting.
     private(set) var personUsageCounts: [UUID: Int] = [:]
     /// How many transcripts stand for each person, for the sidebar's badges.

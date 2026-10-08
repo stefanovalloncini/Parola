@@ -73,6 +73,63 @@ struct LanguageChoicesTests {
     }
 }
 
+// @unchecked: only written from the observation callback, which the model raises on the main actor.
+private final class LanguagesRedrawn: @unchecked Sendable {
+    var fired = false
+}
+
+@MainActor
+@Suite("Recent languages")
+struct RecentLanguagesTests {
+    private func makeModel() -> AppModel {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("recent-languages"))
+        model.selectedLanguage = nil
+        return model
+    }
+
+    private func entry(_ id: String, _ language: String, daysAgo: Double) -> LibraryEntry {
+        let manifest = ParolaDocument.Manifest(
+            createdAt: Date(timeIntervalSinceNow: -daysAgo * 86_400), originalAudioName: "\(id).m4a", modelName: "stub",
+            language: language
+        )
+        return LibraryEntry(id: id, bundleURL: URL(fileURLWithPath: "/tmp/RecentLanguages/\(id).parola"), manifest: manifest)
+    }
+
+    @Test("the language pickers end their lead with the library's last three languages, newest first")
+    func lastThreeNewestFirst() {
+        let model = makeModel()
+        model.libraryEntries = [
+            entry("a", "en", daysAgo: 5), entry("b", "it", daysAgo: 1), entry("c", "fr", daysAgo: 3),
+            entry("d", "de", daysAgo: 4), entry("e", "it", daysAgo: 6),
+        ]
+        #expect(Array(LanguageChoices.leading(model: model).suffix(3)) == ["it", "fr", "de"])
+    }
+
+    @Test("a transcript in a language already listed leaves the language pickers alone; a new language reaches them")
+    func onlyANewLanguageRedraws() {
+        let model = makeModel()
+        model.libraryEntries = [entry("a", "en", daysAgo: 2), entry("b", "it", daysAgo: 1)]
+        let sameLanguage = LanguagesRedrawn()
+        withObservationTracking {
+            _ = LanguageChoices.leading(model: model)
+        } onChange: {
+            sameLanguage.fired = true
+        }
+        model.libraryEntries.append(entry("c", "it", daysAgo: 0))
+        #expect(!sameLanguage.fired)
+
+        let newLanguage = LanguagesRedrawn()
+        withObservationTracking {
+            _ = LanguageChoices.leading(model: model)
+        } onChange: {
+            newLanguage.fired = true
+        }
+        model.libraryEntries.append(entry("d", "fr", daysAgo: 0))
+        #expect(newLanguage.fired)
+        #expect(Array(LanguageChoices.leading(model: model).suffix(3)) == ["fr", "it", "en"])
+    }
+}
+
 @MainActor
 @Suite("Apple Speech languages")
 struct AppleSpeechLanguageChoicesTests {

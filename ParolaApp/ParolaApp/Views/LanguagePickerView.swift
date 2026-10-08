@@ -220,13 +220,25 @@ enum LanguageChoices {
     @MainActor
     static func leading(model: AppModel) -> [String] {
         let system = Locale.preferredLanguages.compactMap { Locale(identifier: $0).language.languageCode?.identifier }
-        var recent: [String] = []
-        for entry in model.libraryEntries.sorted(by: { $0.createdAt > $1.createdAt }) {
-            guard let code = LanguageDisplay.code(for: entry.language)?.lowercased(), !recent.contains(code) else { continue }
-            recent.append(code)
-            if recent.count == recentLimit { break }
+        return [model.selectedLanguage].compactMap { $0 } + system + model.recentLanguages
+    }
+
+    /// The last few languages the entries were transcribed in, newest first, from one pass over them.
+    static func recent(in entries: [LibraryEntry]) -> [String] {
+        var latest: [String: Date] = [:]
+        var codes: [String: String?] = [:]
+        for entry in entries {
+            let code: String?
+            if let known = codes[entry.language] {
+                code = known
+            } else {
+                code = LanguageDisplay.code(for: entry.language)?.lowercased()
+                codes[entry.language] = code
+            }
+            guard let code, latest[code].map({ $0 < entry.createdAt }) ?? true else { continue }
+            latest[code] = entry.createdAt
         }
-        return [model.selectedLanguage].compactMap { $0 } + system + recent
+        return latest.sorted { $0.value > $1.value }.prefix(recentLimit).map(\.key)
     }
 
     static let recentLimit = 3
