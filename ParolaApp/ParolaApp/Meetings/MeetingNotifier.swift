@@ -146,9 +146,11 @@ final class MeetingNotifier: NSObject {
         return UNNotificationRequest(identifier: requestID, content: content, trigger: nil)
     }
 
+    /// No `.foreground`: Record starts the take in place, as the menu bar's Record does — activating Parola would
+    /// pull the user out of a full-screen call to a Space with the Stage, with no way back but a swipe.
     nonisolated static func category(bundle: Bundle = .main) -> UNNotificationCategory {
         let record = UNNotificationAction(
-            identifier: recordActionID, title: String(localized: "Record Meeting", bundle: bundle), options: [.foreground]
+            identifier: recordActionID, title: String(localized: "Record Meeting", bundle: bundle), options: []
         )
         let notNow = UNNotificationAction(identifier: notNowActionID, title: String(localized: "Not Now", bundle: bundle), options: [])
         return UNNotificationCategory(identifier: categoryID, actions: [record, notNow], intentIdentifiers: [], options: [])

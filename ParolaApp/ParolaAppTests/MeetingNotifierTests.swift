@@ -109,7 +109,7 @@ struct MeetingNotifierTests {
         #expect(model.meetingNotifier === notifier)
         #expect(center.registered.map(\.identifier) == [MeetingNotifier.categoryID])
         #expect(center.registered.first?.actions.map(\.title) == ["Record Meeting", "Not Now"])
-        #expect(center.registered.first?.actions.first?.options.contains(.foreground) == true)
+        #expect(center.registered.first?.actions.first?.options.contains(.foreground) == false)
         #expect(center.registered.first?.actions.last?.options.contains(.foreground) == false)
         #expect(center.withdrawn == [MeetingNotifier.requestID])
     }
@@ -189,6 +189,7 @@ struct MeetingNotifierTests {
         #expect(rig.model.recording?.source == .systemAudio)
         #expect(rig.model.meetingDetectedApp == nil)
         #expect(rig.center.withdrawn == [MeetingNotifier.requestID])
+        #expect(rig.broughtForward.count == 0, "Record starts the take in place, as the menu bar's Record does")
         await rig.model.discardTake()
         await waitUntil { !rig.model.recordingActive }
     }
