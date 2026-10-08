@@ -66,6 +66,7 @@ struct RuleListQuery {
     }
 }
 
+/// Search, the enabled filter and sort, on one line above the list they narrow.
 struct RuleListToolbar: View {
     @Binding var query: RuleListQuery
     let placeholder: LocalizedStringKey
@@ -75,36 +76,45 @@ struct RuleListToolbar: View {
         HStack(spacing: 8) {
             SearchPill(text: $query.search, placeholder: placeholder, leaf: "\(leafPrefix).TextField.Search")
                 .frame(maxWidth: 240)
-            RuleEnabledFilterChips(filter: $query.filter)
+            RuleEnabledFilterPicker(filter: $query.filter, leaf: "\(leafPrefix).Picker.Filter")
             Spacer()
-            Menu {
-                sortOptions
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
-            }
-            .menuStyle(.button)
-            .buttonStyle(DSIconChipButtonStyle(side: 28))
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Sort")
-            .accessibilityRepresentation {
-                Menu("Sort") { sortOptions }
-            }
-            .axLeaf("\(leafPrefix).Menu.Sort")
-        }
-    }
-
-    @ViewBuilder private var sortOptions: some View {
-        ForEach(RuleListSort.allCases, id: \.self) { option in
-            Button {
-                query.sort = option
-            } label: {
-                if query.sort == option {
-                    Label(option.title, systemImage: "checkmark")
-                } else {
-                    Text(option.title)
+            RuleListSortMenu(leaf: "\(leafPrefix).Menu.Sort") {
+                ForEach(RuleListSort.allCases, id: \.self) { option in
+                    Button {
+                        query.sort = option
+                    } label: {
+                        if query.sort == option {
+                            Label(option.title, systemImage: "checkmark")
+                        } else {
+                            Text(option.title)
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+/// A native pull-down that shows only the sort glyph, named for VoiceOver.
+struct RuleListSortMenu<Options: View>: View {
+    var title: LocalizedStringKey = "Sort"
+    let leaf: String
+    @ViewBuilder var options: Options
+
+    var body: some View {
+        Menu {
+            options
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .menuStyle(.button)
+        .buttonStyle(.borderless)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(title)
+        .accessibilityRepresentation {
+            Menu(title) { options }
+        }
+        .axLeaf(leaf)
     }
 }

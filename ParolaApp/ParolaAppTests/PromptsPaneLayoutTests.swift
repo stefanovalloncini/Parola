@@ -59,7 +59,8 @@ struct PromptsPaneLayoutTests {
         let hosted = host(model)
         defer { hosted.close() }
         let elements = HostedAccessibility.elements(in: hosted.host)
-        let add = try #require(elements.first { $0.identifier?.hasSuffix("Prompts.Button.AddPrompt") == true })
+        let add = try #require(elements.first { $0.identifier?.hasSuffix("Prompts.Button.Add") == true })
+        #expect(add.name == String(localized: "Add Prompt"))
         let firstBuiltIn = try #require(Prompt.builtIns.first)
         let row = try #require(elements.first { $0.words.contains(firstBuiltIn.name) })
         #expect(add.frame.minY > row.frame.maxY, "Add Prompt sits below the built-in list")
@@ -101,16 +102,22 @@ struct PromptsPaneLayoutTests {
         #expect(copy.assistantMode == viewing.assistantMode)
     }
 
-    @Test("Delete on a custom prompt asks first")
+    @Test("− on a chosen custom prompt asks first")
     func deleteAsks() async {
         let model = makeModel()
         _ = await model.promptLibrary.addUserPrompt(name: "Mine", instructions: "Do it", triggerWords: [], useSystemInstructions: true)
         let hosted = host(model)
         defer { hosted.close() }
-        await waitFor({ ids(in: hosted).contains { $0.hasSuffix("Prompts.Button.Delete") } }, in: hosted)
+        await waitFor({ ids(in: hosted).contains { $0.hasSuffix("Prompts.Row") } }, in: hosted)
 
-        #expect(HostedAccessibility.press(endingWith: "Prompts.Button.Delete", in: hosted.host))
-        for _ in 0..<10 { try? await Task.sleep(for: .milliseconds(20)) }
+        #expect(HostedAccessibility.press(endingWith: "Prompts.Row", in: hosted.host))
+        await waitFor({
+            HostedAccessibility.elements(in: hosted.host)
+                .first { $0.identifier?.hasSuffix("Prompts.Button.Remove") == true }?.isEnabled == true
+        }, in: hosted)
+        #expect(HostedAccessibility.press(endingWith: "Prompts.Button.Remove", in: hosted.host))
+        let asked = await waitUntil { hosted.window.attachedSheet != nil }
+        #expect(asked, "− deleted without asking")
         let names = await model.promptLibrary.userPrompts.map(\.name)
         #expect(names == ["Mine"])
     }

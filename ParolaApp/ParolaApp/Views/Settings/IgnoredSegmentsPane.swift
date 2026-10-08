@@ -4,44 +4,51 @@ import ParolaCore
 struct IgnoredSegmentsPane: View {
     @Environment(AppModel.self) private var model
     @State private var query = RuleListQuery()
+    @State private var selection: IgnoredSegmentRule.ID?
 
     var body: some View {
-        @Bindable var model = model
+        let displayed = displayedRules
         return SettingsForm {
-            if query.showsToolbar(ruleCount: model.ignoredSegmentRules.count) {
-                RuleListToolbar(query: $query, placeholder: "Search patterns…", leafPrefix: "IgnoredSegments")
-            }
-
-            SettingsSection {
+            Section {
                 if model.ignoredSegmentRules.isEmpty {
                     InlineEmptyText("No patterns yet")
-                } else if displayedRules.isEmpty {
-                    HStack {
-                        Text("No matches").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
-                        Spacer()
-                    }
+                } else if displayed.isEmpty {
+                    InlineEmptyText("No matches")
                 } else {
-                    ForEach(Array(displayedRules.enumerated()), id: \.element.id) { position, rule in
+                    ForEach(displayed) { rule in
                         if let binding = binding(for: rule.id) {
-                            IgnoredRuleRow(rule: binding) {
-                                model.ignoredSegmentRules.removeAll { $0.id == rule.id }
-                            }
+                            IgnoredRuleRow(rule: binding)
+                                .ruleListRow(rule.id, selection: $selection, leaf: "IgnoredSegments.Row")
                         }
                     }
                 }
+                RuleListBar(
+                    leafPrefix: "IgnoredSegments", addLabel: "Add Pattern", removeLabel: "Remove Pattern",
+                    canRemove: displayed.contains { $0.id == selection },
+                    onAdd: add, onRemove: removeSelected
+                )
+            } header: {
+                if query.showsToolbar(ruleCount: model.ignoredSegmentRules.count) {
+                    RuleListToolbar(query: $query, placeholder: "Search patterns…", leafPrefix: "IgnoredSegments")
+                }
             }
-
-            Button {
-                query.showNewRule()
-                model.ignoredSegmentRules.append(IgnoredSegmentRule(pattern: ""))
-            } label: {
-                Label("Add Pattern", systemImage: "plus.circle")
-            }
-            .axLeaf("IgnoredSegments.Button.AddPattern")
 
             SettingHelper(text: "A segment is removed when its entire text equals a pattern (case-insensitive, trimmed). Catches filler-only segments like “uh” — not words inside sentences. Applies to new transcriptions; saved transcripts don't change.")
             ResetPaneButton(scope: .ignoredSegments)
         }
+    }
+
+    private func add() {
+        query.showNewRule()
+        let rule = IgnoredSegmentRule(pattern: "")
+        model.ignoredSegmentRules.append(rule)
+        selection = rule.id
+    }
+
+    private func removeSelected() {
+        guard let selection else { return }
+        model.ignoredSegmentRules.removeAll { $0.id == selection }
+        self.selection = nil
     }
 
     private var displayedRules: [IgnoredSegmentRule] {
@@ -64,7 +71,6 @@ struct IgnoredSegmentsPane: View {
 
 private struct IgnoredRuleRow: View {
     @Binding var rule: IgnoredSegmentRule
-    let onDelete: () -> Void
 
     private var canEnable: Bool {
         !rule.pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -82,22 +88,16 @@ private struct IgnoredRuleRow: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Toggle("Use this rule", isOn: enabledBinding)
-                    .labelsHidden()
-                    .disabled(!canEnable)
-                    .axLeaf("IgnoredSegments.Toggle.RuleEnabled")
-                TextField("e.g. uh", text: $rule.pattern, prompt: Text("e.g. uh"))
-                    .labelsHidden()
-                    .textFieldStyle(.roundedBorder)
-                    .axLeaf("IgnoredSegments.TextField.Pattern")
-                Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .axLeaf("IgnoredSegments.Button.Delete")
-            }
+        HStack(spacing: 10) {
+            Toggle("Use this rule", isOn: enabledBinding)
+                .labelsHidden()
+                .disabled(!canEnable)
+                .axLeaf("IgnoredSegments.Toggle.RuleEnabled")
+            TextField("e.g. uh", text: $rule.pattern, prompt: Text("e.g. uh"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .selectsRuleRowOnFocus()
+                .axLeaf("IgnoredSegments.TextField.Pattern")
         }
     }
 }

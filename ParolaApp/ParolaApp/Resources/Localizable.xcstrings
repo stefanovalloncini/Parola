@@ -12711,6 +12711,72 @@
         }
       }
     },
+    "Remove Correction": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi correzione"
+          }
+        }
+      }
+    },
+    "Remove Destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi destinazione"
+          }
+        }
+      }
+    },
+    "Remove Folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi cartella"
+          }
+        }
+      }
+    },
+    "Remove Pattern": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi pattern"
+          }
+        }
+      }
+    },
+    "Remove Rule": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi regola"
+          }
+        }
+      }
+    },
+    "Remove Snippet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi snippet"
+          }
+        }
+      }
+    },
     "Remove Translation": {
       "extractionState": "manual",
       "localizations": {
@@ -14854,28 +14920,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Origine"
-          }
-        }
-      }
-    },
-    "Source A→Z": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sorgente A→Z"
-          }
-        }
-      }
-    },
-    "Source Z→A": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sorgente Z→A"
           }
         }
       }

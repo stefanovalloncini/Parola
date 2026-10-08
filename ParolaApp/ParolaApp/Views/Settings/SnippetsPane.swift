@@ -5,55 +5,39 @@ import ParolaDictation
 struct SnippetsPane: View {
     @Environment(AppModel.self) private var model
     @State private var query = RuleListQuery()
+    @State private var selection: Snippet.ID?
 
     var body: some View {
-        SettingsForm {
-            if query.showsToolbar(ruleCount: model.snippets.count) {
-                RuleListToolbar(query: $query, placeholder: "Search snippets…", leafPrefix: "Snippets")
-            }
-
-            SettingsSection {
-                let visible = visibleSnippets
+        let visible = visibleSnippets
+        return SettingsForm {
+            Section {
                 if model.snippets.isEmpty {
                     InlineEmptyText("No snippets yet")
                 } else if visible.isEmpty {
-                    HStack {
-                        Text("No snippets match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
-                        Spacer()
-                    }
+                    InlineEmptyText("No snippets match.")
                 } else {
-                    ForEach(Array(visible.enumerated()), id: \.element.id) { idx, snippet in
+                    ForEach(visible) { snippet in
                         if let binding = binding(for: snippet.id) {
-                            SnippetRow(snippet: binding) {
-                                model.snippets.removeAll { $0.id == snippet.id }
-                            }
+                            SnippetRow(snippet: binding)
+                                .ruleListRow(snippet.id, selection: $selection, leaf: "Snippets.Row")
                         }
                     }
                 }
-            }
-
-            HStack(spacing: 8) {
-                Button {
-                    query.showNewRule()
-                    model.snippets.append(Snippet(trigger: "", replacement: ""))
-                } label: {
-                    Label("Add Snippet", systemImage: "plus.circle")
+                RuleListBar(
+                    leafPrefix: "Snippets", addLabel: "Add Snippet", removeLabel: "Remove Snippet",
+                    canRemove: visible.contains { $0.id == selection },
+                    onAdd: add, onRemove: removeSelected
+                ) {
+                    Button("Import…") { model.importSnippetsFromFile() }
+                        .axLeaf("Snippets.MenuItem.Import")
+                    Button("Export…") { model.exportSnippetsToFile() }
+                        .disabled(model.snippets.isEmpty)
+                        .axLeaf("Snippets.MenuItem.Export")
                 }
-                .axLeaf("Snippets.Button.AddSnippet")
-                Spacer()
-                Button {
-                    model.importSnippetsFromFile()
-                } label: {
-                    Label("Import…", systemImage: "square.and.arrow.down")
+            } header: {
+                if query.showsToolbar(ruleCount: model.snippets.count) {
+                    RuleListToolbar(query: $query, placeholder: "Search snippets…", leafPrefix: "Snippets")
                 }
-                .axLeaf("Snippets.Button.Import")
-                Button {
-                    model.exportSnippetsToFile()
-                } label: {
-                    Label("Export…", systemImage: "square.and.arrow.up")
-                }
-                .disabled(model.snippets.isEmpty)
-                .axLeaf("Snippets.Button.Export")
             }
 
             SettingHelper(text: "Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
@@ -63,6 +47,19 @@ struct SnippetsPane: View {
                 .padding(.horizontal, DS.Spacing.tight)
             ResetPaneButton(scope: .snippets)
         }
+    }
+
+    private func add() {
+        query.showNewRule()
+        let snippet = Snippet(trigger: "", replacement: "")
+        model.snippets.append(snippet)
+        selection = snippet.id
+    }
+
+    private func removeSelected() {
+        guard let selection else { return }
+        model.snippets.removeAll { $0.id == selection }
+        self.selection = nil
     }
 
     private var visibleSnippets: [Snippet] {
@@ -85,7 +82,6 @@ struct SnippetsPane: View {
 
 private struct SnippetRow: View {
     @Binding var snippet: Snippet
-    let onDelete: () -> Void
 
     private var canEnable: Bool {
         !snippet.trigger.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -103,30 +99,23 @@ private struct SnippetRow: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Toggle("Use this snippet", isOn: enabledBinding)
-                        .labelsHidden()
-                        .disabled(!canEnable)
-                        .axLeaf("Snippets.Toggle.SnippetEnabled")
-                    TextField("trigger phrase", text: $snippet.trigger, prompt: Text("trigger phrase"))
-                        .labelsHidden()
-                        .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: 200)
-                        .axLeaf("Snippets.TextField.Trigger")
-                    Text("→").foregroundStyle(DS.Color.secondaryText)
-                    TextField("replacement", text: $snippet.replacement, prompt: Text("replacement"))
-                        .labelsHidden()
-                        .textFieldStyle(.roundedBorder)
-                        .axLeaf("Snippets.TextField.Replacement")
-                    Button(role: .destructive, action: onDelete) {
-                        Image(systemName: "trash")
-                    }
-                    .buttonStyle(.borderless)
-                    .axLeaf("Snippets.Button.Delete")
-                }
-            }
+        HStack(spacing: 8) {
+            Toggle("Use this snippet", isOn: enabledBinding)
+                .labelsHidden()
+                .disabled(!canEnable)
+                .axLeaf("Snippets.Toggle.SnippetEnabled")
+            TextField("trigger phrase", text: $snippet.trigger, prompt: Text("trigger phrase"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 200)
+                .selectsRuleRowOnFocus()
+                .axLeaf("Snippets.TextField.Trigger")
+            Text("→").foregroundStyle(DS.Color.secondaryText)
+            TextField("replacement", text: $snippet.replacement, prompt: Text("replacement"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .selectsRuleRowOnFocus()
+                .axLeaf("Snippets.TextField.Replacement")
         }
     }
 }

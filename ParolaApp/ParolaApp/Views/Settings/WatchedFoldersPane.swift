@@ -11,51 +11,51 @@ struct WatchedFoldersPane: View {
 
 private struct WatchedFoldersPaneBody: View {
     let store: WatchedFoldersStore
+    @State private var selection: WatchedFolder.ID?
 
     var body: some View {
         SettingsForm {
-            SettingsSection {
+            Section {
                 if store.folders.isEmpty {
                     InlineEmptyText("No watched folders yet")
                 } else {
-                    ForEach(Array(store.folders.enumerated()), id: \.element.id) { idx, folder in
+                    ForEach(store.folders) { folder in
                         WatchedFolderRow(store: store, folder: folder)
+                            .ruleListRow(folder.id, selection: $selection, leaf: "WatchedFolders.Row")
                     }
                 }
-            }
-
-            if let error = store.lastError {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(DS.Palette.warning)
-                    Text(error)
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer()
-                    Button("Dismiss") { store.dismissError() }
-                        .buttonStyle(.borderless)
-                        .controlSize(.small)
-                        .axLeaf("WatchedFolders.Button.DismissError")
-                }
-                .padding(DS.Spacing.regular)
-                .background(
-                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(DS.Palette.warning.opacity(0.10))
+                RuleListBar(
+                    leafPrefix: "WatchedFolders", addLabel: "Add Folder…", removeLabel: "Remove Folder",
+                    canRemove: store.folders.contains { $0.id == selection },
+                    onAdd: { store.presentAddFolderPanel() },
+                    onRemove: removeSelected
                 )
+            } footer: {
+                if let error = store.lastError {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(DS.Palette.warning)
+                        Text(error)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Button("Dismiss") { store.dismissError() }
+                            .controlSize(.small)
+                            .axLeaf("WatchedFolders.Button.DismissError")
+                    }
+                    .foregroundStyle(.secondary)
+                }
             }
-
-            Button {
-                store.presentAddFolderPanel()
-            } label: {
-                Label("Add Folder…", systemImage: "plus.circle")
-            }
-            .axLeaf("WatchedFolders.Button.AddFolder")
 
             SettingHelper(text: "New files dropped into a watched folder are transcribed automatically, including ones added while Parola was closed. Files already there when you add the folder are ignored.")
             ResetPaneButton(scope: .watchedFolders)
         }
+    }
+
+    private func removeSelected() {
+        guard let selection else { return }
+        store.removeFolder(selection)
+        self.selection = nil
     }
 }
 
@@ -67,8 +67,8 @@ private struct WatchedFolderRow: View {
         let unavailable = store.isUnavailable(folder.id)
         SettingRow(titleVerbatim: folder.displayName,
                    descriptionVerbatim: folder.displayPath) {
-            HStack(spacing: 6) {
-                if unavailable {
+            if unavailable {
+                HStack(spacing: 6) {
                     Label("Unavailable", systemImage: "exclamationmark.triangle.fill")
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.warningText)
@@ -78,13 +78,6 @@ private struct WatchedFolderRow: View {
                     .controlSize(.small)
                     .axLeaf("WatchedFolders.Button.Readd")
                 }
-                Button {
-                    store.removeFolder(folder.id)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .axLeaf("WatchedFolders.Button.Remove")
             }
         }
     }

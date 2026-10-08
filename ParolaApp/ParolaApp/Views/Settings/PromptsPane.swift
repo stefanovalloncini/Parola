@@ -9,38 +9,36 @@ struct PromptsPane: View {
     @State private var editing: PromptEditDraft?
     @State private var pendingDelete: Prompt?
     @State private var saveFailed = false
+    @State private var selection: Prompt.ID?
 
     var body: some View {
-        SettingsForm {
-            HStack(spacing: 8) {
-                SearchPill(text: $searchText, placeholder: "Search prompts…", leaf: "Prompts.TextField.Search")
-                sortMenu
-            }
-            if saveFailed { saveErrorBanner }
-
-            SettingsSection("Custom prompts") {
-                let custom = visible(userPrompts)
+        let custom = visible(userPrompts)
+        return SettingsForm {
+            Section {
                 if custom.isEmpty {
                     InlineEmptyText(isSearching ? "No prompts match." : "No custom prompts yet")
                 } else {
-                    ForEach(Array(custom.enumerated()), id: \.element.id) { idx, prompt in
-                        PromptRow(
-                            prompt: prompt,
-                            onEdit: { editing = PromptEditDraft(prompt: prompt) },
-                            onDelete: { pendingDelete = prompt }
-                        )
+                    ForEach(custom) { prompt in
+                        PromptRow(prompt: prompt, onOpen: { editing = PromptEditDraft(prompt: prompt) })
+                            .ruleListRow(prompt.id, selection: $selection, leaf: "Prompts.Row")
                     }
                 }
-            }
-
-            HStack {
-                Button {
-                    editing = PromptEditDraft(prompt: Prompt(name: "", instructions: "", isBuiltIn: false))
-                } label: {
-                    Label("Add Prompt", systemImage: "plus.circle")
+                RuleListBar(
+                    leafPrefix: "Prompts", addLabel: "Add Prompt", removeLabel: "Delete prompt",
+                    canRemove: custom.contains { $0.id == selection },
+                    onAdd: { editing = PromptEditDraft(prompt: Prompt(name: "", instructions: "", isBuiltIn: false)) },
+                    onRemove: { pendingDelete = custom.first { $0.id == selection } }
+                )
+            } header: {
+                VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+                    HStack(spacing: 8) {
+                        SearchPill(text: $searchText, placeholder: "Search prompts…", leaf: "Prompts.TextField.Search")
+                        RuleListSortMenu(title: "Sort prompts", leaf: "Prompts.Menu.Sort") { sortOptions }
+                    }
+                    Text("Custom prompts")
                 }
-                .axLeaf("Prompts.Button.AddPrompt")
-                Spacer()
+            } footer: {
+                if saveFailed { saveErrorBanner }
             }
 
             SettingsSection("Built-in prompts") {
@@ -48,12 +46,8 @@ struct PromptsPane: View {
                 if builtIns.isEmpty {
                     InlineEmptyText("No prompts match.")
                 } else {
-                    ForEach(Array(builtIns.enumerated()), id: \.element.id) { idx, prompt in
-                        PromptRow(
-                            prompt: prompt,
-                            onEdit: { editing = PromptEditDraft(viewing: prompt) },
-                            onDelete: {}
-                        )
+                    ForEach(builtIns) { prompt in
+                        PromptRow(prompt: prompt, onOpen: { editing = PromptEditDraft(viewing: prompt) })
                     }
                 }
             }
@@ -83,6 +77,7 @@ struct PromptsPane: View {
             Button("Delete", role: .destructive) {
                 delete(prompt)
                 pendingDelete = nil
+                selection = nil
             }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
         }
@@ -114,39 +109,19 @@ struct PromptsPane: View {
     }
 
     private var saveErrorBanner: some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(DS.Palette.warning)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Couldn't save your prompts")
-                    .font(DS.Font.bodyStrong)
+                    .foregroundStyle(.primary)
                 Text("The change is only in this session. Check that Parola can write to its Application Support folder.")
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
         }
-        .padding(DS.Spacing.small)
-        .background(DS.Palette.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .combine)
         .axLeaf("Prompts.Text.SaveError")
-    }
-
-    private var sortMenu: some View {
-        Menu {
-            sortOptions
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-        }
-        .menuStyle(.button)
-        .buttonStyle(DSIconChipButtonStyle(side: 28))
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Sort prompts")
-        .accessibilityRepresentation {
-            Menu("Sort prompts") { sortOptions }
-        }
-        .axLeaf("Prompts.Menu.Sort")
     }
 
     @ViewBuilder private var sortOptions: some View {
@@ -220,42 +195,30 @@ struct PromptsPane: View {
 
 private struct PromptRow: View {
     let prompt: Prompt
-    let onEdit: () -> Void
-    let onDelete: () -> Void
+    let onOpen: () -> Void
 
     var body: some View {
         SettingRow(titleVerbatim: prompt.name) {
-            HStack(spacing: 6) {
-                if prompt.isBuiltIn {
-                    Button {
-                        onEdit()
-                    } label: {
-                        Image(systemName: "eye")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Show prompt")
-                    .accessibilityLabel("Show prompt")
-                    .axLeaf("Prompts.Button.View")
-                } else {
-                    Button {
-                        onEdit()
-                    } label: {
-                        Image(systemName: "pencil")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Edit prompt")
-                    .accessibilityLabel("Edit prompt")
-                    .axLeaf("Prompts.Button.Edit")
-                    Button(role: .destructive) {
-                        onDelete()
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Delete prompt")
-                    .accessibilityLabel("Delete prompt")
-                    .axLeaf("Prompts.Button.Delete")
+            if prompt.isBuiltIn {
+                Button {
+                    onOpen()
+                } label: {
+                    Image(systemName: "eye")
                 }
+                .buttonStyle(.borderless)
+                .help("Show prompt")
+                .accessibilityLabel("Show prompt")
+                .axLeaf("Prompts.Button.View")
+            } else {
+                Button {
+                    onOpen()
+                } label: {
+                    Image(systemName: "pencil")
+                }
+                .buttonStyle(.borderless)
+                .help("Edit prompt")
+                .accessibilityLabel("Edit prompt")
+                .axLeaf("Prompts.Button.Edit")
             }
         }
     }

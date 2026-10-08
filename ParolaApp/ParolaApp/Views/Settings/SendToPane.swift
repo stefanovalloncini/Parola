@@ -5,10 +5,11 @@ struct SendToPane: View {
     @Environment(AppModel.self) private var model
     @State private var editing: ObsidianVaultFolderDestination?
     @State private var isNew = false
+    @State private var selection: AnyDestination.ID?
 
     var body: some View {
         SettingsForm {
-            SettingsSection {
+            Section {
                 if model.destinations.isEmpty {
                     InlineEmptyText("No destinations yet")
                 } else {
@@ -19,11 +20,26 @@ struct SendToPane: View {
                             canMoveDown: position < model.destinations.count - 1,
                             onEdit: { edit(stored) }
                         )
+                        .ruleListRow(stored.id, selection: $selection, leaf: "SendTo.Row")
                     }
                 }
+                RuleListBar(
+                    leafPrefix: "SendTo", addLabel: "Add Destination", removeLabel: "Remove Destination",
+                    canRemove: model.destinations.contains { $0.id == selection },
+                    addMenu: {
+                        Button("Obsidian Vault Folder") {
+                            isNew = true
+                            editing = ObsidianVaultFolderDestination(
+                                name: String(localized: "Obsidian"),
+                                vaultBookmark: Data(),
+                                vaultPath: ""
+                            )
+                        }
+                        .accessibilityIdentifier("SendTo.Button.AddObsidian")
+                    },
+                    onRemove: removeSelected
+                )
             }
-
-            addMenu
 
             SettingHelper(text: "A destination writes a Markdown note when you send a transcript to it. Turn on Send automatically to write one as soon as a transcription finishes. A batch run is not sent automatically.")
 
@@ -47,24 +63,10 @@ struct SendToPane: View {
         }
     }
 
-    private var addMenu: some View {
-        Menu {
-            Button("Obsidian Vault Folder") {
-                isNew = true
-                editing = ObsidianVaultFolderDestination(
-                    name: String(localized: "Obsidian"),
-                    vaultBookmark: Data(),
-                    vaultPath: ""
-                )
-            }
-            .accessibilityIdentifier("SendTo.Button.AddObsidian")
-        } label: {
-            Label("Add Destination", systemImage: "plus.circle")
-        }
-        .menuStyle(.button)
-        .buttonStyle(.borderless)
-        .fixedSize()
-        .axLeaf("SendTo.Button.Add")
+    private func removeSelected() {
+        guard let selection else { return }
+        model.removeDestination(id: selection)
+        self.selection = nil
     }
 
     private func edit(_ stored: AnyDestination) {
@@ -82,12 +84,10 @@ private struct DestinationRow: View {
     let onEdit: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
-                header
-                if stored.destination != nil {
-                    controls
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            header
+            if stored.destination != nil {
+                controls
             }
         }
     }
@@ -138,13 +138,6 @@ private struct DestinationRow: View {
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf(leaf("Button.Edit"))
             }
-            Button(role: .destructive) {
-                model.removeDestination(id: stored.id)
-            } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.borderless)
-            .axLeaf(leaf("Button.Remove"))
         }
     }
 

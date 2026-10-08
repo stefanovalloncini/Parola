@@ -22,26 +22,19 @@ enum RuleEnabledFilter: CaseIterable {
     }
 }
 
-struct RuleEnabledFilterChips: View {
+struct RuleEnabledFilterPicker: View {
     @Binding var filter: RuleEnabledFilter
+    let leaf: String
 
     var body: some View {
-        HStack(spacing: 4) {
+        Picker("Show", selection: $filter) {
             ForEach(RuleEnabledFilter.allCases, id: \.self) { option in
-                Button {
-                    filter = option
-                } label: {
-                    Text(option.title)
-                        .font(DS.Font.caption)
-                        .padding(.horizontal, DS.Spacing.small)
-                        .padding(.vertical, DS.Spacing.hair)
-                        .foregroundStyle(filter == option ? DS.Color.onAccent : Color.primary.opacity(0.85))
-                        .background(
-                            Capsule().fill(filter == option ? DS.Color.accentFill : Color.secondary.opacity(0.15))
-                        )
-                }
-                .buttonStyle(.plain)
+                Text(option.title).tag(option)
             }
         }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .axLeaf(leaf)
     }
 }

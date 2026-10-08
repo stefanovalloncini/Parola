@@ -5,44 +5,51 @@ import ParolaDictation
 struct CorrectionsPane: View {
     @Environment(AppModel.self) private var model
     @State private var query = RuleListQuery()
+    @State private var selection: CorrectionRule.ID?
 
     var body: some View {
-        SettingsForm {
-            if query.showsToolbar(ruleCount: model.correctionRules.count) {
-                RuleListToolbar(query: $query, placeholder: "Search corrections…", leafPrefix: "Corrections")
-            }
-
-            SettingsSection {
-                let visible = visibleRules
+        let visible = visibleRules
+        return SettingsForm {
+            Section {
                 if model.correctionRules.isEmpty {
                     InlineEmptyText("No corrections yet")
                 } else if visible.isEmpty {
-                    HStack {
-                        Text("No corrections match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
-                        Spacer()
-                    }
+                    InlineEmptyText("No corrections match.")
                 } else {
-                    ForEach(Array(visible.enumerated()), id: \.element.id) { idx, rule in
+                    ForEach(visible) { rule in
                         if let binding = binding(for: rule.id) {
-                            CorrectionRow(rule: binding) {
-                                model.correctionRules.removeAll { $0.id == rule.id }
-                            }
+                            CorrectionRow(rule: binding)
+                                .ruleListRow(rule.id, selection: $selection, leaf: "Corrections.Row")
                         }
                     }
                 }
+                RuleListBar(
+                    leafPrefix: "Corrections", addLabel: "Add Correction", removeLabel: "Remove Correction",
+                    canRemove: visible.contains { $0.id == selection },
+                    onAdd: add, onRemove: removeSelected
+                )
+            } header: {
+                if query.showsToolbar(ruleCount: model.correctionRules.count) {
+                    RuleListToolbar(query: $query, placeholder: "Search corrections…", leafPrefix: "Corrections")
+                }
             }
-
-            Button {
-                query.showNewRule()
-                model.correctionRules.append(CorrectionRule(from: "", to: ""))
-            } label: {
-                Label("Add Correction", systemImage: "plus.circle")
-            }
-            .axLeaf("Corrections.Button.AddCorrection")
 
             SettingHelper(text: "Word-bounded replacements applied after every dictation. Use this for mis-transcribed jargon like “q three” → “Q3”.")
             ResetPaneButton(scope: .corrections)
         }
+    }
+
+    private func add() {
+        query.showNewRule()
+        let rule = CorrectionRule(from: "", to: "")
+        model.correctionRules.append(rule)
+        selection = rule.id
+    }
+
+    private func removeSelected() {
+        guard let selection else { return }
+        model.correctionRules.removeAll { $0.id == selection }
+        self.selection = nil
     }
 
     private var visibleRules: [CorrectionRule] {
@@ -65,7 +72,6 @@ struct CorrectionsPane: View {
 
 private struct CorrectionRow: View {
     @Binding var rule: CorrectionRule
-    let onDelete: () -> Void
 
     private var canEnable: Bool {
         !rule.from.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -83,33 +89,28 @@ private struct CorrectionRow: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Toggle("Use this rule", isOn: enabledBinding)
-                    .labelsHidden()
-                    .disabled(!canEnable)
-                    .axLeaf("Corrections.Toggle.RuleEnabled")
-                TextField("heard", text: $rule.from, prompt: Text("heard"))
-                    .labelsHidden()
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 180)
-                    .axLeaf("Corrections.TextField.From")
-                Text("→").foregroundStyle(DS.Color.secondaryText)
-                TextField("write", text: $rule.to, prompt: Text("write"))
-                    .labelsHidden()
-                    .textFieldStyle(.roundedBorder)
-                    .axLeaf("Corrections.TextField.To")
-                Toggle("Case-sensitive", isOn: $rule.caseSensitive)
-                    .toggleStyle(.checkbox)
-                    .font(DS.Font.secondary)
-                    .fixedSize()
-                    .axLeaf("Corrections.Toggle.CaseSensitive")
-                Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .axLeaf("Corrections.Button.Delete")
-            }
+        HStack(spacing: 8) {
+            Toggle("Use this rule", isOn: enabledBinding)
+                .labelsHidden()
+                .disabled(!canEnable)
+                .axLeaf("Corrections.Toggle.RuleEnabled")
+            TextField("heard", text: $rule.from, prompt: Text("heard"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 180)
+                .selectsRuleRowOnFocus()
+                .axLeaf("Corrections.TextField.From")
+            Text("→").foregroundStyle(DS.Color.secondaryText)
+            TextField("write", text: $rule.to, prompt: Text("write"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .selectsRuleRowOnFocus()
+                .axLeaf("Corrections.TextField.To")
+            Toggle("Case-sensitive", isOn: $rule.caseSensitive)
+                .toggleStyle(.checkbox)
+                .font(DS.Font.secondary)
+                .fixedSize()
+                .axLeaf("Corrections.Toggle.CaseSensitive")
         }
     }
 }
