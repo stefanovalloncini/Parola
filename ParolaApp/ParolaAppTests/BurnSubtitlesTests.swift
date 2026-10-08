@@ -234,6 +234,15 @@ struct BurnSubtitlesTests {
         model.cancelBurn()
     }
 
+    @Test("the sheet's Outline has a key of its own, apart from the transcript's outline")
+    func outlineSwitchHasItsOwnKey() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        #expect(String(localized: "BurnStyle.Outline", bundle: italian) == "Contorno")
+        #expect(String(localized: "BurnStyle.Outline") == "Outline")
+        #expect(String(localized: "Outline", bundle: italian) == "Outline")
+    }
+
     @Test("dismissing the save panel abandons the burn without starting a job")
     func abandonedSavePanelLeavesPhase() async {
         let picker = TestFilePicker()

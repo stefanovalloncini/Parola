@@ -2928,6 +2928,24 @@
         }
       }
     },
+    "BurnStyle.Outline": {
+      "comment": "The Burn sheet's switch for an edge around the subtitle text; the transcript's \"Outline\" is its list of sections.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outline"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contorno"
+          }
+        }
+      }
+    },
     "Burning subtitles into %@": {
       "extractionState": "manual",
       "localizations": {

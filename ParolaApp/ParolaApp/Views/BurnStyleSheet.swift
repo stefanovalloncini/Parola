@@ -41,7 +41,7 @@ struct BurnStyleSheet: View {
                 .axLeaf("BurnStyle.Picker.TextColor")
             }
 
-            optionRow("Outline") {
+            optionRow("BurnStyle.Outline") {
                 Toggle("", isOn: $model.burnOutline)
                     .toggleStyle(.switch)
                     .controlSize(.small)
