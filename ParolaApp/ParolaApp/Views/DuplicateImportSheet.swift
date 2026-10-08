@@ -15,8 +15,8 @@ struct DuplicateImportSheet: View {
             content: { contentBody },
             footer: { footerBody }
         )
-        .sheetSize(width: 500, minHeight: 200, maxHeight: 320)
-        .closeLeaf("Duplicate.Button.Close")
+        .sheetSize(width: 500, minHeight: 200, maxHeight: 360)
+        .hidesCloseButton()
         .axBranch("Duplicate")
     }
 
@@ -47,6 +47,11 @@ struct DuplicateImportSheet: View {
             .background(DS.Palette.subtleFill)
             .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
 
+            Toggle("Remember this choice", isOn: $remember)
+                .toggleStyle(.checkbox)
+                .fixedSize()
+                .axLeaf("Duplicate.Toggle.Remember")
+
             Spacer(minLength: 0)
         }
         .padding(DS.Spacing.regular)
@@ -66,17 +71,16 @@ struct DuplicateImportSheet: View {
 
     private var footerBody: some View {
         HStack(spacing: DS.Spacing.small) {
-            Toggle("Remember this choice", isOn: $remember)
-                .toggleStyle(.checkbox)
-                .font(DS.Font.secondary)
-                .fixedSize()
-                .axLeaf("Duplicate.Toggle.Remember")
-
-            Spacer(minLength: DS.Spacing.small)
+            Spacer(minLength: 0)
 
             Button("Transcribe Again") { model.transcribeDuplicateAgain(remembering: remember) }
                 .sheetSecondaryAction()
                 .axLeaf("Duplicate.Button.TranscribeAgain")
+
+            Button("Cancel") { model.dismissDuplicateImport() }
+                .sheetSecondaryAction()
+                .keyboardShortcut(.cancelAction)
+                .axLeaf("Duplicate.Button.Cancel")
 
             Button("Open Existing") { model.openExistingDuplicate(remembering: remember) }
                 .sheetPrimaryAction()

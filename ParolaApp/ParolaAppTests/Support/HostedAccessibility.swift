@@ -73,6 +73,30 @@ struct HostedWindow {
     }
 }
 
+extension HostedWindow {
+    enum Key {
+        case escape
+        case `return`
+
+        var code: UInt16 { self == .escape ? 53 : 36 }
+        var characters: String { self == .escape ? "\u{1b}" : "\r" }
+    }
+
+    /// The key as the window offers it to its views before anything else; true when a keyboard shortcut took it.
+    @discardableResult
+    func press(_ key: Key) -> Bool {
+        let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+            context: nil, characters: key.characters, charactersIgnoringModifiers: key.characters,
+            isARepeat: false, keyCode: key.code
+        )
+        guard let event else { return false }
+        let taken = window.performKeyEquivalent(with: event)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+        return taken
+    }
+}
+
 /// What SwiftUI hands VoiceOver in a hosted view; each walk raises an assistive app's flag and lowers it before it returns.
 @MainActor
 enum HostedAccessibility {
