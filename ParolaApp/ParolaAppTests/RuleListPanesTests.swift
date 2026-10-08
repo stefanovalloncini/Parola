@@ -296,6 +296,20 @@ struct RuleListPanesTests {
         await hosted.close()
     }
 
+    @Test("Snippets' placeholders are a note under the list, beside its other note, not a box of their own")
+    func snippetPlaceholdersAreAFooter() async throws {
+        let hosted = try await host(.snippets, words: ["alpha", "beta"])
+        let found = elements(hosted)
+        let note = try #require(found.first { $0.words.contains { $0.hasPrefix("Triggers fire on dictated text only") } })
+        let placeholders = try #require(found.first { $0.words.contains { $0.hasPrefix("These placeholders expand") } })
+        let add = try #require(element("Snippets.Button.Add", in: hosted))
+        #expect(placeholders.frame.maxY <= note.frame.minY, "the placeholders sit above the note")
+        #expect(note.frame.minY - placeholders.frame.maxY < 8, "the placeholders sit \(note.frame.minY - placeholders.frame.maxY) pt under the note")
+        #expect(add.frame.minY - note.frame.maxY < 24, "the note sits \(add.frame.minY - note.frame.maxY) pt under the list")
+        #expect(abs(placeholders.frame.minX - note.frame.minX) < 2, "the placeholders don't line up with the note")
+        await hosted.close()
+    }
+
     @Test("the toolbar shows from the threshold, or while it narrows the list")
     func toolbarThreshold() {
         let idle = RuleListQuery()

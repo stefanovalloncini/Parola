@@ -38,13 +38,15 @@ struct SnippetsPane: View {
                 if query.showsToolbar(ruleCount: model.snippets.count) {
                     RuleListToolbar(query: $query, placeholder: "Search snippets…", leafPrefix: "Snippets")
                 }
+            } footer: {
+                VStack(alignment: .leading, spacing: DS.Spacing.hair) {
+                    Text("Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
+                    Text("These placeholders expand in the replacement text: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")
+                }
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
-            SettingHelper(text: "Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
-            Text("These placeholders expand in the replacement text: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")
-                .font(DS.Font.mono)
-                .foregroundStyle(DS.Color.secondaryText)
-                .padding(.horizontal, DS.Spacing.tight)
             ResetPaneButton(scope: .snippets)
         }
     }
