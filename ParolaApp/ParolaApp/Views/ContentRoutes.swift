@@ -37,23 +37,19 @@ struct ContentRoutes: View {
 
     @ViewBuilder
     private var content: some View {
-        if model.mode == .test, model.settingsRoutePreview {
-            SettingsView()
-        } else {
-            switch model.route {
-            case .batch:
-                BatchView()
-            case .queue:
-                QueueView()
-            case .statistics:
-                StatisticsView()
-            case .recentlyDeleted:
-                MacRecentlyDeletedView()
-            case .recording:
-                StageRoute(library: libraryPage(browses: true), phasePage: phaseContent)
-            case .transcript:
-                transcriptPage
-            }
+        switch model.route {
+        case .batch:
+            BatchView()
+        case .queue:
+            QueueView()
+        case .statistics:
+            StatisticsView()
+        case .recentlyDeleted:
+            MacRecentlyDeletedView()
+        case .recording:
+            StageRoute(library: libraryPage(browses: true), phasePage: phaseContent)
+        case .transcript:
+            transcriptPage
         }
     }
 
@@ -81,7 +77,6 @@ struct ContentRoutes: View {
 
     /// Coarse on purpose: one case per library filter keeps the list's identity across a category switch.
     static func routeID(for model: AppModel) -> RouteID {
-        if model.mode == .test, model.settingsRoutePreview { return .settingsPreview }
         switch model.route {
         case .batch: return .batch
         case .queue: return .queue
@@ -94,7 +89,6 @@ struct ContentRoutes: View {
     }
 
     enum RouteID: Hashable {
-        case settingsPreview
         case batch
         case queue
         case statistics

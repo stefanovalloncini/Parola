@@ -10,6 +10,8 @@ struct ContentView: View {
             if model.introduction.isPresented {
                 IntroductionView()
                     .transition(.opacity)
+            } else if model.mode == .test, model.settingsRoutePreview {
+                SettingsView()
             } else {
                 home
                     .transition(.opacity)

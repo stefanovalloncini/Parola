@@ -146,7 +146,7 @@ struct TranscriptToolbarTests {
         }
     }
 
-    @Test("the test-mode Settings preview over a transcript leaves the transcript's controls out")
+    @Test("the test-mode Settings preview takes the whole window, with none of the transcript's controls")
     func settingsPreviewGetsNone() async {
         await withIsolatedDefaults { defaults in
             let model = AppModel(bootstrap: AppBootstrap(
@@ -165,7 +165,14 @@ struct TranscriptToolbarTests {
             #expect(arrived)
 
             model.settingsRoutePreview = true
-            await expectNoTranscriptControls(in: hosted, "over the Settings preview")
+            let replaced = await waitUntil {
+                let ids = toolbarIDs(hosted)
+                return shows("Settings.Sidebar.Button.general", in: ids) && !shows("Sidebar.Row.Library", in: ids)
+            }
+            #expect(replaced, "the preview should take the whole window: \(toolbarIDs(hosted))")
+            let ids = toolbarIDs(hosted)
+            let left = (Self.controls + [Self.newMenu]).filter { shows($0, in: ids) }
+            #expect(left.isEmpty, "\(left)")
         }
     }
 
