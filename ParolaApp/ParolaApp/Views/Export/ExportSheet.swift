@@ -66,9 +66,10 @@ struct ExportSheet: View {
             sectionTitle("Style")
             LeadingFlow(spacing: DS.Spacing.tight) {
                 ForEach(ExportStyle.allCases) { style in
-                    Button(LocalizedStringKey(style.displayName)) {
-                        model.setExportSpec(spec.changing(style: style))
-                    }
+                    Toggle(LocalizedStringKey(style.displayName), isOn: Binding(
+                        get: { spec.style == style },
+                        set: { if $0 { model.setExportSpec(spec.changing(style: style)) } }
+                    ))
                     .chip(chosen: spec.style == style)
                     .accessibilityAddTraits(spec.style == style ? .isSelected : [])
                     .axLeaf("Export.Button.Style.\(style.rawValue)")
@@ -82,9 +83,10 @@ struct ExportSheet: View {
             sectionTitle("Format")
             LeadingFlow(spacing: DS.Spacing.tight) {
                 ForEach(spec.style.formats, id: \.self) { format in
-                    Button(LocalizedStringKey(format.displayName)) {
-                        model.setExportSpec(spec.changing(format: format))
-                    }
+                    Toggle(LocalizedStringKey(format.displayName), isOn: Binding(
+                        get: { spec.format == format },
+                        set: { if $0 { model.setExportSpec(spec.changing(format: format)) } }
+                    ))
                     .chip(chosen: spec.format == format)
                     .accessibilityAddTraits(spec.format == format ? .isSelected : [])
                     .axLeaf("Export.Button.Format.\(format.fileExtension)")
@@ -312,12 +314,13 @@ struct ExportSheet: View {
 }
 
 private extension View {
+    /// A push-on button: the chosen one fills with the accent, and still reads as pressed in a window that isn't key.
     @ViewBuilder
     func chip(chosen: Bool) -> some View {
         if chosen {
-            buttonStyle(.borderedProminent)
+            toggleStyle(.button).buttonStyle(.borderedProminent)
         } else {
-            sheetButton()
+            toggleStyle(.button).sheetButton()
         }
     }
 }

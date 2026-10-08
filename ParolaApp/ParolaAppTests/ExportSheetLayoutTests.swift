@@ -83,6 +83,58 @@ struct ExportSheetLayoutTests {
         #expect(!otherFormat.isSelected)
     }
 
+    @Test("pressing a chip chooses it, and pressing the chosen one keeps it")
+    func pressingAChipChoosesIt() {
+        let model = makeModel()
+        let hosted = host(model)
+        defer { hosted.close() }
+        let pressedMarkdown = HostedAccessibility.press(endingWith: "Export.Button.Format.md", in: hosted.host)
+        #expect(pressedMarkdown)
+        #expect(model.exportSheetSpec.format == .md)
+        hosted.host.layoutSubtreeIfNeeded()
+        let pressedAgain = HostedAccessibility.press(endingWith: "Export.Button.Format.md", in: hosted.host)
+        #expect(pressedAgain)
+        #expect(model.exportSheetSpec.format == .md)
+        let pressedSubtitles = HostedAccessibility.press(endingWith: "Export.Button.Style.subtitles", in: hosted.host)
+        #expect(pressedSubtitles)
+        #expect(model.exportSheetSpec.style == .subtitles)
+    }
+
+    @Test("the chosen Style and Format still stand out while the sheet's window isn't key")
+    func chosenChipsShowInAnInactiveWindow() throws {
+        let model = makeModel()
+        let hosted = host(model)
+        defer { hosted.close() }
+        let elements = HostedAccessibility.elements(in: hosted.host)
+        let bitmap = try #require(hosted.host.bitmapImageRepForCachingDisplay(in: hosted.host.bounds))
+        hosted.host.cacheDisplay(in: hosted.host.bounds, to: bitmap)
+        let scale = CGFloat(bitmap.pixelsWide) / hosted.host.bounds.width
+        let window = hosted.window.frame
+        func bezel(_ leaf: String) throws -> NSColor {
+            let found = elements.first { $0.identifier?.hasSuffix(leaf) == true }
+            let chip = try #require(found, "no \(leaf)").frame
+            let x = Int((chip.minX - window.minX + 5) * scale)
+            let y = Int((window.maxY - chip.midY) * scale)
+            return try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+        }
+        let chosenStyle = try bezel("Export.Button.Style.transcript")
+        let otherStyle = try bezel("Export.Button.Style.subtitles")
+        let chosenFormat = try bezel("Export.Button.Format.txt")
+        let otherFormat = try bezel("Export.Button.Format.md")
+        func apart(_ one: NSColor, _ other: NSColor) -> CGFloat {
+            [
+                one.redComponent - other.redComponent,
+                one.greenComponent - other.greenComponent,
+                one.blueComponent - other.blueComponent,
+                one.alphaComponent - other.alphaComponent,
+            ].map(abs).max() ?? 0
+        }
+        let styleGap = apart(chosenStyle, otherStyle)
+        let formatGap = apart(chosenFormat, otherFormat)
+        #expect(styleGap > 0.02, "\(chosenStyle) vs \(otherStyle)")
+        #expect(formatGap > 0.02, "\(chosenFormat) vs \(otherFormat)")
+    }
+
     @Test("Close sits beside Export on the trailing side, and Copy to Clipboard leads")
     func closeSitsBesideTheDefaultButton() throws {
         let model = makeModel()
