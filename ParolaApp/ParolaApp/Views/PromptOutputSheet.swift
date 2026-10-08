@@ -65,12 +65,12 @@ struct PromptOutputSheet: View {
             }
         } else {
             HStack(spacing: DS.Spacing.small) {
+                Spacer()
+
                 Button("Close") { dismiss() }
                     .sheetSecondaryAction()
                     .keyboardShortcut(.cancelAction)
                     .axLeaf("PromptOutput.Button.Close")
-
-                Spacer()
 
                 Button(action: copy) {
                     Label(copied ? "Copied" : "Copy",

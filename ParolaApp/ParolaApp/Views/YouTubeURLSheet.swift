@@ -64,15 +64,15 @@ struct YouTubeURLSheet: View {
 
             Spacer(minLength: DS.Spacing.small)
 
-            Button("Cancel") { dismiss() }
-                .sheetSecondaryAction()
-                .keyboardShortcut(.cancelAction)
-                .axLeaf("YouTube.Button.Cancel")
-
             Button("Use Captions") { submit(prefersExistingSubs: true) }
                 .sheetSecondaryAction()
                 .disabled(disabled || !model.ytDlpAvailable)
                 .axLeaf("YouTube.Button.UseCaptions")
+
+            Button("Cancel") { dismiss() }
+                .sheetSecondaryAction()
+                .keyboardShortcut(.cancelAction)
+                .axLeaf("YouTube.Button.Cancel")
 
             Button("Transcribe") { submit(prefersExistingSubs: false) }
                 .sheetPrimaryAction()

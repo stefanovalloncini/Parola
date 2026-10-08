@@ -65,12 +65,12 @@ struct BurnStyleSheet: View {
 
     private var footerBody: some View {
         HStack(spacing: DS.Spacing.small) {
+            Spacer()
+
             Button("Cancel") { dismiss() }
                 .sheetSecondaryAction()
                 .keyboardShortcut(.cancelAction)
                 .axLeaf("BurnStyle.Button.Cancel")
-
-            Spacer()
 
             Button("Choose Video…") {
                 dismiss()

@@ -74,12 +74,12 @@ struct SpeakersSheet: View {
 
     private var footerBody: some View {
         HStack(spacing: DS.Spacing.small) {
+            Spacer()
+
             Button("Cancel") { dismiss() }
                 .sheetSecondaryAction()
                 .keyboardShortcut(.cancelAction)
                 .axLeaf("Speakers.Button.Cancel")
-
-            Spacer()
 
             Button("Done") {
                 model.applySpeakerRenames(renames.filter { $0.key != $0.value })
