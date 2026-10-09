@@ -850,30 +850,39 @@ struct StageClockLayerTests {
         #expect(abs(drawnAt.minY - element.frame.minY) < 0.5 && abs(drawnAt.height - element.frame.height) < 0.5, "\(drawnAt) over \(element.frame)")
     }
 
-    @Test("as the clock grows a digit at 10:00 the digits that changed roll, the new one just appears, and every character keeps to its place")
-    func growingClockRollsOnlyItsChangedDigits() throws {
+    @Test(
+        "as the clock grows a digit at 10:00 or 1:00:00 the digits that changed roll out where they stood, the new one just appears, and every character keeps to its place",
+        arguments: [("9:59", "10:00", [0, 1, 3]), ("59:59", "1:00:00", [0, 1, 3, 4])]
+    )
+    func growingClockRollsOnlyItsChangedDigits(from: String, to: String, rolls: [Int]) throws {
         let window = OffscreenWindow(width: 300, height: 120, styleMask: [.borderless])
         defer { window.orderOut(nil) }
         let view = StageClock.DigitsView()
-        view.frame = CGRect(x: 0, y: 0, width: 200, height: 66)
+        view.frame = CGRect(x: 0, y: 0, width: 260, height: 66)
         window.contentView?.addSubview(view)
         window.orderFront(nil)
         let ink = Color.black.resolve(in: EnvironmentValues())
-        view.show("9:59", font: DS.Font.takeTimerStage, ink: ink)
+        view.show(from, font: DS.Font.takeTimerStage, ink: ink)
+        let stood = view.places.mapValues(\.shown.frame.origin)
         let colonBefore = try #require(view.places[2]).shown.frame.minX
         #expect(view.places.values.allSatisfy { $0.shown.animation(forKey: StageClock.rollKey) == nil }, "the first time shown stands still")
 
-        view.show("10:00", font: DS.Font.takeTimerStage, ink: ink)
+        view.show(to, font: DS.Font.takeTimerStage, ink: ink)
         let rolling = Set(view.places.filter { $0.value.shown.animation(forKey: StageClock.rollKey) != nil }.keys)
-        #expect(rolling == [0, 1, 3])
-        #expect(view.places[4]?.character == "1")
+        #expect(rolling == Set(rolls))
+        #expect(view.places[to.count - 1]?.character == "1")
         #expect(view.places[2]?.character == ":")
         let colonAfter = try #require(view.places[2]).shown.frame.minX
         #expect(colonAfter > colonBefore, "the colon moves right as a digit joins on its left")
+        for index in rolling {
+            let place = try #require(view.places[index])
+            #expect(place.leaving.frame.origin == stood[index], "place \(index)'s old digit rolls out where it stood")
+            #expect(place.shown.frame.minX > place.leaving.frame.minX, "place \(index)'s new digit rolls in where it now stands")
+        }
         let lefts = view.places.sorted { $0.key > $1.key }.map(\.value.shown.frame.minX)
         #expect(lefts == lefts.sorted())
 
-        view.show("10:00", font: DS.Font.takeTimerStage, ink: Color.white.resolve(in: EnvironmentValues()))
+        view.show(to, font: DS.Font.takeTimerStage, ink: Color.white.resolve(in: EnvironmentValues()))
         #expect(view.places.values.allSatisfy { $0.shown.animation(forKey: StageClock.rollKey) == nil }, "a new ink redraws the digits in place")
     }
 

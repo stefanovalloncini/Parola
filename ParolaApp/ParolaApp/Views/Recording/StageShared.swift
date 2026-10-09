@@ -190,10 +190,11 @@ struct StageClock: View {
                 x += glyph.size.width
                 let old = place.character
                 if redrawn || old != character {
+                    let stood = place.shown.frame.origin
                     place.character = character
                     put(glyph, in: place.shown, at: origin, scale: scale)
                     if !redrawn, window != nil, let old, let out = ClockGlyphs.glyph(old, font: font, ink: ink, scale: scale) {
-                        put(out, in: place.leaving, at: origin, scale: scale)
+                        put(out, in: place.leaving, at: stood, scale: scale)
                         place.leaving.add(StageClock.rollAnimation(entering: false, scale: scale), forKey: StageClock.rollKey)
                         place.shown.add(StageClock.rollAnimation(entering: true, scale: scale), forKey: StageClock.rollKey)
                     } else {
