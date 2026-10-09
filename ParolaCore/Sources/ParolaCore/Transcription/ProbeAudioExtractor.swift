@@ -2,9 +2,7 @@ import Accelerate
 import AVFoundation
 import Foundation
 
-/// Measures how loud the stretches of a recording are and copies the loudest few out for a language
-/// probe, because a voice memo often opens with minutes of room noise that would tell a recognizer
-/// nothing.
+/// Finds a recording's loudest stretches for language probes: memos often open on minutes of room noise.
 enum ProbeAudioExtractor {
     private static let measureSlices = 8
     private static let measureSliceSeconds = 0.5
