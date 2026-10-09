@@ -178,6 +178,29 @@ struct RecordingPillMeterTests {
     }
 
     @MainActor
+    @Test("VoiceOver hears the pill's meter give the level while the take records, and \"Paused\" once it pauses")
+    func pausedPillMeterSaysPaused() async throws {
+        let audio = try tempWAV("pill-paused")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("pill-paused")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -30))
+        defer { model.endTestTake() }
+        let takeID = model.recording?.takeID
+        let face = RecordingPillFace(model: model, isOnScreen: true, onShowParola: {}, onStop: { _ in }, onSize: { _ in })
+        let hosted = HostedWindow(face.environment(model), width: 400, height: 80)
+        defer { hosted.close() }
+        @MainActor func meter() -> String? {
+            HostedAccessibility.elements(in: hosted.host).first { $0.identifier?.hasSuffix("RecordingPill.Meter.Level") == true }?.value
+        }
+
+        let drawn = await waitUntil { meter()?.hasSuffix("%") == true }
+        #expect(drawn, "the meter reads \(meter() ?? "nothing")")
+        model.updateSession(of: takeID) { $0.pause(at: Date()) }
+        let paused = await waitUntil { meter() == "Paused" }
+        #expect(paused, "the meter reads \(meter() ?? "nothing")")
+    }
+
+    @MainActor
     @Test("drawn on its layer, a quiet pill meter's bars sit along the foot of its box, not the top")
     func quietBarsDrawAtTheFoot() throws {
         let model = makeRecordingModel("pill-bars-drawn")
