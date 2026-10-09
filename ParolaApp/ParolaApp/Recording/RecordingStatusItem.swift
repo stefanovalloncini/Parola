@@ -24,11 +24,10 @@ final class RecordingStatusItem: NSObject {
     private let statusBar: NSStatusBar?
     private let appIsActive: @MainActor () -> Bool
     private var item: NSStatusItem?
-    private var tick: Task<Void, Never>?
     private var failure = OutOfSightFailure()
     private(set) var face: Face?
-
-    var isTicking: Bool { tick != nil }
+    /// Following the take's clock, which moves only while the take records.
+    private(set) var isTicking = false
 
     /// Without a status bar the face is kept and nothing reaches the menu bar, as a test wants it.
     init(statusBar: NSStatusBar? = .system, appIsActive: @escaping @MainActor () -> Bool = { NSApp.isActive }) {
@@ -112,8 +111,8 @@ final class RecordingStatusItem: NSObject {
         let take = model.recording
         let held = failure.holds(take, stoppedOnItsOwn: model.takeStoppedOnItsOwn, appActive: appIsActive())
         if enabled, let take, take.isRunning || held {
-            show(take, now: Date())
-            if take.state == .recording { startTick() } else { stopTick() }
+            isTicking = take.state == .recording
+            show(take, now: model.takeClockNow(following: isTicking))
         } else {
             hide()
         }
@@ -161,7 +160,7 @@ final class RecordingStatusItem: NSObject {
     }
 
     private func hide() {
-        stopTick()
+        isTicking = false
         face = nil
         guard let item else { return }
         statusBar?.removeStatusItem(item)
@@ -192,29 +191,6 @@ final class RecordingStatusItem: NSObject {
     nonisolated static func firstSentence(of text: String) -> String {
         guard let end = text.range(of: ". ") else { return text }
         return String(text[..<end.lowerBound]) + "."
-    }
-
-    /// Reads the take's clock as each of its seconds turns over, as the Dock badge does; a paused clock needs no reading.
-    private func startTick() {
-        guard tick == nil else { return }
-        tick = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                guard let wait = self?.refresh() else { return }
-                try? await Task.sleep(for: .seconds(wait))
-            }
-        }
-    }
-
-    private func stopTick() {
-        tick?.cancel()
-        tick = nil
-    }
-
-    private func refresh() -> Double {
-        guard let take = model?.recording, take.state == .recording else { return 1 }
-        let now = Date()
-        show(take, now: now)
-        return DockBadge.secondsToNextTick(for: take, now: now)
     }
 
     @objc private func stop() {

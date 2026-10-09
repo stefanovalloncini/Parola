@@ -370,7 +370,7 @@ extension AppModel {
         let clock = clock
         recordingWatchTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30), clock: clock)
+                try? await Task.sleep(for: .seconds(30), tolerance: .seconds(1), clock: clock)
                 if Task.isCancelled { return }
                 guard let self else { return }
                 await self.checkRecordingDiskSpace()

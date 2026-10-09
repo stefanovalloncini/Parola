@@ -873,7 +873,7 @@ extension TranscriberMockSuites {
                 talking.cancel()
 
                 let quiet = feed(mac: mac.levelMeter, mic: mic.levelMeter, micLevel: 0)
-                // A few 750 ms ticks of the watch, and a slow host can stall the main actor for seconds.
+                // A few of the watch's 800 ms checks, and a slow host can stall the main actor for seconds.
                 let silent = await waitUntil(timeoutMs: 15_000) { model.recordingIsSilent }
                 #expect(silent)
                 #expect(model.takeMicTrackState == .recording)

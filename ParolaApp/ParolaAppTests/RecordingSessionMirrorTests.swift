@@ -244,7 +244,7 @@ extension TranscriberMockSuites {
             let cameUp = Date()
             #expect(model.recording?.isArming == true)
             #expect(model.takeInProgress, "a capture that is up holds audio a quit would lose")
-            #expect(model.silenceWatchTask != nil)
+            #expect(model.watchesSilence)
 
             let warned = await waitUntil { model.recordingIsSilent }
             #expect(warned, "Mac audio that has heard nothing yet warns early")

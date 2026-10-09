@@ -113,12 +113,12 @@ extension TranscriberMockSuites {
             let model = makeRecordingModel("take-pause-capture")
             let capture = ScriptedCapture(file: audio)
             try await startScriptedTake(model, capture)
-            #expect(model.silenceWatchTask != nil)
+            #expect(model.watchesSilence)
 
             #expect(model.pauseTake())
             let heldAt = try #require(model.recording?.elapsed(at: Date()))
             let levelsAtPause = model.takeLevels?.sampleCount ?? 0
-            #expect(model.silenceWatchTask == nil)
+            #expect(!model.watchesSilence)
             #expect(!model.recordingIsSilent)
             try await Task.sleep(for: .milliseconds(400))
             let drift = (model.recording?.elapsed(at: Date()) ?? 0) - heldAt
@@ -128,7 +128,7 @@ extension TranscriberMockSuites {
             #expect(model.resumeTake())
             #expect(model.pauseTake())
             #expect(model.resumeTake())
-            #expect(model.silenceWatchTask != nil)
+            #expect(model.watchesSilence)
             let told = await waitUntil { await capture.pauseCalls.count == 4 }
             #expect(told)
             #expect(await capture.pauseCalls == [true, false, true, false])

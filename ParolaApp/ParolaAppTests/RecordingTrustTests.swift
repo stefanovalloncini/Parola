@@ -649,12 +649,12 @@ extension TranscriberMockSuites {
                 arming: .startingCapture
             )
             #expect(DockBadge.recordingBadge(for: take, now: start) == "…")
-            #expect(DockBadge.secondsToNextTick(for: take, now: start) == 1)
 
             take.markCapturing(at: start)
 
             #expect(DockBadge.recordingBadge(for: take, now: start.addingTimeInterval(3_725)) == "1:02:05")
-            #expect(abs(DockBadge.secondsToNextTick(for: take, now: start.addingTimeInterval(2.3)) - 0.7) < 0.000_1)
+            #expect(DockBadge.recordingBadge(for: take, now: start.addingTimeInterval(2.999)) == "0:02")
+            #expect(DockBadge.recordingBadge(for: take, now: start.addingTimeInterval(3.002)) == "0:03")
         }
 
         @Test("the Dock badge holds still while a take is paused, and after it stops")
@@ -706,7 +706,7 @@ extension TranscriberMockSuites {
                 await waitUntil { model.recordingLevelMeter != nil && model.recordingStartedAt != nil }
                 #expect(AppModel.RecordSource.systemAudio.meterLabel == "System audio")
 
-                // A few 750 ms ticks of the watch, and a slow host can stall the main actor for seconds.
+                // A few of the watch's 800 ms checks, and a slow host can stall the main actor for seconds.
                 await waitUntil(timeoutMs: 15_000) { model.recordingIsSilent }
 
                 model.recordingLevelMeter?.record(0.6)

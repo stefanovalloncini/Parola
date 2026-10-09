@@ -171,12 +171,8 @@ struct RecordingPillFace: View {
             let warning = TakeRemote.warning(for: take, in: model)
             if let ending = TakeRemote.ending(of: take, stopReason: model.takeStopReason) {
                 chrome(stoppedFace(ending), warned: false)
-            } else if isOnScreen, take.state == .recording, let origin = take.clockOrigin {
-                TimelineView(.periodic(from: origin, by: 1)) { context in
-                    chrome(face(take, warning: warning, at: context.date), warned: warning != nil)
-                }
             } else {
-                chrome(face(take, warning: warning, at: Date()), warned: warning != nil)
+                chrome(face(take, warning: warning), warned: warning != nil)
             }
         }
     }
@@ -218,28 +214,9 @@ struct RecordingPillFace: View {
             .axBranch("RecordingPill")
     }
 
-    /// A warning the Stage would show sits after the clock in amber, and is what the pointer and VoiceOver hear about.
-    private func face(_ take: RecordingSession, warning: TakeRemote.Warning?, at now: Date) -> some View {
+    private func face(_ take: RecordingSession, warning: TakeRemote.Warning?) -> some View {
         HStack(spacing: DS.Spacing.regular) {
-            Button(action: onShowParola) {
-                HStack(spacing: DS.Spacing.small) {
-                    TakeLight(take: take, pulsesFrom: isOnScreen && take.state == .recording ? take.clockOrigin : nil)
-                    Text(verbatim: TakeRemote.clock(for: take, now: now))
-                        .font(DS.Font.takeTimerCompact)
-                        .foregroundStyle(DS.Color.primaryText)
-                    if let warning {
-                        Image(systemName: warning.symbol)
-                            .foregroundStyle(DS.Color.warningText)
-                    }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(warning.map { Text(verbatim: $0.message) } ?? Text("Show Recording"))
-            .accessibilityLabel(Text(verbatim: TakeRemote.spokenStatus(for: take, at: now)))
-            .accessibilityValue(Text(verbatim: warning?.message ?? ""))
-            .accessibilityHint("Show Recording")
-            .axLeaf("Button.ShowParola")
+            PillClock(model: model, take: take, warning: warning, ticks: isOnScreen && take.state == .recording, onShowParola: onShowParola)
             LiveLevelBars(
                 model: model,
                 style: .pill,
@@ -263,5 +240,38 @@ struct RecordingPillFace: View {
             .accessibilityLabel(Text(verbatim: TakeRemote.endTitle(for: take)))
             .axLeaf("Button.Stop")
         }
+    }
+}
+
+/// The pill's light and clock, which a click answers with Parola; a view of its own, so only it turns over with the take's seconds. A warning the Stage would show sits after the clock in amber, and is what the pointer and VoiceOver hear about.
+private struct PillClock: View {
+    let model: AppModel
+    let take: RecordingSession
+    let warning: TakeRemote.Warning?
+    /// Off while the panel is hidden or the take's clock can't move.
+    let ticks: Bool
+    let onShowParola: () -> Void
+
+    var body: some View {
+        let now = model.takeClockNow(following: ticks)
+        Button(action: onShowParola) {
+            HStack(spacing: DS.Spacing.small) {
+                TakeLight(take: take, pulsesFrom: ticks ? take.clockOrigin : nil)
+                Text(verbatim: TakeRemote.clock(for: take, now: now))
+                    .font(DS.Font.takeTimerCompact)
+                    .foregroundStyle(DS.Color.primaryText)
+                if let warning {
+                    Image(systemName: warning.symbol)
+                        .foregroundStyle(DS.Color.warningText)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(warning.map { Text(verbatim: $0.message) } ?? Text("Show Recording"))
+        .accessibilityLabel(Text(verbatim: TakeRemote.spokenStatus(for: take, at: now)))
+        .accessibilityValue(Text(verbatim: warning?.message ?? ""))
+        .accessibilityHint("Show Recording")
+        .axLeaf("Button.ShowParola")
     }
 }

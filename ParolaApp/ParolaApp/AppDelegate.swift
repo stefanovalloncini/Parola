@@ -272,11 +272,11 @@ final class DockBadge {
     private let appIsActive: @MainActor () -> Bool
     private let requestAttention: @MainActor () -> Void
     private var shown: String??
-    private var tick: Task<Void, Never>?
     private var failure = OutOfSightFailure(includesTranscription: true)
     private var macStopWeighed: Int?
 
-    var isTicking: Bool { tick != nil }
+    /// Following the take's clock, which moves only while the take records.
+    private(set) var isTicking = false
 
     init(
         show: @escaping @MainActor (String?) -> Void = { NSApp.dockTile.badgeLabel = $0 },
@@ -315,10 +315,10 @@ final class DockBadge {
         }
         askForALookAtMacAudioStop(model)
         if let take = model.recording, take.isRunning {
-            display(Self.recordingBadge(for: take, now: Date()))
-            if take.state == .recording { startTick() } else { stopTick() }
+            isTicking = take.state == .recording
+            display(Self.recordingBadge(for: take, now: model.takeClockNow(following: isTicking)))
         } else {
-            stopTick()
+            isTicking = false
             let takeTranscribing = model.recording?.isTranscribing ?? false
             display(Self.badge(for: model.phase, takeTranscribing: takeTranscribing, burnProgress: model.burnJob?.progress))
         }
@@ -337,40 +337,10 @@ final class DockBadge {
         show(label)
     }
 
-    /// Reads the take's own clock each second, turning over with the pane's; a clock that can't move needs no reading.
-    private func startTick() {
-        guard tick == nil else { return }
-        tick = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                guard let wait = self?.showTakeClock() else { return }
-                try? await Task.sleep(for: .seconds(wait))
-            }
-        }
-    }
-
-    private func stopTick() {
-        tick?.cancel()
-        tick = nil
-    }
-
-    private func showTakeClock() -> Double {
-        guard let take = model?.recording, take.state == .recording else { return 1 }
-        let now = Date()
-        display(Self.recordingBadge(for: take, now: now))
-        return Self.secondsToNextTick(for: take, now: now)
-    }
-
     /// A take still starting has no time to show yet.
     nonisolated static func recordingBadge(for take: RecordingSession, now: Date) -> String {
         guard take.startedAt != nil else { return "…" }
         return AppFormat.elapsed(take.elapsed(at: now))
-    }
-
-    nonisolated static func secondsToNextTick(for take: RecordingSession, now: Date) -> Double {
-        guard take.state == .recording, take.startedAt != nil else { return 1 }
-        let elapsed = take.elapsed(at: now)
-        let next = elapsed.rounded(.down) + 1 - elapsed
-        return max(0.05, next)
     }
 
     /// A burn shows its progress only while nothing in the window reports its own; a take transcribing reports as a file's run does.

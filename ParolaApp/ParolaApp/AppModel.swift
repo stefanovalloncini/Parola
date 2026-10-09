@@ -278,6 +278,8 @@ final class AppModel {
     var takeStopReason: String?
     var takeStoppedOnItsOwn: Bool { takeStopReason != nil }
     private(set) var takeLevelTick = 0
+    /// The running take's clock in whole seconds, pauses left out, turned over by the sampler's tick; the Dock badge, the menu bar item and the pill read their seconds off it.
+    private(set) var takeClockSeconds = 0
     /// When the newest of the take's levels came in; the Stage's band slides from here until the next one.
     @ObservationIgnored private(set) var takeLevelTickAt = Date.distantPast
     @ObservationIgnored private var takeSampler: Task<Void, Never>?
@@ -330,6 +332,9 @@ final class AppModel {
     /// How long a take whose capture is up waits for a metered buffer before its clock starts from the capture anyway.
     nonisolated static let firstBufferWait: Duration = .seconds(2)
     nonisolated static let takeSampleInterval: Duration = .milliseconds(100)
+    /// How late a tick may land, so the kernel can wake for it with other timers.
+    nonisolated static let takeSampleTolerance: Duration = .milliseconds(10)
+    nonisolated static let silenceCheckTicks = 8
     /// The route the running take took; the recording pane reads it.
     var liveTakeIsStreaming: Bool { recording?.isStreaming ?? false }
     /// When the take in progress began capturing; the pane, the toolbar and the Dock all count from it.
@@ -1501,7 +1506,9 @@ final class AppModel {
     var recordingIsSilent: Bool = false
     @ObservationIgnored var silenceDetector: SilenceDetector = SilenceDetector(threshold: 8)
     @ObservationIgnored var silenceRule = SilenceRule()
-    @ObservationIgnored var silenceWatchTask: Task<Void, Never>?
+    /// The take's silence watch runs on the sampler's tick from its capture's start until it pauses or ends.
+    @ObservationIgnored private(set) var watchesSilence = false
+    @ObservationIgnored private var silenceTicks = 0
     @ObservationIgnored var recordingAutoStopTask: Task<Void, Never>?
     @ObservationIgnored private var recordingAutoStop: AutoStopBudget?
     /// The last pause or resume on its way to the capture; the next one waits for it.
@@ -2156,7 +2163,7 @@ final class AppModel {
         cancelRecordingCountdown()
         batchTask?.cancel(); batchTask = nil
         matchesDebounce?.cancel(); matchesDebounce = nil
-        silenceWatchTask?.cancel(); silenceWatchTask = nil
+        watchesSilence = false
         cancelRecordingAutoStop()
         recordingWatchTask?.cancel(); recordingWatchTask = nil
         searchTask?.cancel(); searchTask = nil
@@ -4254,6 +4261,7 @@ final class AppModel {
     private func clearTakeReadouts() {
         takeReadoutsOwner = nil
         stopTakeSampler()
+        if takeClockSeconds != 0 { takeClockSeconds = 0 }
         if recordingLevelMeter != nil { recordingLevelMeter = nil }
         recordingLevelTrace = nil
     }
@@ -4264,7 +4272,7 @@ final class AppModel {
         clearTakeReadouts()
     }
 
-    /// The one reader of the take's meter peak, which every read resets; the first buffer it finds starts the take's clock.
+    /// The one reader of the take's meter peak, which every read resets; the first buffer it finds starts the take's clock. Its tick is the take's one timer: the clock's seconds and the silence watch run on it too.
     private func startTakeSampler(meter: LevelMeter, take: TakeContext) {
         stopTakeSampler()
         takeSampler = Task { @MainActor [weak self] in
@@ -4272,16 +4280,29 @@ final class AppModel {
             while !Task.isCancelled {
                 guard let self else { return }
                 self.sampleTake(meter, take: take)
-                tick = Self.nextSampleTick(after: tick, now: .now)
-                try? await Task.sleep(until: tick, clock: .continuous)
+                self.watchSilence()
+                tick = Self.nextSampleTick(after: tick, now: .now, clock: self.runningClockElapsed(of: take))
+                try? await Task.sleep(until: tick, tolerance: Self.takeSampleTolerance, clock: .continuous)
             }
         }
     }
 
-    /// Ten a second on average, whatever a tick costs; a stall longer than a second is skipped rather than replayed.
-    nonisolated static func nextSampleTick(after tick: ContinuousClock.Instant, now: ContinuousClock.Instant) -> ContinuousClock.Instant {
-        let next = tick + takeSampleInterval
-        return next < now - .seconds(1) ? now : next
+    /// Ten a second on average, whatever a tick costs; a stall longer than a second is skipped rather than replayed. While the take's clock runs, a tick lands just past each tenth of it, so one sees each of its seconds turn over.
+    nonisolated static func nextSampleTick(
+        after tick: ContinuousClock.Instant, now: ContinuousClock.Instant, clock elapsed: TimeInterval? = nil
+    ) -> ContinuousClock.Instant {
+        guard let elapsed else {
+            let next = tick + takeSampleInterval
+            return next < now - .seconds(1) ? now : next
+        }
+        let step = 0.1, lag = 0.002
+        let target = ((elapsed - lag) / step).rounded(.down) * step + step + lag
+        return now + .seconds(max(target - elapsed, 0.000_1))
+    }
+
+    private func runningClockElapsed(of take: TakeContext) -> TimeInterval? {
+        guard let session = recording, session.takeID == take.id, session.state == .recording else { return nil }
+        return session.elapsed(at: Date())
     }
 
     private func stopTakeSampler() {
@@ -4306,6 +4327,14 @@ final class AppModel {
         takeMicLevels?.append(micPeak ?? 0)
         takeLevelTick &+= 1
         takeLevelTickAt = Date()
+        let seconds = Int(session.elapsed(at: takeLevelTickAt))
+        if takeClockSeconds != seconds { takeClockSeconds = seconds }
+    }
+
+    /// When to read the take's clock for display; `following` ties the reader, inside an observation, to the clock's seconds, so it reads again as each turns over.
+    func takeClockNow(following: Bool) -> Date {
+        if following { _ = takeClockSeconds }
+        return Date()
     }
 
     /// The wall-clock moment a meter reading came in.
@@ -4350,16 +4379,13 @@ final class AppModel {
     /// Reads the meter rather than a voice detector, so every source warns off the same signal: mic or Mac audio, live or not.
     private func startSilenceWatch() {
         stopSilenceWatch()
-        silenceDetector.reset()
-        recordingIsSilent = false
-        let clock = clock
-        silenceWatchTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(750), clock: clock)
-                if Task.isCancelled { return }
-                self?.noteRecordingLevel()
-            }
-        }
+        watchesSilence = true
+    }
+
+    private func watchSilence() {
+        guard watchesSilence else { return }
+        silenceTicks += 1
+        if silenceTicks.isMultiple(of: Self.silenceCheckTicks) { noteRecordingLevel() }
     }
 
     private func noteRecordingLevel() {
@@ -4376,8 +4402,8 @@ final class AppModel {
     }
 
     private func stopSilenceWatch() {
-        silenceWatchTask?.cancel()
-        silenceWatchTask = nil
+        watchesSilence = false
+        silenceTicks = 0
         silenceDetector.reset()
         recordingIsSilent = false
     }
