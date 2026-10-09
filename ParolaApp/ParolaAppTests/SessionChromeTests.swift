@@ -176,6 +176,34 @@ struct RecordingPillMeterTests {
         let newest = style.path([1])
         #expect(newest.boundingRect == CGRect(x: 0, y: 0, width: 3, height: 16))
     }
+
+    @MainActor
+    @Test("drawn on its layer, a quiet pill meter's bars sit along the foot of its box, not the top")
+    func quietBarsDrawAtTheFoot() throws {
+        let model = makeRecordingModel("pill-bars-drawn")
+        let bars = LiveLevelBars(model: model, style: .pill, ink: .black, follows: false, identifier: "Meter.Level")
+        let hosted = HostedWindow(bars.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading), width: 40, height: 40)
+        defer { hosted.close() }
+        func views(in view: NSView) -> [LiveLevelBars.BarsView] {
+            ((view as? LiveLevelBars.BarsView).map { [$0] } ?? []) + view.subviews.flatMap(views(in:))
+        }
+        let view = try #require(views(in: hosted.host).first)
+        #expect(view.bounds.size == CGSize(width: 13, height: 16))
+        let layer = try #require(view.layer)
+        let context = try #require(CGContext(
+            data: nil, width: 13, height: 16, bitsPerComponent: 8, bytesPerRow: 13 * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        layer.render(in: context)
+        let image = try #require(context.makeImage())
+        let pixels = try #require(image.dataProvider?.data as Data?)
+        // A bitmap's first row is its top.
+        func inked(row: Int) -> Bool {
+            (0..<13).contains { pixels[(row * 13 + $0) * 4 + 3] > 128 }
+        }
+        #expect((13..<16).allSatisfy(inked), "the quiet bars stand three points tall on the foot")
+        #expect(!(0..<12).contains(where: inked), "nothing above them")
+    }
 }
 
 @MainActor
