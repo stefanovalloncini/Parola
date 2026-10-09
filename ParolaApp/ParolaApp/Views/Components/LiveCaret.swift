@@ -3,13 +3,39 @@ import SwiftUI
 /// Marks the caret's place at the end of a live text, so the caret's own view can sit over it.
 struct LiveCaretMark: TextAttribute {}
 
-/// The live caret on a view of its own, over a transparent one the text ends with: a blink redraws the caret, never the paragraph.
+/// Where the placeholder caret sits: its baseline origin and the room its line gives it, in the overlay's space.
+struct CaretPlace: Equatable {
+    var origin: CGPoint
+    var ascent: CGFloat
+    var descent: CGFloat
+    var width: CGFloat
+
+    static func find(in layouts: [Text.LayoutKey.AnchoredLayout], proxy: GeometryProxy) -> CaretPlace? {
+        for anchored in layouts.reversed() {
+            for line in anchored.layout.reversed() {
+                for run in line.reversed() where run[LiveCaretMark.self] != nil {
+                    let origin = proxy[anchored.origin]
+                    let bounds = run.typographicBounds
+                    return CaretPlace(
+                        origin: CGPoint(x: origin.x + bounds.origin.x, y: origin.y + bounds.origin.y),
+                        ascent: bounds.ascent,
+                        descent: bounds.descent,
+                        width: bounds.width
+                    )
+                }
+            }
+        }
+        return nil
+    }
+}
+
+/// The live caret on a view of its own, over a transparent one the text ends with: a blink changes the caret's opacity, nothing else.
 struct LiveCaret: View {
     let font: Font
-    /// Where the placeholder sits on its baseline.
-    let origin: CGPoint
+    let place: CaretPlace
     let blinks: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.displayScale) private var displayScale
     @State private var epoch = Date()
 
     /// Ends the text, transparent, so its lines break with room for the caret.
@@ -18,6 +44,8 @@ struct LiveCaret: View {
     }
 
     var body: some View {
+        let glyph = CaretGlyph(font: font, place: place, ink: DS.Color.accentInk, scale: displayScale)
+            .equatable()
         if blinks, !reduceMotion {
             TimelineView(.periodic(from: epoch, by: StreamingReveal.caretBlinkPeriod)) { context in
                 let ticks = Int(context.date.timeIntervalSince(epoch) / StreamingReveal.caretBlinkPeriod)
@@ -27,29 +55,39 @@ struct LiveCaret: View {
             glyph
         }
     }
+}
 
-    // Drawn rather than laid out: a view lands on whole pixels, the text's own glyphs don't.
-    private var glyph: some View {
+/// The caret glyph in a small box set on whole pixels, drawn inside it where the text's own glyph would fall: a view lands on whole pixels, the text's glyphs don't.
+struct CaretGlyph: View, Equatable {
+    let font: Font
+    let place: CaretPlace
+    let ink: Color
+    let scale: CGFloat
+
+    nonisolated static let bleed: CGFloat = 4
+
+    var body: some View {
+        let box = Self.box(for: place, scale: scale)
         Canvas { context, _ in
-            let caret = context.resolve(StreamingReveal.caret(visible: true).font(font))
+            let caret = context.resolve(Text(verbatim: StreamingReveal.caretGlyph).font(font).foregroundStyle(ink))
             let size = caret.measure(in: CGSize(width: CGFloat.infinity, height: .infinity))
-            let top = origin.y - caret.firstBaseline(in: size)
-            context.draw(caret, in: CGRect(origin: CGPoint(x: origin.x, y: top), size: size))
+            let top = place.origin.y - box.minY - caret.firstBaseline(in: size)
+            context.draw(caret, in: CGRect(origin: CGPoint(x: place.origin.x - box.minX, y: top), size: size))
         }
+        .frame(width: box.width, height: box.height)
+        .offset(x: box.minX, y: box.minY)
     }
 
-    /// Where the placeholder sits on its baseline, in the space `proxy` reads.
-    static func origin(in layouts: [Text.LayoutKey.AnchoredLayout], proxy: GeometryProxy) -> CGPoint? {
-        for anchored in layouts.reversed() {
-            for line in anchored.layout.reversed() {
-                for run in line.reversed() where run[LiveCaretMark.self] != nil {
-                    let origin = proxy[anchored.origin]
-                    let bounds = run.typographicBounds
-                    return CGPoint(x: origin.x + bounds.origin.x, y: origin.y + bounds.origin.y)
-                }
-            }
-        }
-        return nil
+    nonisolated static func box(for place: CaretPlace, scale: CGFloat) -> CGRect {
+        let onPixel = { (value: CGFloat) in (value * scale).rounded(.down) / scale }
+        let x = onPixel(place.origin.x - bleed)
+        let y = onPixel(place.origin.y - place.ascent - bleed)
+        return CGRect(
+            x: x,
+            y: y,
+            width: (place.origin.x + place.width + bleed - x).rounded(.up),
+            height: (place.origin.y + place.descent + bleed - y).rounded(.up)
+        )
     }
 }
 
@@ -58,8 +96,8 @@ extension View {
     func liveCaret(font: Font, blinks: Bool) -> some View {
         overlayPreferenceValue(Text.LayoutKey.self) { layouts in
             GeometryReader { proxy in
-                if let origin = LiveCaret.origin(in: layouts, proxy: proxy) {
-                    LiveCaret(font: font, origin: origin, blinks: blinks)
+                if let place = CaretPlace.find(in: layouts, proxy: proxy) {
+                    LiveCaret(font: font, place: place, blinks: blinks)
                 }
             }
             .allowsHitTesting(false)

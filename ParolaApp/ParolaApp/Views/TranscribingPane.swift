@@ -182,13 +182,7 @@ struct TranscribingPane: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                     if hasText {
-                        Text("\(Text(bodyText))\(LiveCaret.placeholder)")
-                            .font(DS.Font.transcript)
-                            .lineSpacing(DS.Spacing.transcriptLeading)
-                            .textSelection(.enabled)
-                            .contentTransition(.interpolate)
-                            .accessibilityLabel(partial)
-                            .liveCaret(font: DS.Font.transcript, blinks: isOnScreen)
+                        TranscribingText(text: bodyText, spoken: partial, blinks: isOnScreen)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .transition(.opacity)
                             .id(Self.tailID)
@@ -236,6 +230,23 @@ struct TranscribingPane: View {
         } else {
             Color.black
         }
+    }
+}
+
+/// The run's words so far, selectable, the newest settling in with a fade, and the caret after them.
+struct TranscribingText: View {
+    let text: AttributedString
+    let spoken: String
+    let blinks: Bool
+
+    var body: some View {
+        Text("\(Text(text))\(LiveCaret.placeholder)")
+            .font(DS.Font.transcript)
+            .lineSpacing(DS.Spacing.transcriptLeading)
+            .textSelection(.enabled)
+            .contentTransition(.interpolate)
+            .accessibilityLabel(spoken)
+            .liveCaret(font: DS.Font.transcript, blinks: blinks)
     }
 }
 

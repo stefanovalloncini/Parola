@@ -49,11 +49,23 @@ struct StageLiveTextTests {
         #expect(String(partialOnly.characters) == "For the")
     }
 
-    private static let paragraph = "The meeting opened with a quick agenda review before the group walked through the numbers and the questions"
+    enum CaretCase: String, CaseIterable, CustomTestStringConvertible {
+        case stage, pane, paneRightToLeft, stageRightToLeft
+        var testDescription: String { rawValue }
+
+        var rightToLeft: Bool { self == .paneRightToLeft || self == .stageRightToLeft }
+        var settled: String {
+            rightToLeft
+                ? "הפגישה נפתחה בסקירה קצרה של סדר היום לפני שהקבוצה עברה על המספרים ועל השאלות"
+                : "The meeting opened with a quick agenda review before the group walked through the numbers"
+        }
+        var partial: String { rightToLeft ? "שעלו בדרך" : "and the questions" }
+        var width: CGFloat { self == .stage || self == .stageRightToLeft ? 360 : 300 }
+    }
 
     /// Pixels of `view` at twice the scale, white behind it; nil if it couldn't be drawn.
-    private func pixels(_ view: some View, width: CGFloat) -> [UInt8]? {
-        let renderer = ImageRenderer(content: view.frame(width: width, alignment: .leading).background(Color.white).environment(\.colorScheme, .light))
+    private func pixels(_ view: some View, width: CGFloat, scheme: ColorScheme = .light) -> [UInt8]? {
+        let renderer = ImageRenderer(content: view.frame(width: width, alignment: .leading).background(Color.white).environment(\.colorScheme, scheme))
         renderer.scale = 2
         guard let image = renderer.cgImage, let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
         var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
@@ -73,23 +85,90 @@ struct StageLiveTextTests {
         zip(a, b).count { abs(Int($0) - Int($1)) > 16 }
     }
 
-    @Test("the caret drawn on its own view sits where the caret at the end of the text did, on the Stage and in the file pane", arguments: [true, false])
-    func caretSitsAtTheEnd(onStage: Bool) throws {
-        let font = onStage ? DS.Font.liveTranscriptStage : DS.Font.transcript
-        let lineSpacing = onStage ? StageLiveText.lineSpacing : DS.Spacing.transcriptLeading
-        let width: CGFloat = onStage ? 360 : 300
-        let body = Text(verbatim: Self.paragraph)
-        let inline = Text("\(body)\(StreamingReveal.caret(visible: true))").font(font).lineSpacing(lineSpacing)
-        let laidOver = Text("\(body)\(LiveCaret.placeholder)").font(font).lineSpacing(lineSpacing)
+    /// The Stage's text as it was drawn before the caret had a view of its own: the caret a character at its end.
+    private func inlineStage(_ settled: String, _ partial: String, caretVisible: Bool) -> some View {
+        var text = LiveTail.attributed(settled: settled, partial: partial)
+        var caret = AttributedString(StreamingReveal.caretGlyph)
+        caret.foregroundColor = DS.Color.accentInk.opacity(caretVisible ? 1 : 0)
+        text.append(caret)
+        return Text(text)
+            .font(DS.Font.liveTranscriptStage)
+            .lineSpacing(StageLiveText.lineSpacing)
+            .contentTransition(.identity)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The file pane's text as it was drawn before, caret and all.
+    private func inlinePane(_ text: AttributedString, caretVisible: Bool) -> some View {
+        Text("\(Text(text))\(StreamingReveal.caret(visible: caretVisible))")
+            .font(DS.Font.transcript)
+            .lineSpacing(DS.Spacing.transcriptLeading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
-            .liveCaret(font: font, blinks: false)
-        let bare = Text("\(body)\(LiveCaret.placeholder)").font(font).lineSpacing(lineSpacing)
-        let old = try #require(pixels(inline, width: width))
-        let new = try #require(pixels(laidOver, width: width))
-        let none = try #require(pixels(bare, width: width))
+            .contentTransition(.interpolate)
+    }
+
+    @Test("the caret drawn on its own view sits where the caret at the end of the text did, on the Stage and in the file pane", arguments: CaretCase.allCases)
+    func caretSitsAtTheEnd(_ place: CaretCase) throws {
+        let old, new, none: [UInt8]
+        switch place {
+        case .stage, .stageRightToLeft:
+            old = try #require(pixels(inlineStage(place.settled, place.partial, caretVisible: true), width: place.width))
+            none = try #require(pixels(inlineStage(place.settled, place.partial, caretVisible: false), width: place.width))
+            let tail = LiveTail(
+                settled: place.settled, partial: place.partial, font: DS.Font.liveTranscriptStage,
+                lineSpacing: StageLiveText.lineSpacing, blinks: false
+            )
+            new = try #require(pixels(tail, width: place.width))
+        case .pane, .paneRightToLeft:
+            let text = StreamingReveal.attributed(settled: place.settled, fresh: " " + place.partial)
+            old = try #require(pixels(inlinePane(text, caretVisible: true), width: place.width))
+            none = try #require(pixels(inlinePane(text, caretVisible: false), width: place.width))
+            let pane = TranscribingText(text: text, spoken: place.settled, blinks: false)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            new = try #require(pixels(pane, width: place.width))
+        }
         #expect(old.count == new.count && old.count == none.count, "the caret changed the text's size")
         #expect(differing(old, none) > 40, "the text with no caret should lack the caret's pixels")
         #expect(differing(old, new) <= 8, "\(differing(old, new)) channels differ from the caret in the text")
+    }
+
+    /// The average colour of what a hosted view drew over its white, as the window shows it now; nil if it drew nothing.
+    private func ink(of host: NSView) -> [Int]? {
+        host.layoutSubtreeIfNeeded()
+        host.displayIfNeeded()
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return nil }
+        host.cacheDisplay(in: host.bounds, to: rep)
+        var sums = [0, 0, 0], count = 0
+        for y in 0..<rep.pixelsHigh {
+            for x in 0..<rep.pixelsWide {
+                guard let color = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                let rgb = [color.redComponent, color.greenComponent, color.blueComponent].map { Int($0 * 255) }
+                guard rgb.contains(where: { $0 < 200 }) else { continue }
+                for channel in 0..<3 { sums[channel] += rgb[channel] }
+                count += 1
+            }
+        }
+        return count > 0 ? sums.map { $0 / count } : nil
+    }
+
+    @Test("a caret that holds still takes the new ink when light switches to dark")
+    func steadyCaretFollowsTheAppearance() async throws {
+        let scheme = CaretScheme()
+        let hosted = HostedWindow(SchemedCaret(scheme: scheme), width: 60, height: 60)
+        defer { hosted.close() }
+        let light = try #require(ink(of: hosted.host))
+        scheme.value = .dark
+        await settle(for: .milliseconds(100))
+        let switched = try #require(ink(of: hosted.host))
+
+        let darkScheme = CaretScheme()
+        darkScheme.value = .dark
+        let fresh = HostedWindow(SchemedCaret(scheme: darkScheme), width: 60, height: 60)
+        defer { fresh.close() }
+        let dark = try #require(ink(of: fresh.host))
+        #expect(light != dark, "the accent ink should differ between light and dark")
+        #expect(switched == dark, "after the switch the caret reads \(switched), a dark one \(dark), the light one \(light)")
     }
 
     private func height(lines: Int) -> CGFloat {
@@ -106,5 +185,23 @@ struct StageLiveTextTests {
         #expect(height(lines: StageLiveText.visibleLines) <= StageLiveText.height)
         #expect(height(lines: StageLiveText.visibleLines + 1) > StageLiveText.height)
         #expect(height(lines: 1) <= StageLiveText.minHeight)
+    }
+}
+
+@MainActor
+@Observable
+private final class CaretScheme {
+    var value: ColorScheme = .light
+}
+
+/// The Stage's caret alone, steady, on white, in whichever scheme it is handed.
+private struct SchemedCaret: View {
+    let scheme: CaretScheme
+
+    var body: some View {
+        LiveTail(settled: "", partial: "", font: DS.Font.liveTranscriptStage, lineSpacing: StageLiveText.lineSpacing, blinks: false)
+            .frame(width: 60, height: 60, alignment: .topLeading)
+            .background(Color.white)
+            .environment(\.colorScheme, scheme.value)
     }
 }

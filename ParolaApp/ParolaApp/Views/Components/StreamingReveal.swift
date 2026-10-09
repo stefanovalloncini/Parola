@@ -3,6 +3,7 @@ import SwiftUI
 /// The live-transcription look: settled text, the words that just arrived dimmed, a caret at the end.
 enum StreamingReveal {
     static let caretBlinkPeriod: Double = 0.6
+    static let caretGlyph = "\u{258F}"
 
     /// How far the words that have just arrived are held back, in the demo card as well as the live pane.
     static let freshOpacity: Double = 0.5
@@ -19,7 +20,7 @@ enum StreamingReveal {
     }
 
     static func caret(visible: Bool) -> Text {
-        Text(verbatim: "\u{258F}")
+        Text(verbatim: caretGlyph)
             .foregroundStyle(DS.Color.accentInk.opacity(visible ? 1 : 0))
     }
 }
