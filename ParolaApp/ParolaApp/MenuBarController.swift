@@ -48,8 +48,16 @@ final class MenuBarController: NSObject {
         var canRecordSystemAudio: Bool = true
     }
 
+    /// What the status button shows; each change redraws the item, so it is set only when this changes.
+    private struct Icon: Equatable {
+        let symbol: String
+        let cue: String?
+        let accent: ThemeColor?
+    }
+
     private weak var model: AppModel?
     private var statusItem: NSStatusItem?
+    private var shownIcon: Icon?
     private(set) var lastSnapshot: MenuSnapshot?
     private var lastInputDevices: [AudioInputDevice] = []
     private var takeBlocksRecord: Bool?
@@ -59,6 +67,7 @@ final class MenuBarController: NSObject {
     /// Testing seam: what VoiceOver would read off the status button.
     var statusButtonAccessibilityLabel: String? { statusItem?.button?.accessibilityLabel() }
     var statusButtonAccessibilityValue: String? { statusItem?.button?.accessibilityValue() as? String }
+    var statusButtonImage: NSImage? { statusItem?.button?.image }
 
     func bind(_ model: AppModel) {
         self.model = model
@@ -154,10 +163,12 @@ final class MenuBarController: NSObject {
         if visible {
             if statusItem == nil {
                 statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                shownIcon = nil
             }
         } else if let item = statusItem {
             NSStatusBar.system.removeStatusItem(item)
             statusItem = nil
+            shownIcon = nil
             cuedMeetingApp = nil
         }
     }
@@ -174,11 +185,17 @@ final class MenuBarController: NSObject {
 
     private func applyIcon(meetingCue app: String?) {
         guard let model, let button = statusItem?.button else { return }
-        let symbol = Self.symbolName(
-            dictationEnabled: model.dictationEnabled && model.features.isEnabled(.dictation),
-            state: model.dictationState
+        let icon = Icon(
+            symbol: Self.symbolName(
+                dictationEnabled: model.dictationEnabled && model.features.isEnabled(.dictation),
+                state: model.dictationState
+            ),
+            cue: app,
+            accent: app == nil ? nil : DS.theme.accentInk
         )
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Parola")
+        guard icon != shownIcon else { return }
+        shownIcon = icon
+        let image = NSImage(systemSymbolName: icon.symbol, accessibilityDescription: "Parola")
         image?.isTemplate = true
         button.image = image
         button.imagePosition = app == nil ? .imageOnly : .imageLeading
@@ -194,19 +211,28 @@ final class MenuBarController: NSObject {
         "\(String(localized: "\(app) is running")). \(String(localized: "Record this meeting with Parola?"))"
     }
 
+    private static let cueDiameter: CGFloat = 6
+    private static var drawnCueDot: (accent: ThemeColor, image: NSImage)?
+
     /// A dot in `accentInk` after the icon, raised to its top; the icon stays a template, so it keeps the menu bar's ink.
     static func meetingCue(font: NSFont = .menuBarFont(ofSize: 0)) -> NSAttributedString {
-        let diameter: CGFloat = 6
-        let accentInk = DS.theme.accentInk.nsColor
-        let dot = NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
+        let attachment = NSTextAttachment()
+        attachment.image = cueDot(accent: DS.theme.accentInk)
+        attachment.bounds = NSRect(x: 0, y: font.capHeight - cueDiameter, width: cueDiameter, height: cueDiameter)
+        return NSAttributedString(attachment: attachment)
+    }
+
+    /// One dot per accent; it draws itself as it shows, so its colour still follows light and dark.
+    private static func cueDot(accent: ThemeColor) -> NSImage {
+        if let drawnCueDot, drawnCueDot.accent == accent { return drawnCueDot.image }
+        let accentInk = accent.nsColor
+        let image = NSImage(size: NSSize(width: cueDiameter, height: cueDiameter), flipped: false) { rect in
             accentInk.setFill()
             NSBezierPath(ovalIn: rect).fill()
             return true
         }
-        let attachment = NSTextAttachment()
-        attachment.image = dot
-        attachment.bounds = NSRect(x: 0, y: font.capHeight - diameter, width: diameter, height: diameter)
-        return NSAttributedString(attachment: attachment)
+        drawnCueDot = (accent, image)
+        return image
     }
 
     private func rebuildMenu(_ snapshot: MenuSnapshot) {

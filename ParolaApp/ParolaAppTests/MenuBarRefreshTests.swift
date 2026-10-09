@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import ParolaCore
@@ -80,6 +81,41 @@ struct MenuBarRefreshTests {
 
         model.showMenuBarExtra = false
         try await settle(controller) { $0?.mode == .hidden }
+    }
+
+    @Test("a library write leaves the status button's icon as it was set; a meeting's cue sets it again")
+    func libraryWritesKeepTheIcon() async throws {
+        let model = await makeModel()
+        model.showMenuBarExtra = true
+        model.meetingDetector.isEnabled = true
+        let controller = MenuBarController()
+        controller.bind(model)
+        try await settle(controller) { $0?.mode == .full }
+        let image = try #require(controller.statusButtonImage)
+
+        model.libraryEntries = [entry("a", offset: 100)]
+        model.libraryEntries = [entry("a", offset: 100), entry("b", offset: 200, pinned: true)]
+        try await settle(controller) { $0?.pinned.count == 1 }
+        #expect(controller.lastSnapshot?.recents.count == 2)
+        #expect(controller.statusButtonImage === image, "a library write set the icon again")
+
+        model.meetingDetector.fire(appName: "Acme Conference")
+        try await settle(controller) { _ in controller.cuedMeetingApp != nil }
+        #expect(controller.cuedMeetingApp == "Acme Conference")
+        #expect(controller.statusButtonImage !== image)
+        model.dismissMeetingPrompt()
+        model.showMenuBarExtra = false
+        try await settle(controller) { $0?.mode == .hidden }
+    }
+
+    @Test("the meeting cue's dot is drawn once for an accent")
+    func cueDotIsDrawnOnce() throws {
+        func dot() throws -> NSImage {
+            let cue = MenuBarController.meetingCue()
+            let attachment = try #require(cue.attribute(.attachment, at: 0, effectiveRange: nil) as? NSTextAttachment)
+            return try #require(attachment.image)
+        }
+        #expect(try dot() === dot())
     }
 
     @Test("the snapshot lists the newest entries first and caps them")
