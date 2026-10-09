@@ -274,16 +274,14 @@ struct RecordingSurfaceTests {
         #expect(shown)
         #expect(item.face?.lamp == .recording)
         #expect(item.face?.controls.map(\.title) == ["Stop Recording", "Pause", "Add Marker", "Discard…", "Show Recording"])
-        #expect(item.isTicking)
 
         #expect(model.pauseTake())
         let paused = await waitUntil { item.face?.lamp == .paused }
         #expect(paused)
         #expect(item.face?.controls[1].title == "Resume")
-        #expect(!item.isTicking)
         #expect(model.resumeTake())
-        let ticking = await waitUntil { item.isTicking }
-        #expect(ticking)
+        let resumed = await waitUntil { item.face?.lamp == .recording }
+        #expect(resumed)
 
         model.showRecordingStatusItem = false
         let hidden = await waitUntil { item.face == nil }
@@ -458,12 +456,13 @@ struct RecordingSurfaceTests {
         #expect(model.recording?.state == .arming(.startingCapture))
         let shown = await waitUntil { item.face != nil }
         #expect(shown)
-        #expect(!item.isTicking)
+        #expect(item.face?.clock == "…", "a take still starting has no time to show")
 
         let recording = await waitUntil { model.recording?.state == .recording }
         #expect(recording)
-        let ticking = await waitUntil { item.isTicking }
-        #expect(ticking)
+        let first = item.face?.clock
+        let ticking = await waitUntil(timeoutMs: 3_000) { item.face?.clock != first }
+        #expect(ticking, "the item still reads \(first ?? "nothing") a second into the take")
     }
 }
 

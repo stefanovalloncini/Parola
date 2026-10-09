@@ -334,6 +334,8 @@ final class AppModel {
     nonisolated static let takeSampleInterval: Duration = .milliseconds(100)
     /// How late a tick may land, so the kernel can wake for it with other timers.
     nonisolated static let takeSampleTolerance: Duration = .milliseconds(10)
+    /// How far past each step of the take's clock a tick aims, so one that lands on time never reads the second before.
+    nonisolated static let takeClockLag: Duration = .milliseconds(2)
     nonisolated static let silenceCheckTicks = 8
     /// The route the running take took; the recording pane reads it.
     var liveTakeIsStreaming: Bool { recording?.isStreaming ?? false }
@@ -4281,21 +4283,21 @@ final class AppModel {
                 guard let self else { return }
                 self.sampleTake(meter, take: take)
                 self.watchSilence()
-                tick = Self.nextSampleTick(after: tick, now: .now, clock: self.runningClockElapsed(of: take))
+                tick = Self.nextSampleTick(after: tick, now: .now, takeElapsed: self.runningClockElapsed(of: take))
                 try? await Task.sleep(until: tick, tolerance: Self.takeSampleTolerance, clock: .continuous)
             }
         }
     }
 
-    /// Ten a second on average, whatever a tick costs; a stall longer than a second is skipped rather than replayed. While the take's clock runs, a tick lands just past each tenth of it, so one sees each of its seconds turn over.
+    /// Ten a second on average, whatever a tick costs; a stall longer than a second is skipped rather than replayed. While the take's clock runs, a tick lands just past each step of it, so one sees each of its seconds turn over.
     nonisolated static func nextSampleTick(
-        after tick: ContinuousClock.Instant, now: ContinuousClock.Instant, clock elapsed: TimeInterval? = nil
+        after tick: ContinuousClock.Instant, now: ContinuousClock.Instant, takeElapsed elapsed: TimeInterval? = nil
     ) -> ContinuousClock.Instant {
         guard let elapsed else {
             let next = tick + takeSampleInterval
             return next < now - .seconds(1) ? now : next
         }
-        let step = 0.1, lag = 0.002
+        let step = takeSampleInterval / .seconds(1), lag = takeClockLag / .seconds(1)
         let target = ((elapsed - lag) / step).rounded(.down) * step + step + lag
         return now + .seconds(max(target - elapsed, 0.000_1))
     }

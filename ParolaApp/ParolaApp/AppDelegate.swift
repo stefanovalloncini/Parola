@@ -275,9 +275,6 @@ final class DockBadge {
     private var failure = OutOfSightFailure(includesTranscription: true)
     private var macStopWeighed: Int?
 
-    /// Following the take's clock, which moves only while the take records.
-    private(set) var isTicking = false
-
     init(
         show: @escaping @MainActor (String?) -> Void = { NSApp.dockTile.badgeLabel = $0 },
         appIsActive: @escaping @MainActor () -> Bool = { NSApp.isActive },
@@ -315,10 +312,8 @@ final class DockBadge {
         }
         askForALookAtMacAudioStop(model)
         if let take = model.recording, take.isRunning {
-            isTicking = take.state == .recording
-            display(Self.recordingBadge(for: take, now: model.takeClockNow(following: isTicking)))
+            display(Self.recordingBadge(for: take, now: model.takeClockNow(following: take.state == .recording)))
         } else {
-            isTicking = false
             let takeTranscribing = model.recording?.isTranscribing ?? false
             display(Self.badge(for: model.phase, takeTranscribing: takeTranscribing, burnProgress: model.burnJob?.progress))
         }

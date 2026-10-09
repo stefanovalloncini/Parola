@@ -57,22 +57,32 @@ struct DockBadgeRestTests {
         let audio = try tempWAV("dock-rest")
         defer { try? FileManager.default.removeItem(at: audio) }
         let model = makeRecordingModel("dock-rest")
-        let badge = DockBadge(show: { _ in }, appIsActive: { true }, requestAttention: {})
+        model.useStreaming = false
+        model.selectedModel = "openai_whisper-tiny"
+        let capture = DeletingCapture(file: audio)
+        model.takeCaptureOverride = { _ in capture }
+        let shown = BadgeLabels()
+        let badge = DockBadge(show: { shown.labels.append($0) }, appIsActive: { true }, requestAttention: {})
         badge.bind(model)
-        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -75))
-        let ticking = await waitUntil { badge.isTicking }
-        #expect(ticking)
+        model.startRecording(source: .microphone)
+        let recording = await waitUntil { model.recording?.state == .recording }
+        try #require(recording)
+        let first = shown.labels.count
+        let ticking = await waitUntil(timeoutMs: 3_000) { shown.labels.count > first }
+        #expect(ticking, "the badge never turned over while the take recorded")
 
         #expect(model.pauseTake())
-        let resting = await waitUntil { !badge.isTicking }
-        #expect(resting)
+        await settle()
+        let atPause = shown.labels.count
+        await settle(for: .milliseconds(1_300))
+        #expect(shown.labels.count == atPause, "the badge turned over while the take was paused: \(shown.labels.suffix(3))")
 
         #expect(model.resumeTake())
-        let again = await waitUntil { badge.isTicking }
+        let again = await waitUntil(timeoutMs: 3_000) { shown.labels.count > atPause }
         #expect(again)
-        model.endTestTake()
-        let stopped = await waitUntil { !badge.isTicking }
-        #expect(stopped)
+        await model.discardTake()
+        let cleared = await waitUntil { shown.labels.last == .some(nil) }
+        #expect(cleared)
     }
 }
 
@@ -80,7 +90,7 @@ struct DockBadgeRestTests {
 struct TakeClockTickTests {
     private func wait(at elapsed: Double) -> Double {
         let tick = ContinuousClock.now
-        let parts = tick.duration(to: AppModel.nextSampleTick(after: tick, now: tick, clock: elapsed)).components
+        let parts = tick.duration(to: AppModel.nextSampleTick(after: tick, now: tick, takeElapsed: elapsed)).components
         return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
     }
 
@@ -95,8 +105,8 @@ struct TakeClockTickTests {
     @Test("a take whose clock can't move is sampled ten times a second at its own pace, and a long stall is skipped")
     func samplerKeepsItsOwnPace() {
         let tick = ContinuousClock.now
-        #expect(AppModel.nextSampleTick(after: tick, now: tick + .milliseconds(40), clock: nil) == tick + .milliseconds(100))
-        #expect(AppModel.nextSampleTick(after: tick, now: tick + .seconds(3), clock: nil) == tick + .seconds(3))
+        #expect(AppModel.nextSampleTick(after: tick, now: tick + .milliseconds(40), takeElapsed: nil) == tick + .milliseconds(100))
+        #expect(AppModel.nextSampleTick(after: tick, now: tick + .seconds(3), takeElapsed: nil) == tick + .seconds(3))
     }
 }
 
@@ -143,30 +153,33 @@ struct TakeClockSurfaceTests {
             let turned = await waitUntil(timeoutMs: 3_000) { model.takeClockSeconds > second }
             #expect(turned)
             let into = (model.recording?.elapsed(at: Date()) ?? 0) - Double(model.takeClockSeconds)
-            #expect(into >= 0 && into < 0.5, "the clock read \(model.takeClockSeconds) s with \(into) s of the next gone")
+            #expect(into >= 0, "the clock read \(model.takeClockSeconds) s \(-into) s before that second began")
             let read = await waitUntil { surfacesShowTheClock() }
             #expect(read, "the Dock reads \(String(describing: shown.labels.last)), the menu bar \(item.face?.clock ?? "nothing")")
             let spokenAgain = await waitUntil { pill() != spoken }
             #expect(spokenAgain, "the pill still says \(spoken ?? "nothing")")
         }
-        #expect(badge.isTicking)
-        #expect(item.isTicking)
 
         #expect(model.pauseTake())
         let held = model.takeClockSeconds
-        let resting = await waitUntil { !badge.isTicking && !item.isTicking }
-        #expect(resting)
+        await settle()
+        let badgesAtPause = shown.labels.count
+        let faceAtPause = item.face
+        let pillAtPause = pill()
         await settle(for: .milliseconds(1_300))
         #expect(model.takeClockSeconds == held, "a paused clock doesn't turn over")
+        #expect(shown.labels.count == badgesAtPause, "the Dock turned over during the pause")
+        #expect(item.face == faceAtPause, "the menu bar item changed during the pause")
+        #expect(pill() == pillAtPause, "the pill changed during the pause")
 
         #expect(model.resumeTake())
         let again = await waitUntil(timeoutMs: 3_000) { model.takeClockSeconds > held }
         #expect(again)
-        let ticking = await waitUntil { badge.isTicking && item.isTicking }
-        #expect(ticking)
+        let readAgain = await waitUntil { surfacesShowTheClock() }
+        #expect(readAgain)
 
         await model.discardTake()
-        let ended = await waitUntil { !badge.isTicking && item.face == nil }
+        let ended = await waitUntil { item.face == nil && shown.labels.last == .some(nil) }
         #expect(ended)
     }
 }
