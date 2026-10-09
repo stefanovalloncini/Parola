@@ -18,7 +18,8 @@ final class AudioFileEnergyProbe: SegmentEnergyProbe {
         }
         self.file = file
         duration = Double(file.length) / file.processingFormat.sampleRate
-        windows = windowEnergies.flatMap { $0.isEmpty ? nil : $0 }
+        // The engine's decode sums and rescales channels, so its loudness matches the file's only for mono.
+        windows = file.processingFormat.channelCount == 1 ? windowEnergies.flatMap { $0.isEmpty ? nil : $0 } : nil
     }
 
     /// Measured over windows spread across the whole recording rather than over the segments in

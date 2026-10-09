@@ -2,6 +2,7 @@ import AVFoundation
 import Clocks
 import Foundation
 import Testing
+@preconcurrency import WhisperKit
 
 @testable import ParolaCore
 
@@ -64,6 +65,19 @@ struct SilentRepetitionsTests {
 
         #expect(seeded.windowEnergies() == [0.25, 0.5])
         #expect(swept.windowEnergies().count == ProbeWindowPlanner.candidates(duration: 200).count)
+    }
+
+    @Test("a stereo file sweeps itself: the engine's summed decode reads its silent side as loud")
+    func stereoIgnoresSeededEnergies() throws {
+        let url = try Self.writeOneSidedStereo(seconds: 60)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let decoded = try AudioProcessor.loadAudioAsFloatArray(fromPath: url.path)
+        let seeded = ProbeAudioExtractor.measure(samples: decoded, sampleRate: 16_000).map(\.energy)
+        let swept = try #require(AudioFileEnergyProbe(url: url)).windowEnergies()
+
+        let ratio = try #require(seeded.max()) / max(try #require(swept.max()), 1e-9)
+        #expect(ratio > 1.3, "one silent side: the decode sums channels, the file averages them")
+        #expect(try #require(AudioFileEnergyProbe(url: url, windowEnergies: seeded)).windowEnergies() == swept)
     }
 
     @Test("two copies are never enough")
@@ -312,6 +326,33 @@ struct SilentRepetitionsTests {
         language: "it",
         modelName: "m"
     )
+}
+
+extension SilentRepetitionsTests {
+    /// A 16 kHz stereo file with a tone on the left and nothing on the right.
+    static func writeOneSidedStereo(seconds: Double) throws -> URL {
+        let sampleRate = 16_000.0
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
+        let frameCount = AVAudioFrameCount(sampleRate * seconds)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)!
+        buffer.frameLength = frameCount
+        for frame in 0..<Int(frameCount) {
+            buffer.floatChannelData![0][frame] = Float(sin(2 * .pi * 440 * Double(frame) / sampleRate) * 0.5)
+            buffer.floatChannelData![1][frame] = 0
+        }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-stereo-\(UUID().uuidString).wav")
+        let file = try AVAudioFile(forWriting: url, settings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: 2,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ])
+        try file.write(from: buffer)
+        return url
+    }
 }
 
 /// A recording that opens with two and a half minutes of room tone and only then has someone
